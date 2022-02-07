@@ -49,6 +49,23 @@ def add_all_nodes(graph, iterator, saved_element):
             graph.add_node(node_for_adding=node_id, attr=element.attrib)
             element.clear()
 
+
+def add_all_edges(graph, iterator, saved_element):
+    """Add edges and their attributes to a graph.
+
+    Args:
+        graph (nx.Graph): Graph on which to add nodes.
+        iterator (ET.iterparse): XML element iterator.
+        saved_element (ET.Element): Element holding the information to add.
+    """
+    event, element = next(iterator)
+    while (event, element) != ('end', saved_element):
+        event, element = next(iterator)
+        if event == 'start' and element.tag == 'Edge': 
+            entry_node = element.attrib.pop('SPOT_SOURCE_ID')
+            exit_node = element.attrib.pop('SPOT_TARGET_ID')
+            graph.add_edge(entry_node, exit_node, attr=element.attrib)
+            element.clear()
                
 
 if __name__ == "__main__":
@@ -75,13 +92,18 @@ if __name__ == "__main__":
             graph = add_model_info(graph, element)
 
         # Adding the spots as nodes.
-        if element.tag == 'AllSpots':
+        if element.tag == 'AllSpots' and event == 'start':
             add_all_nodes(graph, it, element)
+
+        # Adding the tracks as edges.
+        if element.tag == 'AllTracks' and event == 'start':
+            add_all_edges(graph, it, element)
                     
 
         
             
 
     print(graph)
+    print(nx.number_connected_components(graph))
     # print(graph.graph)
             
