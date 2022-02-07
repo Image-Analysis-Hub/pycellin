@@ -30,6 +30,7 @@ def add_model_info(graph, element):
     
     for k, v in element.attrib.items():
         graph.graph[k] = v
+    element.clear()
     return graph
 
 
@@ -48,6 +49,7 @@ def add_all_nodes(graph, iterator, saved_element):
         if event == 'start' and element.tag == 'Spot': 
             node_id = element.attrib.pop('ID')
             graph.add_node(node_for_adding=node_id, attr=element.attrib)
+            element.clear()
 
                
 
