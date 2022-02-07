@@ -31,7 +31,25 @@ def add_model_info(graph, element):
     for k, v in element.attrib.items():
         graph.graph[k] = v
     return graph
-   
+
+
+def add_all_nodes(graph, iterator, saved_element):
+    """Add nodes and their attributes to a graph.
+
+    Args:
+        graph (nx.Graph): Graph on which to add nodes.
+        iterator (et.iterparse): XML element iterator.
+        saved_element (et.Element): Element holding the information to add.
+    """
+    
+    event, element = next(iterator)
+    while (event, element) != ('end', saved_element):
+        event, element = next(iterator)
+        if event == 'start' and element.tag == 'Spot': 
+            node_id = element.attrib.pop('ID')
+            graph.add_node(node_for_adding=node_id, attr=element.attrib)
+
+               
 
 if __name__ == "__main__":
 
@@ -44,8 +62,8 @@ if __name__ == "__main__":
     # the resulting graph will be disconnected.
     graph = nx.Graph()
 
-    # So as not to load the entire XML file into memory, we're using an
-    # iterator to browse over the tags one by one.
+    # So as not to load the entire XML file into memory at once, we're 
+    # using an iterator to browse over the tags one by one.
     # The events 'start' and 'end' correspond respectively to the opening 
     # and the closing of the considered tag.
     it = et.iterparse(args.xml, events=['start', 'end'])
@@ -56,9 +74,14 @@ if __name__ == "__main__":
         if element.tag == 'Model' and event == 'start':
             graph = add_model_info(graph, element)
 
+        # Adding the spots as nodes.
+        if element.tag == 'AllSpots':
+            add_all_nodes(graph, it, element)
+                    
+
         
             
 
     print(graph)
-    print(graph.graph)
+    # print(graph.graph)
             
