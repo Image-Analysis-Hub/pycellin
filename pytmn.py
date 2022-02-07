@@ -12,7 +12,7 @@ __date__ = "2022-02-07"
 __version__ = "0.1"
 
 import argparse
-import xml.etree.ElementTree as et
+import xml.etree.ElementTree as ET
 
 import networkx as nx
 
@@ -22,12 +22,11 @@ def add_model_info(graph, element):
 
     Args:
         graph (nx.Graph): Graph on which to add attributes.
-        element (et.Element): Element holding the information to be added.
-
+        element (ET.Element): Element holding the information to be added.
+        
     Returns:
         nx.Graph: The updated graph.
     """
-    
     for k, v in element.attrib.items():
         graph.graph[k] = v
     element.clear()
@@ -39,10 +38,9 @@ def add_all_nodes(graph, iterator, saved_element):
 
     Args:
         graph (nx.Graph): Graph on which to add nodes.
-        iterator (et.iterparse): XML element iterator.
-        saved_element (et.Element): Element holding the information to add.
+        iterator (ET.iterparse): XML element iterator.
+        saved_element (ET.Element): Element holding the information to add.
     """
-    
     event, element = next(iterator)
     while (event, element) != ('end', saved_element):
         event, element = next(iterator)
@@ -68,7 +66,7 @@ if __name__ == "__main__":
     # using an iterator to browse over the tags one by one.
     # The events 'start' and 'end' correspond respectively to the opening 
     # and the closing of the considered tag.
-    it = et.iterparse(args.xml, events=['start', 'end'])
+    it = ET.iterparse(args.xml, events=['start', 'end'])
 
     for event, element in it:
 
