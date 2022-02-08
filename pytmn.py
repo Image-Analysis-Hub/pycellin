@@ -14,6 +14,7 @@ __version__ = "0.1"
 import argparse
 import xml.etree.ElementTree as ET
 
+import matplotlib.pyplot as plt
 import networkx as nx
 
 
@@ -54,13 +55,8 @@ def add_all_nodes(graph, iterator, ancestor):
 
 
 def add_all_edges(graph, iterator, ancestor):
-    """Add edges and their attributes to a graph.
-
-    All the elements that are descendants of `ancestor` are explored.
-
-    Args:
-        graph (nx.Graph): Graph on which to add edges.
-        iterator (ET.iterparse): XML element iterator.
+    """Add edges andnx.draw(graph, with_labels=True, font_weight='bold')
+    plt.show().iterparse): XML element iterator.
         ancestor (ET.Element): Element encompassing the information to add.
     """
     event, element = next(iterator)
@@ -109,4 +105,6 @@ if __name__ == "__main__":
 
     print(graph)
     print(nx.number_connected_components(graph))    
-            
+
+    nx.draw(graph, with_labels=True, font_weight='bold')
+    plt.show()
