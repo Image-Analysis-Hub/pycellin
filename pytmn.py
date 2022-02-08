@@ -58,8 +58,13 @@ def add_all_nodes(graph, iterator, ancestor):
 
 
 def add_all_edges(graph, iterator, ancestor):
-    """Add edges andnx.draw(graph, with_labels=True, font_weight='bold')
-    plt.show().iterparse): XML element iterator.
+    """Add edges and their attributes to a graph.
+
+    All the elements that are descendants of `ancestor` are explored.
+
+    Args:
+        graph (nx.Graph): Graph on which to add edges.
+        iterator (ET.iterparse): XML element iterator.
         ancestor (ET.Element): Element encompassing the information to add.
     """
     event, element = next(iterator)
