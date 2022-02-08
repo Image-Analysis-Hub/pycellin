@@ -30,7 +30,9 @@ def add_model_info(graph, element):
     """
     for k, v in element.attrib.items():
         graph.graph[k] = v
-    element.clear()
+    element.clear()  # We won't need it anymore so we free up some memory.
+    # .clear() does not delete the element: it only removes all subelements 
+    # and clears or sets to `None` all attributes.
     return graph
 
 
@@ -52,9 +54,6 @@ def add_all_nodes(graph, iterator, ancestor):
             node_id = element.attrib.pop('ID')
             graph.add_node(node_for_adding=node_id, attr=element.attrib)
             element.clear()
-
-        # TODO: clean the tree view, the whole FeatureDeclarations part is
-        # still in memory. 
 
 
 def add_all_edges(graph, iterator, ancestor):
@@ -98,21 +97,26 @@ if __name__ == "__main__":
     # The events 'start' and 'end' correspond respectively to the opening
     # and the closing of the considered tag.
     it = ET.iterparse(args.xml, events=['start', 'end'])
+    _, root = next(it)  # Saving the root of the tree for later cleaning.
 
     for event, element in it:
 
         # Adding the model information as graph attributes.
         if element.tag == 'Model' and event == 'start':
             graph = add_model_info(graph, element)
+            root.clear()  # Cleaning the tree to free up some memory.
+            # All the browsed subelements of `root` are deleted.
 
         # Adding the spots as nodes.
         if element.tag == 'AllSpots' and event == 'start':
             add_all_nodes(graph, it, element)
+            root.clear()
 
         # Adding the tracks as edges.
         # TODO: add Tracks attributes somewhere (subgraphs?).
         if element.tag == 'AllTracks' and event == 'start':
             add_all_edges(graph, it, element)
+            root.clear()
 
         # TODO: add Settings as graph attributes. Is everything relevant?
 
