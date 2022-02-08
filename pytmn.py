@@ -33,16 +33,19 @@ def add_model_info(graph, element):
     return graph
 
 
-def add_all_nodes(graph, iterator, saved_element):
+def add_all_nodes(graph, iterator, ancestor):
     """Add nodes and their attributes to a graph.
+
+    All the elements that are descendants of `ancestor` are explored.
 
     Args:
         graph (nx.Graph): Graph on which to add nodes.
         iterator (ET.iterparse): XML element iterator.
-        saved_element (ET.Element): Element holding the information to add.
+        ancestor (ET.Element): Element encompassing the information to add.
     """
     event, element = next(iterator)
-    while (event, element) != ('end', saved_element):
+
+    while (event, element) != ('end', ancestor):
         event, element = next(iterator)
         if event == 'start' and element.tag == 'Spot': 
             node_id = element.attrib.pop('ID')
@@ -50,16 +53,18 @@ def add_all_nodes(graph, iterator, saved_element):
             element.clear()
 
 
-def add_all_edges(graph, iterator, saved_element):
+def add_all_edges(graph, iterator, ancestor):
     """Add edges and their attributes to a graph.
 
+    All the elements that are descendants of `ancestor` are explored.
+
     Args:
-        graph (nx.Graph): Graph on which to add nodes.
+        graph (nx.Graph): Graph on which to add edges.
         iterator (ET.iterparse): XML element iterator.
-        saved_element (ET.Element): Element holding the information to add.
+        ancestor (ET.Element): Element encompassing the information to add.
     """
     event, element = next(iterator)
-    while (event, element) != ('end', saved_element):
+    while (event, element) != ('end', ancestor):
         event, element = next(iterator)
         if event == 'start' and element.tag == 'Edge': 
             entry_node = element.attrib.pop('SPOT_SOURCE_ID')
@@ -98,12 +103,10 @@ if __name__ == "__main__":
         # Adding the tracks as edges.
         if element.tag == 'AllTracks' and event == 'start':
             add_all_edges(graph, it, element)
-                    
 
-        
-            
+
+
 
     print(graph)
-    print(nx.number_connected_components(graph))
-    # print(graph.graph)
+    print(nx.number_connected_components(graph))    
             
