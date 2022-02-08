@@ -53,6 +53,9 @@ def add_all_nodes(graph, iterator, ancestor):
             graph.add_node(node_for_adding=node_id, attr=element.attrib)
             element.clear()
 
+        # TODO: clean the tree view, the whole FeatureDeclarations part is
+        # still in memory. 
+
 
 def add_all_edges(graph, iterator, ancestor):
     """Add edges andnx.draw(graph, with_labels=True, font_weight='bold')
@@ -75,14 +78,19 @@ if __name__ == "__main__":
     parser.add_argument("xml", help="path of the XML file to process")
     args = parser.parse_args()
 
+    # TODO: filter disconnected nodes. Are these the nodes that were filtered 
+    # out in TM? Add option to keep them?
+
+    # TODO: filter out spurious tracks by default. Add an option to keep them.
+
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
     # the resulting graph will be disconnected.
     graph = nx.Graph()
 
-    # So as not to load the entire XML file into memory at once, we're 
+    # So as not to load the entire XML file into memory at once, we're
     # using an iterator to browse over the tags one by one.
-    # The events 'start' and 'end' correspond respectively to the opening 
+    # The events 'start' and 'end' correspond respectively to the opening
     # and the closing of the considered tag.
     it = ET.iterparse(args.xml, events=['start', 'end'])
 
@@ -97,10 +105,11 @@ if __name__ == "__main__":
             add_all_nodes(graph, it, element)
 
         # Adding the tracks as edges.
+        # TODO: add Tracks attributes somewhere (subgraphs?).
         if element.tag == 'AllTracks' and event == 'start':
             add_all_edges(graph, it, element)
 
-
+        # TODO: add Settings as graph attributes. Is everything relevant?
 
 
     print(graph)
