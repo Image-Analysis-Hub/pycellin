@@ -100,6 +100,26 @@ def add_all_edges(graph, iterator, ancestor):
     return tracks_attributes
 
 
+def get_filtered_tracks_ID(iterator, ancestor):
+    """Get the list of IDs of the tracks to keep.
+
+    Args:
+        iterator (ET.iterparse): XML element iterator.
+        ancestor (ET.Element): Element encompassing the information to add.
+
+    Returns:
+        list(str): List of tracks ID to keep.
+    """
+    filtered_tracks_ID = []
+    event, element = next(iterator)
+    filtered_tracks_ID.append(element.attrib['TRACK_ID'])
+    while (event, element) != ('end', ancestor):
+        event, element = next(iterator)          
+        if element.tag == 'TrackID' and event == 'start':
+            filtered_tracks_ID.append(element.attrib['TRACK_ID'])
+    return filtered_tracks_ID         
+    
+
 def add_tracks_info(graphs, tracks_attributes):
     """Add track attributes to each corresponding graph.
 
@@ -134,9 +154,9 @@ if __name__ == "__main__":
     parser.add_argument("xml", help="path of the XML file to process")
     parser.add_argument("-s", "--keep_all_spots", action="store_true",
                         help="keep the spots filtered out in TrackMate")
+    parser.add_argument("-t", "--keep_all_tracks", action="store_true",
+                        help="keep the tracks filtered out in TrackMate")
     args = parser.parse_args()
-
-    # TODO: filter out spurious tracks by default. Add an option to keep them.
 
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
@@ -176,6 +196,13 @@ if __name__ == "__main__":
 
         # Filtering out tracks and adding tracks attribute.
         if element.tag == 'FilteredTracks' and event == 'start':
+
+            # Removal of filtered tracks / graphs.
+            if not args.keep_all_tracks:
+                id_to_keep = get_filtered_tracks_ID(it, element)
+                to_remove = [n for n, t in graph.nodes(data='TRACK_ID') 
+                             if t not in id_to_keep]
+                graph.remove_nodes_from(to_remove)
 
             # Subgraphs creation.
             # One subgraph is created per track, so each subgraph is
