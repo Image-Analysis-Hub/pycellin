@@ -80,10 +80,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("xml", help="path of the XML file to process")
+    parser.add_argument("-s", "--keep_all_spots", action="store_true",
+                        help="keep the spots filtered out in TrackMate")
     args = parser.parse_args()
-
-    # TODO: filter disconnected nodes. Are these the nodes that were filtered 
-    # out in TM? Add option to keep them?
 
     # TODO: filter out spurious tracks by default. Add an option to keep them.
 
@@ -118,6 +117,12 @@ if __name__ == "__main__":
             add_all_edges(graph, it, element)
             root.clear()
 
+            # Removal of filtered spots / nodes.
+            if not args.keep_all_spots:
+                # Those nodes belong to no tracks: they have a degree of 0.
+                lone_nodes = [n for n, d in graph.degree if d == 0]
+                graph.remove_nodes_from(lone_nodes)
+            
         # TODO: add Settings as graph attributes. Is everything relevant?
 
 
