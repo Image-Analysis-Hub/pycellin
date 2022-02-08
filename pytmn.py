@@ -49,7 +49,7 @@ def add_all_nodes(graph, iterator, ancestor):
     event, element = next(iterator)
     while (event, element) != ('end', ancestor):
         event, element = next(iterator)          
-        if event == 'start' and element.tag == 'Spot': 
+        if element.tag == 'Spot' and event == 'start': 
             node_id = element.attrib.pop('ID')
             graph.add_node(node_for_adding=node_id, attr=element.attrib)
             element.clear()
@@ -86,7 +86,7 @@ def add_all_edges(graph, iterator, ancestor):
             current_track_id = element.attrib['TRACK_ID']
 
         # Edge creation.
-        if event == 'start' and element.tag == 'Edge': 
+        if element.tag == 'Edge' and event == 'start': 
             entry_node = element.attrib.pop('SPOT_SOURCE_ID')
             exit_node = element.attrib.pop('SPOT_TARGET_ID')
             graph.add_edge(entry_node, exit_node, attr=element.attrib)
