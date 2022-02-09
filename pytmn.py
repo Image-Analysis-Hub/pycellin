@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 
 
+# TODO: maybe rename in add_graph_attrib_from_element for better generalisation.
 def add_model_info(graph, element):
     """Add graph attributes from an XML element.
 
@@ -50,9 +51,16 @@ def add_all_nodes(graph, iterator, ancestor):
     while (event, element) != ('end', ancestor):
         event, element = next(iterator)          
         if element.tag == 'Spot' and event == 'start': 
-            node_id = element.attrib.pop('ID')
-            graph.add_node(node_for_adding=node_id, attr=element.attrib)
-            element.clear()
+            try:
+                node_id = element.attrib.pop('ID')
+            except KeyError as err:
+                print(f"No key {err} in the attributes of "
+                      f"current element '{element.tag}'. "
+                      f"Not adding this node to the graph.")
+            else:
+                graph.add_nodes_from([(node_id, element.attrib)])
+            finally:
+                element.clear()
 
 
 def add_all_edges(graph, iterator, ancestor):
@@ -135,7 +143,7 @@ def add_tracks_info(graphs, tracks_attributes):
 
         # Finding the dict of attributes matching the track.
         tmp = set(t for n, t in graph.nodes(data='TRACK_ID'))
-        assert len(tmp) == 1, ('Impossible state: several IDs for one track')
+        assert len(tmp) == 1, ('Impossible state: several IDs for one track.')
         current_track_id = list(tmp)[0]
         current_track_attr = [d_attr for d_attr in tracks_attributes 
                               if d_attr['TRACK_ID'] == current_track_id][0]
@@ -216,9 +224,9 @@ if __name__ == "__main__":
 
         # TODO: add Settings as graph attributes. Is everything relevant?
 
-    # Very basic visualisation.
+    # # Very basic visualisation.
     for graph in graphs:
         print(graph)
-        print(graph.graph)
+        # print(graph.graph)
         nx.draw(graph, with_labels=True, font_weight='bold')
         plt.show()
