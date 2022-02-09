@@ -18,8 +18,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 
 
-# TODO: maybe rename in add_graph_attrib_from_element for better generalisation.
-def add_model_info(graph, element):
+def add_graph_attrib_from_element(graph, element):
     """Add graph attributes from an XML element.
 
     Args:
@@ -63,6 +62,25 @@ def add_all_nodes(graph, iterator, ancestor):
                 element.clear()
 
 
+def add_edge_from_element(graph, element, current_track_id):
+    """Add an edge and its attributes from an XML element.
+
+    Args:
+        graph (nx.Graph): Graph on which to add the edge.
+        element (ET.Element): Element holding the information to be added.
+        current_track_id (str): Track ID of the track holding the edge. 
+    """
+    entry_node = element.attrib.pop('SPOT_SOURCE_ID')
+    exit_node = element.attrib.pop('SPOT_TARGET_ID')
+    graph.add_edge(entry_node, exit_node, attr=element.attrib)
+    element.clear()
+    # Adding the current track ID to the nodes of the newly created
+    # edge. This will be useful later to filter nodes by track and
+    # add the saved tracks attributes (as returned by this method).
+    graph.nodes[entry_node]['TRACK_ID'] = current_track_id
+    graph.nodes[exit_node]['TRACK_ID'] = current_track_id
+
+
 def add_all_edges(graph, iterator, ancestor):
     """Add edges and their attributes to a graph.
 
@@ -95,15 +113,7 @@ def add_all_edges(graph, iterator, ancestor):
 
         # Edge creation.
         if element.tag == 'Edge' and event == 'start': 
-            entry_node = element.attrib.pop('SPOT_SOURCE_ID')
-            exit_node = element.attrib.pop('SPOT_TARGET_ID')
-            graph.add_edge(entry_node, exit_node, attr=element.attrib)
-            element.clear()
-            # Adding the current track ID to the nodes of the newly created
-            # edge. This will be useful later to filter nodes by track and
-            # add the saved tracks attributes (as returned by this method).
-            graph.nodes[entry_node]['TRACK_ID'] = current_track_id
-            graph.nodes[exit_node]['TRACK_ID'] = current_track_id
+            add_edge_from_element(graph, element, current_track_id)
             
     return tracks_attributes
 
@@ -182,7 +192,7 @@ if __name__ == "__main__":
 
         # Adding the model information as graph attributes.
         if element.tag == 'Model' and event == 'start':
-            graph = add_model_info(graph, element)
+            graph = add_graph_attrib_from_element(graph, element)
             root.clear()  # Cleaning the tree to free up some memory.
             # All the browsed subelements of `root` are deleted.
 
