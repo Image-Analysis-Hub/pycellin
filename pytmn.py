@@ -70,16 +70,25 @@ def add_edge_from_element(graph, element, current_track_id):
         element (ET.Element): Element holding the information to be added.
         current_track_id (str): Track ID of the track holding the edge. 
     """
-    entry_node = element.attrib.pop('SPOT_SOURCE_ID')
-    exit_node = element.attrib.pop('SPOT_TARGET_ID')
-    graph.add_edge(entry_node, exit_node, attr=element.attrib)
-    element.clear()
-    # Adding the current track ID to the nodes of the newly created
-    # edge. This will be useful later to filter nodes by track and
-    # add the saved tracks attributes (as returned by this method).
-    graph.nodes[entry_node]['TRACK_ID'] = current_track_id
-    graph.nodes[exit_node]['TRACK_ID'] = current_track_id
-
+    try:
+        entry_node = element.attrib.pop('SPOT_SOURCE_ID')
+        exit_node = element.attrib.pop('SPOT_TARGET_ID')
+    except KeyError as err:
+        print(f"No key {err} in the attributes of "
+              f"current element '{element.tag}'. "
+              f"Not adding this edge to the graph.")
+    else:
+        graph.add_edge(entry_node, exit_node)
+        nx.set_edge_attributes(graph, 
+                               {(entry_node, exit_node): element.attrib})
+        # Adding the current track ID to the nodes of the newly created
+        # edge. This will be useful later to filter nodes by track and
+        # add the saved tracks attributes (as returned by this method).
+        graph.nodes[entry_node]['TRACK_ID'] = current_track_id
+        graph.nodes[exit_node]['TRACK_ID'] = current_track_id
+    finally:
+        element.clear()
+        
 
 def add_all_edges(graph, iterator, ancestor):
     """Add edges and their attributes to a graph.
@@ -234,9 +243,9 @@ if __name__ == "__main__":
 
         # TODO: add Settings as graph attributes. Is everything relevant?
 
-    # # Very basic visualisation.
+    # Very basic visualisation.
     for graph in graphs:
         print(graph)
-        # print(graph.graph)
+        print(graph.graph)
         nx.draw(graph, with_labels=True, font_weight='bold')
         plt.show()
