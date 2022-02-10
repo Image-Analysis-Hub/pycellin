@@ -392,4 +392,39 @@ def test_add_all_edges_no_track_attributes():
 
 ### get_filtered_tracks_ID ###
 
+def test_get_filtered_tracks_ID():
+    xml_data = ('<data>'
+                '   <TrackID TRACK_ID="0" />'
+                '   <TrackID TRACK_ID="1" />'
+                '</data>')
+    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    _, element = next(it)
+
+    obtained_ID = pytmn.get_filtered_tracks_ID(it, element)
+    expected_ID = ['0', '1']
+    assert obtained_ID.sort() == expected_ID.sort()
+    
+
+def test_get_filtered_tracks_ID_no_ID():
+    xml_data = ('<data>'
+                '   <TrackID />'
+                '   <TrackID />'
+                '</data>')
+    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    _, element = next(it)
+    obtained_ID = pytmn.get_filtered_tracks_ID(it, element)
+    assert not obtained_ID
+
+
+def test_get_filtered_tracks_ID_no_tracks():
+    xml_data = ('<data>'
+                '   <tag />'
+                '   <tag />'
+                '</data>')
+    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    _, element = next(it)
+    obtained_ID = pytmn.get_filtered_tracks_ID(it, element)
+    assert not obtained_ID
+    
+
 ### add_tracks_info ###

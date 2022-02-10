@@ -127,8 +127,8 @@ def add_all_edges(graph, iterator, ancestor):
                 current_track_id = element.attrib['TRACK_ID']
             except KeyError as err:
                 print(f"No key {err} in the attributes of "
-                    f"current element '{element.tag}'. "
-                    f"Not adding the {err} edge to the graph.")
+                      f"current element '{element.tag}'. "
+                      f"Not adding the {err} edge to the graph.")
                 current_track_id = None
 
         # Edge creation.
@@ -150,11 +150,21 @@ def get_filtered_tracks_ID(iterator, ancestor):
     """
     filtered_tracks_ID = []
     event, element = next(iterator)
-    filtered_tracks_ID.append(element.attrib['TRACK_ID'])
+    try:
+        filtered_tracks_ID.append(element.attrib['TRACK_ID'])
+    except KeyError as err:
+        print(f"No key {err} in the attributes of current element "
+              f"'{element.tag}'. Ignoring this track.")
+        
     while (event, element) != ('end', ancestor):
         event, element = next(iterator)          
         if element.tag == 'TrackID' and event == 'start':
-            filtered_tracks_ID.append(element.attrib['TRACK_ID'])
+            try:
+                filtered_tracks_ID.append(element.attrib['TRACK_ID'])
+            except KeyError as err:
+                print(f"No key {err} in the attributes of current element "
+                      f"'{element.tag}'. Ignoring this track.")
+            
     return filtered_tracks_ID         
     
 
