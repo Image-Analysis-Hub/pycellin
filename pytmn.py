@@ -172,18 +172,37 @@ def add_tracks_info(graphs, tracks_attributes):
     """Add track attributes to each corresponding graph.
 
     Args:
-        graphs (nx.DiGraph): List of graphs to update.
+        graphs (list(nx.DiGraph)): List of graphs to update.
         tracks_attributes (list(dict)): Dictionaries of tracks attributes.
+
+    Raises:
+        ValueError: If several different track IDs are found for one track.
 
     Returns:
         list(nx.DiGraph): List of the updated graphs.
     """
     updated_graphs = []
-    for i, graph in enumerate(graphs):
-
+    for graph in graphs:
+        
         # Finding the dict of attributes matching the track.
-        tmp = set(t for n, t in graph.nodes(data='TRACK_ID'))
-        assert len(tmp) == 1, ('Impossible state: several IDs for one track.')
+        tmp = set(t_id for n, t_id in graph.nodes(data='TRACK_ID'))
+
+        if not tmp:
+            # 'tmp' is empty because there's no nodes in the current graph.
+            # Even if it can't be updated, we still want to return this graph.
+            updated_graphs.append(graph)
+            continue
+        elif tmp == {None}:
+            # Happens when all the nodes do not have a TRACK_ID attribute.
+            updated_graphs.append(graph)
+            continue
+        elif None in tmp:
+            # Happens when at least one node does not have a TRACK_ID 
+            # attribute, so we clean 'tmp' and carry on.
+            tmp.remove(None)
+        elif len(tmp) != 1:
+            raise ValueError('Impossible state: several IDs for one track.')
+    
         current_track_id = list(tmp)[0]
         current_track_attr = [d_attr for d_attr in tracks_attributes 
                               if d_attr['TRACK_ID'] == current_track_id][0]
@@ -261,7 +280,12 @@ if __name__ == "__main__":
             del graph  # Redondant with the subgraphs.
 
             # Adding the tracks attributes as graphs attributes.
-            graphs = add_tracks_info(graphs, tracks_attributes)
+            try:
+                graphs = add_tracks_info(graphs, tracks_attributes)
+            except ValueError as err:
+                print(err)
+                # The program is in an impossible state so we need to stop.
+                raise
 
     # Very basic visualisation.
     for graph in graphs:

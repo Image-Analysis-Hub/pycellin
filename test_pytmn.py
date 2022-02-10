@@ -428,3 +428,124 @@ def test_get_filtered_tracks_ID_no_tracks():
     
 
 ### add_tracks_info ###
+
+def test_add_tracks_info():
+    g1_attr = {'name': 'blob', 'TRACK_ID': '0'}
+    g2_attr = {'name': 'blub', 'TRACK_ID': '1'}
+
+    g1_obt = nx.DiGraph()
+    g1_obt.add_node(1, TRACK_ID='0')
+    g2_obt = nx.DiGraph()
+    g2_obt.add_node(2, TRACK_ID='1')
+    obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
+                                            [g1_attr, g2_attr])
+
+    g1_exp = nx.DiGraph()
+    g1_exp.graph['name'] = 'blob'
+    g1_exp.graph['TRACK_ID'] = '0'
+    g1_exp.add_node(1, TRACK_ID='0')
+    g2_exp = nx.DiGraph()
+    g2_exp.graph['name'] = 'blub'
+    g2_exp.graph['TRACK_ID'] = '1'
+    g2_exp.add_node(2, TRACK_ID='1')
+    expected_graphs = [g1_exp, g2_exp]
+
+    assert is_equal(obtained_graphs[0], expected_graphs[0])
+    assert is_equal(obtained_graphs[1], expected_graphs[1])
+
+
+def test_add_tracks_info_no_track_ID_on_all_nodes():
+    g1_attr = {'name': 'blob', 'TRACK_ID': '0'}
+    g2_attr = {'name': 'blub', 'TRACK_ID': '1'}
+
+    g1_obt = nx.DiGraph()
+    g1_obt.add_node(1)
+    g1_obt.add_node(3)
+    g2_obt = nx.DiGraph()
+    g2_obt.add_node(2, TRACK_ID='1')
+    obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
+                                            [g1_attr, g2_attr])
+
+    g1_exp = nx.DiGraph()
+    g1_exp.add_node(1)
+    g1_exp.add_node(3)
+    g2_exp = nx.DiGraph()
+    g2_exp.graph['name'] = 'blub'
+    g2_exp.graph['TRACK_ID'] = '1'
+    g2_exp.add_node(2, TRACK_ID='1')
+    expected_graphs = [g1_exp, g2_exp]
+
+    assert is_equal(obtained_graphs[0], expected_graphs[0])
+    assert is_equal(obtained_graphs[1], expected_graphs[1])
+    
+
+def test_add_tracks_info_no_track_ID_on_one_node():
+    g1_attr = {'name': 'blob', 'TRACK_ID': '0'}
+    g2_attr = {'name': 'blub', 'TRACK_ID': '1'}
+
+    g1_obt = nx.DiGraph()
+    g1_obt.add_node(1)
+    g1_obt.add_node(3)
+    g1_obt.add_node(4, TRACK_ID='0')
+    
+    g2_obt = nx.DiGraph()
+    g2_obt.add_node(2, TRACK_ID='1')
+    obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
+                                            [g1_attr, g2_attr])
+
+    g1_exp = nx.DiGraph()
+    g1_exp.graph['name'] = 'blob'
+    g1_exp.graph['TRACK_ID'] = '0'
+    g1_exp.add_node(1)
+    g1_exp.add_node(3)
+    g1_exp.add_node(4, TRACK_ID='0')
+    g2_exp = nx.DiGraph()
+    g2_exp.graph['name'] = 'blub'
+    g2_exp.graph['TRACK_ID'] = '1'
+    g2_exp.add_node(2, TRACK_ID='1')
+    expected_graphs = [g1_exp, g2_exp]
+
+    assert is_equal(obtained_graphs[0], expected_graphs[0])
+    assert is_equal(obtained_graphs[1], expected_graphs[1])
+
+
+def test_add_tracks_info_different_ID_for_one_track():
+    g1_attr = {'name': 'blob', 'TRACK_ID': '0'}
+    g2_attr = {'name': 'blub', 'TRACK_ID': '1'}
+    
+    g1_obt = nx.DiGraph()
+    g1_obt.add_node(1, TRACK_ID='0')
+    g1_obt.add_node(3, TRACK_ID='2')
+    g1_obt.add_node(4, TRACK_ID='0')
+    
+    g2_obt = nx.DiGraph()
+    g2_obt.add_node(2, TRACK_ID='1')
+    with pytest.raises(ValueError):
+        obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
+                                                [g1_attr, g2_attr])
+
+
+def test_add_tracks_info_no_nodes():
+    g1_attr = {'name': 'blob', 'TRACK_ID': '0'}
+    g2_attr = {'name': 'blub', 'TRACK_ID': '1'}
+
+    g1_obt = nx.DiGraph()
+    g2_obt = nx.DiGraph()
+    g2_obt.add_node(2, TRACK_ID='1')
+    obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
+                                            [g1_attr, g2_attr])
+
+    g1_exp = nx.DiGraph()
+    g2_exp = nx.DiGraph()
+    g2_exp.graph['name'] = 'blub'
+    g2_exp.graph['TRACK_ID'] = '1'
+    g2_exp.add_node(2, TRACK_ID='1')
+    expected_graphs = [g1_exp, g2_exp]
+
+    assert is_equal(obtained_graphs[0], expected_graphs[0])
+    assert is_equal(obtained_graphs[1], expected_graphs[1])
+
+
+
+
+
