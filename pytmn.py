@@ -22,11 +22,11 @@ def add_graph_attrib_from_element(graph, element):
     """Add graph attributes from an XML element.
 
     Args:
-        graph (nx.Graph): Graph on which to add attributes.
+        graph (nx.DiGraph): Graph on which to add attributes.
         element (ET.Element): Element holding the information to be added.
         
     Returns:
-        nx.Graph: The updated graph.
+        nx.DiGraph: The updated graph.
     """
     for k, v in element.attrib.items():
         graph.graph[k] = v
@@ -42,7 +42,7 @@ def add_all_nodes(graph, iterator, ancestor):
     All the elements that are descendants of `ancestor` are explored.
 
     Args:
-        graph (nx.Graph): Graph on which to add nodes.
+        graph (nx.DiGraph): Graph on which to add nodes.
         iterator (ET.iterparse): XML element iterator.
         ancestor (ET.Element): Element encompassing the information to add.
     """
@@ -67,7 +67,7 @@ def add_edge_from_element(graph, element, current_track_id):
     """Add an edge and its attributes from an XML element.
 
     Args:
-        graph (nx.Graph): Graph on which to add the edge.
+        graph (nx.DiGraph): Graph on which to add the edge.
         element (ET.Element): Element holding the information to be added.
         current_track_id (str): Track ID of the track holding the edge. 
     """
@@ -97,7 +97,7 @@ def add_all_edges(graph, iterator, ancestor):
     All the elements that are descendants of `ancestor` are explored.
 
     Args:
-        graph (nx.Graph): Graph on which to add edges.
+        graph (nx.DiGraph): Graph on which to add edges.
         iterator (ET.iterparse): XML element iterator.
         ancestor (ET.Element): Element encompassing the information to add.
 
@@ -152,11 +152,11 @@ def add_tracks_info(graphs, tracks_attributes):
     """Add track attributes to each corresponding graph.
 
     Args:
-        graphs (nx.Graph): List of graphs to update.
+        graphs (nx.DiGraph): List of graphs to update.
         tracks_attributes (list(dict)): Dictionaries of tracks attributes.
 
     Returns:
-        list(nx.Graph): List of the updated graphs.
+        list(nx.DiGraph): List of the updated graphs.
     """
     updated_graphs = []
     for i, graph in enumerate(graphs):
@@ -189,8 +189,7 @@ if __name__ == "__main__":
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
     # the resulting graph will be disconnected.
-    graph = nx.Graph()
-    # TODO: switch to a directed graph.
+    graph = nx.DiGraph()
 
     # So as not to load the entire XML file into memory at once, we're
     # using an iterator to browse over the tags one by one.
@@ -238,7 +237,7 @@ if __name__ == "__main__":
             # One subgraph is created per track, so each subgraph is
             # a connected component of `graph`.
             graphs = [graph.subgraph(c).copy() 
-                      for c in nx.connected_components(graph)]
+                      for c in nx.weakly_connected_components(graph)]
             del graph  # Redondant with the subgraphs.
 
             # Adding the tracks attributes as graphs attributes.

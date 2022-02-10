@@ -21,8 +21,8 @@ def is_equal(obt, exp):
     nodes and edges attributes are all identical.
 
     Args:
-        obt (nx.Graph): The obtained graph, built from pytmn.py.
-        exp (nx.Graph): The expected graph, built from here.
+        obt (nx.DiGraph): The obtained graph, built from pytmn.py.
+        exp (nx.DiGraph): The expected graph, built from here.
 
     Returns:
         bool: True if the graphs are identical, False otherwise.
@@ -72,14 +72,15 @@ def is_equal(obt, exp):
         return False
     
 
+### add_graph_attrib_from_element ###
 
 def test_add_graph_attrib_from_element():
     xml_data = ('<data attrib1="text" attrib2="10">'
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data))
     _, element = next(it)
-    obtained = pytmn.add_graph_attrib_from_element(nx.Graph(), element)
-    expected = nx.Graph(attrib1="text", attrib2="10")
+    obtained = pytmn.add_graph_attrib_from_element(nx.DiGraph(), element)
+    expected = nx.DiGraph(attrib1="text", attrib2="10")
 
     print(obtained.edges.data())
     print(expected.edges.data())
@@ -93,11 +94,12 @@ def test_add_graph_attrib_from_element_no_graph_attributes():
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data))
     _, element = next(it)
-    obtained = pytmn.add_graph_attrib_from_element(nx.Graph(), element)
-    expected = nx.Graph()
+    obtained = pytmn.add_graph_attrib_from_element(nx.DiGraph(), element)
+    expected = nx.DiGraph()
     assert is_equal(obtained, expected)
 
 
+### add_all_nodes ###
 
 def test_add_all_nodes_several_attributes():
     xml_data = ('<data>'
@@ -109,10 +111,10 @@ def test_add_all_nodes_several_attributes():
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     event, element = next(it)
 
-    obtained = nx.Graph()
+    obtained = nx.DiGraph()
     pytmn.add_all_nodes(obtained, it, element)
 
-    expected = nx.Graph()
+    expected = nx.DiGraph()
     expected.add_nodes_from([("blub", {"y": "30", "x": "30"}),
                              ("blob", {"x": "10", "y": "20"})])
 
@@ -129,10 +131,10 @@ def test_add_all_nodes_only_ID_attribute():
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
 
-    obtained = nx.Graph()
+    obtained = nx.DiGraph()
     pytmn.add_all_nodes(obtained, it, element)
 
-    expected = nx.Graph()
+    expected = nx.DiGraph()
     expected.add_nodes_from(["blob", "blub"])
 
     assert is_equal(obtained, expected)
@@ -148,10 +150,10 @@ def test_add_all_nodes_no_node_attributes():
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
 
-    obtained = nx.Graph()
+    obtained = nx.DiGraph()
     pytmn.add_all_nodes(obtained, it, element)
 
-    expected = nx.Graph()
+    expected = nx.DiGraph()
     expected.add_nodes_from(["blub"])
 
     assert is_equal(obtained, expected)
@@ -165,11 +167,13 @@ def test_add_all_nodes_no_nodes():
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
     
-    obtained = nx.Graph()
+    obtained = nx.DiGraph()
     pytmn.add_all_nodes(obtained, it, element)
     
-    assert is_equal(obtained, nx.Graph())
+    assert is_equal(obtained, nx.DiGraph())
 
+
+### add_edge_from_element ###
 
 def test_add_edge_from_element():
     xml_data = ('<data SPOT_SOURCE_ID="1" SPOT_TARGET_ID="2" x="20" y="25">'
@@ -178,10 +182,10 @@ def test_add_edge_from_element():
     _, element = next(it)
     track_id = '0'
 
-    obtained = nx.Graph()
+    obtained = nx.DiGraph()
     pytmn.add_edge_from_element(obtained, element, track_id)
 
-    expected = nx.Graph()
+    expected = nx.DiGraph()
     expected.add_edge('1', '2', x='20', y='25')
     expected.nodes['1']['TRACK_ID'] = track_id
     expected.nodes['2']['TRACK_ID'] = track_id
@@ -196,10 +200,10 @@ def test_add_edge_from_element_no_node_ID():
     _, element = next(it)
     track_id = '0'
     
-    obtained = nx.Graph()
+    obtained = nx.DiGraph()
     pytmn.add_edge_from_element(obtained, element, track_id)
     
-    assert is_equal(obtained, nx.Graph())
+    assert is_equal(obtained, nx.DiGraph())
 
 
 def test_add_edge_from_element_no_edge_attributes():
@@ -209,13 +213,18 @@ def test_add_edge_from_element_no_edge_attributes():
     _, element = next(it)
     track_id = '0'
 
-    obtained = nx.Graph()
+    obtained = nx.DiGraph()
     pytmn.add_edge_from_element(obtained, element, track_id)
 
-    expected = nx.Graph()
+    expected = nx.DiGraph()
     expected.add_edge('1', '2')
     expected.nodes['1']['TRACK_ID'] = track_id
     expected.nodes['2']['TRACK_ID'] = track_id
 
     assert is_equal(obtained, expected)
-    
+
+
+### add_all_edges ###
+
+def test_add_all_edges():
+    pass
