@@ -115,8 +115,8 @@ def test_add_all_nodes_several_attributes():
     pytmn.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph()
-    expected.add_nodes_from([("blub", {"y": "30", "x": "30"}),
-                             ("blob", {"x": "10", "y": "20"})])
+    expected.add_nodes_from([("blub", {"y": "30", "ID": "blub", "x": "30"}),
+                             ("blob", {"ID": "blob", "x": "10", "y": "20"})])
 
     assert is_equal(obtained, expected)
 
@@ -135,7 +135,8 @@ def test_add_all_nodes_only_ID_attribute():
     pytmn.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph()
-    expected.add_nodes_from(["blob", "blub"])
+    expected.add_nodes_from([("blub", {"ID": "blub"}),
+                             ("blob", {"ID": "blob"})])
 
     assert is_equal(obtained, expected)
 
@@ -154,7 +155,7 @@ def test_add_all_nodes_no_node_attributes():
     pytmn.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph()
-    expected.add_nodes_from(["blub"])
+    expected.add_nodes_from([("blub", {"ID": "blub"})])
 
     assert is_equal(obtained, expected)
 
@@ -186,7 +187,8 @@ def test_add_edge_from_element():
     pytmn.add_edge_from_element(obtained, element, track_id)
 
     expected = nx.DiGraph()
-    expected.add_edge('1', '2', x='20', y='25')
+    expected.add_edge('1', '2',
+                      x='20', y='25', SPOT_SOURCE_ID='1', SPOT_TARGET_ID='2')
     expected.nodes['1']['TRACK_ID'] = track_id
     expected.nodes['2']['TRACK_ID'] = track_id
 
@@ -217,7 +219,7 @@ def test_add_edge_from_element_no_edge_attributes():
     pytmn.add_edge_from_element(obtained, element, track_id)
 
     expected = nx.DiGraph()
-    expected.add_edge('1', '2')
+    expected.add_edge('1', '2', SPOT_SOURCE_ID='1', SPOT_TARGET_ID='2')
     expected.nodes['1']['TRACK_ID'] = track_id
     expected.nodes['2']['TRACK_ID'] = track_id
 

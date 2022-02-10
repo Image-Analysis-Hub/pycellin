@@ -46,19 +46,16 @@ def add_all_nodes(graph, iterator, ancestor):
         iterator (ET.iterparse): XML element iterator.
         ancestor (ET.Element): Element encompassing the information to add.
     """
-    # TODO: keep the spot ID.
     event, element = next(iterator)
     while (event, element) != ('end', ancestor):
         event, element = next(iterator)          
         if element.tag == 'Spot' and event == 'start': 
             try:
-                node_id = element.attrib.pop('ID')
+                graph.add_nodes_from([(element.attrib['ID'], element.attrib)])
             except KeyError as err:
                 print(f"No key {err} in the attributes of "
                       f"current element '{element.tag}'. "
                       f"Not adding this node to the graph.")
-            else:
-                graph.add_nodes_from([(node_id, element.attrib)])
             finally:
                 element.clear()
 
@@ -72,8 +69,8 @@ def add_edge_from_element(graph, element, current_track_id):
         current_track_id (str): Track ID of the track holding the edge. 
     """
     try:
-        entry_node = element.attrib.pop('SPOT_SOURCE_ID')
-        exit_node = element.attrib.pop('SPOT_TARGET_ID')
+        entry_node = element.attrib['SPOT_SOURCE_ID']
+        exit_node = element.attrib['SPOT_TARGET_ID']
     except KeyError as err:
         print(f"No key {err} in the attributes of "
               f"current element '{element.tag}'. "
@@ -247,5 +244,7 @@ if __name__ == "__main__":
     for graph in graphs:
         print(graph)
         # print(graph.graph)
+        # print(graph.nodes.data())
+        # print(graph.edges.data())
         nx.draw(graph, with_labels=True, font_weight='bold')
         plt.show()
