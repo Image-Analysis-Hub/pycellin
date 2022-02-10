@@ -107,8 +107,15 @@ def add_all_edges(graph, iterator, ancestor):
     if element.tag == 'Track' and event == 'start':
         # This condition is a bit of an overkill since the XML structure
         # SHOULD stay the same but better safe than sorry.
+        # TODO: refactor this chunk that appears twice in this method.
         tracks_attributes.append(element.attrib)
-        current_track_id = element.attrib['TRACK_ID']
+        try:
+            current_track_id = element.attrib['TRACK_ID']
+        except KeyError as err:
+            print(f"No key {err} in the attributes of "
+                  f"current element '{element.tag}'. "
+                  f"Not adding the {err} edge to the graph.")
+            current_track_id = None         
 
     while (event, element) != ('end', ancestor):
         event, element = next(iterator)
@@ -116,7 +123,13 @@ def add_all_edges(graph, iterator, ancestor):
         # Saving the current track information.
         if element.tag == 'Track' and event == 'start':
             tracks_attributes.append(element.attrib)
-            current_track_id = element.attrib['TRACK_ID']
+            try:
+                current_track_id = element.attrib['TRACK_ID']
+            except KeyError as err:
+                print(f"No key {err} in the attributes of "
+                    f"current element '{element.tag}'. "
+                    f"Not adding the {err} edge to the graph.")
+                current_track_id = None
 
         # Edge creation.
         if element.tag == 'Edge' and event == 'start': 

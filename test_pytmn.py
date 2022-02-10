@@ -228,5 +228,175 @@ def test_add_edge_from_element_no_edge_attributes():
 
 ### add_all_edges ###
 
-def test_add_all_edges():
-    pass
+def test_add_all_edges_several_attributes():
+    xml_data = ('<data>'
+                '   <Track TRACK_ID="1" name="blob">'
+                '       <Edge SPOT_SOURCE_ID="11" SPOT_TARGET_ID="12"'
+                '           x="10" y="20"></Edge>'
+                '       <Edge SPOT_SOURCE_ID="12" SPOT_TARGET_ID="13"'
+                '           x="30" y="30"></Edge>'
+                '   </Track>'
+                '   <Track TRACK_ID="2" name="blub">'
+                '       <Edge SPOT_SOURCE_ID="21" SPOT_TARGET_ID="22"'
+                '           x="15" y="25"></Edge>'
+                '   </Track>'
+                '</data>')
+    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    _, element = next(it)
+
+    obtained = nx.DiGraph()
+    obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = sorted(obtained_tracks_attrib, 
+                                    key=lambda d: d['TRACK_ID'])
+
+    expected = nx.DiGraph()
+    expected.add_edge('11', '12',
+                      SPOT_SOURCE_ID='11', SPOT_TARGET_ID='12', x='10', y='20')
+    expected.add_edge('12', '13',
+                      SPOT_SOURCE_ID='12', SPOT_TARGET_ID='13', x='30', y='30')
+    expected.add_edge('21', '22',
+                      SPOT_SOURCE_ID='21', SPOT_TARGET_ID='22', x='15', y='25')
+    expected.add_nodes_from([('11', {'TRACK_ID': '1'}),
+                             ('12', {'TRACK_ID': '1'}),
+                             ('13', {'TRACK_ID': '1'}),
+                             ('21', {'TRACK_ID': '2'}),
+                             ('22', {'TRACK_ID': '2'})])
+    expected_tracks_attrib = [{'TRACK_ID': '2', 'name': 'blub'},
+                              {'TRACK_ID': '1', 'name': 'blob'}]
+    expected_tracks_attrib = sorted(expected_tracks_attrib, 
+                                    key=lambda d: d['TRACK_ID'])
+
+    assert is_equal(obtained, expected)
+    assert obtained_tracks_attrib == expected_tracks_attrib
+
+
+def test_add_all_edges_no_nodes_ID():
+    xml_data = ('<data>'
+                '   <Track TRACK_ID="1" name="blob">'
+                '       <Edge x="10" y="20"></Edge>'
+                '       <Edge x="30" y="30"></Edge>'
+                '   </Track>'
+                '   <Track TRACK_ID="2" name="blub">'
+                '       <Edge x="15" y="25"></Edge>'
+                '   </Track>'
+                '</data>')
+    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    _, element = next(it)
+
+    obtained = nx.DiGraph()
+    obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = sorted(obtained_tracks_attrib, 
+                                    key=lambda d: d['TRACK_ID'])
+
+    expected_tracks_attrib = [{'TRACK_ID': '2', 'name': 'blub'},
+                              {'TRACK_ID': '1', 'name': 'blob'}]
+    expected_tracks_attrib = sorted(expected_tracks_attrib, 
+                                    key=lambda d: d['TRACK_ID'])
+
+    assert is_equal(obtained, nx.DiGraph())
+    assert obtained_tracks_attrib == expected_tracks_attrib
+
+
+def test_add_all_edges_no_edges():
+    xml_data = ('<data>'
+                '   <Track TRACK_ID="1" name="blob">'
+                '   </Track>'
+                '   <Track TRACK_ID="2" name="blub">'
+                '   </Track>'
+                '</data>')
+    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    _, element = next(it)
+
+    obtained = nx.DiGraph()
+    obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = sorted(obtained_tracks_attrib, 
+                                    key=lambda d: d['TRACK_ID'])
+    
+    expected_tracks_attrib = [{'TRACK_ID': '2', 'name': 'blub'},
+                              {'TRACK_ID': '1', 'name': 'blob'}]
+    expected_tracks_attrib = sorted(expected_tracks_attrib, 
+                                    key=lambda d: d['TRACK_ID'])
+
+    assert is_equal(obtained, nx.DiGraph())
+    assert obtained_tracks_attrib == expected_tracks_attrib
+
+
+def test_add_all_edges_no_track_id():
+    xml_data = ('<data>'
+            '   <Track name="blob">'
+            '       <Edge SPOT_SOURCE_ID="11" SPOT_TARGET_ID="12"'
+            '           x="10" y="20"></Edge>'
+            '       <Edge SPOT_SOURCE_ID="12" SPOT_TARGET_ID="13"'
+            '           x="30" y="30"></Edge>'
+            '   </Track>'
+            '   <Track name="blub">'
+            '       <Edge SPOT_SOURCE_ID="21" SPOT_TARGET_ID="22"'
+            '           x="15" y="25"></Edge>'
+            '   </Track>'
+            '</data>')
+    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    _, element = next(it)
+
+    obtained = nx.DiGraph()
+    obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
+    
+    expected = nx.DiGraph()
+    expected.add_edge('11', '12',
+                      SPOT_SOURCE_ID='11', SPOT_TARGET_ID='12', x='10', y='20')
+    expected.add_edge('12', '13',
+                      SPOT_SOURCE_ID='12', SPOT_TARGET_ID='13', x='30', y='30')
+    expected.add_edge('21', '22',
+                      SPOT_SOURCE_ID='21', SPOT_TARGET_ID='22', x='15', y='25')
+    expected.add_nodes_from([('11', {'TRACK_ID': None}),
+                             ('12', {'TRACK_ID': None}),
+                             ('13', {'TRACK_ID': None}),
+                             ('21', {'TRACK_ID': None}),
+                             ('22', {'TRACK_ID': None})])
+    expected_tracks_attrib = [{'name': 'blub'}, {'name': 'blob'}]
+    expected_tracks_attrib = sorted(expected_tracks_attrib, 
+                                    key=lambda d: d['name'])
+    
+    assert is_equal(obtained, expected)
+    assert obtained_tracks_attrib == expected_tracks_attrib
+
+
+def test_add_all_edges_no_track_attributes():
+    xml_data = ('<data>'
+            '   <Track>'
+            '       <Edge SPOT_SOURCE_ID="11" SPOT_TARGET_ID="12"'
+            '           x="10" y="20"></Edge>'
+            '       <Edge SPOT_SOURCE_ID="12" SPOT_TARGET_ID="13"'
+            '           x="30" y="30"></Edge>'
+            '   </Track>'
+            '   <Track>'
+            '       <Edge SPOT_SOURCE_ID="21" SPOT_TARGET_ID="22"'
+            '           x="15" y="25"></Edge>'
+            '   </Track>'
+            '</data>')
+    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    _, element = next(it)
+
+    obtained = nx.DiGraph()
+    obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
+    
+    expected = nx.DiGraph()
+    expected.add_edge('11', '12',
+                      SPOT_SOURCE_ID='11', SPOT_TARGET_ID='12', x='10', y='20')
+    expected.add_edge('12', '13',
+                      SPOT_SOURCE_ID='12', SPOT_TARGET_ID='13', x='30', y='30')
+    expected.add_edge('21', '22',
+                      SPOT_SOURCE_ID='21', SPOT_TARGET_ID='22', x='15', y='25')
+    expected.add_nodes_from([('11', {'TRACK_ID': None}),
+                             ('12', {'TRACK_ID': None}),
+                             ('13', {'TRACK_ID': None}),
+                             ('21', {'TRACK_ID': None}),
+                             ('22', {'TRACK_ID': None})])
+    expected_tracks_attrib = [{}, {}]
+    
+    assert is_equal(obtained, expected)
+    assert obtained_tracks_attrib == expected_tracks_attrib
+
+
+### get_filtered_tracks_ID ###
+
+### add_tracks_info ###
