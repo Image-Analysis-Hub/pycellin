@@ -75,8 +75,7 @@ def is_equal(obt, exp):
 ### add_graph_attrib_from_element ###
 
 def test_add_graph_attrib_from_element():
-    xml_data = ('<data attrib1="text" attrib2="10">'
-                '</data>')
+    xml_data = ('<data attrib1="text" attrib2="10" />')
     it = ET.iterparse(io.StringIO(xml_data))
     _, element = next(it)
     obtained = pytmn.add_graph_attrib_from_element(nx.DiGraph(), element)
@@ -104,8 +103,8 @@ def test_add_graph_attrib_from_element_no_graph_attributes():
 def test_add_all_nodes_several_attributes():
     xml_data = ('<data>'
                 '   <frame>'
-                '       <Spot ID="blob" x="10" y="20"></Spot>'
-                '       <Spot ID="blub" x="30" y="30"></Spot>'
+                '       <Spot ID="blob" x="10" y="20" />'
+                '       <Spot ID="blub" x="30" y="30" />'
                 '   </frame>'
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
@@ -115,8 +114,8 @@ def test_add_all_nodes_several_attributes():
     pytmn.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph()
-    expected.add_nodes_from([("blub", {"y": "30", "ID": "blub", "x": "30"}),
-                             ("blob", {"ID": "blob", "x": "10", "y": "20"})])
+    expected.add_nodes_from([('blub', {'y': '30', 'ID': 'blub', 'x': '30'}),
+                             ('blob', {'ID': 'blob', 'x': '10', 'y': '20'})])
 
     assert is_equal(obtained, expected)
 
@@ -124,8 +123,8 @@ def test_add_all_nodes_several_attributes():
 def test_add_all_nodes_only_ID_attribute():
     xml_data = ('<data>'
                 '   <frame>'
-                '       <Spot ID="blob"></Spot>'
-                '       <Spot ID="blub"></Spot>'
+                '       <Spot ID="blob" />'
+                '       <Spot ID="blub" />'
                 '   </frame>'
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
@@ -135,8 +134,8 @@ def test_add_all_nodes_only_ID_attribute():
     pytmn.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph()
-    expected.add_nodes_from([("blub", {"ID": "blub"}),
-                             ("blob", {"ID": "blob"})])
+    expected.add_nodes_from([('blub', {'ID': 'blub'}),
+                             ('blob', {'ID': 'blob'})])
 
     assert is_equal(obtained, expected)
 
@@ -144,8 +143,8 @@ def test_add_all_nodes_only_ID_attribute():
 def test_add_all_nodes_no_node_attributes():
     xml_data = ('<data>'
                 '   <frame>'
-                '       <Spot></Spot>'
-                '       <Spot ID="blub"></Spot>'
+                '       <Spot />'
+                '       <Spot ID="blub" />'
                 '   </frame>'
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
@@ -155,15 +154,14 @@ def test_add_all_nodes_no_node_attributes():
     pytmn.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph()
-    expected.add_nodes_from([("blub", {"ID": "blub"})])
+    expected.add_nodes_from([('blub', {'ID': 'blub'})])
 
     assert is_equal(obtained, expected)
 
 
 def test_add_all_nodes_no_nodes():
     xml_data = ('<data>'
-                '   <frame>'
-                '   </frame>'
+                '   <frame />'
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
@@ -177,8 +175,7 @@ def test_add_all_nodes_no_nodes():
 ### add_edge_from_element ###
 
 def test_add_edge_from_element():
-    xml_data = ('<data SPOT_SOURCE_ID="1" SPOT_TARGET_ID="2" x="20" y="25">'
-                '</data>')
+    xml_data = ('<data SPOT_SOURCE_ID="1" SPOT_TARGET_ID="2" x="20" y="25" />')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
     track_id = '0'
@@ -196,8 +193,7 @@ def test_add_edge_from_element():
 
 
 def test_add_edge_from_element_no_node_ID():
-    xml_data = ('<data SPOT_SOURCE_ID="1" x="20" y="25">'
-                '</data>')
+    xml_data = ('<data SPOT_SOURCE_ID="1" x="20" y="25" />')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
     track_id = '0'
@@ -209,8 +205,7 @@ def test_add_edge_from_element_no_node_ID():
 
 
 def test_add_edge_from_element_no_edge_attributes():
-    xml_data = ('<data SPOT_SOURCE_ID="1" SPOT_TARGET_ID="2">'
-                '</data>')
+    xml_data = ('<data SPOT_SOURCE_ID="1" SPOT_TARGET_ID="2" />')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
     track_id = '0'
@@ -232,13 +227,13 @@ def test_add_all_edges_several_attributes():
     xml_data = ('<data>'
                 '   <Track TRACK_ID="1" name="blob">'
                 '       <Edge SPOT_SOURCE_ID="11" SPOT_TARGET_ID="12"'
-                '           x="10" y="20"></Edge>'
+                '           x="10" y="20" />'
                 '       <Edge SPOT_SOURCE_ID="12" SPOT_TARGET_ID="13"'
-                '           x="30" y="30"></Edge>'
+                '           x="30" y="30" />'
                 '   </Track>'
                 '   <Track TRACK_ID="2" name="blub">'
                 '       <Edge SPOT_SOURCE_ID="21" SPOT_TARGET_ID="22"'
-                '           x="15" y="25"></Edge>'
+                '           x="15" y="25" />'
                 '   </Track>'
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
@@ -273,11 +268,11 @@ def test_add_all_edges_several_attributes():
 def test_add_all_edges_no_nodes_ID():
     xml_data = ('<data>'
                 '   <Track TRACK_ID="1" name="blob">'
-                '       <Edge x="10" y="20"></Edge>'
-                '       <Edge x="30" y="30"></Edge>'
+                '       <Edge x="10" y="20" />'
+                '       <Edge x="30" y="30" />'
                 '   </Track>'
                 '   <Track TRACK_ID="2" name="blub">'
-                '       <Edge x="15" y="25"></Edge>'
+                '       <Edge x="15" y="25" />'
                 '   </Track>'
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
@@ -299,10 +294,8 @@ def test_add_all_edges_no_nodes_ID():
 
 def test_add_all_edges_no_edges():
     xml_data = ('<data>'
-                '   <Track TRACK_ID="1" name="blob">'
-                '   </Track>'
-                '   <Track TRACK_ID="2" name="blub">'
-                '   </Track>'
+                '   <Track TRACK_ID="1" name="blob" />'
+                '   <Track TRACK_ID="2" name="blub" />'
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
@@ -325,13 +318,13 @@ def test_add_all_edges_no_track_id():
     xml_data = ('<data>'
             '   <Track name="blob">'
             '       <Edge SPOT_SOURCE_ID="11" SPOT_TARGET_ID="12"'
-            '           x="10" y="20"></Edge>'
+            '           x="10" y="20" />'
             '       <Edge SPOT_SOURCE_ID="12" SPOT_TARGET_ID="13"'
-            '           x="30" y="30"></Edge>'
+            '           x="30" y="30" />'
             '   </Track>'
             '   <Track name="blub">'
             '       <Edge SPOT_SOURCE_ID="21" SPOT_TARGET_ID="22"'
-            '           x="15" y="25"></Edge>'
+            '           x="15" y="25" />'
             '   </Track>'
             '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
@@ -364,13 +357,13 @@ def test_add_all_edges_no_track_attributes():
     xml_data = ('<data>'
             '   <Track>'
             '       <Edge SPOT_SOURCE_ID="11" SPOT_TARGET_ID="12"'
-            '           x="10" y="20"></Edge>'
+            '           x="10" y="20" />'
             '       <Edge SPOT_SOURCE_ID="12" SPOT_TARGET_ID="13"'
-            '           x="30" y="30"></Edge>'
+            '           x="30" y="30" />'
             '   </Track>'
             '   <Track>'
             '       <Edge SPOT_SOURCE_ID="21" SPOT_TARGET_ID="22"'
-            '           x="15" y="25"></Edge>'
+            '           x="15" y="25" />'
             '   </Track>'
             '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
