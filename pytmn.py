@@ -46,6 +46,7 @@ def add_all_nodes(graph, iterator, ancestor):
         iterator (ET.iterparse): XML element iterator.
         ancestor (ET.Element): Element encompassing the information to add.
     """
+    # TODO: keep the spot ID.
     event, element = next(iterator)
     while (event, element) != ('end', ancestor):
         event, element = next(iterator)          
@@ -189,6 +190,7 @@ if __name__ == "__main__":
     # in the XML file. This means that if there's more than one track,
     # the resulting graph will be disconnected.
     graph = nx.Graph()
+    # TODO: switch to a directed graph.
 
     # So as not to load the entire XML file into memory at once, we're
     # using an iterator to browse over the tags one by one.
@@ -204,6 +206,7 @@ if __name__ == "__main__":
             graph = add_graph_attrib_from_element(graph, element)
             root.clear()  # Cleaning the tree to free up some memory.
             # All the browsed subelements of `root` are deleted.
+        # TODO: add all Feature as graph attributes.
 
         # Adding the spots as nodes.
         if element.tag == 'AllSpots' and event == 'start':
@@ -241,11 +244,9 @@ if __name__ == "__main__":
             # Adding the tracks attributes as graphs attributes.
             graphs = add_tracks_info(graphs, tracks_attributes)
 
-        # TODO: add Settings as graph attributes. Is everything relevant?
-
     # Very basic visualisation.
     for graph in graphs:
         print(graph)
-        print(graph.graph)
+        # print(graph.graph)
         nx.draw(graph, with_labels=True, font_weight='bold')
         plt.show()
