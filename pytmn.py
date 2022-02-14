@@ -9,9 +9,10 @@ __author__ = "Laura Xénard"
 __contact__ = "laura.xenard@pasteur.fr"
 __copyright__ = "GNU GPLv3"
 __date__ = "2022-02-07"
-__version__ = "0.1"
+__version__ = "0.2"
 
 import argparse
+from pathlib import Path
 import xml.etree.ElementTree as ET
 
 import matplotlib.pyplot as plt
@@ -287,11 +288,8 @@ if __name__ == "__main__":
                 # The program is in an impossible state so we need to stop.
                 raise
 
-    # Very basic visualisation.
+    # Basic visualisation.
     for graph in graphs:
-        print(graph)
-        # print(graph.graph)
-        # print(graph.nodes.data())
-        # print(graph.edges.data())
-        nx.draw(graph, with_labels=True, font_weight='bold')
+        pos = nx.drawing.nx_agraph.graphviz_layout(graph, prog='dot')
+        nx.draw(graph, pos, with_labels=True, arrows=True, font_weight='bold')
         plt.show()
