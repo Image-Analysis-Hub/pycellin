@@ -243,6 +243,8 @@ if __name__ == "__main__":
                         help="keep the spots filtered out in TrackMate")
     parser.add_argument("-t", "--keep_all_tracks", action="store_true",
                         help="keep the tracks filtered out in TrackMate")
+    parser.add_argument("-p", "--plot_graph", action="store_true",
+                        help="plot the obtained graphs")
     args = parser.parse_args()
 
     # Creation of a graph that will hold all the tracks described
@@ -313,7 +315,9 @@ if __name__ == "__main__":
             export_graph(graph, args.xml)
 
     # Basic visualisation.
-    for graph in graphs:
-        pos = nx.drawing.nx_agraph.graphviz_layout(graph, prog='dot')
-        nx.draw(graph, pos, with_labels=True, arrows=True, font_weight='bold')
-        plt.show()
+    if args.plot_graph:
+        for graph in graphs:
+            pos = nx.drawing.nx_agraph.graphviz_layout(graph, prog='dot')
+            nx.draw(graph, pos, with_labels=True, arrows=True, 
+                    font_weight='bold')
+            plt.show()
