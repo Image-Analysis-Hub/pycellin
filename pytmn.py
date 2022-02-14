@@ -214,12 +214,31 @@ def add_tracks_info(graphs, tracks_attributes):
         updated_graphs.append(graph)
 
     return updated_graphs
+
+
+def export_graph(graph, input):
+    """Export a graph object as a gpickle file.
+
+    The graph is exported in the same folder than the XML file 
+    it originates from. The gpickle is named after the XML file and the 
+    graph name.
+    
+    Args:
+        graph (nx.DiGraph): The graph to export.
+        input (str): Path of the XML file of the graph.
+    """
+    input = Path(input)
+    output = input.with_name(input.stem + f"_{graph.graph['name']}.gz")
+    nx.write_gpickle(graph, output, protocol=5)
+        
              
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("xml", help="path of the XML file to process")
+    parser.add_argument("-e", "--export", action="store_true",
+                        help="export the obtained graphs as gpickle files")
     parser.add_argument("-s", "--keep_all_spots", action="store_true",
                         help="keep the spots filtered out in TrackMate")
     parser.add_argument("-t", "--keep_all_tracks", action="store_true",
@@ -287,6 +306,11 @@ if __name__ == "__main__":
                 print(err)
                 # The program is in an impossible state so we need to stop.
                 raise
+
+    # Exporting the graphs.
+    if args.export:
+        for graph in graphs:
+            export_graph(graph, args.xml)
 
     # Basic visualisation.
     for graph in graphs:
