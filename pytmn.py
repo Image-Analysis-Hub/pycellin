@@ -18,6 +18,8 @@ import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 import networkx as nx
 
+# TODO: convert str attributes to int or float when it makes sense.
+
 
 def add_graph_attrib_from_element(graph, element):
     """Add graph attributes from an XML element.
