@@ -18,7 +18,6 @@ import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 import networkx as nx
 
-# TODO: convert str attributes to int or float when it makes sense.
 
 def add_graph_attrib_from_element(graph, element):
     """Add graph attributes from an XML element.
@@ -86,6 +85,37 @@ def add_all_features(graph, iterator, ancestor) -> nx.DiGraph:
         event, element = next(iterator)
     return graph   
 
+
+def convert_attributes(attributes: dict, features: dict):
+    """Convert the values of `attributes` from string to int or float.
+
+    The type to convert to is given by the dictionary of features with
+    the key 'isint'.    
+
+    Args:
+        attributes (dict): The dictionary whose values we want to convert.
+        features (dict): The dictionary holding the type information to use.
+
+    Raises:
+        KeyError: If the 'isint' feature attribute doesn't exist.
+        ValueError: If the value of the 'isint' feature attribute is invalid.
+    """
+    for key in attributes:
+        if key in features:
+            if 'isint' not in features[key]:
+                raise KeyError(f"No 'isint' feature attribute in "
+                               f"FeatureDeclarations.")
+            if features[key]['isint'].lower() == 'true':
+                attributes[key] = int(attributes[key])
+            elif features[key]['isint'].lower() == 'false':
+                try: 
+                    attributes[key] = float(attributes[key])
+                except ValueError:
+                    pass  # Not an int nor a float so we let it be.
+            else:
+                raise ValueError(f"'{features[key]['isint']}' is an invalid"
+                                 f" feature attribute value for 'isint'.")
+
             
 def add_all_nodes(graph, iterator, ancestor):
     """Add nodes and their attributes to a graph.
@@ -101,6 +131,19 @@ def add_all_nodes(graph, iterator, ancestor):
     while (event, element) != ('end', ancestor):
         event, element = next(iterator)          
         if element.tag == 'Spot' and event == 'start': 
+            # All items in element.attrib are parsed as strings but most
+            # of them (if not all) are numbers. So we need to do a
+            # conversion based on these attributes type (attribute `isint`)
+            # as defined in the FeaturesDeclaration tag.
+            try:
+                convert_attributes(element.attrib,
+                                   graph.graph['Model']['SpotFeatures'])
+            except ValueError as err:
+                print(f'ERROR: {err} Please check the XML file.')
+                raise
+            except KeyError as err:
+                print(f'ERROR: {err} Please check the XML file.')
+                raise
             try:
                 graph.add_nodes_from([(int(element.attrib['ID']),
                                        element.attrib)])
@@ -375,7 +418,3 @@ if __name__ == "__main__":
             nx.draw(graph, pos, with_labels=True, arrows=True, 
                     font_weight='bold')
             plt.show()
-
-    # print(graphs[1].graph.keys())
-    # print(graphs[1].graph['Model'].keys())
-    print(graphs[1].nodes[2091])

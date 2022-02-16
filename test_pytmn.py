@@ -250,25 +250,75 @@ def test_add_all_features_no_feature_attribute():
     assert is_equal(obtained, expected)
 
 
+### convert_attributes ###
+
+def test_convert_attributes():
+
+    features = {'float': {'isint': 'false'}, 'int': {'isint': 'true'},
+                'neg': {'isint': 'false'}, 'str': {'isint': 'false'}}
+    
+    obtained_attr = {'float': '30', 'int': '20', 'neg': '-10', 'str': 'meep'}
+    pytmn.convert_attributes(obtained_attr, features)
+    
+    expected_attr = {'float': 30.0, 'int': 20, 'neg': -10.0, 'str': 'meep'}
+
+    assert obtained_attr == expected_attr
+
+
+def test_convert_attributes_mixed_case():
+
+    features = {'float': {'isint': 'FaLsE'}, 'int': {'isint': 'tRuE'}}
+    
+    obtained_attr = {'float': '30', 'int': '20'}
+    pytmn.convert_attributes(obtained_attr, features)
+    
+    expected_attr = {'float': 30.0, 'int': 20}
+
+    assert obtained_attr == expected_attr
+    
+
+def test_convert_attributes_KeyError():
+
+    features = {'float': {'not_isint': 'false'}, 'int': {'not_isint': 'true'}}
+    attributes = {'float': '30', 'int': '20'}
+
+    with pytest.raises(KeyError):
+        pytmn.convert_attributes(attributes, features)
+
+
+def test_convert_attributes_ValueError():
+
+    features = {'float': {'isint': 'not false'}, 'int': {'isint': 'true'}}
+    attributes = {'float': '30', 'int': '20'}
+
+    with pytest.raises(ValueError):
+        pytmn.convert_attributes(attributes, features)
+
+
 ### add_all_nodes ###
 
 def test_add_all_nodes_several_attributes():
     xml_data = ('<data>'
                 '   <frame>'
                 '       <Spot ID="1000" x="10" y="20" />'
-                '       <Spot ID="1001" x="30" y="30" />'
+                '       <Spot ID="1001" x="30.5" y="30" />'
                 '   </frame>'
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
 
-    obtained = nx.DiGraph()
+    spot_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'}}
+    obtained = nx.DiGraph(Model={'SpotFeatures': spot_features})
     pytmn.add_all_nodes(obtained, it, element)
+    print('\nOBTAINED')
+    print(obtained.graph)
+    print(obtained.nodes.data())
 
-    expected = nx.DiGraph()
-    expected.add_nodes_from([(1001, {'y': '30', 'ID': '1001', 'x': '30'}),
-                             (1000, {'ID': '1000', 'x': '10', 'y': '20'})])
-
+    expected = nx.DiGraph(Model={'SpotFeatures': spot_features})
+    expected.add_nodes_from([(1001, {'y': 30, 'ID': '1001', 'x': 30.5}),
+                             (1000, {'ID': '1000', 'x': 10.0, 'y': 20})])
+    print('\nEXPECTED')
+    print(expected.graph)
     print(expected.nodes.data())
 
     assert is_equal(obtained, expected)
@@ -284,10 +334,10 @@ def test_add_all_nodes_only_ID_attribute():
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
 
-    obtained = nx.DiGraph()
+    obtained = nx.DiGraph(Model={'SpotFeatures': {}})
     pytmn.add_all_nodes(obtained, it, element)
 
-    expected = nx.DiGraph()
+    expected = nx.DiGraph(Model={'SpotFeatures': {}})
     expected.add_nodes_from([(1001, {'ID': '1001'}),
                              (1000, {'ID': '1000'})])
 
@@ -304,10 +354,10 @@ def test_add_all_nodes_no_node_attributes():
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
 
-    obtained = nx.DiGraph()
+    obtained = nx.DiGraph(Model={'SpotFeatures': {}})
     pytmn.add_all_nodes(obtained, it, element)
 
-    expected = nx.DiGraph()
+    expected = nx.DiGraph(Model={'SpotFeatures': {}})
     expected.add_nodes_from([(1001, {'ID': '1001'})])
 
     assert is_equal(obtained, expected)
@@ -320,10 +370,10 @@ def test_add_all_nodes_no_nodes():
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
     
-    obtained = nx.DiGraph()
+    obtained = nx.DiGraph(Model={'SpotFeatures': {}})
     pytmn.add_all_nodes(obtained, it, element)
     
-    assert is_equal(obtained, nx.DiGraph())
+    assert is_equal(obtained, nx.DiGraph(Model={'SpotFeatures': {}}))
 
 
 ### add_edge_from_element ###
