@@ -38,23 +38,50 @@ def add_graph_attrib_from_element(graph, element):
     return graph
 
 
-def add_features(graph, iterator, ancestor):
-    # ancestor = SpotFeatures
+def add_features(graph, iterator, ancestor) -> nx.DiGraph:
+    """Add a category of features and their attributes to the graph.
+
+    The category can be spots, edges and tracks features.
+    Args:
+        graph (nx.DiGraph): Graph on which to add features.
+        iterator (ET.iterparse): XML element iterator.
+        ancestor (ET.Element): Element encompassing the information to add.
+
+    Returns:
+        nx.DiGraph: The updated graph.
+    """
     event, element = next(iterator)  # Feature.
-    # feature_type = element.tag
     features = dict()
     while (event, element) != ('end', ancestor):
         if element.tag == 'Feature' and event == 'start':
-            features[element.attrib['feature']] = element.attrib
+            try:
+                features[element.attrib['feature']] = element.attrib
+            except KeyError as err:
+                print(f"No key {err} in the attributes of "
+                      f"current element '{element.tag}'. "
+                      f"Not adding this feature to the graph.")
         element.clear()
         event, element = next(iterator)
     graph.graph[ancestor.tag] = features
     return graph
             
 
-def add_all_features(graph, iterator, ancestor):
-    # ancestor = FeatureDeclarations.
-    event, element = next(iterator)  # SpotFeatures.
+def add_all_features(graph, iterator, ancestor) -> nx.DiGraph:
+    """Add all the model features and their attributes to the graph.
+
+    The model features are divided in 3 categories: spots, edges and 
+    tracks features.
+    Those features are regrouped under the tag FeatureDeclarations.
+
+    Args:
+        graph (nx.DiGraph): Graph on which to add features.
+        iterator (ET.iterparse): XML element iterator.
+        ancestor (ET.Element): Element encompassing the information to add.
+
+    Returns:
+        nx.DiGraph: The updated graph.
+    """
+    event, element = next(iterator)
     while (event, element) != ('end', ancestor):
         graph = add_features(graph, iterator, element)
         element.clear()
@@ -288,12 +315,15 @@ if __name__ == "__main__":
     for event, element in it:
 
         # Adding the model information as graph attributes.
-        if element.tag == 'Model' and event == 'start':
+        if element.tag == 'Model' and event == 'start':  # Add units.
             graph = add_graph_attrib_from_element(graph, element)
             root.clear()  # Cleaning the tree to free up some memory.
             # All the browsed subelements of `root` are deleted.
-        # TODO: add all Feature as graph attributes.
-
+        # Add features declaration for spot, edge and track features.
+        if element.tag == 'FeatureDeclarations' and event == 'start':
+            graph = add_all_features(graph, it, element)
+            root.clear()
+        
         # Adding the spots as nodes.
         if element.tag == 'AllSpots' and event == 'start':
             add_all_nodes(graph, it, element)
@@ -348,4 +378,4 @@ if __name__ == "__main__":
                     font_weight='bold')
             plt.show()
 
-    print(graphs[1].nodes())
+    print(graphs[1].graph)
