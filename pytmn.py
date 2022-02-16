@@ -30,28 +30,26 @@ def add_graph_attrib_from_element(graph, element):
     Returns:
         nx.DiGraph: The updated graph.
     """
-    for k, v in element.attrib.items():
-        graph.graph[k] = v
+    graph.graph['Model'] = element.attrib
+    # for k, v in element.attrib.items():
+    #     graph.graph[k] = v
     element.clear()  # We won't need it anymore so we free up some memory.
     # .clear() does not delete the element: it only removes all subelements 
     # and clears or sets to `None` all attributes.
     return graph
 
+def get_features_dict(iterator, ancestor):
+    """Get all the features of ancestor and return them as a dictionary.
 
-def add_features(graph, iterator, ancestor) -> nx.DiGraph:
-    """Add a category of features and their attributes to the graph.
-
-    The category can be spots, edges and tracks features.
     Args:
-        graph (nx.DiGraph): Graph on which to add features.
         iterator (ET.iterparse): XML element iterator.
         ancestor (ET.Element): Element encompassing the information to add.
 
     Returns:
-        nx.DiGraph: The updated graph.
+        dict: Features contained in the ancestor element.
     """
-    event, element = next(iterator)  # Feature.
     features = dict()
+    event, element = next(iterator)  # Feature.
     while (event, element) != ('end', ancestor):
         if element.tag == 'Feature' and event == 'start':
             try:
@@ -62,8 +60,7 @@ def add_features(graph, iterator, ancestor) -> nx.DiGraph:
                       f"Not adding this feature to the graph.")
         element.clear()
         event, element = next(iterator)
-    graph.graph[ancestor.tag] = features
-    return graph
+    return features
             
 
 def add_all_features(graph, iterator, ancestor) -> nx.DiGraph:
@@ -83,7 +80,8 @@ def add_all_features(graph, iterator, ancestor) -> nx.DiGraph:
     """
     event, element = next(iterator)
     while (event, element) != ('end', ancestor):
-        graph = add_features(graph, iterator, element)
+        features = get_features_dict(iterator, element)
+        graph.graph['Model'][element.tag] = features
         element.clear()
         event, element = next(iterator)
     return graph   
@@ -378,4 +376,5 @@ if __name__ == "__main__":
                     font_weight='bold')
             plt.show()
 
-    print(graphs[1].graph)
+    print(graphs[1].graph.keys())
+    # print(graphs[1].graph['Model'].keys())
