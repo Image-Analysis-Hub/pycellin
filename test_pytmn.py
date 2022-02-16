@@ -338,10 +338,10 @@ def test_add_edge_from_element():
     pytmn.add_edge_from_element(obtained, element, track_id)
 
     expected = nx.DiGraph()
-    expected.add_edge('1', '2',
+    expected.add_edge(1, 2,
                       x='20', y='25', SPOT_SOURCE_ID='1', SPOT_TARGET_ID='2')
-    expected.nodes['1']['TRACK_ID'] = track_id
-    expected.nodes['2']['TRACK_ID'] = track_id
+    expected.nodes[1]['TRACK_ID'] = track_id
+    expected.nodes[2]['TRACK_ID'] = track_id
 
     assert is_equal(obtained, expected)
 
@@ -368,9 +368,9 @@ def test_add_edge_from_element_no_edge_attributes():
     pytmn.add_edge_from_element(obtained, element, track_id)
 
     expected = nx.DiGraph()
-    expected.add_edge('1', '2', SPOT_SOURCE_ID='1', SPOT_TARGET_ID='2')
-    expected.nodes['1']['TRACK_ID'] = track_id
-    expected.nodes['2']['TRACK_ID'] = track_id
+    expected.add_edge(1, 2, SPOT_SOURCE_ID='1', SPOT_TARGET_ID='2')
+    expected.nodes[1]['TRACK_ID'] = track_id
+    expected.nodes[2]['TRACK_ID'] = track_id
 
     assert is_equal(obtained, expected)
 
@@ -399,17 +399,17 @@ def test_add_all_edges_several_attributes():
                                     key=lambda d: d['TRACK_ID'])
 
     expected = nx.DiGraph()
-    expected.add_edge('11', '12',
+    expected.add_edge(11, 12,
                       SPOT_SOURCE_ID='11', SPOT_TARGET_ID='12', x='10', y='20')
-    expected.add_edge('12', '13',
+    expected.add_edge(12, 13,
                       SPOT_SOURCE_ID='12', SPOT_TARGET_ID='13', x='30', y='30')
-    expected.add_edge('21', '22',
+    expected.add_edge(21, 22,
                       SPOT_SOURCE_ID='21', SPOT_TARGET_ID='22', x='15', y='25')
-    expected.add_nodes_from([('11', {'TRACK_ID': '1'}),
-                             ('12', {'TRACK_ID': '1'}),
-                             ('13', {'TRACK_ID': '1'}),
-                             ('21', {'TRACK_ID': '2'}),
-                             ('22', {'TRACK_ID': '2'})])
+    expected.add_nodes_from([(11, {'TRACK_ID': '1'}),
+                             (12, {'TRACK_ID': '1'}),
+                             (13, {'TRACK_ID': '1'}),
+                             (21, {'TRACK_ID': '2'}),
+                             (22, {'TRACK_ID': '2'})])
     expected_tracks_attrib = [{'TRACK_ID': '2', 'name': 'blub'},
                               {'TRACK_ID': '1', 'name': 'blob'}]
     expected_tracks_attrib = sorted(expected_tracks_attrib, 
@@ -488,17 +488,17 @@ def test_add_all_edges_no_track_id():
     obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
     
     expected = nx.DiGraph()
-    expected.add_edge('11', '12',
+    expected.add_edge(11, 12,
                       SPOT_SOURCE_ID='11', SPOT_TARGET_ID='12', x='10', y='20')
-    expected.add_edge('12', '13',
+    expected.add_edge(12, 13,
                       SPOT_SOURCE_ID='12', SPOT_TARGET_ID='13', x='30', y='30')
-    expected.add_edge('21', '22',
+    expected.add_edge(21, 22,
                       SPOT_SOURCE_ID='21', SPOT_TARGET_ID='22', x='15', y='25')
-    expected.add_nodes_from([('11', {'TRACK_ID': None}),
-                             ('12', {'TRACK_ID': None}),
-                             ('13', {'TRACK_ID': None}),
-                             ('21', {'TRACK_ID': None}),
-                             ('22', {'TRACK_ID': None})])
+    expected.add_nodes_from([(11, {'TRACK_ID': None}),
+                             (12, {'TRACK_ID': None}),
+                             (13, {'TRACK_ID': None}),
+                             (21, {'TRACK_ID': None}),
+                             (22, {'TRACK_ID': None})])
     expected_tracks_attrib = [{'name': 'blub'}, {'name': 'blob'}]
     expected_tracks_attrib = sorted(expected_tracks_attrib, 
                                     key=lambda d: d['name'])
@@ -527,17 +527,17 @@ def test_add_all_edges_no_track_attributes():
     obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
     
     expected = nx.DiGraph()
-    expected.add_edge('11', '12',
+    expected.add_edge(11, 12,
                       SPOT_SOURCE_ID='11', SPOT_TARGET_ID='12', x='10', y='20')
-    expected.add_edge('12', '13',
+    expected.add_edge(12, 13,
                       SPOT_SOURCE_ID='12', SPOT_TARGET_ID='13', x='30', y='30')
-    expected.add_edge('21', '22',
+    expected.add_edge(21, 22,
                       SPOT_SOURCE_ID='21', SPOT_TARGET_ID='22', x='15', y='25')
-    expected.add_nodes_from([('11', {'TRACK_ID': None}),
-                             ('12', {'TRACK_ID': None}),
-                             ('13', {'TRACK_ID': None}),
-                             ('21', {'TRACK_ID': None}),
-                             ('22', {'TRACK_ID': None})])
+    expected.add_nodes_from([(11, {'TRACK_ID': None}),
+                             (12, {'TRACK_ID': None}),
+                             (13, {'TRACK_ID': None}),
+                             (21, {'TRACK_ID': None}),
+                             (22, {'TRACK_ID': None})])
     expected_tracks_attrib = [{}, {}]
     
     assert is_equal(obtained, expected)

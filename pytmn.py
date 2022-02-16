@@ -121,8 +121,8 @@ def add_edge_from_element(graph, element, current_track_id):
         current_track_id (str): Track ID of the track holding the edge. 
     """
     try:
-        entry_node = element.attrib['SPOT_SOURCE_ID']
-        exit_node = element.attrib['SPOT_TARGET_ID']
+        entry_node = int(element.attrib['SPOT_SOURCE_ID'])
+        exit_node = int(element.attrib['SPOT_TARGET_ID'])
     except KeyError as err:
         print(f"No key {err} in the attributes of "
               f"current element '{element.tag}'. "
@@ -376,5 +376,6 @@ if __name__ == "__main__":
                     font_weight='bold')
             plt.show()
 
-    print(graphs[1].graph.keys())
+    # print(graphs[1].graph.keys())
     # print(graphs[1].graph['Model'].keys())
+    print(graphs[1].nodes[2091])
