@@ -80,11 +80,6 @@ def test_add_graph_attrib_from_element():
     _, element = next(it)
     obtained = pytmn.add_graph_attrib_from_element(nx.DiGraph(), element)
     expected = nx.DiGraph(attrib1="text", attrib2="10")
-
-    print(obtained.edges.data())
-    print(expected.edges.data())
-    print(obtained.edges.data() == expected.edges.data())
-    
     assert is_equal(obtained, expected)
 
 
@@ -98,33 +93,72 @@ def test_add_graph_attrib_from_element_no_graph_attributes():
     assert is_equal(obtained, expected)
 
 
+### add_features ###
+
+def test_add_features():
+    xml_data = ('<FeatureDeclarations>'
+                '   <SpotFeatures>'
+                '       <Feature feature="QUALITY" isint="false" />'
+                '       <Feature feature="FRAME" isint="true" />'
+                '   </SpotFeatures>'
+                '</FeatureDeclarations>')
+    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    _, element = next(it)
+
+    obtained = nx.DiGraph()
+    pytmn.add_all_features(obtained, it, element)
+
+    spot_features = {"QUALITY": {'feature': "QUALITY", 'isint': "false"},
+                     "FRAME": {'feature': "FRAME", 'isint': "true"}}
+    expected = nx.DiGraph(SpotFeatures=spot_features)
+
+    assert is_equal(obtained, expected)
+
+
+### add_all_features ###
+
+def test_add_all_features():
+    xml_data = ('<FeatureDeclarations>'
+                '   <SpotFeatures>'
+                '       <Feature feature="QUALITY" isint="false" />'
+                '       <Feature feature="FRAME" isint="true" />'
+                '   </SpotFeatures>'
+                '   <EdgeFeatures>'
+                '       <Feature feature="SPOT_SOURCE_ID" isint="true" />'
+                '       <Feature feature="SPOT_TARGET_ID" isint="true" />'
+                '   </EdgeFeatures>'
+                '   <TrackFeatures>'
+                '       <Feature feature="TRACK_INDEX" isint="true" />'
+                '       <Feature feature="NUMBER_SPOTS" isint="true" />'
+                '   </TrackFeatures>'
+                '</FeatureDeclarations>')
+    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    _, element = next(it)
+
+    obtained = nx.DiGraph()
+    pytmn.add_all_features(obtained, it, element)
+
+    spot_features = {"QUALITY": {'feature': "QUALITY", 'isint': "false"},
+                     "FRAME": {'feature': "FRAME", 'isint': "true"}}
+    edge_features = {"SPOT_SOURCE_ID": {'feature': "SPOT_SOURCE_ID", 'isint': "true"},
+                     "SPOT_TARGET_ID": {'feature': "SPOT_TARGET_ID", 'isint': "true"}}
+    track_features = {"TRACK_INDEX": {'feature': "TRACK_INDEX",  'isint':"true"},
+                      "NUMBER_SPOTS": {'feature': "NUMBER_SPOTS", 'isint': "true"}}
+    expected = nx.DiGraph(SpotFeatures=spot_features,
+                          EdgeFeatures=edge_features,
+                          TrackFeatures=track_features)
+
+    assert is_equal(obtained, expected)
+    
+
+
 ### add_all_nodes ###
 
 def test_add_all_nodes_several_attributes():
     xml_data = ('<data>'
                 '   <frame>'
-                '       <Spot ID="blob" x="10" y="20" />'
-                '       <Spot ID="blub" x="30" y="30" />'
-                '   </frame>'
-                '</data>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
-    event, element = next(it)
-
-    obtained = nx.DiGraph()
-    pytmn.add_all_nodes(obtained, it, element)
-
-    expected = nx.DiGraph()
-    expected.add_nodes_from([('blub', {'y': '30', 'ID': 'blub', 'x': '30'}),
-                             ('blob', {'ID': 'blob', 'x': '10', 'y': '20'})])
-
-    assert is_equal(obtained, expected)
-
-
-def test_add_all_nodes_only_ID_attribute():
-    xml_data = ('<data>'
-                '   <frame>'
-                '       <Spot ID="blob" />'
-                '       <Spot ID="blub" />'
+                '       <Spot ID="1000" x="10" y="20" />'
+                '       <Spot ID="1001" x="30" y="30" />'
                 '   </frame>'
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
@@ -134,8 +168,30 @@ def test_add_all_nodes_only_ID_attribute():
     pytmn.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph()
-    expected.add_nodes_from([('blub', {'ID': 'blub'}),
-                             ('blob', {'ID': 'blob'})])
+    expected.add_nodes_from([(1001, {'y': '30', 'ID': '1001', 'x': '30'}),
+                             (1000, {'ID': '1000', 'x': '10', 'y': '20'})])
+
+    print(expected.nodes.data())
+
+    assert is_equal(obtained, expected)
+
+
+def test_add_all_nodes_only_ID_attribute():
+    xml_data = ('<data>'
+                '   <frame>'
+                '       <Spot ID="1000" />'
+                '       <Spot ID="1001" />'
+                '   </frame>'
+                '</data>')
+    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    _, element = next(it)
+
+    obtained = nx.DiGraph()
+    pytmn.add_all_nodes(obtained, it, element)
+
+    expected = nx.DiGraph()
+    expected.add_nodes_from([(1001, {'ID': '1001'}),
+                             (1000, {'ID': '1000'})])
 
     assert is_equal(obtained, expected)
 
@@ -144,7 +200,7 @@ def test_add_all_nodes_no_node_attributes():
     xml_data = ('<data>'
                 '   <frame>'
                 '       <Spot />'
-                '       <Spot ID="blub" />'
+                '       <Spot ID="1001" />'
                 '   </frame>'
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
@@ -154,7 +210,7 @@ def test_add_all_nodes_no_node_attributes():
     pytmn.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph()
-    expected.add_nodes_from([('blub', {'ID': 'blub'})])
+    expected.add_nodes_from([(1001, {'ID': '1001'})])
 
     assert is_equal(obtained, expected)
 

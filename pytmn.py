@@ -20,7 +20,6 @@ import networkx as nx
 
 # TODO: convert str attributes to int or float when it makes sense.
 
-
 def add_graph_attrib_from_element(graph, element):
     """Add graph attributes from an XML element.
 
@@ -39,6 +38,30 @@ def add_graph_attrib_from_element(graph, element):
     return graph
 
 
+def add_features(graph, iterator, ancestor):
+    # ancestor = SpotFeatures
+    event, element = next(iterator)  # Feature.
+    # feature_type = element.tag
+    features = dict()
+    while (event, element) != ('end', ancestor):
+        if element.tag == 'Feature' and event == 'start':
+            features[element.attrib['feature']] = element.attrib
+        element.clear()
+        event, element = next(iterator)
+    graph.graph[ancestor.tag] = features
+    return graph
+            
+
+def add_all_features(graph, iterator, ancestor):
+    # ancestor = FeatureDeclarations.
+    event, element = next(iterator)  # SpotFeatures.
+    while (event, element) != ('end', ancestor):
+        graph = add_features(graph, iterator, element)
+        element.clear()
+        event, element = next(iterator)
+    return graph   
+
+            
 def add_all_nodes(graph, iterator, ancestor):
     """Add nodes and their attributes to a graph.
 
@@ -54,7 +77,8 @@ def add_all_nodes(graph, iterator, ancestor):
         event, element = next(iterator)          
         if element.tag == 'Spot' and event == 'start': 
             try:
-                graph.add_nodes_from([(element.attrib['ID'], element.attrib)])
+                graph.add_nodes_from([(int(element.attrib['ID']),
+                                       element.attrib)])
             except KeyError as err:
                 print(f"No key {err} in the attributes of "
                       f"current element '{element.tag}'. "
@@ -323,3 +347,5 @@ if __name__ == "__main__":
             nx.draw(graph, pos, with_labels=True, arrows=True, 
                     font_weight='bold')
             plt.show()
+
+    print(graphs[1].nodes())
