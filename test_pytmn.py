@@ -104,8 +104,8 @@ def test_get_features_dict():
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
     features = pytmn.get_features_dict(it, element)
-    spot_features = {"QUALITY": {'feature': "QUALITY", 'isint': "false"},
-                     "FRAME": {'feature': "FRAME", 'isint': "true"}}
+    spot_features = {'QUALITY': {'feature': 'QUALITY', 'isint': 'false'},
+                     'FRAME': {'feature': 'FRAME', 'isint': 'true'}}
     assert features == spot_features
 
 
@@ -126,7 +126,7 @@ def test_get_features_dict_other_tag():
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
     features = pytmn.get_features_dict(it, element)
-    spot_features = {"QUALITY": {'feature': "QUALITY", 'isint': "false"}}
+    spot_features = {'QUALITY': {'feature': 'QUALITY', 'isint': 'false'}}
     assert features == spot_features
 
 
@@ -153,16 +153,16 @@ def test_add_all_features():
     obtained = nx.DiGraph(Model={})
     pytmn.add_all_features(obtained, it, element)
 
-    spot_features = {"QUALITY": {'feature': "QUALITY", 'isint': "false"},
-                     "FRAME": {'feature': "FRAME", 'isint': "true"}}
-    edge_features = {"SPOT_SOURCE_ID": {'feature': "SPOT_SOURCE_ID",
-                                        'isint': "true"},
-                     "SPOT_TARGET_ID": {'feature': "SPOT_TARGET_ID",
-                                        'isint': "true"}}
-    track_features = {"TRACK_INDEX": {'feature': "TRACK_INDEX",
-                                      'isint':"true"},
-                      "NUMBER_SPOTS": {'feature': "NUMBER_SPOTS",
-                                       'isint': "true"}}
+    spot_features = {'QUALITY': {'feature': 'QUALITY', 'isint': 'false'},
+                     'FRAME': {'feature': 'FRAME', 'isint': 'true'}}
+    edge_features = {'SPOT_SOURCE_ID': {'feature': 'SPOT_SOURCE_ID',
+                                        'isint': 'true'},
+                     'SPOT_TARGET_ID': {'feature': 'SPOT_TARGET_ID',
+                                        'isint': 'true'}}
+    track_features = {'TRACK_INDEX': {'feature': 'TRACK_INDEX',
+                                      'isint':'true'},
+                      'NUMBER_SPOTS': {'feature': 'NUMBER_SPOTS',
+                                       'isint': 'true'}}
     expected = nx.DiGraph(Model={'SpotFeatures': spot_features,
                                  'EdgeFeatures': edge_features,
                                  'TrackFeatures': track_features})
@@ -201,12 +201,12 @@ def test_add_all_features_tag_with_no_feature_tag():
     obtained = nx.DiGraph(Model={})
     pytmn.add_all_features(obtained, it, element)
 
-    spot_features = {"QUALITY": {'feature': "QUALITY", 'isint': "false"},
-                     "FRAME": {'feature': "FRAME", 'isint': "true"}}
-    track_features = {"TRACK_INDEX": {'feature': "TRACK_INDEX",
-                                      'isint':"true"},
-                      "NUMBER_SPOTS": {'feature': "NUMBER_SPOTS",
-                                       'isint': "true"}}
+    spot_features = {'QUALITY': {'feature': 'QUALITY', 'isint': 'false'},
+                     'FRAME': {'feature': 'FRAME', 'isint': 'true'}}
+    track_features = {'TRACK_INDEX': {'feature': 'TRACK_INDEX',
+                                      'isint':'true'},
+                      'NUMBER_SPOTS': {'feature': 'NUMBER_SPOTS',
+                                       'isint': 'true'}}
     expected = nx.DiGraph(Model={'SpotFeatures': spot_features,
                                  'EdgeFeatures': {},
                                  'TrackFeatures': track_features})
@@ -235,14 +235,14 @@ def test_add_all_features_no_feature_attribute():
     obtained = nx.DiGraph(Model={})
     pytmn.add_all_features(obtained, it, element)
 
-    spot_features = {"QUALITY": {'feature': "QUALITY", 'isint': "false"},
-                     "FRAME": {'feature': "FRAME", 'isint': "true"}}
-    edge_features = {"SPOT_SOURCE_ID": {'feature': "SPOT_SOURCE_ID",
-                                        'isint': "true"}}
-    track_features = {"TRACK_INDEX": {'feature': "TRACK_INDEX",
-                                      'isint':"true"},
-                      "NUMBER_SPOTS": {'feature': "NUMBER_SPOTS",
-                                       'isint': "true"}}
+    spot_features = {'QUALITY': {'feature': 'QUALITY', 'isint': 'false'},
+                     'FRAME': {'feature': 'FRAME', 'isint': 'true'}}
+    edge_features = {'SPOT_SOURCE_ID': {'feature': 'SPOT_SOURCE_ID',
+                                        'isint': 'true'}}
+    track_features = {'TRACK_INDEX': {'feature': 'TRACK_INDEX',
+                                      'isint':'true'},
+                      'NUMBER_SPOTS': {'feature': 'NUMBER_SPOTS',
+                                       'isint': 'true'}}
     expected = nx.DiGraph(Model={'SpotFeatures': spot_features,
                                  'EdgeFeatures': edge_features,
                                  'TrackFeatures': track_features})
@@ -310,16 +310,10 @@ def test_add_all_nodes_several_attributes():
     spot_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'}}
     obtained = nx.DiGraph(Model={'SpotFeatures': spot_features})
     pytmn.add_all_nodes(obtained, it, element)
-    print('\nOBTAINED')
-    print(obtained.graph)
-    print(obtained.nodes.data())
 
     expected = nx.DiGraph(Model={'SpotFeatures': spot_features})
     expected.add_nodes_from([(1001, {'y': 30, 'ID': '1001', 'x': 30.5}),
                              (1000, {'ID': '1000', 'x': 10.0, 'y': 20})])
-    print('\nEXPECTED')
-    print(expected.graph)
-    print(expected.nodes.data())
 
     assert is_equal(obtained, expected)
 
