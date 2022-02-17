@@ -117,8 +117,28 @@ def convert_attributes(attributes: dict, features: dict):
             else:
                 raise ValueError(f"'{features[key]['isint']}' is an invalid"
                                  f" feature attribute value for 'isint'.")
-    
-            
+
+
+def add_ROI_coordinates(element):
+    """Extract, format and add ROI coordinates to the element attributes.
+
+    Args:
+        element (ET.Element): Element from which to extract ROI coordinates.
+    """
+    try:
+        n_points = int(element.attrib['ROI_N_POINTS'])
+    except KeyError as err:
+        print(f"No key {err} in the attributes of current element "
+              f"'{element.tag}'. ")
+    else:        
+        points_coordinates = element.text.split()
+        points_coordinates = [float(x) for x in points_coordinates]
+        points_dimension = len(points_coordinates) // n_points
+        it = [iter(points_coordinates)] * points_dimension
+        points_coordinates = list(zip(*it))
+        element.attrib['ROI_N_POINTS'] = points_coordinates
+
+           
 def add_all_nodes(graph, iterator, ancestor):
     """Add nodes and their attributes to a graph.
 
@@ -132,7 +152,7 @@ def add_all_nodes(graph, iterator, ancestor):
     event, element = next(iterator)
     while (event, element) != ('end', ancestor):
         event, element = next(iterator)          
-        if element.tag == 'Spot' and event == 'start': 
+        if element.tag == 'Spot' and event == 'end': 
             # All items in element.attrib are parsed as strings but most
             # of them (if not all) are numbers. So we need to do a
             # conversion based on these attributes type (attribute `isint`)
@@ -146,6 +166,13 @@ def add_all_nodes(graph, iterator, ancestor):
             except KeyError as err:
                 print(f'ERROR: {err} Please check the XML file.')
                 raise
+
+            # The ROI coordinates are not stored in a tag attribute but in
+            # the tag text. So we need to extract then format them.
+            add_ROI_coordinates(element)             
+
+            # Now that all the node attributes have been updated, we can add
+            # it to the graph.
             try:
                 graph.add_nodes_from([(int(element.attrib['ID']),
                                        element.attrib)])

@@ -253,7 +253,6 @@ def test_add_all_features_no_feature_attribute():
 ### convert_attributes ###
 
 def test_convert_attributes():
-
     features = {'float': {'isint': 'false'}, 'int': {'isint': 'true'},
                 'neg': {'isint': 'false'}, 'str': {'isint': 'false'}}
     
@@ -266,7 +265,6 @@ def test_convert_attributes():
 
 
 def test_convert_attributes_mixed_case():
-
     features = {'float': {'isint': 'FaLsE'}, 'int': {'isint': 'tRuE'}}
     
     obtained_attr = {'float': '30', 'int': '20'}
@@ -278,7 +276,6 @@ def test_convert_attributes_mixed_case():
     
 
 def test_convert_attributes_KeyError():
-
     features = {'float': {'not_isint': 'false'}, 'int': {'not_isint': 'true'}}
     attributes = {'float': '30', 'int': '20'}
 
@@ -287,12 +284,45 @@ def test_convert_attributes_KeyError():
 
 
 def test_convert_attributes_ValueError():
-
     features = {'float': {'isint': 'not false'}, 'int': {'isint': 'true'}}
     attributes = {'float': '30', 'int': '20'}
 
     with pytest.raises(ValueError):
         pytmn.convert_attributes(attributes, features)
+
+
+### add_ROI_coordinates ###
+
+def test_add_ROI_coordinates_2D():
+    el_obtained = ET.Element('Spot')
+    el_obtained.attrib['ROI_N_POINTS'] = '3'
+    el_obtained.text = '1 2.0 -3 -4.0 5.5 6'
+    pytmn.add_ROI_coordinates(el_obtained)
+
+    el_expected = ET.Element('Spot')
+    el_expected.attrib['ROI_N_POINTS'] = [(1.0, 2.0), (-3.0, -4.0), (5.5, 6.0)]
+    
+    assert el_obtained.attrib == el_expected.attrib
+
+
+def test_add_ROI_coordinates_3D():
+    el_obtained = ET.Element('Spot')
+    el_obtained.attrib['ROI_N_POINTS'] = '2'
+    el_obtained.text = '1 2.0 -3 -4.0 5.5 6'
+    pytmn.add_ROI_coordinates(el_obtained)
+
+    el_expected = ET.Element('Spot')
+    el_expected.attrib['ROI_N_POINTS'] = [(1.0, 2.0, -3.0), (-4.0, 5.5, 6.0)]
+    
+    assert el_obtained.attrib == el_expected.attrib
+
+
+def test_add_ROI_coordinates_no_ROI():
+    el_obtained = ET.Element('Spot')
+    el_obtained.text = '1 2.0 -3 -4.0 5.5 6'
+    pytmn.add_ROI_coordinates(el_obtained)
+
+    assert el_obtained.attrib == ET.Element('Spot').attrib
 
 
 ### add_all_nodes ###
