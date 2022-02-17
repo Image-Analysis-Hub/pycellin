@@ -101,7 +101,9 @@ def convert_attributes(attributes: dict, features: dict):
         ValueError: If the value of the 'isint' feature attribute is invalid.
     """
     for key in attributes:
-        if key in features:
+        if key == 'ID':
+            attributes[key] = int(attributes[key])  # IDs are always integers.
+        elif key in features:
             if 'isint' not in features[key]:
                 raise KeyError(f"No 'isint' feature attribute in "
                                f"FeatureDeclarations.")
@@ -115,7 +117,7 @@ def convert_attributes(attributes: dict, features: dict):
             else:
                 raise ValueError(f"'{features[key]['isint']}' is an invalid"
                                  f" feature attribute value for 'isint'.")
-
+    
             
 def add_all_nodes(graph, iterator, ancestor):
     """Add nodes and their attributes to a graph.
@@ -418,3 +420,5 @@ if __name__ == "__main__":
             nx.draw(graph, pos, with_labels=True, arrows=True, 
                     font_weight='bold')
             plt.show()
+
+# print(graphs[1].nodes[2091])

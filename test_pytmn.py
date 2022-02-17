@@ -312,8 +312,8 @@ def test_add_all_nodes_several_attributes():
     pytmn.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph(Model={'SpotFeatures': spot_features})
-    expected.add_nodes_from([(1001, {'y': 30, 'ID': '1001', 'x': 30.5}),
-                             (1000, {'ID': '1000', 'x': 10.0, 'y': 20})])
+    expected.add_nodes_from([(1001, {'y': 30, 'ID': 1001, 'x': 30.5}),
+                             (1000, {'ID': 1000, 'x': 10.0, 'y': 20})])
 
     assert is_equal(obtained, expected)
 
@@ -332,8 +332,8 @@ def test_add_all_nodes_only_ID_attribute():
     pytmn.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph(Model={'SpotFeatures': {}})
-    expected.add_nodes_from([(1001, {'ID': '1001'}),
-                             (1000, {'ID': '1000'})])
+    expected.add_nodes_from([(1001, {'ID': 1001}),
+                             (1000, {'ID': 1000})])
 
     assert is_equal(obtained, expected)
 
@@ -352,7 +352,7 @@ def test_add_all_nodes_no_node_attributes():
     pytmn.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph(Model={'SpotFeatures': {}})
-    expected.add_nodes_from([(1001, {'ID': '1001'})])
+    expected.add_nodes_from([(1001, {'ID': 1001})])
 
     assert is_equal(obtained, expected)
 
