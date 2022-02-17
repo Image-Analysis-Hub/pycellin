@@ -165,9 +165,11 @@ def add_edge_from_element(graph, element, current_track_id):
         element (ET.Element): Element holding the information to be added.
         current_track_id (str): Track ID of the track holding the edge. 
     """
+    convert_attributes(element.attrib,
+                       graph.graph['Model']['EdgeFeatures'])
     try:
-        entry_node = int(element.attrib['SPOT_SOURCE_ID'])
-        exit_node = int(element.attrib['SPOT_TARGET_ID'])
+        entry_node = element.attrib['SPOT_SOURCE_ID']
+        exit_node = element.attrib['SPOT_TARGET_ID']
     except KeyError as err:
         print(f"No key {err} in the attributes of "
               f"current element '{element.tag}'. "
@@ -205,6 +207,8 @@ def add_all_edges(graph, iterator, ancestor):
         # This condition is a bit of an overkill since the XML structure
         # SHOULD stay the same but better safe than sorry.
         # TODO: refactor this chunk that appears twice in this method.
+        convert_attributes(element.attrib,
+                           graph.graph['Model']['TrackFeatures'])
         tracks_attributes.append(element.attrib)
         try:
             current_track_id = element.attrib['TRACK_ID']
@@ -219,6 +223,8 @@ def add_all_edges(graph, iterator, ancestor):
 
         # Saving the current track information.
         if element.tag == 'Track' and event == 'start':
+            convert_attributes(element.attrib,
+                               graph.graph['Model']['TrackFeatures'])
             tracks_attributes.append(element.attrib)
             try:
                 current_track_id = element.attrib['TRACK_ID']
@@ -248,7 +254,7 @@ def get_filtered_tracks_ID(iterator, ancestor):
     filtered_tracks_ID = []
     event, element = next(iterator)
     try:
-        filtered_tracks_ID.append(element.attrib['TRACK_ID'])
+        filtered_tracks_ID.append(int(element.attrib['TRACK_ID']))
     except KeyError as err:
         print(f"No key {err} in the attributes of current element "
               f"'{element.tag}'. Ignoring this track.")
@@ -257,7 +263,7 @@ def get_filtered_tracks_ID(iterator, ancestor):
         event, element = next(iterator)          
         if element.tag == 'TrackID' and event == 'start':
             try:
-                filtered_tracks_ID.append(element.attrib['TRACK_ID'])
+                filtered_tracks_ID.append(int(element.attrib['TRACK_ID']))
             except KeyError as err:
                 print(f"No key {err} in the attributes of current element "
                       f"'{element.tag}'. Ignoring this track.")
@@ -420,5 +426,3 @@ if __name__ == "__main__":
             nx.draw(graph, pos, with_labels=True, arrows=True, 
                     font_weight='bold')
             plt.show()
-
-# print(graphs[1].nodes[2091])

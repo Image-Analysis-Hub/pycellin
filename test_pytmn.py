@@ -376,14 +376,16 @@ def test_add_edge_from_element():
     xml_data = ('<data SPOT_SOURCE_ID="1" SPOT_TARGET_ID="2" x="20" y="25" />')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
-    track_id = '0'
+    track_id = 0
 
-    obtained = nx.DiGraph()
+    edge_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'},
+                     'SPOT_SOURCE_ID': {'isint': 'true'},
+                     'SPOT_TARGET_ID': {'isint': 'true'}}
+    obtained = nx.DiGraph(Model={'EdgeFeatures': edge_features})
     pytmn.add_edge_from_element(obtained, element, track_id)
 
-    expected = nx.DiGraph()
-    expected.add_edge(1, 2,
-                      x='20', y='25', SPOT_SOURCE_ID='1', SPOT_TARGET_ID='2')
+    expected = nx.DiGraph(Model={'EdgeFeatures': edge_features})
+    expected.add_edge(1, 2, x=20.0, y=25, SPOT_SOURCE_ID=1, SPOT_TARGET_ID=2)
     expected.nodes[1]['TRACK_ID'] = track_id
     expected.nodes[2]['TRACK_ID'] = track_id
 
@@ -394,25 +396,31 @@ def test_add_edge_from_element_no_node_ID():
     xml_data = ('<data SPOT_SOURCE_ID="1" x="20" y="25" />')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
-    track_id = '0'
+    track_id = 0
     
-    obtained = nx.DiGraph()
+    edge_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'},
+                     'SPOT_SOURCE_ID': {'isint': 'true'}}
+    obtained = nx.DiGraph(Model={'EdgeFeatures': edge_features})
     pytmn.add_edge_from_element(obtained, element, track_id)
     
-    assert is_equal(obtained, nx.DiGraph())
+    expected = nx.DiGraph(Model={'EdgeFeatures': edge_features})
+    
+    assert is_equal(obtained, expected)
 
 
 def test_add_edge_from_element_no_edge_attributes():
     xml_data = ('<data SPOT_SOURCE_ID="1" SPOT_TARGET_ID="2" />')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
-    track_id = '0'
+    track_id = 0
 
-    obtained = nx.DiGraph()
+    edge_features = {'SPOT_SOURCE_ID': {'isint': 'true'},
+                     'SPOT_TARGET_ID': {'isint': 'true'}}
+    obtained = nx.DiGraph(Model={'EdgeFeatures': edge_features})
     pytmn.add_edge_from_element(obtained, element, track_id)
 
-    expected = nx.DiGraph()
-    expected.add_edge(1, 2, SPOT_SOURCE_ID='1', SPOT_TARGET_ID='2')
+    expected = nx.DiGraph(Model={'EdgeFeatures': edge_features})
+    expected.add_edge(1, 2, SPOT_SOURCE_ID=1, SPOT_TARGET_ID=2)
     expected.nodes[1]['TRACK_ID'] = track_id
     expected.nodes[2]['TRACK_ID'] = track_id
 
@@ -436,26 +444,32 @@ def test_add_all_edges_several_attributes():
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
+    edge_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'},
+                     'SPOT_SOURCE_ID': {'isint': 'true'},
+                     'SPOT_TARGET_ID': {'isint': 'true'}}
+    track_features = {'TRACK_ID': {'isint': 'true'}}
 
-    obtained = nx.DiGraph()
+    obtained = nx.DiGraph(Model={'EdgeFeatures': edge_features,
+                                 'TrackFeatures': track_features})
     obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, 
                                     key=lambda d: d['TRACK_ID'])
 
-    expected = nx.DiGraph()
+    expected = nx.DiGraph(Model={'EdgeFeatures': edge_features,
+                                 'TrackFeatures': track_features})
     expected.add_edge(11, 12,
-                      SPOT_SOURCE_ID='11', SPOT_TARGET_ID='12', x='10', y='20')
+                      SPOT_SOURCE_ID=11, SPOT_TARGET_ID=12, x=10.0, y=20)
     expected.add_edge(12, 13,
-                      SPOT_SOURCE_ID='12', SPOT_TARGET_ID='13', x='30', y='30')
+                      SPOT_SOURCE_ID=12, SPOT_TARGET_ID=13, x=30.0, y=30)
     expected.add_edge(21, 22,
-                      SPOT_SOURCE_ID='21', SPOT_TARGET_ID='22', x='15', y='25')
-    expected.add_nodes_from([(11, {'TRACK_ID': '1'}),
-                             (12, {'TRACK_ID': '1'}),
-                             (13, {'TRACK_ID': '1'}),
-                             (21, {'TRACK_ID': '2'}),
-                             (22, {'TRACK_ID': '2'})])
-    expected_tracks_attrib = [{'TRACK_ID': '2', 'name': 'blub'},
-                              {'TRACK_ID': '1', 'name': 'blob'}]
+                      SPOT_SOURCE_ID=21, SPOT_TARGET_ID=22, x=15.0, y=25)
+    expected.add_nodes_from([(11, {'TRACK_ID': 1}),
+                             (12, {'TRACK_ID': 1}),
+                             (13, {'TRACK_ID': 1}),
+                             (21, {'TRACK_ID': 2}),
+                             (22, {'TRACK_ID': 2})])
+    expected_tracks_attrib = [{'TRACK_ID': 2, 'name': 'blub'},
+                              {'TRACK_ID': 1, 'name': 'blob'}]
     expected_tracks_attrib = sorted(expected_tracks_attrib, 
                                     key=lambda d: d['TRACK_ID'])
 
@@ -475,18 +489,23 @@ def test_add_all_edges_no_nodes_ID():
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
+    edge_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'}}
+    track_features = {'TRACK_ID': {'isint': 'true'}}
 
-    obtained = nx.DiGraph()
+    obtained = nx.DiGraph(Model={'EdgeFeatures': edge_features,
+                                 'TrackFeatures': track_features})
     obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, 
                                     key=lambda d: d['TRACK_ID'])
 
-    expected_tracks_attrib = [{'TRACK_ID': '2', 'name': 'blub'},
-                              {'TRACK_ID': '1', 'name': 'blob'}]
+    expected = nx.DiGraph(Model={'EdgeFeatures': edge_features,
+                                 'TrackFeatures': track_features})
+    expected_tracks_attrib = [{'TRACK_ID': 2, 'name': 'blub'},
+                              {'TRACK_ID': 1, 'name': 'blob'}]
     expected_tracks_attrib = sorted(expected_tracks_attrib, 
                                     key=lambda d: d['TRACK_ID'])
 
-    assert is_equal(obtained, nx.DiGraph())
+    assert is_equal(obtained, expected)
     assert obtained_tracks_attrib == expected_tracks_attrib
 
 
@@ -497,18 +516,20 @@ def test_add_all_edges_no_edges():
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
+    track_features = {'TRACK_ID': {'isint': 'true'}}
 
-    obtained = nx.DiGraph()
+    obtained = nx.DiGraph(Model={'TrackFeatures': track_features})
     obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, 
                                     key=lambda d: d['TRACK_ID'])
-    
-    expected_tracks_attrib = [{'TRACK_ID': '2', 'name': 'blub'},
-                              {'TRACK_ID': '1', 'name': 'blob'}]
+
+    expected = nx.DiGraph(Model={'TrackFeatures': track_features})
+    expected_tracks_attrib = [{'TRACK_ID': 2, 'name': 'blub'},
+                              {'TRACK_ID': 1, 'name': 'blob'}]
     expected_tracks_attrib = sorted(expected_tracks_attrib, 
                                     key=lambda d: d['TRACK_ID'])
 
-    assert is_equal(obtained, nx.DiGraph())
+    assert is_equal(obtained, expected)
     assert obtained_tracks_attrib == expected_tracks_attrib
 
 
@@ -527,17 +548,22 @@ def test_add_all_edges_no_track_id():
             '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
+    edge_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'},
+                     'SPOT_SOURCE_ID': {'isint': 'true'},
+                     'SPOT_TARGET_ID': {'isint': 'true'}}
 
-    obtained = nx.DiGraph()
+    obtained = nx.DiGraph(Model={'EdgeFeatures': edge_features,
+                                 'TrackFeatures': {}})
     obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
     
-    expected = nx.DiGraph()
-    expected.add_edge(11, 12,
-                      SPOT_SOURCE_ID='11', SPOT_TARGET_ID='12', x='10', y='20')
-    expected.add_edge(12, 13,
-                      SPOT_SOURCE_ID='12', SPOT_TARGET_ID='13', x='30', y='30')
-    expected.add_edge(21, 22,
-                      SPOT_SOURCE_ID='21', SPOT_TARGET_ID='22', x='15', y='25')
+    expected = nx.DiGraph(Model={'EdgeFeatures': edge_features,
+                                 'TrackFeatures': {}})
+    expected.add_edge(11, 12, SPOT_SOURCE_ID=11, SPOT_TARGET_ID=12, 
+                      x=10.0, y=20)
+    expected.add_edge(12, 13, SPOT_SOURCE_ID=12, SPOT_TARGET_ID=13,
+                      x=30.0, y=30)
+    expected.add_edge(21, 22, SPOT_SOURCE_ID=21, SPOT_TARGET_ID=22,
+                      x=15.0, y=25)
     expected.add_nodes_from([(11, {'TRACK_ID': None}),
                              (12, {'TRACK_ID': None}),
                              (13, {'TRACK_ID': None}),
@@ -566,17 +592,22 @@ def test_add_all_edges_no_track_attributes():
             '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
+    edge_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'},
+                     'SPOT_SOURCE_ID': {'isint': 'true'},
+                     'SPOT_TARGET_ID': {'isint': 'true'}}
 
-    obtained = nx.DiGraph()
+    obtained = nx.DiGraph(Model={'EdgeFeatures': edge_features,
+                                 'TrackFeatures': {}})
     obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
     
-    expected = nx.DiGraph()
-    expected.add_edge(11, 12,
-                      SPOT_SOURCE_ID='11', SPOT_TARGET_ID='12', x='10', y='20')
-    expected.add_edge(12, 13,
-                      SPOT_SOURCE_ID='12', SPOT_TARGET_ID='13', x='30', y='30')
-    expected.add_edge(21, 22,
-                      SPOT_SOURCE_ID='21', SPOT_TARGET_ID='22', x='15', y='25')
+    expected = nx.DiGraph(Model={'EdgeFeatures': edge_features,
+                                 'TrackFeatures': {}})
+    expected.add_edge(11, 12, SPOT_SOURCE_ID=11, SPOT_TARGET_ID=12,
+                      x=10.0, y=20)
+    expected.add_edge(12, 13, SPOT_SOURCE_ID=12, SPOT_TARGET_ID=13, 
+                      x=30.0, y=30)
+    expected.add_edge(21, 22, SPOT_SOURCE_ID=21, SPOT_TARGET_ID=22,
+                      x=15.0, y=25)
     expected.add_nodes_from([(11, {'TRACK_ID': None}),
                              (12, {'TRACK_ID': None}),
                              (13, {'TRACK_ID': None}),
@@ -599,7 +630,7 @@ def test_get_filtered_tracks_ID():
     _, element = next(it)
 
     obtained_ID = pytmn.get_filtered_tracks_ID(it, element)
-    expected_ID = ['0', '1']
+    expected_ID = [0, 1]
     assert obtained_ID.sort() == expected_ID.sort()
     
 
@@ -628,24 +659,24 @@ def test_get_filtered_tracks_ID_no_tracks():
 ### add_tracks_info ###
 
 def test_add_tracks_info():
-    g1_attr = {'name': 'blob', 'TRACK_ID': '0'}
-    g2_attr = {'name': 'blub', 'TRACK_ID': '1'}
+    g1_attr = {'name': 'blob', 'TRACK_ID': 0}
+    g2_attr = {'name': 'blub', 'TRACK_ID': 1}
 
     g1_obt = nx.DiGraph()
-    g1_obt.add_node(1, TRACK_ID='0')
+    g1_obt.add_node(1, TRACK_ID=0)
     g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID='1')
+    g2_obt.add_node(2, TRACK_ID=1)
     obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
                                             [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
     g1_exp.graph['name'] = 'blob'
-    g1_exp.graph['TRACK_ID'] = '0'
-    g1_exp.add_node(1, TRACK_ID='0')
+    g1_exp.graph['TRACK_ID'] = 0
+    g1_exp.add_node(1, TRACK_ID=0)
     g2_exp = nx.DiGraph()
     g2_exp.graph['name'] = 'blub'
-    g2_exp.graph['TRACK_ID'] = '1'
-    g2_exp.add_node(2, TRACK_ID='1')
+    g2_exp.graph['TRACK_ID'] = 1
+    g2_exp.add_node(2, TRACK_ID=1)
     expected_graphs = [g1_exp, g2_exp]
 
     assert is_equal(obtained_graphs[0], expected_graphs[0])
@@ -653,14 +684,14 @@ def test_add_tracks_info():
 
 
 def test_add_tracks_info_no_track_ID_on_all_nodes():
-    g1_attr = {'name': 'blob', 'TRACK_ID': '0'}
-    g2_attr = {'name': 'blub', 'TRACK_ID': '1'}
+    g1_attr = {'name': 'blob', 'TRACK_ID': 0}
+    g2_attr = {'name': 'blub', 'TRACK_ID': 1}
 
     g1_obt = nx.DiGraph()
     g1_obt.add_node(1)
     g1_obt.add_node(3)
     g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID='1')
+    g2_obt.add_node(2, TRACK_ID=1)
     obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
                                             [g1_attr, g2_attr])
 
@@ -669,8 +700,8 @@ def test_add_tracks_info_no_track_ID_on_all_nodes():
     g1_exp.add_node(3)
     g2_exp = nx.DiGraph()
     g2_exp.graph['name'] = 'blub'
-    g2_exp.graph['TRACK_ID'] = '1'
-    g2_exp.add_node(2, TRACK_ID='1')
+    g2_exp.graph['TRACK_ID'] = 1
+    g2_exp.add_node(2, TRACK_ID=1)
     expected_graphs = [g1_exp, g2_exp]
 
     assert is_equal(obtained_graphs[0], expected_graphs[0])
@@ -678,29 +709,29 @@ def test_add_tracks_info_no_track_ID_on_all_nodes():
     
 
 def test_add_tracks_info_no_track_ID_on_one_node():
-    g1_attr = {'name': 'blob', 'TRACK_ID': '0'}
-    g2_attr = {'name': 'blub', 'TRACK_ID': '1'}
+    g1_attr = {'name': 'blob', 'TRACK_ID': 0}
+    g2_attr = {'name': 'blub', 'TRACK_ID': 1}
 
     g1_obt = nx.DiGraph()
     g1_obt.add_node(1)
     g1_obt.add_node(3)
-    g1_obt.add_node(4, TRACK_ID='0')
+    g1_obt.add_node(4, TRACK_ID=0)
     
     g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID='1')
+    g2_obt.add_node(2, TRACK_ID=1)
     obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
                                             [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
     g1_exp.graph['name'] = 'blob'
-    g1_exp.graph['TRACK_ID'] = '0'
+    g1_exp.graph['TRACK_ID'] = 0
     g1_exp.add_node(1)
     g1_exp.add_node(3)
-    g1_exp.add_node(4, TRACK_ID='0')
+    g1_exp.add_node(4, TRACK_ID=0)
     g2_exp = nx.DiGraph()
     g2_exp.graph['name'] = 'blub'
-    g2_exp.graph['TRACK_ID'] = '1'
-    g2_exp.add_node(2, TRACK_ID='1')
+    g2_exp.graph['TRACK_ID'] = 1
+    g2_exp.add_node(2, TRACK_ID=1)
     expected_graphs = [g1_exp, g2_exp]
 
     assert is_equal(obtained_graphs[0], expected_graphs[0])
@@ -708,36 +739,36 @@ def test_add_tracks_info_no_track_ID_on_one_node():
 
 
 def test_add_tracks_info_different_ID_for_one_track():
-    g1_attr = {'name': 'blob', 'TRACK_ID': '0'}
-    g2_attr = {'name': 'blub', 'TRACK_ID': '1'}
+    g1_attr = {'name': 'blob', 'TRACK_ID': 0}
+    g2_attr = {'name': 'blub', 'TRACK_ID': 1}
     
     g1_obt = nx.DiGraph()
-    g1_obt.add_node(1, TRACK_ID='0')
-    g1_obt.add_node(3, TRACK_ID='2')
-    g1_obt.add_node(4, TRACK_ID='0')
+    g1_obt.add_node(1, TRACK_ID=0)
+    g1_obt.add_node(3, TRACK_ID=2)
+    g1_obt.add_node(4, TRACK_ID=0)
     
     g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID='1')
+    g2_obt.add_node(2, TRACK_ID=1)
     with pytest.raises(ValueError):
         obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
                                                 [g1_attr, g2_attr])
 
 
 def test_add_tracks_info_no_nodes():
-    g1_attr = {'name': 'blob', 'TRACK_ID': '0'}
-    g2_attr = {'name': 'blub', 'TRACK_ID': '1'}
+    g1_attr = {'name': 'blob', 'TRACK_ID': 0}
+    g2_attr = {'name': 'blub', 'TRACK_ID': 1}
 
     g1_obt = nx.DiGraph()
     g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID='1')
+    g2_obt.add_node(2, TRACK_ID=1)
     obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
                                             [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
     g2_exp = nx.DiGraph()
     g2_exp.graph['name'] = 'blub'
-    g2_exp.graph['TRACK_ID'] = '1'
-    g2_exp.add_node(2, TRACK_ID='1')
+    g2_exp.graph['TRACK_ID'] = 1
+    g2_exp.add_node(2, TRACK_ID=1)
     expected_graphs = [g1_exp, g2_exp]
 
     assert is_equal(obtained_graphs[0], expected_graphs[0])
