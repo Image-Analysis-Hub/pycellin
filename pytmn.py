@@ -13,6 +13,7 @@ __version__ = "0.2"
 
 import argparse
 from pathlib import Path
+import time
 import xml.etree.ElementTree as ET
 
 import matplotlib.pyplot as plt
@@ -364,6 +365,9 @@ def export_graph(graph, input):
 
 if __name__ == "__main__":
 
+    start = time.process_time()
+    print('Starting conversion...')
+
     parser = argparse.ArgumentParser()
     parser.add_argument("xml", help="path of the XML file to process")
     parser.add_argument("-e", "--export", action="store_true",
@@ -453,3 +457,7 @@ if __name__ == "__main__":
             nx.draw(graph, pos, with_labels=True, arrows=True, 
                     font_weight='bold')
             plt.show()
+
+    p_time = time.process_time() - start
+    print(f'...done in {(p_time // 60):.0f} min {(p_time % 60):.2f} s.')
+    print(f'{len(graphs)} tracks have been exported.')
