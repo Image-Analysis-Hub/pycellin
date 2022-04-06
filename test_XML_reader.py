@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Unit test for pyTMn.
+"""Unit test for pyTMn XML_reader.
 """
 
 import io
@@ -11,7 +11,7 @@ import networkx as nx
 import networkx.algorithms.isomorphism as iso
 import pytest
 
-import pytmn
+import XML_reader as xmlr
 
 
 def is_equal(obt, exp):
@@ -21,7 +21,7 @@ def is_equal(obt, exp):
     nodes and edges attributes are all identical.
 
     Args:
-        obt (nx.DiGraph): The obtained graph, built from pytmn.py.
+        obt (nx.DiGraph): The obtained graph, built from XML_reader.py.
         exp (nx.DiGraph): The expected graph, built from here.
 
     Returns:
@@ -78,7 +78,7 @@ def test_add_graph_attrib_from_element():
     xml_data = ('<data attrib1="text" attrib2="10" />')
     it = ET.iterparse(io.StringIO(xml_data))
     _, element = next(it)
-    obtained = pytmn.add_graph_attrib_from_element(nx.DiGraph(), element)
+    obtained = xmlr.add_graph_attrib_from_element(nx.DiGraph(), element)
     model = {'attrib1': 'text', 'attrib2': '10'}
     expected = nx.DiGraph(Model=model)
     assert is_equal(obtained, expected)
@@ -89,7 +89,7 @@ def test_add_graph_attrib_from_element_no_graph_attributes():
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data))
     _, element = next(it)
-    obtained = pytmn.add_graph_attrib_from_element(nx.DiGraph(), element)
+    obtained = xmlr.add_graph_attrib_from_element(nx.DiGraph(), element)
     expected = nx.DiGraph(Model={})
     assert is_equal(obtained, expected)
 
@@ -103,7 +103,7 @@ def test_get_features_dict():
                 '</SpotFeatures>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
-    features = pytmn.get_features_dict(it, element)
+    features = xmlr.get_features_dict(it, element)
     spot_features = {'QUALITY': {'feature': 'QUALITY', 'isint': 'false'},
                      'FRAME': {'feature': 'FRAME', 'isint': 'true'}}
     assert features == spot_features
@@ -114,7 +114,7 @@ def test_get_features_dict_no_feature_tag():
                 '</SpotFeatures>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
-    features = pytmn.get_features_dict(it, element)
+    features = xmlr.get_features_dict(it, element)
     assert features == {}
 
 
@@ -125,7 +125,7 @@ def test_get_features_dict_other_tag():
                 '</SpotFeatures>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
-    features = pytmn.get_features_dict(it, element)
+    features = xmlr.get_features_dict(it, element)
     spot_features = {'QUALITY': {'feature': 'QUALITY', 'isint': 'false'}}
     assert features == spot_features
 
@@ -151,7 +151,7 @@ def test_add_all_features():
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={})
-    pytmn.add_all_features(obtained, it, element)
+    xmlr.add_all_features(obtained, it, element)
 
     spot_features = {'QUALITY': {'feature': 'QUALITY', 'isint': 'false'},
                      'FRAME': {'feature': 'FRAME', 'isint': 'true'}}
@@ -177,7 +177,7 @@ def test_add_all_features_empty():
     _, element = next(it)
 
     obtained = nx.DiGraph()
-    pytmn.add_all_features(obtained, it, element)
+    xmlr.add_all_features(obtained, it, element)
 
     assert is_equal(obtained, nx.DiGraph())
 
@@ -199,7 +199,7 @@ def test_add_all_features_tag_with_no_feature_tag():
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={})
-    pytmn.add_all_features(obtained, it, element)
+    xmlr.add_all_features(obtained, it, element)
 
     spot_features = {'QUALITY': {'feature': 'QUALITY', 'isint': 'false'},
                      'FRAME': {'feature': 'FRAME', 'isint': 'true'}}
@@ -233,7 +233,7 @@ def test_add_all_features_no_feature_attribute():
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={})
-    pytmn.add_all_features(obtained, it, element)
+    xmlr.add_all_features(obtained, it, element)
 
     spot_features = {'QUALITY': {'feature': 'QUALITY', 'isint': 'false'},
                      'FRAME': {'feature': 'FRAME', 'isint': 'true'}}
@@ -257,7 +257,7 @@ def test_convert_attributes():
                 'neg': {'isint': 'false'}, 'str': {'isint': 'false'}}
     
     obtained_attr = {'float': '30', 'int': '20', 'neg': '-10', 'str': 'meep'}
-    pytmn.convert_attributes(obtained_attr, features)
+    xmlr.convert_attributes(obtained_attr, features)
     
     expected_attr = {'float': 30.0, 'int': 20, 'neg': -10.0, 'str': 'meep'}
 
@@ -268,7 +268,7 @@ def test_convert_attributes_mixed_case():
     features = {'float': {'isint': 'FaLsE'}, 'int': {'isint': 'tRuE'}}
     
     obtained_attr = {'float': '30', 'int': '20'}
-    pytmn.convert_attributes(obtained_attr, features)
+    xmlr.convert_attributes(obtained_attr, features)
     
     expected_attr = {'float': 30.0, 'int': 20}
 
@@ -280,7 +280,7 @@ def test_convert_attributes_KeyError():
     attributes = {'float': '30', 'int': '20'}
 
     with pytest.raises(KeyError):
-        pytmn.convert_attributes(attributes, features)
+        xmlr.convert_attributes(attributes, features)
 
 
 def test_convert_attributes_ValueError():
@@ -288,7 +288,7 @@ def test_convert_attributes_ValueError():
     attributes = {'float': '30', 'int': '20'}
 
     with pytest.raises(ValueError):
-        pytmn.convert_attributes(attributes, features)
+        xmlr.convert_attributes(attributes, features)
 
 
 ### add_ROI_coordinates ###
@@ -297,7 +297,7 @@ def test_add_ROI_coordinates_2D():
     el_obtained = ET.Element('Spot')
     el_obtained.attrib['ROI_N_POINTS'] = '3'
     el_obtained.text = '1 2.0 -3 -4.0 5.5 6'
-    pytmn.add_ROI_coordinates(el_obtained)
+    xmlr.add_ROI_coordinates(el_obtained)
 
     el_expected = ET.Element('Spot')
     el_expected.attrib['ROI_N_POINTS'] = [(1.0, 2.0), (-3.0, -4.0), (5.5, 6.0)]
@@ -309,7 +309,7 @@ def test_add_ROI_coordinates_3D():
     el_obtained = ET.Element('Spot')
     el_obtained.attrib['ROI_N_POINTS'] = '2'
     el_obtained.text = '1 2.0 -3 -4.0 5.5 6'
-    pytmn.add_ROI_coordinates(el_obtained)
+    xmlr.add_ROI_coordinates(el_obtained)
 
     el_expected = ET.Element('Spot')
     el_expected.attrib['ROI_N_POINTS'] = [(1.0, 2.0, -3.0), (-4.0, 5.5, 6.0)]
@@ -320,7 +320,7 @@ def test_add_ROI_coordinates_3D():
 def test_add_ROI_coordinates_no_ROI():
     el_obtained = ET.Element('Spot')
     el_obtained.text = '1 2.0 -3 -4.0 5.5 6'
-    pytmn.add_ROI_coordinates(el_obtained)
+    xmlr.add_ROI_coordinates(el_obtained)
 
     assert el_obtained.attrib == ET.Element('Spot').attrib
 
@@ -339,7 +339,7 @@ def test_add_all_nodes_several_attributes():
 
     spot_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'}}
     obtained = nx.DiGraph(Model={'SpotFeatures': spot_features})
-    pytmn.add_all_nodes(obtained, it, element)
+    xmlr.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph(Model={'SpotFeatures': spot_features})
     expected.add_nodes_from([(1001, {'y': 30, 'ID': 1001, 'x': 30.5}),
@@ -359,7 +359,7 @@ def test_add_all_nodes_only_ID_attribute():
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={'SpotFeatures': {}})
-    pytmn.add_all_nodes(obtained, it, element)
+    xmlr.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph(Model={'SpotFeatures': {}})
     expected.add_nodes_from([(1001, {'ID': 1001}),
@@ -379,7 +379,7 @@ def test_add_all_nodes_no_node_attributes():
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={'SpotFeatures': {}})
-    pytmn.add_all_nodes(obtained, it, element)
+    xmlr.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph(Model={'SpotFeatures': {}})
     expected.add_nodes_from([(1001, {'ID': 1001})])
@@ -395,7 +395,7 @@ def test_add_all_nodes_no_nodes():
     _, element = next(it)
     
     obtained = nx.DiGraph(Model={'SpotFeatures': {}})
-    pytmn.add_all_nodes(obtained, it, element)
+    xmlr.add_all_nodes(obtained, it, element)
     
     assert is_equal(obtained, nx.DiGraph(Model={'SpotFeatures': {}}))
 
@@ -412,7 +412,7 @@ def test_add_edge_from_element():
                      'SPOT_SOURCE_ID': {'isint': 'true'},
                      'SPOT_TARGET_ID': {'isint': 'true'}}
     obtained = nx.DiGraph(Model={'EdgeFeatures': edge_features})
-    pytmn.add_edge_from_element(obtained, element, track_id)
+    xmlr.add_edge_from_element(obtained, element, track_id)
 
     expected = nx.DiGraph(Model={'EdgeFeatures': edge_features})
     expected.add_edge(1, 2, x=20.0, y=25, SPOT_SOURCE_ID=1, SPOT_TARGET_ID=2)
@@ -431,7 +431,7 @@ def test_add_edge_from_element_no_node_ID():
     edge_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'},
                      'SPOT_SOURCE_ID': {'isint': 'true'}}
     obtained = nx.DiGraph(Model={'EdgeFeatures': edge_features})
-    pytmn.add_edge_from_element(obtained, element, track_id)
+    xmlr.add_edge_from_element(obtained, element, track_id)
     
     expected = nx.DiGraph(Model={'EdgeFeatures': edge_features})
     
@@ -447,7 +447,7 @@ def test_add_edge_from_element_no_edge_attributes():
     edge_features = {'SPOT_SOURCE_ID': {'isint': 'true'},
                      'SPOT_TARGET_ID': {'isint': 'true'}}
     obtained = nx.DiGraph(Model={'EdgeFeatures': edge_features})
-    pytmn.add_edge_from_element(obtained, element, track_id)
+    xmlr.add_edge_from_element(obtained, element, track_id)
 
     expected = nx.DiGraph(Model={'EdgeFeatures': edge_features})
     expected.add_edge(1, 2, SPOT_SOURCE_ID=1, SPOT_TARGET_ID=2)
@@ -481,7 +481,7 @@ def test_add_all_edges_several_attributes():
 
     obtained = nx.DiGraph(Model={'EdgeFeatures': edge_features,
                                  'TrackFeatures': track_features})
-    obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = xmlr.add_all_edges(obtained, it, element)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, 
                                     key=lambda d: d['TRACK_ID'])
 
@@ -524,7 +524,7 @@ def test_add_all_edges_no_nodes_ID():
 
     obtained = nx.DiGraph(Model={'EdgeFeatures': edge_features,
                                  'TrackFeatures': track_features})
-    obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = xmlr.add_all_edges(obtained, it, element)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, 
                                     key=lambda d: d['TRACK_ID'])
 
@@ -549,7 +549,7 @@ def test_add_all_edges_no_edges():
     track_features = {'TRACK_ID': {'isint': 'true'}}
 
     obtained = nx.DiGraph(Model={'TrackFeatures': track_features})
-    obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = xmlr.add_all_edges(obtained, it, element)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, 
                                     key=lambda d: d['TRACK_ID'])
 
@@ -584,7 +584,7 @@ def test_add_all_edges_no_track_id():
 
     obtained = nx.DiGraph(Model={'EdgeFeatures': edge_features,
                                  'TrackFeatures': {}})
-    obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = xmlr.add_all_edges(obtained, it, element)
     
     expected = nx.DiGraph(Model={'EdgeFeatures': edge_features,
                                  'TrackFeatures': {}})
@@ -628,7 +628,7 @@ def test_add_all_edges_no_track_attributes():
 
     obtained = nx.DiGraph(Model={'EdgeFeatures': edge_features,
                                  'TrackFeatures': {}})
-    obtained_tracks_attrib = pytmn.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = xmlr.add_all_edges(obtained, it, element)
     
     expected = nx.DiGraph(Model={'EdgeFeatures': edge_features,
                                  'TrackFeatures': {}})
@@ -659,7 +659,7 @@ def test_get_filtered_tracks_ID():
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
 
-    obtained_ID = pytmn.get_filtered_tracks_ID(it, element)
+    obtained_ID = xmlr.get_filtered_tracks_ID(it, element)
     expected_ID = [0, 1]
     assert obtained_ID.sort() == expected_ID.sort()
     
@@ -671,7 +671,7 @@ def test_get_filtered_tracks_ID_no_ID():
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
-    obtained_ID = pytmn.get_filtered_tracks_ID(it, element)
+    obtained_ID = xmlr.get_filtered_tracks_ID(it, element)
     assert not obtained_ID
 
 
@@ -682,7 +682,7 @@ def test_get_filtered_tracks_ID_no_tracks():
                 '</data>')
     it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
     _, element = next(it)
-    obtained_ID = pytmn.get_filtered_tracks_ID(it, element)
+    obtained_ID = xmlr.get_filtered_tracks_ID(it, element)
     assert not obtained_ID
     
 
@@ -696,7 +696,7 @@ def test_add_tracks_info():
     g1_obt.add_node(1, TRACK_ID=0)
     g2_obt = nx.DiGraph()
     g2_obt.add_node(2, TRACK_ID=1)
-    obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
+    obtained_graphs = xmlr.add_tracks_info([g1_obt, g2_obt],
                                             [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
@@ -722,7 +722,7 @@ def test_add_tracks_info_no_track_ID_on_all_nodes():
     g1_obt.add_node(3)
     g2_obt = nx.DiGraph()
     g2_obt.add_node(2, TRACK_ID=1)
-    obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
+    obtained_graphs = xmlr.add_tracks_info([g1_obt, g2_obt],
                                             [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
@@ -749,7 +749,7 @@ def test_add_tracks_info_no_track_ID_on_one_node():
     
     g2_obt = nx.DiGraph()
     g2_obt.add_node(2, TRACK_ID=1)
-    obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
+    obtained_graphs = xmlr.add_tracks_info([g1_obt, g2_obt],
                                             [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
@@ -780,7 +780,7 @@ def test_add_tracks_info_different_ID_for_one_track():
     g2_obt = nx.DiGraph()
     g2_obt.add_node(2, TRACK_ID=1)
     with pytest.raises(ValueError):
-        obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
+        obtained_graphs = xmlr.add_tracks_info([g1_obt, g2_obt],
                                                 [g1_attr, g2_attr])
 
 
@@ -791,7 +791,7 @@ def test_add_tracks_info_no_nodes():
     g1_obt = nx.DiGraph()
     g2_obt = nx.DiGraph()
     g2_obt.add_node(2, TRACK_ID=1)
-    obtained_graphs = pytmn.add_tracks_info([g1_obt, g2_obt],
+    obtained_graphs = xmlr.add_tracks_info([g1_obt, g2_obt],
                                             [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
