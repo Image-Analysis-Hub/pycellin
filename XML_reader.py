@@ -342,7 +342,7 @@ def add_tracks_info(graphs, tracks_attributes):
     return updated_graphs
 
 
-def read_TrackMate_XML(xml_path, keep_all_spots, keep_all_tracks):
+def read_model(xml_path, keep_all_spots, keep_all_tracks):
 
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
@@ -363,6 +363,7 @@ def read_TrackMate_XML(xml_path, keep_all_spots, keep_all_tracks):
             graph = add_graph_attrib_from_element(graph, element)
             root.clear()  # Cleaning the tree to free up some memory.
             # All the browsed subelements of `root` are deleted.
+            
         # Add features declaration for spot, edge and track features.
         if element.tag == 'FeatureDeclarations' and event == 'start':
             graph = add_all_features(graph, it, element)
@@ -409,4 +410,10 @@ def read_TrackMate_XML(xml_path, keep_all_spots, keep_all_tracks):
                 # The program is in an impossible state so we need to stop.
                 raise
 
+        if element.tag == 'Model' and event == 'end':
+            break
+
     return graphs
+
+# TODO: faire un read_model, et un read_settings, vraiment traiter les 2 
+# séparemment
