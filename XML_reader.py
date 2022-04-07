@@ -4,7 +4,6 @@
 from copy import deepcopy
 
 from lxml import etree as ET
-# import xml.etree.ElementTree as ET
 
 import networkx as nx
 
@@ -292,8 +291,7 @@ def get_filtered_tracks_ID(iterator, ancestor):
             except KeyError as err:
                 print(f"No key {err} in the attributes of current element "
                       f"'{element.tag}'. Ignoring this track.")
-
-    print(filtered_tracks_ID)        
+       
     return filtered_tracks_ID         
     
 

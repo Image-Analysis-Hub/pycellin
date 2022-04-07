@@ -5,7 +5,6 @@
 """
 
 import io
-# import xml.etree.ElementTree as ET
 from lxml import etree as ET
 
 import networkx as nx
