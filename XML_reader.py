@@ -415,5 +415,32 @@ def read_model(xml_path, keep_all_spots, keep_all_tracks):
 
     return graphs
 
-# TODO: faire un read_model, et un read_settings, vraiment traiter les 2 
-# séparemment
+
+def read_settings(xml_path):
+    it = ET.iterparse(xml_path, events=['start', 'end'])
+    _, root = next(it)
+
+    for event, element in it:
+
+        if element.tag != 'Settings':
+            root.clear()
+            
+        if element.tag == 'Settings' and event == 'end':
+            settings = deepcopy(element)
+
+    # # To explore the settings:
+    # print(settings)
+    # print(settings.tag)
+    # print(settings.attrib)
+
+    # for child in settings:
+    #     print(child.tag, child. attrib)
+
+    # for descendant in settings.iter():
+    #     print(descendant.tag, descendant. attrib)
+
+    return settings
+
+
+    
+    
