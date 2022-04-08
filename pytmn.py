@@ -34,7 +34,16 @@ def export_graph(graph, input):
         input (str): Path of the XML file of the graph.
     """
     input = Path(input)
-    output = input.with_name(input.stem + f"_{graph.graph['name']}.gz")
+    n_nodes = graph.number_of_nodes()
+    if n_nodes == 1:
+        # This can happen when args.keep_all_spots is set to True. In that
+        # case, there will be unconnected nodes. Each node is a graph by 
+        # itself but the graph unnamed. So we're using the node name instead
+        # of the graph name. 
+        node_name = [name for _, name in graph.nodes(data='name')][0]
+        output = input.with_name(input.stem + f"_{node_name}.gz")
+    else:
+        output = input.with_name(input.stem + f"_{graph.graph['name']}.gz")
     nx.write_gpickle(graph, output, protocol=5)
         
              
@@ -55,8 +64,8 @@ if __name__ == "__main__":
                         help="plot the obtained graphs")
     args = parser.parse_args()
 
-    graphs = XML_reader.read_TrackMate_XML(args.xml, args.keep_all_spots,
-                                           args.keep_all_tracks) 
+    graphs = XML_reader.read_model(args.xml, args.keep_all_spots,
+                                             args.keep_all_tracks) 
 
     # Exporting the graphs.
     if args.export:
