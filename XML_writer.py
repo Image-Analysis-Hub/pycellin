@@ -7,40 +7,100 @@ import networkx as nx
 import XML_reader
 
 
-def write_FeatureDeclarations(graphs: list[nx.DiGraph], xml_path: str) -> None:
+def write_FeatureDeclarations(xf: ET.xmlfile,
+                              graphs: list[nx.DiGraph]) -> None:
+    """Write the feature declarations into an XML file.
+    
+    The feature declarations are divided in three parts: spot features,
+    edge features, and track features.
+
+    Args:
+        xf (ET.xmlfile): Context manager for the XML file to write. 
+        graphs (list[nx.DiGraph]): Graphs containing the data to write.
+    """
+    
     pass
 
 
-def write_AllSpots(graphs: list[nx.DiGraph], xml_path: str) -> None:
+def write_AllSpots(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
+    """Write the nodes/spots data into an XML file.
+    
+    Args:
+        xf (ET.xmlfile): Context manager for the XML file to write. 
+        graphs (list[nx.DiGraph]): Graphs containing the data to write.
+    """
+    
     pass
 
 
-def write_AllTracks(graphs: list[nx.DiGraph], xml_path: str) -> None:
+def write_AllTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
+    """Write the tracks data into an XML file.
+    
+    Args:
+        xf (ET.xmlfile): Context manager for the XML file to write. 
+        graphs (list[nx.DiGraph]): Graphs containing the data to write.
+    """
+    
     pass
 
 
-def write_FilteredTracks(graphs: list[nx.DiGraph], xml_path: str) -> None:
+def write_FilteredTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
+    """Write the filtered tracks data into an XML file.
+    
+    Args:
+        xf (ET.xmlfile): Context manager for the XML file to write. 
+        graphs (list[nx.DiGraph]): Graphs containing the data to write.
+    """
+
     pass
 
 
-def write_Model(graphs: list[nx.DiGraph], xml_path: str) -> None:
+def write_Model(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
+    """Write all the model data into an XML file.
 
-    write_FeatureDeclarations(graphs, xml_path)
-    write_AllSpots(graphs, xml_path)
-    write_AllTracks(graphs, xml_path)
-    write_FilteredTracks(graphs, xml_path)
+    This includes Features declarations, spots, tracks and filtered tracks.
+    
+    Args:
+        xf (ET.xmlfile): Context manager for the XML file to write. 
+        graphs (list[nx.DiGraph]): Graphs containing the data to write.
+    """
+    
+    with xf.element('Model'):
+        write_FeatureDeclarations(xf, graphs)
+        write_AllSpots(xf, graphs)
+        write_AllTracks(xf, graphs)
+        write_FilteredTracks(xf, graphs)
+        xf.write('\n\t')
 
-def write_Settings(settings: ET._Element, xml_path: str) -> None:
 
-    with ET.xmlfile(xml_path, encoding='utf-8') as xf:
-        xf.write(settings, pretty_print=True)
-        
+def write_Settings(xf: ET.xmlfile, settings: ET._Element) -> None:
+    """Write the given TrackMate settings into an XML file.
+
+    Args:
+        xf (ET.xmlfile): Context manager for the XML file to write.
+        settings (ET._Element): Element holding all the settings to write.
+    """
+
+    xf.write(settings, pretty_print=True)
+    
 
 def write_TrackMate_XML(graphs: list[nx.DiGraph], settings: ET._Element,
                         xml_path: str) -> None:
+    """Write an XML file readable by TrackMate from networkX graphs data.
 
-    write_Model(graphs, xml_path)
-    write_Settings(settings, xml_path)
+    Args:
+        graphs (list[nx.DiGraph]): Graphs containing the data to write.
+        settings (ET._Element): Element holding all the settings to write.
+        xml_path (str): Path of the XML file to write.
+    """
+
+    with ET.xmlfile(xml_path, encoding='utf-8', close=True) as xf:
+        xf.write_declaration()
+        with xf.element('TrackMate'):
+            xf.write('\n\t')
+            write_Model(xf, graphs)
+            xf.write('\n\t')
+            write_Settings(xf, settings)         
 
 
 if __name__ == "__main__":
