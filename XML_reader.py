@@ -342,8 +342,27 @@ def add_tracks_info(graphs, tracks_attributes):
     return updated_graphs
 
 
-def read_model(xml_path, keep_all_spots, keep_all_tracks):
+def read_model(xml_path: str, keep_all_spots: bool, 
+               keep_all_tracks: bool) -> list[nx.DiGraph]:
+    """Read a XML file and convert the model data into several graphs. 
 
+    Each TrackMate track and its associated data described in the XML file
+    are modeled as networkX directed graphs. Spots are modeled as graph
+    nodes, and edges as graph edges. All data pertaining to the model
+    itself such as units, spot features, etc. are stored in each graph as 
+    graph attributes.
+    
+    Args:
+        xml_path (str): Path of the XML file to process.
+        keep_all_spots (bool): True to keep the spots filtered out in 
+            TrackMate, False otherwise.
+        keep_all_tracks (bool): True to keep the tracks filtered out in 
+            TrackMate, False otherwise.
+
+    Returns:
+        list[nx.DiGraph]: List of graphs modeling the tracks.
+    """
+    
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
     # the resulting graph will be disconnected.
@@ -411,12 +430,21 @@ def read_model(xml_path, keep_all_spots, keep_all_tracks):
                 raise
 
         if element.tag == 'Model' and event == 'end':
-            break
+            break  # We are not interested in the following data.
 
     return graphs
 
 
-def read_settings(xml_path):
+def read_settings(xml_path: str) -> ET._Element:
+    """Extract the TrackMate settings of a TrackMate XML file.
+
+    Args:
+        xml_path (str): Path of the XML file to process.
+
+    Returns:
+        ET._Element: Element holding all the TrackMate settings.
+    """
+
     it = ET.iterparse(xml_path, events=['start', 'end'])
     _, root = next(it)
 
@@ -429,6 +457,7 @@ def read_settings(xml_path):
             settings = deepcopy(element)
 
     # # To explore the settings:
+    # print(type(settings))
     # print(settings)
     # print(settings.tag)
     # print(settings.attrib)
@@ -436,11 +465,8 @@ def read_settings(xml_path):
     # for child in settings:
     #     print(child.tag, child. attrib)
 
-    # for descendant in settings.iter():
+    # for descendant in settings.iterdescendants():
     #     print(descendant.tag, descendant. attrib)
 
-    return settings
-
-
-    
+    return settings    
     
