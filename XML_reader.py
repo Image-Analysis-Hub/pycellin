@@ -344,7 +344,7 @@ def add_tracks_info(graphs, tracks_attributes):
 
 def read_model(xml_path: str, keep_all_spots: bool, 
                keep_all_tracks: bool) -> list[nx.DiGraph]:
-    """Read a XML file and convert the model data into several graphs. 
+    """Read an XML file and convert the model data into several graphs. 
 
     Each TrackMate track and its associated data described in the XML file
     are modeled as networkX directed graphs. Spots are modeled as graph
