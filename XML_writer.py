@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from pathlib import Path
 from lxml import etree as ET
 import networkx as nx
 
@@ -22,14 +23,34 @@ def write_FeatureDeclarations(xf: ET.xmlfile,
     pass
 
 
+def create_Spot(node: dict) -> ET._Element:
+    """Create an XML Spot Element representing a graph node. 
+
+    Args:
+        node (dict): Attributes of the spot.
+
+    Returns:
+        ET._Element: The newly created Spot Element.
+    """
+
+    # print(graphs[0].nodes())
+    # print(len(graphs[0].nodes[2004].keys()))  # 30 ici alors que 29 dans XML
+    # TODO: dans les graphes, il y a les TRACK_ID en plus, bien penser à 
+    # enlever ça avant d'écrire en XML
+    pass
+
+
 def write_AllSpots(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     """Write the nodes/spots data into an XML file.
-    
+    Attributes to write for the node.
     Args:
         xf (ET.xmlfile): Context manager for the XML file to write. 
         graphs (list[nx.DiGraph]): Graphs containing the data to write.
     """
     
+    # Remove TRACK_ID from node attributes
+    # Sort nodes by frame
+    # For each frame, write the corresponding nodes, with ROI as text
     pass
 
 
@@ -107,10 +128,23 @@ if __name__ == "__main__":
 
     xml_in = "/mnt/data/Code/pytmn/samples/FakeTracks.xml"
     xml_out = '/mnt/data/xml_test/somefile.xml'
+    graph_folder = "/mnt/data/Code/pytmn/samples/"
+
+    # For now, not taking into account lone nodes.
+    def load_graphs(folder):
+        graphs = []
+        for file in Path(folder).glob('*_Track_*.gz'):
+            graph = nx.read_gpickle(file)
+            graphs.append(graph)
+        return graphs
+
+    graphs = load_graphs(graph_folder)
+    print(len(graphs))
 
     settings = XML_reader.read_settings(xml_in)
-    graphs = [nx.DiGraph(), nx.DiGraph(), nx.DiGraph()]
     write_TrackMate_XML(graphs, settings, xml_out)
+
+
 
     # def generate_some_elements():
     #     a = ET.Element('a')
