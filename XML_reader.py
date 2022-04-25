@@ -343,7 +343,7 @@ def add_tracks_info(graphs, tracks_attributes):
 
 
 def read_model(xml_path: str, keep_all_spots: bool, 
-               keep_all_tracks: bool) -> list[nx.DiGraph]:
+               keep_all_tracks: bool, one_graph: bool) -> list[nx.DiGraph]:
     """Read an XML file and convert the model data into several graphs. 
 
     Each TrackMate track and its associated data described in the XML file
@@ -358,6 +358,9 @@ def read_model(xml_path: str, keep_all_spots: bool,
             TrackMate, False otherwise.
         keep_all_tracks (bool): True to keep the tracks filtered out in 
             TrackMate, False otherwise.
+        one_graph (bool): True to create only one graph (probably 
+            disconnected) that contains all nodes and edges, False to 
+            create a graph (connected) per track .
 
     Returns:
         list[nx.DiGraph]: List of graphs modeling the tracks.
@@ -415,24 +418,28 @@ def read_model(xml_path: str, keep_all_spots: bool,
                 graph.remove_nodes_from(to_remove)
 
             # Subgraphs creation.
-            # One subgraph is created per track, so each subgraph is
-            # a connected component of `graph`.
-            graphs = [graph.subgraph(c).copy() 
-                      for c in nx.weakly_connected_components(graph)]
-            del graph  # Redondant with the subgraphs.
+            if not one_graph:
+                # One subgraph is created per track, so each subgraph is
+                # a connected component of `graph`.
+                graphs = [graph.subgraph(c).copy() 
+                          for c in nx.weakly_connected_components(graph)]
+                del graph  # Redondant with the subgraphs.
 
-            # Adding the tracks attributes as graphs attributes.
-            try:
-                graphs = add_tracks_info(graphs, tracks_attributes)
-            except ValueError as err:
-                print(err)
-                # The program is in an impossible state so we need to stop.
-                raise
+                # Adding the tracks attributes as graphs attributes.
+                try:
+                    graphs = add_tracks_info(graphs, tracks_attributes)
+                except ValueError as err:
+                    print(err)
+                    # The program is in an impossible state so we need to stop.
+                    raise
 
         if element.tag == 'Model' and event == 'end':
             break  # We are not interested in the following data.
 
-    return graphs
+    if one_graph:
+        return [graph]
+    else:
+        return graphs
 
 
 def read_settings(xml_path: str) -> ET._Element:
