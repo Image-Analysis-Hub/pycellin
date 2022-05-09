@@ -41,7 +41,7 @@ def export_graph(graph, input):
         # of the graph name. 
         node_name = [name for _, name in graph.nodes(data='name')][0]
         output = input.with_name(input.stem + f"_{node_name}.gz")
-    if nx.number_weakly_connected_components(graph) != 1:
+    elif nx.number_weakly_connected_components(graph) != 1:
          # This can happen when args.one_graph is set to True. In that case,
          # all tracks are regrouped in a same disconnected graph. The name of 
          # the graph is the name of the XML file.
