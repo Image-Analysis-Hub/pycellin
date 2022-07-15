@@ -14,7 +14,6 @@ __version__ = "0.2"
 import argparse
 from pathlib import Path
 import time
-import xml.etree.ElementTree as ET
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -37,10 +36,10 @@ def export_graph(graph, input):
     if graph.number_of_nodes() == 1:
         # This can happen when args.keep_all_spots is set to True. In that
         # case, there will be unconnected nodes. Each node is a graph by 
-        # itself but the graph is unnamed. So we're using the node name instead
+        # itself but the graph is unnamed. So we're using the node ID instead
         # of the graph name. 
-        node_name = [name for _, name in graph.nodes(data='name')][0]
-        output = input.with_name(input.stem + f"_{node_name}.gz")
+        node_id = [nid for _, nid in graph.nodes(data='ID')][0]
+        output = input.with_name(input.stem + f"_Node_{node_id}.gz")
     elif nx.number_weakly_connected_components(graph) != 1:
          # This can happen when args.one_graph is set to True. In that case,
          # all tracks are regrouped in a same disconnected graph. The name of 
