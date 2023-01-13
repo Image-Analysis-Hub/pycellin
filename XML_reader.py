@@ -123,12 +123,15 @@ def add_ROI_coordinates(element, attribs):
         print(f"No key {err} in the attributes of current element "
               f"'{element.tag}'. ")
     else:        
-        points_coordinates = element.text.split()
-        points_coordinates = [float(x) for x in points_coordinates]
-        points_dimension = len(points_coordinates) // n_points
-        it = [iter(points_coordinates)] * points_dimension
-        points_coordinates = list(zip(*it))
-        attribs['ROI_N_POINTS'] = points_coordinates
+        if element.text:
+            points_coordinates = element.text.split()
+            points_coordinates = [float(x) for x in points_coordinates]
+            points_dimension = len(points_coordinates) // n_points
+            it = [iter(points_coordinates)] * points_dimension
+            points_coordinates = list(zip(*it))
+            attribs['ROI_N_POINTS'] = points_coordinates
+        else:
+            attribs['ROI_N_POINTS'] = None
 
            
 def add_all_nodes(graph, iterator, ancestor):
@@ -365,7 +368,6 @@ def read_model(xml_path: str, keep_all_spots: bool,
     Returns:
         list[nx.DiGraph]: List of graphs modeling the tracks.
     """
-    
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
     # the resulting graph will be disconnected.
