@@ -697,7 +697,7 @@ def test_add_tracks_info():
     g2_obt = nx.DiGraph()
     g2_obt.add_node(2, TRACK_ID=1)
     obtained_graphs = xmlr.add_tracks_info([g1_obt, g2_obt],
-                                            [g1_attr, g2_attr])
+                                           [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
     g1_exp.graph['name'] = 'blob'
@@ -723,7 +723,7 @@ def test_add_tracks_info_no_track_ID_on_all_nodes():
     g2_obt = nx.DiGraph()
     g2_obt.add_node(2, TRACK_ID=1)
     obtained_graphs = xmlr.add_tracks_info([g1_obt, g2_obt],
-                                            [g1_attr, g2_attr])
+                                           [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
     g1_exp.add_node(1)
@@ -750,7 +750,7 @@ def test_add_tracks_info_no_track_ID_on_one_node():
     g2_obt = nx.DiGraph()
     g2_obt.add_node(2, TRACK_ID=1)
     obtained_graphs = xmlr.add_tracks_info([g1_obt, g2_obt],
-                                            [g1_attr, g2_attr])
+                                           [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
     g1_exp.graph['name'] = 'blob'
@@ -781,7 +781,7 @@ def test_add_tracks_info_different_ID_for_one_track():
     g2_obt.add_node(2, TRACK_ID=1)
     with pytest.raises(ValueError):
         obtained_graphs = xmlr.add_tracks_info([g1_obt, g2_obt],
-                                                [g1_attr, g2_attr])
+                                               [g1_attr, g2_attr])
 
 
 def test_add_tracks_info_no_nodes():
@@ -792,7 +792,7 @@ def test_add_tracks_info_no_nodes():
     g2_obt = nx.DiGraph()
     g2_obt.add_node(2, TRACK_ID=1)
     obtained_graphs = xmlr.add_tracks_info([g1_obt, g2_obt],
-                                            [g1_attr, g2_attr])
+                                           [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
     g2_exp = nx.DiGraph()
