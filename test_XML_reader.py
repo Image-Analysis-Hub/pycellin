@@ -76,7 +76,7 @@ def is_equal(obt, exp):
 
 def test_add_graph_attrib_from_element():
     xml_data = ('<data attrib1="text" attrib2="10" />')
-    it = ET.iterparse(io.StringIO(xml_data))
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')))
     _, element = next(it)
     obtained = xmlr.add_graph_attrib_from_element(nx.DiGraph(), element)
     model = {'attrib1': 'text', 'attrib2': '10'}
@@ -87,7 +87,7 @@ def test_add_graph_attrib_from_element():
 def test_add_graph_attrib_from_element_no_graph_attributes():
     xml_data = ('<data>'
                 '</data>')
-    it = ET.iterparse(io.StringIO(xml_data))
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')))
     _, element = next(it)
     obtained = xmlr.add_graph_attrib_from_element(nx.DiGraph(), element)
     expected = nx.DiGraph(Model={})
@@ -101,7 +101,8 @@ def test_get_features_dict():
                 '   <Feature feature="QUALITY" isint="false" />'
                 '   <Feature feature="FRAME" isint="true" />'
                 '</SpotFeatures>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
     features = xmlr.get_features_dict(it, element)
     spot_features = {'QUALITY': {'feature': 'QUALITY', 'isint': 'false'},
@@ -112,7 +113,8 @@ def test_get_features_dict():
 def test_get_features_dict_no_feature_tag():
     xml_data = ('<SpotFeatures>'
                 '</SpotFeatures>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
     features = xmlr.get_features_dict(it, element)
     assert features == {}
@@ -123,7 +125,8 @@ def test_get_features_dict_other_tag():
                 '   <Feature feature="QUALITY" isint="false" />'
                 '   <Other feature="FRAME" isint="true" />'
                 '</SpotFeatures>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
     features = xmlr.get_features_dict(it, element)
     spot_features = {'QUALITY': {'feature': 'QUALITY', 'isint': 'false'}}
@@ -147,7 +150,8 @@ def test_add_all_features():
                 '       <Feature feature="NUMBER_SPOTS" isint="true" />'
                 '   </TrackFeatures>'
                 '</FeatureDeclarations>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={})
@@ -173,7 +177,8 @@ def test_add_all_features():
 def test_add_all_features_empty():
     xml_data = ('<FeatureDeclarations>'
                 '</FeatureDeclarations>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
 
     obtained = nx.DiGraph()
@@ -195,7 +200,8 @@ def test_add_all_features_tag_with_no_feature_tag():
                 '       <Feature feature="NUMBER_SPOTS" isint="true" />'
                 '   </TrackFeatures>'
                 '</FeatureDeclarations>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={})
@@ -229,7 +235,8 @@ def test_add_all_features_no_feature_attribute():
                 '       <Feature feature="NUMBER_SPOTS" isint="true" />'
                 '   </TrackFeatures>'
                 '</FeatureDeclarations>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={})
@@ -334,7 +341,8 @@ def test_add_all_nodes_several_attributes():
                 '       <Spot ID="1001" x="30.5" y="30" />'
                 '   </frame>'
                 '</data>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
 
     spot_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'}}
@@ -355,7 +363,8 @@ def test_add_all_nodes_only_ID_attribute():
                 '       <Spot ID="1001" />'
                 '   </frame>'
                 '</data>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={'SpotFeatures': {}})
@@ -375,7 +384,8 @@ def test_add_all_nodes_no_node_attributes():
                 '       <Spot ID="1001" />'
                 '   </frame>'
                 '</data>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={'SpotFeatures': {}})
@@ -391,7 +401,8 @@ def test_add_all_nodes_no_nodes():
     xml_data = ('<data>'
                 '   <frame />'
                 '</data>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
     
     obtained = nx.DiGraph(Model={'SpotFeatures': {}})
@@ -404,7 +415,8 @@ def test_add_all_nodes_no_nodes():
 
 def test_add_edge_from_element():
     xml_data = ('<data SPOT_SOURCE_ID="1" SPOT_TARGET_ID="2" x="20" y="25" />')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
     track_id = 0
 
@@ -424,7 +436,8 @@ def test_add_edge_from_element():
 
 def test_add_edge_from_element_no_node_ID():
     xml_data = ('<data SPOT_SOURCE_ID="1" x="20" y="25" />')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')), 
+                      events=['start', 'end'])
     _, element = next(it)
     track_id = 0
     
@@ -440,7 +453,8 @@ def test_add_edge_from_element_no_node_ID():
 
 def test_add_edge_from_element_no_edge_attributes():
     xml_data = ('<data SPOT_SOURCE_ID="1" SPOT_TARGET_ID="2" />')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
     track_id = 0
 
@@ -472,7 +486,8 @@ def test_add_all_edges_several_attributes():
                 '           x="15" y="25" />'
                 '   </Track>'
                 '</data>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
     edge_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'},
                      'SPOT_SOURCE_ID': {'isint': 'true'},
@@ -517,7 +532,8 @@ def test_add_all_edges_no_nodes_ID():
                 '       <Edge x="15" y="25" />'
                 '   </Track>'
                 '</data>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
     edge_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'}}
     track_features = {'TRACK_ID': {'isint': 'true'}}
@@ -544,7 +560,8 @@ def test_add_all_edges_no_edges():
                 '   <Track TRACK_ID="1" name="blob" />'
                 '   <Track TRACK_ID="2" name="blub" />'
                 '</data>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
     track_features = {'TRACK_ID': {'isint': 'true'}}
 
@@ -576,7 +593,8 @@ def test_add_all_edges_no_track_id():
             '           x="15" y="25" />'
             '   </Track>'
             '</data>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
     edge_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'},
                      'SPOT_SOURCE_ID': {'isint': 'true'},
@@ -620,7 +638,8 @@ def test_add_all_edges_no_track_attributes():
             '           x="15" y="25" />'
             '   </Track>'
             '</data>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
     edge_features = {'x': {'isint': 'false'}, 'y': {'isint': 'true'},
                      'SPOT_SOURCE_ID': {'isint': 'true'},
@@ -656,7 +675,8 @@ def test_get_filtered_tracks_ID():
                 '   <TrackID TRACK_ID="0" />'
                 '   <TrackID TRACK_ID="1" />'
                 '</data>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
 
     obtained_ID = xmlr.get_filtered_tracks_ID(it, element)
@@ -669,7 +689,8 @@ def test_get_filtered_tracks_ID_no_ID():
                 '   <TrackID />'
                 '   <TrackID />'
                 '</data>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
     obtained_ID = xmlr.get_filtered_tracks_ID(it, element)
     assert not obtained_ID
@@ -680,7 +701,8 @@ def test_get_filtered_tracks_ID_no_tracks():
                 '   <tag />'
                 '   <tag />'
                 '</data>')
-    it = ET.iterparse(io.StringIO(xml_data), events=['start', 'end'])
+    it = ET.iterparse(io.BytesIO(xml_data.encode('utf-8')),
+                      events=['start', 'end'])
     _, element = next(it)
     obtained_ID = xmlr.get_filtered_tracks_ID(it, element)
     assert not obtained_ID
