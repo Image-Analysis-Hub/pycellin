@@ -4,6 +4,8 @@
 """Unit test for pyTMn XML_reader.
 """
 
+from copy import deepcopy
+
 import io
 from lxml import etree as ET
 
@@ -304,32 +306,43 @@ def test_add_ROI_coordinates_2D():
     el_obtained = ET.Element('Spot')
     el_obtained.attrib['ROI_N_POINTS'] = '3'
     el_obtained.text = '1 2.0 -3 -4.0 5.5 6'
-    xmlr.add_ROI_coordinates(el_obtained)
+    att_obtained = deepcopy(el_obtained.attrib)
+    xmlr.add_ROI_coordinates(el_obtained, att_obtained)
 
-    el_expected = ET.Element('Spot')
-    el_expected.attrib['ROI_N_POINTS'] = [(1.0, 2.0), (-3.0, -4.0), (5.5, 6.0)]
+    att_expected = {'ROI_N_POINTS': [(1.0, 2.0), (-3.0, -4.0), (5.5, 6.0)]}
     
-    assert el_obtained.attrib == el_expected.attrib
+    assert att_obtained == att_expected
 
 
 def test_add_ROI_coordinates_3D():
     el_obtained = ET.Element('Spot')
     el_obtained.attrib['ROI_N_POINTS'] = '2'
     el_obtained.text = '1 2.0 -3 -4.0 5.5 6'
-    xmlr.add_ROI_coordinates(el_obtained)
+    att_obtained = deepcopy(el_obtained.attrib)
+    xmlr.add_ROI_coordinates(el_obtained, att_obtained)
 
-    el_expected = ET.Element('Spot')
-    el_expected.attrib['ROI_N_POINTS'] = [(1.0, 2.0, -3.0), (-4.0, 5.5, 6.0)]
+    att_expected = {'ROI_N_POINTS': [(1.0, 2.0, -3.0), (-4.0, 5.5, 6.0)]}
     
-    assert el_obtained.attrib == el_expected.attrib
+    assert att_obtained == att_expected
 
 
-def test_add_ROI_coordinates_no_ROI():
+def test_add_ROI_coordinates_no_ROI_att():
     el_obtained = ET.Element('Spot')
     el_obtained.text = '1 2.0 -3 -4.0 5.5 6'
-    xmlr.add_ROI_coordinates(el_obtained)
+    att_obtained = deepcopy(el_obtained.attrib)
+    xmlr.add_ROI_coordinates(el_obtained, att_obtained)
 
-    assert el_obtained.attrib == ET.Element('Spot').attrib
+    assert att_obtained == dict()
+
+
+def test_add_ROI_coordinates_no_ROI_txt():
+    el_obtained = ET.Element('Spot')
+    el_obtained.attrib['ROI_N_POINTS'] = '2'
+    att_obtained = deepcopy(el_obtained.attrib)
+    xmlr.add_ROI_coordinates(el_obtained, att_obtained)
+
+    att_expected = {'ROI_N_POINTS': None} 
+    assert att_obtained == att_expected
 
 
 ### add_all_nodes ###
