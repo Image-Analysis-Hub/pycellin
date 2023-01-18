@@ -14,7 +14,6 @@ __version__ = "0.2"
 import argparse
 from pathlib import Path
 import time
-import xml.etree.ElementTree as ET
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -34,7 +33,20 @@ def export_graph(graph, input):
         input (str): Path of the XML file of the graph.
     """
     input = Path(input)
-    output = input.with_name(input.stem + f"_{graph.graph['name']}.gz")
+    if graph.number_of_nodes() == 1:
+        # This can happen when args.keep_all_spots is set to True. In that
+        # case, there will be unconnected nodes. Each node is a graph by 
+        # itself but the graph is unnamed. So we're using the node ID instead
+        # of the graph name. 
+        node_id = [nid for _, nid in graph.nodes(data='ID')][0]
+        output = input.with_name(input.stem + f"_Node_{node_id}.gz")
+    elif nx.number_weakly_connected_components(graph) != 1:
+         # This can happen when args.one_graph is set to True. In that case,
+         # all tracks are regrouped in a same disconnected graph. The name of 
+         # the graph is the name of the XML file.
+        output = input.with_name(input.stem + ".gz")
+    else:
+        output = input.with_name(input.stem + f"_{graph.graph['name']}.gz")
     nx.write_gpickle(graph, output, protocol=5)
         
              
@@ -53,10 +65,14 @@ if __name__ == "__main__":
                         help="keep the tracks filtered out in TrackMate")
     parser.add_argument("-p", "--plot_graph", action="store_true",
                         help="plot the obtained graphs")
+    parser.add_argument("-o", "--one_graph", action="store_true",
+                        help=("create only one graph instead of one per track."
+                              " Useful when there is no tracking."))
     args = parser.parse_args()
 
-    graphs = XML_reader.read_TrackMate_XML(args.xml, args.keep_all_spots,
-                                           args.keep_all_tracks) 
+    graphs = XML_reader.read_model(args.xml, args.keep_all_spots,
+                                             args.keep_all_tracks,
+                                             args.one_graph) 
 
     # Exporting the graphs.
     if args.export:

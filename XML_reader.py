@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from copy import deepcopy
 
-
-import xml.etree.ElementTree as ET
+from lxml import etree as ET
 
 import networkx as nx
 
@@ -19,7 +19,7 @@ def add_graph_attrib_from_element(graph, element):
     Returns:
         nx.DiGraph: The updated graph.
     """
-    graph.graph['Model'] = element.attrib
+    graph.graph['Model'] = deepcopy(element.attrib)
     # for k, v in element.attrib.items():
     #     graph.graph[k] = v
     element.clear()  # We won't need it anymore so we free up some memory.
@@ -41,8 +41,9 @@ def get_features_dict(iterator, ancestor):
     event, element = next(iterator)  # Feature.
     while (event, element) != ('end', ancestor):
         if element.tag == 'Feature' and event == 'start':
+            attribs = deepcopy(element.attrib)
             try:
-                features[element.attrib['feature']] = element.attrib
+                features[attribs['feature']] = attribs
             except KeyError as err:
                 print(f"No key {err} in the attributes of "
                       f"current element '{element.tag}'. "
@@ -69,8 +70,8 @@ def add_all_features(graph, iterator, ancestor) -> nx.DiGraph:
     """
     event, element = next(iterator)
     while (event, element) != ('end', ancestor):
-        features = get_features_dict(iterator, element)
-        graph.graph['Model'][element.tag] = features
+        features = get_features_dict(iterator, element)     
+        graph.graph['Model'][element.tag] = features     
         element.clear()
         event, element = next(iterator)
     return graph   
@@ -109,24 +110,28 @@ def convert_attributes(attributes: dict, features: dict):
                                  f" feature attribute value for 'isint'.")
 
 
-def add_ROI_coordinates(element):
-    """Extract, format and add ROI coordinates to the element attributes.
+def add_ROI_coordinates(element, attribs):
+    """Extract, format and add ROI coordinates to the attributes dict.
 
     Args:
         element (ET.Element): Element from which to extract ROI coordinates.
+        attribs (dict): Attributes dict to update with ROI coordinates.
     """
     try:
-        n_points = int(element.attrib['ROI_N_POINTS'])
+        n_points = int(attribs['ROI_N_POINTS'])
     except KeyError as err:
         print(f"No key {err} in the attributes of current element "
               f"'{element.tag}'. ")
     else:        
-        points_coordinates = element.text.split()
-        points_coordinates = [float(x) for x in points_coordinates]
-        points_dimension = len(points_coordinates) // n_points
-        it = [iter(points_coordinates)] * points_dimension
-        points_coordinates = list(zip(*it))
-        element.attrib['ROI_N_POINTS'] = points_coordinates
+        if element.text:
+            points_coordinates = element.text.split()
+            points_coordinates = [float(x) for x in points_coordinates]
+            points_dimension = len(points_coordinates) // n_points
+            it = [iter(points_coordinates)] * points_dimension
+            points_coordinates = list(zip(*it))
+            attribs['ROI_N_POINTS'] = points_coordinates
+        else:
+            attribs['ROI_N_POINTS'] = None
 
            
 def add_all_nodes(graph, iterator, ancestor):
@@ -147,8 +152,9 @@ def add_all_nodes(graph, iterator, ancestor):
             # of them (if not all) are numbers. So we need to do a
             # conversion based on these attributes type (attribute `isint`)
             # as defined in the FeaturesDeclaration tag.
+            attribs = deepcopy(element.attrib)
             try:
-                convert_attributes(element.attrib,
+                convert_attributes(attribs,
                                    graph.graph['Model']['SpotFeatures'])
             except ValueError as err:
                 print(f'ERROR: {err} Please check the XML file.')
@@ -159,13 +165,12 @@ def add_all_nodes(graph, iterator, ancestor):
 
             # The ROI coordinates are not stored in a tag attribute but in
             # the tag text. So we need to extract then format them.
-            add_ROI_coordinates(element)             
+            add_ROI_coordinates(element, attribs)             
 
             # Now that all the node attributes have been updated, we can add
             # it to the graph.
             try:
-                graph.add_nodes_from([(int(element.attrib['ID']),
-                                       element.attrib)])
+                graph.add_nodes_from([(int(attribs['ID']), attribs)])
             except KeyError as err:
                 print(f"No key {err} in the attributes of "
                       f"current element '{element.tag}'. "
@@ -182,11 +187,12 @@ def add_edge_from_element(graph, element, current_track_id):
         element (ET.Element): Element holding the information to be added.
         current_track_id (str): Track ID of the track holding the edge. 
     """
-    convert_attributes(element.attrib,
+    attribs = deepcopy(element.attrib)
+    convert_attributes(attribs,
                        graph.graph['Model']['EdgeFeatures'])
     try:
-        entry_node = element.attrib['SPOT_SOURCE_ID']
-        exit_node = element.attrib['SPOT_TARGET_ID']
+        entry_node = attribs['SPOT_SOURCE_ID']
+        exit_node = attribs['SPOT_TARGET_ID']
     except KeyError as err:
         print(f"No key {err} in the attributes of "
               f"current element '{element.tag}'. "
@@ -194,7 +200,7 @@ def add_edge_from_element(graph, element, current_track_id):
     else:
         graph.add_edge(entry_node, exit_node)
         nx.set_edge_attributes(graph, 
-                               {(entry_node, exit_node): element.attrib})
+                               {(entry_node, exit_node): attribs})
         # Adding the current track ID to the nodes of the newly created
         # edge. This will be useful later to filter nodes by track and
         # add the saved tracks attributes (as returned by this method).
@@ -224,27 +230,29 @@ def add_all_edges(graph, iterator, ancestor):
         # This condition is a bit of an overkill since the XML structure
         # SHOULD stay the same but better safe than sorry.
         # TODO: refactor this chunk that appears twice in this method.
-        convert_attributes(element.attrib,
+        attribs = deepcopy(element.attrib)
+        convert_attributes(attribs,
                            graph.graph['Model']['TrackFeatures'])
-        tracks_attributes.append(element.attrib)
+        tracks_attributes.append(attribs)
         try:
-            current_track_id = element.attrib['TRACK_ID']
+            current_track_id = attribs['TRACK_ID']
         except KeyError as err:
             print(f"No key {err} in the attributes of "
                   f"current element '{element.tag}'. "
                   f"Not adding the {err} edge to the graph.")
-            current_track_id = None         
+            current_track_id = None        
 
     while (event, element) != ('end', ancestor):
         event, element = next(iterator)
 
         # Saving the current track information.
         if element.tag == 'Track' and event == 'start':
-            convert_attributes(element.attrib,
+            attribs = deepcopy(element.attrib)
+            convert_attributes(attribs,
                                graph.graph['Model']['TrackFeatures'])
-            tracks_attributes.append(element.attrib)
+            tracks_attributes.append(attribs)
             try:
-                current_track_id = element.attrib['TRACK_ID']
+                current_track_id = attribs['TRACK_ID']
             except KeyError as err:
                 print(f"No key {err} in the attributes of "
                       f"current element '{element.tag}'. "
@@ -254,7 +262,7 @@ def add_all_edges(graph, iterator, ancestor):
         # Edge creation.
         if element.tag == 'Edge' and event == 'start': 
             add_edge_from_element(graph, element, current_track_id)
-            
+        
     return tracks_attributes
 
 
@@ -270,8 +278,9 @@ def get_filtered_tracks_ID(iterator, ancestor):
     """
     filtered_tracks_ID = []
     event, element = next(iterator)
+    attribs = deepcopy(element.attrib)
     try:
-        filtered_tracks_ID.append(int(element.attrib['TRACK_ID']))
+        filtered_tracks_ID.append(int(attribs['TRACK_ID']))
     except KeyError as err:
         print(f"No key {err} in the attributes of current element "
               f"'{element.tag}'. Ignoring this track.")
@@ -279,12 +288,13 @@ def get_filtered_tracks_ID(iterator, ancestor):
     while (event, element) != ('end', ancestor):
         event, element = next(iterator)          
         if element.tag == 'TrackID' and event == 'start':
+            attribs = deepcopy(element.attrib)
             try:
-                filtered_tracks_ID.append(int(element.attrib['TRACK_ID']))
+                filtered_tracks_ID.append(int(attribs['TRACK_ID']))
             except KeyError as err:
                 print(f"No key {err} in the attributes of current element "
                       f"'{element.tag}'. Ignoring this track.")
-            
+       
     return filtered_tracks_ID         
     
 
@@ -335,8 +345,29 @@ def add_tracks_info(graphs, tracks_attributes):
     return updated_graphs
 
 
-def read_TrackMate_XML(xml_path, keep_all_spots, keep_all_tracks):
+def read_model(xml_path: str, keep_all_spots: bool, 
+               keep_all_tracks: bool, one_graph: bool) -> list[nx.DiGraph]:
+    """Read an XML file and convert the model data into several graphs. 
 
+    Each TrackMate track and its associated data described in the XML file
+    are modeled as networkX directed graphs. Spots are modeled as graph
+    nodes, and edges as graph edges. All data pertaining to the model
+    itself such as units, spot features, etc. are stored in each graph as 
+    graph attributes.
+    
+    Args:
+        xml_path (str): Path of the XML file to process.
+        keep_all_spots (bool): True to keep the spots filtered out in 
+            TrackMate, False otherwise.
+        keep_all_tracks (bool): True to keep the tracks filtered out in 
+            TrackMate, False otherwise.
+        one_graph (bool): True to create only one graph (probably 
+            disconnected) that contains all nodes and edges, False to 
+            create a graph (connected) per track .
+
+    Returns:
+        list[nx.DiGraph]: List of graphs modeling the tracks.
+    """
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
     # the resulting graph will be disconnected.
@@ -356,6 +387,7 @@ def read_TrackMate_XML(xml_path, keep_all_spots, keep_all_tracks):
             graph = add_graph_attrib_from_element(graph, element)
             root.clear()  # Cleaning the tree to free up some memory.
             # All the browsed subelements of `root` are deleted.
+            
         # Add features declaration for spot, edge and track features.
         if element.tag == 'FeatureDeclarations' and event == 'start':
             graph = add_all_features(graph, it, element)
@@ -388,18 +420,62 @@ def read_TrackMate_XML(xml_path, keep_all_spots, keep_all_tracks):
                 graph.remove_nodes_from(to_remove)
 
             # Subgraphs creation.
-            # One subgraph is created per track, so each subgraph is
-            # a connected component of `graph`.
-            graphs = [graph.subgraph(c).copy() 
-                      for c in nx.weakly_connected_components(graph)]
-            del graph  # Redondant with the subgraphs.
+            if not one_graph:
+                # One subgraph is created per track, so each subgraph is
+                # a connected component of `graph`.
+                graphs = [graph.subgraph(c).copy() 
+                          for c in nx.weakly_connected_components(graph)]
+                del graph  # Redondant with the subgraphs.
 
-            # Adding the tracks attributes as graphs attributes.
-            try:
-                graphs = add_tracks_info(graphs, tracks_attributes)
-            except ValueError as err:
-                print(err)
-                # The program is in an impossible state so we need to stop.
-                raise
+                # Adding the tracks attributes as graphs attributes.
+                try:
+                    graphs = add_tracks_info(graphs, tracks_attributes)
+                except ValueError as err:
+                    print(err)
+                    # The program is in an impossible state so we need to stop.
+                    raise
 
-    return graphs
+        if element.tag == 'Model' and event == 'end':
+            break  # We are not interested in the following data.
+
+    if one_graph:
+        return [graph]
+    else:
+        return graphs
+
+
+def read_settings(xml_path: str) -> ET._Element:
+    """Extract the TrackMate settings of a TrackMate XML file.
+
+    Args:
+        xml_path (str): Path of the XML file to process.
+
+    Returns:
+        ET._Element: Element holding all the TrackMate settings.
+    """
+
+    it = ET.iterparse(xml_path, events=['start', 'end'])
+    _, root = next(it)
+
+    for event, element in it:
+
+        if element.tag != 'Settings':
+            root.clear()
+            
+        if element.tag == 'Settings' and event == 'end':
+            settings = deepcopy(element)
+
+    # # To explore the settings:
+    # print(type(settings))
+    # print(settings)
+    # print(settings.tag)
+    # print(settings.attrib)
+
+    # for child in settings:
+    #     print(child.tag, child. attrib)
+
+    # for descendant in settings.iterdescendants():
+    #     print(descendant.tag, descendant. attrib)
+
+    return settings    
+    
