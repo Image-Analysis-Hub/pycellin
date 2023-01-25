@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from pathlib import Path
+
 from lxml import etree as ET
 import networkx as nx
 
@@ -42,7 +43,7 @@ def create_Spot(node: dict) -> ET._Element:
 
 def write_AllSpots(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     """Write the nodes/spots data into an XML file.
-    Attributes to write for the node.
+    
     Args:
         xf (ET.xmlfile): Context manager for the XML file to write. 
         graphs (list[nx.DiGraph]): Graphs containing the data to write.

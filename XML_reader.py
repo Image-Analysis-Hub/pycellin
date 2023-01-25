@@ -4,9 +4,7 @@
 from copy import deepcopy
 
 from lxml import etree as ET
-
 import networkx as nx
-
 
 
 def add_graph_attrib_from_element(graph, element):

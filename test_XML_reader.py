@@ -5,10 +5,9 @@
 """
 
 from copy import deepcopy
-
 import io
-from lxml import etree as ET
 
+from lxml import etree as ET
 import networkx as nx
 import networkx.algorithms.isomorphism as iso
 import pytest
