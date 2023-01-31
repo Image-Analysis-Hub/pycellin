@@ -20,26 +20,34 @@ def write_FeatureDeclarations(xf: ET.xmlfile,
         xf (ET.xmlfile): Context manager for the XML file to write. 
         graphs (list[nx.DiGraph]): Graphs containing the data to write.
     """
-    features_type = ['SpotFeatures', 'EdgeFeatures', 'TrackFeatures']
-    for type in features_type:
-        dict_feats = {k: graphs[0].graph['Model'].get(k, None) 
-                    for k in [type]}
-        for graph in graphs[1:]:
-            tmp_dict = {k: graph.graph['Model'].get(k, None) 
+    xf.write('\n\t\t')
+    with xf.element('FeatureDeclarations'):
+        features_type = ['SpotFeatures', 'EdgeFeatures', 'TrackFeatures']
+        for type in features_type:
+            # We need to check that all graphs have the same features
+            # definition.
+            dict_feats = {k: graphs[0].graph['Model'].get(k, None) 
                         for k in [type]}
-            assert dict_feats == tmp_dict
+            for graph in graphs[1:]:
+                tmp_dict = {k: graph.graph['Model'].get(k, None) 
+                            for k in [type]}
+                assert dict_feats == tmp_dict
 
-        xf.write('\n\t\t')
-        with xf.element(type):
+            # Actual writing.
             xf.write('\n\t\t\t')
-            for v_feats in dict_feats.values():
-                for v in v_feats.values():
-                    el_feat = ET.Element('Feature', v)
-                    xf.write(el_feat)
-                    xf.write('\n\t\t\t')
-            xf.write('\n\t\t')
-    
+            with xf.element(type):
+                xf.write('\n\t\t\t\t')
+                for v_feats in dict_feats.values():
+                    dict_length = len(v_feats)
+                    for i, v in enumerate(v_feats.values()):
+                        el_feat = ET.Element('Feature', v)
+                        xf.write(el_feat)
+                        if i != dict_length - 1:
+                            xf.write('\n\t\t\t\t')
+                xf.write('\n\t\t\t')
+        xf.write('\n\t\t')
     xf.write('\n\t')
+
 
 def create_Spot(node: dict) -> ET._Element:
     """Create an XML Spot Element representing a graph node. 
