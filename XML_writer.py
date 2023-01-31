@@ -37,6 +37,11 @@ def write_FeatureDeclarations(xf: ET.xmlfile,
             xf.write('\n\t\t\t')
             with xf.element(type):
                 xf.write('\n\t\t\t\t')
+                # For each type of features, data is stored as a dict of dict.
+                # E.g. for SpotFeatures: 
+                # {'QUALITY': {'feature': 'QUALITY', 'name': 'Quality'...},
+                #  'POSITION_X': {'feature': 'POSITION_X', 'name': 'X'...},
+                #  ...}
                 for v_feats in dict_feats.values():
                     dict_length = len(v_feats)
                     for i, v in enumerate(v_feats.values()):
@@ -181,7 +186,7 @@ if __name__ == "__main__":
     settings = XML_reader.read_settings(xml_in)
     write_TrackMate_XML(graphs, settings, xml_out)
 
-    # print(graphs[0].graph['Model'].keys())
+    # print(graphs[0].graph['Model'])
     # print({k: graphs[0].graph['Model'].get(k, None) for k in ('spatialunits', 'timeunits')})
    
 
