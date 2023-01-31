@@ -20,17 +20,26 @@ def write_FeatureDeclarations(xf: ET.xmlfile,
         xf (ET.xmlfile): Context manager for the XML file to write. 
         graphs (list[nx.DiGraph]): Graphs containing the data to write.
     """
+    features_type = ['SpotFeatures', 'EdgeFeatures', 'TrackFeatures']
+    for type in features_type:
+        dict_feats = {k: graphs[0].graph['Model'].get(k, None) 
+                    for k in [type]}
+        for graph in graphs[1:]:
+            tmp_dict = {k: graph.graph['Model'].get(k, None) 
+                        for k in [type]}
+            assert dict_feats == tmp_dict
 
-    xf.write(ET.Element('test'))
+        xf.write('\n\t\t')
+        with xf.element(type):
+            xf.write('\n\t\t\t')
+            for v_feats in dict_feats.values():
+                for v in v_feats.values():
+                    el_feat = ET.Element('Feature', v)
+                    xf.write(el_feat)
+                    xf.write('\n\t\t\t')
+            xf.write('\n\t\t')
     
-    # Spot features.
-
-    # Edge features.
-
-    # Track features.
-    
-    pass
-
+    xf.write('\n\t')
 
 def create_Spot(node: dict) -> ET._Element:
     """Create an XML Spot Element representing a graph node. 
@@ -107,7 +116,7 @@ def write_Model(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
         write_AllSpots(xf, graphs)
         write_AllTracks(xf, graphs)
         write_FilteredTracks(xf, graphs)
-        xf.write('\n\t')
+        # xf.write('\n\t')
 
 
 def write_Settings(xf: ET.xmlfile, settings: ET._Element) -> None:
