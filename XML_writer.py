@@ -20,6 +20,14 @@ def write_FeatureDeclarations(xf: ET.xmlfile,
         xf (ET.xmlfile): Context manager for the XML file to write. 
         graphs (list[nx.DiGraph]): Graphs containing the data to write.
     """
+
+    xf.write(ET.Element('test'))
+    
+    # Spot features.
+
+    # Edge features.
+
+    # Track features.
     
     pass
 
@@ -87,7 +95,14 @@ def write_Model(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
         graphs (list[nx.DiGraph]): Graphs containing the data to write.
     """
     
-    with xf.element('Model'):
+    dict_units = {k: graphs[0].graph['Model'].get(k, None) 
+                  for k in ('spatialunits', 'timeunits')}
+    for graph in graphs[1:]:
+        tmp_dict = {k: graph.graph['Model'].get(k, None) 
+                    for k in ('spatialunits', 'timeunits')}
+        assert dict_units == tmp_dict
+
+    with xf.element('Model', dict_units):
         write_FeatureDeclarations(xf, graphs)
         write_AllSpots(xf, graphs)
         write_AllTracks(xf, graphs)
@@ -127,9 +142,13 @@ def write_TrackMate_XML(graphs: list[nx.DiGraph], settings: ET._Element,
 
 if __name__ == "__main__":
 
-    xml_in = "/mnt/data/Code/pytmn/samples/FakeTracks.xml"
-    xml_out = '/mnt/data/xml_test/somefile.xml'
-    graph_folder = "/mnt/data/Code/pytmn/samples/"
+    # xml_in = "/mnt/data/Code/pytmn/samples/FakeTracks.xml"
+    # xml_out = '/mnt/data/xml_test/somefile.xml'
+    # graph_folder = "/mnt/data/Code/pytmn/samples/"
+
+    xml_in = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks.xml'
+    xml_out = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks_written.xml'
+    graph_folder = "G:/RAID/IAH/Code/pytmn/samples/"
 
     # For now, not taking into account lone nodes.
     def load_graphs(folder):
@@ -145,7 +164,9 @@ if __name__ == "__main__":
     settings = XML_reader.read_settings(xml_in)
     write_TrackMate_XML(graphs, settings, xml_out)
 
-
+    # print(graphs[0].graph['Model'].keys())
+    # print({k: graphs[0].graph['Model'].get(k, None) for k in ('spatialunits', 'timeunits')})
+   
 
     # def generate_some_elements():
     #     a = ET.Element('a')
@@ -155,23 +176,23 @@ if __name__ == "__main__":
 
     #     return a
 
-    # # with ET.xmlfile(file_path, encoding='utf-8') as xf:
-    # #     xf.write_declaration(standalone=True)
-    # #     xf.write_doctype('<!DOCTYPE root SYSTEM "some.dtd">')
+    # with ET.xmlfile(xml_out, encoding='utf-8') as xf:
+    #     xf.write_declaration(standalone=True)
+    #     xf.write_doctype('<!DOCTYPE root SYSTEM "some.dtd">')
 
-    # #     # generate an element (the root element)
-    # #     with xf.element('root'):
-    # #          # write a complete Element into the open root element
-    # #          xf.write(ET.Element('test'), pretty_print=True)
+    #     # generate an element (the root element)
+    #     with xf.element('root'):
+    #          # write a complete Element into the open root element
+    #          xf.write(ET.Element('test'), pretty_print=True)
 
-    # #         #  # generate and write more Elements, e.g. through iterparse
-    # #         #  for element in generate_some_elements():
-    # #         #      # serialise generated elements into the XML file
-    # #         #      xf.write(element, pretty_print=True)
+    #         #  # generate and write more Elements, e.g. through iterparse
+    #          for element in generate_some_elements():
+    #              # serialise generated elements into the XML file
+    #              xf.write(element, pretty_print=True)
 
-    # #          # or write multiple Elements or strings at once
-    # #         #  xf.write(ET.Element('start'), "text", ET.Element('end'), 
-    # #         #           pretty_print=True)
+    #          # or write multiple Elements or strings at once
+    #          xf.write(ET.Element('start'), "text", ET.Element('end'), 
+    #                   pretty_print=True)
 
     # def derp(tag):
     #     with xf.element(tag):
@@ -187,7 +208,7 @@ if __name__ == "__main__":
     #     with xf.element('abc'):
     #         derp('model')
 
-    #         a = ET.Element('a')
+            # a = ET.Element('a')
     #         for i in range(4):
     #             rec = ET.SubElement(a, "record", id=str(i))
     #             rec.text = "record text data"
