@@ -164,13 +164,13 @@ def write_TrackMate_XML(graphs: list[nx.DiGraph], settings: ET._Element,
 
 if __name__ == "__main__":
 
-    # xml_in = "/mnt/data/Code/pytmn/samples/FakeTracks.xml"
-    # xml_out = '/mnt/data/xml_test/somefile.xml'
-    # graph_folder = "/mnt/data/Code/pytmn/samples/"
+    xml_in = "/mnt/data/Code/pytmn/samples/FakeTracks.xml"
+    xml_out = '/mnt/data/Code/pytmn/samples/FakeTracks_written.xml'
+    graph_folder = "/mnt/data/Code/pytmn/samples/"
 
-    xml_in = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks.xml'
-    xml_out = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks_written.xml'
-    graph_folder = "G:/RAID/IAH/Code/pytmn/samples/"
+    # xml_in = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks.xml'
+    # xml_out = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks_written.xml'
+    # graph_folder = "G:/RAID/IAH/Code/pytmn/samples/"
 
     # For now, not taking into account lone nodes.
     def load_graphs(folder):
