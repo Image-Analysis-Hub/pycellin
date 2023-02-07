@@ -117,7 +117,10 @@ def write_AllTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     """
     xf.write('\n\t\t')
     with xf.element('AllTracks'):
-        pass
+
+        xf.write('\n\t\t\t')
+        with xf.element('Track'):
+            pass
 
 
 def write_FilteredTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
@@ -184,7 +187,8 @@ def write_TrackMate_XML(graphs: list[nx.DiGraph], settings: ET._Element,
 
     with ET.xmlfile(xml_path, encoding='utf-8', close=True) as xf:
         xf.write_declaration()
-        with xf.element('TrackMate'):
+        # TODO: deal with the problem of unknown version.
+        with xf.element('TrackMate', {'version': "unknown"}):
             xf.write('\n\t')
             write_Model(xf, graphs)
             xf.write('\n\t')
@@ -231,14 +235,17 @@ if __name__ == "__main__":
             graphs.append(graph)
         return graphs
 
-    graphs = load_graphs_rost(graph_folder)
+    graphs = load_graphs_rst(graph_folder)
     print(len(graphs))
 
     settings = XML_reader.read_settings(xml_in)
     write_TrackMate_XML(graphs, settings, xml_out)
 
-    # derp = {k for k,v in graphs[0].nodes[2004].items()}
-    # print(derp)
+    # print(graphs[-1].graph.keys())
+
+    # graphs = nx.weakly_connected_components(graphs[0])
+    # for g in graphs:
+    #     print(g.graph())
 
     # FeatureDeclarations
     # AllSpots
