@@ -12,7 +12,7 @@ import XML_reader
 def write_FeatureDeclarations(xf: ET.xmlfile,
                               graphs: list[nx.DiGraph]) -> None:
     """Write the feature declarations into an XML file.
-    
+
     The feature declarations are divided in three parts: spot features,
     edge features, and track features.
 
@@ -26,10 +26,10 @@ def write_FeatureDeclarations(xf: ET.xmlfile,
         for type in features_type:
             # We need to check that all graphs have the same features
             # definition.
-            dict_feats = {k: graphs[0].graph['Model'].get(k, None) 
-                        for k in [type]}
+            dict_feats = {k: graphs[0].graph['Model'].get(k, None)
+                          for k in [type]}
             for graph in graphs[1:]:
-                tmp_dict = {k: graph.graph['Model'].get(k, None) 
+                tmp_dict = {k: graph.graph['Model'].get(k, None)
                             for k in [type]}
                 assert dict_feats == tmp_dict
 
@@ -38,7 +38,7 @@ def write_FeatureDeclarations(xf: ET.xmlfile,
             with xf.element(type):
                 xf.write('\n\t\t\t\t')
                 # For each type of features, data is stored as a dict of dict.
-                # E.g. for SpotFeatures: 
+                # E.g. for SpotFeatures:
                 # {'QUALITY': {'feature': 'QUALITY', 'name': 'Quality'...},
                 #  'POSITION_X': {'feature': 'POSITION_X', 'name': 'X'...},
                 #  ...}
@@ -54,54 +54,63 @@ def write_FeatureDeclarations(xf: ET.xmlfile,
     # xf.write('\n\t')
 
 
-def create_Spot(node: dict) -> ET._Element:
+def create_Spot(graph: nx.DiGraph, node: dict) -> ET._Element:
     """Create an XML Spot Element representing a graph node. 
 
     Args:
+        graph (nx.DiGraph): Graph containing the node to write.
         node (dict): Attributes of the spot.
 
     Returns:
         ET._Element: The newly created Spot Element.
     """
+    # Building Spot attributes.
+    exluded_keys = ['TRACK_ID', 'ROI_N_POINTS']
+    n_attr = {k: str(v) for k, v in graph.nodes[node].items()
+              if k not in exluded_keys}
+    n_attr['ROI_N_POINTS'] = str(len(graph.nodes[node]['ROI_N_POINTS']))
 
-    # print(graphs[0].nodes())
-    # print(len(graphs[0].nodes[2004].keys()))  # 30 ici alors que 29 dans XML
-    # TODO: dans les graphes, il y a les TRACK_ID en plus, bien penser à 
-    # enlever ça avant d'écrire en XML
-    pass
+    # Building Spot text: coordinates of ROI points.
+    coords = [item for pt in graph.nodes[node]['ROI_N_POINTS'] for item in pt]
+
+    el_node = ET.Element('Spot', n_attr)
+    el_node.text = ' '.join(map(str, coords))
+    return el_node
 
 
 def write_AllSpots(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     """Write the nodes/spots data into an XML file.
-    
+
     Args:
         xf (ET.xmlfile): Context manager for the XML file to write. 
         graphs (list[nx.DiGraph]): Graphs containing the data to write.
     """
-    
-    # Remove TRACK_ID from node attributes
-    # Sort nodes by frame
-    # For each frame, write the corresponding nodes, with ROI as text
-
     xf.write('\n\t\t')
     nb_nodes = sum([len(graph) for graph in graphs])
     with xf.element('AllSpots', {'nspots': str(nb_nodes)}):
+        # For each frame, nodes can be spread over several graphs so we first
+        # need to identify all of the existing frames.
         frames = set()
         for graph in graphs:
             frames.update(nx.get_node_attributes(graph, 'FRAME').values())
-            print(frames)
+
+        # Then at each frame, we can find the nodes and write its data.
         for frame in frames:
             xf.write('\n\t\t\t')
             with xf.element('SpotsInFrame', {'frame': str(frame)}):
+                for graph in graphs:
+                    nodes = [n for n in graph.nodes()
+                             if graph.nodes[n]['FRAME'] == frame]
+                    for node in nodes:
+                        xf.write('\n\t\t\t\t')
+                        xf.write(create_Spot(graph, node))
                 xf.write('\n\t\t\t')
-                # for graph in graphs:
-                #     nodes = []
         xf.write('\n\t\t')
 
 
 def write_AllTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     """Write the tracks data into an XML file.
-    
+
     Args:
         xf (ET.xmlfile): Context manager for the XML file to write. 
         graphs (list[nx.DiGraph]): Graphs containing the data to write.
@@ -113,7 +122,7 @@ def write_AllTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
 
 def write_FilteredTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     """Write the filtered tracks data into an XML file.
-    
+
     Args:
         xf (ET.xmlfile): Context manager for the XML file to write. 
         graphs (list[nx.DiGraph]): Graphs containing the data to write.
@@ -128,17 +137,17 @@ def write_Model(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     """Write all the model data into an XML file.
 
     This includes Features declarations, spots, tracks and filtered tracks.
-    
+
     Args:
         xf (ET.xmlfile): Context manager for the XML file to write. 
         graphs (list[nx.DiGraph]): Graphs containing the data to write.
     """
-    
-    dict_units = {k: graphs[0].graph['Model'].get(k, None) 
+
+    dict_units = {k: graphs[0].graph['Model'].get(k, None)
                   for k in ('spatialunits', 'timeunits')}
     if len(graphs) > 1:
         for graph in graphs[1:]:
-            tmp_dict = {k: graph.graph['Model'].get(k, None) 
+            tmp_dict = {k: graph.graph['Model'].get(k, None)
                         for k in ('spatialunits', 'timeunits')}
             assert dict_units == tmp_dict
 
@@ -159,7 +168,7 @@ def write_Settings(xf: ET.xmlfile, settings: ET._Element) -> None:
     """
 
     xf.write(settings, pretty_print=True)
-    
+
 
 def write_TrackMate_XML(graphs: list[nx.DiGraph], settings: ET._Element,
                         xml_path: str) -> None:
@@ -177,7 +186,7 @@ def write_TrackMate_XML(graphs: list[nx.DiGraph], settings: ET._Element,
             xf.write('\n\t')
             write_Model(xf, graphs)
             xf.write('\n\t')
-            write_Settings(xf, settings)         
+            write_Settings(xf, settings)
 
 
 if __name__ == "__main__":
@@ -226,6 +235,9 @@ if __name__ == "__main__":
     settings = XML_reader.read_settings(xml_in)
     write_TrackMate_XML(graphs, settings, xml_out)
 
+    # derp = {k for k,v in graphs[0].nodes[2004].items()}
+    # print(derp)
+
     # FeatureDeclarations
     # AllSpots
     # AllTracks
@@ -233,8 +245,6 @@ if __name__ == "__main__":
 
     # print(graphs[0].graph['Model'])
     # print({k: graphs[0].graph['Model'].get(k, None) for k in ('spatialunits', 'timeunits')})
-   
-
 
     # def generate_some_elements():
     #     a = ET.Element('a')
@@ -259,7 +269,7 @@ if __name__ == "__main__":
     #              xf.write(element, pretty_print=True)
 
     #          # or write multiple Elements or strings at once
-    #          xf.write(ET.Element('start'), "text", ET.Element('end'), 
+    #          xf.write(ET.Element('start'), "text", ET.Element('end'),
     #                   pretty_print=True)
 
     # def derp(tag):
@@ -271,16 +281,14 @@ if __name__ == "__main__":
     #                 # no longer needed, discard it right away!
     #                 el = None
 
-
     # with ET.xmlfile(xml_out, encoding='utf-8') as xf:
     #     with xf.element('abc'):
     #         derp('model')
 
-            # a = ET.Element('a')
+    # a = ET.Element('a')
     #         for i in range(4):
     #             rec = ET.SubElement(a, "record", id=str(i))
     #             rec.text = "record text data"
     #             rec2 = ET.SubElement(rec, "info", code=str(i+10))
     #             rec3 = ET.SubElement(rec, "info", code=str(i+20))
     #         xf.write(a, pretty_print=True)
-    
