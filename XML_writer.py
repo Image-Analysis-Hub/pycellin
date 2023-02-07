@@ -51,7 +51,7 @@ def write_FeatureDeclarations(xf: ET.xmlfile,
                             xf.write('\n\t\t\t\t')
                 xf.write('\n\t\t\t')
         xf.write('\n\t\t')
-    xf.write('\n\t')
+    # xf.write('\n\t')
 
 
 def create_Spot(node: dict) -> ET._Element:
@@ -82,7 +82,10 @@ def write_AllSpots(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     # Remove TRACK_ID from node attributes
     # Sort nodes by frame
     # For each frame, write the corresponding nodes, with ROI as text
-    pass
+
+    xf.write('\n\t\t')
+    with xf.element('AllSpots'):
+        pass
 
 
 def write_AllTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
@@ -92,8 +95,9 @@ def write_AllTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
         xf (ET.xmlfile): Context manager for the XML file to write. 
         graphs (list[nx.DiGraph]): Graphs containing the data to write.
     """
-    
-    pass
+    xf.write('\n\t\t')
+    with xf.element('AllTracks'):
+        pass
 
 
 def write_FilteredTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
@@ -103,8 +107,10 @@ def write_FilteredTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
         xf (ET.xmlfile): Context manager for the XML file to write. 
         graphs (list[nx.DiGraph]): Graphs containing the data to write.
     """
-
-    pass
+    xf.write('\n\t\t')
+    with xf.element('FilteredTracks'):
+        pass
+    xf.write('\n\t')
 
 
 def write_Model(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
@@ -164,13 +170,13 @@ def write_TrackMate_XML(graphs: list[nx.DiGraph], settings: ET._Element,
 
 if __name__ == "__main__":
 
-    xml_in = "/mnt/data/Code/pytmn/samples/FakeTracks.xml"
-    xml_out = '/mnt/data/Code/pytmn/samples/FakeTracks_written.xml'
-    graph_folder = "/mnt/data/Code/pytmn/samples/"
+    # xml_in = "/mnt/data/Code/pytmn/samples/FakeTracks.xml"
+    # xml_out = '/mnt/data/Code/pytmn/samples/FakeTracks_written.xml'
+    # graph_folder = "/mnt/data/Code/pytmn/samples/"
 
-    # xml_in = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks.xml'
-    # xml_out = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks_written.xml'
-    # graph_folder = "G:/RAID/IAH/Code/pytmn/samples/"
+    xml_in = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks.xml'
+    xml_out = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks_written.xml'
+    graph_folder = "G:/RAID/IAH/Code/pytmn/samples/"
 
     # For now, not taking into account lone nodes.
     def load_graphs(folder):
@@ -186,9 +192,15 @@ if __name__ == "__main__":
     settings = XML_reader.read_settings(xml_in)
     write_TrackMate_XML(graphs, settings, xml_out)
 
+    # FeatureDeclarations
+    # AllSpots
+    # AllTracks
+    # FilteredTracks
+
     # print(graphs[0].graph['Model'])
     # print({k: graphs[0].graph['Model'].get(k, None) for k in ('spatialunits', 'timeunits')})
    
+
 
     # def generate_some_elements():
     #     a = ET.Element('a')
