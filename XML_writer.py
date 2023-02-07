@@ -143,6 +143,8 @@ def write_Model(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
         graphs (list[nx.DiGraph]): Graphs containing the data to write.
     """
 
+    # Checking that each and every graph have the same features.
+    # It should be the case but better safe than sorry.
     dict_units = {k: graphs[0].graph['Model'].get(k, None)
                   for k in ('spatialunits', 'timeunits')}
     if len(graphs) > 1:
