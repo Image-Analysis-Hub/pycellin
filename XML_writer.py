@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import math
 from pathlib import Path
 
 from lxml import etree as ET
@@ -54,6 +55,16 @@ def write_FeatureDeclarations(xf: ET.xmlfile,
     # xf.write('\n\t')
 
 
+def convert_dict(value):
+    # TODO: docstrings
+    if isinstance(value, str):
+        return value
+    elif math.isnan(value):
+        return "NaN"
+    else:
+        return str(value)
+
+
 def create_Spot(graph: nx.DiGraph, node: dict) -> ET._Element:
     """Create an XML Spot Element representing a graph node. 
 
@@ -66,7 +77,7 @@ def create_Spot(graph: nx.DiGraph, node: dict) -> ET._Element:
     """
     # Building Spot attributes.
     exluded_keys = ['TRACK_ID', 'ROI_N_POINTS']
-    n_attr = {k: str(v) for k, v in graph.nodes[node].items()
+    n_attr = {k: convert_dict(v) for k, v in graph.nodes[node].items()
               if k not in exluded_keys}
     n_attr['ROI_N_POINTS'] = str(len(graph.nodes[node]['ROI_N_POINTS']))
 
@@ -117,10 +128,26 @@ def write_AllTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     """
     xf.write('\n\t\t')
     with xf.element('AllTracks'):
+        for graph in graphs:
+            # We have track tags to add only if there was a tracking done
+            # in the first place. A graph with no TRACK_ID attribute has
+            # no tracking associated.
+            if 'TRACK_ID' not in graph.graph:
+                continue
 
-        xf.write('\n\t\t\t')
-        with xf.element('Track'):
-            pass
+            # Track tags.
+            xf.write('\n\t\t\t')
+            exluded_keys = ['Model']
+            t_attr = {k: convert_dict(v) for k, v in graph.graph.items()
+                      if k not in exluded_keys}
+            with xf.element('Track', t_attr):
+                # Edge tags.
+                for edge in graph.edges.data():
+                    xf.write('\n\t\t\t\t')
+                    e_attr = {k: convert_dict(v) for k, v in edge[2].items()}
+                    xf.write(ET.Element('Edge', e_attr))
+                xf.write('\n\t\t\t')
+        xf.write('\n\t\t')
 
 
 def write_FilteredTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
@@ -240,8 +267,6 @@ if __name__ == "__main__":
 
     settings = XML_reader.read_settings(xml_in)
     write_TrackMate_XML(graphs, settings, xml_out)
-
-    # print(graphs[-1].graph.keys())
 
     # graphs = nx.weakly_connected_components(graphs[0])
     # for g in graphs:
