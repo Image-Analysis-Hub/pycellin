@@ -23,19 +23,19 @@ def write_FeatureDeclarations(xf: ET.xmlfile,
     xf.write('\n\t\t')
     with xf.element('FeatureDeclarations'):
         features_type = ['SpotFeatures', 'EdgeFeatures', 'TrackFeatures']
-        for type in features_type:
+        for f_type in features_type:
             # We need to check that all graphs have the same features
             # definition.
             dict_feats = {k: graphs[0].graph['Model'].get(k, None)
-                          for k in [type]}
+                          for k in [f_type]}
             for graph in graphs[1:]:
                 tmp_dict = {k: graph.graph['Model'].get(k, None)
-                            for k in [type]}
+                            for k in [f_type]}
                 assert dict_feats == tmp_dict
 
             # Actual writing.
             xf.write('\n\t\t\t')
-            with xf.element(type):
+            with xf.element(f_type):
                 xf.write('\n\t\t\t\t')
                 # For each type of features, data is stored as a dict of dict.
                 # E.g. for SpotFeatures:
