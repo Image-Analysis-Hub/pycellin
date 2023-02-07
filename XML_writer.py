@@ -84,7 +84,8 @@ def write_AllSpots(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     # For each frame, write the corresponding nodes, with ROI as text
 
     xf.write('\n\t\t')
-    with xf.element('AllSpots'):
+    nb_nodes = sum([len(graph) for graph in graphs])
+    with xf.element('AllSpots', {'nspots': str(nb_nodes)}):
         pass
 
 
@@ -125,10 +126,11 @@ def write_Model(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     
     dict_units = {k: graphs[0].graph['Model'].get(k, None) 
                   for k in ('spatialunits', 'timeunits')}
-    for graph in graphs[1:]:
-        tmp_dict = {k: graph.graph['Model'].get(k, None) 
-                    for k in ('spatialunits', 'timeunits')}
-        assert dict_units == tmp_dict
+    if len(graphs) > 1:
+        for graph in graphs[1:]:
+            tmp_dict = {k: graph.graph['Model'].get(k, None) 
+                        for k in ('spatialunits', 'timeunits')}
+            assert dict_units == tmp_dict
 
     with xf.element('Model', dict_units):
         write_FeatureDeclarations(xf, graphs)
@@ -178,15 +180,37 @@ if __name__ == "__main__":
     xml_out = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks_written.xml'
     graph_folder = "G:/RAID/IAH/Code/pytmn/samples/"
 
-    # For now, not taking into account lone nodes.
     def load_graphs(folder):
+        # only tracks
         graphs = []
         for file in Path(folder).glob('*_Track_*.gz'):
+            print(file)
             graph = nx.read_gpickle(file)
+            print(len(graph))
             graphs.append(graph)
         return graphs
 
-    graphs = load_graphs(graph_folder)
+    def load_graphs_rost(folder):
+        # one graph
+        graphs = []
+        for file in Path(folder).glob('FakeTracks.gz'):
+            print(file)
+            graph = nx.read_gpickle(file)
+            print(len(graph))
+            graphs.append(graph)
+        return graphs
+
+    def load_graphs_rst(folder):
+        # tracks + lone nodes
+        graphs = []
+        for file in Path(folder).glob('FakeTracks_*.gz'):
+            print(file)
+            graph = nx.read_gpickle(file)
+            print(len(graph))
+            graphs.append(graph)
+        return graphs
+
+    graphs = load_graphs_rost(graph_folder)
     print(len(graphs))
 
     settings = XML_reader.read_settings(xml_in)
