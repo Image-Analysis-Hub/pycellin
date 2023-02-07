@@ -86,7 +86,17 @@ def write_AllSpots(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     xf.write('\n\t\t')
     nb_nodes = sum([len(graph) for graph in graphs])
     with xf.element('AllSpots', {'nspots': str(nb_nodes)}):
-        pass
+        frames = set()
+        for graph in graphs:
+            frames.update(nx.get_node_attributes(graph, 'FRAME').values())
+            print(frames)
+        for frame in frames:
+            xf.write('\n\t\t\t')
+            with xf.element('SpotsInFrame', {'frame': str(frame)}):
+                xf.write('\n\t\t\t')
+                # for graph in graphs:
+                #     nodes = []
+        xf.write('\n\t\t')
 
 
 def write_AllTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
