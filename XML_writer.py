@@ -3,11 +3,14 @@
 
 import math
 from pathlib import Path
+import sys
 
 from lxml import etree as ET
 import networkx as nx
 
 import XML_reader
+sys.path.append('/mnt/data/Code/lleblanc/src/')
+import lineage as lin
 
 
 def write_FeatureDeclarations(xf: ET.xmlfile,
@@ -61,6 +64,11 @@ def convert_dict(value):
         return value
     elif math.isnan(value):
         return "NaN"
+    elif math.isinf(value):
+        if value > 0:
+            return "Infinity"
+        else:
+            return "-Infinity"
     else:
         return str(value)
 
@@ -224,13 +232,17 @@ def write_TrackMate_XML(graphs: list[nx.DiGraph], settings: ET._Element,
 
 if __name__ == "__main__":
 
-    # xml_in = "/mnt/data/Code/pytmn/samples/FakeTracks.xml"
-    # xml_out = '/mnt/data/Code/pytmn/samples/FakeTracks_written.xml'
-    # graph_folder = "/mnt/data/Code/pytmn/samples/"
+    xml_in = "/mnt/data/Code/pytmn/samples/FakeTracks.xml"
+    xml_out = '/mnt/data/Code/pytmn/samples/FakeTracks_written.xml'
+    graph_folder = "/mnt/data/Code/pytmn/samples/"
 
-    xml_in = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks.xml'
-    xml_out = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks_written.xml'
-    graph_folder = "G:/RAID/IAH/Code/pytmn/samples/"
+    xml_in = "/mnt/data/Code/data_test_pytmn_writer/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage5_StackReg_crop_merged+track_FINAL.xml"
+    xml_out = '/mnt/data/Code/data_test_pytmn_writer/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage5_StackReg_crop_merged+track_FINAL_written.xml'
+    graph_folder = "/mnt/data/Code/data_test_pytmn_writer/"
+
+    # xml_in = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks.xml'
+    # xml_out = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks_written.xml'
+    # graph_folder = "G:/RAID/IAH/Code/pytmn/samples/"
 
     def load_graphs(folder):
         # only tracks
@@ -262,8 +274,10 @@ if __name__ == "__main__":
             graphs.append(graph)
         return graphs
 
-    graphs = load_graphs_rst(graph_folder)
+    graphs = load_graphs(graph_folder)
     print(len(graphs))
+    for graph in graphs:
+        lin.add_node_attributes(graph, tracking=False)
 
     settings = XML_reader.read_settings(xml_in)
     write_TrackMate_XML(graphs, settings, xml_out)
