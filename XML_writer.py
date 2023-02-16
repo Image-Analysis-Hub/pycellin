@@ -9,7 +9,8 @@ from lxml import etree as ET
 import networkx as nx
 
 import XML_reader
-sys.path.append('/mnt/data/Code/lleblanc/src/')
+# sys.path.append('/mnt/data/Code/lleblanc/src/')
+sys.path.append('G:/RAID/IAH/Code/lleblanc/src/')
 import lineage as lin
 
 
@@ -167,7 +168,12 @@ def write_FilteredTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     """
     xf.write('\n\t\t')
     with xf.element('FilteredTracks'):
-        pass
+        for graph in graphs:
+            if 'TRACK_ID' in graph.graph and graph.graph['FilteredTrack']:
+                xf.write('\n\t\t\t')
+                t_attr = {'TRACK_ID': str(graph.graph['TRACK_ID'])}
+                xf.write(ET.Element('TrackID', t_attr))
+        xf.write('\n\t\t')
     xf.write('\n\t')
 
 
@@ -232,17 +238,17 @@ def write_TrackMate_XML(graphs: list[nx.DiGraph], settings: ET._Element,
 
 if __name__ == "__main__":
 
-    xml_in = "/mnt/data/Code/pytmn/samples/FakeTracks.xml"
-    xml_out = '/mnt/data/Code/pytmn/samples/FakeTracks_written.xml'
-    graph_folder = "/mnt/data/Code/pytmn/samples/"
+    # xml_in = "/mnt/data/Code/pytmn/samples/FakeTracks.xml"
+    # xml_out = '/mnt/data/Code/pytmn/samples/FakeTracks_written.xml'
+    # graph_folder = "/mnt/data/Code/pytmn/samples/"
 
-    xml_in = "/mnt/data/Code/data_test_pytmn_writer/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage5_StackReg_crop_merged+track_FINAL.xml"
-    xml_out = '/mnt/data/Code/data_test_pytmn_writer/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage5_StackReg_crop_merged+track_FINAL_written.xml'
-    graph_folder = "/mnt/data/Code/data_test_pytmn_writer/"
+    # xml_in = "/mnt/data/Code/data_test_pytmn_writer/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage5_StackReg_crop_merged+track_FINAL.xml"
+    # xml_out = '/mnt/data/Code/data_test_pytmn_writer/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage5_StackReg_crop_merged+track_FINAL_written.xml'
+    # graph_folder = "/mnt/data/Code/data_test_pytmn_writer/"
 
-    # xml_in = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks.xml'
-    # xml_out = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks_written.xml'
-    # graph_folder = "G:/RAID/IAH/Code/pytmn/samples/"
+    xml_in = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks.xml'
+    xml_out = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks_written.xml'
+    graph_folder = "G:/RAID/IAH/Code/pytmn/samples/"
 
     def load_graphs(folder):
         # only tracks
@@ -275,9 +281,9 @@ if __name__ == "__main__":
         return graphs
 
     graphs = load_graphs(graph_folder)
-    print(len(graphs))
-    for graph in graphs:
-        lin.add_node_attributes(graph, tracking=False)
+    # print(len(graphs))
+    # for graph in graphs:
+    #     lin.add_node_attributes(graph, tracking=False)
 
     settings = XML_reader.read_settings(xml_in)
     write_TrackMate_XML(graphs, settings, xml_out)
