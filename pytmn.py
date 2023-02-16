@@ -19,9 +19,10 @@ import matplotlib.pyplot as plt
 import networkx as nx
 
 import XML_reader
+import XML_writer
 
 
-def export_graph(graph, input):
+def export_graph(graph: nx.DiGraph, input: str):
     """Export a graph object as a gpickle file.
 
     The graph is exported in the same folder than the XML file 
@@ -63,7 +64,7 @@ if __name__ == "__main__":
                               "tracks to directed graphs and export them to "
                               "gpickle files"))
     parser.add_argument("-w", "--write_xml", action="store_true",
-                        help=("read the given gpickle file and export the "
+                        help=("read the given gpickle file(s) and export the "
                               "tracks in a TrackMate xml file"))
     parser.add_argument("-s", "--keep_all_spots", action="store_true",
                         help=("in reader mode, keep the spots filtered out in "
@@ -93,8 +94,16 @@ if __name__ == "__main__":
               f' been exported.')
 
     # From directed graphs to TM xml.
+    # TODO: add conditionally required arguments to pass original xml path 
+    # in order to extract log and settings. See:
+    # https://stackoverflow.com/questions/19414060/argparse-required-argument-y-if-x-is-present
+    # and do some more research on argparse.
+    # Otherwise, separate reader and writer.
     if args.write_xml:
+        # TODO: make it work if input is a gz file or a folder containing gz.
+        # And modify input argparse help accordingly.
         pass
+        # XML_reader.write_TrackMate_XML(graphs, settings, xml_out)
 
     # Basic visualisation.
     if args.plot_graph:

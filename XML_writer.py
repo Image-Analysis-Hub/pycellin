@@ -9,14 +9,17 @@ from typing import Union
 from lxml import etree as ET
 import networkx as nx
 
+# TODO: delete lines below when main will be cleaned up.
 import XML_reader
 # sys.path.append('/mnt/data/Code/lleblanc/src/')
 sys.path.append('G:/RAID/IAH/Code/lleblanc/src/')
 import lineage as lin
 
 
-def write_FeatureDeclarations(xf: ET.xmlfile,
-                              graphs: list[nx.DiGraph]) -> None:
+def write_FeatureDeclarations(
+        xf: ET.xmlfile,
+        graphs: list[nx.DiGraph],
+        ) -> None:
     """Write the feature declarations into an XML file.
 
     The feature declarations are divided in three parts: spot features,
@@ -59,7 +62,9 @@ def write_FeatureDeclarations(xf: ET.xmlfile,
         xf.write('\n\t\t')
 
 
-def value_to_str(value: Union[int, float, str]) -> str:
+def value_to_str(
+        value: Union[int, float, str],
+        ) -> str:
     """Convert a value to its associated string.
 
     Indeed, ET.write() method only accepts to write strings.
@@ -88,7 +93,10 @@ def value_to_str(value: Union[int, float, str]) -> str:
         return str(value)
 
 
-def create_Spot(graph: nx.DiGraph, node: dict) -> ET._Element:
+def create_Spot(
+        graph: nx.DiGraph,
+        node: dict,
+        ) -> ET._Element:
     """Create an XML Spot Element representing a graph node. 
 
     Args:
@@ -112,7 +120,10 @@ def create_Spot(graph: nx.DiGraph, node: dict) -> ET._Element:
     return el_node
 
 
-def write_AllSpots(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
+def write_AllSpots(
+        xf: ET.xmlfile, 
+        graphs: list[nx.DiGraph],
+        ) -> None:
     """Write the nodes/spots data into an XML file.
 
     Args:
@@ -142,7 +153,10 @@ def write_AllSpots(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
         xf.write('\n\t\t')
 
 
-def write_AllTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
+def write_AllTracks(
+        xf: ET.xmlfile,
+        graphs: list[nx.DiGraph],
+        ) -> None:
     """Write the tracks data into an XML file.
 
     Args:
@@ -173,7 +187,10 @@ def write_AllTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
         xf.write('\n\t\t')
 
 
-def write_FilteredTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
+def write_FilteredTracks(
+        xf: ET.xmlfile,
+        graphs: list[nx.DiGraph],
+        ) -> None:
     """Write the filtered tracks data into an XML file.
 
     Args:
@@ -191,7 +208,10 @@ def write_FilteredTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     xf.write('\n\t')
 
 
-def write_Model(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
+def write_Model(
+        xf: ET.xmlfile, 
+        graphs: list[nx.DiGraph],
+        ) -> None:
     """Write all the model data into an XML file.
 
     This includes Features declarations, spots, tracks and filtered 
@@ -218,7 +238,10 @@ def write_Model(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
         write_FilteredTracks(xf, graphs)
 
 
-def write_Settings(xf: ET.xmlfile, settings: ET._Element) -> None:
+def write_Settings(
+        xf: ET.xmlfile, 
+        settings: ET._Element,
+        ) -> None:
     """Write the given TrackMate settings into an XML file.
 
     Args:
@@ -228,8 +251,11 @@ def write_Settings(xf: ET.xmlfile, settings: ET._Element) -> None:
     xf.write(settings, pretty_print=True)
 
 
-def write_TrackMate_XML(graphs: list[nx.DiGraph], settings: ET._Element,
-                        xml_path: str) -> None:
+def write_TrackMate_XML(
+        graphs: list[nx.DiGraph], 
+        settings: ET._Element,
+        xml_path: str,
+        ) -> None:
     """Write an XML file readable by TrackMate from networkX graphs data.
 
     Args:
@@ -261,8 +287,8 @@ if __name__ == "__main__":
     # xml_out = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks_written.xml'
     # graph_folder = "G:/RAID/IAH/Code/pytmn/samples/"
 
-    xml_in = 'G:/RAID/IAH/Film/XML_TEST/230123_Ec-MG1655-ZipA-CsiD_Stage8_composite_focus_crop_Merge_random-tracking.xml'
-    xml_out = 'G:/RAID/IAH/Film/XML_TEST/230123_Ec-MG1655-ZipA-CsiD_Stage8_composite_focus_crop_Merge_random-tracking_WRITTEN.xml'
+    xml_in = 'G:/RAID/IAH/Film/XML_TEST/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage3_StackReg_crop_merged+track_FINAL.xml'
+    xml_out = 'G:/RAID/IAH/Film/XML_TEST/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage3_StackReg_crop_merged+track_FINAL_WRITTEN.xml'
     graph_folder = "G:/RAID/IAH/Film/XML_TEST/"
 
     def load_graphs(folder):

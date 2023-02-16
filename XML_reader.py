@@ -7,7 +7,10 @@ from lxml import etree as ET
 import networkx as nx
 
 
-def add_graph_attrib_from_element(graph, element):
+def add_graph_attrib_from_element(
+        graph: nx.DiGraph, 
+        element: ET.Element,
+        ) -> nx.DiGraph:
     """Add graph attributes from an XML element.
 
     Args:
@@ -18,15 +21,16 @@ def add_graph_attrib_from_element(graph, element):
         nx.DiGraph: The updated graph.
     """
     graph.graph['Model'] = deepcopy(element.attrib)
-    # for k, v in element.attrib.items():
-    #     graph.graph[k] = v
     element.clear()  # We won't need it anymore so we free up some memory.
     # .clear() does not delete the element: it only removes all subelements
     # and clears or sets to `None` all attributes.
     return graph
 
 
-def get_features_dict(iterator, ancestor):
+def get_features_dict(
+        iterator: ET.iterparse, 
+        ancestor: ET.Element,
+        ) -> dict:
     """Get all the features of ancestor and return them as a dictionary.
 
     Args:
@@ -52,7 +56,11 @@ def get_features_dict(iterator, ancestor):
     return features
 
 
-def add_all_features(graph, iterator, ancestor) -> nx.DiGraph:
+def add_all_features(
+        graph: nx.DiGraph,
+        iterator: ET.iterparse, 
+        ancestor: ET.Element,
+        ) -> nx.DiGraph:
     """Add all the model features and their attributes to the graph.
 
     The model features are divided in 3 categories: spots, edges and 
@@ -76,7 +84,10 @@ def add_all_features(graph, iterator, ancestor) -> nx.DiGraph:
     return graph
 
 
-def convert_attributes(attributes: dict, features: dict):
+def convert_attributes(
+        attributes: dict, 
+        features: dict,
+        ):
     """Convert the values of `attributes` from string to int or float.
 
     The type to convert to is given by the dictionary of features with
@@ -109,7 +120,10 @@ def convert_attributes(attributes: dict, features: dict):
                                  f" feature attribute value for 'isint'.")
 
 
-def add_ROI_coordinates(element, attribs):
+def add_ROI_coordinates(
+        element: ET.Element,
+        attribs: dict,
+        ):
     """Extract, format and add ROI coordinates to the attributes dict.
 
     Args:
@@ -133,7 +147,11 @@ def add_ROI_coordinates(element, attribs):
             attribs['ROI_N_POINTS'] = None
 
 
-def add_all_nodes(graph, iterator, ancestor):
+def add_all_nodes(
+        graph: nx.DiGraph,
+        iterator: ET.iterparse,
+        ancestor: ET.Element,
+        ):
     """Add nodes and their attributes to a graph.
 
     All the elements that are descendants of `ancestor` are explored.
@@ -178,7 +196,11 @@ def add_all_nodes(graph, iterator, ancestor):
                 element.clear()
 
 
-def add_edge_from_element(graph, element, current_track_id):
+def add_edge_from_element(
+        graph: nx.DiGraph,
+        element: ET.Element,
+        current_track_id: str,
+        ):
     """Add an edge and its attributes from an XML element.
 
     Args:
@@ -209,7 +231,11 @@ def add_edge_from_element(graph, element, current_track_id):
         element.clear()
 
 
-def add_all_edges(graph, iterator, ancestor):
+def add_all_edges(
+        graph: nx.DiGraph,
+        iterator: ET.iterparse,
+        ancestor: ET.Element,
+        ) -> list(dict):
     """Add edges and their attributes to a graph.
 
     All the elements that are descendants of `ancestor` are explored.
@@ -265,7 +291,10 @@ def add_all_edges(graph, iterator, ancestor):
     return tracks_attributes
 
 
-def get_filtered_tracks_ID(iterator, ancestor):
+def get_filtered_tracks_ID(
+        iterator: ET.iterparse,
+        ancestor: ET.Element,
+        ) -> list(str):
     """Get the list of IDs of the tracks to keep.
 
     Args:
@@ -297,7 +326,10 @@ def get_filtered_tracks_ID(iterator, ancestor):
     return filtered_tracks_ID
 
 
-def add_tracks_info(graphs, tracks_attributes):
+def add_tracks_info(
+        graphs: list(nx.DiGraph),
+        tracks_attributes: list(dict),
+        ) -> list(nx.DiGraph):
     """Add track attributes to each corresponding graph.
 
     Args:
@@ -344,8 +376,12 @@ def add_tracks_info(graphs, tracks_attributes):
     return updated_graphs
 
 
-def read_model(xml_path: str, keep_all_spots: bool,
-               keep_all_tracks: bool, one_graph: bool) -> list[nx.DiGraph]:
+def read_model(
+        xml_path: str,
+        keep_all_spots: bool,
+        keep_all_tracks: bool,
+        one_graph: bool,
+        ) -> list[nx.DiGraph]:
     """Read an XML file and convert the model data into several graphs. 
 
     Each TrackMate track and its associated data described in the XML file
@@ -453,7 +489,9 @@ def read_model(xml_path: str, keep_all_spots: bool,
         return graphs
 
 
-def read_settings(xml_path: str) -> ET._Element:
+def read_settings(
+        xml_path: str,
+        ) -> ET._Element:
     """Extract the TrackMate settings of a TrackMate XML file.
 
     Args:
@@ -462,28 +500,13 @@ def read_settings(xml_path: str) -> ET._Element:
     Returns:
         ET._Element: Element holding all the TrackMate settings.
     """
-
     it = ET.iterparse(xml_path, events=['start', 'end'])
     _, root = next(it)
 
     for event, element in it:
-
         if element.tag != 'Settings':
             root.clear()
-
         if element.tag == 'Settings' and event == 'end':
             settings = deepcopy(element)
-
-    # # To explore the settings:
-    # print(type(settings))
-    # print(settings)
-    # print(settings.tag)
-    # print(settings.attrib)
-
-    # for child in settings:
-    #     print(child.tag, child. attrib)
-
-    # for descendant in settings.iterdescendants():
-    #     print(descendant.tag, descendant. attrib)
 
     return settings
