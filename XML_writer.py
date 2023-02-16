@@ -4,6 +4,7 @@
 import math
 from pathlib import Path
 import sys
+from typing import Union
 
 from lxml import etree as ET
 import networkx as nx
@@ -56,11 +57,24 @@ def write_FeatureDeclarations(xf: ET.xmlfile,
                             xf.write('\n\t\t\t\t')
                 xf.write('\n\t\t\t')
         xf.write('\n\t\t')
-    # xf.write('\n\t')
 
 
-def convert_dict(value):
-    # TODO: docstrings
+def value_to_str(value: Union[int, float, str]) -> str:
+    """Convert a value to its associated string.
+
+    Indeed, ET.write() method only accepts to write strings.
+    However, TrackMate is only able to read Spot, Edge and Track
+    features that can be parsed as numeric by Java.
+
+    Args:
+        value (Union[int, float, str]): Value to convert to string.
+
+    Returns:
+        str: The string equivalent of `value`.
+    """
+    # TODO: Should this function take care of converting non-numeric added
+    # features to numeric ones (like GEN_ID)? Or should it be done in 
+    # pycellin?
     if isinstance(value, str):
         return value
     elif math.isnan(value):
@@ -86,7 +100,7 @@ def create_Spot(graph: nx.DiGraph, node: dict) -> ET._Element:
     """
     # Building Spot attributes.
     exluded_keys = ['TRACK_ID', 'ROI_N_POINTS']
-    n_attr = {k: convert_dict(v) for k, v in graph.nodes[node].items()
+    n_attr = {k: value_to_str(v) for k, v in graph.nodes[node].items()
               if k not in exluded_keys}
     n_attr['ROI_N_POINTS'] = str(len(graph.nodes[node]['ROI_N_POINTS']))
 
@@ -147,13 +161,13 @@ def write_AllTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
             # Track tags.
             xf.write('\n\t\t\t')
             exluded_keys = ['Model']
-            t_attr = {k: convert_dict(v) for k, v in graph.graph.items()
+            t_attr = {k: value_to_str(v) for k, v in graph.graph.items()
                       if k not in exluded_keys}
             with xf.element('Track', t_attr):
                 # Edge tags.
                 for edge in graph.edges.data():
                     xf.write('\n\t\t\t\t')
-                    e_attr = {k: convert_dict(v) for k, v in edge[2].items()}
+                    e_attr = {k: value_to_str(v) for k, v in edge[2].items()}
                     xf.write(ET.Element('Edge', e_attr))
                 xf.write('\n\t\t\t')
         xf.write('\n\t\t')
@@ -180,13 +194,13 @@ def write_FilteredTracks(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
 def write_Model(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
     """Write all the model data into an XML file.
 
-    This includes Features declarations, spots, tracks and filtered tracks.
+    This includes Features declarations, spots, tracks and filtered 
+    tracks.
 
     Args:
         xf (ET.xmlfile): Context manager for the XML file to write. 
         graphs (list[nx.DiGraph]): Graphs containing the data to write.
     """
-
     # Checking that each and every graph have the same features.
     # It should be the case but better safe than sorry.
     dict_units = {k: graphs[0].graph['Model'].get(k, None)
@@ -202,7 +216,6 @@ def write_Model(xf: ET.xmlfile, graphs: list[nx.DiGraph]) -> None:
         write_AllSpots(xf, graphs)
         write_AllTracks(xf, graphs)
         write_FilteredTracks(xf, graphs)
-        # xf.write('\n\t')
 
 
 def write_Settings(xf: ET.xmlfile, settings: ET._Element) -> None:
@@ -212,7 +225,6 @@ def write_Settings(xf: ET.xmlfile, settings: ET._Element) -> None:
         xf (ET.xmlfile): Context manager for the XML file to write.
         settings (ET._Element): Element holding all the settings to write.
     """
-
     xf.write(settings, pretty_print=True)
 
 
@@ -225,7 +237,6 @@ def write_TrackMate_XML(graphs: list[nx.DiGraph], settings: ET._Element,
         settings (ET._Element): Element holding all the settings to write.
         xml_path (str): Path of the XML file to write.
     """
-
     with ET.xmlfile(xml_path, encoding='utf-8', close=True) as xf:
         xf.write_declaration()
         # TODO: deal with the problem of unknown version.
@@ -246,9 +257,13 @@ if __name__ == "__main__":
     # xml_out = '/mnt/data/Code/data_test_pytmn_writer/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage5_StackReg_crop_merged+track_FINAL_written.xml'
     # graph_folder = "/mnt/data/Code/data_test_pytmn_writer/"
 
-    xml_in = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks.xml'
-    xml_out = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks_written.xml'
-    graph_folder = "G:/RAID/IAH/Code/pytmn/samples/"
+    # xml_in = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks.xml'
+    # xml_out = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks_written.xml'
+    # graph_folder = "G:/RAID/IAH/Code/pytmn/samples/"
+
+    xml_in = 'G:/RAID/IAH/Film/XML_TEST/230123_Ec-MG1655-ZipA-CsiD_Stage8_composite_focus_crop_Merge_random-tracking.xml'
+    xml_out = 'G:/RAID/IAH/Film/XML_TEST/230123_Ec-MG1655-ZipA-CsiD_Stage8_composite_focus_crop_Merge_random-tracking_WRITTEN.xml'
+    graph_folder = "G:/RAID/IAH/Film/XML_TEST/"
 
     def load_graphs(folder):
         # only tracks
@@ -281,68 +296,9 @@ if __name__ == "__main__":
         return graphs
 
     graphs = load_graphs(graph_folder)
-    # print(len(graphs))
-    # for graph in graphs:
-    #     lin.add_node_attributes(graph, tracking=False)
+    print(len(graphs))
+    for graph in graphs:
+        lin.add_node_attributes(graph, tracking=True)
 
     settings = XML_reader.read_settings(xml_in)
     write_TrackMate_XML(graphs, settings, xml_out)
-
-    # graphs = nx.weakly_connected_components(graphs[0])
-    # for g in graphs:
-    #     print(g.graph())
-
-    # FeatureDeclarations
-    # AllSpots
-    # AllTracks
-    # FilteredTracks
-
-    # print(graphs[0].graph['Model'])
-    # print({k: graphs[0].graph['Model'].get(k, None) for k in ('spatialunits', 'timeunits')})
-
-    # def generate_some_elements():
-    #     a = ET.Element('a')
-    #     for i in range(10):
-    #         rec = ET.SubElement(a, "record", id=str(i))
-    #         rec.text = "record text data"
-
-    #     return a
-
-    # with ET.xmlfile(xml_out, encoding='utf-8') as xf:
-    #     xf.write_declaration(standalone=True)
-    #     xf.write_doctype('<!DOCTYPE root SYSTEM "some.dtd">')
-
-    #     # generate an element (the root element)
-    #     with xf.element('root'):
-    #          # write a complete Element into the open root element
-    #          xf.write(ET.Element('test'), pretty_print=True)
-
-    #         #  # generate and write more Elements, e.g. through iterparse
-    #          for element in generate_some_elements():
-    #              # serialise generated elements into the XML file
-    #              xf.write(element, pretty_print=True)
-
-    #          # or write multiple Elements or strings at once
-    #          xf.write(ET.Element('start'), "text", ET.Element('end'),
-    #                   pretty_print=True)
-
-    # def derp(tag):
-    #     with xf.element(tag):
-    #             for value in '123':
-    #                 # construct a really complex XML tree
-    #                 el = ET.Element('xyz', attr=value)
-    #                 xf.write(el, pretty_print=True)
-    #                 # no longer needed, discard it right away!
-    #                 el = None
-
-    # with ET.xmlfile(xml_out, encoding='utf-8') as xf:
-    #     with xf.element('abc'):
-    #         derp('model')
-
-    # a = ET.Element('a')
-    #         for i in range(4):
-    #             rec = ET.SubElement(a, "record", id=str(i))
-    #             rec.text = "record text data"
-    #             rec2 = ET.SubElement(rec, "info", code=str(i+10))
-    #             rec3 = ET.SubElement(rec, "info", code=str(i+20))
-    #         xf.write(a, pretty_print=True)
