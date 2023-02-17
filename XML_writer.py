@@ -174,7 +174,7 @@ def write_AllTracks(
 
             # Track tags.
             xf.write('\n\t\t\t')
-            exluded_keys = ['Model']
+            exluded_keys = ['Model', 'FilteredTrack']
             t_attr = {k: value_to_str(v) for k, v in graph.graph.items()
                       if k not in exluded_keys}
             with xf.element('Track', t_attr):
