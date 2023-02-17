@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from copy import deepcopy
+from typing import Any
 
 from lxml import etree as ET
 import networkx as nx
@@ -30,7 +31,7 @@ def add_graph_attrib_from_element(
 def get_features_dict(
         iterator: ET.iterparse, 
         ancestor: ET.Element,
-        ) -> dict:
+        ) -> dict[str, str]:
     """Get all the features of ancestor and return them as a dictionary.
 
     Args:
@@ -85,8 +86,8 @@ def add_all_features(
 
 
 def convert_attributes(
-        attributes: dict, 
-        features: dict,
+        attributes: dict[str, str], 
+        features: dict[str, dict[str, str]],
         ):
     """Convert the values of `attributes` from string to int or float.
 
@@ -122,7 +123,7 @@ def convert_attributes(
 
 def add_ROI_coordinates(
         element: ET.Element,
-        attribs: dict,
+        attribs: dict[str, Any],
         ):
     """Extract, format and add ROI coordinates to the attributes dict.
 
@@ -235,7 +236,7 @@ def add_all_edges(
         graph: nx.DiGraph,
         iterator: ET.iterparse,
         ancestor: ET.Element,
-        ) -> list(dict):
+        ) -> list[dict[str, Any]]:
     """Add edges and their attributes to a graph.
 
     All the elements that are descendants of `ancestor` are explored.
@@ -294,7 +295,7 @@ def add_all_edges(
 def get_filtered_tracks_ID(
         iterator: ET.iterparse,
         ancestor: ET.Element,
-        ) -> list(str):
+        ) -> list[str]:
     """Get the list of IDs of the tracks to keep.
 
     Args:
@@ -327,9 +328,9 @@ def get_filtered_tracks_ID(
 
 
 def add_tracks_info(
-        graphs: list(nx.DiGraph),
-        tracks_attributes: list(dict),
-        ) -> list(nx.DiGraph):
+        graphs: list[nx.DiGraph],
+        tracks_attributes: list[dict[str, Any]],
+        ) -> list[nx.DiGraph]:
     """Add track attributes to each corresponding graph.
 
     Args:
@@ -341,7 +342,7 @@ def add_tracks_info(
 
     Returns:
         list(nx.DiGraph): List of the updated graphs.
-    """
+    """    
     updated_graphs = []
     for graph in graphs:
 

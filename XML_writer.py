@@ -11,8 +11,8 @@ import networkx as nx
 
 # TODO: delete lines below when main will be cleaned up.
 import XML_reader
-# sys.path.append('/mnt/data/Code/lleblanc/src/')
-sys.path.append('G:/RAID/IAH/Code/lleblanc/src/')
+sys.path.append('/mnt/data/Code/lleblanc/src/')
+# sys.path.append('G:/RAID/IAH/Code/lleblanc/src/')
 import lineage as lin
 
 
@@ -95,13 +95,13 @@ def value_to_str(
 
 def create_Spot(
         graph: nx.DiGraph,
-        node: dict,
+        node: int,
         ) -> ET._Element:
     """Create an XML Spot Element representing a graph node. 
 
     Args:
-        graph (nx.DiGraph): Graph containing the node to write.
-        node (dict): Attributes of the spot.
+        graph (nx.DiGraph): Graph containing the node to create.
+        node (int): ID of the node in the graph.
 
     Returns:
         ET._Element: The newly created Spot Element.
@@ -275,9 +275,9 @@ def write_TrackMate_XML(
 
 if __name__ == "__main__":
 
-    # xml_in = "/mnt/data/Code/pytmn/samples/FakeTracks.xml"
-    # xml_out = '/mnt/data/Code/pytmn/samples/FakeTracks_written.xml'
-    # graph_folder = "/mnt/data/Code/pytmn/samples/"
+    xml_in = "/mnt/data/Code/pytmn/samples/FakeTracks.xml"
+    xml_out = '/mnt/data/Code/pytmn/samples/FakeTracks_written.xml'
+    graph_folder = "/mnt/data/Code/pytmn/samples/"
 
     # xml_in = "/mnt/data/Code/data_test_pytmn_writer/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage5_StackReg_crop_merged+track_FINAL.xml"
     # xml_out = '/mnt/data/Code/data_test_pytmn_writer/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage5_StackReg_crop_merged+track_FINAL_written.xml'
@@ -287,9 +287,9 @@ if __name__ == "__main__":
     # xml_out = 'G:/RAID/IAH/Code/pytmn/samples/FakeTracks_written.xml'
     # graph_folder = "G:/RAID/IAH/Code/pytmn/samples/"
 
-    xml_in = 'G:/RAID/IAH/Film/XML_TEST/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage3_StackReg_crop_merged+track_FINAL.xml'
-    xml_out = 'G:/RAID/IAH/Film/XML_TEST/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage3_StackReg_crop_merged+track_FINAL_WRITTEN.xml'
-    graph_folder = "G:/RAID/IAH/Film/XML_TEST/"
+    # xml_in = 'G:/RAID/IAH/Film/XML_TEST/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage3_StackReg_crop_merged+track_FINAL.xml'
+    # xml_out = 'G:/RAID/IAH/Film/XML_TEST/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage3_StackReg_crop_merged+track_FINAL_WRITTEN.xml'
+    # graph_folder = "G:/RAID/IAH/Film/XML_TEST/"
 
     def load_graphs(folder):
         # only tracks
@@ -321,10 +321,10 @@ if __name__ == "__main__":
             graphs.append(graph)
         return graphs
 
-    graphs = load_graphs(graph_folder)
+    graphs = load_graphs_rst(graph_folder)
     print(len(graphs))
     for graph in graphs:
-        lin.add_node_attributes(graph, tracking=True)
+        lin.add_node_attributes(graph, tracking=False)
 
     settings = XML_reader.read_settings(xml_in)
     write_TrackMate_XML(graphs, settings, xml_out)
