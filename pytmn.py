@@ -12,14 +12,16 @@ __date__ = "2022-02-07"
 __version__ = "0.2"
 
 import argparse
+from importlib.metadata import version
 from pathlib import Path
+import pickle
 import time
 
 import matplotlib.pyplot as plt
 import networkx as nx
 
 import XML_reader
-import XML_writer
+# import XML_writer
 
 
 def export_graph(graph: nx.DiGraph, input: str):
@@ -48,8 +50,17 @@ def export_graph(graph: nx.DiGraph, input: str):
         output = input.with_name(input.stem + ".gz")
     else:
         output = input.with_name(input.stem + f"_{graph.graph['name']}.gz")
-    nx.write_gpickle(graph, output, protocol=5)
-
+    
+    # Cf https://networkx.org/documentation/stable/release/migration_guide_from_2.x_to_3.0.html
+    nx_version = version('networkx')
+    if nx_version.startswith('2.'):
+        nx.write_gpickle(graph, output, protocol=5)
+    elif nx_version.startswith('3.'):
+        with open(output, 'wb') as f:
+            pickle.dump(graph, f, pickle.HIGHEST_PROTOCOL)
+    else:
+        err = f'Unsupported networkx version ({nx_version}). Version 2.x or 3.x is required.'
+        raise RuntimeError(err)
 
 if __name__ == "__main__":
 
