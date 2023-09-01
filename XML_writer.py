@@ -3,6 +3,7 @@
 
 import math
 from pathlib import Path
+import pickle
 import sys
 from typing import Union
 
@@ -11,8 +12,9 @@ import networkx as nx
 
 # TODO: delete lines below when main will be cleaned up.
 import XML_reader
-sys.path.append('/mnt/data/Code/lleblanc/src/')
+# sys.path.append('/mnt/data/Code/lleblanc/src/')
 # sys.path.append('G:/RAID/IAH/Code/lleblanc/src/')
+sys.path.append('/mnt/bee/Pasteur/Code/lleblanc/src/')
 import lineage as lin
 
 
@@ -275,9 +277,46 @@ def write_TrackMate_XML(
 
 if __name__ == "__main__":
 
-    xml_in = "/mnt/data/Code/pytmn/samples/FakeTracks.xml"
-    xml_out = '/mnt/data/Code/pytmn/samples/FakeTracks_written.xml'
-    graph_folder = "/mnt/data/Code/pytmn/samples/"
+    # xml_in = "220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage5_StackReg_crop_merged+track_FINAL.xml"
+    # xml_out = '220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage5_StackReg_crop_merged+track_FINAL_updated.xml'
+    # folder = "/mnt/data/Films/Chip_Ec/220516/220516_AutomaticSelection/Stage5/"
+
+    nb = '7' 
+
+    folder = f"/mnt/bee/Pasteur/Films/For_Laura/Segmentation_ONLY/230828_Ec-BW-Rcs-FtsZ/Stage8/"
+    file_graph = f'230828_Ec-BW-Rcs-FtsZ_Stage8_timestep30min_crop_merge_FINAL_updated.gz'
+    xml_in = f'230828_Ec-BW-Rcs-FtsZ_Stage8_timestep30min_crop_merge_FINAL.xml'
+    xml_out = f'230828_Ec-BW-Rcs-FtsZ_Stage8_timestep30min_crop_merge_FINAL_updated.xml'
+
+    # folder = f"/mnt/data/Films/Chip_Ec/220907+230323_IbpA/Induction_threshold/Stage{nb}/"
+    # file_graph = f'230323_IbpA_Stage{nb}_Composite_Crop_FinalMerge_updated.gz'
+    # xml_in = f"230323_IbpA_Stage{nb}_Composite_Crop_FinalMerge.xml"
+    # xml_out = f'230323_IbpA_Stage{nb}_Composite_Crop_FinalMerge_updated.xml'
+    
+    # folder = f"/mnt/data/Films/Chip_Ec/230109_RcsA/Induction_threshold/Stage{nb}/"
+    # file_graph = f'230109_Ec-MG1655-ZipA-pRcsA_Stage{nb}_491_focus_crop_Merge_updated.gz'
+    # xml_in = folder + f"230109_Ec-MG1655-ZipA-pRcsA_Stage{nb}_491_focus_crop_Merge.xml"
+    # xml_out = folder + f'230109_Ec-MG1655-ZipA-pRcsA_Stage{nb}_491_focus_crop_Merge_updated.xml'
+
+    # folder = f"/mnt/data/Films/Chip_Ec/220908/Induction_threshold/Stage{nb}/"
+    # file_graph = f'220908_YiaG_Stage{nb}_timestep30min_focus_crop_Merge_FINAL_no-tracking_updated.gz'
+    # xml_in = folder + f"220908_YiaG_Stage{nb}_timestep30min_focus_crop_Merge_FINAL_no-tracking.xml"
+    # xml_out = folder + f"220908_YiaG_Stage{nb}_timestep30min_focus_crop_Merge_FINAL_no-tracking_updated.xml"
+    
+    # folder = f"/mnt/data/Films/Chip_Ec/220907/Induction_threshold/Stage{nb}/"
+    # file_graph = f'220907_Ec-MG1655-ZipA-IbpA_timestep30min_Stage{nb}_crop_Merge_updated.gz'
+    # xml_in = folder + f"220907_Ec-MG1655-ZipA-IbpA_timestep30min_Stage{nb}_crop_Merge.xml"
+    # xml_out = folder + f"220907_Ec-MG1655-ZipA-IbpA_timestep30min_Stage{nb}_crop_Merge_updated.xml"
+    
+    # folder = f"/mnt/data/Films/Chip_Ec/221128/Induction_threshold/Stage{nb}/"
+    # file_graph = f'221128_Ec-MG1655-ZipA-Cpx_timestep30min_Stage{nb}_crop_Merge_updated.gz'
+    # xml_in = folder + f"221128_Ec-MG1655-ZipA-Cpx_timestep30min_Stage{nb}_crop_Merge.xml"
+    # xml_out = folder + f"221128_Ec-MG1655-ZipA-Cpx_timestep30min_Stage{nb}_crop_Merge_updated.xml"
+
+    # folder = f"/mnt/data/Films/Chip_Ec/221004/Induction_threshold/Stage{nb}/"
+    # file_graph = f'221004_Ec-MG1655-ZipA-RecA_Stage{nb}_491nm_focus_crop_Merge_updated.gz'
+    # xml_in = folder + f"221004_Ec-MG1655-ZipA-RecA_Stage{nb}_491nm_focus_crop_Merge.xml"
+    # xml_out = folder + f"221004_Ec-MG1655-ZipA-RecA_Stage{nb}_491nm_focus_crop_Merge_updated.xml"
 
     # xml_in = "/mnt/data/Code/data_test_pytmn_writer/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage5_StackReg_crop_merged+track_FINAL.xml"
     # xml_out = '/mnt/data/Code/data_test_pytmn_writer/220516_Loading_Chamber_PDMS15for1_Ecoli-TB28-ZipA-mCherry_100X+SR3D_timestep5min_pressure1000mbar_Stage5_StackReg_crop_merged+track_FINAL_written.xml'
@@ -304,9 +343,11 @@ if __name__ == "__main__":
     def load_graphs_rost(folder):
         # one graph
         graphs = []
-        for file in Path(folder).glob('FakeTracks.gz'):
+        for file in Path(folder).glob('*_updated.gz'):
             print(file)
-            graph = nx.read_gpickle(file)
+            with open(file, 'rb') as f:
+                # graph = nx.read_gpickle(file)
+                graph = pickle.load(f)
             print(len(graph))
             graphs.append(graph)
         return graphs
@@ -314,17 +355,23 @@ if __name__ == "__main__":
     def load_graphs_rst(folder):
         # tracks + lone nodes
         graphs = []
-        for file in Path(folder).glob('FakeTracks_*.gz'):
-            print(file)
+        for file in Path(folder).glob('*_updated.gz'):
+            # print(file)
             graph = nx.read_gpickle(file)
-            print(len(graph))
+            # print(len(graph))
             graphs.append(graph)
         return graphs
+    
 
-    graphs = load_graphs_rst(graph_folder)
+
+    graphs = load_graphs_rost(folder)
     print(len(graphs))
-    for graph in graphs:
-        lin.add_node_attributes(graph, tracking=False)
+    # for graph in graphs:
+    #     lin.add_node_attributes(graph, tracking=False)
 
-    settings = XML_reader.read_settings(xml_in)
-    write_TrackMate_XML(graphs, settings, xml_out)
+    # graph = nx.read_gpickle(folder + file_graph)
+    # print(len(graph))
+    settings = XML_reader.read_settings(folder + xml_in)
+    write_TrackMate_XML(graphs, settings, folder + xml_out)
+    # settings = XML_reader.read_settings(xml_in)
+    # write_TrackMate_XML(graphs, settings, xml_out)
