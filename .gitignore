@@ -1,3 +1,6 @@
 *.json
 *.pyc
 *.gz
+*.xml
+
+!FakeTracks.xml
