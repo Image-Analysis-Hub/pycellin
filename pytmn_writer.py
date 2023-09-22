@@ -23,23 +23,29 @@ import networkx as nx
 import XML_reader
 import XML_writer
 
+# Small change of API between version 2 and 3 of networkx.
+# Cf https://networkx.org/documentation/stable/release/migration_guide_from_2.x_to_3.0.html
+NX_VERSION = version("networkx")
 
-def load_graph(path: Path) -> nx.DiGraph:
-    # Small change of API between version 2 and 3 of networkx.
-    # Cf https://networkx.org/documentation/stable/release/migration_guide_from_2.x_to_3.0.html
-    nx_version = version("networkx")
-    if nx_version.startswith("2."):
+if NX_VERSION.startswith("2."):
+
+    def load_graph(path: Path) -> nx.DiGraph:
         graph = nx.read_gpickle(path)
-    elif nx_version.startswith("3."):
+        return graph
+
+elif NX_VERSION.startswith("3."):
+
+    def load_graph(path: Path) -> nx.DiGraph:
         with open(path, "rb") as file:
             graph = pickle.load(file)
-    else:
-        err = (
-            f"Unsupported networkx version ({nx_version}). "
-            "Version 2.x or 3.x is required."
-        )
-        raise RuntimeError(err)
-    return graph
+        return graph
+
+else:
+    err = (
+        f"Unsupported networkx version ({NX_VERSION}). "
+        "Version 2.x or 3.x is required."
+    )
+    raise RuntimeError(err)
 
 
 if __name__ == "__main__":
@@ -71,7 +77,6 @@ if __name__ == "__main__":
     #     action="store",
     #     help=("original xml file to get its settings"),
     # )
-
     args = parser.parse_args()
 
     input = Path(args.input_graph)
@@ -87,7 +92,6 @@ if __name__ == "__main__":
         except RuntimeError as err:
             print(err)
         graphs = [graph]
-    print(len(graphs))
 
     # if args.header:
     #     header = XML_reader.read_header(args.header)
