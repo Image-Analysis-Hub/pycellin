@@ -87,11 +87,7 @@ if __name__ == "__main__":
             graphs.append(load_graph(file))
     else:
         # Only one .gz to load.
-        try:
-            graph = load_graph(input)
-        except RuntimeError as err:
-            print(err)
-        graphs = [graph]
+        graphs = [load_graph(input)]
 
     # if args.header:
     #     header = XML_reader.read_header(args.header)
