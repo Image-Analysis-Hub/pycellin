@@ -20,7 +20,7 @@ import time
 import matplotlib.pyplot as plt
 import networkx as nx
 
-import XML_reader
+import xml_utils
 
 # TODO: by default only one file: a forest of graph.
 # Need to specifically ask for one file per graph.
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    graphs = XML_reader.read_model(
+    graphs = xml_utils.read_model(
         args.input, args.keep_all_spots, args.keep_all_tracks, args.one_graph
     )
 

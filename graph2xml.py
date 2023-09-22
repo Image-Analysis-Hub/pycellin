@@ -20,7 +20,7 @@ import time
 
 import networkx as nx
 
-import XML_reader
+import xml_utils
 import XML_writer
 
 # Small change of API between version 2 and 3 of networkx.
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     # opening the xml.
     # The other settings (like display settings) as well as the header
     # are not mandatory.
-    settings = XML_reader.read_settings(args.input_xml)
+    settings = xml_utils.read_settings(args.input_xml)
     XML_writer.write_TrackMate_XML(graphs, settings, args.output)
 
     p_time = time.process_time() - start
