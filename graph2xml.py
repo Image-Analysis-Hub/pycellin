@@ -21,7 +21,7 @@ import time
 import networkx as nx
 
 import xml_utils
-import XML_writer
+
 
 # Small change of API between version 2 and 3 of networkx.
 # Cf https://networkx.org/documentation/stable/release/migration_guide_from_2.x_to_3.0.html
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     # The other settings (like display settings) as well as the header
     # are not mandatory.
     settings = xml_utils.read_settings(args.input_xml)
-    XML_writer.write_TrackMate_XML(graphs, settings, args.output)
+    xml_utils.write_TrackMate_XML(graphs, settings, args.output)
 
     p_time = time.process_time() - start
     print(f"...done in {(p_time // 60):.0f} min {(p_time % 60):.2f} s.")
