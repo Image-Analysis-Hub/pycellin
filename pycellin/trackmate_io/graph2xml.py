@@ -22,7 +22,6 @@ import networkx as nx
 
 import xml_utils
 
-
 # Small change of API between version 2 and 3 of networkx.
 # Cf https://networkx.org/documentation/stable/release/migration_guide_from_2.x_to_3.0.html
 NX_VERSION = version("networkx")
