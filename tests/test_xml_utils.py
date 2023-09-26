@@ -12,7 +12,7 @@ import networkx as nx
 import networkx.algorithms.isomorphism as iso
 import pytest
 
-import pycellin.trackmate_io.xml_utils as xu
+import pycellin.tmio.xml_utils as xu
 
 
 def is_equal(obt, exp):
