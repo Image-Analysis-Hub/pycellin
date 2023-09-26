@@ -1,6 +1,8 @@
-*.json
-*.pyc
+__pycache__/
+.pytest_cache/
+*.egg-info/
+.vscode/
+
 *.gz
 *.xml
-
 !FakeTracks.xml
