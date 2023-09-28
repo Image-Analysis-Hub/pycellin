@@ -12,40 +12,11 @@ __date__ = "2022-02-07"
 __version__ = "0.2"
 
 import argparse
-
-from importlib.metadata import version
 from pathlib import Path
-import pickle
 import time
 
-import networkx as nx
-
 import xml_utils
-
-# Small change of API between version 2 and 3 of networkx.
-# Cf https://networkx.org/documentation/stable/release/migration_guide_from_2.x_to_3.0.html
-NX_VERSION = version("networkx")
-
-if NX_VERSION.startswith("2."):
-
-    def load_graph(path: Path) -> nx.DiGraph:
-        graph = nx.read_gpickle(path)
-        return graph
-
-elif NX_VERSION.startswith("3."):
-
-    def load_graph(path: Path) -> nx.DiGraph:
-        with open(path, "rb") as file:
-            graph = pickle.load(file)
-        return graph
-
-else:
-    err = (
-        f"Unsupported networkx version ({NX_VERSION}). "
-        "Version 2.x or 3.x is required."
-    )
-    raise RuntimeError(err)
-
+from pycellin.graph.io import load_graph
 
 if __name__ == "__main__":
     start = time.process_time()
