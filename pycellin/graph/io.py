@@ -39,7 +39,7 @@ else:
     raise RuntimeError(err)
 
 
-def load_graphs(dir: str) -> Tuple(list[nx.DiGraph], list[str]):
+def load_graphs(dir: str) -> Tuple[list[nx.DiGraph], list[str]]:
     """Load all the files identified as graphs (.gz) from a directory.
 
     The two output lists are aligned.
