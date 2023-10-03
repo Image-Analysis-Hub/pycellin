@@ -9,5 +9,5 @@ setup(
     description="Python Distribution Utilities",
     author="Laura Xénard",
     author_email="laura.xenard@pasteur.fr",
-    packages=["pycellin", "pycellin.trackmate_io"],
+    packages=["pycellin", "pycellin.tmio"],
 )
