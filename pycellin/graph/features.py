@@ -5,7 +5,7 @@
 A collection of diverse features/attributes that can be added to lineage graphs.
 """
 
-from typing import Callable
+from typing import Any, Callable
 
 import networkx as nx
 import numpy as np
@@ -34,6 +34,64 @@ def apply_on_nodes(
     for n in graph:
         if not need_TRACK_ID or (need_TRACK_ID and "TRACK_ID" in graph.nodes[n]):
             graph.nodes[n][feature] = fun(graph, n)
+
+
+def add_custom_attr(
+    graph: nx.DiGraph,
+    attr_type: str,
+    attr: str,
+    name: str,
+    shortname: str,
+    dimension: str,
+    isint: str,
+    func: Callable,
+    *args: Any,
+    **kwargs: Any,
+) -> None:
+    """
+    _summary_
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        _description_
+    attr_type : str
+        _description_
+    attr : str
+        _description_
+    name : str
+        _description_
+    shortname : str
+        _description_
+    dimension : str
+        _description_
+    isint : str
+        _description_
+    func : Callable
+        _description_
+    """
+    err_message = "Wrong type attribute. Only 'node', 'edge' and 'track' are valid."
+    attr_type = attr_type.lower()
+    assert attr_type in ["node", "edge", "track"], err_message
+
+    if attr_type == "node":
+        tag = "SpotFeatures"
+    elif attr_type == "edge":
+        tag = "EdgeFeatures"
+    else:
+        tag = "TrackFeatures"
+
+    # Adding feature declaration.
+    graph.graph["Model"][tag][attr] = {
+        "feature": attr,
+        "name": name,
+        "shortname": shortname,
+        "dimension": dimension,
+        "isint": isint,
+    }
+
+    # Computing new feature values.
+    func(*args, **kwargs)
 
 
 def generation_level(graph: nx.DiGraph, node: int) -> int:
@@ -68,7 +126,7 @@ def add_generation_level(graph: nx.DiGraph) -> None:
     graph : nx.DiGraph
         Graph to process.
     """
-    lin.add_custom_attr(
+    add_custom_attr(
         graph,
         "node",
         "GEN_LVL",
@@ -132,7 +190,7 @@ def add_generation_completeness(graph: nx.DiGraph) -> None:
     graph : nx.DiGraph
         Graph to process.
     """
-    lin.add_custom_attr(
+    add_custom_attr(
         graph,
         "node",
         "GEN_COMPLETE",
