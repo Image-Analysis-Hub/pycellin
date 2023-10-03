@@ -1,21 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Importation of ImageJ TrackMate results (XML file) as a Python network
-for tracks analysis.
+"""Create a TrackMate compatible XML file from networkX directed graphs.
 """
 
-__author__ = "Laura Xénard"
-__contact__ = "laura.xenard@pasteur.fr"
-__copyright__ = "GNU GPLv3"
-__date__ = "2022-02-07"
-__version__ = "0.2"
 
 import argparse
 from pathlib import Path
 import time
 
-import xml_utils
+from xml_utils import read_settings, write_TrackMate_XML
 from pycellin.graph.io import load_graph
 
 if __name__ == "__main__":
@@ -33,7 +27,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "output",
-        help=(""),
+        help=("filename for the xml output"),
     )
     # parser.add_argument(
     #     "--header",
@@ -67,9 +61,9 @@ if __name__ == "__main__":
     # The settings we get below are needed. Without them, TM crashes when
     # opening the xml.
     # The other settings (like display settings) as well as the header
-    # are not mandatory.
-    settings = xml_utils.read_settings(args.input_xml)
-    xml_utils.write_TrackMate_XML(graphs, settings, args.output)
+    # are not mandatory. So for the time being I'm just ignoring them.
+    settings = read_settings(args.input_xml)
+    write_TrackMate_XML(graphs, settings, args.output)
 
     p_time = time.process_time() - start
     print(f"...done in {(p_time // 60):.0f} min {(p_time % 60):.2f} s.")
