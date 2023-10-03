@@ -410,18 +410,22 @@ def read_model(
     itself such as units, spot features, etc. are stored in each graph as
     graph attributes.
 
-    Args:
-        xml_path (str): Path of the XML file to process.
-        keep_all_spots (bool): True to keep the spots filtered out in
-            TrackMate, False otherwise.
-        keep_all_tracks (bool): True to keep the tracks filtered out in
-            TrackMate, False otherwise.
-        one_graph (bool): True to create only one graph (probably
-            disconnected) that contains all nodes and edges, False to
-            create a graph (connected) per track .
+    Parameters
+    ----------
+    xml_path : str
+        Path of the XML file to process.
+    keep_all_spots : bool
+        True to keep the spots filtered out in TrackMate, False otherwise.
+    keep_all_tracks : bool
+        True to keep the tracks filtered out in TrackMate, False otherwise.
+    one_graph : bool
+        True to create only one graph (probably disconnected) that contains all
+        nodes and edges, False to create a graph (connected) per track.
 
-    Returns:
-        list[nx.DiGraph]: List of graphs modeling the tracks.
+    Returns
+    -------
+    list[nx.DiGraph]
+        List of graphs modeling the tracks.
     """
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
@@ -531,6 +535,47 @@ def read_settings(
             settings = deepcopy(element)
 
     return settings
+
+
+def read_TrackMate_XML(
+    xml_path: str,
+    keep_all_spots: bool,
+    keep_all_tracks: bool,
+    one_graph: bool,
+) -> list[nx.DiGraph]:
+    """
+    Read a TrackMate XML file and convert the tracks data to directed graphs.
+
+    Each TrackMate track and its associated data described in the XML file
+    are modeled as networkX directed graphs. Spots are modeled as graph
+    nodes, and edges as graph edges. All data pertaining to the model
+    itself such as units, spot features, etc. are stored in each graph as
+    graph attributes.
+
+    Parameters
+    ----------
+    xml_path : str
+        Path of the XML file to process.
+    keep_all_spots : bool
+        True to keep the spots filtered out in TrackMate, False otherwise.
+    keep_all_tracks : bool
+        True to keep the tracks filtered out in TrackMate, False otherwise.
+    one_graph : bool
+        True to create only one graph (probably disconnected) that contains all
+        nodes and edges, False to create a graph (connected) per track.
+
+    Returns
+    -------
+    list[nx.DiGraph]
+        List of graphs modeling the tracks.
+    """
+    # For now this function is just a wrapper for read_model, but in a future version
+    # it will also take care of reading log, GUI state, settings and display settings.
+    # log = read_log(xml_path)
+    # gui_state = read_GUI_state(xml_path)
+    # settings = read_settings(xml_path)
+    # display_settings = read_display_settings(xml_path)
+    return read_model(xml_path, keep_all_spots, keep_all_tracks, one_graph)
 
 
 ### graph2xml ###
