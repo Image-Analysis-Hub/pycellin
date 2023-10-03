@@ -6,8 +6,9 @@ from distutils.core import setup
 setup(
     name="pycellin",
     version="0.2",
-    description="Python Distribution Utilities",
+    licence="GNU GPLv3",
+    description="Conversion and analysis of TrackMate tracks as networkX directed graphs",
     author="Laura Xénard",
     author_email="laura.xenard@pasteur.fr",
-    packages=["pycellin", "pycellin.tmio"],
+    packages=["pycellin", "pycellin.tmio", "pycellin.graph"],
 )
