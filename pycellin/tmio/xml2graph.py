@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Importation of ImageJ TrackMate results (XML file) as a Python directed graph
-for tracks analysis.
+"""Create networkX directed graphs from TrackMate results (XML file).
 """
 
 
