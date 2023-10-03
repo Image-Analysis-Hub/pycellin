@@ -5,11 +5,6 @@
 for tracks analysis.
 """
 
-__author__ = "Laura Xénard"
-__contact__ = "laura.xenard@pasteur.fr"
-__copyright__ = "GNU GPLv3"
-__date__ = "2022-02-07"
-__version__ = "0.2"
 
 import argparse
 from importlib.metadata import version
@@ -20,10 +15,11 @@ import time
 import matplotlib.pyplot as plt
 import networkx as nx
 
-import xml_utils
+from xml_utils import read_TrackMate_XML
 
-# TODO: by default only one file: a forest of graph.
-# Need to specifically ask for one file per graph.
+# TODO: right now there's one graph per track. So one XML => several graphs.
+# What would be better is to have by default only one file: a forest of graph.
+# With the option to specifically ask for one file per graph.
 
 
 def export_graph(graph: nx.DiGraph, input: str):
@@ -101,7 +97,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    graphs = xml_utils.read_model(
+    graphs = read_TrackMate_XML(
         args.input, args.keep_all_spots, args.keep_all_tracks, args.one_graph
     )
 
