@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Create a TrackMate compatible XML file from networkX directed graphs.
 """
-
+Create a TrackMate compatible XML file from networkX directed graphs.
+"""
 
 import argparse
 from pathlib import Path

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Create networkX directed graphs from TrackMate results (XML file).
 """
-
+Create networkX directed graphs from TrackMate results (XML file).
+"""
 
 import argparse
 from importlib.metadata import version
