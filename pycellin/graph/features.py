@@ -3,9 +3,12 @@
 
 """
 A collection of diverse features/attributes that can be added to lineage graphs.
+
+
+A generation is a list of nodes between 2 successive divisions.
 """
 
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 import networkx as nx
 import numpy as np
@@ -49,26 +52,27 @@ def add_custom_attr(
     **kwargs: Any,
 ) -> None:
     """
-    _summary_
+    Add a custom feature to a graph while ensuring TrackMate compatibility.
 
     Parameters
     ----------
     graph : nx.DiGraph
-        _description_
+        Graph to process.
     attr_type : str
-        _description_
+        Type of feature to add: node, edge or track.
     attr : str
-        _description_
+        Attribute name used by networkx to access its data. This is also the
+        name of the matching feature inTrackMate.
     name : str
-        _description_
+        Full name for the TrackMate attribute.
     shortname : str
-        _description_
+        Abridged name for the TrackMate attribute.
     dimension : str
-        _description_
+        Dimension of the TrackMate attribute.
     isint : str
-        _description_
+        'true' if the TrackMate attribute is meant to be a an int, 'false' otherwise.
     func : Callable
-        _description_
+        Function that will compute the feature values.
     """
     err_message = "Wrong type attribute. Only 'node', 'edge' and 'track' are valid."
     attr_type = attr_type.lower()
@@ -81,7 +85,7 @@ def add_custom_attr(
     else:
         tag = "TrackFeatures"
 
-    # Adding feature declaration.
+    # Adding feature declaration for TrackMate compatibility.
     graph.graph["Model"][tag][attr] = {
         "feature": attr,
         "name": name,
@@ -119,7 +123,7 @@ def generation_level(graph: nx.DiGraph, node: int) -> int:
 
 def add_generation_level(graph: nx.DiGraph) -> None:
     """
-    _summary_
+    Add the generation level feature to the nodes of a graph.
 
     Parameters
     ----------
@@ -141,11 +145,8 @@ def add_generation_level(graph: nx.DiGraph) -> None:
     )
 
 
-# TODO: the argument generation is of union type: bool U list
-
-
 def generation_completeness(
-    graph: nx.DiGraph, node: int, generation: bool = False
+    graph: nx.DiGraph, node: int, generation: Optional[list[int]]
 ) -> bool:
     """
     Compute the generation completeness of a given node.
@@ -163,15 +164,18 @@ def generation_completeness(
         Graph to process.
     node : int
         Node ID.
-    generation : bool, optional
-        _description_, by default False
+    generation : Optional[list[int]]
+        List of nodes that belong to the current generation. Useful if
+        the generation has already been precomputed. If None, the generation will
+        first be computed.
 
     Returns
     -------
     bool
-        Generation completeness of the node.
+        True if the generation is complete, False otherwise.
     """
-    if generation:
+
+    if generation is not None:
         assert node in generation
     else:
         generation = lin.get_generation(graph, node)
@@ -183,7 +187,7 @@ def generation_completeness(
 
 def add_generation_completeness(graph: nx.DiGraph) -> None:
     """
-    _summary_
+    Add the generation_completeness feature to the nodes of a graph.
 
     Parameters
     ----------
@@ -278,11 +282,18 @@ if __name__ == "__main__":
     G.add_node(4, color="blue")
     print(G)
 
-    def test_map(graph, node):
-        return f"{node*2}pm"
+    def add_attr(graph, node):
+        graph.nodes[node]["time"] = f"{node*2}pm"
 
-    apply_on_nodes(G, "time", test_map)
+    def add_new_node(graph, new_node):
+        G.add_node(new_node, color="blue")
+
+    for n in G:
+        add_attr(G, n)
+
+    add_new_node(G, 5)
 
     print(G.nodes)
     print(G.nodes[1])
     print(G.nodes[4])
+    print(G.nodes[5])
