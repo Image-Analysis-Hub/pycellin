@@ -254,6 +254,7 @@ def add_all_edges(
     """
     tracks_attributes = []
     event, element = next(iterator)
+    current_track_id = None
     # Initialisation of current track information.
     if element.tag == "Track" and event == "start":
         # This condition is a bit of an overkill since the XML structure
@@ -292,6 +293,7 @@ def add_all_edges(
 
         # Edge creation.
         if element.tag == "Edge" and event == "start":
+            assert current_track_id is not None
             add_edge_from_element(graph, element, current_track_id)
 
     return tracks_attributes
