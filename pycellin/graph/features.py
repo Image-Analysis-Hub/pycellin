@@ -4,8 +4,8 @@
 """
 A collection of diverse features/attributes that can be added to lineage graphs.
 
-
-A generation is a list of nodes between 2 successive divisions.
+Vocabulary:
+- A generation is a list of nodes between 2 successive divisions.
 """
 
 from typing import Any, Callable, Optional
@@ -108,9 +108,9 @@ def generation_level(graph: nx.DiGraph, node: int) -> int:
     Parameters
     ----------
     graph : nx.DiGraph
-        Graph to process.
+        Graph containing the node of interest.
     node : int
-        Node ID.
+        Node ID of the node of interest.
 
     Returns
     -------
@@ -161,9 +161,9 @@ def generation_completeness(
     Parameters
     ----------
     graph : nx.DiGraph
-        Graph to process.
+        Graph containing the node of interest.
     node : int
-        Node ID.
+        Node ID of the node of interest.
     generation : Optional[list[int]]
         List of nodes that belong to the current generation. Useful if
         the generation has already been precomputed. If None, the generation will
@@ -210,7 +210,7 @@ def add_generation_completeness(graph: nx.DiGraph) -> None:
     )
 
 
-def division_time(graph: nx.DiGraph, node: int, generation: bool = False) -> int:
+def division_time(graph: nx.DiGraph, node: int, generation: Optional[list[int]]) -> int:
     if generation:
         assert node in generation
     else:
@@ -218,7 +218,7 @@ def division_time(graph: nx.DiGraph, node: int, generation: bool = False) -> int
     return len(generation)
 
 
-def cell_phase(graph: nx.DiGraph, node: int, generation: bool = False) -> str:
+def cell_phase(graph: nx.DiGraph, node: int, generation: Optional[list[int]]) -> str:
     def append_tag(tag, new_tag):
         if not tag:
             tag = new_tag
@@ -252,12 +252,38 @@ def absolute_age(graph: nx.DiGraph, node: int) -> int:
     return len(nx.ancestors(graph, node)) + 1
 
 
-def relative_age(graph: nx.DiGraph, node: int, generation: bool = False) -> int:
+def relative_age(graph: nx.DiGraph, node: int, generation: Optional[list[int]]) -> int:
     if generation:
         assert node in generation
     else:
         generation = lin.get_generation(graph, node)
     return generation.index(node) + 1
+
+
+def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
+    """
+    Compute the generation ID of a given node.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph containing the node of interest.
+    node : int
+        Node ID of the node of interest.
+
+    Returns
+    -------
+    Optional[str]
+        Generation ID of the given node.
+    """
+    try:
+        track_ID = graph.nodes[node]["TRACK_ID"]
+    except KeyError as err:
+        print(err, f"Has a tracking been done on node {node}?")
+    else:
+        gen_end_node = lin.get_generation(graph, node)[-1]
+        gen_ID = f"{track_ID}_{gen_end_node}"
+        return gen_ID
 
 
 def area_increment(graph: nx.DiGraph, node: int) -> float:
