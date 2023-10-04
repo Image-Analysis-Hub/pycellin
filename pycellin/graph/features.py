@@ -5,6 +5,9 @@
 A collection of diverse features/attributes that can be added to lineage graphs.
 
 Vocabulary:
+- TrackMate (resp. networkX) uses the word feature (resp. attribute) to refer to 
+spot (resp. node), link (resp. edge) or track (resp. graph) information. Both naming 
+are used her, depending on the context.
 - A generation is a list of nodes between 2 successive divisions.
 """
 
@@ -14,6 +17,26 @@ import networkx as nx
 import numpy as np
 
 from pycellin.graph import lineage as lin
+
+
+def get_node_attributes_names(graph: nx.DiGraph) -> list[str]:
+    """Return a list of the attributes used for nodes.
+
+    Args:
+        graph (nx.DiGraph): Graph on which to work.
+
+    Returns:
+        list[str]: Names of the attributes used for nodes.
+    """
+    # node_attributes = set([k for n in graph.nodes for k in graph.nodes[n].keys()])
+    node_attributes = list()
+    for node in graph.nodes:
+        # By construction, each and every node has the same set of attributes,
+        # only their values change. So we get the first node, whichever it is,
+        # and get its attributes. There's no need to do it for every node.
+        node_attributes = list(graph.nodes[node].keys())
+        break
+    return node_attributes
 
 
 def apply_on_nodes(
