@@ -340,7 +340,7 @@ def get_filtered_tracks_ID(
 def add_tracks_info(
     graphs: list[nx.DiGraph],
     tracks_attributes: list[dict[str, Any]],
-) -> list[nx.DiGraph]:
+):
     """Add track attributes to each corresponding graph.
 
     Args:
@@ -349,11 +349,7 @@ def add_tracks_info(
 
     Raises:
         ValueError: If several different track IDs are found for one track.
-
-    Returns:
-        list(nx.DiGraph): List of the updated graphs.
     """
-    updated_graphs = []
     for graph in graphs:
         # Finding the dict of attributes matching the track.
         tmp = set(t_id for n, t_id in graph.nodes(data="TRACK_ID"))
@@ -361,11 +357,11 @@ def add_tracks_info(
         if not tmp:
             # 'tmp' is empty because there's no nodes in the current graph.
             # Even if it can't be updated, we still want to return this graph.
-            updated_graphs.append(graph)
+            # updated_graphs.append(graph)
             continue
         elif tmp == {None}:
             # Happens when all the nodes do not have a TRACK_ID attribute.
-            updated_graphs.append(graph)
+            # updated_graphs.append(graph)
             continue
         elif None in tmp:
             # Happens when at least one node does not have a TRACK_ID
@@ -384,9 +380,9 @@ def add_tracks_info(
         # Adding the attributes to the graph.
         for k, v in current_track_attr.items():
             graph.graph[k] = v
-        updated_graphs.append(graph)
+        # updated_graphs.append(graph)
 
-    return updated_graphs
+    # return updated_graphs
 
 
 def read_model(
@@ -482,7 +478,7 @@ def read_model(
 
                 # Adding the tracks attributes as graphs attributes.
                 try:
-                    graphs = add_tracks_info(graphs, tracks_attributes)
+                    add_tracks_info(graphs, tracks_attributes)
                 except ValueError as err:
                     print(err)
                     # The program is in an impossible state so we need to stop.
@@ -491,12 +487,12 @@ def read_model(
                 # Also adding if each track was present in the 'FilteredTracks'
                 # tag because this info is needed when reconstructing TM XMLs
                 # from graphs.
-                for graph in graphs:
-                    if "TRACK_ID" in graph.graph:
-                        if graph.graph["TRACK_ID"] in id_to_keep:
-                            graph.graph["FilteredTrack"] = True
+                for g in graphs:
+                    if "TRACK_ID" in g.graph:
+                        if g.graph["TRACK_ID"] in id_to_keep:
+                            g.graph["FilteredTrack"] = True
                         else:
-                            graph.graph["FilteredTrack"] = False
+                            g.graph["FilteredTrack"] = False
 
         if element.tag == "Model" and event == "end":
             break  # We are not interested in the following data.
@@ -521,6 +517,7 @@ def read_settings(
     it = ET.iterparse(xml_path, events=["start", "end"])
     _, root = next(it)
 
+    settings = ET._Element()
     for event, element in it:
         if element.tag != "Settings":
             root.clear()
