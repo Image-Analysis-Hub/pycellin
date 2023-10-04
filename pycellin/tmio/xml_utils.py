@@ -203,14 +203,14 @@ def add_all_nodes(
 def add_edge_from_element(
     graph: nx.DiGraph,
     element: ET.Element,
-    current_track_id: str,
+    current_track_id: Any,
 ):
     """Add an edge and its attributes from an XML element.
 
     Args:
         graph (nx.DiGraph): Graph on which to add the edge.
         element (ET.Element): Element holding the information to be added.
-        current_track_id (str): Track ID of the track holding the edge.
+        current_track_id (Any): Track ID of the track holding the edge.
     """
     attribs = deepcopy(element.attrib)
     convert_attributes(attribs, graph.graph["Model"]["EdgeFeatures"])
@@ -293,7 +293,6 @@ def add_all_edges(
 
         # Edge creation.
         if element.tag == "Edge" and event == "start":
-            assert current_track_id is not None
             add_edge_from_element(graph, element, current_track_id)
 
     return tracks_attributes
