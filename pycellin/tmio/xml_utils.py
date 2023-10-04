@@ -14,7 +14,7 @@ import networkx as nx
 
 def add_graph_attrib_from_element(
     graph: nx.DiGraph,
-    element: ET.Element,
+    element: ET._Element,
 ):
     """Add graph attributes from an XML element.
 
@@ -30,7 +30,7 @@ def add_graph_attrib_from_element(
 
 def get_features_dict(
     iterator: ET.iterparse,
-    ancestor: ET.Element,
+    ancestor: ET._Element,
 ) -> dict[str, str]:
     """Get all the features of ancestor and return them as a dictionary.
 
@@ -62,7 +62,7 @@ def get_features_dict(
 def add_all_features(
     graph: nx.DiGraph,
     iterator: ET.iterparse,
-    ancestor: ET.Element,
+    ancestor: ET._Element,
 ):
     """Add all the model features and their attributes to the graph.
 
@@ -123,7 +123,7 @@ def convert_attributes(
 
 
 def add_ROI_coordinates(
-    element: ET.Element,
+    element: ET._Element,
     attribs: dict[str, Any],
 ):
     """Extract, format and add ROI coordinates to the attributes dict.
@@ -153,7 +153,7 @@ def add_ROI_coordinates(
 def add_all_nodes(
     graph: nx.DiGraph,
     iterator: ET.iterparse,
-    ancestor: ET.Element,
+    ancestor: ET._Element,
 ):
     """Add nodes and their attributes to a graph.
 
@@ -202,7 +202,7 @@ def add_all_nodes(
 
 def add_edge_from_element(
     graph: nx.DiGraph,
-    element: ET.Element,
+    element: ET._Element,
     current_track_id: Any,
 ):
     """Add an edge and its attributes from an XML element.
@@ -238,7 +238,7 @@ def add_edge_from_element(
 def add_all_edges(
     graph: nx.DiGraph,
     iterator: ET.iterparse,
-    ancestor: ET.Element,
+    ancestor: ET._Element,
 ) -> list[dict[str, Any]]:
     """Add edges and their attributes to a graph.
 
@@ -300,7 +300,7 @@ def add_all_edges(
 
 def get_filtered_tracks_ID(
     iterator: ET.iterparse,
-    ancestor: ET.Element,
+    ancestor: ET._Element,
 ) -> list[str]:
     """Get the list of IDs of the tracks to keep.
 
