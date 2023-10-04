@@ -81,7 +81,8 @@ def test_add_graph_attrib_from_element():
     xml_data = '<data attrib1="text" attrib2="10" />'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")))
     _, element = next(it)
-    obtained = xu.add_graph_attrib_from_element(nx.DiGraph(), element)
+    obtained = nx.DiGraph()
+    xu.add_graph_attrib_from_element(obtained, element)
     model = {"attrib1": "text", "attrib2": "10"}
     expected = nx.DiGraph(Model=model)
     assert is_equal(obtained, expected)
@@ -91,7 +92,8 @@ def test_add_graph_attrib_from_element_no_graph_attributes():
     xml_data = "<data>" "</data>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")))
     _, element = next(it)
-    obtained = xu.add_graph_attrib_from_element(nx.DiGraph(), element)
+    obtained = nx.DiGraph()
+    xu.add_graph_attrib_from_element(obtained, element)
     expected = nx.DiGraph(Model={})
     assert is_equal(obtained, expected)
 
