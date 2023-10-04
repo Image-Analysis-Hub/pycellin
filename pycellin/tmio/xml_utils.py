@@ -15,21 +15,17 @@ import networkx as nx
 def add_graph_attrib_from_element(
     graph: nx.DiGraph,
     element: ET.Element,
-) -> nx.DiGraph:
+):
     """Add graph attributes from an XML element.
 
     Args:
         graph (nx.DiGraph): Graph on which to add attributes.
         element (ET.Element): Element holding the information to be added.
-
-    Returns:
-        nx.DiGraph: The updated graph.
     """
     graph.graph["Model"] = deepcopy(element.attrib)
     element.clear()  # We won't need it anymore so we free up some memory.
     # .clear() does not delete the element: it only removes all subelements
     # and clears or sets to `None` all attributes.
-    return graph
 
 
 def get_features_dict(
@@ -67,7 +63,7 @@ def add_all_features(
     graph: nx.DiGraph,
     iterator: ET.iterparse,
     ancestor: ET.Element,
-) -> nx.DiGraph:
+):
     """Add all the model features and their attributes to the graph.
 
     The model features are divided in 3 categories: spots, edges and
@@ -78,9 +74,6 @@ def add_all_features(
         graph (nx.DiGraph): Graph on which to add features.
         iterator (ET.iterparse): XML element iterator.
         ancestor (ET.Element): Element encompassing the information to add.
-
-    Returns:
-        nx.DiGraph: The updated graph.
     """
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
@@ -88,7 +81,6 @@ def add_all_features(
         graph.graph["Model"][element.tag] = features
         element.clear()
         event, element = next(iterator)
-    return graph
 
 
 def convert_attributes(
@@ -442,13 +434,13 @@ def read_model(
     for event, element in it:
         # Adding the model information as graph attributes.
         if element.tag == "Model" and event == "start":  # Add units.
-            graph = add_graph_attrib_from_element(graph, element)
+            add_graph_attrib_from_element(graph, element)
             root.clear()  # Cleaning the tree to free up some memory.
             # All the browsed subelements of `root` are deleted.
 
         # Add features declaration for spot, edge and track features.
         if element.tag == "FeatureDeclarations" and event == "start":
-            graph = add_all_features(graph, it, element)
+            add_all_features(graph, it, element)
             root.clear()
 
         # Adding the spots as nodes.
