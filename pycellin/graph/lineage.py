@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from typing import Optional
+
 import matplotlib.pyplot as plt
 import networkx as nx
 
@@ -8,7 +10,7 @@ import networkx as nx
 ### Accessing elements ###
 
 
-def get_root(graph):
+def get_root(graph: nx.DiGraph) -> int:
     if len(graph) == 1:
         root = [n for n in graph.nodes()]
         assert len(root) == 1
@@ -22,25 +24,24 @@ def get_root(graph):
     return root[0]
 
 
-def get_leaves(graph):
+def get_leaves(graph: nx.DiGraph) -> list[int]:
     leaves = [
         n for n in graph.nodes() if graph.in_degree(n) != 0 and graph.out_degree(n) == 0
     ]
     return leaves
 
 
-def get_divisions(graph, nodes=[]):
-    if not nodes:
+def get_divisions(graph: nx.DiGraph, nodes: Optional[list[int]] = None) -> list[int]:
+    if nodes is None:
         nodes = graph.nodes()
-    divisions = [n for n in nodes if graph.out_degree(n) > 1]
-    return divisions
+    return [n for n in nodes if graph.out_degree(n) > 1]
 
 
-def get_branch(graph, root, leave):
+def get_branch(graph: nx.DiGraph, root: int, leave: int) -> list[int]:
     return nx.shortest_path(graph, source=root, target=leave)
 
 
-def get_generation(graph, node):
+def get_generation(graph: nx.DiGraph, node: int) -> list[int]:
     gen = [node]
     start = False
     end = False
@@ -88,7 +89,9 @@ def get_generation(graph, node):
     return gen
 
 
-def get_generations(graph, keep_incomplete_gens=False, debug=False):
+def get_generations(
+    graph: nx.DiGraph, keep_incomplete_gens: bool = False, debug: bool = False
+):
     """Find all the generation segments of a graph.
 
     A generation is a tree segment that starts at the root or at a
@@ -128,21 +131,21 @@ def get_generations(graph, keep_incomplete_gens=False, debug=False):
 ### Predicates ###
 
 
-def is_root(graph, node):
+def is_root(graph: nx.DiGraph, node: int):
     if graph.in_degree(node) == 0 and graph.out_degree(node) != 0:
         return True
     else:
         return False
 
 
-def is_leaf(graph, node):
+def is_leaf(graph: nx.DiGraph, node: int):
     if graph.in_degree(node) != 0 and graph.out_degree(node) == 0:
         return True
     else:
         return False
 
 
-def is_division(graph, node):
+def is_division(graph: nx.DiGraph, node: int):
     if graph.in_degree(node) <= 1 and graph.out_degree(node) > 1:
         return True
     else:
@@ -152,7 +155,7 @@ def is_division(graph, node):
 ### Not so random stuff ###
 
 
-def display_lineage(graph):
+def display_lineage(graph: nx.DiGraph):
     pos = nx.drawing.nx_agraph.graphviz_layout(graph, prog="dot")
     plt.figure(figsize=(12, 12))
     nx.draw(graph, pos, with_labels=True, arrows=False, font_weight="bold")
