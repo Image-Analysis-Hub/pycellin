@@ -9,6 +9,20 @@ Vocabulary:
 spot (resp. node), link (resp. edge) or track (resp. graph) information. Both naming 
 are used her, depending on the context.
 - A generation is a list of nodes between 2 successive divisions.
+
+
+
+        o
+        |
+        o
+       / \
+      o   o
+      |   |
+      x   o  
+      |   |    
+      o   o
+     / \
+    o   o
 """
 
 from typing import Any, Callable, Optional
