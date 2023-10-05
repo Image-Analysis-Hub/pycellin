@@ -176,7 +176,10 @@ def generation_completeness(
 
     A generation is defined as complete when it starts by a division
     AND ends by a division. Generations that start at the root or end with a leaf
-    are thus incomplete.
+    are thus incomplete.nodes,
+        graph,
+        "GEN_COMPLETE",
+        generation_completen
     This can be useful when analyzing features like division time. It avoids
     the introduction of a bias since we have no information on what happened before
     the root or after the leaves.
@@ -188,7 +191,7 @@ def generation_completeness(
     node : int
         Node ID of the node of interest.
     generation : Optional[list[int]]
-        List of nodes that belong to the current generation. Useful if
+        List of nodes that belong to the generation of the input node. Useful if
         the generation has already been precomputed. If None, the generation will
         first be computed.
 
@@ -234,7 +237,34 @@ def add_generation_completeness(graph: nx.DiGraph) -> None:
 
 
 def division_time(graph: nx.DiGraph, node: int, generation: Optional[list[int]]) -> int:
-    if generation:
+    """
+    Compute the division time of a given node, expressed in nodes.
+
+    Division time is defined as the number of nodes between the 2 divisions surrounding
+    the node of interest. It is the length of the generation of the node of interest.
+    This means that all the nodes of a generation will have the same division time.
+    It also means that when studying division time, it is important to only take one
+    node per generation into account (usually first or last node of the generation).
+    Otherwise a bias will be introduced since longer generations will be more
+    represented.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph containing the node of interest.
+    node : int
+        Node ID of the node of interest.
+    generation : Optional[list[int]]
+        List of nodes that belong to the generation of the input node. Useful if
+        the generation has already been precomputed. If None, the generation will
+        first be computed.
+
+    Returns
+    -------
+    int
+        Division time of the node, expressed in nodes.
+    """
+    if generation is not None:
         assert node in generation
     else:
         generation = lin.get_generation(graph, node)
@@ -242,6 +272,37 @@ def division_time(graph: nx.DiGraph, node: int, generation: Optional[list[int]])
 
 
 def cell_phase(graph: nx.DiGraph, node: int, generation: Optional[list[int]]) -> str:
+    """
+    Compute the phase(s)/stage(s) in which the node of interest is currently in.
+
+    Phases can be:
+    - 'division' -> when the out degree of the node is higher than its in degree
+    - 'birth' -> when the previous node is a division
+    - 'first' -> graph root i.e. beginning of lineage
+    - 'last' -> graph leaf i.e end of lineage
+    - '-' -> when the node is not in one of the above phases.
+
+    Notice that a node can be in different phases simultaneously, e.g. 'first'
+    and 'division'. In that case, a '+' sign is used as separator between phases,
+    e.g. 'first+division'.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph containing the node of interest.
+    node : int
+        Node ID of the node of interest.
+    generation : Optional[list[int]]
+        List of nodes that belong to the generation of the input node. Useful if
+        the generation has already been precomputed. If None, the generation will
+        first be computed.
+
+    Returns
+    -------
+    str
+        Phase(s) of the node.
+    """
+
     def append_tag(tag, new_tag):
         if not tag:
             tag = new_tag
@@ -276,7 +337,7 @@ def absolute_age(graph: nx.DiGraph, node: int) -> int:
 
 
 def relative_age(graph: nx.DiGraph, node: int, generation: Optional[list[int]]) -> int:
-    if generation:
+    if generation is not None:
         assert node in generation
     else:
         generation = lin.get_generation(graph, node)
