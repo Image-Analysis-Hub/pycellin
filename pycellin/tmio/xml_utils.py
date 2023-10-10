@@ -529,9 +529,9 @@ def read_settings(
 
 def read_TrackMate_XML(
     xml_path: str,
-    keep_all_spots: bool,
-    keep_all_tracks: bool,
-    one_graph: bool,
+    keep_all_spots: bool = False,
+    keep_all_tracks: bool = False,
+    one_graph: bool = False,
 ) -> list[nx.DiGraph]:
     """
     Read a TrackMate XML file and convert the tracks data to directed graphs.
@@ -546,13 +546,16 @@ def read_TrackMate_XML(
     ----------
     xml_path : str
         Path of the XML file to process.
-    keep_all_spots : bool
+    keep_all_spots : bool, optional
         True to keep the spots filtered out in TrackMate, False otherwise.
-    keep_all_tracks : bool
+        False by default.
+    keep_all_tracks : bool, optional
         True to keep the tracks filtered out in TrackMate, False otherwise.
-    one_graph : bool
+        False by default.
+    one_graph : bool, optional
         True to create only one graph (probably disconnected) that contains all
         nodes and edges, False to create a graph (connected) per track.
+        False by default.
 
     Returns
     -------
