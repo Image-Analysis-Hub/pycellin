@@ -85,7 +85,7 @@ def add_generation_level(graph: nx.DiGraph) -> None:
 
 
 def generation_completeness(
-    graph: nx.DiGraph, node: int, generation: Optional[list[int]]
+    graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
 ) -> bool:
     """
     Compute the generation completeness of a given node.
@@ -106,10 +106,10 @@ def generation_completeness(
         Graph containing the node of interest.
     node : int
         Node ID of the node of interest.
-    generation : Optional[list[int]]
+    generation : Optional[list[int]], optional
         List of nodes that belong to the generation of the input node. Useful if
         the generation has already been precomputed. If None, the generation will
-        first be computed.
+        first be computed. By default None.
 
     Returns
     -------
@@ -152,7 +152,9 @@ def add_generation_completeness(graph: nx.DiGraph) -> None:
     )
 
 
-def division_time(graph: nx.DiGraph, node: int, generation: Optional[list[int]]) -> int:
+def division_time(
+    graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
+) -> int:
     """
     Compute the division time of a given node, expressed in nodes.
 
@@ -170,10 +172,10 @@ def division_time(graph: nx.DiGraph, node: int, generation: Optional[list[int]])
         Graph containing the node of interest.
     node : int
         Node ID of the node of interest.
-    generation : Optional[list[int]]
+    generation : Optional[list[int]], optional
         List of nodes that belong to the generation of the input node. Useful if
         the generation has already been precomputed. If None, the generation will
-        first be computed.
+        first be computed. By default None.
 
     Returns
     -------
@@ -212,7 +214,9 @@ def add_division_time(graph: nx.DiGraph) -> None:
     )
 
 
-def cell_phase(graph: nx.DiGraph, node: int, generation: Optional[list[int]]) -> str:
+def cell_phase(
+    graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
+) -> str:
     """
     Compute the phase(s)/stage(s) in which the node of interest is currently in.
 
@@ -233,10 +237,10 @@ def cell_phase(graph: nx.DiGraph, node: int, generation: Optional[list[int]]) ->
         Graph containing the node of interest.
     node : int
         Node ID of the node of interest.
-    generation : Optional[list[int]]
+    generation : Optional[list[int]], optional
         List of nodes that belong to the generation of the input node. Useful if
         the generation has already been precomputed. If None, the generation will
-        first be computed.
+        first be computed. By default None.
 
     Returns
     -------
@@ -303,15 +307,58 @@ def add_cell_phase(graph: nx.DiGraph) -> None:
 
 
 def absolute_age(graph: nx.DiGraph, node: int) -> int:
-    return len(nx.ancestors(graph, node)) + 1
+    """
+    Compute the absolute age of a given node.
+
+    Absolute age is defined as the number of nodes between the start of the lineage
+    (i.e. root of the graph) and the node of interest.
+    Absolute age of the root is 0.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph containing the node of interest.
+    node : int
+        Node ID of the node of interest.
+
+    Returns
+    -------
+    int
+        Absolute age of the node.
+    """
+    return len(nx.ancestors(graph, node))
 
 
-def relative_age(graph: nx.DiGraph, node: int, generation: Optional[list[int]]) -> int:
+def relative_age(
+    graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
+) -> int:
+    """
+    Compute the relative age of a given node.
+
+    Relative age is defined as the number of nodes between the start of the generation
+    (i.e. previous division, or root) and the node of interest.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph containing the node of interest.
+    node : int
+        Node ID of the node of interest.
+    generation : Optional[list[int]], optional
+        List of nodes that belong to the generation of the input node. Useful if
+        the generation has already been precomputed. If None, the generation will
+        first be computed. By default None.
+
+    Returns
+    -------
+    int
+        Relative age of the node.
+    """
     if generation is not None:
         assert node in generation
     else:
         generation = lin.get_generation(graph, node)
-    return generation.index(node) + 1
+    return generation.index(node)
 
 
 def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
