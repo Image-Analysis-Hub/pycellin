@@ -129,7 +129,7 @@ def generation_completeness(
 
 def add_generation_completeness(graph: nx.DiGraph) -> None:
     """
-    Add the generation_completeness feature to the nodes of a graph.
+    Add the generation completeness feature to the nodes of a graph.
 
     Parameters
     ----------
@@ -189,7 +189,7 @@ def division_time(graph: nx.DiGraph, node: int, generation: Optional[list[int]])
 
 def add_division_time(graph: nx.DiGraph) -> None:
     """
-    _summary_
+    Add the division time feature to the nodes of a graph.
 
     Parameters
     ----------
