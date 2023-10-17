@@ -457,28 +457,3 @@ def add_generation_ID(graph: nx.DiGraph) -> None:
         "GEN_ID",
         generation_ID,
     )
-
-
-if __name__ == "__main__":
-    G = nx.Graph()
-    G.add_node(1, color="blue")
-    G.add_node(2, color="blue")
-    G.add_node(3, color="blue")
-    G.add_node(4, color="blue")
-    print(G)
-
-    def add_attr(graph, node):
-        graph.nodes[node]["time"] = f"{node*2}pm"
-
-    def add_new_node(graph, new_node):
-        G.add_node(new_node, color="blue")
-
-    for n in G:
-        add_attr(G, n)
-
-    add_new_node(G, 5)
-
-    print(G.nodes)
-    print(G.nodes[1])
-    print(G.nodes[4])
-    print(G.nodes[5])

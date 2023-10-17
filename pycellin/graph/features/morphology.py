@@ -388,39 +388,3 @@ def area_increment(graph: nx.DiGraph, node: int) -> float:
         assert len(predecessors) == 1, err_mes
         # print(predecessors)
         return graph.nodes[node]["AREA"] - graph.nodes[predecessors[0]]["AREA"]
-
-
-if __name__ == "__main__":
-    import pycellin.graph.io as gio
-
-    folder = "/mnt/data/Films/Chip_Ec/220516/220516_AutomaticSelection/Manual_corrections/tracking/"
-    # folder = '/mnt/data/Films/AgarPad_Nm/AgarPad_Nm_mScarlet_graphs/test_nb_bact/'
-    # folder = '/mnt/data/Films/AgarPad_Ec/221031_4_Agar_Pad/561nm/output/Stationary_2'
-    # folder = '/mnt/data/Films/AgarPad_Ec/221031_4_Agar_Pad/561nm/output/Exponential_2'
-    # folder = '/mnt/data/Films/Chip_Ec/220113'
-    # folder = '/mnt/data/Films/AgarPad_Nm/AgarPad_Nm_mScarlet_graphs/'
-    graphs, files = gio.load_graphs(folder)
-    print(len(graphs))
-    pixel_size = 0.06568
-    tolerance = 0.5
-    for graph in graphs:
-        print(graph)
-        for node in graph:
-            if node == 36065:
-                width, length = get_width_and_length(
-                    graph,
-                    node,
-                    pixel_size,
-                    "zhang",
-                    tolerance,
-                    debug=True,
-                    debug_folder=folder + "/debug_morphology/",
-                )
-            else:
-                width, length = get_width_and_length(
-                    graph,
-                    node,
-                    pixel_size,
-                    "zhang",
-                    tolerance,
-                )

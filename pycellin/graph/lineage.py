@@ -160,7 +160,3 @@ def display_lineage(graph: nx.DiGraph):
     plt.figure(figsize=(12, 12))
     nx.draw(graph, pos, with_labels=True, arrows=False, font_weight="bold")
     plt.show()
-
-
-if __name__ == "__main__":
-    pass
