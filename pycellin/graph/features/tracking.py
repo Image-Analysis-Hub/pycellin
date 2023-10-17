@@ -22,7 +22,7 @@ Vocabulary:
       4   5  
       |   |    
       6   7
-     / \
+     / \ 
     8   9
 
 - Complete generation: It is a generation that do not include a root nor a leaf.
@@ -185,6 +185,31 @@ def division_time(graph: nx.DiGraph, node: int, generation: Optional[list[int]])
     else:
         generation = lin.get_generation(graph, node)
     return len(generation)
+
+
+def add_division_time(graph: nx.DiGraph) -> None:
+    """
+    _summary_
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph to process.
+    """
+    feat.add_custom_attr(
+        graph,
+        "node",
+        "DIV_TIME",
+        "Division time",
+        "Div. time",
+        "TIME",
+        "false",
+        feat.apply_on_nodes,
+        graph,
+        "GEN_COMPLETE",
+        division_time,
+        need_TRACK_ID=True,
+    )
 
 
 def cell_phase(graph: nx.DiGraph, node: int, generation: Optional[list[int]]) -> str:
