@@ -435,6 +435,30 @@ def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
         return gen_ID
 
 
+def add_generation_ID(graph: nx.DiGraph) -> None:
+    """
+    Add the generation ID feature to the nodes of a graph.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph to process.
+    """
+    feat.add_custom_attr(
+        graph,
+        "node",
+        "GEN_ID",
+        "Generation ID",
+        "Gen. ID",
+        "NONE",
+        "false",
+        feat.apply_on_nodes,
+        graph,
+        "GEN_ID",
+        generation_ID,
+    )
+
+
 if __name__ == "__main__":
     G = nx.Graph()
     G.add_node(1, color="blue")
