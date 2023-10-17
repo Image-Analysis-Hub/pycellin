@@ -9,11 +9,15 @@ import networkx as nx
 def get_node_attributes_names(graph: nx.DiGraph) -> list[str]:
     """Return a list of the attributes used for nodes.
 
-    Args:
-        graph (nx.DiGraph): Graph on which to work.
+    Parameters
+    ----------
+    graph : nx.DiGraph)
+        Graph on which to work.
 
-    Returns:
-        list[str]: Names of the attributes used for nodes.
+    Returns
+    -------
+    list[str]
+        Names of the attributes used for nodes.
     """
     # node_attributes = set([k for n in graph.nodes for k in graph.nodes[n].keys()])
     node_attributes = list()
