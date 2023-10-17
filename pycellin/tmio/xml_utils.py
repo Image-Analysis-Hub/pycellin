@@ -16,11 +16,15 @@ def add_graph_attrib_from_element(
     graph: nx.DiGraph,
     element: ET._Element,
 ):
-    """Add graph attributes from an XML element.
+    """
+    Add graph attributes from an XML element.
 
-    Args:
-        graph (nx.DiGraph): Graph on which to add attributes.
-        element (ET.Element): Element holding the information to be added.
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph on which to add attributes.
+    element : ET._Element
+        Element holding the information to be added.
     """
     graph.graph["Model"] = deepcopy(element.attrib)
     element.clear()  # We won't need it anymore so we free up some memory.
@@ -32,14 +36,20 @@ def get_features_dict(
     iterator: ET.iterparse,
     ancestor: ET._Element,
 ) -> dict[str, str]:
-    """Get all the features of ancestor and return them as a dictionary.
+    """
+    Get all the features of ancestor and return them as a dictionary.
 
-    Args:
-        iterator (ET.iterparse): XML element iterator.
-        ancestor (ET.Element): Element encompassing the information to add.
+    Parameters
+    ----------
+    iterator : ET.iterparse
+        XML element iterator.
+    ancestor : ET._Element
+        Element encompassing the information to add.
 
-    Returns:
-        dict: Features contained in the ancestor element.
+    Returns
+    -------
+    dict
+        Features contained in the ancestor element.
     """
     features = dict()
     event, element = next(iterator)  # Feature.
@@ -64,16 +74,21 @@ def add_all_features(
     iterator: ET.iterparse,
     ancestor: ET._Element,
 ):
-    """Add all the model features and their attributes to the graph.
+    """
+    Add all the model features and their attributes to the graph.
 
     The model features are divided in 3 categories: spots, edges and
     tracks features.
     Those features are regrouped under the tag FeatureDeclarations.
 
-    Args:
-        graph (nx.DiGraph): Graph on which to add features.
-        iterator (ET.iterparse): XML element iterator.
-        ancestor (ET.Element): Element encompassing the information to add.
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph on which to add features.
+    iterator : ET.iterparse
+        XML element iterator.
+    ancestor : ET._Element
+        Element encompassing the information to add.
     """
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
@@ -87,18 +102,25 @@ def convert_attributes(
     attributes: dict[str, str],
     features: dict[str, dict[str, str]],
 ):
-    """Convert the values of `attributes` from string to int or float.
+    """
+    Convert the values of `attributes` from string to int or float.
 
     The type to convert to is given by the dictionary of features with
     the key 'isint'.
 
-    Args:
-        attributes (dict): The dictionary whose values we want to convert.
-        features (dict): The dictionary holding the type information to use.
+    Parameters
+    ----------
+    attributes : dict[str, str]
+        The dictionary whose values we want to convert.
+    features : dict[str, dict[str, str]]
+        The dictionary holding the type information to use.
 
-    Raises:
-        KeyError: If the 'isint' feature attribute doesn't exist.
-        ValueError: If the value of the 'isint' feature attribute is invalid.
+    Raises
+    ------
+    KeyError
+        If the 'isint' feature attribute doesn't exist.
+    ValueError
+        If the value of the 'isint' feature attribute is invalid.
     """
     for key in attributes:
         if key == "ID":
@@ -126,11 +148,15 @@ def add_ROI_coordinates(
     element: ET._Element,
     attribs: dict[str, Any],
 ):
-    """Extract, format and add ROI coordinates to the attributes dict.
+    """
+    Extract, format and add ROI coordinates to the attributes dict.
 
-    Args:
-        element (ET.Element): Element from which to extract ROI coordinates.
-        attribs (dict): Attributes dict to update with ROI coordinates.
+    Parameters
+    ----------
+    element : ET._Element
+        Element from which to extract ROI coordinates.
+    attribs : dict[str, Any]
+        Attributes dict to update with ROI coordinates.
     """
     try:
         n_points = int(attribs["ROI_N_POINTS"])
@@ -155,14 +181,19 @@ def add_all_nodes(
     iterator: ET.iterparse,
     ancestor: ET._Element,
 ):
-    """Add nodes and their attributes to a graph.
+    """
+    Add nodes and their attributes to a graph.
 
     All the elements that are descendants of `ancestor` are explored.
 
-    Args:
-        graph (nx.DiGraph): Graph on which to add nodes.
-        iterator (ET.iterparse): XML element iterator.
-        ancestor (ET.Element): Element encompassing the information to add.
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph on which to add nodes.
+    iterator : ET.iterparse
+        XML element iterator.
+    ancestor : ET._Element
+        Element encompassing the information to add.
     """
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
@@ -205,12 +236,17 @@ def add_edge_from_element(
     element: ET._Element,
     current_track_id: Any,
 ):
-    """Add an edge and its attributes from an XML element.
+    """
+    Add an edge and its attributes from an XML element.
 
-    Args:
-        graph (nx.DiGraph): Graph on which to add the edge.
-        element (ET.Element): Element holding the information to be added.
-        current_track_id (Any): Track ID of the track holding the edge.
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph on which to add the edge.
+    element : ET._Element
+        Element holding the information to be added.
+    current_track_id : Any
+        Track ID of the track holding the edge.
     """
     attribs = deepcopy(element.attrib)
     convert_attributes(attribs, graph.graph["Model"]["EdgeFeatures"])
@@ -240,17 +276,24 @@ def add_all_edges(
     iterator: ET.iterparse,
     ancestor: ET._Element,
 ) -> list[dict[str, Any]]:
-    """Add edges and their attributes to a graph.
+    """
+    Add edges and their attributes to a graph.
 
     All the elements that are descendants of `ancestor` are explored.
 
-    Args:
-        graph (nx.DiGraph): Graph on which to add edges.
-        iterator (ET.iterparse): XML element iterator.
-        ancestor (ET.Element): Element encompassing the information to add.
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph on which to add edges.
+    iterator : ET.iterparse
+        XML element iterator.
+    ancestor : ET._Element
+        Element encompassing the information to add.
 
-    Returns:
-        list(dict): A dictionary of attributes for every track.
+    Returns
+    -------
+    list[dict[str, Any]]
+        A dictionary of attributes for every track.
     """
     tracks_attributes = []
     event, element = next(iterator)
@@ -302,14 +345,20 @@ def get_filtered_tracks_ID(
     iterator: ET.iterparse,
     ancestor: ET._Element,
 ) -> list[str]:
-    """Get the list of IDs of the tracks to keep.
+    """
+    Get the list of IDs of the tracks to keep.
 
-    Args:
-        iterator (ET.iterparse): XML element iterator.
-        ancestor (ET.Element): Element encompassing the information to add.
+    Parameters
+    ----------
+    iterator : ET.iterparse
+        XML element iterator.
+    ancestor : ET._Element
+        Element encompassing the information to add.
 
-    Returns:
-        list(str): List of tracks ID to keep.
+    Returns
+    -------
+    list[str]
+        List of tracks ID to keep.
     """
     filtered_tracks_ID = []
     event, element = next(iterator)
@@ -341,14 +390,20 @@ def add_tracks_info(
     graphs: list[nx.DiGraph],
     tracks_attributes: list[dict[str, Any]],
 ):
-    """Add track attributes to each corresponding graph.
+    """
+    Add track attributes to each corresponding graph.
 
-    Args:
-        graphs (list(nx.DiGraph)): List of graphs to update.
-        tracks_attributes (list(dict)): Dictionaries of tracks attributes.
+    Parameters
+    ----------
+    graphs : list[nx.DiGraph]
+        List of graphs to update.
+    tracks_attributes : list[dict[str, Any]]
+        Dictionaries of tracks attributes.
 
-    Raises:
-        ValueError: If several different track IDs are found for one track.
+    Raises
+    ------
+    ValueError
+        If several different track IDs are found for one track.
     """
     for graph in graphs:
         # Finding the dict of attributes matching the track.
@@ -391,7 +446,8 @@ def read_model(
     keep_all_tracks: bool,
     one_graph: bool,
 ) -> list[nx.DiGraph]:
-    """Read an XML file and convert the model data into several graphs.
+    """
+    Read an XML file and convert the model data into several graphs.
 
     Each TrackMate track and its associated data described in the XML file
     are modeled as networkX directed graphs. Spots are modeled as graph
@@ -506,13 +562,18 @@ def read_model(
 def read_settings(
     xml_path: str,
 ) -> ET._Element:
-    """Extract the TrackMate settings of a TrackMate XML file.
+    """
+    Extract the TrackMate settings of a TrackMate XML file.
 
-    Args:
-        xml_path (str): Path of the XML file to process.
+    Parameters
+    ----------
+    xml_path : str
+        Path of the XML file to process.
 
-    Returns:
-        ET._Element: Element holding all the TrackMate settings.
+    Returns
+    -------
+    ET._Element
+        Element holding all the TrackMate settings.
     """
     it = ET.iterparse(xml_path, events=["start", "end"])
     _, root = next(it)
@@ -578,14 +639,18 @@ def write_FeatureDeclarations(
     xf: ET.xmlfile,
     graphs: list[nx.DiGraph],
 ) -> None:
-    """Write the feature declarations into an XML file.
+    """
+    Write the feature declarations into an XML file.
 
     The feature declarations are divided in three parts: spot features,
     edge features, and track features.
 
-    Args:
-        xf (ET.xmlfile): Context manager for the XML file to write.
-        graphs (list[nx.DiGraph]): Graphs containing the data to write.
+    Parameters
+    ----------
+    xf : ET.xmlfile
+        Context manager for the XML file to write.
+    graphs : list[nx.DiGraph]
+        Graphs containing the data to write.
     """
     xf.write("\n\t\t")
     with xf.element("FeatureDeclarations"):
@@ -621,17 +686,22 @@ def write_FeatureDeclarations(
 def value_to_str(
     value: Union[int, float, str],
 ) -> str:
-    """Convert a value to its associated string.
+    """
+    Convert a value to its associated string.
 
     Indeed, ET.write() method only accepts to write strings.
     However, TrackMate is only able to read Spot, Edge and Track
     features that can be parsed as numeric by Java.
 
-    Args:
-        value (Union[int, float, str]): Value to convert to string.
+    Parameters
+    ----------
+    value : Union[int, float, str]
+        Value to convert to string.
 
-    Returns:
-        str: The string equivalent of `value`.
+    Returns
+    -------
+    str
+        The string equivalent of `value`.
     """
     # TODO: Should this function take care of converting non-numeric added
     # features to numeric ones (like GEN_ID)? Or should it be done in
@@ -653,14 +723,20 @@ def create_Spot(
     graph: nx.DiGraph,
     node: int,
 ) -> ET._Element:
-    """Create an XML Spot Element representing a graph node.
+    """
+    Create an XML Spot Element representing a graph node.
 
-    Args:
-        graph (nx.DiGraph): Graph containing the node to create.
-        node (int): ID of the node in the graph.
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph containing the node to create.
+    node : int
+        ID of the node in the graph.
 
-    Returns:
-        ET._Element: The newly created Spot Element.
+    Returns
+    -------
+    ET._Element
+        The newly created Spot Element.
     """
     # Building Spot attributes.
     exluded_keys = ["TRACK_ID", "ROI_N_POINTS"]
@@ -683,11 +759,15 @@ def write_AllSpots(
     xf: ET.xmlfile,
     graphs: list[nx.DiGraph],
 ) -> None:
-    """Write the nodes/spots data into an XML file.
+    """
+    Write the nodes/spots data into an XML file.
 
-    Args:
-        xf (ET.xmlfile): Context manager for the XML file to write.
-        graphs (list[nx.DiGraph]): Graphs containing the data to write.
+    Parameters
+    ----------
+    xf : ET.xmlfile
+        Context manager for the XML file to write.
+    graphs : list[nx.DiGraph]
+        Graphs containing the data to write.
     """
     xf.write("\n\t\t")
     nb_nodes = sum([len(graph) for graph in graphs])
@@ -717,11 +797,15 @@ def write_AllTracks(
     xf: ET.xmlfile,
     graphs: list[nx.DiGraph],
 ) -> None:
-    """Write the tracks data into an XML file.
+    """
+    Write the tracks data into an XML file.
 
-    Args:
-        xf (ET.xmlfile): Context manager for the XML file to write.
-        graphs (list[nx.DiGraph]): Graphs containing the data to write.
+    Parameters
+    ----------
+    xf : ET.xmlfile
+        Context manager for the XML file to write.
+    graphs : list[nx.DiGraph]
+        Graphs containing the data to write.
     """
     xf.write("\n\t\t")
     with xf.element("AllTracks"):
@@ -754,11 +838,15 @@ def write_FilteredTracks(
     xf: ET.xmlfile,
     graphs: list[nx.DiGraph],
 ) -> None:
-    """Write the filtered tracks data into an XML file.
+    """
+    Write the filtered tracks data into an XML file.
 
-    Args:
-        xf (ET.xmlfile): Context manager for the XML file to write.
-        graphs (list[nx.DiGraph]): Graphs containing the data to write.
+    Parameters
+    ----------
+    xf : ET.xmlfile
+        Context manager for the XML file to write.
+    graphs : list[nx.DiGraph]
+        Graphs containing the data to write.
     """
     xf.write("\n\t\t")
     with xf.element("FilteredTracks"):
@@ -775,14 +863,18 @@ def write_Model(
     xf: ET.xmlfile,
     graphs: list[nx.DiGraph],
 ) -> None:
-    """Write all the model data into an XML file.
+    """
+    Write all the model data into an XML file.
 
     This includes Features declarations, spots, tracks and filtered
     tracks.
 
-    Args:
-        xf (ET.xmlfile): Context manager for the XML file to write.
-        graphs (list[nx.DiGraph]): Graphs containing the data to write.
+    Parameters
+    ----------
+    xf : ET.xmlfile
+        Context manager for the XML file to write.
+    graphs : list[nx.DiGraph]
+        Graphs containing the data to write.
     """
     # Checking that each and every graph have the same features.
     # It should be the case but better safe than sorry.
@@ -808,11 +900,15 @@ def write_Settings(
     xf: ET.xmlfile,
     settings: ET._Element,
 ) -> None:
-    """Write the given TrackMate settings into an XML file.
+    """
+    Write the given TrackMate settings into an XML file.
 
-    Args:
-        xf (ET.xmlfile): Context manager for the XML file to write.
-        settings (ET._Element): Element holding all the settings to write.
+    Parameters
+    ----------
+    xf : ET.xmlfile
+        Context manager for the XML file to write.
+    settings : ET._Element
+        Element holding all the settings to write.
     """
     xf.write(settings, pretty_print=True)
 
@@ -822,12 +918,17 @@ def write_TrackMate_XML(
     settings: ET._Element,
     xml_path: str,
 ) -> None:
-    """Write an XML file readable by TrackMate from networkX graphs data.
+    """
+    Write an XML file readable by TrackMate from networkX graphs data.
 
-    Args:
-        graphs (list[nx.DiGraph]): Graphs containing the data to write.
-        settings (ET._Element): Element holding all the settings to write.
-        xml_path (str): Path of the XML file to write.
+    Parameters
+    ----------
+    graphs : list[nx.DiGraph]
+        Graphs containing the data to write.
+    settings : ET._Element
+        Element holding all the settings to write.
+    xml_path : str
+        Path of the XML file to write.
     """
     with ET.xmlfile(xml_path, encoding="utf-8", close=True) as xf:
         xf.write_declaration()
