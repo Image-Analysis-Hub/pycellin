@@ -10,5 +10,5 @@ setup(
     description="Conversion and analysis of TrackMate tracks as networkX directed graphs",
     author="Laura Xénard",
     author_email="laura.xenard@pasteur.fr",
-    packages=["pycellin", "pycellin.tmio", "pycellin.graph"],
+    packages=["pycellin", "pycellin.tmio", "pycellin.graph", "pycellin.graph.features"],
 )
