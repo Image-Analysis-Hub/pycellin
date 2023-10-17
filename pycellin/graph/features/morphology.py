@@ -371,6 +371,20 @@ def get_width_and_length(
     return width, length
 
 
+def area_increment(graph: nx.DiGraph, node: int) -> float:
+    # Area of node at t minus area at t-1.
+    predecessors = list(graph.predecessors(node))
+    if len(predecessors) == 0:
+        return np.NaN
+    else:
+        err_mes = (
+            f'Node {node} in track {graph.graph["name"]} has multiple predecessors.'
+        )
+        assert len(predecessors) == 1, err_mes
+        # print(predecessors)
+        return graph.nodes[node]["AREA"] - graph.nodes[predecessors[0]]["AREA"]
+
+
 if __name__ == "__main__":
     import pycellin.graph.io as gio
 

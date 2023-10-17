@@ -7,7 +7,7 @@ A collection of diverse features/attributes that can be added to lineage graphs.
 Vocabulary:
 - TrackMate (resp. networkX) uses the word feature (resp. attribute) to refer to 
 spot (resp. node), link (resp. edge) or track (resp. graph) information. Both naming 
-are used her, depending on the context.
+are used here, depending on the context.
 - A generation is a list of nodes between 2 successive divisions.
 
 
@@ -25,114 +25,13 @@ are used her, depending on the context.
     o   o
 """
 
-from typing import Any, Callable, Optional
+from typing import Optional
 
 import networkx as nx
 import numpy as np
 
 from pycellin.graph import lineage as lin
-
-
-def get_node_attributes_names(graph: nx.DiGraph) -> list[str]:
-    """Return a list of the attributes used for nodes.
-
-    Args:
-        graph (nx.DiGraph): Graph on which to work.
-
-    Returns:
-        list[str]: Names of the attributes used for nodes.
-    """
-    # node_attributes = set([k for n in graph.nodes for k in graph.nodes[n].keys()])
-    node_attributes = list()
-    for node in graph.nodes:
-        # By construction, each and every node has the same set of attributes,
-        # only their values change. So we get the first node, whichever it is,
-        # and get its attributes. There's no need to do it for every node.
-        node_attributes = list(graph.nodes[node].keys())
-        break
-    return node_attributes
-
-
-def apply_on_nodes(
-    graph: nx.DiGraph, feature: str, fun: Callable, need_TRACK_ID: bool = False
-) -> None:
-    """
-    Apply a function in order to add a new feature on all nodes of a graph.
-
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        Graph to process.
-    feature : str
-        Name of the feature to add.
-    fun : Callable
-        Function to apply on all nodes.
-    need_TRACK_ID : bool, optional
-        True if the new feature needs tracking data to be computed, False otherwise.
-        By default False.
-    """
-    for n in graph:
-        if not need_TRACK_ID or (need_TRACK_ID and "TRACK_ID" in graph.nodes[n]):
-            graph.nodes[n][feature] = fun(graph, n)
-
-
-def add_custom_attr(
-    graph: nx.DiGraph,
-    attr_type: str,
-    attr: str,
-    name: str,
-    shortname: str,
-    dimension: str,
-    isint: str,
-    func: Callable,
-    *args: Any,
-    **kwargs: Any,
-) -> None:
-    """
-    Add a custom feature to a graph while ensuring TrackMate compatibility.
-
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        Graph to process.
-    attr_type : str
-        Type of feature to add: node, edge or track.
-    attr : str
-        Attribute name used by networkx to access its data. This is also the
-        name of the matching feature inTrackMate.
-    name : str
-        Full name for the TrackMate attribute.
-    shortname : str
-        Abridged name for the TrackMate attribute.
-    dimension : str
-        Dimension of the TrackMate attribute.
-    isint : str
-        'true' if the TrackMate attribute is meant to be a an int, 'false' otherwise.
-    func : Callable
-        Function that will compute the feature values.
-    """
-    err_message = "Wrong type attribute. Only 'node', 'edge' and 'track' are valid."
-    attr_type = attr_type.lower()
-    assert attr_type in ["node", "edge", "track"], err_message
-
-    if attr_type == "node":
-        tag = "SpotFeatures"
-    elif attr_type == "edge":
-        tag = "EdgeFeatures"
-    else:
-        tag = "TrackFeatures"
-
-    # Adding feature declaration for TrackMate compatibility.
-    graph.graph["Model"][tag][attr] = {
-        "feature": attr,
-        "name": name,
-        "shortname": shortname,
-        "dimension": dimension,
-        "isint": isint,
-    }
-
-    # Computing new feature values.
-    func(*args, **kwargs)
+import pycellin.graph.features as feat
 
 
 def generation_level(graph: nx.DiGraph, node: int) -> int:
@@ -167,7 +66,7 @@ def add_generation_level(graph: nx.DiGraph) -> None:
     graph : nx.DiGraph
         Graph to process.
     """
-    add_custom_attr(
+    feat.add_custom_attr(
         graph,
         "node",
         "GEN_LVL",
@@ -175,7 +74,7 @@ def add_generation_level(graph: nx.DiGraph) -> None:
         "Gen. lvl",
         "NONE",
         "true",
-        apply_on_nodes,
+        feat.apply_on_nodes,
         graph,
         "GEN_LVL",
         generation_level,
@@ -234,7 +133,7 @@ def add_generation_completeness(graph: nx.DiGraph) -> None:
     graph : nx.DiGraph
         Graph to process.
     """
-    add_custom_attr(
+    feat.add_custom_attr(
         graph,
         "node",
         "GEN_COMPLETE",
@@ -242,7 +141,7 @@ def add_generation_completeness(graph: nx.DiGraph) -> None:
         "Gen. complete",
         "NONE",
         "true",
-        apply_on_nodes,
+        feat.apply_on_nodes,
         graph,
         "GEN_COMPLETE",
         generation_completeness,
@@ -382,20 +281,6 @@ def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
         gen_end_node = lin.get_generation(graph, node)[-1]
         gen_ID = f"{track_ID}_{gen_end_node}"
         return gen_ID
-
-
-def area_increment(graph: nx.DiGraph, node: int) -> float:
-    # Area of node at t minus area at t-1.
-    predecessors = list(graph.predecessors(node))
-    if len(predecessors) == 0:
-        return np.NaN
-    else:
-        err_mes = (
-            f'Node {node} in track {graph.graph["name"]} has multiple predecessors.'
-        )
-        assert len(predecessors) == 1, err_mes
-        # print(predecessors)
-        return graph.nodes[node]["AREA"] - graph.nodes[predecessors[0]]["AREA"]
 
 
 if __name__ == "__main__":
