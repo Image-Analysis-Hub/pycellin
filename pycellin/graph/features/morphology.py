@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+A collection of diverse tracking features/attributes that can be added to 
+lineage graphs.
+"""
+
 from itertools import product, combinations
 from operator import itemgetter
 

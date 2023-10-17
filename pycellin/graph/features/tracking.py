@@ -2,33 +2,36 @@
 # -*- coding: utf-8 -*-
 
 """
-A collection of diverse features/attributes that can be added to lineage graphs.
+A collection of diverse tracking features/attributes that can be added to 
+lineage graphs.
 
 Vocabulary:
-- TrackMate (resp. networkX) uses the word feature (resp. attribute) to refer to 
-spot (resp. node), link (resp. edge) or track (resp. graph) information. Both naming 
-are used here, depending on the context.
-- A generation is a list of nodes between 2 successive divisions.
+- Feature/Attribute: TrackMate (resp. networkX) uses the word feature (resp. attribute) 
+  to refer to spot (resp. node), link (resp. edge) or track (resp. graph) information. 
+  Both naming are used here, depending on the context.
+- Generation: A generation is a list of nodes between 2 successive divisions. 
+  It includes the second division but not the first one.
+  For example, in the following graph where node IDs belong to [0, 9]:
 
-
-
-        o
-        |
-        o
-       / \
-      o   o
-      |   |
-      x   o  
+        0           we have the following generation:
+        |             [0, 1]
+        1             [2, 4, 6]
+       / \            [3, 5, 7]
+      2   3           [8]
+      |   |           [9]
+      4   5  
       |   |    
-      o   o
+      6   7
      / \
-    o   o
+    8   9
+
+- Complete generation: It is a generation that do not include a root nor a leaf.
+  If we take the previous example, the only complete generation is [2, 4, 6].
 """
 
 from typing import Optional
 
 import networkx as nx
-import numpy as np
 
 from pycellin.graph import lineage as lin
 import pycellin.graph.features as feat
