@@ -431,7 +431,7 @@ def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
         print(err, f"Has a tracking been done on node {node}?")
     else:
         gen_end_node = lin.get_generation(graph, node)[-1]
-        gen_ID = f"{track_ID}_{gen_end_node}"
+        gen_ID = f"{track_ID}.{gen_end_node}"
         return gen_ID
 
 
