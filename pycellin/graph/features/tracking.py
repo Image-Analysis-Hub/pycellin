@@ -244,6 +244,7 @@ def cell_phase(graph: nx.DiGraph, node: int, generation: Optional[list[int]]) ->
         Phase(s) of the node.
     """
 
+    # TODO: change to concatenated digits tags for TM compatibility
     def append_tag(tag, new_tag):
         if not tag:
             tag = new_tag
@@ -271,6 +272,34 @@ def cell_phase(graph: nx.DiGraph, node: int, generation: Optional[list[int]]) ->
         return "-"
     else:
         return tag
+
+
+def add_cell_phase(graph: nx.DiGraph) -> None:
+    """
+    Add the cell phase feature to the nodes of a graph.
+
+    Notes
+    -----
+        TrackMate does not support string features so it is necessary to convert
+        cell phase tags to integers. We concatenate digits between 1 and 9 included
+        so that when there are several tags per node, no information is lost.
+        Examples:
+        - '-' -> 0
+        - 'first' -> 1
+        - 'last' -> 9
+        - 'division' -> 2
+        - 'birth' -> 3
+        - 'first+division' -> 12
+        - 'last+birth' -> 93
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph to process.
+    """
+
+    # TODO: implement
+    phase_mapping = {"first": 1, "last": 9, "division": 2, "birth": 3}
 
 
 def absolute_age(graph: nx.DiGraph, node: int) -> int:
