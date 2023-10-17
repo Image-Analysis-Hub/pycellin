@@ -329,6 +329,30 @@ def absolute_age(graph: nx.DiGraph, node: int) -> int:
     return len(nx.ancestors(graph, node))
 
 
+def add_absolute_age(graph: nx.DiGraph) -> None:
+    """
+    Add the absolute age feature to the nodes of a graph.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph to process.
+    """
+    feat.add_custom_attr(
+        graph,
+        "node",
+        "ABSOLUTE_AGE",
+        "Absolute age",
+        "Abs. age",
+        "TIME",
+        "false",
+        feat.apply_on_nodes,
+        graph,
+        "ABSOLUTE_AGE",
+        absolute_age,
+    )
+
+
 def relative_age(
     graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
 ) -> int:
@@ -359,6 +383,30 @@ def relative_age(
     else:
         generation = lin.get_generation(graph, node)
     return generation.index(node)
+
+
+def add_relative_age(graph: nx.DiGraph) -> None:
+    """
+    Add the relative age feature to the nodes of a graph.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph to process.
+    """
+    feat.add_custom_attr(
+        graph,
+        "node",
+        "RELATIVE_AGE",
+        "Relative age",
+        "Rel. age",
+        "TIME",
+        "false",
+        feat.apply_on_nodes,
+        graph,
+        "RELATIVE_AGE",
+        relative_age,
+    )
 
 
 def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
