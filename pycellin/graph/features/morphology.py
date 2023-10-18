@@ -17,6 +17,8 @@ from scipy import ndimage as ndi
 from shapely.geometry import Point, LineString
 from skimage.morphology import skeletonize
 
+import pycellin.graph.features as feat
+
 # TODO:
 # - remove debug code
 # - always return a value even if weird skeleton shape (but put a warning in that case)
@@ -99,7 +101,7 @@ def from_path_to_line(path, tol):
     return simplified_line
 
 
-def get_width_and_length(
+def width_and_length(
     graph, node, pixel_size, skel_algo, tolerance=0.5, debug=False, debug_folder=None
 ):
     """Compute the width and length of the ROI associated with a node.
@@ -374,6 +376,35 @@ def get_width_and_length(
     width *= pixel_size
 
     return width, length
+
+
+def add_width_and_length(
+    graph: nx.DiGraph,
+    pixel_size: float,
+    skel_algo: str = "zhang",
+    tolerance: float = 0.5,
+) -> None:
+    # Updating the nodes attributes.
+    for n in graph:
+        width, length = width_and_length(graph, n, pixel_size, skel_algo, tolerance)
+        graph.nodes[n]["WIDTH"] = width
+        graph.nodes[n]["LENGTH"] = length
+
+    # Updating the graph attributes.
+    graph.graph["Model"]["SpotFeatures"]["WIDTH"] = {
+        "feature": "WIDTH",
+        "name": "Width",
+        "shortname": "Width",
+        "dimension": "LENGTH",
+        "isint": "false",
+    }
+    graph.graph["Model"]["SpotFeatures"]["LENGTH"] = {
+        "feature": "LENGTH",
+        "name": "Length",
+        "shortname": "Length",
+        "dimension": "LENGTH",
+        "isint": "false",
+    }
 
 
 def area_increment(graph: nx.DiGraph, node: int) -> float:
