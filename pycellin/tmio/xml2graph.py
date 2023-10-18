@@ -21,6 +21,8 @@ from pycellin.graph.io import export_graph
 # What would be better is to have by default only one file: a forest of graph.
 # With the option to specifically ask for one file per graph.
 
+# TODO: add output argument to be able to decide where to save the files.
+
 
 if __name__ == "__main__":
     start = time.process_time()
