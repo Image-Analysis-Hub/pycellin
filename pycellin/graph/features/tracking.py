@@ -208,7 +208,7 @@ def add_division_time(graph: nx.DiGraph) -> None:
         "false",
         feat.apply_on_nodes,
         graph,
-        "GEN_COMPLETE",
+        "DIV_TIME",
         division_time,
         need_TRACK_ID=True,
     )
