@@ -248,7 +248,6 @@ def cell_phase(
         Phase(s) of the node.
     """
 
-    # TODO: change to concatenated digits tags for TM compatibility
     def append_tag(tag, new_tag):
         if not tag:
             tag = new_tag
@@ -284,26 +283,27 @@ def add_cell_phase(graph: nx.DiGraph) -> None:
 
     Notes
     -----
-        TrackMate does not support string features so it is necessary to convert
-        cell phase tags to integers. We concatenate digits between 1 and 9 included
-        so that when there are several tags per node, no information is lost.
-        Examples:
-        - '-' -> 0
-        - 'first' -> 1
-        - 'last' -> 9
-        - 'division' -> 2
-        - 'birth' -> 3
-        - 'first+division' -> 12
-        - 'last+birth' -> 93
+    This feature is currently not compatible with TrackMate and thus will not
+    carry over the XML file. TrackMate do not support string features.
 
     Parameters
     ----------
     graph : nx.DiGraph
         Graph to process.
     """
-
-    # TODO: implement
-    phase_mapping = {"first": 1, "last": 9, "division": 2, "birth": 3}
+    feat.add_custom_attr(
+        graph,
+        "node",
+        "CELL_PHASE",
+        "Cell cycle phase",
+        "Phase",
+        "NONE",
+        "false",
+        feat.apply_on_nodes,
+        graph,
+        "CELL_PHASE",
+        cell_phase,
+    )
 
 
 def absolute_age(graph: nx.DiGraph, node: int) -> int:
@@ -440,6 +440,11 @@ def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
 def add_generation_ID(graph: nx.DiGraph) -> None:
     """
     Add the generation ID feature to the nodes of a graph.
+
+    Notes
+    -----
+    This feature is currently not compatible with TrackMate and thus will not
+    carry over the XML file. TrackMate do not support string features.
 
     Parameters
     ----------
