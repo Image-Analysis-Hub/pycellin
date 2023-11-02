@@ -8,6 +8,7 @@ lineage graphs.
 
 from itertools import product, combinations
 from operator import itemgetter
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -102,28 +103,41 @@ def from_path_to_line(path, tol):
 
 
 def width_and_length(
-    graph, node, pixel_size, skel_algo, tolerance=0.5, debug=False, debug_folder=None
-):
-    """Compute the width and length of the ROI associated with a node.
-
-    # There are 2 algorithms available for the skeleton: Zhang and Lee.
-    # It would need a more thorough check but from what I've seen Zhang
-    # produces a skeleton with more branches than Lee so a pruning step is
-    # required. But for small and roundish object, Zhang seems to yield a
-    # better width and length approximation than Lee.
-
-    Args:
-        graph (nx.DiGraph): Graph on which to work.
-        node (int): Node on which to work.
-        pixel_size (float): Pixel size in micrometer.
-        skel_algo (str): 'zhang' or 'lee'.
-        tolerance (float): Tolerance distance for shape simplification (0-1).
-            The higher the tolerance, the more simplified the line will be.
-            Defaults to 0.5.
-        debug (bool): True to activate debug behavior. Defaults to False.
-        debug_folder (str): Folder in which to save the debug graphs.
+    graph: nx.DiGraph,
+    node: int,
+    pixel_size: float,
+    skel_algo: str = "zhang",
+    tolerance: float = 0.5,
+    debug: bool = False,
+    debug_folder: Optional[str] = None,
+) -> tuple[int, int]:
     """
+    Compute the width and length of the ROI associated with a node.
 
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph on which to work.
+    node : int
+        Node on which to work.
+    pixel_size : float
+        Pixel size in micrometer.
+    skel_algo : str, optional
+        'zhang' or 'lee', by default 'zhang'.
+    tolerance : float, optional
+        Tolerance distance for shape simplification (0-1).
+        The higher the tolerance, the more simplified the line will be.
+        By default 0.5.
+    debug : bool, optional
+        True to activate debug behavior, by default False.
+    debug_folder : Optional[str], optional
+        Folder in which to save the debug graphs, by default None.
+
+    Returns
+    -------
+    tuple[int, int]
+        Width and length of the ROI.
+    """
     if debug:
         print("NODE", node)
         if skel_algo == "zhang":
