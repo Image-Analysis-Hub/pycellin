@@ -303,6 +303,7 @@ def add_cell_phase(graph: nx.DiGraph) -> None:
         graph,
         "CELL_PHASE",
         cell_phase,
+        need_TRACK_ID=True,
     )
 
 
