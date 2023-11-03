@@ -1,6 +1,9 @@
 lxml >= 4.8.0
 matplotlib >= 3.5
-networkx >= 2.6.2
-pygraphviz >= 1.8 # for better drawing
+networkx >= 2.6.2 # BUT DON'T MIX BETWEEN 2.x and 3.x because the graph format is different
+pygraphviz >= 1.8 # for drawing graphs, on conda-forge
 pytest >= 6.2.4
-scipy >= 1.7.3 # only needed when drawing big graphs (hundreds of nodes)
+scikit-image >= 0.19.3
+scipy >= 1.7.3
+shapely >= 1.8.2
+tifffile >= 2021.7.2 # only needed for Getting started notebook
