@@ -64,7 +64,7 @@ def load_graphs(dir: str) -> Tuple[list[nx.DiGraph], list[str]]:
     return graphs, files
 
 
-def export_graph(graph: nx.DiGraph, xmlpath: str):
+def export_graph(graph: nx.DiGraph, xmlpath: str) -> str:
     """Export a graph object as a gpickle file.
 
     The graph is exported in the same folder than the XML file
@@ -77,6 +77,11 @@ def export_graph(graph: nx.DiGraph, xmlpath: str):
         Graph to save.
     xmlpath : str
         Path of the XML file of the graph.
+
+    Returns
+    -------
+    str
+        Path where the graph has been saved.
     """
     xmlpath = Path(xmlpath)
 
@@ -97,6 +102,7 @@ def export_graph(graph: nx.DiGraph, xmlpath: str):
         output = xmlpath.with_name(xmlpath.stem + f"_{graph.graph['name']}.gz")
 
     save_graph(graph, output)
+    return output
 
 
 # TODO: make a version of export_graph() to export wherever we want, and without
