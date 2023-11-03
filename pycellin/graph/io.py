@@ -97,3 +97,7 @@ def export_graph(graph: nx.DiGraph, xmlpath: str):
         output = xmlpath.with_name(xmlpath.stem + f"_{graph.graph['name']}.gz")
 
     save_graph(graph, output)
+
+
+# TODO: make a version of export_graph() to export wherever we want, and without
+# relying on the original XML file.
