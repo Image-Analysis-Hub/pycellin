@@ -108,6 +108,8 @@ def width_and_length(
     pixel_size: float,
     skel_algo: str = "zhang",
     tolerance: float = 0.5,
+    method_width: str = "mean",
+    width_ignore_tips: bool = False,
     debug: bool = False,
     debug_folder: Optional[str] = None,
 ) -> tuple[int, int]:
@@ -128,6 +130,10 @@ def width_and_length(
         Tolerance distance for shape simplification (0-1).
         The higher the tolerance, the more simplified the line will be.
         By default 0.5.
+    method_width : str, optional
+        Method to compute width along skeleton: min, max, mean or median. By default mean.
+    width_ignore_tips : bool, optional
+        True to ignore the skeleton tips while computing width, by default False.
     debug : bool, optional
         True to activate debug behavior, by default False.
     debug_folder : Optional[str], optional
@@ -341,8 +347,35 @@ def width_and_length(
             for px in tip_px2:
                 length2 += dist_on_skel2[px]
 
-        # Width: averaging the distance transform along skeleton.
-        width = (np.sum(dist_on_skel) / len(pixels_i)) * 2 - 1
+        if width_ignore_tips:
+            for px in tip_px:
+                dist_on_skel[px] = 0
+        # We are only interested in the distance map of the skeleton
+        # so we discard the rest.
+        dist_on_skel = dist_on_skel[dist_on_skel > 0]
+
+        if method_width == "mean":
+            # Width: averaging the distance transform along skeleton.
+            width = (np.sum(dist_on_skel) / len(dist_on_skel)) * 2 - 1
+        elif method_width == "median":
+            # Width: median distance transform along skeleton.
+            width = np.median(dist_on_skel) * 2 - 1
+        elif method_width == "max":
+            # Width: max distance transform along skeleton.
+            # TODO: see how to deal with this case, maybe put it in the ignore_tips?
+            if len(dist_on_skel) == 0:
+                width = np.NaN
+            else:
+                width = np.max(dist_on_skel) * 2 - 1
+        elif method_width == "min":
+            # Width: min distance transform along skeleton.
+            if len(dist_on_skel) == 0:
+                width = np.NaN
+            else:
+                width = np.min(dist_on_skel) * 2 - 1
+        else:
+            print("Wrong width method. Should be one of: min, max, mean, median.")
+            # TODO: raise an error when method is not supported
 
         if debug:
             print(f"Width: {width:.2f} px i.e. {width*pixel_size:.2f} μm.")
@@ -397,10 +430,20 @@ def add_width_and_length(
     pixel_size: float,
     skel_algo: str = "zhang",
     tolerance: float = 0.5,
+    method_width: str = "mean",
+    width_ignore_tips: bool = False,
 ) -> None:
     # Updating the nodes attributes.
     for n in graph:
-        width, length = width_and_length(graph, n, pixel_size, skel_algo, tolerance)
+        width, length = width_and_length(
+            graph,
+            n,
+            pixel_size,
+            skel_algo=skel_algo,
+            tolerance=tolerance,
+            method_width=method_width,
+            width_ignore_tips=width_ignore_tips,
+        )
         graph.nodes[n]["WIDTH"] = width
         graph.nodes[n]["LENGTH"] = length
 
