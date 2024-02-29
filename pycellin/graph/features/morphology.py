@@ -476,3 +476,18 @@ def area_increment(graph: nx.DiGraph, node: int) -> float:
         assert len(predecessors) == 1, err_mes
         # print(predecessors)
         return graph.nodes[node]["AREA"] - graph.nodes[predecessors[0]]["AREA"]
+
+
+def add_area_increment(graph: nx.DiGraph) -> None:
+    # Updating the nodes attributes.
+    for n in graph:
+        graph.nodes[n]["AREA_INCREMENT"] = area_increment(graph, n)
+
+    # Updating the graph attributes.
+    graph.graph["Model"]["SpotFeatures"]["AREA_INCREMENT"] = {
+        "feature": "AREA_INCREMENT",
+        "name": "Area increment",
+        "shortname": "Area increment",
+        "dimension": "AREA",
+        "isint": "false",
+    }
