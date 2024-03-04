@@ -348,8 +348,11 @@ def width_and_length(
                 length2 += dist_on_skel2[px]
 
         if width_ignore_tips:
-            for px in tip_px:
-                dist_on_skel[px] = 0
+            if len(dist_on_skel[dist_on_skel > 0]) >= 3:
+                # We remove the tips of the skeleton only when there are
+                # at least 3 pixels in the skeleton.
+                for px in tip_px:
+                    dist_on_skel[px] = 0
         # We are only interested in the distance map of the skeleton
         # so we discard the rest.
         dist_on_skel = dist_on_skel[dist_on_skel > 0]
