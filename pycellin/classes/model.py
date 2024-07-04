@@ -5,39 +5,48 @@ from datetime import datetime
 import itertools
 from pathlib import Path
 from pkg_resources import get_distribution
+from typing import Optional
 
-# from pycellin.classes.metadata import Metadata
+from pycellin.classes.metadata import Metadata
+from pycellin.classes.data import CoreData
 
 
 class Model:
-    """What do I need here on top of data and metadata?
-    - an ID (string or number), can be the name of the file when it is built from a TM file
-    - a provenance field? (mandatory) TM, CTC...
-    - a date? (mandatory) can be useful for traceability
-    - the version of Pycellin that was used to build the model? (mandatory) can be useful for traceability
-    - a description in which people can put whatever they want (string, facultative),
-      or maybe a dict with a few keys (description, author, etc.) that can be defined
-      by the users, or create a function to allow the users to add their own fields?
-    - and I'm probably forgetting something...
+    """ """
 
-    """
+    def __init__(
+        self,
+        metadata: Metadata,
+        coredata: CoreData,
+        name: str = None,  # Should I make it optional? name: Optionale[str] = None
+        provenance: str = None,
+    ):
+        """
+        Constructs all the necessary attributes for the Model object.
 
-    id_iter = itertools.count()
-
-    def __init__(self):
-        self.id = next(Model.id_iter)
-        self.provenance = "Python"
+        Parameters
+        ----------
+        metadata : Metadata
+            The metadata associated with the model.
+        coredata : CoreData
+            The lineages data of the model.
+        name : str, optional
+            The name of the model (default is None).
+        provenance : str, optional
+            The provenance of the model (default is None).
+        """
         self.date = datetime.now()
         self.pycellin_version = get_distribution("pycellin").version
+        self.metadata = metadata
+        self.coredata = coredata
+        self.name = name
+        self.provenance = provenance
 
-        self.metadata = None
-        self.coredatas = None
-
-    @classmethod
-    def create(cls, id=None):
-        cls.id = id if id else next(cls.id_iter)
-        cls.date = datetime.now()
-        cls.pycellin_version = get_distribution("pycellin").version
+        # Add an optional argument to ask to compute the CycleLineage?
+        # Add a description in which people can put whatever they want
+        # (string, facultative), or maybe a dict with a few keys (description,
+        # author, etc.) that can be defined by the users, or create a function
+        # to allow the users to add their own fields?
 
     def add_feature(self, feature_name: str):
         """
@@ -88,6 +97,7 @@ class Model:
         # Then need to update the metadata and the data.
 
     # Should I have methods to process several features at once?
+    # Yes if I need it at some point.
 
     def compute_CycleLineage(self):
         """
