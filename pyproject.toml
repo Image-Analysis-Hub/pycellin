@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+test = ["pytest>=6.2.4"]
+viz = ["pygraphviz>=1.8"]
+
+[project]
+name = "pycellin"
+version = "0.2.0"
+authors = [{ name = "Laura Xénard", email = "laura.xenard@pasteur.fr" }]
+description = "Conversion and analysis of TrackMate tracks as networkX directed graphs"
+requires-python = ">=3.7"
+dependencies = [
+    "lxml>=4.8.0",
+    "matplotlib>=3.5",
+    "networkx>=2.6.2,<3.0", # Ensuring compatibility as specified
+    "scikit-image>=0.19.3",
+    "scipy>=1.7.3",
+    "shapely>=1.8.2",
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+
+[project.urls]
+Documentation = "https://Image-Analysis-Hub.github.io/pycellin/"
+Examples = "https://Image-Analysis-Hub.github.io/pycellin/notebooks/"
+Issues = "https://github.com/Image-Analysis-Hub/pycellin/issues"
+Source = "https://github.com/Image-Analysis-Hub/pycellin/"
+
+[tool.setuptools]
+packages = [
+    "pycellin",
+    "pycellin.tmio",
+    "pycellin.graph",
+    "pycellin.graph.features",
+]
