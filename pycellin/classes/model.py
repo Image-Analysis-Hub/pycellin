@@ -33,26 +33,6 @@ class Model:
         self.metadata = None
         self.coredatas = None
 
-    def __init__(self, trackmate_file: str):
-        self.id = Path(trackmate_file).stem
-        self.provenance = "TrackMate"
-        self.date = datetime.now()
-        self.pycellin_version = get_distribution("pycellin").version
-
-        # The rest is coming from the TrackMate file.
-        # self.metadata = Metadata()
-        # self.coredatas =
-
-    def __init__(self, ctc_file: str):
-        self.id = Path(ctc_file).stem
-        self.provenance = "Cell Tracking Challenge"
-        self.date = datetime.now()
-        self.pycellin_version = get_distribution("pycellin").version
-
-        # The rest is coming from the CTC file.
-        # self.metadata = Metadata()
-        # self.coredatas =
-
     def add_feature(self, feature_name: str):
         """
         Add the specified feature to the model.
