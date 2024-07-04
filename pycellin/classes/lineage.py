@@ -16,11 +16,10 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     I need to think about all the methods before I decide.
     """
 
-    pass
-
     # For all the following methods, we might need to recompute features.
     #   => put it in the abstract method and then use super() in the subclasses after modifying the graph
     # Abstract method because for CellLineages, we first need to unfreeze the graph.
+    # Can I reuse already implemented methods from networkx?
 
     @abstractmethod
     def add_node(self):

@@ -33,6 +33,12 @@ class Model:
         self.metadata = None
         self.coredatas = None
 
+    @classmethod
+    def create(cls, id=None):
+        cls.id = id if id else next(cls.id_iter)
+        cls.date = datetime.now()
+        cls.pycellin_version = get_distribution("pycellin").version
+
     def add_feature(self, feature_name: str):
         """
         Add the specified feature to the model.
@@ -82,6 +88,12 @@ class Model:
         # Then need to update the metadata and the data.
 
     # Should I have methods to process several features at once?
+
+    def compute_CycleLineage(self):
+        """
+        Compute the CycleLineage from the CellLineage.
+        """
+        pass
 
     def export(self, path: str, format: str):
         """Export to another format, e.g. TrackMate."""

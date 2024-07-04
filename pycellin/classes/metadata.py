@@ -7,9 +7,6 @@ class Metadata:
     - dict of features: {feature_name: Feature}
     """
 
-    def __init__(self):
-        self.features = {}
-
     def __init__(self, features: dict):
         self.features = features
 
