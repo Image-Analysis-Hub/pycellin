@@ -3,7 +3,6 @@
 
 from datetime import datetime
 import itertools
-from pathlib import Path
 from pkg_resources import get_distribution
 from typing import Optional
 
@@ -20,7 +19,7 @@ class Model:
         coredata: CoreData,
         name: str = None,  # Should I make it optional? name: Optionale[str] = None
         provenance: str = None,
-    ):
+    ) -> None:
         """
         Constructs all the necessary attributes for the Model object.
 
@@ -47,8 +46,11 @@ class Model:
         # (string, facultative), or maybe a dict with a few keys (description,
         # author, etc.) that can be defined by the users, or create a function
         # to allow the users to add their own fields?
+        # Should name be optional or set to None? If optional and not provided, an
+        # error will be raised when trying to access the attribute.
+        # Same for provenance, description, etc.
 
-    def add_feature(self, feature_name: str):
+    def add_feature(self, feature_name: str) -> None:
         """
         Add the specified feature to the model.
 
@@ -64,7 +66,7 @@ class Model:
         # (or a graph one?), and a cell or a cycle feature.
         pass
 
-    def recompute_feature(self, feature_name: str):
+    def recompute_feature(self, feature_name: str) -> None:
         """
         Recompute the values of the specified feature for all lineages.
 
@@ -79,7 +81,7 @@ class Model:
 
         # Then need to update the data.
 
-    def remove_feature(self, feature_name: str):
+    def remove_feature(self, feature_name: str) -> None:
         """
         Remove the specified feature from the model.
 
@@ -99,12 +101,32 @@ class Model:
     # Should I have methods to process several features at once?
     # Yes if I need it at some point.
 
-    def compute_CycleLineage(self):
+    def compute_CycleLineage(self) -> None:
         """
         Compute the CycleLineage from the CellLineage.
         """
         pass
 
-    def export(self, path: str, format: str):
-        """Export to another format, e.g. TrackMate."""
+    def save(self, path: str) -> None:
+        """
+        Save the model to a file.
+
+        Parameters
+        ----------
+        path : str
+            Path to save the model.
+        """
+        pass
+
+    def export(self, path: str, format: str) -> None:
+        """
+        Export the model to a file in a specific format (e.g. TrackMate).
+
+        Parameters
+        ----------
+        path : str
+            Path to export the model.
+        format : str
+            Format of the exported file.
+        """
         pass
