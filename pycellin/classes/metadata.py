@@ -3,19 +3,72 @@
 
 from typing import Optional
 
+from pycellin.classes.lineage import Lineage
+
 
 class Feature:
-    """
-    - name
-    - description
-    - data type (int, float, string)
-    - unit (for TM compatibility, dimension will be infered from the unit. Ask JY for java code when needed)
-    - provenance? (TM, CTC, pycellin, custom)
-    - lineage_type? (cell, cycle, both)
-    """
+    """ """
 
-    def __init__(self) -> None:
-        pass
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        lineage_type: str,
+        provenance: str,
+        data_type: str,
+        unit: Optional[str] = None,
+    ) -> None:
+        """
+        Constructs all the necessary attributes for the Feature object.
+
+        Parameters
+        ----------
+        name : str
+            The name of the feature.
+        description : str
+            A description of the feature.
+        lineage_type : str
+            The type of lineage the feature is associated with (cell, cycle, or both).
+        provenance : str
+            The provenance of the feature (TrackMate, CTC, Pycellin, custom...).
+        data_type : str
+            The data type of the feature (int, float, string).
+        unit : str, optional
+            The unit of the feature (default is None).
+        """
+        self.name = name
+        self.description = description
+        self.lineage_type = lineage_type
+        self.provenance = provenance
+        self.data_type = data_type
+        self.unit = unit
+
+    def __repr__(self) -> str:
+        """
+        Compute a string representation of the Feature object.
+
+        Returns
+        -------
+        str
+            A string representation of the Feature object.
+        """
+        return (
+            f"Feature(name={self.name!r}, description={self.description!r}, "
+            f"lineage_type={self.lineage_type!r}, provenance={self.provenance!r}, "
+            f"data_type={self.data_type!r}, unit={self.unit!r})"
+        )
+
+    def __str__(self) -> str:
+        """
+        Compute a human-readable string representation of the Feature object.
+
+        Returns
+        -------
+        str
+            A human-readable string representation of the Feature object.
+        """
+        # TODO: see if and how to simplify the string representation
+        return self.__repr__()
 
 
 class Metadata:
