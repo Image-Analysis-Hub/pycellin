@@ -10,7 +10,7 @@ from lxml import etree as ET
 import networkx as nx
 
 from pycellin.classes.model import Model
-from pycellin.classes.metadata import Metadata
+from pycellin.classes.metadata import Metadata, Feature
 from pycellin.classes.data import CoreData
 from pycellin.classes.lineage import CellLineage
 
@@ -77,6 +77,93 @@ def _get_features_dict(
     return features
 
 
+def _dimension_to_unit(trackmate_feature, units):
+    """
+    Convert the dimension of a feature to its unit.
+
+    Parameters
+    ----------
+    trackmate_feature : dict[str, str]
+        The feature to convert.
+    units : dict[str, str]
+        The units of the TrackMate model.
+
+    Returns
+    -------
+    str
+        The unit of the feature.
+    """
+    dimension = trackmate_feature["dimension"]
+    match dimension:
+        case "NONE" | "QUALITY" | "VISIBILITY" | "RATIO" | "INTENSITY" | "COST":
+            return "none"
+        case "LENGTH" | "POSITION":
+            return units["spatialunits"]
+        case "VELOCITY":
+            return units["spatialunits"] + "/" + units["timeunits"]
+        case "AREA":
+            return units["spatialunits"] + "²"
+        case "TIME":
+            return units["timeunits"]
+        case "ANGLE":
+            return "rad"
+        case "ANGLE_RATE":
+            return "rad/" + units["timeunits"]
+        case _:
+            raise ValueError(f"Invalid dimension: {dimension}")
+
+
+def _convert_and_add_feature(
+    trackmate_feature: dict[str, str],
+    feature_type: str,
+    metadata: Metadata,
+    units: dict[str, str],
+):
+    """
+    Convert a TrackMate feature to a Pycellin one and add it to the metadata.
+
+    Parameters
+    ----------
+    trackmate_feature : dict[str, str]
+        The feature to add.
+    feature_type : str
+        The type of the feature to add (node, edge, or lineage).
+    metadata : Metadata
+        The metadata object to add the feature to.
+    units : dict[str, str]
+        The units of the TrackMate model.
+    """
+    feat_name = trackmate_feature["feature"].lower()
+    feat_description = trackmate_feature["name"]
+    feat_lineage_type = "CellLineage"
+    if trackmate_feature["isint"] == "true":
+        feat_data_type = "int"
+    else:
+        feat_data_type = "float"
+    feat_provenance = "TrackMate"
+    feat_unit = _dimension_to_unit(trackmate_feature, units)
+
+    feature = Feature(
+        feat_name,
+        feat_description,
+        feat_lineage_type,
+        feat_provenance,
+        feat_data_type,
+        feat_unit,
+    )
+
+    match feature_type:
+        case "SpotFeatures":
+            feat_type = "node"
+        case "EdgeFeatures":
+            feat_type = "edge"
+        case "TrackFeatures":
+            feat_type = "lineage"
+        case _:
+            raise ValueError(f"Invalid feature type: {feature_type}")
+    metadata._add_feature(feature, feat_type)
+
+
 def _add_all_features(
     iterator: ET.iterparse,
     ancestor: ET._Element,
@@ -88,7 +175,7 @@ def _add_all_features(
 
     The model features are divided in 3 categories: spots, edges and
     tracks features.
-    Those features are regrouped under the tag FeatureDeclarations.
+    Those features are regrouped under the FeatureDeclarations tag.
 
     Parameters
     ----------
@@ -98,17 +185,15 @@ def _add_all_features(
         Element encompassing the information to add.
     """
     event, element = next(iterator)
-
-    #
     while (event, element) != ("end", ancestor):
-
-        print(element.tag)
+        # Extract the list of features from the current tag.
         features = _get_features_dict(iterator, element)
+        # Then add each feature to the metadata.
         for feat in features:
-            print(feat)
-
+            _convert_and_add_feature(feat, element.tag, metadata, units)
         element.clear()
         event, element = next(iterator)
+    print(metadata)
 
 
 def _convert_attributes(
