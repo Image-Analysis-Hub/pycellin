@@ -4,6 +4,20 @@
 from typing import Optional
 
 
+class Feature:
+    """
+    - name
+    - description
+    - data type (int, float, string)
+    - unit (for TM compatibility, dimension will be infered from the unit. Ask JY for java code when needed)
+    - provenance? (TM, CTC, pycellin, custom)
+    - lineage_type? (cell, cycle, both)
+    """
+
+    def __init__(self) -> None:
+        pass
+
+
 class Metadata:
     """
     Spatial and temporal units are not part of the metadata but of the features to
@@ -16,9 +30,9 @@ class Metadata:
 
     def __init__(
         self,
-        node_features: dict = None,
-        edge_features: dict = None,
-        lineage_features: dict = None,
+        node_features: dict = {},
+        edge_features: dict = {},
+        lineage_features: dict = {},
     ) -> None:
         self.node_feats = node_features
         self.edge_feats = edge_features
@@ -43,16 +57,27 @@ class Metadata:
         """
         pass
 
-    def _add_feature(self, feature_name: str) -> None:
+    def _add_feature(self, feature: Feature, feature_type: str) -> None:
         """
         Add the specified feature to the metadata.
 
         Parameters
         ----------
-        feature_name : str
-            The name of the feature to add.
+        feature : Feature
+            The feature to add.
+        feature_type : str
+            The type of the feature to add (node, edge, or lineage).
         """
-        pass
+        # TODO: raise an error if the feature already exists
+        match feature_type:
+            case "node":
+                self.node_feats[feature.name] = feature
+            case "edge":
+                self.edge_feats[feature.name] = feature
+            case "lineage":
+                self.lin_feats[feature.name] = feature
+            case _:
+                raise ValueError(f"Invalid feature type: {feature_type}")
 
     def _remove_feature(self, feature_name: str) -> None:
         """
@@ -63,18 +88,4 @@ class Metadata:
         feature_name : str
             The name of the feature to remove.
         """
-        pass
-
-
-class Feature:
-    """
-    - name
-    - description
-    - data type (int, float, string)
-    - unit (for TM compatibility, dimension will be infered from the unit. Ask JY for java code when needed)
-    - provenance? (TM, CTC, pycellin, custom)
-    - lineage_type? (cell, cycle, both)
-    """
-
-    def __init__(self) -> None:
         pass
