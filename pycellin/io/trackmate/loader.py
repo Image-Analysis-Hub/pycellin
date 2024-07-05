@@ -151,6 +151,216 @@ def _add_all_nodes(
                 element.clear()
 
 
+def _add_edge_from_element(
+    graph: nx.DiGraph,
+    element: ET._Element,
+    current_track_id: Any,
+):
+    """
+    Add an edge and its attributes from an XML element.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph on which to add the edge.
+    element : ET._Element
+        Element holding the information to be added.
+    current_track_id : Any
+        Track ID of the track holding the edge.
+    """
+    attribs = deepcopy(element.attrib)
+    _convert_attributes(attribs, graph.graph["Model"]["EdgeFeatures"])
+    try:
+        entry_node = attribs["SPOT_SOURCE_ID"]
+        exit_node = attribs["SPOT_TARGET_ID"]
+    except KeyError as err:
+        print(
+            f"No key {err} in the attributes of "
+            f"current element '{element.tag}'. "
+            f"Not adding this edge to the graph."
+        )
+    else:
+        graph.add_edge(entry_node, exit_node)
+        nx.set_edge_attributes(graph, {(entry_node, exit_node): attribs})
+        # Adding the current track ID to the nodes of the newly created
+        # edge. This will be useful later to filter nodes by track and
+        # add the saved tracks attributes (as returned by this method).
+        graph.nodes[entry_node]["TRACK_ID"] = current_track_id
+        graph.nodes[exit_node]["TRACK_ID"] = current_track_id
+    finally:
+        element.clear()
+
+
+# TODO: this methods add the edges to the graph but also gets the track attribute
+# I don't see how to separate the two tasks while keeping a line by line parsing
+# of the XML file, but I should at least rename this function to better reflect what
+# it does.
+def _add_all_edges(
+    graph: nx.DiGraph,
+    iterator: ET.iterparse,
+    ancestor: ET._Element,
+) -> list[dict[str, Any]]:
+    """
+    Add edges and their attributes to a graph.
+
+    All the elements that are descendants of `ancestor` are explored.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph on which to add edges.
+    iterator : ET.iterparse
+        XML element iterator.
+    ancestor : ET._Element
+        Element encompassing the information to add.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        A dictionary of attributes for every track.
+    """
+    tracks_attributes = []
+    event, element = next(iterator)
+    current_track_id = None
+    # Initialisation of current track information.
+    if element.tag == "Track" and event == "start":
+        # This condition is a bit of an overkill since the XML structure
+        # SHOULD stay the same but better safe than sorry.
+        # TODO: refactor this chunk that appears twice in this method.
+        attribs = deepcopy(element.attrib)
+        _convert_attributes(attribs, graph.graph["Model"]["TrackFeatures"])
+        tracks_attributes.append(attribs)
+        try:
+            current_track_id = attribs["TRACK_ID"]
+        except KeyError as err:
+            print(
+                f"No key {err} in the attributes of "
+                f"current element '{element.tag}'. "
+                f"Not adding the {err} edge to the graph."
+            )
+            current_track_id = None
+
+    while (event, element) != ("end", ancestor):
+        event, element = next(iterator)
+
+        # Saving the current track information.
+        if element.tag == "Track" and event == "start":
+            attribs = deepcopy(element.attrib)
+            _convert_attributes(attribs, graph.graph["Model"]["TrackFeatures"])
+            tracks_attributes.append(attribs)
+            try:
+                current_track_id = attribs["TRACK_ID"]
+            except KeyError as err:
+                print(
+                    f"No key {err} in the attributes of "
+                    f"current element '{element.tag}'. "
+                    f"Not adding the {err} edge to the graph."
+                )
+                current_track_id = None
+
+        # Edge creation.
+        if element.tag == "Edge" and event == "start":
+            _add_edge_from_element(graph, element, current_track_id)
+
+    return tracks_attributes
+
+
+def _get_filtered_tracks_ID(
+    iterator: ET.iterparse,
+    ancestor: ET._Element,
+) -> list[str]:
+    """
+    Get the list of IDs of the tracks to keep.
+
+    Parameters
+    ----------
+    iterator : ET.iterparse
+        XML element iterator.
+    ancestor : ET._Element
+        Element encompassing the information to add.
+
+    Returns
+    -------
+    list[str]
+        List of tracks ID to keep.
+    """
+    filtered_tracks_ID = []
+    event, element = next(iterator)
+    attribs = deepcopy(element.attrib)
+    try:
+        filtered_tracks_ID.append(int(attribs["TRACK_ID"]))
+    except KeyError as err:
+        print(
+            f"No key {err} in the attributes of current element "
+            f"'{element.tag}'. Ignoring this track."
+        )
+
+    while (event, element) != ("end", ancestor):
+        event, element = next(iterator)
+        if element.tag == "TrackID" and event == "start":
+            attribs = deepcopy(element.attrib)
+            try:
+                filtered_tracks_ID.append(int(attribs["TRACK_ID"]))
+            except KeyError as err:
+                print(
+                    f"No key {err} in the attributes of current element "
+                    f"'{element.tag}'. Ignoring this track."
+                )
+
+    return filtered_tracks_ID
+
+
+def _add_tracks_info(
+    graphs: list[nx.DiGraph],
+    tracks_attributes: list[dict[str, Any]],
+):
+    """
+    Add track attributes to each corresponding graph.
+
+    Parameters
+    ----------
+    graphs : list[nx.DiGraph]
+        List of graphs to update.
+    tracks_attributes : list[dict[str, Any]]
+        Dictionaries of tracks attributes.
+
+    Raises
+    ------
+    ValueError
+        If several different track IDs are found for one track.
+    """
+    for graph in graphs:
+        # Finding the dict of attributes matching the track.
+        tmp = set(t_id for n, t_id in graph.nodes(data="TRACK_ID"))
+
+        if not tmp:
+            # 'tmp' is empty because there's no nodes in the current graph.
+            # Even if it can't be updated, we still want to return this graph.
+            # updated_graphs.append(graph)
+            continue
+        elif tmp == {None}:
+            # Happens when all the nodes do not have a TRACK_ID attribute.
+            # updated_graphs.append(graph)
+            continue
+        elif None in tmp:
+            # Happens when at least one node does not have a TRACK_ID
+            # attribute, so we clean 'tmp' and carry on.
+            tmp.remove(None)
+        elif len(tmp) != 1:
+            raise ValueError("Impossible state: several IDs for one track.")
+
+        current_track_id = list(tmp)[0]
+        current_track_attr = [
+            d_attr
+            for d_attr in tracks_attributes
+            if d_attr["TRACK_ID"] == current_track_id
+        ][0]
+
+        # Adding the attributes to the graph.
+        for k, v in current_track_attr.items():
+            graph.graph[k] = v
+
+
 def _parse_model_tag(
     xml_path: str,
     keep_all_spots: bool,
@@ -187,7 +397,7 @@ def _parse_model_tag(
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
     # the resulting graph will be disconnected.
-    graph = nx.DiGraph()
+    graph = CellLineage()
 
     # So as not to load the entire XML file into memory at once, we're
     # using an iterator to browse over the tags one by one.
@@ -212,12 +422,12 @@ def _parse_model_tag(
 
         # Adding the spots as nodes.
         if element.tag == "AllSpots" and event == "start":
-            add_all_nodes(graph, it, element)
+            _add_all_nodes(graph, it, element)
             root.clear()
 
         # Adding the tracks as edges.
         if element.tag == "AllTracks" and event == "start":
-            tracks_attributes = add_all_edges(graph, it, element)
+            tracks_attributes = _add_all_edges(graph, it, element)
             root.clear()
 
             # Removal of filtered spots / nodes.
@@ -229,7 +439,7 @@ def _parse_model_tag(
         # Filtering out tracks and adding tracks attribute.
         if element.tag == "FilteredTracks" and event == "start":
             # Removal of filtered tracks / graphs.
-            id_to_keep = get_filtered_tracks_ID(it, element)
+            id_to_keep = _get_filtered_tracks_ID(it, element)
             if not keep_all_tracks:
                 to_remove = [
                     n for n, t in graph.nodes(data="TRACK_ID") if t not in id_to_keep
@@ -248,7 +458,7 @@ def _parse_model_tag(
 
                 # Adding the tracks attributes as graphs attributes.
                 try:
-                    add_tracks_info(graphs, tracks_attributes)
+                    _add_tracks_info(graphs, tracks_attributes)
                 except ValueError as err:
                     print(err)
                     # The program is in an impossible state so we need to stop.

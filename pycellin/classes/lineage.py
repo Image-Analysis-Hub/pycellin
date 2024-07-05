@@ -21,31 +21,34 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     # Abstract method because for CellLineages, we first need to unfreeze the graph.
     # Can I reuse already implemented methods from networkx?
 
-    @abstractmethod
-    def add_node(self):
-        pass
+    # @abstractmethod
+    # def add_node(self):
+    #     pass
 
-    @abstractmethod
-    def remove_node(self):
-        pass
+    # @abstractmethod
+    # def remove_node(self):
+    #     pass
 
-    @abstractmethod
-    def add_edge(self):
-        pass
+    # @abstractmethod
+    # def add_edge(self):
+    #     pass
 
-    @abstractmethod
-    def remove_edge(self):
-        pass
+    # @abstractmethod
+    # def remove_edge(self):
+    #     pass
 
-    # If I use _add_element(), maybe I don't need the other methods to be abstract
-    # since they all call _add_element() under the hood.
-    @abstractmethod
-    def _add_element(self, element_type: str, element: dict):
-        # element_type: node or edge, but maybe it could also be 0 for node and 1 for edge
-        pass
+    # # If I use _add_element(), maybe I don't need the other methods to be abstract
+    # # since they all call _add_element() under the hood.
+    # @abstractmethod
+    # def _add_element(self, element_type: str, element: dict):
+    #     # element_type: node or edge, but maybe it could also be 0 for node and 1 for edge
+    #     pass
+
+    pass
 
 
 class CellLineage(Lineage):
+
     pass
 
 
