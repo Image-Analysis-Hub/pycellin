@@ -18,6 +18,33 @@ from pycellin.classes.lineage import CellLineage
 # TODO: switch from nx.Digraph to CellLineage
 
 
+def _get_units(
+    element: ET._Element,
+) -> dict[str, str]:
+    """
+    Extracts units information from an XML element and returns it as a dictionary.
+
+    This function deep copies the attributes of the XML element into a dictionary,
+    then clears the element to free up memory.
+
+    Parameters
+    ----------
+    element : ET._Element
+        The XML element holding the units information.
+
+    Returns
+    -------
+    dict[str, str]
+        A dictionary where the keys are the attribute names and the values are the
+        corresponding attribute values (units information).
+    """
+    units = deepcopy(element.attrib)
+    element.clear()  # We won't need it anymore so we free up some memory.
+    # .clear() does not delete the element: it only removes all subelements
+    # and clears or sets to `None` all attributes.
+    return units
+
+
 def _convert_attributes(
     attributes: dict[str, str],
     features: dict[str, dict[str, str]],
@@ -393,6 +420,7 @@ def _parse_model_tag(
     tuple[Metadata, CoreData]
         TODO
     """
+    md = Metadata()
 
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
@@ -407,12 +435,11 @@ def _parse_model_tag(
     _, root = next(it)  # Saving the root of the tree for later cleaning.
 
     for event, element in it:
-        # # Adding the model information as graph attributes.
-        # # TODO: this is metadata
-        # if element.tag == "Model" and event == "start":  # Add units.
-        #     add_graph_attrib_from_element(graph, element)
-        #     root.clear()  # Cleaning the tree to free up some memory.
-        #     # All the browsed subelements of `root` are deleted.
+        # Adding TM model information to the metadata.
+        if element.tag == "Model" and event == "start":  # Add units.
+            units = _get_units(element)
+            root.clear()  # Cleaning the tree to free up some memory.
+            # All the browsed subelements of `root` are deleted.
 
         # # Add features declaration for spot, edge and track features.
         # # TODO: this is metadata

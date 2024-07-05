@@ -11,6 +11,7 @@ class Metadata:
     - dict of node features: {feature_name: Feature}
     - dict of edge features: {feature_name: Feature}
     - dict of lineage features: {feature_name: Feature}
+    How to differentiate between cell features and cycle features?
     """
 
     def __init__(
@@ -72,6 +73,7 @@ class Feature:
     - data type (int, float, string)
     - unit (for TM compatibility, dimension will be infered from the unit. Ask JY for java code when needed)
     - provenance? (TM, CTC, pycellin, custom)
+    - lineage_type? (cell, cycle, both)
     """
 
     def __init__(self) -> None:
