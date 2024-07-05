@@ -45,6 +45,72 @@ def _get_units(
     return units
 
 
+def _get_features_dict(
+    iterator: ET.iterparse,
+    ancestor: ET._Element,
+) -> dict[str, str]:
+    """
+    Get all the features of ancestor and return them as a list.
+
+    The ancestor is either a SpotFeatures, EdgeFeatures or a TrackFeatures tag.
+
+    Parameters
+    ----------
+    iterator : ET.iterparse
+        XML element iterator.
+    ancestor : ET._Element
+        Element encompassing the information to add.
+
+    Returns
+    -------
+    list
+        List of features contained in the ancestor element.
+    """
+    features = []
+    event, element = next(iterator)  # Feature.
+    while (event, element) != ("end", ancestor):
+        if element.tag == "Feature" and event == "start":
+            attribs = deepcopy(element.attrib)
+            features.append(attribs)
+        element.clear()
+        event, element = next(iterator)
+    return features
+
+
+def _add_all_features(
+    iterator: ET.iterparse,
+    ancestor: ET._Element,
+    metadata: Metadata,
+    units: dict[str, str],
+):
+    """
+    Add all the model features and their attributes to the graph.
+
+    The model features are divided in 3 categories: spots, edges and
+    tracks features.
+    Those features are regrouped under the tag FeatureDeclarations.
+
+    Parameters
+    ----------
+    iterator : ET.iterparse
+        XML element iterator.
+    ancestor : ET._Element
+        Element encompassing the information to add.
+    """
+    event, element = next(iterator)
+
+    #
+    while (event, element) != ("end", ancestor):
+
+        print(element.tag)
+        features = _get_features_dict(iterator, element)
+        for feat in features:
+            print(feat)
+
+        element.clear()
+        event, element = next(iterator)
+
+
 def _convert_attributes(
     attributes: dict[str, str],
     features: dict[str, dict[str, str]],
@@ -435,17 +501,17 @@ def _parse_model_tag(
     _, root = next(it)  # Saving the root of the tree for later cleaning.
 
     for event, element in it:
-        # Adding TM model information to the metadata.
-        if element.tag == "Model" and event == "start":  # Add units.
+        # Get the temporal and spatial units of the model. They will be
+        # injected into each Feature.
+        if element.tag == "Model" and event == "start":
             units = _get_units(element)
             root.clear()  # Cleaning the tree to free up some memory.
             # All the browsed subelements of `root` are deleted.
 
-        # # Add features declaration for spot, edge and track features.
-        # # TODO: this is metadata
-        # if element.tag == "FeatureDeclarations" and event == "start":
-        #     add_all_features(graph, it, element)
-        #     root.clear()
+        # Get the spot, edge and track features and add them to the metadata.
+        if element.tag == "FeatureDeclarations" and event == "start":
+            _add_all_features(it, element, md, units)
+            root.clear()
 
         # Adding the spots as nodes.
         if element.tag == "AllSpots" and event == "start":
