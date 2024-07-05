@@ -171,11 +171,10 @@ def _add_all_features(
     units: dict[str, str],
 ):
     """
-    Add all the model features and their attributes to the graph.
+    Add all the TrackMate model features to a Metadata object.
 
-    The model features are divided in 3 categories: spots, edges and
-    tracks features.
-    Those features are regrouped under the FeatureDeclarations tag.
+    The model features are divided in 3 categories: SpotFeatures, EdgeFeatures and
+    TrackFeatures. Those features are regrouped under the FeatureDeclarations tag.
 
     Parameters
     ----------
@@ -193,53 +192,52 @@ def _add_all_features(
             _convert_and_add_feature(feat, element.tag, metadata, units)
         element.clear()
         event, element = next(iterator)
-    print(metadata)
 
 
 def _convert_attributes(
     attributes: dict[str, str],
-    features: dict[str, dict[str, str]],
+    features: dict[str, CellLineage],
 ):
     """
     Convert the values of `attributes` from string to int or float.
 
-    The type to convert to is given by the dictionary of features with
-    the key 'isint'.
+    The type to convert to is given by the metadata that stores all the features info.
 
     Parameters
     ----------
     attributes : dict[str, str]
         The dictionary whose values we want to convert.
-    features : dict[str, dict[str, str]]
-        The dictionary holding the type information to use.
+    features : dict[str, CellLineage]
+        The dictionary of features that contains the information on how to convert
+        the values of `attributes`.
 
     Raises
     ------
-    KeyError
-        If the 'isint' feature attribute doesn't exist.
     ValueError
-        If the value of the 'isint' feature attribute is invalid.
+        If a feature has an invalid data_type (not "int", "float" nor "lineage").
     """
+    # TODO: DEBUG THIS FUNCTION
+    # TODO: should I add name and ID as features in the metadata...?
+    # print(features)
     for key in attributes:
+        print(key)
         if key == "ID":
             attributes[key] = int(attributes[key])  # IDs are always integers.
-        elif key in features:
-            if "isint" not in features[key]:
-                raise KeyError(
-                    f"No 'isint' feature attribute in " f"FeatureDeclarations."
-                )
-            if features[key]["isint"].lower() == "true":
-                attributes[key] = int(attributes[key])
-            elif features[key]["isint"].lower() == "false":
-                try:
-                    attributes[key] = float(attributes[key])
-                except ValueError:
-                    pass  # Not an int nor a float so we let it be.
-            else:
-                raise ValueError(
-                    f"'{features[key]['isint']}' is an invalid"
-                    f" feature attribute value for 'isint'."
-                )
+        elif key == "name":
+            # "name" is a string so we don't need to convert it.
+            pass
+        elif key.lower() in features:
+            match features[key.lower()].data_type:
+                case "int":
+                    attributes[key.lower()] = int(attributes[key])
+                case "float":
+                    attributes[key.lower()] = float(attributes[key])
+                case "string":
+                    pass  # Nothing to do.
+                case _:
+                    raise ValueError(f"Invalid data type: {features[key]['data_type']}")
+        else:
+            raise KeyError(f"Feature {key} not found in the metadata.")
 
 
 def _add_ROI_coordinates(
@@ -275,23 +273,26 @@ def _add_ROI_coordinates(
 
 
 def _add_all_nodes(
-    graph: nx.DiGraph,
     iterator: ET.iterparse,
     ancestor: ET._Element,
+    metadata: Metadata,
+    lineage: CellLineage,
 ) -> None:
     """
-    Add nodes and their attributes to a graph.
+    Add nodes and their attributes to a CellLineage.
 
     All the elements that are descendants of `ancestor` are explored.
 
     Parameters
     ----------
-    graph : nx.DiGraph
-        Graph on which to add nodes.
     iterator : ET.iterparse
         XML element iterator.
     ancestor : ET._Element
         Element encompassing the information to add.
+    metadata : Metadata
+        Metadata object holding the features information.
+    lineage : CellLineage
+        CellLineage to add the nodes to.
     """
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
@@ -300,10 +301,10 @@ def _add_all_nodes(
             # All items in element.attrib are parsed as strings but most
             # of them (if not all) are numbers. So we need to do a
             # conversion based on these attributes type (attribute `isint`)
-            # as defined in the FeaturesDeclaration tag.
+            # as defined in the metadata.
             attribs = deepcopy(element.attrib)
             try:
-                _convert_attributes(attribs, graph.graph["Model"]["SpotFeatures"])
+                _convert_attributes(attribs, metadata.node_feats)
             except ValueError as err:
                 print(f"ERROR: {err} Please check the XML file.")
                 raise
@@ -576,7 +577,7 @@ def _parse_model_tag(
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
     # the resulting graph will be disconnected.
-    graph = CellLineage()
+    lineage = CellLineage()
 
     # So as not to load the entire XML file into memory at once, we're
     # using an iterator to browse over the tags one by one.
@@ -600,7 +601,7 @@ def _parse_model_tag(
 
         # Adding the spots as nodes.
         if element.tag == "AllSpots" and event == "start":
-            _add_all_nodes(graph, it, element)
+            _add_all_nodes(it, element, md, lineage)
             root.clear()
 
         # Adding the tracks as edges.
