@@ -91,6 +91,39 @@ class Metadata:
         self.edge_feats = edge_features
         self.lin_feats = lineage_features
 
+    def __repr__(self) -> str:
+        """
+        Compute a string representation of the Metadata object.
+
+        Returns
+        -------
+        str
+            A string representation of the Metadata object.
+        """
+        return (
+            f"Metadata(node_features={self.node_feats!r}, "
+            f"edge_features={self.edge_feats!r}, "
+            f"lineage_features={self.lin_feats!r})"
+        )
+
+    def __str__(self) -> str:
+        """
+        Compute a human-readable string representation of the Metadata object.
+
+        Returns
+        -------
+        str
+            A human-readable string representation of the Metadata object.
+        """
+        node_features = ", ".join(self.node_feats.keys())
+        edge_features = ", ".join(self.edge_feats.keys())
+        lineage_features = ", ".join(self.lin_feats.keys())
+        return (
+            f"Node features: {node_features}\n"
+            f"Edge features: {edge_features}\n"
+            f"Lineage features: {lineage_features}"
+        )
+
     def has_feature(self, feature_name: str, feature_type: Optional[str]) -> bool:
         """
         Check if the metadata contains the specified feature.
