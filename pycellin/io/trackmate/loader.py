@@ -215,9 +215,10 @@ def _convert_attributes(
     ------
     ValueError
         If a feature has an invalid data_type (not "int", "float" nor "lineage").
+    KeyError
+        If a feature is not found in the metadata nor treated as a special case.
     """
-    # TODO: should I add name and ID as features in the metadata...?
-    # ROI_N_POINT?
+    # TODO: should I add name and ID as features in the metadata...? ROI_N_POINT?
     for key in attributes:
         if key.lower() in features:
             match features[key.lower()].data_type:
@@ -242,7 +243,7 @@ def _convert_attributes(
             raise KeyError(f"Feature {key} not found in the metadata.")
 
 
-def _add_ROI_coordinates(
+def _convert_ROI_coordinates(
     element: ET._Element,
     attribs: dict[str, Any],
 ):
@@ -316,12 +317,12 @@ def _add_all_nodes(
 
             # The ROI coordinates are not stored in a tag attribute but in
             # the tag text. So we need to extract then format them.
-            _add_ROI_coordinates(element, attribs)
+            _convert_ROI_coordinates(element, attribs)
 
             # Now that all the node attributes have been updated, we can add
-            # it to the graph.
+            # them to the Lineage.
             try:
-                graph.add_nodes_from([(int(attribs["ID"]), attribs)])
+                lineage.add_nodes_from([(int(attribs["ID"]), attribs)])
             except KeyError as err:
                 print(
                     f"No key {err} in the attributes of "
@@ -605,6 +606,7 @@ def _parse_model_tag(
         if element.tag == "AllSpots" and event == "start":
             _add_all_nodes(it, element, md, lineage)
             root.clear()
+            print(lineage.nodes[2004])
 
         # Adding the tracks as edges.
         if element.tag == "AllTracks" and event == "start":
