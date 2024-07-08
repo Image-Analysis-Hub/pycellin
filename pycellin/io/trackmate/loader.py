@@ -216,26 +216,28 @@ def _convert_attributes(
     ValueError
         If a feature has an invalid data_type (not "int", "float" nor "lineage").
     """
-    # TODO: DEBUG THIS FUNCTION
     # TODO: should I add name and ID as features in the metadata...?
-    # print(features)
+    # ROI_N_POINT?
     for key in attributes:
-        print(key)
-        if key == "ID":
-            attributes[key] = int(attributes[key])  # IDs are always integers.
-        elif key == "name":
-            # "name" is a string so we don't need to convert it.
-            pass
-        elif key.lower() in features:
+        if key.lower() in features:
             match features[key.lower()].data_type:
                 case "int":
-                    attributes[key.lower()] = int(attributes[key])
+                    attributes[key] = int(attributes[key])
                 case "float":
-                    attributes[key.lower()] = float(attributes[key])
+                    attributes[key] = float(attributes[key])
                 case "string":
                     pass  # Nothing to do.
                 case _:
                     raise ValueError(f"Invalid data type: {features[key]['data_type']}")
+        elif key == "ID":
+            attributes[key] = int(attributes[key])  # IDs are always integers.
+        elif key == "name":
+            # "name" is a string so we don't need to convert it.
+            pass
+        elif key == "ROI_N_POINTS":
+            # This attribute is a special case (stored as a tag text instead of tag
+            # attribute) and will be converted later, in _add_ROI_coordinates().
+            pass
         else:
             raise KeyError(f"Feature {key} not found in the metadata.")
 
