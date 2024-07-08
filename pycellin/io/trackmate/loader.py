@@ -191,6 +191,8 @@ def _add_all_features(
         # Then add each feature to the metadata.
         for feat in features:
             _convert_and_add_feature(feat, element.tag, metadata, units)
+        # TODO: add 'name' feature to node and lineage features.
+        # TODO: add 'ID' and ROI_COORDINATES to node features.
         element.clear()
         event, element = next(iterator)
 
