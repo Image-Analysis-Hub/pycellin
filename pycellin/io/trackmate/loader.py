@@ -133,7 +133,7 @@ def _convert_and_add_feature(
     units : dict[str, str]
         The units of the TrackMate model.
     """
-    feat_name = trackmate_feature["feature"].lower()
+    feat_name = trackmate_feature["feature"]
     feat_description = trackmate_feature["name"]
     feat_lineage_type = "CellLineage"
     if trackmate_feature["isint"] == "true":
@@ -151,6 +151,7 @@ def _convert_and_add_feature(
         feat_data_type,
         feat_unit,
     )
+    print(feature)
 
     match feature_type:
         case "SpotFeatures":
@@ -220,8 +221,8 @@ def _convert_attributes(
     """
     # TODO: should I add name and ID as features in the metadata...? ROI_N_POINT?
     for key in attributes:
-        if key.lower() in features:
-            match features[key.lower()].data_type:
+        if key in features:
+            match features[key].data_type:
                 case "int":
                     attributes[key] = int(attributes[key])
                 case "float":
