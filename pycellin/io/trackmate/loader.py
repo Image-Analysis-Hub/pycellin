@@ -151,7 +151,6 @@ def _convert_and_add_feature(
         feat_data_type,
         feat_unit,
     )
-    print(feature)
 
     match feature_type:
         case "SpotFeatures":
@@ -359,9 +358,10 @@ def _add_all_nodes(
                 element.clear()
 
 
-def _add_edge_from_element(
-    graph: nx.DiGraph,
+def _add_edge(
     element: ET._Element,
+    metadata: Metadata,
+    lineage: CellLineage,
     current_track_id: Any,
 ):
     """
@@ -369,15 +369,17 @@ def _add_edge_from_element(
 
     Parameters
     ----------
-    graph : nx.DiGraph
-        Graph on which to add the edge.
     element : ET._Element
         Element holding the information to be added.
+    metadata : Metadata
+        Metadata object holding the features information.
+    lineage : CellLineage
+        CellLineage to add the edge to.
     current_track_id : Any
         Track ID of the track holding the edge.
     """
     attribs = deepcopy(element.attrib)
-    _convert_attributes(attribs, graph.graph["Model"]["EdgeFeatures"])
+    _convert_attributes(attribs, metadata.edge_feats)
     try:
         entry_node = attribs["SPOT_SOURCE_ID"]
         exit_node = attribs["SPOT_TARGET_ID"]
@@ -388,25 +390,29 @@ def _add_edge_from_element(
             f"Not adding this edge to the graph."
         )
     else:
-        graph.add_edge(entry_node, exit_node)
-        nx.set_edge_attributes(graph, {(entry_node, exit_node): attribs})
+        lineage.add_edge(entry_node, exit_node)
+        nx.set_edge_attributes(lineage, {(entry_node, exit_node): attribs})
         # Adding the current track ID to the nodes of the newly created
         # edge. This will be useful later to filter nodes by track and
         # add the saved tracks attributes (as returned by this method).
-        graph.nodes[entry_node]["TRACK_ID"] = current_track_id
-        graph.nodes[exit_node]["TRACK_ID"] = current_track_id
+        error_msg = f"Incoherent track ID for nodes {entry_node} and {exit_node}."
+        if "TRACK_ID" not in lineage.nodes[entry_node]:
+            lineage.nodes[entry_node]["TRACK_ID"] = current_track_id
+        else:
+            assert lineage.nodes[entry_node]["TRACK_ID"] == current_track_id, error_msg
+        if "TRACK_ID" not in lineage.nodes[exit_node]:
+            lineage.nodes[exit_node]["TRACK_ID"] = current_track_id
+        else:
+            assert lineage.nodes[exit_node]["TRACK_ID"] == current_track_id, error_msg
     finally:
         element.clear()
 
 
-# TODO: this methods add the edges to the graph but also gets the track attribute
-# I don't see how to separate the two tasks while keeping a line by line parsing
-# of the XML file, but I should at least rename this function to better reflect what
-# it does.
-def _add_all_edges(
-    graph: nx.DiGraph,
+def _build_tracks(
     iterator: ET.iterparse,
     ancestor: ET._Element,
+    metadata: Metadata,
+    lineage: CellLineage,
 ) -> list[dict[str, Any]]:
     """
     Add edges and their attributes to a graph.
@@ -415,12 +421,14 @@ def _add_all_edges(
 
     Parameters
     ----------
-    graph : nx.DiGraph
-        Graph on which to add edges.
     iterator : ET.iterparse
         XML element iterator.
     ancestor : ET._Element
         Element encompassing the information to add.
+    metadata : Metadata
+        Metadata object holding the features information.
+    lineage : CellLineage
+        CellLineage to add the edges to.
 
     Returns
     -------
@@ -428,47 +436,22 @@ def _add_all_edges(
         A dictionary of attributes for every track.
     """
     tracks_attributes = []
-    event, element = next(iterator)
     current_track_id = None
-    # Initialisation of current track information.
-    if element.tag == "Track" and event == "start":
-        # This condition is a bit of an overkill since the XML structure
-        # SHOULD stay the same but better safe than sorry.
-        # TODO: refactor this chunk that appears twice in this method.
-        attribs = deepcopy(element.attrib)
-        _convert_attributes(attribs, graph.graph["Model"]["TrackFeatures"])
-        tracks_attributes.append(attribs)
-        try:
-            current_track_id = attribs["TRACK_ID"]
-        except KeyError as err:
-            print(
-                f"No key {err} in the attributes of "
-                f"current element '{element.tag}'. "
-                f"Not adding the {err} edge to the graph."
-            )
-            current_track_id = None
-
+    event, element = next(iterator)
     while (event, element) != ("end", ancestor):
+        print(element.tag, event)
         event, element = next(iterator)
 
         # Saving the current track information.
         if element.tag == "Track" and event == "start":
             attribs = deepcopy(element.attrib)
-            _convert_attributes(attribs, graph.graph["Model"]["TrackFeatures"])
+            _convert_attributes(attribs, metadata.lin_feats)
             tracks_attributes.append(attribs)
-            try:
-                current_track_id = attribs["TRACK_ID"]
-            except KeyError as err:
-                print(
-                    f"No key {err} in the attributes of "
-                    f"current element '{element.tag}'. "
-                    f"Not adding the {err} edge to the graph."
-                )
-                current_track_id = None
+            current_track_id = attribs["TRACK_ID"]
 
         # Edge creation.
         if element.tag == "Edge" and event == "start":
-            _add_edge_from_element(graph, element, current_track_id)
+            _add_edge(element, metadata, lineage, current_track_id)
 
     return tracks_attributes
 
@@ -632,11 +615,10 @@ def _parse_model_tag(
         if element.tag == "AllSpots" and event == "start":
             _add_all_nodes(it, element, md, lineage)
             root.clear()
-            print(lineage.nodes[2004])
 
         # Adding the tracks as edges.
         if element.tag == "AllTracks" and event == "start":
-            tracks_attributes = _add_all_edges(graph, it, element)
+            tracks_attributes = _build_tracks(it, element, md, lineage)
             root.clear()
 
             # Removal of filtered spots / nodes.
@@ -744,4 +726,6 @@ def load_TrackMate_XML(
 if __name__ == "__main__":
 
     xml = "sample_data/FakeTracks.xml"
+    # xml = "sample_data/FakeTracks_no_tracks.xml"
+
     _parse_model_tag(xml, keep_all_spots=False, keep_all_tracks=False, one_graph=False)
