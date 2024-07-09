@@ -57,9 +57,9 @@ def _get_features_dict(
     Parameters
     ----------
     iterator : ET.iterparse
-        XML element iterator.
+        An iterator over XML elements.
     ancestor : ET._Element
-        Element encompassing the information to add.
+        The XML element that encompasses the information to be added.
 
     Returns
     -------
@@ -181,9 +181,9 @@ def _add_all_features(
     Parameters
     ----------
     iterator : ET.iterparse
-        XML element iterator.
+        An iterator over XML elements.
     ancestor : ET._Element
-        Element encompassing the information to add.
+        The XML element that encompasses the information to be added.
     """
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
@@ -314,11 +314,12 @@ def _add_all_nodes(
     Parameters
     ----------
     iterator : ET.iterparse
-        XML element iterator.
+        An iterator over XML elements.
     ancestor : ET._Element
-        Element encompassing the information to add.
+        The XML element that encompasses the information to be added.
     metadata : Metadata
-        Metadata object holding the features information.
+        An object holding metadata information used to enrich the
+        graph's attributes.
     lineage : CellLineage
         CellLineage to add the nodes to.
     """
@@ -362,27 +363,41 @@ def _add_edge(
     element: ET._Element,
     metadata: Metadata,
     lineage: CellLineage,
-    current_track_id: Any,
+    current_track_id: int,
 ):
     """
-    Add an edge and its attributes from an XML element.
+    Add an edge between two nodes in the Lineage graph based on the XML element.
+
+    This function extracts source and target node identifiers from the
+    given XML element, along with any additional attributes defined
+    within. It then adds an edge between these nodes in the specified
+    Lineage graph. If the nodes have a 'TRACK_ID' attribute, it ensures
+    consistency with the current track ID.
 
     Parameters
     ----------
     element : ET._Element
-        Element holding the information to be added.
+        The XML element containing edge information.
     metadata : Metadata
-        Metadata object holding the features information.
+        An object holding metadata information used to convert the
+        edge attributes.
     lineage : CellLineage
-        CellLineage to add the edge to.
-    current_track_id : Any
+        The graph to which the edge and its attributes will be added.
+    current_track_id : int
         Track ID of the track holding the edge.
+
+    Raises
+    ------
+    AssertionError
+        If the 'TRACK_ID' attribute of either the source or target node
+        does not match the current track ID, indicating an inconsistency
+        in track assignment.
     """
     attribs = deepcopy(element.attrib)
     _convert_attributes(attribs, metadata.edge_feats)
     try:
-        entry_node = attribs["SPOT_SOURCE_ID"]
-        exit_node = attribs["SPOT_TARGET_ID"]
+        entry_node_id = attribs["SPOT_SOURCE_ID"]
+        exit_node_id = attribs["SPOT_TARGET_ID"]
     except KeyError as err:
         print(
             f"No key {err} in the attributes of "
@@ -390,20 +405,22 @@ def _add_edge(
             f"Not adding this edge to the graph."
         )
     else:
-        lineage.add_edge(entry_node, exit_node)
-        nx.set_edge_attributes(lineage, {(entry_node, exit_node): attribs})
+        lineage.add_edge(entry_node_id, exit_node_id)
+        nx.set_edge_attributes(lineage, {(entry_node_id, exit_node_id): attribs})
         # Adding the current track ID to the nodes of the newly created
         # edge. This will be useful later to filter nodes by track and
         # add the saved tracks attributes (as returned by this method).
-        error_msg = f"Incoherent track ID for nodes {entry_node} and {exit_node}."
-        if "TRACK_ID" not in lineage.nodes[entry_node]:
-            lineage.nodes[entry_node]["TRACK_ID"] = current_track_id
+        error_msg = f"Incoherent track ID for nodes {entry_node_id} and {exit_node_id}."
+        entry_node = lineage.nodes[entry_node_id]
+        if "TRACK_ID" not in entry_node:
+            entry_node["TRACK_ID"] = current_track_id
         else:
-            assert lineage.nodes[entry_node]["TRACK_ID"] == current_track_id, error_msg
-        if "TRACK_ID" not in lineage.nodes[exit_node]:
-            lineage.nodes[exit_node]["TRACK_ID"] = current_track_id
+            assert entry_node["TRACK_ID"] == current_track_id, error_msg
+        exit_node = lineage.nodes[exit_node_id]
+        if "TRACK_ID" not in exit_node:
+            exit_node["TRACK_ID"] = current_track_id
         else:
-            assert lineage.nodes[exit_node]["TRACK_ID"] == current_track_id, error_msg
+            assert exit_node["TRACK_ID"] == current_track_id, error_msg
     finally:
         element.clear()
 
@@ -415,25 +432,32 @@ def _build_tracks(
     lineage: CellLineage,
 ) -> list[dict[str, Any]]:
     """
-    Add edges and their attributes to a graph.
+    Add edges and their attributes to a Lineage based on the XML elements.
 
-    All the elements that are descendants of `ancestor` are explored.
+    This function explores all elements that are descendants of the
+    specified `ancestor` element, adding edges and their attributes to
+    the provided `CellLineage` graph. It iterates through the XML
+    elements using the provided iterator, extracting and processing
+    relevant information to construct track attributes.
 
     Parameters
     ----------
     iterator : ET.iterparse
-        XML element iterator.
+        An iterator over XML elements.
     ancestor : ET._Element
-        Element encompassing the information to add.
+        The XML element that encompasses the information to be added.
     metadata : Metadata
-        Metadata object holding the features information.
+        An object holding metadata information used to convert the
+        edge and tracks attributes.
     lineage : CellLineage
-        CellLineage to add the edges to.
+        The `CellLineage` graph to which the edges and their attributes
+        will be added.
 
     Returns
     -------
     list[dict[str, Any]]
-        A dictionary of attributes for every track.
+        A list of dictionaries, each representing the attributes for a
+        track.
     """
     tracks_attributes = []
     current_track_id = None
@@ -466,9 +490,9 @@ def _get_filtered_tracks_ID(
     Parameters
     ----------
     iterator : ET.iterparse
-        XML element iterator.
+        An iterator over XML elements.
     ancestor : ET._Element
-        Element encompassing the information to add.
+        The XML element that encompasses the information to be added.
 
     Returns
     -------
