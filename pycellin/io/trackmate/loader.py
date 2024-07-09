@@ -176,6 +176,8 @@ def _add_all_features(
 
     The model features are divided in 3 categories: SpotFeatures, EdgeFeatures and
     TrackFeatures. Those features are regrouped under the FeatureDeclarations tag.
+    Some other features are used in the Spot and Track tags but are not declared in
+    the FeatureDeclarations tag.
 
     Parameters
     ----------
@@ -186,13 +188,34 @@ def _add_all_features(
     """
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
-        # Extract the list of features from the current tag.
+        # Features stored in the FeatureDeclarations tag.
         features = _get_features_dict(iterator, element)
-        # Then add each feature to the metadata.
         for feat in features:
             _convert_and_add_feature(feat, element.tag, metadata, units)
-        # TODO: add 'name' feature to node and lineage features.
-        # TODO: add 'ID' and ROI_COORDINATES to node features.
+        # Features used in Spot tags but not declared in the FeatureDeclarations tag.
+        if element.tag == "SpotFeatures":
+            name_feat = Feature(
+                "name", "Name of the spot", "CellLineage", "TrackMate", "string"
+            )
+            metadata._add_feature(name_feat, "node")
+            id_feat = Feature(
+                "ID", "Unique identifier of the spot", "CellLineage", "TrackMate", "int"
+            )
+            metadata._add_feature(id_feat, "node")
+            roi_coord_feat = Feature(
+                "ROI_COORDINATES",
+                "List of coordinates of the region of interest",
+                "CellLineage",
+                "TrackMate",
+                "float",
+            )
+            metadata._add_feature(roi_coord_feat, "node")
+        # Feature used in Track tags but not declared in the FeatureDeclarations tag.
+        if element.tag == "TrackFeatures":
+            name_feat = Feature(
+                "name", "Name of the track", "CellLineage", "TrackMate", "string"
+            )
+            metadata._add_feature(name_feat, "lineage")
         element.clear()
         event, element = next(iterator)
 
