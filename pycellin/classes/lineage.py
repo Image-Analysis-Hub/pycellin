@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from abc import ABCMeta, abstractmethod
+from typing import Optional
 
 import networkx as nx
 
@@ -15,6 +16,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     Maybe it would make more sense to have CycleLineage inherit from CellLineage...?
     I need to think about all the methods before I decide.
     """
+
+    def __init__(self, nx_digraph: Optional[nx.DiGraph] = None):
+        super().__init__(incoming_graph_data=nx_digraph)
 
     # For all the following methods, we might need to recompute features.
     #   => put it in the abstract method and then use super() in the subclasses after modifying the graph
