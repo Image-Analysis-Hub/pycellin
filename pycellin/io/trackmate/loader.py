@@ -744,6 +744,27 @@ def _get_specific_tags(xml_path: str, tag_names: list[str]) -> dict[str, ET._Ele
     return dict_tags
 
 
+def _get_trackmate_version(xml_path: str) -> str:
+    """
+    Extract the version of TrackMate used to generate the XML file.
+
+    Parameters
+    ----------
+    xml_path : str
+        The file path of the XML file to be parsed.
+
+    Returns
+    -------
+    str
+        The version of TrackMate used to generate the XML file.
+    """
+    it = ET.iterparse(xml_path, events=["start", "end"])
+    for event, element in it:
+        if event == "start" and element.tag == "TrackMate":
+            version = str(element.attrib["version"])
+            return version
+
+
 def load_TrackMate_XML(
     xml_path: str,
     keep_all_spots: bool = False,
@@ -786,6 +807,11 @@ def load_TrackMate_XML(
     # settings = read_settings(xml_path)
     # display_settings = read_display_settings(xml_path)
 
+    trackmate_version = _get_trackmate_version(xml_path)
+    dict_tags = _get_specific_tags(
+        xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
+    )
+
     metadata, data = _parse_model_tag(
         xml_path, keep_all_spots, keep_all_tracks, one_graph
     )
@@ -796,6 +822,9 @@ def load_TrackMate_XML(
 if __name__ == "__main__":
 
     xml = "sample_data/FakeTracks.xml"
+    # xml = "sample_data/FakeTracks_no_tracks.xml"
+    trackmate_version = _get_trackmate_version(xml)
+    print(trackmate_version)
 
     # tree = ET.parse(xml)
     # root = tree.getroot()
@@ -803,16 +832,15 @@ if __name__ == "__main__":
     # element_string = ET.tostring(elem, encoding='utf-8').decode()
     # print(element_string)
 
-    # xml = "sample_data/FakeTracks_no_tracks.xml"
     # elem = read_settings(xml)
-    elem = _get_specific_tags(xml, ["Settings", "Log"])
-    print(elem)
+    # elem = _get_specific_tags(xml, ["Settings", "Log"])
+    # print(elem)
 
-    element_string = ET.tostring(elem, encoding="utf-8").decode()
-    print(element_string)
+    # element_string = ET.tostring(elem, encoding="utf-8").decode()
+    # print(element_string)
 
-    elem_from_string = ET.fromstring(element_string)
-    print(type(elem_from_string))
-    print(elem_from_string.tag)
-    print(elem_from_string.text)
+    # elem_from_string = ET.fromstring(element_string)
+    # print(type(elem_from_string))
+    # print(elem_from_string.tag)
+    # print(elem_from_string.text)
     # _parse_model_tag(xml, keep_all_spots=True, keep_all_tracks=True, one_graph=False)
