@@ -728,7 +728,6 @@ def _get_specific_tags(xml_path: str, tag_names: list[str]) -> dict[str, ET._Ele
         deep copied `ET._Element` object for that tag.
     """
     it = ET.iterparse(xml_path, events=["start", "end"])
-    # _, root = next(it)
     dict_tags = {}
     for event, element in it:
         if event == "start" and element.tag in tag_names:
@@ -800,21 +799,33 @@ def load_TrackMate_XML(
     Model
         a Pycellin Model that contains the data from the TrackMate XML file.
     """
-    # For now this function is just a wrapper for read_model, but in a future version
-    # it will also take care of reading log, GUI state, settings and display settings.
-    # log = read_log(xml_path)
-    # gui_state = read_GUI_state(xml_path)
-    # settings = read_settings(xml_path)
-    # display_settings = read_display_settings(xml_path)
-
-    trackmate_version = _get_trackmate_version(xml_path)
-    dict_tags = _get_specific_tags(
-        xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
-    )
-
     metadata, data = _parse_model_tag(
         xml_path, keep_all_spots, keep_all_tracks, one_graph
     )
+
+    # Add in the metadata all the TrackMate info that was not in the model tag.
+    # TODO: should I add this to the Model instead...?
+    trackmate_version = _get_trackmate_version(xml_path)
+    # metadata._add_feature(
+    #     Feature(
+    #         "TrackMate_version",
+    #         "Version of TrackMate",
+    #         "CellLineage",
+    #         "TrackMate",
+    #         "string",
+    #     )
+    # )
+    dict_tags = _get_specific_tags(
+        xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
+    )
+    for tag_name, tag in dict_tags.items():
+        element_string = ET.tostring(tag, encoding="utf-8").decode()
+        # metadata._add_feature(
+        #     Feature(
+        #         tag_name, f"TrackMate {tag_name}", "CellLineage", "TrackMate", "string"
+        #     )
+        # )
+
     model = Model(metadata, data, name=Path(xml_path).stem, provenance="TrackMate")
     return model
 
