@@ -541,7 +541,7 @@ def _add_tracks_info(
     lineages : list[CellLineage]
         A list of the lineages to update.
     tracks_attributes : list[dict[str, Any]]
-        A list of dictionaries, where each dictionary contains 
+        A list of dictionaries, where each dictionary contains
         attributes for a specific track, identified by a 'TRACK_ID' key.
 
     Raises
@@ -703,6 +703,47 @@ def _parse_model_tag(
         return lineages
 
 
+def _get_specific_tags(xml_path: str, tag_names: list[str]) -> dict[str, ET._Element]:
+    """
+    Extract specific tags from an XML file and returns them in a dictionary.
+
+    This function parses an XML file, searching for specific tag names
+    provided by the user. Once a tag is found, it is deep copied and
+    stored in a dictionary with the tag name as the key. The search
+    stops when all specified tags have been found or the end of the
+    file is reached.
+
+    Parameters
+    ----------
+    xml_path : str
+        The file path of the XML file to be parsed.
+    tag_names : list[str]
+        A list of tag names to search for in the XML file.
+
+    Returns
+    -------
+    dict[str, ET._Element]
+        A dictionary where each key is a tag name from `tag_names` that
+        was found in the XML file, and the corresponding value is the
+        deep copied `ET._Element` object for that tag.
+    """
+    it = ET.iterparse(xml_path, events=["start", "end"])
+    # _, root = next(it)
+    dict_tags = {}
+    for event, element in it:
+        if event == "start" and element.tag in tag_names:
+            dict_tags[element.tag] = deepcopy(element)
+            tag_names.remove(element.tag)
+            if not tag_names:
+                # All the tags have been found.
+                break
+
+        if event == "end":
+            element.clear()
+
+    return dict_tags
+
+
 def load_TrackMate_XML(
     xml_path: str,
     keep_all_spots: bool = False,
@@ -755,6 +796,23 @@ def load_TrackMate_XML(
 if __name__ == "__main__":
 
     xml = "sample_data/FakeTracks.xml"
-    # xml = "sample_data/FakeTracks_no_tracks.xml"
 
-    _parse_model_tag(xml, keep_all_spots=True, keep_all_tracks=True, one_graph=False)
+    # tree = ET.parse(xml)
+    # root = tree.getroot()
+    # elem = root.findall("Settings")
+    # element_string = ET.tostring(elem, encoding='utf-8').decode()
+    # print(element_string)
+
+    # xml = "sample_data/FakeTracks_no_tracks.xml"
+    # elem = read_settings(xml)
+    elem = _get_specific_tags(xml, ["Settings", "Log"])
+    print(elem)
+
+    element_string = ET.tostring(elem, encoding="utf-8").decode()
+    print(element_string)
+
+    elem_from_string = ET.fromstring(element_string)
+    print(type(elem_from_string))
+    print(elem_from_string.tag)
+    print(elem_from_string.text)
+    # _parse_model_tag(xml, keep_all_spots=True, keep_all_tracks=True, one_graph=False)
