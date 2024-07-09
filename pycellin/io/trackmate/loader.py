@@ -15,7 +15,6 @@ from pycellin.classes.data import CoreData
 from pycellin.classes.lineage import CellLineage
 
 # TODO: update all docstrings
-# TODO: switch from nx.Digraph to CellLineage
 
 
 def _get_units(
@@ -463,7 +462,6 @@ def _build_tracks(
     current_track_id = None
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
-        print(element.tag, event)
         event, element = next(iterator)
 
         # Saving the current track information.
@@ -483,9 +481,9 @@ def _build_tracks(
 def _get_filtered_tracks_ID(
     iterator: ET.iterparse,
     ancestor: ET._Element,
-) -> list[str]:
+) -> list[int]:
     """
-    Get the list of IDs of the tracks to keep.
+    Extract and return a list of track IDs to identify the tracks to keep.
 
     Parameters
     ----------
@@ -496,8 +494,8 @@ def _get_filtered_tracks_ID(
 
     Returns
     -------
-    list[str]
-        List of tracks ID to keep.
+    list[int]
+        List of tracks ID to identify the tracks to keep.
     """
     filtered_tracks_ID = []
     event, element = next(iterator)
@@ -526,36 +524,43 @@ def _get_filtered_tracks_ID(
 
 
 def _add_tracks_info(
-    graphs: list[nx.DiGraph],
+    lineages: list[CellLineage],
     tracks_attributes: list[dict[str, Any]],
 ):
     """
-    Add track attributes to each corresponding graph.
+    Update each CellLineage in the list with corresponding track attributes.
+
+    This function iterates over a list of CellLineage objects,
+    attempting to match each lineage with its corresponding track
+    attributes based on the 'TRACK_ID' attribute present in the
+    lineage nodes. It then updates the lineage graph with these
+    attributes.
 
     Parameters
     ----------
-    graphs : list[nx.DiGraph]
-        List of graphs to update.
+    lineages : list[CellLineage]
+        A list of the lineages to update.
     tracks_attributes : list[dict[str, Any]]
-        Dictionaries of tracks attributes.
+        A list of dictionaries, where each dictionary contains 
+        attributes for a specific track, identified by a 'TRACK_ID' key.
 
     Raises
     ------
     ValueError
-        If several different track IDs are found for one track.
+        If a lineage is found to contain nodes with multiple distinct
+        'TRACK_ID' values, indicating an inconsistency in track ID
+        assignment.
     """
-    for graph in graphs:
+    for lin in lineages:
         # Finding the dict of attributes matching the track.
-        tmp = set(t_id for n, t_id in graph.nodes(data="TRACK_ID"))
+        tmp = set(t_id for _, t_id in lin.nodes(data="TRACK_ID"))
 
         if not tmp:
             # 'tmp' is empty because there's no nodes in the current graph.
             # Even if it can't be updated, we still want to return this graph.
-            # updated_graphs.append(graph)
             continue
         elif tmp == {None}:
             # Happens when all the nodes do not have a TRACK_ID attribute.
-            # updated_graphs.append(graph)
             continue
         elif None in tmp:
             # Happens when at least one node does not have a TRACK_ID
@@ -571,9 +576,9 @@ def _add_tracks_info(
             if d_attr["TRACK_ID"] == current_track_id
         ][0]
 
-        # Adding the attributes to the graph.
+        # Adding the attributes to the lineage.
         for k, v in current_track_attr.items():
-            graph.graph[k] = v
+            lin.graph[k] = v
 
 
 def _parse_model_tag(
@@ -648,32 +653,32 @@ def _parse_model_tag(
             # Removal of filtered spots / nodes.
             if not keep_all_spots:
                 # Those nodes belong to no tracks: they have a degree of 0.
-                lone_nodes = [n for n, d in graph.degree if d == 0]
-                graph.remove_nodes_from(lone_nodes)
+                lone_nodes = [n for n, d in lineage.degree if d == 0]
+                lineage.remove_nodes_from(lone_nodes)
 
         # Filtering out tracks and adding tracks attribute.
         if element.tag == "FilteredTracks" and event == "start":
-            # Removal of filtered tracks / graphs.
+            # Removal of filtered tracks / lineages.
             id_to_keep = _get_filtered_tracks_ID(it, element)
             if not keep_all_tracks:
                 to_remove = [
-                    n for n, t in graph.nodes(data="TRACK_ID") if t not in id_to_keep
+                    n for n, t in lineage.nodes(data="TRACK_ID") if t not in id_to_keep
                 ]
-                graph.remove_nodes_from(to_remove)
+                lineage.remove_nodes_from(to_remove)
 
             # Subgraphs creation.
             if not one_graph:
                 # One subgraph is created per track, so each subgraph is
                 # a connected component of `graph`.
-                graphs = [
-                    graph.subgraph(c).copy()
-                    for c in nx.weakly_connected_components(graph)
+                lineages = [
+                    lineage.subgraph(c).copy()
+                    for c in nx.weakly_connected_components(lineage)
                 ]
-                del graph  # Redondant with the subgraphs.
+                del lineage  # Redondant with the subgraphs.
 
                 # Adding the tracks attributes as graphs attributes.
                 try:
-                    _add_tracks_info(graphs, tracks_attributes)
+                    _add_tracks_info(lineages, tracks_attributes)
                 except ValueError as err:
                     print(err)
                     # The program is in an impossible state so we need to stop.
@@ -682,20 +687,20 @@ def _parse_model_tag(
                 # Also adding if each track was present in the 'FilteredTracks'
                 # tag because this info is needed when reconstructing TM XMLs
                 # from graphs.
-                for g in graphs:
-                    if "TRACK_ID" in g.graph:
-                        if g.graph["TRACK_ID"] in id_to_keep:
-                            g.graph["FilteredTrack"] = True
+                for lin in lineages:
+                    if "TRACK_ID" in lin.graph:
+                        if lin.graph["TRACK_ID"] in id_to_keep:
+                            lin.graph["FilteredTrack"] = True
                         else:
-                            g.graph["FilteredTrack"] = False
+                            lin.graph["FilteredTrack"] = False
 
         if element.tag == "Model" and event == "end":
             break  # We are not interested in the following data.
 
     if one_graph:
-        return [graph]
+        return [lineage]
     else:
-        return graphs
+        return lineages
 
 
 def load_TrackMate_XML(
@@ -752,4 +757,4 @@ if __name__ == "__main__":
     xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
 
-    _parse_model_tag(xml, keep_all_spots=False, keep_all_tracks=False, one_graph=False)
+    _parse_model_tag(xml, keep_all_spots=True, keep_all_tracks=True, one_graph=False)
