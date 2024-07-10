@@ -71,10 +71,11 @@ class Feature:
         return self.__repr__()
 
 
-class Metadata:
+class FeaturesDeclaration:
     """
-    Spatial and temporal units are not part of the metadata but of the features to
-    allow different units for a same dimension (e.g. time in seconds or minutes).
+    Spatial and temporal units are not part of the FeaturesDeclaration but of the
+    features themselves to allow different units for a same dimension (e.g. time
+    in seconds or minutes).
     - dict of node features: {feature_name: Feature}
     - dict of edge features: {feature_name: Feature}
     - dict of lineage features: {feature_name: Feature}
@@ -93,27 +94,27 @@ class Metadata:
 
     def __repr__(self) -> str:
         """
-        Compute a string representation of the Metadata object.
+        Compute a string representation of the FeaturesDeclaration object.
 
         Returns
         -------
         str
-            A string representation of the Metadata object.
+            A string representation of the FeaturesDeclaration object.
         """
         return (
-            f"Metadata(node_features={self.node_feats!r}, "
+            f"FeaturesDeclaration(node_features={self.node_feats!r}, "
             f"edge_features={self.edge_feats!r}, "
             f"lineage_features={self.lin_feats!r})"
         )
 
     def __str__(self) -> str:
         """
-        Compute a human-readable string representation of the Metadata object.
+        Compute a human-readable string representation of the FeaturesDeclaration object.
 
         Returns
         -------
         str
-            A human-readable string representation of the Metadata object.
+            A human-readable string representation of the FeaturesDeclaration object.
         """
         node_features = ", ".join(self.node_feats.keys())
         edge_features = ", ".join(self.edge_feats.keys())
@@ -126,7 +127,7 @@ class Metadata:
 
     def has_feature(self, feature_name: str, feature_type: Optional[str]) -> bool:
         """
-        Check if the metadata contains the specified feature.
+        Check if the FeaturesDeclaration contains the specified feature.
 
         Parameters
         ----------
@@ -139,13 +140,13 @@ class Metadata:
         Returns
         -------
         bool
-            True if the feature is in the metadata, False otherwise.
+            True if the feature is in the FeaturesDeclaration, False otherwise.
         """
         pass
 
     def _add_feature(self, feature: Feature, feature_type: str) -> None:
         """
-        Add the specified feature to the metadata.
+        Add the specified feature to the FeaturesDeclaration.
 
         Parameters
         ----------
@@ -167,7 +168,7 @@ class Metadata:
 
     def _remove_feature(self, feature_name: str) -> None:
         """
-        Remove the specified feature from the metadata.
+        Remove the specified feature from the FeaturesDeclaration.
 
         Parameters
         ----------

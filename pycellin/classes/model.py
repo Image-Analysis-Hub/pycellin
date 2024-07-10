@@ -6,7 +6,7 @@ import itertools
 from pkg_resources import get_distribution
 from typing import Optional
 
-from pycellin.classes.metadata import Metadata
+from pycellin.classes.feature import FeaturesDeclaration
 from pycellin.classes.data import CoreData
 
 
@@ -15,7 +15,7 @@ class Model:
 
     def __init__(
         self,
-        metadata: Metadata,
+        feat_declaration: FeaturesDeclaration,
         coredata: CoreData,
         name: str = None,  # Should I make it optional? name: Optionale[str] = None
         provenance: str = None,
@@ -25,8 +25,8 @@ class Model:
 
         Parameters
         ----------
-        metadata : Metadata
-            The metadata associated with the model.
+        feat_declaration : FeaturesDeclaration
+            The declaration of the features present in the model.
         coredata : CoreData
             The lineages data of the model.
         name : str, optional
@@ -36,7 +36,7 @@ class Model:
         """
         self.date = datetime.now()
         self.pycellin_version = get_distribution("pycellin").version
-        self.metadata = metadata
+        self.feat_declaration = feat_declaration
         self.coredata = coredata
         self.name = name
         self.provenance = provenance
@@ -54,14 +54,14 @@ class Model:
         """
         Add the specified feature to the model.
 
-        This updates the metadata and compute the feature values for all lineages.
+        This updates the FeaturesDeclaration and compute the feature values for all lineages.
 
         Parameters
         ----------
         feature_name : str
             Name of the feature to add. Need to be an available feature.
         """
-        # Need to update the metadata and the data
+        # Need to update the FeaturesDeclaration and the data
         # The name of the feature defines if its a node or an edge feature
         # (or a graph one?), and a cell or a cycle feature.
         pass
@@ -76,7 +76,7 @@ class Model:
             Name of the feature to recompute.
         """
         # First need to check if the feature exists.
-        if not self.metadata.has_feature(feature_name):
+        if not self.feat_declaration.has_feature(feature_name):
             raise ValueError(f"Feature {feature_name} does not exist.")
 
         # Then need to update the data.
@@ -85,7 +85,7 @@ class Model:
         """
         Remove the specified feature from the model.
 
-        This updates the metadata and remove the feature values for all lineages.
+        This updates the FeaturesDeclaration and remove the feature values for all lineages.
 
         Parameters
         ----------
@@ -93,10 +93,10 @@ class Model:
             Name of the feature to remove.
         """
         # First need to check if the feature exists.
-        if not self.metadata.has_feature(feature_name):
+        if not self.feat_declaration.has_feature(feature_name):
             raise ValueError(f"Feature {feature_name} does not exist.")
 
-        # Then need to update the metadata and the data.
+        # Then need to update the FeaturesDeclaration and the data.
 
     # Should I have methods to process several features at once?
     # Yes if I need it at some point.

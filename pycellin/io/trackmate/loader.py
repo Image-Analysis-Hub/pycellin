@@ -10,7 +10,7 @@ from lxml import etree as ET
 import networkx as nx
 
 from pycellin.classes.model import Model
-from pycellin.classes.metadata import Metadata, Feature
+from pycellin.classes.feature import FeaturesDeclaration, Feature
 from pycellin.classes.data import CoreData
 from pycellin.classes.lineage import CellLineage
 
@@ -115,11 +115,11 @@ def _dimension_to_unit(trackmate_feature, units):
 def _convert_and_add_feature(
     trackmate_feature: dict[str, str],
     feature_type: str,
-    metadata: Metadata,
+    feat_declaration: FeaturesDeclaration,
     units: dict[str, str],
 ):
     """
-    Convert a TrackMate feature to a Pycellin one and add it to the metadata.
+    Convert a TrackMate feature to a Pycellin one and add it to the features declaration.
 
     Parameters
     ----------
@@ -127,8 +127,8 @@ def _convert_and_add_feature(
         The feature to add.
     feature_type : str
         The type of the feature to add (node, edge, or lineage).
-    metadata : Metadata
-        The metadata object to add the feature to.
+    feat_declaration : FeaturesDeclaration
+        The FeaturesDeclaration object to add the feature to.
     units : dict[str, str]
         The units of the TrackMate model.
     """
@@ -160,17 +160,17 @@ def _convert_and_add_feature(
             feat_type = "lineage"
         case _:
             raise ValueError(f"Invalid feature type: {feature_type}")
-    metadata._add_feature(feature, feat_type)
+    feat_declaration._add_feature(feature, feat_type)
 
 
 def _add_all_features(
     iterator: ET.iterparse,
     ancestor: ET._Element,
-    metadata: Metadata,
+    feat_declaration: FeaturesDeclaration,
     units: dict[str, str],
 ):
     """
-    Add all the TrackMate model features to a Metadata object.
+    Add all the TrackMate model features to a FeaturesDeclaration object.
 
     The model features are divided in 3 categories: SpotFeatures, EdgeFeatures and
     TrackFeatures. Those features are regrouped under the FeatureDeclarations tag.
@@ -189,17 +189,17 @@ def _add_all_features(
         # Features stored in the FeatureDeclarations tag.
         features = _get_features_dict(iterator, element)
         for feat in features:
-            _convert_and_add_feature(feat, element.tag, metadata, units)
+            _convert_and_add_feature(feat, element.tag, feat_declaration, units)
         # Features used in Spot tags but not declared in the FeatureDeclarations tag.
         if element.tag == "SpotFeatures":
             name_feat = Feature(
                 "name", "Name of the spot", "CellLineage", "TrackMate", "string"
             )
-            metadata._add_feature(name_feat, "node")
+            feat_declaration._add_feature(name_feat, "node")
             id_feat = Feature(
                 "ID", "Unique identifier of the spot", "CellLineage", "TrackMate", "int"
             )
-            metadata._add_feature(id_feat, "node")
+            feat_declaration._add_feature(id_feat, "node")
             roi_coord_feat = Feature(
                 "ROI_COORDINATES",
                 "List of coordinates of the region of interest",
@@ -207,13 +207,13 @@ def _add_all_features(
                 "TrackMate",
                 "float",
             )
-            metadata._add_feature(roi_coord_feat, "node")
+            feat_declaration._add_feature(roi_coord_feat, "node")
         # Feature used in Track tags but not declared in the FeatureDeclarations tag.
         if element.tag == "TrackFeatures":
             name_feat = Feature(
                 "name", "Name of the track", "CellLineage", "TrackMate", "string"
             )
-            metadata._add_feature(name_feat, "lineage")
+            feat_declaration._add_feature(name_feat, "lineage")
         element.clear()
         event, element = next(iterator)
 
@@ -225,7 +225,8 @@ def _convert_attributes(
     """
     Convert the values of `attributes` from string to int or float.
 
-    The type to convert to is given by the metadata that stores all the features info.
+    The type to convert to is given by the features declaration that stores all
+    the features info.
 
     Parameters
     ----------
@@ -238,11 +239,12 @@ def _convert_attributes(
     Raises
     ------
     ValueError
-        If a feature has an invalid data_type (not "int", "float" nor "lineage").
+        If a feature has an invalid data_type (not "int", "float" nor "string").
     KeyError
-        If a feature is not found in the metadata nor treated as a special case.
+        If a feature is not found in the features declaration nor treated as a
+        special case.
     """
-    # TODO: should I add name and ID as features in the metadata...? ROI_N_POINT?
+    # TODO: Rewrite this.
     for key in attributes:
         if key in features:
             match features[key].data_type:
@@ -264,7 +266,7 @@ def _convert_attributes(
             # attribute) and will be converted later, in _add_ROI_coordinates().
             pass
         else:
-            raise KeyError(f"Feature {key} not found in the metadata.")
+            raise KeyError(f"Feature {key} not found in the features declaration.")
 
 
 def _convert_ROI_coordinates(
@@ -302,7 +304,7 @@ def _convert_ROI_coordinates(
 def _add_all_nodes(
     iterator: ET.iterparse,
     ancestor: ET._Element,
-    metadata: Metadata,
+    feat_declaration: FeaturesDeclaration,
     lineage: CellLineage,
 ) -> None:
     """
@@ -316,9 +318,9 @@ def _add_all_nodes(
         An iterator over XML elements.
     ancestor : ET._Element
         The XML element that encompasses the information to be added.
-    metadata : Metadata
-        An object holding metadata information used to enrich the
-        graph's attributes.
+    feat_declaration : FeaturesDeclaration
+        An object holding the features declaration information used to convert the
+        node attributes.
     lineage : CellLineage
         CellLineage to add the nodes to.
     """
@@ -329,10 +331,10 @@ def _add_all_nodes(
             # All items in element.attrib are parsed as strings but most
             # of them (if not all) are numbers. So we need to do a
             # conversion based on these attributes type (attribute `isint`)
-            # as defined in the metadata.
+            # as defined in the features declaration.
             attribs = deepcopy(element.attrib)
             try:
-                _convert_attributes(attribs, metadata.node_feats)
+                _convert_attributes(attribs, feat_declaration.node_feats)
             except ValueError as err:
                 print(f"ERROR: {err} Please check the XML file.")
                 raise
@@ -360,7 +362,7 @@ def _add_all_nodes(
 
 def _add_edge(
     element: ET._Element,
-    metadata: Metadata,
+    feat_declaration: FeaturesDeclaration,
     lineage: CellLineage,
     current_track_id: int,
 ):
@@ -377,8 +379,8 @@ def _add_edge(
     ----------
     element : ET._Element
         The XML element containing edge information.
-    metadata : Metadata
-        An object holding metadata information used to convert the
+    feat_declaration : FeaturesDeclaration
+        An object holding the features declaration information used to convert the
         edge attributes.
     lineage : CellLineage
         The graph to which the edge and its attributes will be added.
@@ -393,7 +395,7 @@ def _add_edge(
         in track assignment.
     """
     attribs = deepcopy(element.attrib)
-    _convert_attributes(attribs, metadata.edge_feats)
+    _convert_attributes(attribs, feat_declaration.edge_feats)
     try:
         entry_node_id = attribs["SPOT_SOURCE_ID"]
         exit_node_id = attribs["SPOT_TARGET_ID"]
@@ -427,7 +429,7 @@ def _add_edge(
 def _build_tracks(
     iterator: ET.iterparse,
     ancestor: ET._Element,
-    metadata: Metadata,
+    feat_declaration: FeaturesDeclaration,
     lineage: CellLineage,
 ) -> list[dict[str, Any]]:
     """
@@ -445,8 +447,8 @@ def _build_tracks(
         An iterator over XML elements.
     ancestor : ET._Element
         The XML element that encompasses the information to be added.
-    metadata : Metadata
-        An object holding metadata information used to convert the
+    feat_declaration : FeaturesDeclaration
+        An object holding the features declaration information used to convert the
         edge and tracks attributes.
     lineage : CellLineage
         The `CellLineage` graph to which the edges and their attributes
@@ -466,13 +468,13 @@ def _build_tracks(
         # Saving the current track information.
         if element.tag == "Track" and event == "start":
             attribs = deepcopy(element.attrib)
-            _convert_attributes(attribs, metadata.lin_feats)
+            _convert_attributes(attribs, feat_declaration.lin_feats)
             tracks_attributes.append(attribs)
             current_track_id = attribs["TRACK_ID"]
 
         # Edge creation.
         if element.tag == "Edge" and event == "start":
-            _add_edge(element, metadata, lineage, current_track_id)
+            _add_edge(element, feat_declaration, lineage, current_track_id)
 
         event, element = next(iterator)
 
@@ -587,7 +589,7 @@ def _parse_model_tag(
     keep_all_spots: bool,
     keep_all_tracks: bool,
     one_graph: bool,
-) -> tuple[Metadata, CoreData]:
+) -> tuple[FeaturesDeclaration, CoreData]:
     """
     Read an XML file and convert the model data into several graphs.
 
@@ -611,10 +613,10 @@ def _parse_model_tag(
 
     Returns
     -------
-    tuple[Metadata, CoreData]
+    tuple[FeaturesDeclaration, CoreData]
         TODO
     """
-    md = Metadata()
+    md = FeaturesDeclaration()
 
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
@@ -636,7 +638,8 @@ def _parse_model_tag(
             root.clear()  # Cleaning the tree to free up some memory.
             # All the browsed subelements of `root` are deleted.
 
-        # Get the spot, edge and track features and add them to the metadata.
+        # Get the spot, edge and track features and add them to the
+        # features declaration.
         if element.tag == "FeatureDeclarations" and event == "start":
             _add_all_features(it, element, md, units)
             root.clear()
@@ -809,14 +812,14 @@ def load_TrackMate_XML(
     Model
         a Pycellin Model that contains the data from the TrackMate XML file.
     """
-    metadata, data = _parse_model_tag(
+    feat_declaration, data = _parse_model_tag(
         xml_path, keep_all_spots, keep_all_tracks, one_graph
     )
 
-    # Add in the metadata all the TrackMate info that was not in the model tag.
+    # Add in the features declaration all the TrackMate info that was not in the model tag.
     # TODO: should I add this to the Model instead...?
     trackmate_version = _get_trackmate_version(xml_path)
-    # metadata._add_feature(
+    # feat_declaration._add_feature(
     #     Feature(
     #         "TrackMate_version",
     #         "Version of TrackMate",
@@ -830,13 +833,15 @@ def load_TrackMate_XML(
     )
     for tag_name, tag in dict_tags.items():
         element_string = ET.tostring(tag, encoding="utf-8").decode()
-        # metadata._add_feature(
+        # feat_declaration._add_feature(
         #     Feature(
         #         tag_name, f"TrackMate {tag_name}", "CellLineage", "TrackMate", "string"
         #     )
         # )
 
-    model = Model(metadata, data, name=Path(xml_path).stem, provenance="TrackMate")
+    model = Model(
+        feat_declaration, data, name=Path(xml_path).stem, provenance="TrackMate"
+    )
     return model
 
 
@@ -859,7 +864,7 @@ if __name__ == "__main__":
     model = load_TrackMate_XML(
         xml, keep_all_spots=True, keep_all_tracks=True, one_graph=False
     )
-    # print(model.metadata)
+    # print(model.feat_declaration)
     # print(model.coredata)
 
     for id, lin in model.coredata.data.items():
