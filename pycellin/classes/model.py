@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from datetime import datetime
-import itertools
-from pkg_resources import get_distribution
-from typing import Optional
+from typing import Any
 
 from pycellin.classes.feature import FeaturesDeclaration
 from pycellin.classes.data import CoreData
@@ -15,31 +12,29 @@ class Model:
 
     def __init__(
         self,
-        feat_declaration: FeaturesDeclaration,
-        coredata: CoreData,
-        name: str = None,  # Should I make it optional? name: Optionale[str] = None
-        provenance: str = None,
+        metadata: dict[str, Any] = None,
+        feat_declaration: FeaturesDeclaration = None,
+        coredata: CoreData = None,
     ) -> None:
         """
         Constructs all the necessary attributes for the Model object.
 
         Parameters
         ----------
-        feat_declaration : FeaturesDeclaration
-            The declaration of the features present in the model.
-        coredata : CoreData
-            The lineages data of the model.
-        name : str, optional
-            The name of the model (default is None).
-        provenance : str, optional
-            The provenance of the model (default is None).
+        metadata : dict[str, Any], optional
+            Metadata of the model (default is None).
+        feat_declaration : FeaturesDeclaration, optional
+            The declaration of the features present in the model (default is None).
+        coredata : CoreData, optional
+            The lineages data of the model (default is None).
         """
-        self.date = datetime.now()
-        self.pycellin_version = get_distribution("pycellin").version
+        self.metadata = metadata
         self.feat_declaration = feat_declaration
         self.coredata = coredata
-        self.name = name
-        self.provenance = provenance
+        # self.date = datetime.now()
+        # self.pycellin_version = get_distribution("pycellin").version
+        # self.name = name
+        # self.provenance = provenance
 
         # Add an optional argument to ask to compute the CycleLineage?
         # Add a description in which people can put whatever they want

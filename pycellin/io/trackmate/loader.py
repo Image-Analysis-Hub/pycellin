@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 
 from copy import deepcopy
-import math
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Union
+from pkg_resources import get_distribution
+from typing import Any
 
 from lxml import etree as ET
 import networkx as nx
@@ -816,32 +817,21 @@ def load_TrackMate_XML(
         xml_path, keep_all_spots, keep_all_tracks, one_graph
     )
 
-    # Add in the features declaration all the TrackMate info that was not in the model tag.
-    # TODO: should I add this to the Model instead...?
-    trackmate_version = _get_trackmate_version(xml_path)
-    # feat_declaration._add_feature(
-    #     Feature(
-    #         "TrackMate_version",
-    #         "Version of TrackMate",
-    #         "CellLineage",
-    #         "TrackMate",
-    #         "string",
-    #     )
-    # )
+    # Add in the metadata all the TrackMate info that was not in the model tag.
+    metadata = {}
+    metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
     dict_tags = _get_specific_tags(
         xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
     )
     for tag_name, tag in dict_tags.items():
         element_string = ET.tostring(tag, encoding="utf-8").decode()
-        # feat_declaration._add_feature(
-        #     Feature(
-        #         tag_name, f"TrackMate {tag_name}", "CellLineage", "TrackMate", "string"
-        #     )
-        # )
+        metadata[tag_name] = element_string
+    metadata["Name"] = Path(xml_path).stem
+    metadata["Provenance"] = "TrackMate"
+    metadata["Date"] = datetime.now()
+    metadata["Pycellin_version"] = get_distribution("pycellin").version
 
-    model = Model(
-        feat_declaration, data, name=Path(xml_path).stem, provenance="TrackMate"
-    )
+    model = Model(metadata, feat_declaration, data)
     return model
 
 
@@ -864,6 +854,7 @@ if __name__ == "__main__":
     model = load_TrackMate_XML(
         xml, keep_all_spots=True, keep_all_tracks=True, one_graph=False
     )
+    print(model.metadata)
     # print(model.feat_declaration)
     # print(model.coredata)
 
