@@ -462,7 +462,6 @@ def _build_tracks(
     current_track_id = None
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
-        event, element = next(iterator)
 
         # Saving the current track information.
         if element.tag == "Track" and event == "start":
@@ -474,6 +473,8 @@ def _build_tracks(
         # Edge creation.
         if element.tag == "Edge" and event == "start":
             _add_edge(element, metadata, lineage, current_track_id)
+
+        event, element = next(iterator)
 
     return tracks_attributes
 
@@ -698,9 +699,18 @@ def _parse_model_tag(
             break  # We are not interested in the following data.
 
     if one_graph:
-        return [lineage]
-    else:
-        return lineages
+        lineages = [lineage]
+    data = {}
+    for lin in lineages:
+        if "TRACK_ID" in lin.graph:
+            data[lin.graph["TRACK_ID"]] = lin
+        else:
+            assert len(lin) == 1, "Track ID not found and not a one-spot lineage."
+            node = [n for n in lin.nodes][0]
+            lin_id = f"Node_{node}"
+            data[lin_id] = lin
+
+    return md, CoreData(data)
 
 
 def _get_specific_tags(xml_path: str, tag_names: list[str]) -> dict[str, ET._Element]:
@@ -834,24 +844,26 @@ if __name__ == "__main__":
 
     xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
-    trackmate_version = _get_trackmate_version(xml)
-    print(trackmate_version)
 
-    # tree = ET.parse(xml)
-    # root = tree.getroot()
-    # elem = root.findall("Settings")
-    # element_string = ET.tostring(elem, encoding='utf-8').decode()
-    # print(element_string)
+    # trackmate_version = _get_trackmate_version(xml)
+    # print(trackmate_version)
 
-    # elem = read_settings(xml)
     # elem = _get_specific_tags(xml, ["Settings", "Log"])
     # print(elem)
-
-    # element_string = ET.tostring(elem, encoding="utf-8").decode()
+    # element_string = ET.tostring(elem["Settings"], encoding="utf-8").decode()
     # print(element_string)
-
     # elem_from_string = ET.fromstring(element_string)
-    # print(type(elem_from_string))
+    # print(elem_from_string)
     # print(elem_from_string.tag)
-    # print(elem_from_string.text)
-    # _parse_model_tag(xml, keep_all_spots=True, keep_all_tracks=True, one_graph=False)
+
+    model = load_TrackMate_XML(
+        xml, keep_all_spots=True, keep_all_tracks=True, one_graph=False
+    )
+    # print(model.metadata)
+    # print(model.coredata)
+
+    for id, lin in model.coredata.data.items():
+        print(f"ID: {id} - {lin}")
+
+    # TODO: for now one-node graph do not have track features like "real" lineages.
+    # Should I add these features even if the value is None for consistency?
