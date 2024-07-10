@@ -20,6 +20,18 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     def __init__(self, nx_digraph: Optional[nx.DiGraph] = None):
         super().__init__(incoming_graph_data=nx_digraph)
 
+    # TODO: A method to check that there is no merge (i. e. in_degree > 1)
+    # I wrote one for Laure at some point but I cannot find it anymore...?!
+    # def check_no_merge(graph: nx.DiGraph):
+    #     no_merge = True
+    #     for node in graph.nodes():
+    #         if graph.in_degree(node) > 1:
+    #             no_merge = False
+    #             print(f"Node {node} has an in_degree > 1.")
+
+    #     if no_merge:
+    #         print("All good, there is no merge in the graph.")
+
     # For all the following methods, we might need to recompute features.
     #   => put it in the abstract method and then use super() in the subclasses after modifying the graph
     # Abstract method because for CellLineages, we first need to unfreeze the graph.
