@@ -14,9 +14,42 @@ from pycellin.classes.lineage import CellLineage
 from pycellin.io.trackmate.loader import load_TrackMate_XML
 
 
-def _write_Model(xf: ET.xmlfile, model: Model) -> None:
+def _unit_to_dimension(feat: Feature) -> str:
     """
-    Write the Model XML tag to a TrackMate XML file.
+    Convert a unit to a dimension.
+
+    Parameters
+    ----------
+    unit : str
+        Unit to convert.
+
+    Returns
+    -------
+    str
+        Dimension corresponding to the unit.
+    """
+    unit = feat.unit
+    name = feat.name
+    desc = feat.description
+    match unit:
+        case "pixel":
+            if "position" in name.lower() or name.lower() in ["x", "y", "z"]:
+                # Does not work if POSITION_T
+                dimension = "POSITION"
+            else:
+                dimension = "LENGTH"
+        case "none" | "frame":
+            dimension = "NONE"
+    # This is going to be a nightmare to deal with all the possible cases.
+    return dimension
+
+
+def _write_FeatureDeclarations(xf: ET.xmlfile, model: Model) -> None:
+    """
+    Write the FeatureDeclarations XML tag to a TrackMate XML file.
+
+    The features declaration is divided in three parts: spot features,
+    edge features, and track features.
 
     Parameters
     ----------
@@ -25,7 +58,17 @@ def _write_Model(xf: ET.xmlfile, model: Model) -> None:
     model : Model
         Model containing the data to write.
     """
-    pass
+    xf.write(f"\n{' '*4}")
+    with xf.element("FeatureDeclarations"):
+        features_type = ["SpotFeatures", "EdgeFeatures", "TrackFeatures"]
+        for f_type in features_type:
+            xf.write(f"\n{' '*6}")
+            with xf.element(f_type):
+                xf.write(f"\n{' '*8}")
+                # Need to convert the Pycellin feature to a TrackMate one
+                # _convert_feature(feat: Feature) -> dict[str, str]
+                # I will use the name as shortname for the feature
+                pass
 
 
 def _write_tag(xf: ET.xmlfile, metadata: dict[str, Any], tag: str) -> None:
@@ -76,8 +119,11 @@ def export_TrackMate_XML(
         with xf.element("TrackMate", {"version": tm_version}):
             xf.write("\n  ")
             _write_tag(xf, model.metadata, "Log")
-            # xf.write("\n  ")
-            # _write_Model(xf, model)
+            xf.write("\n  ")
+            _write_FeatureDeclarations(xf, model)
+            # _write_AllSpots(xf, model)
+            # _write_AllTracks(xf, model)
+            # _write_FilteredTracks(xf, model)
             xf.write("\n  ")
             for tag in ["Settings", "GUIState", "DisplaySettings"]:
                 _write_tag(xf, model.metadata, tag)
@@ -93,5 +139,6 @@ if __name__ == "__main__":
     xml_out = "sample_data/FakeTracks_exported.xml"
 
     model = load_TrackMate_XML(xml_in)
+    print(model.feat_declaration.node_feats)
     # model.metadata.pop("GUIState")
     export_TrackMate_XML(model, xml_out)
