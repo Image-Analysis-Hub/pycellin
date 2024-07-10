@@ -785,13 +785,15 @@ def load_TrackMate_XML(
     one_graph: bool = False,
 ) -> Model:
     """
-    Read a TrackMate XML file and convert the tracks data to directed graphs.
+    Read a TrackMate XML file and convert the tracks data to directed acyclic graphs.
 
     Each TrackMate track and its associated data described in the XML file
     are modeled as networkX directed graphs. Spots are modeled as graph
-    nodes, and edges as graph edges. All data pertaining to the model
-    itself such as units, spot features, etc. are stored in each graph as
-    graph attributes.
+    nodes, and edges as graph edges. Spot, edge and track features are
+    stored in node, edge and graph attributes, respectively.
+    The rest of the information contained in the XML file is stored either
+    as a metadata dict (TrackMate version, log, settings...) or in the Model
+    features declaration.
 
     Parameters
     ----------
@@ -811,14 +813,19 @@ def load_TrackMate_XML(
     Returns
     -------
     Model
-        a Pycellin Model that contains the data from the TrackMate XML file.
+        A Pycellin Model that contains all the data from the TrackMate XML file.
     """
     feat_declaration, data = _parse_model_tag(
         xml_path, keep_all_spots, keep_all_tracks, one_graph
     )
 
-    # Add in the metadata all the TrackMate info that was not in the model tag.
+    # Add in the metadata all the TrackMate info that was not in the
+    # TrackMate XML `Model` tag.
     metadata = {}
+    metadata["Name"] = Path(xml_path).stem
+    metadata["Provenance"] = "TrackMate"
+    metadata["Date"] = datetime.now()
+    metadata["Pycellin_version"] = get_distribution("pycellin").version
     metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
     dict_tags = _get_specific_tags(
         xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
@@ -826,10 +833,6 @@ def load_TrackMate_XML(
     for tag_name, tag in dict_tags.items():
         element_string = ET.tostring(tag, encoding="utf-8").decode()
         metadata[tag_name] = element_string
-    metadata["Name"] = Path(xml_path).stem
-    metadata["Provenance"] = "TrackMate"
-    metadata["Date"] = datetime.now()
-    metadata["Pycellin_version"] = get_distribution("pycellin").version
 
     model = Model(metadata, feat_declaration, data)
     return model
@@ -854,7 +857,7 @@ if __name__ == "__main__":
     model = load_TrackMate_XML(
         xml, keep_all_spots=True, keep_all_tracks=True, one_graph=False
     )
-    print(model.metadata)
+    # print(model.metadata)
     # print(model.feat_declaration)
     # print(model.coredata)
 
