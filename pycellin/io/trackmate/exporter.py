@@ -44,8 +44,11 @@ def _write_tag(xf: ET.xmlfile, metadata: dict[str, Any], tag: str) -> None:
     tag : str
         XML tag to write.
     """
-    # Write the tag if available, otherwise write an empty tag.
-    pass
+    if tag in metadata:
+        xml_element = ET.fromstring(metadata[tag])
+        xf.write(xml_element)
+    else:
+        xf.write(ET.Element(tag))
 
 
 def export_TrackMate_XML(
@@ -71,14 +74,17 @@ def export_TrackMate_XML(
             tm_version = "unknown"
 
         with xf.element("TrackMate", {"version": tm_version}):
-            xf.write("\n\t")
+            xf.write("\n  ")
             _write_tag(xf, model.metadata, "Log")
-            xf.write("\n\t")
-            _write_Model(xf, model)
-            xf.write("\n\t")
+            # xf.write("\n  ")
+            # _write_Model(xf, model)
+            xf.write("\n  ")
             for tag in ["Settings", "GUIState", "DisplaySettings"]:
                 _write_tag(xf, model.metadata, tag)
-                xf.write("\n\t")
+                if tag == "DisplaySettings":
+                    xf.write("\n")
+                else:
+                    xf.write("\n  ")
 
 
 if __name__ == "__main__":
@@ -87,4 +93,5 @@ if __name__ == "__main__":
     xml_out = "sample_data/FakeTracks_exported.xml"
 
     model = load_TrackMate_XML(xml_in)
+    # model.metadata.pop("GUIState")
     export_TrackMate_XML(model, xml_out)
