@@ -194,6 +194,8 @@ class FeaturesDeclaration:
 
     # TODO: should this method be at the Model level?
     # Should I add a wrapper at the higher level?
+    # => Stephane confirms that it should stay here and that I should add 
+    # a wrapper in Model.
     def get_units_per_features(self) -> dict[str, list[str]]:
         """
         Return a dict of units and the features associated with each unit.
