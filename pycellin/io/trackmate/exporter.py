@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from copy import deepcopy
-from typing import Any
+import math
+from typing import Any, Union
 
 from lxml import etree as ET
 import networkx as nx
@@ -122,6 +122,108 @@ def _write_FeatureDeclarations(xf: ET.xmlfile, model: Model) -> None:
         xf.write(f"\n{' '*4}")
 
 
+def _value_to_str(
+    value: Union[int, float, str],
+) -> str:
+    """
+    Convert a value to its associated string.
+
+    Indeed, ET.write() method only accepts to write strings.
+    However, TrackMate is only able to read Spot, Edge and Track
+    features that can be parsed as numeric by Java.
+
+    Parameters
+    ----------
+    value : Union[int, float, str]
+        Value to convert to string.
+
+    Returns
+    -------
+    str
+        The string equivalent of `value`.
+    """
+    # TODO: Should this function take care of converting non-numeric added
+    # features to numeric ones (like GEN_ID)? Or should it be done in
+    # pycellin?
+    # print(value, type(value))
+
+    if isinstance(value, str):
+        return value
+    elif math.isnan(value):
+        return "NaN"
+    elif math.isinf(value):
+        if value > 0:
+            return "Infinity"
+        else:
+            return "-Infinity"
+    else:
+        return str(value)
+
+
+def _create_Spot(
+    lineage: CellLineage,
+    node: int,
+) -> ET._Element:
+    """
+    Create an XML Spot Element representing a node of a Lineage.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        Lineage containing the node to create.
+    node : int
+        ID of the node in the lineage.
+
+    Returns
+    -------
+    ET._Element
+        The newly created Spot Element.
+    """
+    # Building Spot attributes.
+    # print(lineage.nodes[node].keys())
+    # I have a feature ROI_N_POINTS and I shouldn't.
+    # print(lineage.nodes[node]["ROI_N_POINTS"])
+
+    exluded_keys = ["TRACK_ID", "ROI_COORDINATES"]
+    n_attr = {
+        k: _value_to_str(v)
+        for k, v in lineage.nodes[node].items()
+        if k not in exluded_keys
+    }
+    n_attr["ROI_N_POINTS"] = str(len(lineage.nodes[node]["ROI_COORDINATES"]))
+
+    # Building Spot text: coordinates of ROI points.
+    coords = [item for pt in lineage.nodes[node]["ROI_COORDINATES"] for item in pt]
+
+    el_node = ET.Element("Spot", n_attr)
+    el_node.text = " ".join(map(str, coords))
+    return el_node
+
+
+def _write_AllSpots(xf: ET.xmlfile, model: Model) -> None:
+    xf.write(f"\n{' '*4}")
+    lineages = model.coredata.data.values()
+    nb_nodes = sum([len(lin) for lin in lineages])
+    with xf.element("AllSpots", {"nspots": str(nb_nodes)}):
+        # For each frame, nodes can be spread over several graphs so we first
+        # need to identify all of the existing frames.
+        frames = set()
+        for lin in lineages:
+            frames.update(nx.get_node_attributes(lin, "FRAME").values())
+
+        # Then at each frame, we can find the nodes and write its data.
+        for frame in frames:
+            xf.write(f"\n{' '*6}")
+            with xf.element("SpotsInFrame", {"frame": str(frame)}):
+                for lin in lineages:
+                    nodes = [n for n in lin.nodes() if lin.nodes[n]["FRAME"] == frame]
+                    for node in nodes:
+                        xf.write(f"\n{' '*8}")
+                        xf.write(_create_Spot(lin, node))
+                xf.write(f"\n{' '*6}")
+        xf.write(f"\n{' '*4}")
+
+
 def _write_tag(xf: ET.xmlfile, metadata: dict[str, Any], tag: str) -> None:
     """
     Write the specified XML tag into a TrackMate XML file.
@@ -211,7 +313,7 @@ def export_TrackMate_XML(
             xf.write("\n  ")
             with xf.element("Model", units):
                 _write_FeatureDeclarations(xf, model)
-                # _write_AllSpots(xf, model)
+                _write_AllSpots(xf, model)
                 # _write_AllTracks(xf, model)
                 # _write_FilteredTracks(xf, model)
             xf.write("\n  ")
@@ -228,7 +330,7 @@ if __name__ == "__main__":
     xml_in = "sample_data/FakeTracks.xml"
     xml_out = "sample_data/FakeTracks_exported.xml"
 
-    model = load_TrackMate_XML(xml_in)
+    model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # print(model.feat_declaration.node_feats)
     # model.metadata.pop("GUIState")
     export_TrackMate_XML(
