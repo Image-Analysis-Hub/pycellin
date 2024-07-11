@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from itertools import chain
 from typing import Optional
 
 from pycellin.classes.lineage import Lineage
@@ -176,3 +177,32 @@ class FeaturesDeclaration:
             The name of the feature to remove.
         """
         pass
+
+    # TODO: should this method be at the Model level?
+    # Should I add a wrapper at the higher level?
+    def get_units_per_features(self) -> dict[str, list[str]]:
+        """
+        Return a dict of units and the features associated with each unit.
+
+        The method iterates over the node, edge, and lineage features
+        of the features declaration object, grouping them by unit.
+
+        Returns
+        -------
+        dict[str, list[str]]
+            A dictionary where the keys are units and the values are lists
+            of feature names. For example:
+            {'unit1': ['feature1', 'feature2'], 'unit2': ['feature3']}.
+        """
+        units = {}
+        features_values = [
+            self.node_feats.values(),
+            self.edge_feats.values(),
+            self.lin_feats.values(),
+        ]
+        for feat in chain.from_iterable(features_values):
+            if feat.unit in units:
+                units[feat.unit].append(feat.name)
+            else:
+                units[feat.unit] = [feat.name]
+        return units
