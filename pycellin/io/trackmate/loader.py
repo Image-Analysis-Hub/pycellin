@@ -196,7 +196,6 @@ def _add_all_features(
             name_feat = Feature(
                 "name", "Name of the spot", "CellLineage", "TrackMate", "string", "none"
             )
-            # feat_declaration._add_feature(name_feat, "node")
             id_feat = Feature(
                 "ID",
                 "Unique identifier of the spot",
@@ -205,7 +204,6 @@ def _add_all_features(
                 "int",
                 "none",
             )
-            # feat_declaration._add_feature(id_feat, "node")
             roi_coord_feat = Feature(
                 "ROI_COORDINATES",
                 "List of coordinates of the region of interest",
@@ -214,7 +212,6 @@ def _add_all_features(
                 "float",
                 units["spatialunits"],
             )
-            # feat_declaration._add_feature(roi_coord_feat, "node")
             feat_declaration._add_features(
                 [name_feat, id_feat, roi_coord_feat], ["node"] * 3
             )
@@ -297,23 +294,26 @@ def _convert_ROI_coordinates(
         Element from which to extract ROI coordinates.
     attribs : dict[str, Any]
         Attributes dict to update with ROI coordinates.
+
+    Raises
+    ------
+    KeyError
+        If the "ROI_N_POINTS" attribute is not found in the attributes dict.
     """
-    try:
-        n_points = int(attribs["ROI_N_POINTS"])
-    except KeyError as err:
-        print(
-            f"No key {err} in the attributes of current element " f"'{element.tag}'. "
+    if "ROI_N_POINTS" not in attribs:
+        raise KeyError(
+            f"No key 'ROI_N_POINTS' in the attributes of current element '{element.tag}'."
         )
+    n_points = int(attribs["ROI_N_POINTS"])
+    if element.text:
+        points_coordinates = element.text.split()
+        points_coordinates = [float(x) for x in points_coordinates]
+        points_dimension = len(points_coordinates) // n_points
+        it = [iter(points_coordinates)] * points_dimension
+        points_coordinates = list(zip(*it))
+        attribs["ROI_COORDINATES"] = points_coordinates
     else:
-        if element.text:
-            points_coordinates = element.text.split()
-            points_coordinates = [float(x) for x in points_coordinates]
-            points_dimension = len(points_coordinates) // n_points
-            it = [iter(points_coordinates)] * points_dimension
-            points_coordinates = list(zip(*it))
-            attribs["ROI_N_POINTS"] = points_coordinates
-        else:
-            attribs["ROI_N_POINTS"] = None
+        attribs["ROI_COORDINATES"] = None
 
 
 def _add_all_nodes(
@@ -359,7 +359,12 @@ def _add_all_nodes(
 
             # The ROI coordinates are not stored in a tag attribute but in
             # the tag text. So we need to extract then format them.
-            _convert_ROI_coordinates(element, attribs)
+            try:
+                _convert_ROI_coordinates(element, attribs)
+            except KeyError as err:
+                print(err)
+                # TODO: check th behavior when the key is not found.
+                # Does it happen when TrackMate do a single-point segmentation?
 
             # Now that all the node attributes have been updated, we can add
             # them to the Lineage.
@@ -707,6 +712,7 @@ def _parse_model_tag(
                 # Also adding if each track was present in the 'FilteredTracks'
                 # tag because this info is needed when reconstructing TM XMLs
                 # from graphs.
+                # TODO: add "FilteredTrack" to the features declaration.
                 for lin in lineages:
                     if "TRACK_ID" in lin.graph:
                         if lin.graph["TRACK_ID"] in id_to_keep:
