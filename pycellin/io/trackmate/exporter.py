@@ -109,15 +109,15 @@ def _write_FeatureDeclarations(xf: ET.xmlfile, model: Model) -> None:
                         features = model.feat_declaration.edge_feats
                     case "TrackFeatures":
                         features = model.feat_declaration.lin_feats
-                dict_length = len(features)
-                for i, feat in enumerate(features.values()):
+                first_feat_written = False
+                for feat in features.values():
                     trackmate_feat = _convert_feature(feat)
                     if trackmate_feat:
-                        xf.write(ET.Element("Feature", trackmate_feat))
-                        if i != dict_length - 1:
+                        if first_feat_written:
                             xf.write(f"\n{' '*8}")
-                    # if i == dict_length - 1:
-                    #     xf.write(f"")
+                        else:
+                            first_feat_written = True
+                        xf.write(ET.Element("Feature", trackmate_feat))
                 xf.write(f"\n{' '*6}")
         xf.write(f"\n{' '*4}")
 
