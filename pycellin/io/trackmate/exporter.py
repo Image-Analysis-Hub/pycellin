@@ -41,7 +41,7 @@ def _unit_to_dimension(feat: Feature) -> str:
                 dimension = "LENGTH"
         case "none" | "frame":
             dimension = "NONE"
-    # This is going to be a nightmare to deal with all the possible cases.
+    # It's going to be a nightmare to deal with all the possible cases.
     return dimension
 
 
@@ -51,7 +51,7 @@ def _convert_feature(feat: Feature) -> dict[str, str]:
 
 def _write_FeatureDeclarations(xf: ET.xmlfile, model: Model) -> None:
     """
-    Write the FeatureDeclarations XML tag to a TrackMate XML file.
+    Write the FeatureDeclarations XML tag into a TrackMate XML file.
 
     The features declaration is divided in three parts: spot features,
     edge features, and track features.
@@ -78,7 +78,7 @@ def _write_FeatureDeclarations(xf: ET.xmlfile, model: Model) -> None:
 
 def _write_tag(xf: ET.xmlfile, metadata: dict[str, Any], tag: str) -> None:
     """
-    Write the specified XML tag to a TrackMate XML file.
+    Write the specified XML tag into a TrackMate XML file.
 
     If the tag is not present in the metadata, an empty tag will be
     written.
@@ -101,7 +101,7 @@ def _write_tag(xf: ET.xmlfile, metadata: dict[str, Any], tag: str) -> None:
 
 def _ask_units(feat_declaration: FeaturesDeclaration) -> dict[str, str]:
     """
-    Ask the user for the units of the features.
+    Ask the user to check units consistency and to give a unique spatial and a unique temporal units.
 
     Parameters
     ----------
@@ -111,19 +111,19 @@ def _ask_units(feat_declaration: FeaturesDeclaration) -> dict[str, str]:
     Returns
     -------
     dict[str, str]
-        Dictionary containing the units of the features.
+        Dictionary containing the spatial and temporal units of the features.
     """
-    trackmate_units = {}
     print(
         "TrackMate requires a unique spatial unit, and a unique temporal unit. "
         "Please check below that your spatial and temporal units are the same "
         "across all features. If not, convert your features to the same unit "
-        "before reattempting the export to TrackMate format."
+        "before reattempting to export to TrackMate format."
     )
     model_units = feat_declaration.get_units_per_features()
     for unit, feats in model_units.items():
         print(f"{unit}: {feats}")
     # TODO: Should I ask the user if the units are correct before moving to the next step?
+    trackmate_units = {}
     trackmate_units["spatialunits"] = input("Please type the spatial unit: ")
     trackmate_units["temporalunits"] = input("Please type the temporal unit: ")
     print(f"Using the following units for TrackMate export: {trackmate_units}")
