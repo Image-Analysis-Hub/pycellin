@@ -14,6 +14,7 @@ from pycellin.classes.lineage import CellLineage
 from pycellin.io.trackmate.loader import load_TrackMate_XML
 
 
+# TODO: find a way to write this fuction, see with JY
 def _unit_to_dimension(feat: Feature) -> str:
     """
     Convert a unit to a dimension.
@@ -42,6 +43,10 @@ def _unit_to_dimension(feat: Feature) -> str:
             dimension = "NONE"
     # This is going to be a nightmare to deal with all the possible cases.
     return dimension
+
+
+def _convert_feature(feat: Feature) -> dict[str, str]:
+    pass
 
 
 def _write_FeatureDeclarations(xf: ET.xmlfile, model: Model) -> None:
@@ -94,6 +99,37 @@ def _write_tag(xf: ET.xmlfile, metadata: dict[str, Any], tag: str) -> None:
         xf.write(ET.Element(tag))
 
 
+def _ask_units(feat_declaration: FeaturesDeclaration) -> dict[str, str]:
+    """
+    Ask the user for the units of the features.
+
+    Parameters
+    ----------
+    feat_declaration : FeaturesDeclaration
+        Declaration of the features. It contains the unit of each feature.
+
+    Returns
+    -------
+    dict[str, str]
+        Dictionary containing the units of the features.
+    """
+    trackmate_units = {}
+    print(
+        "TrackMate requires a unique spatial unit, and a unique temporal unit. "
+        "Please check below that your spatial and temporal units are the same "
+        "across all features. If not, convert your features to the same unit "
+        "before reattempting the export to TrackMate format."
+    )
+    model_units = feat_declaration.get_units_per_features()
+    for unit, feats in model_units.items():
+        print(f"{unit}: {feats}")
+    # TODO: Should I ask the user if the units are correct before moving to the next step?
+    trackmate_units["spatialunits"] = input("Please type the spatial unit: ")
+    trackmate_units["temporalunits"] = input("Please type the temporal unit: ")
+    print(f"Using the following units for TrackMate export: {trackmate_units}")
+    return trackmate_units
+
+
 def export_TrackMate_XML(
     model: Model,
     xml_path: str,
@@ -108,6 +144,9 @@ def export_TrackMate_XML(
     xml_path : str
         Path of the XML file to write.
     """
+
+    units = _ask_units(model.feat_declaration)
+
     with ET.xmlfile(xml_path, encoding="utf-8", close=True) as xf:
         xf.write_declaration()
 
@@ -139,6 +178,6 @@ if __name__ == "__main__":
     xml_out = "sample_data/FakeTracks_exported.xml"
 
     model = load_TrackMate_XML(xml_in)
-    print(model.feat_declaration.node_feats)
+    # print(model.feat_declaration.node_feats)
     # model.metadata.pop("GUIState")
     export_TrackMate_XML(model, xml_out)
