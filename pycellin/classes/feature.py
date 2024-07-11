@@ -167,6 +167,20 @@ class FeaturesDeclaration:
             case _:
                 raise ValueError(f"Invalid feature type: {feature_type}")
 
+    def _add_features(self, features: list[Feature], feature_types: list[str]) -> None:
+        """
+        Add the specified features to the FeaturesDeclaration.
+
+        Parameters
+        ----------
+        features : list[Feature]
+            The features to add.
+        feature_types : list[str]
+            The types of the features to add (node, edge, or lineage).
+        """
+        for feature, feature_type in zip(features, feature_types):
+            self._add_feature(feature, feature_type)
+
     def _remove_feature(self, feature_name: str) -> None:
         """
         Remove the specified feature from the FeaturesDeclaration.
