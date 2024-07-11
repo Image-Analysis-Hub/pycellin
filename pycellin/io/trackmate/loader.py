@@ -102,7 +102,7 @@ def _dimension_to_unit(trackmate_feature, units):
         case "VELOCITY":
             return units["spatialunits"] + "/" + units["timeunits"]
         case "AREA":
-            return units["spatialunits"] + "²"
+            return units["spatialunits"] + "^2"
         case "TIME":
             return units["timeunits"]
         case "ANGLE":
@@ -131,7 +131,7 @@ def _convert_and_add_feature(
     feat_declaration : FeaturesDeclaration
         The FeaturesDeclaration object to add the feature to.
     units : dict[str, str]
-        The units of the TrackMate model.
+        The temporal and spatial units of the TrackMate model.
     """
     feat_name = trackmate_feature["feature"]
     feat_description = trackmate_feature["name"]
@@ -194,25 +194,39 @@ def _add_all_features(
         # Features used in Spot tags but not declared in the FeatureDeclarations tag.
         if element.tag == "SpotFeatures":
             name_feat = Feature(
-                "name", "Name of the spot", "CellLineage", "TrackMate", "string"
+                "name", "Name of the spot", "CellLineage", "TrackMate", "string", "none"
             )
-            feat_declaration._add_feature(name_feat, "node")
+            # feat_declaration._add_feature(name_feat, "node")
             id_feat = Feature(
-                "ID", "Unique identifier of the spot", "CellLineage", "TrackMate", "int"
+                "ID",
+                "Unique identifier of the spot",
+                "CellLineage",
+                "TrackMate",
+                "int",
+                "none",
             )
-            feat_declaration._add_feature(id_feat, "node")
+            # feat_declaration._add_feature(id_feat, "node")
             roi_coord_feat = Feature(
                 "ROI_COORDINATES",
                 "List of coordinates of the region of interest",
                 "CellLineage",
                 "TrackMate",
                 "float",
+                units["spatialunits"],
             )
-            feat_declaration._add_feature(roi_coord_feat, "node")
+            # feat_declaration._add_feature(roi_coord_feat, "node")
+            feat_declaration._add_features(
+                [name_feat, id_feat, roi_coord_feat], ["node"] * 3
+            )
         # Feature used in Track tags but not declared in the FeatureDeclarations tag.
         if element.tag == "TrackFeatures":
             name_feat = Feature(
-                "name", "Name of the track", "CellLineage", "TrackMate", "string"
+                "name",
+                "Name of the track",
+                "CellLineage",
+                "TrackMate",
+                "string",
+                "none",
             )
             feat_declaration._add_feature(name_feat, "lineage")
         element.clear()
