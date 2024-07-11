@@ -160,44 +160,6 @@ def _value_to_str(
         return str(value)
 
 
-def _write_AllTracks(xf: ET.xmlfile, data: CoreData) -> None:
-    """
-    Write the tracks data into an XML file.
-
-    Parameters
-    ----------
-    xf : ET.xmlfile
-        Context manager for the XML file to write.
-    data : CoreData
-        Lineages containing the data to write.
-    """
-    xf.write(f"\n{' '*4}")
-    with xf.element("AllTracks"):
-        for lineage in data.values():
-            # We have track tags to add only if there was a tracking done
-            # in the first place. A lineage with no TRACK_ID attribute has
-            # no tracking associated.
-            if "TRACK_ID" not in lineage.graph:
-                continue
-
-            # Track tags.
-            xf.write(f"\n{' '*6}")
-            exluded_keys = ["Model", "FilteredTrack"]
-            t_attr = {
-                k: _value_to_str(v)
-                for k, v in lineage.graph.items()
-                if k not in exluded_keys
-            }
-            with xf.element("Track", t_attr):
-                # Edge tags.
-                for edge in lineage.edges.data():
-                    xf.write(f"\n{' '*8}")
-                    e_attr = {k: _value_to_str(v) for k, v in edge[2].items()}
-                    xf.write(ET.Element("Edge", e_attr))
-                xf.write(f"\n{' '*6}")
-        xf.write(f"\n{' '*4}")
-
-
 def _create_Spot(lineage: CellLineage, node: int) -> ET._Element:
     """
     Create an XML Spot Element representing a node of a Lineage.
@@ -269,7 +231,67 @@ def _write_AllSpots(xf: ET.xmlfile, data: CoreData) -> None:
         xf.write(f"\n{' '*4}")
 
 
-def _write_tag(xf: ET.xmlfile, metadata: dict[str, Any], tag: str) -> None:
+def _write_AllTracks(xf: ET.xmlfile, data: CoreData) -> None:
+    """
+    Write the tracks data into an XML file.
+
+    Parameters
+    ----------
+    xf : ET.xmlfile
+        Context manager for the XML file to write.
+    data : CoreData
+        Lineages containing the data to write.
+    """
+    xf.write(f"\n{' '*4}")
+    with xf.element("AllTracks"):
+        for lineage in data.values():
+            # We have track tags to add only if there was a tracking done
+            # in the first place. A lineage with no TRACK_ID attribute has
+            # no tracking associated.
+            if "TRACK_ID" not in lineage.graph:
+                continue
+
+            # Track tags.
+            xf.write(f"\n{' '*6}")
+            exluded_keys = ["Model", "FilteredTrack"]
+            t_attr = {
+                k: _value_to_str(v)
+                for k, v in lineage.graph.items()
+                if k not in exluded_keys
+            }
+            with xf.element("Track", t_attr):
+                # Edge tags.
+                for edge in lineage.edges.data():
+                    xf.write(f"\n{' '*8}")
+                    e_attr = {k: _value_to_str(v) for k, v in edge[2].items()}
+                    xf.write(ET.Element("Edge", e_attr))
+                xf.write(f"\n{' '*6}")
+        xf.write(f"\n{' '*4}")
+
+
+def _write_FilteredTracks(xf: ET.xmlfile, data: CoreData) -> None:
+    """
+    Write the filtered tracks data into an XML file.
+
+    Parameters
+    ----------
+    xf : ET.xmlfile
+        Context manager for the XML file to write.
+    data : CoreData
+        Lineages containing the data to write.
+    """
+    xf.write(f"\n{' '*4}")
+    with xf.element("FilteredTracks"):
+        for lineage in data.values():
+            if "TRACK_ID" in lineage.graph and lineage.graph["FilteredTrack"]:
+                xf.write(f"\n{' '*6}")
+                t_attr = {"TRACK_ID": str(lineage.graph["TRACK_ID"])}
+                xf.write(ET.Element("TrackID", t_attr))
+        xf.write(f"\n{' '*4}")
+    xf.write(f"\n{' '*2}")
+
+
+def _write_metadata_tag(xf: ET.xmlfile, metadata: dict[str, Any], tag: str) -> None:
     """
     Write the specified XML tag into a TrackMate XML file.
 
@@ -354,16 +376,16 @@ def export_TrackMate_XML(
 
         with xf.element("TrackMate", {"version": tm_version}):
             xf.write("\n  ")
-            _write_tag(xf, model.metadata, "Log")
+            _write_metadata_tag(xf, model.metadata, "Log")
             xf.write("\n  ")
             with xf.element("Model", units):
                 _write_FeatureDeclarations(xf, model)
                 _write_AllSpots(xf, model.coredata.data)
                 _write_AllTracks(xf, model.coredata.data)
-                # _write_FilteredTracks(xf, model)
+                _write_FilteredTracks(xf, model.coredata.data)
             xf.write("\n  ")
             for tag in ["Settings", "GUIState", "DisplaySettings"]:
-                _write_tag(xf, model.metadata, tag)
+                _write_metadata_tag(xf, model.metadata, tag)
                 if tag == "DisplaySettings":
                     xf.write("\n")
                 else:
