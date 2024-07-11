@@ -15,7 +15,9 @@ from pycellin.io.trackmate.loader import load_TrackMate_XML
 
 
 # TODO: find a way to write this fuction, see with JY
-def _unit_to_dimension(feat: Feature) -> str:
+def _unit_to_dimension(
+    feat: Feature,
+) -> str:
     """
     Convert a unit to a dimension.
 
@@ -46,7 +48,9 @@ def _unit_to_dimension(feat: Feature) -> str:
     return dimension
 
 
-def _convert_feature(feat: Feature) -> dict[str, str]:
+def _convert_feature(
+    feat: Feature,
+) -> dict[str, str]:
     """
     Convert a Pycellin feature to a TrackMate feature.
 
@@ -80,7 +84,10 @@ def _convert_feature(feat: Feature) -> dict[str, str]:
     return trackmate_feat
 
 
-def _write_FeatureDeclarations(xf: ET.xmlfile, model: Model) -> None:
+def _write_FeatureDeclarations(
+    xf: ET.xmlfile,
+    model: Model,
+) -> None:
     """
     Write the FeatureDeclarations XML tag into a TrackMate XML file.
 
@@ -145,8 +152,8 @@ def _value_to_str(
     # TODO: Should this function take care of converting non-numeric added
     # features to numeric ones (like GEN_ID)? Or should it be done in
     # pycellin?
-    # print(value, type(value))
-
+    # I can also use the provenance field to ientify which features come
+    # from TrackMate.
     if isinstance(value, str):
         return value
     elif math.isnan(value):
@@ -160,7 +167,10 @@ def _value_to_str(
         return str(value)
 
 
-def _create_Spot(lineage: CellLineage, node: int) -> ET._Element:
+def _create_Spot(
+    lineage: CellLineage,
+    node: int,
+) -> ET._Element:
     """
     Create an XML Spot Element representing a node of a Lineage.
 
@@ -176,11 +186,6 @@ def _create_Spot(lineage: CellLineage, node: int) -> ET._Element:
     ET._Element
         The newly created Spot Element.
     """
-    # Building Spot attributes.
-    # print(lineage.nodes[node].keys())
-    # I have a feature ROI_N_POINTS and I shouldn't.
-    # print(lineage.nodes[node]["ROI_N_POINTS"])
-
     exluded_keys = ["TRACK_ID", "ROI_COORDINATES"]
     n_attr = {
         k: _value_to_str(v)
@@ -197,7 +202,10 @@ def _create_Spot(lineage: CellLineage, node: int) -> ET._Element:
     return el_node
 
 
-def _write_AllSpots(xf: ET.xmlfile, data: CoreData) -> None:
+def _write_AllSpots(
+    xf: ET.xmlfile,
+    data: CoreData,
+) -> None:
     """
     Write the nodes/spots data into an XML file.
 
@@ -212,8 +220,8 @@ def _write_AllSpots(xf: ET.xmlfile, data: CoreData) -> None:
     lineages = data.values()
     nb_nodes = sum([len(lin) for lin in lineages])
     with xf.element("AllSpots", {"nspots": str(nb_nodes)}):
-        # For each frame, nodes can be spread over several lineages so we first
-        # need to identify all of the existing frames.
+        # For each frame, nodes can be spread over several lineages
+        # so we first need to identify all of the existing frames.
         frames = set()
         for lin in lineages:
             frames.update(nx.get_node_attributes(lin, "FRAME").values())
@@ -231,7 +239,10 @@ def _write_AllSpots(xf: ET.xmlfile, data: CoreData) -> None:
         xf.write(f"\n{' '*4}")
 
 
-def _write_AllTracks(xf: ET.xmlfile, data: CoreData) -> None:
+def _write_AllTracks(
+    xf: ET.xmlfile,
+    data: CoreData,
+) -> None:
     """
     Write the tracks data into an XML file.
 
@@ -269,7 +280,10 @@ def _write_AllTracks(xf: ET.xmlfile, data: CoreData) -> None:
         xf.write(f"\n{' '*4}")
 
 
-def _write_FilteredTracks(xf: ET.xmlfile, data: CoreData) -> None:
+def _write_FilteredTracks(
+    xf: ET.xmlfile,
+    data: CoreData,
+) -> None:
     """
     Write the filtered tracks data into an XML file.
 
@@ -291,7 +305,11 @@ def _write_FilteredTracks(xf: ET.xmlfile, data: CoreData) -> None:
     xf.write(f"\n{' '*2}")
 
 
-def _write_metadata_tag(xf: ET.xmlfile, metadata: dict[str, Any], tag: str) -> None:
+def _write_metadata_tag(
+    xf: ET.xmlfile,
+    metadata: dict[str, Any],
+    tag: str,
+) -> None:
     """
     Write the specified XML tag into a TrackMate XML file.
 
@@ -314,7 +332,9 @@ def _write_metadata_tag(xf: ET.xmlfile, metadata: dict[str, Any], tag: str) -> N
         xf.write(ET.Element(tag))
 
 
-def _ask_units(feat_declaration: FeaturesDeclaration) -> dict[str, str]:
+def _ask_units(
+    feat_declaration: FeaturesDeclaration,
+) -> dict[str, str]:
     """
     Ask the user to check units consistency and to give a unique spatial and a unique temporal units.
 
