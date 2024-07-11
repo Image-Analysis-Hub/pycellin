@@ -159,10 +159,11 @@ def export_TrackMate_XML(
             xf.write("\n  ")
             _write_tag(xf, model.metadata, "Log")
             xf.write("\n  ")
-            _write_FeatureDeclarations(xf, model)
-            # _write_AllSpots(xf, model)
-            # _write_AllTracks(xf, model)
-            # _write_FilteredTracks(xf, model)
+            with xf.element("Model", units):
+                _write_FeatureDeclarations(xf, model)
+                # _write_AllSpots(xf, model)
+                # _write_AllTracks(xf, model)
+                # _write_FilteredTracks(xf, model)
             xf.write("\n  ")
             for tag in ["Settings", "GUIState", "DisplaySettings"]:
                 _write_tag(xf, model.metadata, tag)
