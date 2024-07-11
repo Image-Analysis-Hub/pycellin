@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from pycellin.classes.lineage import CellLineage
+
 
 class Data:
     """
@@ -9,7 +11,7 @@ class Data:
     Or maybe I need only the Data class and no subclasses.
     """
 
-    def __init__(self, data):
+    def __init__(self, data: dict[str, CellLineage]):
         self.data = data
 
 
