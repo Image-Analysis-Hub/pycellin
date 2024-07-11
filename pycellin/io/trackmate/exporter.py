@@ -168,7 +168,6 @@ def _ask_units(feat_declaration: FeaturesDeclaration) -> dict[str, str]:
     model_units = feat_declaration.get_units_per_features()
     for unit, feats in model_units.items():
         print(f"{unit}: {feats}")
-    # TODO: Should I ask the user if the units are correct before moving to the next step?
     trackmate_units = {}
     trackmate_units["spatialunits"] = input("Please type the spatial unit: ")
     trackmate_units["temporalunits"] = input("Please type the temporal unit: ")
@@ -179,6 +178,7 @@ def _ask_units(feat_declaration: FeaturesDeclaration) -> dict[str, str]:
 def export_TrackMate_XML(
     model: Model,
     xml_path: str,
+    units: dict[str, str] = None,
 ) -> None:
     """
     Write an XML file readable by TrackMate from a Pycellin model.
@@ -189,11 +189,13 @@ def export_TrackMate_XML(
         Pycellin model containing the data to write.
     xml_path : str
         Path of the XML file to write.
+    units : dict[str, str], optional
+        Dictionary containing the spatial and temporal units of the model.
+        If not specified, the user will be asked to provide them.
     """
 
-    # TODO: DON'T FORGET TO REMOVE THE NEXT LINE AND UNCOMMENT THE NEXT ONE
-    units = {"spatialunits": "pixel", "temporalunits": "frame"}
-    # units = _ask_units(model.feat_declaration)
+    if not units:
+        units = _ask_units(model.feat_declaration)
 
     with ET.xmlfile(xml_path, encoding="utf-8", close=True) as xf:
         xf.write_declaration()
@@ -229,4 +231,6 @@ if __name__ == "__main__":
     model = load_TrackMate_XML(xml_in)
     # print(model.feat_declaration.node_feats)
     # model.metadata.pop("GUIState")
-    export_TrackMate_XML(model, xml_out)
+    export_TrackMate_XML(
+        model, xml_out, {"spatialunits": "pixel", "temporalunits": "sec"}
+    )
