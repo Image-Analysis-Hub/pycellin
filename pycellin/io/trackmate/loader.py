@@ -426,6 +426,7 @@ def _add_edge(
         # Adding the current track ID to the nodes of the newly created
         # edge. This will be useful later to filter nodes by track and
         # add the saved tracks attributes (as returned by this method).
+        # TODO: need to add this to the feature declaration.
         error_msg = f"Incoherent track ID for nodes {entry_node_id} and {exit_node_id}."
         entry_node = lineage.nodes[entry_node_id]
         if "TRACK_ID" not in entry_node:
