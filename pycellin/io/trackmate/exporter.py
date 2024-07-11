@@ -42,11 +42,42 @@ def _unit_to_dimension(feat: Feature) -> str:
         case "none" | "frame":
             dimension = "NONE"
     # It's going to be a nightmare to deal with all the possible cases.
+    dimension = "TODO"
     return dimension
 
 
 def _convert_feature(feat: Feature) -> dict[str, str]:
-    pass
+    """
+    Convert a Pycellin feature to a TrackMate feature.
+
+    Parameters
+    ----------
+    feat : Feature
+        Feature to convert.
+
+    Returns
+    -------
+    dict[str, str]
+        Dictionary of the converted feature.
+    """
+    trackmate_feat = {}
+    match feat.name:
+        case "ID" | "name":
+            # These features do not exist in TrackMate features declaration.
+            pass
+        case "ROI_COORDINATES":
+            pass
+        case _:
+            trackmate_feat["feature"] = feat.name
+            trackmate_feat["name"] = feat.description
+            trackmate_feat["shortname"] = feat.name.lower()
+            trackmate_feat["dimension"] = _unit_to_dimension(feat)
+            if feat.data_type == "int":
+                trackmate_feat["isint"] = "true"
+            else:
+                trackmate_feat["isint"] = "false"
+
+    return trackmate_feat
 
 
 def _write_FeatureDeclarations(xf: ET.xmlfile, model: Model) -> None:
@@ -54,7 +85,8 @@ def _write_FeatureDeclarations(xf: ET.xmlfile, model: Model) -> None:
     Write the FeatureDeclarations XML tag into a TrackMate XML file.
 
     The features declaration is divided in three parts: spot features,
-    edge features, and track features.
+    edge features, and track features. But they are all processed
+    in the same way.
 
     Parameters
     ----------
@@ -70,10 +102,24 @@ def _write_FeatureDeclarations(xf: ET.xmlfile, model: Model) -> None:
             xf.write(f"\n{' '*6}")
             with xf.element(f_type):
                 xf.write(f"\n{' '*8}")
-                # Need to convert the Pycellin feature to a TrackMate one
-                # _convert_feature(feat: Feature) -> dict[str, str]
-                # I will use the name as shortname for the feature
-                pass
+                match f_type:
+                    case "SpotFeatures":
+                        features = model.feat_declaration.node_feats
+                    case "EdgeFeatures":
+                        features = model.feat_declaration.edge_feats
+                    case "TrackFeatures":
+                        features = model.feat_declaration.lin_feats
+                dict_length = len(features)
+                for i, feat in enumerate(features.values()):
+                    trackmate_feat = _convert_feature(feat)
+                    if trackmate_feat:
+                        xf.write(ET.Element("Feature", trackmate_feat))
+                        if i != dict_length - 1:
+                            xf.write(f"\n{' '*8}")
+                    # if i == dict_length - 1:
+                    #     xf.write(f"")
+                xf.write(f"\n{' '*6}")
+        xf.write(f"\n{' '*4}")
 
 
 def _write_tag(xf: ET.xmlfile, metadata: dict[str, Any], tag: str) -> None:
@@ -145,7 +191,9 @@ def export_TrackMate_XML(
         Path of the XML file to write.
     """
 
-    units = _ask_units(model.feat_declaration)
+    # TODO: DON'T FORGET TO REMOVE THE NEXT LINE AND UNCOMMENT THE NEXT ONE
+    units = {"spatialunits": "pixel", "temporalunits": "frame"}
+    # units = _ask_units(model.feat_declaration)
 
     with ET.xmlfile(xml_path, encoding="utf-8", close=True) as xf:
         xf.write_declaration()
