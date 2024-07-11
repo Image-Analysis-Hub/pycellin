@@ -160,10 +160,45 @@ def _value_to_str(
         return str(value)
 
 
-def _create_Spot(
-    lineage: CellLineage,
-    node: int,
-) -> ET._Element:
+def _write_AllTracks(xf: ET.xmlfile, data: CoreData) -> None:
+    """
+    Write the tracks data into an XML file.
+
+    Parameters
+    ----------
+    xf : ET.xmlfile
+        Context manager for the XML file to write.
+    data : CoreData
+        Lineages containing the data to write.
+    """
+    xf.write(f"\n{' '*4}")
+    with xf.element("AllTracks"):
+        for lineage in data.values():
+            # We have track tags to add only if there was a tracking done
+            # in the first place. A lineage with no TRACK_ID attribute has
+            # no tracking associated.
+            if "TRACK_ID" not in lineage.graph:
+                continue
+
+            # Track tags.
+            xf.write(f"\n{' '*6}")
+            exluded_keys = ["Model", "FilteredTrack"]
+            t_attr = {
+                k: _value_to_str(v)
+                for k, v in lineage.graph.items()
+                if k not in exluded_keys
+            }
+            with xf.element("Track", t_attr):
+                # Edge tags.
+                for edge in lineage.edges.data():
+                    xf.write(f"\n{' '*8}")
+                    e_attr = {k: _value_to_str(v) for k, v in edge[2].items()}
+                    xf.write(ET.Element("Edge", e_attr))
+                xf.write(f"\n{' '*6}")
+        xf.write(f"\n{' '*4}")
+
+
+def _create_Spot(lineage: CellLineage, node: int) -> ET._Element:
     """
     Create an XML Spot Element representing a node of a Lineage.
 
@@ -200,12 +235,22 @@ def _create_Spot(
     return el_node
 
 
-def _write_AllSpots(xf: ET.xmlfile, model: Model) -> None:
+def _write_AllSpots(xf: ET.xmlfile, data: CoreData) -> None:
+    """
+    Write the nodes/spots data into an XML file.
+
+    Parameters
+    ----------
+    xf : ET.xmlfile
+        Context manager for the XML file to write.
+    data : CoreData
+        Lineages containing the data to write.
+    """
     xf.write(f"\n{' '*4}")
-    lineages = model.coredata.data.values()
+    lineages = data.values()
     nb_nodes = sum([len(lin) for lin in lineages])
     with xf.element("AllSpots", {"nspots": str(nb_nodes)}):
-        # For each frame, nodes can be spread over several graphs so we first
+        # For each frame, nodes can be spread over several lineages so we first
         # need to identify all of the existing frames.
         frames = set()
         for lin in lineages:
@@ -313,8 +358,8 @@ def export_TrackMate_XML(
             xf.write("\n  ")
             with xf.element("Model", units):
                 _write_FeatureDeclarations(xf, model)
-                _write_AllSpots(xf, model)
-                # _write_AllTracks(xf, model)
+                _write_AllSpots(xf, model.coredata.data)
+                _write_AllTracks(xf, model.coredata.data)
                 # _write_FilteredTracks(xf, model)
             xf.write("\n  ")
             for tag in ["Settings", "GUIState", "DisplaySettings"]:
