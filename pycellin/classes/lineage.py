@@ -62,6 +62,23 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
     pass
 
+    def plot(self):
+        # TODO: investigate the use of plotly to draw an interactive lineage
+        # instead of networkx-pygraphviz. Pygraphviz installation in Windows
+        # is not straightforward and need the preliminary installation of
+        # Graphviz executable.
+        # https://plotly.com/python/tree-plots/
+        # It will rely on igraph but there is a networkx to igraph converter,
+        # and igraph can be installed via conda and is actively supported.
+        # https://python.igraph.org/en/stable/
+        # https://python.igraph.org/en/stable/generation.html#from-external-libraries
+        # Or maybe I can let the user choose between pygraphviz and plotly?
+        pos = nx.drawing.nx_agraph.graphviz_layout(self, prog="dot")
+        # The computed positions do not temporally align the nodes, so we force
+        # the y position to be the frame number.
+        pos = {node: (x, -self.nodes[node]["FRAME"]) for node, (x, _) in pos.items()}
+        nx.draw(self, pos, with_labels=True, arrows=True, font_weight="bold")
+
 
 class CellLineage(Lineage):
 
