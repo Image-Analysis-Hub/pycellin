@@ -14,6 +14,9 @@ class Data:
     def __init__(self, data: dict[str, CellLineage]):
         self.data = data
 
+    def number_of_lineages(self) -> int:
+        return len(self.data)
+
 
 class CoreData(Data):
     """
