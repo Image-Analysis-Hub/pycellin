@@ -113,6 +113,17 @@ class Model:
         """
         pass
 
+    def read(self, path: str) -> None:
+        """
+        Read a model from a Pycellin file.
+
+        Parameters
+        ----------
+        path : str
+            Path to read the model.
+        """
+        pass
+
     def export(self, path: str, format: str) -> None:
         """
         Export the model to a file in a specific format (e.g. TrackMate).
