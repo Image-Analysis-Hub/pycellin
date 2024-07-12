@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import pickle
 from typing import Any
 
 from pycellin.classes.feature import FeaturesDeclaration
@@ -102,27 +103,34 @@ class Model:
         """
         pass
 
-    def save(self, path: str) -> None:
+    def save_to_pickle(
+        self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL
+    ) -> None:
         """
-        Save the model to a file.
+        Save the model to a file by pickling it.
 
         Parameters
         ----------
         path : str
             Path to save the model.
+        protocol : int, optional
+            Pickle protocol to use (default is pickle.HIGHEST_PROTOCOL).
         """
-        pass
+        with open(path, "wb") as file:
+            pickle.dump(self, file, protocol=protocol)
 
-    def read(self, path: str) -> None:
+    @staticmethod
+    def read_from_pickle(path: str) -> None:
         """
-        Read a model from a Pycellin file.
+        Read a model from a pickled Pycellin file.
 
         Parameters
         ----------
         path : str
             Path to read the model.
         """
-        pass
+        with open(path, "rb") as file:
+            return pickle.load(file)
 
     def export(self, path: str, format: str) -> None:
         """
