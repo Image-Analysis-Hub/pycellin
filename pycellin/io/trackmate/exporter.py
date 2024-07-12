@@ -14,7 +14,7 @@ from pycellin.classes.lineage import CellLineage
 from pycellin.io.trackmate.loader import load_TrackMate_XML
 
 
-# TODO: find a way to write this fuction, see with JY
+# TODO: finish this function
 def _unit_to_dimension(
     feat: Feature,
 ) -> str:
@@ -34,17 +34,110 @@ def _unit_to_dimension(
     unit = feat.unit
     name = feat.name
     desc = feat.description
-    match unit:
-        case "pixel":
-            if "position" in name.lower() or name.lower() in ["x", "y", "z"]:
-                # Does not work if POSITION_T
-                dimension = "POSITION"
-            else:
-                dimension = "LENGTH"
-        case "none" | "frame":
-            dimension = "NONE"
-    # It's going to be a nightmare to deal with all the possible cases.
-    dimension = "TODO"
+    provenance = feat.provenance
+
+    # TrackMate features
+    # Mapping between TrackMate features and their dimensions.
+    trackmate_dict = {
+        # Spot features
+        "QUALITY": "QUALITY",
+        "POSITION_X": "POSITION",
+        "POSITION_Y": "POSITION",
+        "POSITION_Z": "POSITION",
+        "POSITION_T": "TIME",
+        "FRAME": "NONE",
+        "RADIUS": "LENGTH",
+        "VISIBILITY": "NONE",
+        "MANUAL_SPOT_COLOR": "NONE",
+        "MEAN_INTENSITY_CH1": "INTENSITY",
+        "MEDIAN_INTENSITY_CH1": "INTENSITY",
+        "MIN_INTENSITY_CH1": "INTENSITY",
+        "MAX_INTENSITY_CH1": "INTENSITY",
+        "TOTAL_INTENSITY_CH1": "INTENSITY",
+        "STD_INTENSITY_CH1": "INTENSITY",
+        "CONTRAST_CH1": "NONE",
+        "SNR_CH1": "NONE",
+        "ELLIPSE_X0": "LENGTH",
+        "ELLIPSE_Y0": "LENGTH",
+        "ELLIPSE_MAJOR": "LENGTH",
+        "ELLIPSE_MINOR": "LENGTH",
+        "ELLIPSE_THETA": "ANGLE",
+        "ELLIPSE_ASPECTRATIO": "NONE",
+        "AREA": "AREA",
+        "PERIMETER": "LENGTH",
+        "CIRCULARITY": "NONE",
+        "SOLIDITY": "NONE",
+        "SHAPE_INDEX": "NONE",
+        # Edge features
+        "SPOT_SOURCE_ID": "NONE",
+        "SPOT_TARGET_ID": "NONE",
+        "LINK_COST": "COST",
+        "DIRECTIONAL_CHANGE_RATE": "ANGLE_RATE",
+        "SPEED": "VELOCITY",
+        "DISPLACEMENT": "LENGTH",
+        "EDGE_TIME": "TIME",
+        "EDGE_X_LOCATION": "POSITION",
+        "EDGE_Y_LOCATION": "POSITION",
+        "EDGE_Z_LOCATION": "POSITION",
+        "MANUAL_EDGE_COLOR": "NONE",
+        # Track features
+        "TRACK_INDEX": "NONE",
+        "TRACK_ID": "NONE",
+        "NUMBER_SPOTS": "NONE",
+        "NUMBER_GAPS": "NONE",
+        "NUMBER_SPLITS": "NONE",
+        "NUMBER_MERGES": "NONE",
+        "NUMBER_COMPLEX": "NONE",
+        "LONGEST_GAP": "NONE",
+        "TRACK_DURATION": "TIME",
+        "TRACK_START": "TIME",
+        "TRACK_STOP": "TIME",
+        "TRACK_DISPLACEMENT": "LENGTH",
+        "TRACK_X_LOCATION": "POSITION",
+        "TRACK_Y_LOCATION": "POSITION",
+        "TRACK_Z_LOCATION": "POSITION",
+        "TRACK_MEAN_SPEED": "VELOCITY",
+        "TRACK_MAX_SPEED": "VELOCITY",
+        "TRACK_MIN_SPEED": "VELOCITY",
+        "TRACK_MEDIAN_SPEED": "VELOCITY",
+        "TRACK_STD_SPEED": "VELOCITY",
+        "TRACK_MEAN_QUALITY": "QUALITY",
+        "TOTAL_DISTANCE_TRAVELED": "LENGTH",
+        "MAX_DISTANCE_TRAVELED": "LENGTH",
+        "CONFINEMENT_RATIO": "NONE",
+        "MEAN_STRAIGHT_LINE_SPEED": "VELOCITY",
+        "LINEARITY_OF_FORWARD_PROGRESSION": "NONE",
+        "MEAN_DIRECTIONAL_CHANGE_RATE": "ANGLE_RATE",
+    }
+    if provenance == "TrackMate":
+        if name in trackmate_dict:
+            dimension = trackmate_dict[name]
+        else:
+            print(
+                f"WARNING: {name} is a feature listed as coming from TrackMate"
+                f" but it is not a known feature of TrackMate. Dimension is set"
+                f" to UNKNOWN."
+            )
+            # TODO: Does TM crashes if the dimension is "UNKNOWN"?
+            dimension = "UNKNOWN"
+
+    elif provenance == "Pycellin":
+        dimension = "TODO1"
+
+    else:
+        match unit:
+            case "pixel":
+                if name.lower() in ["x", "y", "z"]:
+                    dimension = "POSITION"
+                else:
+                    dimension = "LENGTH"
+            case "none" | "frame":
+                dimension = "NONE"
+        # It's going to be a nightmare to deal with all the possible cases.
+        # Is it even possible? I should ask the user for a file with
+        # a feature-dimension mapping.
+        dimension = "TODO2"
+
     return dimension
 
 
