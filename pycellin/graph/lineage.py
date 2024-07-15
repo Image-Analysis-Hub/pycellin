@@ -10,6 +10,7 @@ import networkx as nx
 ### Accessing elements ###
 
 
+# DONE
 def get_root(graph: nx.DiGraph) -> int:
     if len(graph) == 1:
         root = [n for n in graph.nodes()]
@@ -24,6 +25,7 @@ def get_root(graph: nx.DiGraph) -> int:
     return root[0]
 
 
+# DONE
 def get_leaves(graph: nx.DiGraph) -> list[int]:
     leaves = [
         n for n in graph.nodes() if graph.in_degree(n) != 0 and graph.out_degree(n) == 0
@@ -31,6 +33,7 @@ def get_leaves(graph: nx.DiGraph) -> list[int]:
     return leaves
 
 
+# DONE
 def get_divisions(graph: nx.DiGraph, nodes: Optional[list[int]] = None) -> list[int]:
     if nodes is None:
         nodes = graph.nodes()
@@ -131,6 +134,7 @@ def get_generations(
 ### Predicates ###
 
 
+# DONE
 def is_root(graph: nx.DiGraph, node: int):
     if graph.in_degree(node) == 0 and graph.out_degree(node) != 0:
         return True
@@ -138,6 +142,7 @@ def is_root(graph: nx.DiGraph, node: int):
         return False
 
 
+# DONE
 def is_leaf(graph: nx.DiGraph, node: int):
     if graph.in_degree(node) != 0 and graph.out_degree(node) == 0:
         return True
@@ -145,6 +150,7 @@ def is_leaf(graph: nx.DiGraph, node: int):
         return False
 
 
+# DONE
 def is_division(graph: nx.DiGraph, node: int):
     if graph.in_degree(node) <= 1 and graph.out_degree(node) > 1:
         return True
@@ -155,6 +161,7 @@ def is_division(graph: nx.DiGraph, node: int):
 ### Not so random stuff ###
 
 
+# DONE
 def display_lineage(graph: nx.DiGraph):
     pos = nx.drawing.nx_agraph.graphviz_layout(graph, prog="dot")
     plt.figure(figsize=(12, 12))
