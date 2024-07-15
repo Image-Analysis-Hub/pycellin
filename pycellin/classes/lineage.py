@@ -60,7 +60,50 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     #     # element_type: node or edge, but maybe it could also be 0 for node and 1 for edge
     #     pass
 
-    pass
+    def get_root(self) -> int:
+        """
+        Return the root of the lineage.
+
+        The root is defined as the first node of the lineage temporally speaking,
+        i.e. the node with no incoming edges and at least one outgoing edge.
+        A lineage has one and exactly one root node.
+        In the case where the lineage has only one node,
+        that node is considered the root.
+
+        Returns:
+            int: The root node of the lineage.
+
+        Raises:
+            AssertionError: If there is more or less than one root node.
+        """
+        if len(self) == 1:
+            root = [n for n in self.nodes()]
+            assert len(root) == 1
+        else:
+            root = [
+                n
+                for n in self.nodes()
+                if self.in_degree(n) == 0 and self.out_degree(n) != 0
+            ]
+            assert len(root) == 1
+        return root[0]
+
+    def get_leaves(self) -> list[int]:
+        """
+        Return the leaves of the lineage.
+
+        The leaves are defined as the nodes with at least one incoming edge
+        and no outgoing edges.
+
+        Returns:
+            list[int]: The list of leaf nodes in the lineage.
+        """
+        leaves = [
+            n
+            for n in self.nodes()
+            if self.in_degree(n) != 0 and self.out_degree(n) == 0
+        ]
+        return leaves
 
     def plot(self):
         # TODO: investigate the use of plotly to draw an interactive lineage
@@ -82,7 +125,22 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
 class CellLineage(Lineage):
 
-    pass
+    def get_divisions(self, nodes: Optional[list[int]] = None) -> list[int]:
+        """
+        Return the division nodes of the lineage.
+
+        Division nodes are defined as nodes with more than one outgoing edge.
+
+        Parameters:
+            nodes (Optional[list[int]]): A list of nodes to check for divisions.
+                If None, all nodes in the lineage will be checked.
+
+        Returns:
+            list[int]: The list of division nodes in the lineage.
+        """
+        if nodes is None:
+            nodes = self.nodes()
+        return [n for n in nodes if self.out_degree(n) > 1]
 
 
 class CycleLineage(Lineage):
