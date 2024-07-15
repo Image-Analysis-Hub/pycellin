@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import pickle
-from typing import Any
+from typing import Any, Literal
 
-from pycellin.classes.feature import FeaturesDeclaration
 from pycellin.classes.data import CoreData
+from pycellin.classes.feature import FeaturesDeclaration
+from pycellin.classes.lineage import CellLineage, CycleLineage
 
 
 class Model:
@@ -73,6 +74,39 @@ class Model:
         else:
             txt = f"Model with {self.coredata.number_of_lineages()} lineages."
         return txt
+
+    # TODO: do I need these methods?
+    # def get_cell_lineages(self) -> list[CellLineage]:
+    #     return self.coredata.data
+
+    # def get_cycle_lineages(self) -> list[CycleLineage]:
+    #     return self.cycledata.data
+
+    # def get_cell_lineage_from_ID(self, lineage_id: int) -> CellLineage:
+    #     return self.coredata.data[lineage_id]
+
+    # def get_cycle_lineage_from_ID(self, lineage_id: int) -> CycleLineage:
+    #     return self.cycledata.data[lineage_id]
+
+    # def get_lineage_from_name(self, name: str, lineage_type: Literal["cell", "cycle", "both"] = "both") -> CellLineage:
+    #     """
+    #     Return the cell lineage with the specified name.
+
+    #     Parameters
+    #     ----------
+    #     name : str
+    #         Name of the cell lineage to return.
+    #     lineage_type : Literal["cell", "cycle", "both"], optional
+    #         Type of lineage to return (default is "both").
+
+    #     Returns
+    #     -------
+    #     CellLineage
+    #         The cell lineage with the specified name.
+    #     """
+    #     # FIXME: bad design? In some cases it will return a Lineage
+    #     # and in others a dict of Lineages...
+    #     pass
 
     def add_feature(self, feature_name: str) -> None:
         """
