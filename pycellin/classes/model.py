@@ -46,6 +46,34 @@ class Model:
         # error will be raised when trying to access the attribute.
         # Same for provenance, description, etc.
 
+    def __repr__(self) -> str:
+        return (
+            f"Model(metadata={self.metadata!r}, "
+            f"feat_declaration={self.feat_declaration!r}, "
+            f"coredata={self.coredata!r})"
+        )
+
+    def __str__(self) -> str:
+        if "Name" in self.metadata and "Provenance" in self.metadata:
+            txt = (
+                f"Model named '{self.metadata['Name']}' "
+                f"with {self.coredata.number_of_lineages()} lineages, "
+                f"built from {self.metadata['Provenance']}."
+            )
+        elif "Name" in self.metadata:
+            txt = (
+                f"Model named '{self.metadata['Name']}' "
+                f"with {self.coredata.number_of_lineages()} lineages."
+            )
+        elif "Provenance" in self.metadata:
+            txt = (
+                f"Model with {self.coredata.number_of_lineages()} lineages, "
+                f"built from {self.metadata['Provenance']}."
+            )
+        else:
+            txt = f"Model with {self.coredata.number_of_lineages()} lineages."
+        return txt
+
     def add_feature(self, feature_name: str) -> None:
         """
         Add the specified feature to the model.
