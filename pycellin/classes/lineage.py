@@ -221,6 +221,70 @@ class CellLineage(Lineage):
             nodes = self.nodes()
         return [n for n in nodes if self.out_degree(n) > 1]
 
+    def get_cell_cycle(self, node: int) -> list[int]:
+        """
+        Identify all the nodes in the cell cycle of a given node, in chronological order.
+
+        The cell cycle starts from the root or a division node,
+        and ends at a division or leaf node.
+
+        Parameters
+        ----------
+        node : int
+            The node for which to identify the nodes in the cell cycle.
+
+        Returns
+        -------
+        list[int]
+            A chronologically ordered list of nodes representing
+            the cell cycle for the given node.
+        """
+        cell_cycle = [node]
+        start = False
+        end = False
+
+        if self.is_root(node):
+            start = True
+        if self.is_division(node) or self.is_leaf(node):
+            end = True
+
+        if not start:
+            predecessors = list(self.predecessors(node))
+            assert len(predecessors) == 1
+            while not self.is_division(*predecessors) and not self.is_root(
+                *predecessors
+            ):
+                # While not the generation birth.
+                cell_cycle.append(*predecessors)
+                predecessors = list(self.predecessors(*predecessors))
+                err = (
+                    f"Node {node} in {self.graph['name']} has "
+                    f"{len(predecessors)} predecessors."
+                )
+                assert len(predecessors) == 1, err
+            if self.is_root(*predecessors) and not self.is_division(*predecessors):
+                cell_cycle.append(*predecessors)
+            cell_cycle.reverse()  # We built it from the end.
+
+        if not end:
+            successors = list(self.successors(node))
+            err = (
+                f"Node {node} in {self.graph['name']} has "
+                f"{len(successors)} successors."
+            )
+            assert len(successors) == 1, err
+            while not self.is_division(*successors) and not self.is_leaf(*successors):
+                cell_cycle.append(*successors)
+                successors = list(self.successors(*successors))
+                err = (
+                    f"Node {node} in {self.graph['name']} has "
+                    f"{len(successors)} successors."
+                )
+                assert len(successors) == 1, err
+            cell_cycle.append(*successors)
+
+        return cell_cycle
+
     def is_division(self, node: int):
         """
         Check if a given node is a division node.
