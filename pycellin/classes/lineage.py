@@ -285,6 +285,47 @@ class CellLineage(Lineage):
 
         return cell_cycle
 
+    def get_cell_cycles(
+        self, keep_incomplete_cell_cycles: bool = False, debug: bool = False
+    ):
+        """
+        Identify all the nodes of each cell cycle in a lineage.
+
+        A cell cycle is a tree segment that starts at the root or at a
+        division node, ends at a division node or at a leaf, and doesn't
+        include any other division.
+
+        Parameters
+        ----------
+        keep_incomplete_cell_cycles : bool, optional
+            True to keep the first and last cell cycles, False otherwise.
+            Defaults to False.
+        debug : bool, optional
+            True to display debug messages. False otherwise. Defaults to False.
+
+        Returns
+        -------
+        list(list(int))
+            List of nodes ID for each cell cycle, in chronological order.
+        """
+        if keep_incomplete_cell_cycles:
+            end_nodes = self.get_divisions() + self.get_leaves()
+        else:
+            end_nodes = self.get_divisions()  # Includes the root if it's a div.
+        if debug:
+            print("End nodes:", end_nodes)
+
+        cell_cycles = []
+        for node in end_nodes:
+            cc_nodes = self.get_generation(node)
+            if not keep_incomplete_cell_cycles and self.get_root() in cc_nodes:
+                continue
+            cell_cycles.append(cc_nodes)
+            if debug:
+                print("Cell cycle nodes:", cc_nodes)
+
+        return cell_cycles
+
     def is_division(self, node: int):
         """
         Check if a given node is a division node.
