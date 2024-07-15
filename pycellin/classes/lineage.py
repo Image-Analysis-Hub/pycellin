@@ -105,6 +105,42 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ]
         return leaves
 
+    def is_root(self, node: int):
+        """
+        Check if a given node is a root node.
+
+        The root is defined as the first node of the lineage temporally speaking,
+        i.e. the node with no incoming edges and at least one outgoing edge.
+
+        Parameters:
+            node (int): The node to check.
+
+        Returns:
+            bool: True if the node is a root node, False otherwise.
+        """
+        if self.in_degree(node) == 0 and self.out_degree(node) != 0:
+            return True
+        else:
+            return False
+
+    def is_leaf(self, node: int):
+        """
+        Check if a given node is a leaf node.
+
+        A leaf node is defined as a node with at least one incoming edge
+        and no outgoing edges.
+
+        Parameters:
+            node (int): The node to check.
+
+        Returns:
+            bool: True if the node is a leaf node, False otherwise.
+        """
+        if self.in_degree(node) != 0 and self.out_degree(node) == 0:
+            return True
+        else:
+            return False
+
     def plot(self):
         # TODO: investigate the use of plotly to draw an interactive lineage
         # instead of networkx-pygraphviz. Pygraphviz installation in Windows
@@ -141,6 +177,24 @@ class CellLineage(Lineage):
         if nodes is None:
             nodes = self.nodes()
         return [n for n in nodes if self.out_degree(n) > 1]
+
+    def is_division(self, node: int):
+        """
+        Check if a given node is a division node.
+
+        A division node is defined as a node with more than one outgoing edge
+        and at most one incoming edge.
+
+        Parameters:
+            node (int): The node to check.
+
+        Returns:
+            bool: True if the node is a division node, False otherwise.
+        """
+        if self.in_degree(node) <= 1 and self.out_degree(node) > 1:
+            return True
+        else:
+            return False
 
 
 class CycleLineage(Lineage):
