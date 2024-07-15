@@ -10,12 +10,7 @@ import networkx as nx
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
     """
-    Do I really need this one?
-      => do I have something that is applicable for both cell and cycle lineage?
-    - id
-
-    Maybe it would make more sense to have CycleLineage inherit from CellLineage...?
-    I need to think about all the methods before I decide.
+    Abstract class for a lineage graph.
     """
 
     def __init__(self, nx_digraph: Optional[nx.DiGraph] = None):
@@ -73,7 +68,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Returns
         -------
-            int: The root node of the lineage.
+        int
+            The root node of the lineage.
 
         Raises
         ------
