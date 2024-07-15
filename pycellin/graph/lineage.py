@@ -40,10 +40,12 @@ def get_divisions(graph: nx.DiGraph, nodes: Optional[list[int]] = None) -> list[
     return [n for n in nodes if graph.out_degree(n) > 1]
 
 
+# DONE as get_ancestors()
 def get_branch(graph: nx.DiGraph, root: int, leave: int) -> list[int]:
     return nx.shortest_path(graph, source=root, target=leave)
 
 
+# DONE as get_cell_cycle()
 def get_generation(graph: nx.DiGraph, node: int) -> list[int]:
     gen = [node]
     start = False
@@ -92,6 +94,7 @@ def get_generation(graph: nx.DiGraph, node: int) -> list[int]:
     return gen
 
 
+# DONE as get_cell_cycles()
 def get_generations(
     graph: nx.DiGraph, keep_incomplete_gens: bool = False, debug: bool = False
 ):
