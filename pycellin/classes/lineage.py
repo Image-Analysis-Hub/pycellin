@@ -4,6 +4,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import Optional
 
+import matplotlib.pyplot as plt
 import networkx as nx
 
 
@@ -141,7 +142,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         else:
             return False
 
-    def plot(self):
+    def plot(self, figsize: tuple[float, float] = None):
         # TODO: investigate the use of plotly to draw an interactive lineage
         # instead of networkx-pygraphviz. Pygraphviz installation in Windows
         # is not straightforward and need the preliminary installation of
@@ -156,7 +157,10 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # The computed positions do not temporally align the nodes, so we force
         # the y position to be the frame number.
         pos = {node: (x, -self.nodes[node]["FRAME"]) for node, (x, _) in pos.items()}
+        if figsize is not None:
+            plt.figure(figsize=figsize)
         nx.draw(self, pos, with_labels=True, arrows=True, font_weight="bold")
+        plt.show()
 
 
 class CellLineage(Lineage):
