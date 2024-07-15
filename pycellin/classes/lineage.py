@@ -71,11 +71,14 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         In the case where the lineage has only one node,
         that node is considered the root.
 
-        Returns:
+        Returns
+        -------
             int: The root node of the lineage.
 
-        Raises:
-            AssertionError: If there is more or less than one root node.
+        Raises
+        ------
+        AssertionError
+            If there is more or less than one root node.
         """
         if len(self) == 1:
             root = [n for n in self.nodes()]
@@ -96,8 +99,10 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         The leaves are defined as the nodes with at least one incoming edge
         and no outgoing edges.
 
-        Returns:
-            list[int]: The list of leaf nodes in the lineage.
+        Returns
+        -------
+        list[int]
+            The list of leaf nodes in the lineage.
         """
         leaves = [
             n
@@ -113,11 +118,15 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         The root is defined as the first node of the lineage temporally speaking,
         i.e. the node with no incoming edges and at least one outgoing edge.
 
-        Parameters:
-            node (int): The node to check.
+        Parameters
+        ----------
+        node : int
+            The node to check.
 
-        Returns:
-            bool: True if the node is a root node, False otherwise.
+        Returns
+        -------
+        bool
+            True if the node is a root node, False otherwise.
         """
         if self.in_degree(node) == 0 and self.out_degree(node) != 0:
             return True
@@ -131,11 +140,15 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         A leaf node is defined as a node with at least one incoming edge
         and no outgoing edges.
 
-        Parameters:
-            node (int): The node to check.
+        Parameters
+        ----------
+        node : int
+            The node to check.
 
-        Returns:
-            bool: True if the node is a leaf node, False otherwise.
+        Returns
+        -------
+        bool
+            True if the node is a leaf node, False otherwise.
         """
         if self.in_degree(node) != 0 and self.out_degree(node) == 0:
             return True
@@ -171,12 +184,16 @@ class CellLineage(Lineage):
 
         Division nodes are defined as nodes with more than one outgoing edge.
 
-        Parameters:
-            nodes (Optional[list[int]]): A list of nodes to check for divisions.
-                If None, all nodes in the lineage will be checked.
+        Parameters
+        ----------
+        nodes : list[int], optional
+            A list of nodes to check for divisions. If None, all nodes
+            in the lineage will be checked.
 
-        Returns:
-            list[int]: The list of division nodes in the lineage.
+        Returns
+        -------
+        list[int]
+            The list of division nodes in the lineage.
         """
         if nodes is None:
             nodes = self.nodes()
@@ -189,11 +206,15 @@ class CellLineage(Lineage):
         A division node is defined as a node with more than one outgoing edge
         and at most one incoming edge.
 
-        Parameters:
-            node (int): The node to check.
+        Parameters
+        ----------
+        node : int
+            The node to check.
 
-        Returns:
-            bool: True if the node is a division node, False otherwise.
+        Returns
+        -------
+        bool
+            True if the node is a division node, False otherwise.
         """
         if self.in_degree(node) <= 1 and self.out_degree(node) > 1:
             return True
