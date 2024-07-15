@@ -738,7 +738,10 @@ def _parse_model_tag(
     return md, CoreData(data)
 
 
-def _get_specific_tags(xml_path: str, tag_names: list[str]) -> dict[str, ET._Element]:
+def _get_specific_tags(
+    xml_path: str,
+    tag_names: list[str],
+) -> dict[str, ET._Element]:
     """
     Extract specific tags from an XML file and returns them in a dictionary.
 
@@ -778,7 +781,9 @@ def _get_specific_tags(xml_path: str, tag_names: list[str]) -> dict[str, ET._Ele
     return dict_tags
 
 
-def _get_trackmate_version(xml_path: str) -> str:
+def _get_trackmate_version(
+    xml_path: str,
+) -> str:
     """
     Extract the version of TrackMate used to generate the XML file.
 

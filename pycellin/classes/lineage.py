@@ -295,9 +295,9 @@ class CellLineage(Lineage):
         ----------
         keep_incomplete_cell_cycles : bool, optional
             True to keep the first and last cell cycles, False otherwise.
-            Defaults to False.
+            False by default.
         debug : bool, optional
-            True to display debug messages. False otherwise. Defaults to False.
+            True to display debug messages, False otherwise. False by default.
 
         Returns
         -------
