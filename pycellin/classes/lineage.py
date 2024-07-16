@@ -199,59 +199,56 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     def plot_with_plotly(self):
         """
         Plot the lineage as a tree using Plotly.
+
+        Heavily based on the code from https://plotly.com/python/tree-plots/
         """
-
-        def make_annotations(pos, labels, font_size=10, font_color="rgb(250,250,250)"):
-            L = len(pos)
-            if len(labels) != L:
-                raise ValueError("The lists pos and text must have the same len")
-            annotations = []
-            for k in range(L):
-                annotations.append(
-                    dict(
-                        text=labels[
-                            k
-                        ],  # or replace labels with a different list for the text within the circle
-                        x=pos[k][0],
-                        y=2 * M - position[k][1],
-                        xref="x1",
-                        yref="y1",
-                        font=dict(color=font_color, size=font_size),
-                        showarrow=False,
-                    )
-                )
-            return annotations
-
-        # Conversion of the lineage/graph from networkx to igraph.
+        # Conversion of the networkx lineage graph to igraph.
         G = Graph.from_networkx(self)
-        # print(g)
+        nodes_count = G.vcount()
 
-        nr_vertices = G.vcount()
-        v_label = G.vs["ID"]
-        lay = G.layout("rt")  # plot tree
+        # Basic tree layout.
+        layout = G.layout("rt")
 
-        position = {k: lay[k] for k in range(nr_vertices)}
-        Y = [lay[k][1] for k in range(nr_vertices)]
-        # Y = [G.vs["ID"]]
-        M = max(Y)
+        # Adjusting the y position of the nodes to be the frame number.
+        frame_values = G.vs["FRAME"]
+        layout = [(layout[k][0], frame_values[k]) for k in range(nodes_count)]
 
-        es = EdgeSeq(G)  # sequence of edges
-        E = [e.tuple for e in G.es]  # list of edges
+        # Computing the exact positions of nodes and eges.
+        positions = {k: layout[k] for k in range(nodes_count)}
+        edges = [edge.tuple for edge in G.es]  # list of edges
+        x_nodes = [x for (x, _) in positions.values()]
+        y_nodes = [y for (_, y) in positions.values()]
+        x_edges = []
+        y_edges = []
+        for edge in edges:
+            x_edges += [positions[edge[0]][0], positions[edge[1]][0], None]
+            y_edges += [positions[edge[0]][1], positions[edge[1]][1], None]
 
-        L = len(position)
-        Xn = [position[k][0] for k in range(L)]
-        Yn = [2 * M - position[k][1] for k in range(L)]
-        Xe = []
-        Ye = []
-        for edge in E:
-            Xe += [position[edge[0]][0], position[edge[1]][0], None]
-            Ye += [2 * M - position[edge[0]][1], 2 * M - position[edge[1]][1], None]
+        # Annotations.
+        node_labels = G.vs["ID"]
+        if len(node_labels) != nodes_count:
+            raise ValueError("The lists pos and text must have the same len")
+        annotations = []
+        for k in range(nodes_count):
+            annotations.append(
+                dict(
+                    text=node_labels[k],
+                    # or replace labels with a different list for the text within the circle
+                    x=positions[k][0],
+                    # y=2 * M - positions[k][1],
+                    y=positions[k][1],
+                    xref="x1",
+                    yref="y1",
+                    font=dict(color="rgb(250,250,250)", size=10),
+                    showarrow=False,
+                )
+            )
 
         fig = go.Figure()
         fig.add_trace(
             go.Scatter(
-                x=Xe,
-                y=Ye,
+                x=x_edges,
+                y=y_edges,
                 mode="lines",
                 line=dict(color="rgb(210,210,210)", width=1),
                 hoverinfo="none",
@@ -259,40 +256,31 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         )
         fig.add_trace(
             go.Scatter(
-                x=Xn,
-                y=Yn,
+                x=x_nodes,
+                y=y_nodes,
                 mode="markers",
-                name="bla",
                 marker=dict(
                     symbol="circle",
                     size=18,
                     color="#6175c1",  #'#DB4551',
                     line=dict(color="rgb(50,50,50)", width=1),
                 ),
-                text=v_label,
+                text=node_labels,
                 hoverinfo="text",
-                opacity=0.8,
+                # opacity=0.8,
             )
-        )
-
-        axis = dict(
-            showline=False,  # hide axis line, grid, ticklabels and  title
-            zeroline=False,
-            showgrid=False,
-            showticklabels=False,
         )
 
         fig.update_layout(
             title="Title",
-            annotations=make_annotations(position, v_label),
+            annotations=annotations,
             font_size=5,
             showlegend=False,
-            xaxis=axis,
-            yaxis=axis,
-            margin=dict(l=40, r=40, b=85, t=100),
             hovermode="closest",
             plot_bgcolor="rgb(248,248,248)",
         )
+        fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+        fig.update_yaxes(autorange="reversed", title="Time (frames)")
         fig.show()
 
 
