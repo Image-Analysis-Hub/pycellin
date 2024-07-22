@@ -202,6 +202,10 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Heavily based on the code from https://plotly.com/python/tree-plots/
         """
+        # TODO: change feature names to fit Pycellin. FRAME? frame?
+        # TODO: extract parameters to make the function more versatile,
+        # especially for hoverinfo.
+
         # Conversion of the networkx lineage graph to igraph.
         G = Graph.from_networkx(self)
         nodes_count = G.vcount()
