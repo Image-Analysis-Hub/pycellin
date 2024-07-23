@@ -234,10 +234,6 @@ def load_CTC_file(
         _update_node_attributes(lin, lin_id)
         lin_id += 1
 
-    for lin in lineages:
-        print(f'{lin.graph["lineage_ID"]} - {lin}')
-        # lin.plot_with_plotly()
-
     data = {}
     for lin in lineages:
         if "lineage_ID" in lin.graph:
@@ -260,4 +256,9 @@ if __name__ == "__main__":
     model = load_CTC_file(ctc_file)
     print(model)
     print(model.feat_declaration)
+
+    for lin_id, lin in model.coredata.data.items():
+        print(f"{lin_id} - {lin}")
+        lin.plot_with_plotly()
+
     print(model.coredata.data[1].nodes(data=True))
