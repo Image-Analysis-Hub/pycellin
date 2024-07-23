@@ -14,12 +14,61 @@ from pycellin.classes.feature import FeaturesDeclaration, Feature
 from pycellin.classes.data import CoreData
 from pycellin.classes.lineage import CellLineage
 
-# TODO: add CTC file format description
-# TODO: add FeaturesDeclaration and create proper model
-# TODO: decide on the name of the standard Pycellin features
-# I think lower case is easier to read and allows for occasional use
-# of upper case for abreviations.
-# Snake case would be consistent with Python naming conventions.
+
+def _create_metadata(
+    file_path: str,
+) -> Dict[str, Any]:
+    """
+    Create a dictionary of basic Pycellin metadata for a given file.
+
+    Parameters
+    ----------
+    file_path : str
+        The path to the file for which metadata is being created.
+
+    Returns
+    -------
+    Dict[str, Any]
+        A dictionary containing the generated metadata.
+    """
+    metadata = {}
+    metadata["name"] = Path(file_path).stem
+    metadata["provenance"] = "CTC"
+    metadata["date"] = datetime.now()
+    metadata["pycellin_version"] = get_distribution("pycellin").version
+    return metadata
+
+
+def _create_FeaturesDeclaration() -> FeaturesDeclaration:
+    """
+    Return a FeaturesDeclaration object populated with Pycellin basic features.
+
+    Returns
+    -------
+    FeaturesDeclaration
+        An instance of FeaturesDeclaration populated with cell and lineage
+        identification features.
+    """
+    feat_declaration = FeaturesDeclaration()
+    node_id_feat = Feature(
+        "cell_ID",
+        "Unique identifier of the cell",
+        "CellLineage",
+        "Pycellin",
+        "int",
+        "none",
+    )
+    lin_id_feat = Feature(
+        "lineage_ID",
+        "Unique identifier of the lineage",
+        "CellLineage",
+        "Pycellin",
+        "int",
+        "none",
+    )
+    feat_declaration._add_features([node_id_feat, lin_id_feat], ["node"] * 2)
+    feat_declaration._add_feature(lin_id_feat, "lineage")
+    return feat_declaration
 
 
 def _read_track_line(
@@ -53,8 +102,8 @@ def _read_track_line(
     nodes = []
     for frame in range(start_frame, end_frame + 1):
         node_attrs = {
-            "ID": current_node_id,
-            "FRAME": frame,
+            "cell_ID": current_node_id,
+            "frame": frame,
             "TRACK": track_id,
             "PARENT": parent_track,
         }
@@ -109,7 +158,7 @@ def _merge_tracks(
     if parent_track != 0:
         # Finding the last node of the parent track.
         parent_nodes = [
-            (node, data["FRAME"])
+            (node, data["frame"])
             for node, data in graph.nodes(data=True)
             if data["TRACK"] == parent_track
         ]
@@ -136,9 +185,9 @@ def _update_node_attributes(
     lineage_id : int
         The new track ID to be assigned to the lineage graph and its nodes.
     """
-    lineage.graph["TRACK_ID"] = lineage_id
+    lineage.graph["lineage_ID"] = lineage_id
     for _, data in lineage.nodes(data=True):
-        data["TRACK_ID"] = lineage_id
+        data["lineage_ID"] = lineage_id
         # Removing obsolete attributes.
         if "TRACK" in data:
             del data["TRACK"]
@@ -149,15 +198,22 @@ def _update_node_attributes(
 def load_CTC_file(
     file_path: str,
 ) -> Model:
+    """
+    Create a Pycellin model out of a Cell Tracking Challenge (CTC) text file.
 
-    metadata = {}
-    metadata["Name"] = Path(file_path).stem
-    metadata["Provenance"] = "CTC"
-    metadata["Date"] = datetime.now()
-    metadata["Pycellin_version"] = get_distribution("pycellin").version
+    Only track topology is read: no cell segmentations are extracted
+    from associated label images.
 
-    feat_declaration = FeaturesDeclaration()
+    Parameters
+    ----------
+    file_path : str
+        The path to the CTC file that contains the tracking data.
 
+    Returns
+    -------
+    Model
+        The created Pycellin model.
+    """
     graph = nx.DiGraph()
     current_node_id = 0
     with open(file_path) as file:
@@ -172,21 +228,36 @@ def load_CTC_file(
         for c in nx.weakly_connected_components(graph)
     ]
 
-    # Adding a unique TRACK_ID to each lineage and their nodes.
+    # Adding a unique lineage_ID to each lineage and their nodes.
     lin_id = 0  # lineage ID
     for lin in lineages:
         _update_node_attributes(lin, lin_id)
         lin_id += 1
 
     for lin in lineages:
-        print(f'{lin.graph["TRACK_ID"]} - {lin}')
-        lin.plot_with_plotly()
+        print(f'{lin.graph["lineage_ID"]} - {lin}')
+        # lin.plot_with_plotly()
 
-    # model = Model(metadata, feat_declaration, data)
-    # return model
+    data = {}
+    for lin in lineages:
+        if "lineage_ID" in lin.graph:
+            data[lin.graph["lineage_ID"]] = lin
+        else:
+            assert len(lin) == 1, "Lineage ID not found and not a one-node lineage."
+            node = [n for n in lin.nodes][0]
+            lin_id = f"Node_{node}"
+            data[lin_id] = lin
+
+    model = Model(
+        _create_metadata(file_path), _create_FeaturesDeclaration(), CoreData(data)
+    )
+    return model
 
 
 if __name__ == "__main__":
 
     ctc_file = "C:/Users/haiba/Documents/01_RES/res_track.txt"
     model = load_CTC_file(ctc_file)
+    print(model)
+    print(model.feat_declaration)
+    print(model.coredata.data[1].nodes(data=True))
