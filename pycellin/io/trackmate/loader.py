@@ -637,7 +637,7 @@ def _parse_model_tag(
     tuple[FeaturesDeclaration, CoreData]
         TODO
     """
-    md = FeaturesDeclaration()
+    fd = FeaturesDeclaration()
 
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
@@ -662,17 +662,17 @@ def _parse_model_tag(
         # Get the spot, edge and track features and add them to the
         # features declaration.
         if element.tag == "FeatureDeclarations" and event == "start":
-            _add_all_features(it, element, md, units)
+            _add_all_features(it, element, fd, units)
             root.clear()
 
         # Adding the spots as nodes.
         if element.tag == "AllSpots" and event == "start":
-            _add_all_nodes(it, element, md, lineage)
+            _add_all_nodes(it, element, fd, lineage)
             root.clear()
 
         # Adding the tracks as edges.
         if element.tag == "AllTracks" and event == "start":
-            tracks_attributes = _build_tracks(it, element, md, lineage)
+            tracks_attributes = _build_tracks(it, element, fd, lineage)
             root.clear()
 
             # Removal of filtered spots / nodes.
@@ -735,7 +735,7 @@ def _parse_model_tag(
             lin_id = f"Node_{node}"
             data[lin_id] = lin
 
-    return md, CoreData(data)
+    return fd, CoreData(data)
 
 
 def _get_specific_tags(
