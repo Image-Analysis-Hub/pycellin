@@ -50,8 +50,6 @@ def _read_track_line(
         after generating all nodes for this track.
     """
     track_id, start_frame, end_frame, parent_track = [int(el) for el in line.split()]
-
-    # Creating the nodes of the current track, with their respective attributes.
     nodes = []
     for frame in range(start_frame, end_frame + 1):
         node_attrs = {
@@ -62,7 +60,6 @@ def _read_track_line(
         }
         nodes.append((current_node_id, node_attrs))
         current_node_id += 1
-
     return nodes, current_node_id
 
 
@@ -109,8 +106,6 @@ def _merge_tracks(
         the node identifier and a dictionary representing the node's attributes.
     """
     parent_track = nodes[0][1]["PARENT"]
-
-    # Linking the current track and the parent track.
     if parent_track != 0:
         # Finding the last node of the parent track.
         parent_nodes = [
@@ -144,8 +139,7 @@ def _update_node_attributes(
     lineage.graph["TRACK_ID"] = lineage_id
     for _, data in lineage.nodes(data=True):
         data["TRACK_ID"] = lineage_id
-
-        # Removing attributes that are not useful anymore.
+        # Removing obsolete attributes.
         if "TRACK" in data:
             del data["TRACK"]
         if "PARENT" in data:
