@@ -16,6 +16,10 @@ from pycellin.classes.data import CoreData
 from pycellin.classes.lineage import CellLineage
 
 # TODO: update all docstrings
+# TODO: check that TRACK_ID has been added to the FeaturesDeclaration,
+# both for the lineage and the nodes.
+# TODO: switch from TM features name to Pycellin (track => lineage, spot => node,
+# upper case => lower case)
 
 
 def _get_units(
