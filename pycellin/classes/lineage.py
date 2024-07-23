@@ -214,7 +214,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         layout = G.layout("rt")
 
         # Adjusting the y position of the nodes to be the frame number.
-        frame_values = G.vs["FRAME"]
+        frame_values = G.vs["frame"]
         layout = [(layout[k][0], frame_values[k]) for k in range(nodes_count)]
 
         # Computing the exact positions of nodes and eges.
@@ -229,7 +229,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             y_edges += [positions[edge[0]][1], positions[edge[1]][1], None]
 
         # Annotations.
-        node_labels = G.vs["ID"]
+        node_labels = G.vs["cell_ID"]
         if len(node_labels) != nodes_count:
             raise ValueError("The lists pos and text must have the same len")
         annotations = []
