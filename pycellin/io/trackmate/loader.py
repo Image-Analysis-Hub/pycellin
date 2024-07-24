@@ -126,7 +126,7 @@ def _convert_and_add_feature(
     units: dict[str, str],
 ):
     """
-    Convert a TrackMate feature to a Pycellin one and add it to the features declaration.
+    Convert a TrackMate feature to a Pycellin one to add it to the features declaration.
 
     Parameters
     ----------
@@ -298,7 +298,8 @@ def _convert_ROI_coordinates(
     """
     if "ROI_N_POINTS" not in attribs:
         raise KeyError(
-            f"No key 'ROI_N_POINTS' in the attributes of current element '{element.tag}'."
+            f"No key 'ROI_N_POINTS' in the attributes "
+            f"of current element '{element.tag}'."
         )
     n_points = int(attribs["ROI_N_POINTS"])
     if element.text:
@@ -687,9 +688,8 @@ def _parse_model_tag(
 
     Each TrackMate track and its associated data described in the XML file
     are modeled as networkX directed graphs. Spots are modeled as graph
-    nodes, and edges as graph edges. All data pertaining to the model
-    itself such as units, spot features, etc. are stored in each graph as
-    graph attributes.
+    nodes, and edges as graph edges. Spot, edge and track features are
+    stored in node, edge and graph attributes, respectively.
 
     Parameters
     ----------
@@ -703,7 +703,7 @@ def _parse_model_tag(
     Returns
     -------
     tuple[FeaturesDeclaration, CoreData]
-        TODO
+        A tuple containing the features declaration and the data of the model.
     """
     fd = FeaturesDeclaration()
 
@@ -781,7 +781,7 @@ def _parse_model_tag(
     # _update_node_features() to avoid code duplication.
 
     # Also adding if each track was present in the 'FilteredTracks'
-    # tag because this info is needed when reconstructing TM XMLs
+    # tag because this info is needed when reconstructing TrackMate XMLs
     # from graphs.
     data = {}
     for lin in lineages:

@@ -4,8 +4,6 @@
 from itertools import chain
 from typing import Optional
 
-from pycellin.classes.lineage import Lineage
-
 
 class Feature:
     """ """
