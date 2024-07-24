@@ -22,6 +22,8 @@ from pycellin.classes.lineage import CellLineage
 # upper case => lower case)
 # ID => cell_ID
 # TRACK_ID => lin_ID
+# TODO: maybe TRACK_ID / lineage_ID should not be added as a node feature,
+# and a fonction get_lineage_ID() should be implemented instead?
 
 
 def _get_units(
@@ -202,25 +204,15 @@ def _add_all_features(
             name_feat = Feature(
                 "name", "Name of the spot", "CellLineage", "TrackMate", "string", "none"
             )
-            id_feat = Feature(
-                "ID",
-                "Unique identifier of the spot",
-                "CellLineage",
-                "TrackMate",
-                "int",
-                "none",
-            )
             roi_coord_feat = Feature(
-                "ROI_COORDINATES",
+                "ROI_coords",
                 "List of coordinates of the region of interest",
                 "CellLineage",
                 "TrackMate",
                 "float",
                 units["spatialunits"],
             )
-            feat_declaration._add_features(
-                [name_feat, id_feat, roi_coord_feat], ["node"] * 3
-            )
+            feat_declaration._add_features([name_feat, roi_coord_feat], ["node"] * 2)
         # Feature used in Track tags but not declared in the FeatureDeclarations tag.
         if element.tag == "TrackFeatures":
             name_feat = Feature(
@@ -317,9 +309,9 @@ def _convert_ROI_coordinates(
         points_dimension = len(points_coordinates) // n_points
         it = [iter(points_coordinates)] * points_dimension
         points_coordinates = list(zip(*it))
-        attribs["ROI_COORDINATES"] = points_coordinates
+        attribs["ROI_coords"] = points_coordinates
     else:
-        attribs["ROI_COORDINATES"] = None
+        attribs["ROI_coords"] = None
 
 
 def _add_all_nodes(
@@ -612,15 +604,29 @@ def _add_tracks_info(
 
 
 def _split_graph_into_lineages(
-    lineage: CellLineage,
+    graph: CellLineage,
     tracks_attributes: list[dict[str, Any]],
 ) -> list[CellLineage]:
-    # One subgraph is created per track, so each subgraph is
+    """
+    Split a graph into several subgraphs, each representing a lineage.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The graph to split.
+    tracks_attributes : list[dict[str, Any]]
+        A list of dictionaries, where each dictionary contains TrackMate
+        attributes for a specific track, identified by a 'TRACK_ID' key.
+
+    Returns
+    -------
+    list[CellLineage]
+        A list of subgraphs, each representing a lineage.
+    """
+    # One subgraph is created per lineage, so each subgraph is
     # a connected component of `graph`.
-    lineages = [
-        lineage.subgraph(c).copy() for c in nx.weakly_connected_components(lineage)
-    ]
-    del lineage  # Redondant with the subgraphs.
+    lineages = [graph.subgraph(c).copy() for c in nx.weakly_connected_components(graph)]
+    del graph  # Redondant with the subgraphs.
 
     # Adding TrackMate tracks attributes to each lineage.
     try:
@@ -636,20 +642,43 @@ def _split_graph_into_lineages(
 def _update_features_declaration(
     feat_declaration: FeaturesDeclaration,
 ):
-    feat_declaration._remove_feature("TRACK_ID", "lineage")
-    lin_id_feat = Feature(
-        "lineage_ID",
-        "Unique identifier of the lineage",
+    """
+    Update the features declaration to match Pycellin conventions.
+
+    Parameters
+    ----------
+    feat_declaration : FeaturesDeclaration
+        The features declaration to update.
+    """
+    # Lineage features.
+    feat_declaration._rename_feature("TRACK_ID", "lineage_ID", "lineage")
+    feat_declaration._modify_feature_description(
+        "lineage_ID", "Unique identifier of the lineage", "lineage"
+    )
+    feat_filtered_track = Feature(
+        "FilteredTrack",
+        "True if the track was not filtered out in TrackMate",
         "CellLineage",
         "TrackMate",
         "int",
         "none",
     )
-    feat_declaration._add_feature(lin_id_feat, "lineage")
-    # TODO the same for:
-    # - FRAME => frame
-    # - ID => cell_ID
-    # - FilteredTrack
+    feat_declaration._add_feature(feat_filtered_track, "lineage")
+
+    # Node features.
+    feat_cell_id = Feature(
+        "cell_ID",
+        "Unique identifier of the cell",
+        "CellLineage",
+        "TrackMate",
+        "int",
+        "none",
+    )
+    feat_declaration._add_feature(feat_cell_id, "node")
+    feat_declaration._modify_feature_description(
+        "cell_ID", "Unique identifier of the cell", "node"
+    )
+    feat_declaration._rename_feature("FRAME", "frame", "node")
 
 
 def _parse_model_tag(
@@ -737,11 +766,12 @@ def _parse_model_tag(
         if element.tag == "Model" and event == "end":
             break  # We are not interested in the following data.
 
-    # print(lineage.graph)
+    # We want one lineage per track, so we need to split the graph
+    # in its connected components.
     lineages = _split_graph_into_lineages(lineage, tracks_attributes)
-    # print(fd)
+
+    # For Pycellin compatibility, some TrackMate features have to be renamed.
     _update_features_declaration(fd)
-    # print(fd)
 
     # Updating the lineage graph.
     for lin in lineages:
@@ -916,8 +946,8 @@ if __name__ == "__main__":
     # print(model.feat_declaration)
     # print(model.coredata)
 
-    for id, lin in model.coredata.data.items():
-        print(f"ID: {id} - {lin}")
+    # for id, lin in model.coredata.data.items():
+    #     print(f"ID: {id} - {lin}")
 
     model.coredata.data[0].plot_with_plotly()
 
