@@ -20,6 +20,8 @@ from pycellin.classes.lineage import CellLineage
 # both for the lineage and the nodes.
 # TODO: switch from TM features name to Pycellin (track => lineage, spot => node,
 # upper case => lower case)
+# ID => cell_ID
+# TRACK_ID => lin_ID
 
 
 def _get_units(
@@ -695,49 +697,45 @@ def _parse_model_tag(
                 ]
                 lineage.remove_nodes_from(to_remove)
 
-            # Subgraphs creation.
-            if not one_graph:
-                # One subgraph is created per track, so each subgraph is
-                # a connected component of `graph`.
-                lineages = [
-                    lineage.subgraph(c).copy()
-                    for c in nx.weakly_connected_components(lineage)
-                ]
-                del lineage  # Redondant with the subgraphs.
-
-                # Adding the tracks attributes as graphs attributes.
-                try:
-                    _add_tracks_info(lineages, tracks_attributes)
-                except ValueError as err:
-                    print(err)
-                    # The program is in an impossible state so we need to stop.
-                    raise
-
-                # Also adding if each track was present in the 'FilteredTracks'
-                # tag because this info is needed when reconstructing TM XMLs
-                # from graphs.
-                # TODO: add "FilteredTrack" to the features declaration.
-                for lin in lineages:
-                    if "TRACK_ID" in lin.graph:
-                        if lin.graph["TRACK_ID"] in id_to_keep:
-                            lin.graph["FilteredTrack"] = True
-                        else:
-                            lin.graph["FilteredTrack"] = False
-
         if element.tag == "Model" and event == "end":
             break  # We are not interested in the following data.
 
-    if one_graph:
-        lineages = [lineage]
     data = {}
-    for lin in lineages:
-        if "TRACK_ID" in lin.graph:
-            data[lin.graph["TRACK_ID"]] = lin
-        else:
-            assert len(lin) == 1, "Track ID not found and not a one-spot lineage."
-            node = [n for n in lin.nodes][0]
-            lin_id = f"Node_{node}"
-            data[lin_id] = lin
+    if one_graph:
+        lin_id = -1  # ID used in case of a single graph containing several lineages.
+        data[lin_id] = lineage
+    else:
+        # One subgraph is created per track, so each subgraph is
+        # a connected component of `graph`.
+        lineages = [
+            lineage.subgraph(c).copy() for c in nx.weakly_connected_components(lineage)
+        ]
+        del lineage  # Redondant with the subgraphs.
+
+        # Adding the tracks attributes as graphs attributes.
+        try:
+            _add_tracks_info(lineages, tracks_attributes)
+        except ValueError as err:
+            print(err)
+            # The program is in an impossible state so we need to stop.
+            raise
+
+        # Also adding if each track was present in the 'FilteredTracks'
+        # tag because this info is needed when reconstructing TM XMLs
+        # from graphs.
+        # TODO: add "FilteredTrack" to the features declaration.
+        for lin in lineages:
+            if "TRACK_ID" in lin.graph:
+                data[lin.graph["TRACK_ID"]] = lin
+                if lin.graph["TRACK_ID"] in id_to_keep:
+                    lin.graph["FilteredTrack"] = True
+                else:
+                    lin.graph["FilteredTrack"] = False
+            else:
+                assert len(lin) == 1, "Track ID not found and not a one-spot lineage."
+                node = [n for n in lin.nodes][0]
+                lin_id = f"Node_{node}"
+                data[lin_id] = lin
 
     return fd, CoreData(data)
 
@@ -885,7 +883,7 @@ if __name__ == "__main__":
     # print(elem_from_string.tag)
 
     model = load_TrackMate_XML(
-        xml, keep_all_spots=True, keep_all_tracks=True, one_graph=False
+        xml, keep_all_spots=True, keep_all_tracks=True, one_graph=True
     )
     # print(model.metadata)
     # print(model.feat_declaration)
