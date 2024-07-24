@@ -71,6 +71,28 @@ class Feature:
         # TODO: see if and how to simplify the string representation
         return self.__repr__()
 
+    def _rename(self, new_name: str) -> None:
+        """
+        Rename the feature.
+
+        Parameters
+        ----------
+        new_name : str
+            The new name of the feature.
+        """
+        self.name = new_name
+
+    def _modify_description(self, new_description: str) -> None:
+        """
+        Modify the description of the feature.
+
+        Parameters
+        ----------
+        new_description : str
+            The new description of the feature.
+        """
+        self.description = new_description
+
 
 class FeaturesDeclaration:
     """
@@ -145,6 +167,36 @@ class FeaturesDeclaration:
         """
         pass
 
+    def _get_feat_dict_from_feat_type(self, feature_type: str) -> dict:
+        """
+        Return the dictionary of features corresponding to the specified type.
+
+        Parameters
+        ----------
+        feature_type : str
+            The type of the features to return (node, edge, or lineage).
+
+        Returns
+        -------
+        dict
+            The dictionary of features corresponding to the specified type.
+
+        Raises
+        ------
+        ValueError
+            If the feature type is invalid.
+        """
+        # TODO: use literals instead of strings for feature types
+        match feature_type:
+            case "node":
+                return self.node_feats
+            case "edge":
+                return self.edge_feats
+            case "lineage":
+                return self.lin_feats
+            case _:
+                raise ValueError(f"Invalid feature type: {feature_type}")
+
     def _add_feature(self, feature: Feature, feature_type: str) -> None:
         """
         Add the specified feature to the FeaturesDeclaration.
@@ -217,6 +269,78 @@ class FeaturesDeclaration:
         """
         for feature_name, feature_type in zip(feature_names, feature_types):
             self._remove_feature(feature_name, feature_type)
+
+    def _rename_feature(self, feature_name: str, new_name: str, feature_type: str):
+        """
+        Rename a specified feature.
+
+        Parameters
+        ----------
+        feature_name : str
+            The name of the feature to rename.
+        new_name : str
+            The new name for the feature.
+        feature_type : str
+            The type of the feature to rename. Valid values are "node",
+            "edge", or "lineage".
+
+        Raises
+        ------
+        ValueError
+            If the feature type is invalid.
+        KeyError
+            If the feature does not exist within the specified type.
+        """
+        # TODO: make the feature type optional, but raise an error
+        # if several features with the same name exist.
+        # TODO: docstrings
+        try:
+            dict_feats = self._get_feat_dict_from_feat_type(feature_type)
+        except ValueError as e:
+            raise ValueError(e)
+
+        if feature_name not in dict_feats:
+            raise KeyError(
+                f"Feature {feature_name} does not exist in {feature_type} features."
+            )
+
+        dict_feats[new_name] = dict_feats.pop(feature_name)
+        dict_feats[new_name]._rename(new_name)
+
+    def _modify_feature_description(
+        self, feature_name: str, new_description: str, feature_type: str
+    ):
+        """
+        Modify the description of a specified feature.
+
+        Parameters
+        ----------
+        feature_name : str
+            The name of the feature whose description is to be modified.
+        new_description : str
+            The new description for the feature.
+        feature_type : str
+            The type of the feature to be modified. Valid values are "node",
+            "edge", or "lineage".
+
+        Raises
+        ------
+        ValueError
+            If the feature type is invalid.
+        KeyError
+            If the feature does not exist within the specified type.
+        """
+        try:
+            dict_feats = self._get_feat_dict_from_feat_type(feature_type)
+        except ValueError as e:
+            raise ValueError(e)
+
+        if feature_name not in dict_feats:
+            raise KeyError(
+                f"Feature {feature_name} does not exist in {feature_type} features."
+            )
+
+        dict_feats[feature_name]._modify_description(new_description)
 
     # TODO: should this method be at the Model level?
     # Should I add a wrapper at the higher level?
