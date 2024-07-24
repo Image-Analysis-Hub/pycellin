@@ -611,7 +611,7 @@ def _add_tracks_info(
             lin.graph[k] = v
 
 
-def _split_graph(
+def _split_graph_into_lineages(
     lineage: CellLineage,
     tracks_attributes: list[dict[str, Any]],
 ) -> list[CellLineage]:
@@ -631,6 +631,25 @@ def _split_graph(
         raise
 
     return lineages
+
+
+def _update_features_declaration(
+    feat_declaration: FeaturesDeclaration,
+):
+    feat_declaration._remove_feature("TRACK_ID", "lineage")
+    lin_id_feat = Feature(
+        "lineage_ID",
+        "Unique identifier of the lineage",
+        "CellLineage",
+        "TrackMate",
+        "int",
+        "none",
+    )
+    feat_declaration._add_feature(lin_id_feat, "lineage")
+    # TODO the same for:
+    # - FRAME => frame
+    # - ID => cell_ID
+    # - FilteredTrack
 
 
 def _parse_model_tag(
@@ -718,23 +737,39 @@ def _parse_model_tag(
         if element.tag == "Model" and event == "end":
             break  # We are not interested in the following data.
 
-    lineages = _split_graph(lineage, tracks_attributes)
+    # print(lineage.graph)
+    lineages = _split_graph_into_lineages(lineage, tracks_attributes)
+    # print(fd)
+    _update_features_declaration(fd)
+    # print(fd)
+
+    # Updating the lineage graph.
+    for lin in lineages:
+        for node, track_id in lin.nodes(data="TRACK_ID"):
+            if track_id:
+                lin.nodes[node]["lineage_ID"] = track_id
+                lin.nodes[node].pop("TRACK_ID")
+        if "TRACK_ID" in lin.graph:
+            lin.graph["lineage_ID"] = lin.graph.pop("TRACK_ID")
+    # TODO the same for frame and cell_ID, and refactor in a unique function
+    # _update_node_features() to avoid code duplication.
 
     # Also adding if each track was present in the 'FilteredTracks'
     # tag because this info is needed when reconstructing TM XMLs
     # from graphs.
-    # TODO: add "FilteredTrack" to the features declaration.
     data = {}
     for lin in lineages:
-        if "TRACK_ID" in lin.graph:
-            data[lin.graph["TRACK_ID"]] = lin
-            if lin.graph["TRACK_ID"] in id_to_keep:
+        if "lineage_ID" in lin.graph:
+            data[lin.graph["lineage_ID"]] = lin
+            if lin.graph["lineage_ID"] in id_to_keep:
                 lin.graph["FilteredTrack"] = True
             else:
                 lin.graph["FilteredTrack"] = False
         else:
-            assert len(lin) == 1, "Track ID not found and not a one-node lineage."
+            assert len(lin) == 1, "Lineage ID not found and not a one-node lineage."
             node = [n for n in lin.nodes][0]
+            # In this case the lineage ID is not an int...
+            # Maybe use negative values?
             lin_id = f"Node_{node}"
             data[lin_id] = lin
 
@@ -883,6 +918,8 @@ if __name__ == "__main__":
 
     for id, lin in model.coredata.data.items():
         print(f"ID: {id} - {lin}")
+
+    model.coredata.data[0].plot_with_plotly()
 
     # TODO: for now one-node graph do not have track features like "real" lineages.
     # Should I add these features even if the value is None for consistency?
