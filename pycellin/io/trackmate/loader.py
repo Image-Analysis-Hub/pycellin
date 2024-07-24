@@ -710,7 +710,7 @@ def _parse_model_tag(
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
     # the resulting graph will be disconnected.
-    graph = nx.Digraph()
+    graph = nx.DiGraph()
 
     # So as not to load the entire XML file into memory at once, we're
     # using an iterator to browse over the tags one by one.
@@ -794,9 +794,10 @@ def _parse_model_tag(
         else:
             assert len(lin) == 1, "Lineage ID not found and not a one-node lineage."
             node = [n for n in lin.nodes][0]
-            # In this case the lineage ID is not an int...
-            # Maybe use negative values?
-            lin_id = f"Node_{node}"
+            # When we have a one-node lineage, the lineage ID is minus the node ID.
+            # That way, it is easy to discriminate between one-node lineages
+            # (negative IDs) and true lineages (positive IDs).
+            lin_id = -node
             data[lin_id] = lin
 
     return fd, CoreData(data)
@@ -942,8 +943,8 @@ if __name__ == "__main__":
     # print(model.feat_declaration)
     # print(model.coredata)
 
-    # for id, lin in model.coredata.data.items():
-    #     print(f"ID: {id} - {lin}")
+    for id, lin in model.coredata.data.items():
+        print(f"ID: {id} - {lin}")
 
     model.coredata.data[0].plot_with_plotly()
 
