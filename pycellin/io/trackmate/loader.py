@@ -22,8 +22,6 @@ from pycellin.classes.lineage import CellLineage
 # upper case => lower case)
 # ID => cell_ID
 # TRACK_ID => lin_ID
-# TODO: maybe I should remove the one_graph option and deal differently with
-# the no tracking case (one-spot lineages).
 
 
 def _get_units(
@@ -639,7 +637,6 @@ def _parse_model_tag(
     xml_path: str,
     keep_all_spots: bool,
     keep_all_tracks: bool,
-    one_graph: bool,
 ) -> tuple[FeaturesDeclaration, CoreData]:
     """
     Read an XML file and convert the model data into several graphs.
@@ -658,9 +655,6 @@ def _parse_model_tag(
         True to keep the spots filtered out in TrackMate, False otherwise.
     keep_all_tracks : bool
         True to keep the tracks filtered out in TrackMate, False otherwise.
-    one_graph : bool
-        True to create only one graph (probably disconnected) that contains all
-        nodes and edges, False to create a graph (connected) per track.
 
     Returns
     -------
@@ -724,29 +718,25 @@ def _parse_model_tag(
         if element.tag == "Model" and event == "end":
             break  # We are not interested in the following data.
 
-    data = {}
-    if one_graph:
-        lin_id = -1  # ID used in case of a single graph containing several lineages.
-        data[lin_id] = lineage
-    else:
-        lineages = _split_graph(lineage, tracks_attributes)
+    lineages = _split_graph(lineage, tracks_attributes)
 
-        # Also adding if each track was present in the 'FilteredTracks'
-        # tag because this info is needed when reconstructing TM XMLs
-        # from graphs.
-        # TODO: add "FilteredTrack" to the features declaration.
-        for lin in lineages:
-            if "TRACK_ID" in lin.graph:
-                data[lin.graph["TRACK_ID"]] = lin
-                if lin.graph["TRACK_ID"] in id_to_keep:
-                    lin.graph["FilteredTrack"] = True
-                else:
-                    lin.graph["FilteredTrack"] = False
+    # Also adding if each track was present in the 'FilteredTracks'
+    # tag because this info is needed when reconstructing TM XMLs
+    # from graphs.
+    # TODO: add "FilteredTrack" to the features declaration.
+    data = {}
+    for lin in lineages:
+        if "TRACK_ID" in lin.graph:
+            data[lin.graph["TRACK_ID"]] = lin
+            if lin.graph["TRACK_ID"] in id_to_keep:
+                lin.graph["FilteredTrack"] = True
             else:
-                assert len(lin) == 1, "Track ID not found and not a one-spot lineage."
-                node = [n for n in lin.nodes][0]
-                lin_id = f"Node_{node}"
-                data[lin_id] = lin
+                lin.graph["FilteredTrack"] = False
+        else:
+            assert len(lin) == 1, "Track ID not found and not a one-node lineage."
+            node = [n for n in lin.nodes][0]
+            lin_id = f"Node_{node}"
+            data[lin_id] = lin
 
     return fd, CoreData(data)
 
@@ -821,7 +811,6 @@ def load_TrackMate_XML(
     xml_path: str,
     keep_all_spots: bool = False,
     keep_all_tracks: bool = False,
-    one_graph: bool = False,
 ) -> Model:
     """
     Read a TrackMate XML file and convert the tracks data to directed acyclic graphs.
@@ -844,19 +833,13 @@ def load_TrackMate_XML(
     keep_all_tracks : bool, optional
         True to keep the tracks filtered out in TrackMate, False otherwise.
         False by default.
-    one_graph : bool, optional
-        True to create only one graph (probably disconnected) that contains all
-        nodes and edges, False to create a graph (connected) per track.
-        False by default.
 
     Returns
     -------
     Model
         A Pycellin Model that contains all the data from the TrackMate XML file.
     """
-    feat_declaration, data = _parse_model_tag(
-        xml_path, keep_all_spots, keep_all_tracks, one_graph
-    )
+    feat_declaration, data = _parse_model_tag(xml_path, keep_all_spots, keep_all_tracks)
 
     # Add in the metadata all the TrackMate info that was not in the
     # TrackMate XML `Model` tag.
@@ -893,9 +876,7 @@ if __name__ == "__main__":
     # print(elem_from_string)
     # print(elem_from_string.tag)
 
-    model = load_TrackMate_XML(
-        xml, keep_all_spots=True, keep_all_tracks=True, one_graph=True
-    )
+    model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
     # print(model.metadata)
     # print(model.feat_declaration)
     # print(model.coredata)
