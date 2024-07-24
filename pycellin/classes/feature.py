@@ -207,17 +207,26 @@ class FeaturesDeclaration:
             The feature to add.
         feature_type : str
             The type of the feature to add (node, edge, or lineage).
+
+        Raises
+        ------
+        ValueError
+            If the feature type is invalid.
+        ValueError
+            If a feature with the same name already exists in the specified type.
         """
-        # TODO: raise an error if the feature already exists
-        match feature_type:
-            case "node":
-                self.node_feats[feature.name] = feature
-            case "edge":
-                self.edge_feats[feature.name] = feature
-            case "lineage":
-                self.lin_feats[feature.name] = feature
-            case _:
-                raise ValueError(f"Invalid feature type: {feature_type}")
+        try:
+            dict_feats = self._get_feat_dict_from_feat_type(feature_type)
+        except ValueError as e:
+            raise ValueError(e)
+
+        if feature.name in dict_feats:
+            raise ValueError(
+                f"A Feature called {feature.name} already exists in "
+                f"{feature_type} features."
+            )
+
+        dict_feats[feature.name] = feature
 
     def _add_features(self, features: list[Feature], feature_types: list[str]) -> None:
         """
@@ -233,7 +242,7 @@ class FeaturesDeclaration:
         for feature, feature_type in zip(features, feature_types):
             self._add_feature(feature, feature_type)
 
-    def _remove_feature(self, feature_name: str, feature_type: str) -> None:
+    def _remove_feature(self, feature_name: str, feature_type: str):
         """
         Remove the specified feature from the FeaturesDeclaration.
 
@@ -243,20 +252,27 @@ class FeaturesDeclaration:
             The name of the feature to remove.
         feature_type : str
             The type of the feature to add (node, edge, or lineage).
-        """
-        match feature_type:
-            case "node":
-                del self.node_feats[feature_name]
-            case "edge":
-                del self.edge_feats[feature_name]
-            case "lineage":
-                del self.lin_feats[feature_name]
-            case _:
-                raise ValueError(f"Invalid feature type: {feature_type}")
 
-    def _remove_features(
-        self, feature_names: list[str], feature_types: list[str]
-    ) -> None:
+        Raises
+        ------
+        ValueError
+            If the feature type is invalid.
+        KeyError
+            If the feature does not exist within the specified type.
+        """
+        try:
+            dict_feats = self._get_feat_dict_from_feat_type(feature_type)
+        except ValueError as e:
+            raise ValueError(e)
+
+        if feature_name not in dict_feats:
+            raise KeyError(
+                f"Feature {feature_name} does not exist in {feature_type} features."
+            )
+
+        del dict_feats[feature_name]
+
+    def _remove_features(self, feature_names: list[str], feature_types: list[str]):
         """
         Remove the specified features from the FeaturesDeclaration.
 
@@ -293,7 +309,7 @@ class FeaturesDeclaration:
         """
         # TODO: make the feature type optional, but raise an error
         # if several features with the same name exist.
-        # TODO: docstrings
+        # + do the same for the other relevant method
         try:
             dict_feats = self._get_feat_dict_from_feat_type(feature_type)
         except ValueError as e:
