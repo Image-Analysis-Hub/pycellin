@@ -16,8 +16,6 @@ from pycellin.classes.data import CoreData
 from pycellin.classes.lineage import CellLineage
 
 # TODO: update all docstrings
-# TODO: check that TRACK_ID has been added to the FeaturesDeclaration,
-# both for the lineage and the nodes.
 # TODO: switch from TM features name to Pycellin (track => lineage, spot => node,
 # upper case => lower case)
 # ID => cell_ID
@@ -318,10 +316,10 @@ def _add_all_nodes(
     iterator: ET.iterparse,
     ancestor: ET._Element,
     feat_declaration: FeaturesDeclaration,
-    lineage: CellLineage,
+    graph: nx.DiGraph,
 ) -> None:
     """
-    Add nodes and their attributes to a CellLineage.
+    Add nodes and their attributes to a graph.
 
     All the elements that are descendants of `ancestor` are explored.
 
@@ -334,8 +332,8 @@ def _add_all_nodes(
     feat_declaration : FeaturesDeclaration
         An object holding the features declaration information used to convert the
         node attributes.
-    lineage : CellLineage
-        CellLineage to add the nodes to.
+    graph : nx.DiGraph
+        Graph to add the nodes to.
     """
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
@@ -361,13 +359,13 @@ def _add_all_nodes(
                 _convert_ROI_coordinates(element, attribs)
             except KeyError as err:
                 print(err)
-                # TODO: check th behavior when the key is not found.
+                # TODO: check the behavior when the key is not found.
                 # Does it happen when TrackMate do a single-point segmentation?
 
             # Now that all the node attributes have been updated, we can add
-            # them to the Lineage.
+            # them to the graph.
             try:
-                lineage.add_nodes_from([(int(attribs["ID"]), attribs)])
+                graph.add_nodes_from([(int(attribs["ID"]), attribs)])
             except KeyError as err:
                 print(
                     f"No key {err} in the attributes of "
@@ -381,26 +379,26 @@ def _add_all_nodes(
 def _add_edge(
     element: ET._Element,
     feat_declaration: FeaturesDeclaration,
-    lineage: CellLineage,
+    graph: nx.DiGraph,
     current_track_id: int,
 ):
     """
-    Add an edge between two nodes in the Lineage graph based on the XML element.
+    Add an edge between two nodes in the graph based on the XML element.
 
     This function extracts source and target node identifiers from the
     given XML element, along with any additional attributes defined
     within. It then adds an edge between these nodes in the specified
-    Lineage graph. If the nodes have a 'TRACK_ID' attribute, it ensures
-    consistency with the current track ID.
+    graph. If the nodes have a 'TRACK_ID' attribute, it ensures consistency
+    with the current track ID.
 
     Parameters
     ----------
     element : ET._Element
         The XML element containing edge information.
     feat_declaration : FeaturesDeclaration
-        An object holding the features declaration information used to convert the
-        edge attributes.
-    lineage : CellLineage
+        An object holding the features declaration information used
+        to convert the edge attributes.
+    graph : nx.DiGraph
         The graph to which the edge and its attributes will be added.
     current_track_id : int
         Track ID of the track holding the edge.
@@ -424,19 +422,18 @@ def _add_edge(
             f"Not adding this edge to the graph."
         )
     else:
-        lineage.add_edge(entry_node_id, exit_node_id)
-        nx.set_edge_attributes(lineage, {(entry_node_id, exit_node_id): attribs})
+        graph.add_edge(entry_node_id, exit_node_id)
+        nx.set_edge_attributes(graph, {(entry_node_id, exit_node_id): attribs})
         # Adding the current track ID to the nodes of the newly created
         # edge. This will be useful later to filter nodes by track and
         # add the saved tracks attributes (as returned by this method).
-        # TODO: need to add this to the feature declaration.
         error_msg = f"Incoherent track ID for nodes {entry_node_id} and {exit_node_id}."
-        entry_node = lineage.nodes[entry_node_id]
+        entry_node = graph.nodes[entry_node_id]
         if "TRACK_ID" not in entry_node:
             entry_node["TRACK_ID"] = current_track_id
         else:
             assert entry_node["TRACK_ID"] == current_track_id, error_msg
-        exit_node = lineage.nodes[exit_node_id]
+        exit_node = graph.nodes[exit_node_id]
         if "TRACK_ID" not in exit_node:
             exit_node["TRACK_ID"] = current_track_id
         else:
@@ -449,16 +446,16 @@ def _build_tracks(
     iterator: ET.iterparse,
     ancestor: ET._Element,
     feat_declaration: FeaturesDeclaration,
-    lineage: CellLineage,
+    graph: nx.DiGraph,
 ) -> list[dict[str, Any]]:
     """
-    Add edges and their attributes to a Lineage based on the XML elements.
+    Add edges and their attributes to a graph based on the XML elements.
 
     This function explores all elements that are descendants of the
     specified `ancestor` element, adding edges and their attributes to
-    the provided `CellLineage` graph. It iterates through the XML
-    elements using the provided iterator, extracting and processing
-    relevant information to construct track attributes.
+    the provided graph. It iterates through the XML elements using
+    the provided iterator, extracting and processing relevant information
+    to construct track attributes.
 
     Parameters
     ----------
@@ -467,11 +464,10 @@ def _build_tracks(
     ancestor : ET._Element
         The XML element that encompasses the information to be added.
     feat_declaration : FeaturesDeclaration
-        An object holding the features declaration information used to convert the
-        edge and tracks attributes.
-    lineage : CellLineage
-        The `CellLineage` graph to which the edges and their attributes
-        will be added.
+        An object holding the features declaration information used
+        to convert the edge and tracks attributes.
+    graph: nx.DiGraph
+        The graph to which the edges and their attributes will be added.
 
     Returns
     -------
@@ -493,7 +489,7 @@ def _build_tracks(
 
         # Edge creation.
         if element.tag == "Edge" and event == "start":
-            _add_edge(element, feat_declaration, lineage, current_track_id)
+            _add_edge(element, feat_declaration, graph, current_track_id)
 
         event, element = next(iterator)
 
@@ -714,7 +710,7 @@ def _parse_model_tag(
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
     # the resulting graph will be disconnected.
-    lineage = CellLineage()
+    graph = nx.Digraph()
 
     # So as not to load the entire XML file into memory at once, we're
     # using an iterator to browse over the tags one by one.
@@ -739,36 +735,36 @@ def _parse_model_tag(
 
         # Adding the spots as nodes.
         if element.tag == "AllSpots" and event == "start":
-            _add_all_nodes(it, element, fd, lineage)
+            _add_all_nodes(it, element, fd, graph)
             root.clear()
 
         # Adding the tracks as edges.
         if element.tag == "AllTracks" and event == "start":
-            tracks_attributes = _build_tracks(it, element, fd, lineage)
+            tracks_attributes = _build_tracks(it, element, fd, graph)
             root.clear()
 
             # Removal of filtered spots / nodes.
             if not keep_all_spots:
                 # Those nodes belong to no tracks: they have a degree of 0.
-                lone_nodes = [n for n, d in lineage.degree if d == 0]
-                lineage.remove_nodes_from(lone_nodes)
+                lone_nodes = [n for n, d in graph.degree if d == 0]
+                graph.remove_nodes_from(lone_nodes)
 
         # Filtering out tracks and adding tracks attribute.
         if element.tag == "FilteredTracks" and event == "start":
-            # Removal of filtered tracks / lineages.
+            # Removal of filtered tracks.
             id_to_keep = _get_filtered_tracks_ID(it, element)
             if not keep_all_tracks:
                 to_remove = [
-                    n for n, t in lineage.nodes(data="TRACK_ID") if t not in id_to_keep
+                    n for n, t in graph.nodes(data="TRACK_ID") if t not in id_to_keep
                 ]
-                lineage.remove_nodes_from(to_remove)
+                graph.remove_nodes_from(to_remove)
 
         if element.tag == "Model" and event == "end":
             break  # We are not interested in the following data.
 
     # We want one lineage per track, so we need to split the graph
-    # in its connected components.
-    lineages = _split_graph_into_lineages(lineage, tracks_attributes)
+    # into its connected components.
+    lineages = _split_graph_into_lineages(graph, tracks_attributes)
 
     # For Pycellin compatibility, some TrackMate features have to be renamed.
     _update_features_declaration(fd)
