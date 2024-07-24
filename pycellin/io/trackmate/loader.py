@@ -22,6 +22,8 @@ from pycellin.classes.lineage import CellLineage
 # upper case => lower case)
 # ID => cell_ID
 # TRACK_ID => lin_ID
+# TODO: maybe I should remove the one_graph option and deal differently with
+# the no tracking case (one-spot lineages).
 
 
 def _get_units(
@@ -611,6 +613,28 @@ def _add_tracks_info(
             lin.graph[k] = v
 
 
+def _split_graph(
+    lineage: CellLineage,
+    tracks_attributes: list[dict[str, Any]],
+) -> list[CellLineage]:
+    # One subgraph is created per track, so each subgraph is
+    # a connected component of `graph`.
+    lineages = [
+        lineage.subgraph(c).copy() for c in nx.weakly_connected_components(lineage)
+    ]
+    del lineage  # Redondant with the subgraphs.
+
+    # Adding TrackMate tracks attributes to each lineage.
+    try:
+        _add_tracks_info(lineages, tracks_attributes)
+    except ValueError as err:
+        print(err)
+        # The program is in an impossible state so we need to stop.
+        raise
+
+    return lineages
+
+
 def _parse_model_tag(
     xml_path: str,
     keep_all_spots: bool,
@@ -705,20 +729,7 @@ def _parse_model_tag(
         lin_id = -1  # ID used in case of a single graph containing several lineages.
         data[lin_id] = lineage
     else:
-        # One subgraph is created per track, so each subgraph is
-        # a connected component of `graph`.
-        lineages = [
-            lineage.subgraph(c).copy() for c in nx.weakly_connected_components(lineage)
-        ]
-        del lineage  # Redondant with the subgraphs.
-
-        # Adding the tracks attributes as graphs attributes.
-        try:
-            _add_tracks_info(lineages, tracks_attributes)
-        except ValueError as err:
-            print(err)
-            # The program is in an impossible state so we need to stop.
-            raise
+        lineages = _split_graph(lineage, tracks_attributes)
 
         # Also adding if each track was present in the 'FilteredTracks'
         # tag because this info is needed when reconstructing TM XMLs
