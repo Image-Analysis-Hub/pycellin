@@ -202,6 +202,22 @@ class FeaturesDeclaration:
             case _:
                 raise ValueError(f"Invalid feature type: {feature_type}")
 
+    def _remove_features(
+        self, feature_names: list[str], feature_types: list[str]
+    ) -> None:
+        """
+        Remove the specified features from the FeaturesDeclaration.
+
+        Parameters
+        ----------
+        feature_names : list[str]
+            The names of the features to remove.
+        feature_types : list[str]
+            The types of the features to remove (node, edge, or lineage).
+        """
+        for feature_name, feature_type in zip(feature_names, feature_types):
+            self._remove_feature(feature_name, feature_type)
+
     # TODO: should this method be at the Model level?
     # Should I add a wrapper at the higher level?
     # => Stephane confirms that it should stay here and that I should add
