@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional
 
 from igraph import Graph, EdgeSeq
 import matplotlib.pyplot as plt
@@ -15,7 +14,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     Abstract class for a lineage graph.
     """
 
-    def __init__(self, nx_digraph: Optional[nx.DiGraph] = None):
+    def __init__(self, nx_digraph: nx.DiGraph | None = None):
         super().__init__(incoming_graph_data=nx_digraph)
 
     # TODO: A method to check that there is no merge (i. e. in_degree > 1)
@@ -196,15 +195,31 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         nx.draw(self, pos, with_labels=True, arrows=True, font_weight="bold")
         plt.show()
 
-    def plot_with_plotly(self):
+    def plot_with_plotly(
+        self,
+        title: str | None = None,
+    ):
         """
         Plot the lineage as a tree using Plotly.
 
         Heavily based on the code from https://plotly.com/python/tree-plots/
         """
-        # TODO: change feature names to fit Pycellin. FRAME? frame?
-        # TODO: extract parameters to make the function more versatile,
-        # especially for hoverinfo.
+        # https://plotly.com/python/hover-text-and-formatting/#customizing-hover-label-appearance
+        # https://plotly.com/python/hover-text-and-formatting/#customizing-hover-text-with-a-hovertemplate
+
+        # TODO: extract parameters to make the function more versatile:
+        # - node style
+        # - edge style
+        # - node text
+        # - edge text?
+        # - node hoverinfo style
+        # - edge hoverinfo style
+        # - node hoverinfo text
+        # - edge hoverinfo text
+        # - axes
+        # - color mapping node/edge attributes?
+        # - option to hide nodes? or just put nodes and edges in the legend
+        #   so we can hide manually one or the other
 
         # Conversion of the networkx lineage graph to igraph.
         G = Graph.from_networkx(self)
@@ -276,7 +291,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         )
 
         fig.update_layout(
-            title="Title",
+            title=title,
             annotations=annotations,
             font_size=5,
             showlegend=False,
@@ -290,7 +305,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
 class CellLineage(Lineage):
 
-    def get_divisions(self, nodes: Optional[list[int]] = None) -> list[int]:
+    def get_divisions(self, nodes: list[int] | None = None) -> list[int]:
         """
         Return the division nodes of the lineage.
 
