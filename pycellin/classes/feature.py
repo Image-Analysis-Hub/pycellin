@@ -181,7 +181,7 @@ class FeaturesDeclaration:
         for feature, feature_type in zip(features, feature_types):
             self._add_feature(feature, feature_type)
 
-    def _remove_feature(self, feature_name: str) -> None:
+    def _remove_feature(self, feature_name: str, feature_type: str) -> None:
         """
         Remove the specified feature from the FeaturesDeclaration.
 
@@ -189,12 +189,22 @@ class FeaturesDeclaration:
         ----------
         feature_name : str
             The name of the feature to remove.
+        feature_type : str
+            The type of the feature to add (node, edge, or lineage).
         """
-        pass
+        match feature_type:
+            case "node":
+                del self.node_feats[feature_name]
+            case "edge":
+                del self.edge_feats[feature_name]
+            case "lineage":
+                del self.lin_feats[feature_name]
+            case _:
+                raise ValueError(f"Invalid feature type: {feature_type}")
 
     # TODO: should this method be at the Model level?
     # Should I add a wrapper at the higher level?
-    # => Stephane confirms that it should stay here and that I should add 
+    # => Stephane confirms that it should stay here and that I should add
     # a wrapper in Model.
     def get_units_per_features(self) -> dict[str, list[str]]:
         """
