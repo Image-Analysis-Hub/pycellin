@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+Features in the XML file are not in the same order as a file that was exported 
+directly from TrackMate.
+I've tested quickly and it doesn't seem to be a problem for TrackMate.
+"""
+
+
 import math
 from typing import Any, Union
 
@@ -12,15 +19,6 @@ from pycellin.classes.feature import FeaturesDeclaration, Feature
 from pycellin.classes.data import CoreData
 from pycellin.classes.lineage import CellLineage
 from pycellin.io.trackmate.loader import load_TrackMate_XML
-
-# TODO: Order of info in tag Spot is wrong,
-# must be first ID, name, ...., FRAME..., ROI_N_POINTS
-# Is it an issue for TM? If not maybe I don't need to modify this
-# (at least for FRAME since it's in the middle of the tag...)
-
-# TODO: filtered tracks are not correct...?
-# I have TRACK_ID 6, but should have 0 and 4.
-# Issue in loader or exporter?
 
 
 # TODO: finish this function
