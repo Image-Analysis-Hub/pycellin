@@ -681,6 +681,28 @@ def _update_features_declaration(
     feat_declaration._rename_feature("FRAME", "frame", "node")
 
 
+def _update_node_feature_key(
+    lineage: CellLineage,
+    old_key: str,
+    new_key: str,
+):
+    """
+    Update the key of a feature in all the nodes of a lineage.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The lineage to update.
+    old_key : str
+        The old key of the feature.
+    new_key : str
+        The new key of the feature.
+    """
+    for node in lineage.nodes:
+        if old_key in lineage.nodes[node]:
+            lineage.nodes[node][new_key] = lineage.nodes[node].pop(old_key)
+
+
 def _parse_model_tag(
     xml_path: str,
     keep_all_spots: bool,
@@ -768,23 +790,24 @@ def _parse_model_tag(
     # We want one lineage per track, so we need to split the graph
     # into its connected components.
     lineages = _split_graph_into_lineages(graph, tracks_attributes)
+    print(type(lineages[0]))
 
     # For Pycellin compatibility, some TrackMate features have to be renamed.
     _update_features_declaration(fd)
-
-    # Updating the lineage graph.
     for lin in lineages:
-        for node, track_id in lin.nodes(data="TRACK_ID"):
-            if track_id:
-                lin.nodes[node]["lineage_ID"] = track_id
-                lin.nodes[node].pop("TRACK_ID")
+        # Updating the node features.
+        for key_name, new_key in [
+            ("ID", "cell_ID"),
+            ("TRACK_ID", "lineage_ID"),
+            ("FRAME", "frame"),
+        ]:
+            _update_node_feature_key(lin, key_name, new_key)
+        # TRACK_ID is also a graph feature, so we need to update it there.
         if "TRACK_ID" in lin.graph:
             lin.graph["lineage_ID"] = lin.graph.pop("TRACK_ID")
-    # TODO the same for frame and cell_ID, and refactor in a unique function
-    # _update_node_features() to avoid code duplication.
 
-    # Also adding if each track was present in the 'FilteredTracks'
-    # tag because this info is needed when reconstructing TrackMate XMLs
+    # Adding if each track was present in the 'FilteredTracks' tag
+    # because this info is needed when reconstructing TrackMate XMLs
     # from graphs.
     data = {}
     for lin in lineages:
@@ -949,6 +972,7 @@ if __name__ == "__main__":
     for id, lin in model.coredata.data.items():
         print(f"ID: {id} - {lin}")
 
+    print(model.coredata.data[-2094].nodes[2094])
     model.coredata.data[0].plot_with_plotly()
 
     # TODO: for now one-node graph do not have track features like "real" lineages.
