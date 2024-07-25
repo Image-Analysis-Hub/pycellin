@@ -422,7 +422,7 @@ class CellLineage(Lineage):
 
         cell_cycles = []
         for node in end_nodes:
-            cc_nodes = self.get_generation(node)
+            cc_nodes = self.get_cell_cycle(node)
             if not keep_incomplete_cell_cycles and self.get_root() in cc_nodes:
                 continue
             cell_cycles.append(cc_nodes)
