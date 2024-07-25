@@ -15,7 +15,6 @@ from pycellin.classes.feature import FeaturesDeclaration, Feature
 from pycellin.classes.data import CoreData
 from pycellin.classes.lineage import CellLineage
 
-# TODO: update all docstrings
 # TODO: maybe TRACK_ID / lineage_ID should not be added as a node feature,
 # and a fonction get_lineage_ID() should be implemented instead?
 
@@ -699,6 +698,36 @@ def _update_node_feature_key(
             lineage.nodes[node][new_key] = lineage.nodes[node].pop(old_key)
 
 
+def _update_TRACK_ID(
+    lineage: CellLineage,
+):
+    """
+    Update the TRACK_ID feature in the nodes and in the graph of a lineage.
+
+    In the case of a one-node lineage, TRACK_ID does not exist in the graph
+    nor in the nodes. So we define the lineage_ID as minus the node ID.
+    That way, it is easy to discriminate between one-node lineages
+    (negative IDs) and multi-nodes lineages (positive IDs).
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The lineage to update.
+    """
+    # If the TRACK_ID is a node feature, we need to update it in the nodes.
+    _update_node_feature_key(lineage, "TRACK_ID", "lineage_ID")
+    # And in the graph.
+    if "TRACK_ID" in lineage.graph:
+        lineage.graph["lineage_ID"] = lineage.graph.pop("TRACK_ID")
+    else:
+        # One-node graph don't have the TRACK_ID feature in the graph
+        # or in the nodes, so we have to create it.
+        assert len(lineage) == 1, "TRACK_ID not found and not a one-node lineage."
+        node = [n for n in lineage.nodes][0]
+        lineage.graph["lineage_ID"] = -node
+        lineage.nodes[node]["lineage_ID"] = -node
+
+
 def _parse_model_tag(
     xml_path: str,
     keep_all_spots: bool,
@@ -786,7 +815,6 @@ def _parse_model_tag(
     # We want one lineage per track, so we need to split the graph
     # into its connected components.
     lineages = _split_graph_into_lineages(graph, tracks_attributes)
-    print(type(lineages[0]))
 
     # For Pycellin compatibility, some TrackMate features have to be renamed.
     _update_features_declaration(fd)
@@ -794,35 +822,22 @@ def _parse_model_tag(
         # Updating the node features.
         for key_name, new_key in [
             ("ID", "cell_ID"),
-            ("TRACK_ID", "lineage_ID"),
             ("FRAME", "frame"),
         ]:
             _update_node_feature_key(lin, key_name, new_key)
-        # TRACK_ID is also a graph feature, so we need to update it there.
-        if "TRACK_ID" in lin.graph:
-            lin.graph["lineage_ID"] = lin.graph.pop("TRACK_ID")
+        # TRACK_ID is a node and a graph feature, so we need to update it
+        # in both places.
+        _update_TRACK_ID(lin)
 
     # Adding if each track was present in the 'FilteredTracks' tag
     # because this info is needed when reconstructing TrackMate XMLs
     # from graphs.
-    data = {}
-    for lin in lineages:
-        if "lineage_ID" in lin.graph:
-            data[lin.graph["lineage_ID"]] = lin
-            if lin.graph["lineage_ID"] in id_to_keep:
-                lin.graph["FilteredTrack"] = True
-            else:
-                lin.graph["FilteredTrack"] = False
-        else:
-            assert len(lin) == 1, "Lineage ID not found and not a one-node lineage."
-            node = [n for n in lin.nodes][0]
-            # When we have a one-node lineage, the lineage ID is minus the node ID.
-            # That way, it is easy to discriminate between one-node lineages
-            # (negative IDs) and true lineages (positive IDs).
-            lin_id = -node
-            data[lin_id] = lin
+    if lin.graph["lineage_ID"] in id_to_keep:
+        lin.graph["FilteredTrack"] = True
+    else:
+        lin.graph["FilteredTrack"] = False
 
-    return fd, CoreData(data)
+    return fd, CoreData({lin.graph["lineage_ID"]: lin for lin in lineages})
 
 
 def _get_specific_tags(
@@ -968,8 +983,8 @@ if __name__ == "__main__":
     for id, lin in model.coredata.data.items():
         print(f"ID: {id} - {lin}")
 
-    print(model.coredata.data[-2094].nodes[2094])
-    model.coredata.data[0].plot_with_plotly()
+    # print(model.coredata.data[-2094].nodes[2094])
+    # model.coredata.data[0].plot_with_plotly()
 
     # TODO: for now one-node graph do not have track features like "real" lineages.
     # Should I add these features even if the value is None for consistency?
