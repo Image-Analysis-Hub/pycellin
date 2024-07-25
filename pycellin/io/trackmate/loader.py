@@ -622,7 +622,10 @@ def _split_graph_into_lineages(
     """
     # One subgraph is created per lineage, so each subgraph is
     # a connected component of `graph`.
-    lineages = [graph.subgraph(c).copy() for c in nx.weakly_connected_components(graph)]
+    lineages = [
+        CellLineage(graph.subgraph(c).copy())
+        for c in nx.weakly_connected_components(graph)
+    ]
     del graph  # Redondant with the subgraphs.
 
     # Adding TrackMate tracks attributes to each lineage.
