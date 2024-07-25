@@ -16,10 +16,6 @@ from pycellin.classes.data import CoreData
 from pycellin.classes.lineage import CellLineage
 
 # TODO: update all docstrings
-# TODO: switch from TM features name to Pycellin (track => lineage, spot => node,
-# upper case => lower case)
-# ID => cell_ID
-# TRACK_ID => lin_ID
 # TODO: maybe TRACK_ID / lineage_ID should not be added as a node feature,
 # and a fonction get_lineage_ID() should be implemented instead?
 
