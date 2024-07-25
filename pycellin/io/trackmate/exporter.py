@@ -387,15 +387,12 @@ def _write_FilteredTracks(
     xf : ET.xmlfile
         Context manager for the XML file to write.
     data : CoreData
-        Lineages containing the data to write.
+        Lineages containing the data to write.z
     """
     xf.write(f"\n{' '*4}")
     with xf.element("FilteredTracks"):
         for lineage in data.values():
-            # TODO: the bug is here
-            # Line before:
-            # if "TRACK_ID" in lineage.graph and lineage.graph["FilteredTrack"]:
-            if "TRACK_ID" in lineage.graph and "FilteredTrack" in lineage.graph:
+            if "TRACK_ID" in lineage.graph and lineage.graph["FilteredTrack"]:
                 xf.write(f"\n{' '*6}")
                 t_attr = {"TRACK_ID": str(lineage.graph["TRACK_ID"])}
                 xf.write(ET.Element("TrackID", t_attr))

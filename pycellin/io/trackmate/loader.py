@@ -829,13 +829,13 @@ def _parse_model_tag(
         # in both places.
         _update_TRACK_ID(lin)
 
-    # Adding if each track was present in the 'FilteredTracks' tag
-    # because this info is needed when reconstructing TrackMate XMLs
-    # from graphs.
-    if lin.graph["lineage_ID"] in id_to_keep:
-        lin.graph["FilteredTrack"] = True
-    else:
-        lin.graph["FilteredTrack"] = False
+        # Adding if each track was present in the 'FilteredTracks' tag
+        # because this info is needed when reconstructing TrackMate XMLs
+        # from graphs.
+        if lin.graph["lineage_ID"] in id_to_keep:
+            lin.graph["FilteredTrack"] = True
+        else:
+            lin.graph["FilteredTrack"] = False
 
     return fd, CoreData({lin.graph["lineage_ID"]: lin for lin in lineages})
 
