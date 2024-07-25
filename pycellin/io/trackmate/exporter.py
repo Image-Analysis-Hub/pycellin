@@ -13,6 +13,15 @@ from pycellin.classes.data import CoreData
 from pycellin.classes.lineage import CellLineage
 from pycellin.io.trackmate.loader import load_TrackMate_XML
 
+# TODO: Order of info in tag Spot is wrong,
+# must be first ID, name, ...., FRAME..., ROI_N_POINTS
+# Is it an issue for TM? If not maybe I don't need to modify this
+# (at least for FRAME since it's in the middle of the tag...)
+
+# TODO: filtered tracks are not correct...?
+# I have TRACK_ID 6, but should have 0 and 4.
+# Issue in loader or exporter?
+
 
 # TODO: finish this function
 def _unit_to_dimension(
@@ -158,21 +167,14 @@ def _convert_feature(
         Dictionary of the converted feature.
     """
     trackmate_feat = {}
-    match feat.name:
-        case "ID" | "name":
-            # These features do not exist in TrackMate features declaration.
-            pass
-        case "ROI_COORDINATES":
-            pass
-        case _:
-            trackmate_feat["feature"] = feat.name
-            trackmate_feat["name"] = feat.description
-            trackmate_feat["shortname"] = feat.name.lower()
-            trackmate_feat["dimension"] = _unit_to_dimension(feat)
-            if feat.data_type == "int":
-                trackmate_feat["isint"] = "true"
-            else:
-                trackmate_feat["isint"] = "false"
+    trackmate_feat["feature"] = feat.name
+    trackmate_feat["name"] = feat.description
+    trackmate_feat["shortname"] = feat.name.lower()
+    trackmate_feat["dimension"] = _unit_to_dimension(feat)
+    if feat.data_type == "int":
+        trackmate_feat["isint"] = "true"
+    else:
+        trackmate_feat["isint"] = "false"
 
     return trackmate_feat
 
@@ -279,16 +281,16 @@ def _create_Spot(
     ET._Element
         The newly created Spot Element.
     """
-    exluded_keys = ["TRACK_ID", "ROI_COORDINATES"]
+    exluded_keys = ["TRACK_ID", "ROI_coords"]
     n_attr = {
         k: _value_to_str(v)
         for k, v in lineage.nodes[node].items()
         if k not in exluded_keys
     }
-    n_attr["ROI_N_POINTS"] = str(len(lineage.nodes[node]["ROI_COORDINATES"]))
+    n_attr["ROI_N_POINTS"] = str(len(lineage.nodes[node]["ROI_coords"]))
 
     # Building Spot text: coordinates of ROI points.
-    coords = [item for pt in lineage.nodes[node]["ROI_COORDINATES"] for item in pt]
+    coords = [item for pt in lineage.nodes[node]["ROI_coords"] for item in pt]
 
     el_node = ET.Element("Spot", n_attr)
     el_node.text = " ".join(map(str, coords))
@@ -349,10 +351,10 @@ def _write_AllTracks(
     xf.write(f"\n{' '*4}")
     with xf.element("AllTracks"):
         for lineage in data.values():
-            # We have track tags to add only if there was a tracking done
-            # in the first place. A lineage with no TRACK_ID attribute has
-            # no tracking associated.
-            if "TRACK_ID" not in lineage.graph:
+            # We have track tags to add only for tracks with several spots,
+            # so one-node tracks are to be ignored. In Pycellin, a one-node
+            # lineage is identified by a negative ID.
+            if lineage.graph["TRACK_ID"] < 0:
                 continue
 
             # Track tags.
@@ -390,12 +392,49 @@ def _write_FilteredTracks(
     xf.write(f"\n{' '*4}")
     with xf.element("FilteredTracks"):
         for lineage in data.values():
-            if "TRACK_ID" in lineage.graph and lineage.graph["FilteredTrack"]:
+            # TODO: the bug is here
+            # Line before:
+            # if "TRACK_ID" in lineage.graph and lineage.graph["FilteredTrack"]:
+            if "TRACK_ID" in lineage.graph and "FilteredTrack" in lineage.graph:
                 xf.write(f"\n{' '*6}")
                 t_attr = {"TRACK_ID": str(lineage.graph["TRACK_ID"])}
                 xf.write(ET.Element("TrackID", t_attr))
         xf.write(f"\n{' '*4}")
     xf.write(f"\n{' '*2}")
+
+
+def _prepare_model_for_export(
+    model: Model,
+) -> None:
+    """
+    Prepare a Pycellin model for export to TrackMate format.
+
+    Some Pycellin features are a bit different from TrackMate features
+    and need to be modified or deleted.
+    For example, "lineage_ID" in Pycellin is "TRACK_ID" in TrackMate.
+
+    Parameters
+    ----------
+    model : Model
+        Model to prepare for export.
+    """
+    model.feat_declaration._rename_feature("lineage_ID", "TRACK_ID", "lineage")
+    model.feat_declaration._modify_feature_description(
+        "TRACK_ID", "Track ID", "lineage"
+    )
+    model.feat_declaration._remove_feature("FilteredTrack", "lineage")
+    model.feat_declaration._remove_feature("name", "lineage")
+    model.feat_declaration._rename_feature("frame", "FRAME", "node")
+    model.feat_declaration._remove_feature("cell_ID", "node")
+    model.feat_declaration._remove_feature("name", "node")
+    model.feat_declaration._remove_feature("ROI_coords", "node")
+
+    for lin in model.coredata.data.values():
+        lin.graph["TRACK_ID"] = lin.graph.pop("lineage_ID")
+        for node in lin.nodes:
+            lin.nodes[node].pop("lineage_ID")
+            lin.nodes[node]["ID"] = lin.nodes[node].pop("cell_ID")
+            lin.nodes[node]["FRAME"] = lin.nodes[node].pop("frame")
 
 
 def _write_metadata_tag(
@@ -478,6 +517,8 @@ def export_TrackMate_XML(
 
     if not units:
         units = _ask_units(model.feat_declaration)
+
+    _prepare_model_for_export(model)
 
     with ET.xmlfile(xml_path, encoding="utf-8", close=True) as xf:
         xf.write_declaration()
