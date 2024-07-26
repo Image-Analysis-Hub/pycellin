@@ -51,29 +51,61 @@ def _find_gaps(lineage: CellLineage, cell_cycle: list[int]) -> list[tuple[int, i
 
 def export_CTC(model, ctc_file_out):
 
+    # L B E P
+
     lineages = model.coredata.data
     # Removing one-node lineages.
+    # TODO: actually CTC can deal with one-node lineage, so I need to deal
+    # with this kind of special cases when everything else will work.
     lineages = [lineage for lineage in lineages.values() if len(lineage) > 1]
+    current_track_label = 1  # 0 is kept for no parent track
     for lin in lineages:
-        cell_cycles = []
+        print(lin)
+        ctc_tracks = {}
+        node_to_parent_track = {}
         for cc in lin.get_cell_cycles(keep_incomplete_cell_cycles=True):
+            # print(cc)
             gaps = _find_gaps(lin, cc)
             if gaps:
                 print(gaps)
                 for gap in gaps:
-                    pass
                     # We cut the cc at each gap and add it to the list of cell cycles.
+                    # current_track_label += 1
+                    pass
             else:
-                cell_cycles.append(cc)
-        print(cell_cycles)
+                track = {
+                    "B": lin.nodes[cc[0]]["frame"],
+                    "E": lin.nodes[cc[-1]]["frame"],
+                    "B_node": cc[0],
+                    "E_node": cc[-1],
+                }
+                ctc_tracks[current_track_label] = track
+                node_to_parent_track[track["E_node"]] = current_track_label
+                current_track_label += 1
+        # print("ctc_tracks", ctc_tracks)
+        # print("node_to_parent_track", node_to_parent_track)
 
-        lin_id = lin.graph["lineage_ID"]
-        if lin_id == 0:
-            # What value can I use to replace this ID 0?
-            pass
-        else:
-            pass
-            # Iterate over each cc and write to file line by line.
+        for track_label, track_info in ctc_tracks.items():
+            # print(track_label, track_info)
+            parent_nodes = list(lin.predecessors(track_info["B_node"]))
+            # Pycellin and CTC do not support multiple parents.
+            assert_msg = (
+                f"Node {track_info['B_node']} has more than 1 parent node "
+                f"({len(parent_nodes)} nodes) in lineage of ID "
+                f"{lin.graph['lineage_ID']}. Incorrect lineage topology: "
+                f"Pycellin and CTC do not support merge events."
+            )
+            assert len(parent_nodes) <= 1, assert_msg
+            if parent_nodes:
+                track_info["P"] = node_to_parent_track[parent_nodes[0]]
+            else:
+                track_info["P"] = 0
+            print(
+                f"{track_label} {track_info['B']} {track_info['E']} {track_info['P']}"
+            )
+
+        # print("ctc_tracks", ctc_tracks)
+        # print()
 
 
 if __name__ == "__main__":
