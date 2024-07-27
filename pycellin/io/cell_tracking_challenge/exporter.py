@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from pycellin.classes.model import Model
 from pycellin.classes.lineage import CellLineage
 from pycellin.io.cell_tracking_challenge.loader import load_CTC_file
 from pycellin.io.trackmate.loader import load_TrackMate_XML
 
 # TODO: need to extensively test this.
 
-# refactor
-# actual writing to file
 
-
-def sort_nodes_by_frame(
+def _sort_nodes_by_frame(
     lineage: CellLineage,
     nodes: list[int],
 ) -> list[int]:
@@ -31,7 +29,6 @@ def sort_nodes_by_frame(
         A list of nodes ordered by ascending frame.
     """
     sorted_list = [(node, lineage.nodes[node]["frame"]) for node in nodes]
-    print(sorted_list)
     sorted_list.sort(key=lambda x: x[1])
     return [node for node, _ in sorted_list]
 
@@ -101,7 +98,6 @@ def _add_track(
         "B_node": sorted_nodes[0],
         "E_node": sorted_nodes[-1],
     }
-    print(track)
     ctc_tracks[current_track_label] = track
     node_to_parent_track[track["E_node"]] = current_track_label
     return current_track_label + 1
@@ -113,6 +109,25 @@ def _build_CTC_tracks(
     node_to_parent_track: dict[int, int],
     current_track_label: int,
 ) -> int:
+    """
+    Build the CTC tracks from the lineage.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The lineage object we want to build tracks from.
+    ctc_tracks : dict[int, dict[str, int]]
+        A dictionary containing the CTC tracks of the lineage.
+    node_to_parent_track : dict[int, int]
+        A dictionary mapping the nodes to their parent CTC track.
+    current_track_label : int
+        The current track label.
+
+    Returns
+    -------
+    int
+        The updated current track label.
+    """
     if len(lineage) == 1:
         current_track_label = _add_track(
             lineage,
@@ -123,11 +138,9 @@ def _build_CTC_tracks(
         )
     else:
         for cc in lineage.get_cell_cycles(keep_incomplete_cell_cycles=True):
-            sorted_nodes = sort_nodes_by_frame(lineage, cc)
+            sorted_nodes = _sort_nodes_by_frame(lineage, cc)
             gaps = _find_gaps(lineage, sorted_nodes)
             if gaps:
-                print("Gaps found in cell cycle:", cc)
-                print("gaps:", gaps)
                 track_start_i = 0
                 for gap in gaps:
                     track_end_i = sorted_nodes.index(gap[0])
@@ -162,6 +175,18 @@ def _add_parent_track(
     track_info: dict[str, int],
     node_to_parent_track: dict[int, int],
 ):
+    """
+    Add the parent track label to the CTC track information.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The lineage object from which we are building CTC tracks.
+    track_info : dict[str, int]
+        A dictionary containing the CTC track information.
+    node_to_parent_track : dict[int, int]
+        A dictionary mapping the nodes to their parent CTC track.
+    """
     parent_nodes = list(lineage.predecessors(track_info["B_node"]))
     assert_msg = (
         f"Node {track_info['B_node']} has more than 1 parent node "
@@ -176,31 +201,44 @@ def _add_parent_track(
         track_info["P"] = 0
 
 
-def export_CTC_file(model, ctc_file_out):
+def export_CTC_file(model: Model, ctc_file_out):
+    """
+    Export lineage data from a Model to CTC file format.
+
+    Parameters
+    ----------
+    model : Model
+        The model from which we want to export the CTC file.
+    ctc_file_out : str
+        The path to the CTC file to write.
+    """
     lineages = model.coredata.data
     lineages = [lineage for lineage in lineages.values()]
     current_track_label = 1  # 0 is kept for no parent track
     tracks_to_write = []
     for lin in lineages:
-        print(lin)
         ctc_tracks = {}
         node_to_parent_track = {}
         current_track_label = _build_CTC_tracks(
             lin, ctc_tracks, node_to_parent_track, current_track_label
         )
-        print(ctc_tracks)
-
         for track_label, track_info in ctc_tracks.items():
             _add_parent_track(lin, track_info, node_to_parent_track)
-            txt = f"{track_label} {track_info['B']} {track_info['E']} {track_info['P']}"
+            txt = (
+                f"{track_label} {track_info['B']} "
+                f"{track_info['E']} {track_info['P']}\n"
+            )
             tracks_to_write.append(txt)
+
+    with open(ctc_file_out, "w") as file:
+        file.writelines(tracks_to_write)
 
 
 if __name__ == "__main__":
 
     xml_in = "sample_data/FakeTracks.xml"
     ctc_in = "C:/Users/haiba/Documents/01_RES/res_track.txt"
-    ctc_out = "sample_data/FakeTracks_exported_CTC.xml"
+    ctc_out = "sample_data/FakeTracks_exported_CTC.txt"
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # model = load_CTC_file(ctc_in) => FIXME
