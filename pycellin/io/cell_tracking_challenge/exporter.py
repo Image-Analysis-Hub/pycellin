@@ -26,6 +26,7 @@ def sort_nodes_by_frame(
         A list of nodes ordered by ascending frame.
     """
     sorted_list = [(node, lineage.nodes[node]["frame"]) for node in nodes]
+    print(sorted_list)
     sorted_list.sort(key=lambda x: x[1])
     return [node for node, _ in sorted_list]
 
@@ -95,6 +96,7 @@ def _add_track(
         "B_node": sorted_nodes[0],
         "E_node": sorted_nodes[-1],
     }
+    print(track)
     ctc_tracks[current_track_label] = track
     node_to_parent_track[track["E_node"]] = current_track_label
     return current_track_label + 1
@@ -108,45 +110,59 @@ def export_CTC(model, ctc_file_out):
     # Removing one-node lineages.
     # TODO: actually CTC can deal with one-node lineage, so I need to deal
     # with this kind of special cases when everything else will work.
-    lineages = [lineage for lineage in lineages.values() if len(lineage) > 1]
+    lineages = [lineage for lineage in lineages.values()]
     current_track_label = 1  # 0 is kept for no parent track
     for lin in lineages:
         print(lin)
         ctc_tracks = {}
         node_to_parent_track = {}
-        for cc in lin.get_cell_cycles(keep_incomplete_cell_cycles=True):
-            # print(cc)
-            sorted_nodes = sort_nodes_by_frame(lin, cc)
-            gaps = _find_gaps(lin, sorted_nodes)
-            if gaps:
-                print("Gaps found in cell cycle:", cc)
-                print("gaps:", gaps)
-                track_start_i = 0
-                for gap in gaps:
-                    track_end_i = sorted_nodes.index(gap[0])
+
+        if len(lin) == 1:
+            # print("ONE_NODE LINEAGE")
+            current_track_label = _add_track(
+                lin,
+                list(lin.nodes),
+                ctc_tracks,
+                node_to_parent_track,
+                current_track_label,
+            )
+        else:
+            for cc in lin.get_cell_cycles(keep_incomplete_cell_cycles=True):
+                # print(cc)
+                sorted_nodes = sort_nodes_by_frame(lin, cc)
+                print(sorted_nodes)
+                gaps = _find_gaps(lin, sorted_nodes)
+                if gaps:
+                    print("Gaps found in cell cycle:", cc)
+                    print("gaps:", gaps)
+                    track_start_i = 0
+                    for gap in gaps:
+                        track_end_i = sorted_nodes.index(gap[0])
+                        current_track_label = _add_track(
+                            lin,
+                            sorted_nodes[track_start_i : track_end_i + 1],
+                            ctc_tracks,
+                            node_to_parent_track,
+                            current_track_label,
+                        )
+                        track_start_i = sorted_nodes.index(gap[1])
                     current_track_label = _add_track(
                         lin,
-                        sorted_nodes[track_start_i : track_end_i + 1],
+                        sorted_nodes[track_start_i:],
                         ctc_tracks,
                         node_to_parent_track,
                         current_track_label,
                     )
-                    track_start_i = sorted_nodes.index(gap[1])
-                current_track_label = _add_track(
-                    lin,
-                    sorted_nodes[track_start_i:],
-                    ctc_tracks,
-                    node_to_parent_track,
-                    current_track_label,
-                )
-            else:
-                current_track_label = _add_track(
-                    lin,
-                    sorted_nodes,
-                    ctc_tracks,
-                    node_to_parent_track,
-                    current_track_label,
-                )
+                else:
+                    current_track_label = _add_track(
+                        lin,
+                        sorted_nodes,
+                        ctc_tracks,
+                        node_to_parent_track,
+                        current_track_label,
+                    )
+
+        print(ctc_tracks)
 
         for track_label, track_info in ctc_tracks.items():
             parent_nodes = list(lin.predecessors(track_info["B_node"]))
