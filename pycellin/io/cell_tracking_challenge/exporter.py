@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import itertools
 import math
 from typing import Any, Union
 
@@ -19,34 +20,74 @@ from pycellin.io.trackmate.loader import load_TrackMate_XML
 # https://imagej.net/plugins/trackmate/actions/trackmate-ctc-exporter
 
 
-def _find_gaps(lineage: CellLineage, cell_cycle: list[int]) -> list[tuple[int, int]]:
+def sort_nodes_by_frame(
+    lineage: CellLineage, nodes: list[int]
+) -> tuple[list[int], list[int]]:
     """
-    Find missing frames in the cell cycle.
+    Sort the nodes by ascending frame.
 
     Parameters
     ----------
     lineage : CellLineage
-        The lineage object to which the cell cycle belongs.
-    cell_cycle : list[int]
-        A list of node IDs.
+        The lineage object to which the nodes belongs.
+    nodes : list[int]
+        A list of nodes to order by ascending frame.
+
+    Returns
+    -------
+    tuple[list[int], list[int]]
+        A tuple containing the ordered nodes and their corresponding frames.
+    """
+    sorted_list = [(node, lineage.nodes[node]["frame"]) for node in nodes]
+    sorted_list.sort(key=lambda x: x[1])
+    nodes = [node for node, frame in sorted_list]
+    frames = [frame for node, frame in sorted_list]
+    return nodes, frames
+
+
+def _find_gaps(lineage: CellLineage, sorted_nodes: list[int]) -> list[tuple[int, int]]:
+    """
+    Find the temporal gaps in an ordered list of nodes.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The lineage object to which the nodes belongs.
+    sorted_nodes : list[tuple[int, int]]
+        A list of tuples, where each tuple contains the frame of the node and
+        the ID of the node, ordered by ascending frame.
 
     Returns
     -------
     list[tuple[int, int]]
         A list of tuples, where each tuple contains the IDs of the nodes that
-        are separated by a gap in the cell cycle.
+        are separated by a gap in the ordered list of nodes.
     """
-    frames = [(lineage.nodes[node]["frame"], node) for node in cell_cycle]
-    frames.sort(key=lambda x: x[0])
-
-    missing_frames = []
-    for i in range(len(frames) - 1):
-        frame, node = frames[i]
-        next_frame, next_node = frames[i + 1]
+    gap_nodes = []
+    for i in range(len(sorted_nodes) - 1):
+        frame = lineage.nodes[sorted_nodes[i]]["frame"]
+        next_frame = lineage.nodes[sorted_nodes[i + 1]]["frame"]
+        # frame, node = sorted_nodes[i]
+        # next_frame, next_node = sorted_nodes[i + 1]
         if next_frame - frame > 1:
-            missing_frames.append((node, next_node))
+            gap_nodes.append((sorted_nodes[i], sorted_nodes[i + 1]))
+            # gap_nodes.append(sorted_nodes[i + 1])
 
-    return missing_frames
+    return gap_nodes
+
+
+def _add_track(
+    lineage, sorted_nodes, ctc_tracks, node_to_parent_track, current_track_label
+):
+    track = {
+        "B": lineage.nodes[sorted_nodes[0]]["frame"],
+        "E": lineage.nodes[sorted_nodes[-1]]["frame"],
+        "B_node": sorted_nodes[0],
+        "E_node": sorted_nodes[-1],
+    }
+    ctc_tracks[current_track_label] = track
+    node_to_parent_track[track["E_node"]] = current_track_label
+    return current_track_label + 1
 
 
 def export_CTC(model, ctc_file_out):
@@ -65,25 +106,37 @@ def export_CTC(model, ctc_file_out):
         node_to_parent_track = {}
         for cc in lin.get_cell_cycles(keep_incomplete_cell_cycles=True):
             # print(cc)
-            gaps = _find_gaps(lin, cc)
+            sorted_nodes, frames = sort_nodes_by_frame(lin, cc)
+            gaps = _find_gaps(lin, sorted_nodes)
             if gaps:
-                print(gaps)
+                print("Gaps found in cell cycle:", cc)
+                print("gaps:", gaps)
+                start_i = 0
                 for gap in gaps:
-                    # We cut the cc at each gap and add it to the list of cell cycles.
-                    # current_track_label += 1
-                    pass
+                    end_i = sorted_nodes.index(gap[0])
+                    current_track_label = _add_track(
+                        lin,
+                        sorted_nodes[start_i : end_i + 1],
+                        ctc_tracks,
+                        node_to_parent_track,
+                        current_track_label,
+                    )
+                    start_i = sorted_nodes.index(gap[1])
+                current_track_label = _add_track(
+                    lin,
+                    sorted_nodes[start_i:],
+                    ctc_tracks,
+                    node_to_parent_track,
+                    current_track_label,
+                )
             else:
-                track = {
-                    "B": lin.nodes[cc[0]]["frame"],
-                    "E": lin.nodes[cc[-1]]["frame"],
-                    "B_node": cc[0],
-                    "E_node": cc[-1],
-                }
-                ctc_tracks[current_track_label] = track
-                node_to_parent_track[track["E_node"]] = current_track_label
-                current_track_label += 1
-        # print("ctc_tracks", ctc_tracks)
-        # print("node_to_parent_track", node_to_parent_track)
+                current_track_label = _add_track(
+                    lin,
+                    sorted_nodes,
+                    ctc_tracks,
+                    node_to_parent_track,
+                    current_track_label,
+                )
 
         for track_label, track_info in ctc_tracks.items():
             # print(track_label, track_info)
