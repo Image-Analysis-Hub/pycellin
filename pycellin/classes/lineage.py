@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from abc import ABCMeta, abstractmethod
+from typing import Any
 
 from igraph import Graph, EdgeSeq
 import matplotlib.pyplot as plt
@@ -198,19 +199,38 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     def plot_with_plotly(
         self,
         title: str | None = None,
+        node_text: str | None = "cell_ID",
+        node_text_font: dict[str, Any] | None = None,
+        node_marker_style: dict[str, Any] | None = None,
+        node_hovertemplate: str | None = None,
     ):
         """
         Plot the lineage as a tree using Plotly.
 
         Heavily based on the code from https://plotly.com/python/tree-plots/
+
+        Parameters
+        ----------
+        title : str, optional
+            The title of the plot. If None, no title is displayed.
+        node_text : str, optional
+            The feature of the nodes to display as text inside
+            the nodes of the plot. If None, no text is displayed.
+            ID of the node ("cell_ID") by default.
+        node_text_font : dict, optional
+            The font style of the text inside the nodes (size, color, etc).
+            If None, a default style is used.
+        node_marker_style : dict, optional
+            The style of the markers representing the nodes in the plot
+            (symbol, size, color, line, etc). If None, a default style is used.
         """
         # https://plotly.com/python/hover-text-and-formatting/#customizing-hover-label-appearance
         # https://plotly.com/python/hover-text-and-formatting/#customizing-hover-text-with-a-hovertemplate
 
         # TODO: extract parameters to make the function more versatile:
-        # - node style
+        # - node style                  OK
         # - edge style
-        # - node text
+        # - node text                   OK
         # - edge text?
         # - node hoverinfo style
         # - edge hoverinfo style
@@ -243,60 +263,76 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             x_edges += [positions[edge[0]][0], positions[edge[1]][0], None]
             y_edges += [positions[edge[0]][1], positions[edge[1]][1], None]
 
-        # Annotations.
-        node_labels = G.vs["cell_ID"]
-        if len(node_labels) != nodes_count:
-            raise ValueError("The lists pos and text must have the same len")
-        annotations = []
-        for k in range(nodes_count):
-            annotations.append(
-                dict(
-                    text=node_labels[k],
-                    # or replace labels with a different list for the text within the circle
-                    x=positions[k][0],
-                    # y=2 * M - positions[k][1],
-                    y=positions[k][1],
-                    xref="x1",
-                    yref="y1",
-                    font=dict(color="rgb(250,250,250)", size=10),
-                    showarrow=False,
-                )
+        # Default node text font.
+        if not node_text_font:
+            node_text_font = dict(
+                # color="black",
+                size=10,
             )
 
+        # Default node marker style.
+        if not node_marker_style:
+            node_marker_style = dict(
+                symbol="circle",
+                size=20,
+                # color="#636EFA",
+                # line=dict(color="black)", width=1),
+            )
+
+        # Annotations.
+        if node_text:
+            node_labels = G.vs[node_text]
+            if len(node_labels) != nodes_count:
+                raise ValueError("The lists pos and text must have the same len")
+            annotations = []
+            for k in range(nodes_count):
+                annotations.append(
+                    dict(
+                        text=node_labels[k],
+                        x=positions[k][0],
+                        y=positions[k][1],
+                        xref="x1",
+                        yref="y1",
+                        font=node_text_font,
+                        showarrow=False,
+                    )
+                )
+        else:
+            # node_labels = None
+            annotations = None
+
+        # Plot edges.
         fig = go.Figure()
         fig.add_trace(
             go.Scatter(
                 x=x_edges,
                 y=y_edges,
                 mode="lines",
-                line=dict(color="rgb(210,210,210)", width=1),
-                hoverinfo="none",
+                # line=dict(color="rgb(210,210,210)", width=1),
+                # hoverinfo="none",
             )
         )
+
+        # Plot nodes.
         fig.add_trace(
             go.Scatter(
                 x=x_nodes,
                 y=y_nodes,
+                # hovertemplate=node_hovertemplate,
+                # hovertemplate="ID: %{text}<br>Frame: %{y}",
                 mode="markers",
-                marker=dict(
-                    symbol="circle",
-                    size=18,
-                    color="#6175c1",  #'#DB4551',
-                    line=dict(color="rgb(50,50,50)", width=1),
-                ),
-                text=node_labels,
+                marker=node_marker_style,
+                # text=node_labels,  # Used in hoverinfo not for the text in the nodes
                 hoverinfo="text",
-                # opacity=0.8,
             )
         )
 
         fig.update_layout(
             title=title,
             annotations=annotations,
-            font_size=5,
+            # font_size=5,
             showlegend=False,
             hovermode="closest",
-            plot_bgcolor="rgb(248,248,248)",
         )
         fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
         fig.update_yaxes(autorange="reversed", title="Time (frames)")
