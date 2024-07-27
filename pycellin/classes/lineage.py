@@ -363,8 +363,8 @@ class CellLineage(Lineage):
                 cell_cycle.append(*predecessors)
                 predecessors = list(self.predecessors(*predecessors))
                 err = (
-                    f"Node {node} in {self.graph['name']} has "
-                    f"{len(predecessors)} predecessors."
+                    f"Node {node} in lineage of ID {self.graph['lineage_ID']} "
+                    f"has {len(predecessors)} predecessors."
                 )
                 assert len(predecessors) == 1, err
             if self.is_root(*predecessors) and not self.is_division(*predecessors):
@@ -374,16 +374,16 @@ class CellLineage(Lineage):
         if not end:
             successors = list(self.successors(node))
             err = (
-                f"Node {node} in {self.graph['name']} has "
-                f"{len(successors)} successors."
+                f"Node {node} in lineage of ID {self.graph['lineage_ID']} "
+                f"has {len(successors)} successors."
             )
             assert len(successors) == 1, err
             while not self.is_division(*successors) and not self.is_leaf(*successors):
                 cell_cycle.append(*successors)
                 successors = list(self.successors(*successors))
                 err = (
-                    f"Node {node} in {self.graph['name']} has "
-                    f"{len(successors)} successors."
+                    f"Node {node} in lineage of ID {self.graph['lineage_ID']} "
+                    f"has {len(successors)} successors."
                 )
                 assert len(successors) == 1, err
             cell_cycle.append(*successors)

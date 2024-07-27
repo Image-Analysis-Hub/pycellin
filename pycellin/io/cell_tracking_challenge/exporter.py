@@ -240,7 +240,7 @@ if __name__ == "__main__":
     ctc_in = "C:/Users/haiba/Documents/01_RES/res_track.txt"
     ctc_out = "sample_data/FakeTracks_exported_CTC.txt"
 
-    model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
-    # model = load_CTC_file(ctc_in) => FIXME
+    # model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
+    model = load_CTC_file(ctc_in)  # => FIXME
 
     export_CTC_file(model, ctc_out)
