@@ -202,7 +202,10 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_text: str | None = "cell_ID",
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
+        node_colormap_feature: str | None = None,
+        node_color_scale: str | None = None,
         node_hovertemplate: str | None = None,
+        edge_line_style: dict[str, Any] | None = None,
     ):
         """
         Plot the lineage as a tree using Plotly.
@@ -223,13 +226,25 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_marker_style : dict, optional
             The style of the markers representing the nodes in the plot
             (symbol, size, color, line, etc). If None, a default style is used.
+        node_colormap_feature : str, optional
+            The feature of the nodes to use for coloring the nodes.
+            If None, no color mapping is applied.
+        node_color_scale : str, optional
+            The color scale to use for coloring the nodes. If None,
+            default to current Plotly template.
+        node_hovertemplate : str, optional
+            The hover template for the nodes. If None, a default template
+            is used.
+        edge_line_style : dict, optional
+            The style of the lines representing the edges in the plot
+            (color, width, etc). If None, default to current Plotly template.
         """
         # https://plotly.com/python/hover-text-and-formatting/#customizing-hover-label-appearance
         # https://plotly.com/python/hover-text-and-formatting/#customizing-hover-text-with-a-hovertemplate
 
         # TODO: extract parameters to make the function more versatile:
         # - node style                  OK
-        # - edge style
+        # - edge style                  OK
         # - node text                   OK
         # - edge text?
         # - node hoverinfo style
@@ -237,9 +252,10 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # - node hoverinfo text
         # - edge hoverinfo text
         # - axes
-        # - color mapping node/edge attributes?
+        # - color mapping node/edge attributes?     OK nodes
         # - option to hide nodes? or just put nodes and edges in the legend
         #   so we can hide manually one or the other
+        # TODO: need to add unit for color scale, but the info is stored in the model
 
         # Conversion of the networkx lineage graph to igraph.
         G = Graph.from_networkx(self)
@@ -273,11 +289,18 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # Default node marker style.
         if not node_marker_style:
             node_marker_style = dict(
-                symbol="circle",
-                size=20,
+                # symbol="circle",
+                # size=20,
                 # color="#636EFA",
                 # line=dict(color="black)", width=1),
             )
+
+        # Add color mapping if node_colormap_feature is specified.
+        if node_colormap_feature:
+            node_colors = G.vs[node_colormap_feature]
+            node_marker_style["color"] = node_colors
+            node_marker_style["colorscale"] = node_color_scale
+            node_marker_style["colorbar"] = dict(title=node_colormap_feature)
 
         # Annotations.
         if node_text:
@@ -308,7 +331,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 x=x_edges,
                 y=y_edges,
                 mode="lines",
-                # line=dict(color="rgb(210,210,210)", width=1),
+                line=edge_line_style,
                 # hoverinfo="none",
             )
         )
