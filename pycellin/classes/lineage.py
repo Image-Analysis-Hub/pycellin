@@ -199,7 +199,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     def plot_with_plotly(
         self,
         title: str | None = None,
-        node_text: str | None = "cell_ID",
+        node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
         node_colormap_feature: str | None = None,
@@ -232,12 +232,28 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_color_scale : str, optional
             The color scale to use for coloring the nodes. If None,
             default to current Plotly template.
-        node_hovertemplate : str, optional
+        node_hover_features : list[str], optional
             The hover template for the nodes. If None, a default template
             is used.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, default to current Plotly template.
+
+        Examples
+        --------
+        For styling the graph:
+
+        node_text_font = dict(
+            color="black",
+            size=10,
+        )
+
+        node_marker_style = dict(
+            symbol="circle",
+            size=20,
+            color="white",
+            line=dict(color="black", width=1),
+        )
         """
         # https://plotly.com/python/hover-text-and-formatting/#customizing-hover-label-appearance
         # https://plotly.com/python/hover-text-and-formatting/#customizing-hover-text-with-a-hovertemplate
@@ -278,22 +294,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         for edge in edges:
             x_edges += [positions[edge[0]][0], positions[edge[1]][0], None]
             y_edges += [positions[edge[0]][1], positions[edge[1]][1], None]
-
-        # Default node text font.
-        if not node_text_font:
-            node_text_font = dict(
-                # color="black",
-                size=10,
-            )
-
-        # Default node marker style.
-        if not node_marker_style:
-            node_marker_style = dict(
-                # symbol="circle",
-                # size=20,
-                # color="#636EFA",
-                # line=dict(color="black)", width=1),
-            )
 
         # Add color mapping if node_colormap_feature is specified.
         if node_colormap_feature:
@@ -336,16 +336,24 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             )
         )
 
+        # Extract node feature values for hovertemplate
+        node_hover_text = []
+        for node in G.vs:
+            hover_text = f"ID: {node['cell_ID']}<br>Frame: {node['frame']}"
+            # if node_colormap_feature:
+            #     hover_text += f"<br>{node_colormap_feature}: {node[node_colormap_feature]}"
+            node_hover_text.append(hover_text)
+
         # Plot nodes.
         fig.add_trace(
             go.Scatter(
                 x=x_nodes,
                 y=y_nodes,
-                # hovertemplate=node_hovertemplate,
+                hovertemplate=node_hovertemplate if node_hovertemplate else "%{text}",
                 # hovertemplate="ID: %{text}<br>Frame: %{y}",
                 mode="markers",
                 marker=node_marker_style,
-                # text=node_labels,  # Used in hoverinfo not for the text in the nodes
+                text=node_hover_text,  # Used in hoverinfo not for the text in the nodes
                 hoverinfo="text",
             )
         )
