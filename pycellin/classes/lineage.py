@@ -204,7 +204,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_marker_style: dict[str, Any] | None = None,
         node_colormap_feature: str | None = None,
         node_color_scale: str | None = None,
-        node_hovertemplate: str | None = None,
+        node_hover_features: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
     ):
         """
@@ -337,20 +337,25 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         )
 
         # Extract node feature values for hovertemplate
-        node_hover_text = []
-        for node in G.vs:
-            hover_text = f"ID: {node['cell_ID']}<br>Frame: {node['frame']}"
-            # if node_colormap_feature:
-            #     hover_text += f"<br>{node_colormap_feature}: {node[node_colormap_feature]}"
-            node_hover_text.append(hover_text)
+        if node_hover_features:
+            node_hover_text = []
+            for node in G.vs:
+                text = ""
+                for feat in node_hover_features:
+                    hover_text = f"{feat}: {node[feat]}<br>"
+                    text += hover_text
+                node_hover_text.append(text)
+        else:
+            node_hover_text = [
+                f"cell_ID: {node['cell_ID']}<br>frame: {node['frame']}" for node in G.vs
+            ]
 
         # Plot nodes.
         fig.add_trace(
             go.Scatter(
                 x=x_nodes,
                 y=y_nodes,
-                hovertemplate=node_hovertemplate if node_hovertemplate else "%{text}",
-                # hovertemplate="ID: %{text}<br>Frame: %{y}",
+                hovertemplate="%{text}",
                 mode="markers",
                 marker=node_marker_style,
                 text=node_hover_text,  # Used in hoverinfo not for the text in the nodes
@@ -361,7 +366,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         fig.update_layout(
             title=title,
             annotations=annotations,
-            # font_size=5,
             showlegend=False,
             hovermode="closest",
         )
