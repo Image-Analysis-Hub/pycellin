@@ -206,6 +206,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_color_scale: str | None = None,
         node_hover_features: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
+        showlegend: bool = True,
     ):
         """
         Plot the lineage as a tree using Plotly.
@@ -217,27 +218,29 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
-            The feature of the nodes to display as text inside
-            the nodes of the plot. If None, no text is displayed.
-            ID of the node ("cell_ID") by default.
+            The feature of the nodes to display as text inside the nodes
+            of the plot. If None, no text is displayed. None by default.
         node_text_font : dict, optional
             The font style of the text inside the nodes (size, color, etc).
-            If None, a default style is used.
+            If None, defaults to current Plotly template.
         node_marker_style : dict, optional
             The style of the markers representing the nodes in the plot
-            (symbol, size, color, line, etc). If None, a default style is used.
+            (symbol, size, color, line, etc). If None, defaults to
+            current Plotly template.
         node_colormap_feature : str, optional
             The feature of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
         node_color_scale : str, optional
             The color scale to use for coloring the nodes. If None,
-            default to current Plotly template.
+            defaults to current Plotly template.
         node_hover_features : list[str], optional
-            The hover template for the nodes. If None, a default template
-            is used.
+            The hover template for the nodes. If None, defaults to
+            displaying `cell_ID` and `frame`.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
-            (color, width, etc). If None, default to current Plotly template.
+            (color, width, etc). If None, defaults to current Plotly template.
+        showlegend : bool, optional
+            True to display the legend, False otherwise. True by default.
 
         Examples
         --------
@@ -387,7 +390,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         fig.update_layout(
             title=title,
             annotations=node_annotations,
-            showlegend=True,
+            showlegend=showlegend,
             hovermode="closest",
         )
         fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
