@@ -265,13 +265,12 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # - edge text?
         # - node hoverinfo style
         # - edge hoverinfo style
-        # - node hoverinfo text
+        # - node hoverinfo text         OK
         # - edge hoverinfo text
         # - axes
         # - color mapping node/edge attributes?     OK nodes
         # - option to hide nodes? or just put nodes and edges in the legend
         #   so we can hide manually one or the other
-        # TODO: need to add unit for color scale, but the info is stored in the model
 
         # Conversion of the networkx lineage graph to igraph.
         G = Graph.from_networkx(self)
@@ -284,9 +283,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         frame_values = G.vs["frame"]
         layout = [(layout[k][0], frame_values[k]) for k in range(nodes_count)]
 
-        # Computing the exact positions of nodes and eges.
+        # Computing the exact positions of nodes and edges.
         positions = {k: layout[k] for k in range(nodes_count)}
-        edges = [edge.tuple for edge in G.es]  # list of edges
+        edges = [edge.tuple for edge in G.es]
         x_nodes = [x for (x, _) in positions.values()]
         y_nodes = [y for (_, y) in positions.values()]
         x_edges = []
@@ -297,12 +296,16 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         # Add color mapping if node_colormap_feature is specified.
         if node_colormap_feature:
+            if not node_marker_style:
+                node_marker_style = dict()
             node_colors = G.vs[node_colormap_feature]
             node_marker_style["color"] = node_colors
             node_marker_style["colorscale"] = node_color_scale
             node_marker_style["colorbar"] = dict(title=node_colormap_feature)
+            # TODO: add colorbar units, but the info is stored in the model
+            # FIXME: the colorbar is not displayed above the traces names
 
-        # Annotations.
+        # Text in the nodes.
         if node_text:
             node_labels = G.vs[node_text]
             if len(node_labels) != nodes_count:
@@ -321,7 +324,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                     )
                 )
         else:
-            # node_labels = None
             annotations = None
 
         # Plot edges.
@@ -332,11 +334,14 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 y=y_edges,
                 mode="lines",
                 line=edge_line_style,
+                name="Edges",
                 # hoverinfo="none",
             )
         )
 
-        # Extract node feature values for hovertemplate
+        # Define hovertemplate.
+        # TODO: when feature is float, display only 2 decimals
+        # or give control to the user.
         if node_hover_features:
             node_hover_text = []
             for node in G.vs:
@@ -349,7 +354,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             node_hover_text = [
                 f"cell_ID: {node['cell_ID']}<br>frame: {node['frame']}" for node in G.vs
             ]
-
         if "lineage_ID" in G.attributes():
             graph_name = f"lineage_ID: {G['lineage_ID']}"
         else:
@@ -372,7 +376,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         fig.update_layout(
             title=title,
             annotations=annotations,
-            showlegend=False,
+            showlegend=True,
             hovermode="closest",
         )
         fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
