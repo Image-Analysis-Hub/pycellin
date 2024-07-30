@@ -185,6 +185,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_color_scale: str | None = None,
         node_hover_features: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
+        plot_bgcolor: str | None = None,
         showlegend: bool = True,
     ):
         """
@@ -218,6 +219,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
+        plot_bgcolor : str, optional
+            The background color of the plot. If None, defaults to current
+            Plotly template.
         showlegend : bool, optional
             True to display the legend, False otherwise. True by default.
 
@@ -368,6 +372,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             title=title,
             annotations=node_annotations,
             showlegend=showlegend,
+            plot_bgcolor=plot_bgcolor,
             hovermode="closest",
         )
         fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
