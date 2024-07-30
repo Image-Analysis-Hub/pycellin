@@ -308,7 +308,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                     text = ""
                     for feat in node_hover_features:
                         if feat not in node.attributes():
-                            raise ValueError(
+                            raise KeyError(
                                 f"Feature {feat} is not present in the node attributes."
                             )
                         hover_text = f"{feat}: {node[feat]}<br>"
