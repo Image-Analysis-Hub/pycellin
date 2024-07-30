@@ -272,44 +272,24 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # - option to hide nodes? or just put nodes and edges in the legend
         #   so we can hide manually one or the other
 
-        # Conversion of the networkx lineage graph to igraph.
-        G = Graph.from_networkx(self)
-        nodes_count = G.vcount()
+        def get_nodes_position():
+            x_nodes = [x for (x, _) in positions.values()]
+            y_nodes = [y for (_, y) in positions.values()]
+            return x_nodes, y_nodes
 
-        # Basic tree layout.
-        layout = G.layout("rt")
+        def get_edges_position():
+            edges = [edge.tuple for edge in G.es]
+            x_edges = []
+            y_edges = []
+            for edge in edges:
+                x_edges += [positions[edge[0]][0], positions[edge[1]][0], None]
+                y_edges += [positions[edge[0]][1], positions[edge[1]][1], None]
+            return x_edges, y_edges
 
-        # Adjusting the y position of the nodes to be the frame number.
-        frame_values = G.vs["frame"]
-        layout = [(layout[k][0], frame_values[k]) for k in range(nodes_count)]
-
-        # Computing the exact positions of nodes and edges.
-        positions = {k: layout[k] for k in range(nodes_count)}
-        edges = [edge.tuple for edge in G.es]
-        x_nodes = [x for (x, _) in positions.values()]
-        y_nodes = [y for (_, y) in positions.values()]
-        x_edges = []
-        y_edges = []
-        for edge in edges:
-            x_edges += [positions[edge[0]][0], positions[edge[1]][0], None]
-            y_edges += [positions[edge[0]][1], positions[edge[1]][1], None]
-
-        # Add color mapping if node_colormap_feature is specified.
-        if node_colormap_feature:
-            if not node_marker_style:
-                node_marker_style = dict()
-            node_colors = G.vs[node_colormap_feature]
-            node_marker_style["color"] = node_colors
-            node_marker_style["colorscale"] = node_color_scale
-            node_marker_style["colorbar"] = dict(title=node_colormap_feature)
-            # TODO: add colorbar units, but the info is stored in the model
-            # FIXME: the colorbar is not displayed above the traces names
-
-        # Text in the nodes.
-        if node_text:
+        def node_text_annotations():
             node_labels = G.vs[node_text]
             if len(node_labels) != nodes_count:
-                raise ValueError("The lists pos and text must have the same len")
+                raise ValueError("The lists pos and text must have the same length.")
             annotations = []
             for k in range(nodes_count):
                 annotations.append(
@@ -323,8 +303,61 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                         showarrow=False,
                     )
                 )
-        else:
-            annotations = None
+            return annotations
+
+        def node_feature_color_mapping():
+            # TODO: add colorbar units, but the info is stored in the model
+            # FIXME: the colorbar is partially hiding the traces names
+            node_marker_style["color"] = G.vs[node_colormap_feature]
+            node_marker_style["colorscale"] = node_color_scale
+            node_marker_style["colorbar"] = dict(title=node_colormap_feature)
+
+        def node_hovertemplate():
+            # TODO: when feature is float, display only 2 decimals
+            # or give control to the user.
+            if node_hover_features:
+                node_hover_text = []
+                for node in G.vs:
+                    text = ""
+                    for feat in node_hover_features:
+                        hover_text = f"{feat}: {node[feat]}<br>"
+                        text += hover_text
+                    node_hover_text.append(text)
+            else:
+                node_hover_text = [
+                    f"cell_ID: {node['cell_ID']}<br>frame: {node['frame']}"
+                    for node in G.vs
+                ]
+            if "lineage_ID" in G.attributes():
+                graph_name = f"lineage_ID: {G['lineage_ID']}"
+            else:
+                graph_name = ""
+            return node_hover_text, graph_name
+
+        # Conversion of the networkx lineage graph to igraph.
+        G = Graph.from_networkx(self)
+        nodes_count = G.vcount()
+        layout = G.layout("rt")  # Basic tree layout.
+        # Updating the layout so the y position of the nodes is the frame number.
+        layout = [(layout[k][0], G.vs["frame"][k]) for k in range(nodes_count)]
+
+        # Computing the exact positions of nodes and edges.
+        positions = {k: layout[k] for k in range(nodes_count)}
+        x_nodes, y_nodes = get_nodes_position()
+        x_edges, y_edges = get_edges_position()
+
+        # Color mapping the nodes to a node feature.
+        if node_colormap_feature:
+            if not node_marker_style:
+                node_marker_style = dict()
+            node_feature_color_mapping()
+
+        # Text in the nodes.
+        node_annotations = node_text_annotations() if node_text else None
+        # TODO: see if it's better to use a background behind the text
+        # https://plotly.com/python/text-and-annotations/#styling-and-coloring-annotations
+        # Text when hovering on a node.
+        node_hover_text, graph_name = node_hovertemplate()
 
         # Plot edges.
         fig = go.Figure()
@@ -335,47 +368,25 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 mode="lines",
                 line=edge_line_style,
                 name="Edges",
-                # hoverinfo="none",
             )
         )
-
-        # Define hovertemplate.
-        # TODO: when feature is float, display only 2 decimals
-        # or give control to the user.
-        if node_hover_features:
-            node_hover_text = []
-            for node in G.vs:
-                text = ""
-                for feat in node_hover_features:
-                    hover_text = f"{feat}: {node[feat]}<br>"
-                    text += hover_text
-                node_hover_text.append(text)
-        else:
-            node_hover_text = [
-                f"cell_ID: {node['cell_ID']}<br>frame: {node['frame']}" for node in G.vs
-            ]
-        if "lineage_ID" in G.attributes():
-            graph_name = f"lineage_ID: {G['lineage_ID']}"
-        else:
-            graph_name = ""
-
         # Plot nodes.
         fig.add_trace(
             go.Scatter(
                 x=x_nodes,
                 y=y_nodes,
-                hovertemplate="%{text}",
                 mode="markers",
                 marker=node_marker_style,
-                text=node_hover_text,  # Used in hoverinfo not for the text in the nodes
                 hoverinfo="text",
+                hovertemplate="%{text}",
+                text=node_hover_text,  # Used in hoverinfo not for the nodes text.
                 name=graph_name,
             )
         )
 
         fig.update_layout(
             title=title,
-            annotations=annotations,
+            annotations=node_annotations,
             showlegend=True,
             hovermode="closest",
         )
