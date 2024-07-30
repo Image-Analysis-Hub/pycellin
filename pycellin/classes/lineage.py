@@ -186,6 +186,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_hover_features: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
         plot_bgcolor: str | None = None,
+        show_horizontal_grid: bool = True,
         showlegend: bool = True,
     ):
         """
@@ -222,6 +223,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         plot_bgcolor : str, optional
             The background color of the plot. If None, defaults to current
             Plotly template.
+        show_horizontal_grid : bool, optional
+            True to display the horizontal grid, False otherwise. True by default.
         showlegend : bool, optional
             True to display the legend, False otherwise. True by default.
 
@@ -376,7 +379,12 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             hovermode="closest",
         )
         fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
-        fig.update_yaxes(autorange="reversed", title="Time (frames)")
+        fig.update_yaxes(
+            autorange="reversed",
+            showgrid=show_horizontal_grid,
+            zeroline=show_horizontal_grid,
+            title="Time (frames)",
+        )
         fig.show()
 
 
