@@ -175,28 +175,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         else:
             return False
 
-    def plot(self, figsize: tuple[float, float] = None):
-        # TODO: investigate the use of plotly to draw an interactive lineage
-        # instead of networkx-pygraphviz. Pygraphviz installation in Windows
-        # is not straightforward and need the preliminary installation of
-        # Graphviz executable.
-        # https://plotly.com/python/tree-plots/
-        # It will rely on igraph but there is a networkx to igraph converter,
-        # and igraph can be installed via conda and is actively supported.
-        # https://python.igraph.org/en/stable/
-        # https://python.igraph.org/en/stable/generation.html#from-external-libraries
-        # Or maybe I can let the user choose between pygraphviz and plotly?
-
-        pos = nx.drawing.nx_agraph.graphviz_layout(self, prog="dot")
-        # The computed positions do not temporally align the nodes, so we force
-        # the y position to be the frame number.
-        pos = {node: (x, -self.nodes[node]["FRAME"]) for node, (x, _) in pos.items()}
-        if figsize is not None:
-            plt.figure(figsize=figsize)
-        nx.draw(self, pos, with_labels=True, arrows=True, font_weight="bold")
-        plt.show()
-
-    def plot_with_plotly(
+    def plot(
         self,
         title: str | None = None,
         node_text: str | None = None,
@@ -272,8 +251,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # - edge hoverinfo text
         # - axes
         # - color mapping node/edge attributes?     OK nodes
-        # - option to hide nodes? or just put nodes and edges in the legend
-        #   so we can hide manually one or the other
 
         def get_nodes_position():
             x_nodes = [x for (x, _) in positions.values()]
