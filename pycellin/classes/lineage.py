@@ -350,6 +350,11 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 f"cell_ID: {node['cell_ID']}<br>frame: {node['frame']}" for node in G.vs
             ]
 
+        if "lineage_ID" in G.attributes():
+            graph_name = f"lineage_ID: {G['lineage_ID']}"
+        else:
+            graph_name = ""
+
         # Plot nodes.
         fig.add_trace(
             go.Scatter(
@@ -360,6 +365,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 marker=node_marker_style,
                 text=node_hover_text,  # Used in hoverinfo not for the text in the nodes
                 hoverinfo="text",
+                name=graph_name,
             )
         )
 
