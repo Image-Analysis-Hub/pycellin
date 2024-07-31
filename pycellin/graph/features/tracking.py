@@ -33,280 +33,282 @@ from typing import Optional
 
 import networkx as nx
 
-from pycellin.graph import lineage as lin
-import pycellin.graph.features as feat
+from pycellin.classes.lineage import CellLineage
+
+# from pycellin.graph import lineage as lin
+# import pycellin.graph.features as feat
 
 
-def generation_level(graph: nx.DiGraph, node: int) -> int:
-    """
-    Compute the generation level of a given node.
+# def generation_level(graph: nx.DiGraph, node: int) -> int:
+#     """
+#     Compute the generation level of a given node.
 
-    Generation level is defined by how ancient the generation is,
-    i.e. how many divisions there was upstream.
+#     Generation level is defined by how ancient the generation is,
+#     i.e. how many divisions there was upstream.
 
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        Graph containing the node of interest.
-    node : int
-        Node ID of the node of interest.
+#     Parameters
+#     ----------
+#     graph : nx.DiGraph
+#         Graph containing the node of interest.
+#     node : int
+#         Node ID of the node of interest.
 
-    Returns
-    -------
-    int
-        Generation level of the node.
-    """
-    divisions = [n for n in nx.ancestors(graph, node) if graph.out_degree(n) > 1]
-    return len(divisions)
-
-
-def add_generation_level(graph: nx.DiGraph) -> None:
-    """
-    Add the generation level feature to the nodes of a graph.
-
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        Graph to process.
-    """
-    feat.add_custom_attr(
-        graph,
-        "node",
-        "GEN_LVL",
-        "Generation level",
-        "Gen. lvl",
-        "NONE",
-        "true",
-        feat.apply_on_nodes,
-        graph,
-        "GEN_LVL",
-        generation_level,
-    )
+#     Returns
+#     -------
+#     int
+#         Generation level of the node.
+#     """
+#     divisions = [n for n in nx.ancestors(graph, node) if graph.out_degree(n) > 1]
+#     return len(divisions)
 
 
-def generation_completeness(
-    graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
-) -> bool:
-    """
-    Compute the generation completeness of a given node.
+# def add_generation_level(graph: nx.DiGraph) -> None:
+#     """
+#     Add the generation level feature to the nodes of a graph.
 
-    A generation is defined as complete when it starts by a division
-    AND ends by a division. Generations that start at the root or end with a leaf
-    are thus incomplete.nodes,
-        graph,
-        "GEN_COMPLETE",
-        generation_completen
-    This can be useful when analyzing features like division time. It avoids
-    the introduction of a bias since we have no information on what happened before
-    the root or after the leaves.
-
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        Graph containing the node of interest.
-    node : int
-        Node ID of the node of interest.
-    generation : Optional[list[int]], optional
-        List of nodes that belong to the generation of the input node. Useful if
-        the generation has already been precomputed. If None, the generation will
-        first be computed. By default None.
-
-    Returns
-    -------
-    bool
-        True if the generation is complete, False otherwise.
-    """
-
-    if generation is not None:
-        assert node in generation
-    else:
-        generation = lin.get_generation(graph, node)
-    if lin.is_root(graph, generation[0]) or lin.is_leaf(graph, generation[-1]):
-        return False
-    else:
-        return True
+#     Parameters
+#     ----------
+#     graph : nx.DiGraph
+#         Graph to process.
+#     """
+#     feat.add_custom_attr(
+#         graph,
+#         "node",
+#         "GEN_LVL",
+#         "Generation level",
+#         "Gen. lvl",
+#         "NONE",
+#         "true",
+#         feat.apply_on_nodes,
+#         graph,
+#         "GEN_LVL",
+#         generation_level,
+#     )
 
 
-def add_generation_completeness(graph: nx.DiGraph) -> None:
-    """
-    Add the generation completeness feature to the nodes of a graph.
+# def generation_completeness(
+#     graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
+# ) -> bool:
+#     """
+#     Compute the generation completeness of a given node.
 
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        Graph to process.
-    """
-    feat.add_custom_attr(
-        graph,
-        "node",
-        "GEN_COMPLETE",
-        "Generation completeness",
-        "Gen. complete",
-        "NONE",
-        "true",
-        feat.apply_on_nodes,
-        graph,
-        "GEN_COMPLETE",
-        generation_completeness,
-        need_TRACK_ID=True,
-    )
+#     A generation is defined as complete when it starts by a division
+#     AND ends by a division. Generations that start at the root or end with a leaf
+#     are thus incomplete.nodes,
+#         graph,
+#         "GEN_COMPLETE",
+#         generation_completen
+#     This can be useful when analyzing features like division time. It avoids
+#     the introduction of a bias since we have no information on what happened before
+#     the root or after the leaves.
 
+#     Parameters
+#     ----------
+#     graph : nx.DiGraph
+#         Graph containing the node of interest.
+#     node : int
+#         Node ID of the node of interest.
+#     generation : Optional[list[int]], optional
+#         List of nodes that belong to the generation of the input node. Useful if
+#         the generation has already been precomputed. If None, the generation will
+#         first be computed. By default None.
 
-def division_time(
-    graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
-) -> int:
-    """
-    Compute the division time of a given node, expressed in nodes.
+#     Returns
+#     -------
+#     bool
+#         True if the generation is complete, False otherwise.
+#     """
 
-    Division time is defined as the number of nodes between the 2 divisions surrounding
-    the node of interest. It is the length of the generation of the node of interest.
-    This means that all the nodes of a generation will have the same division time.
-    It also means that when studying division time, it is important to only take one
-    node per generation into account (usually first or last node of the generation).
-    Otherwise a bias will be introduced since longer generations will be more
-    represented.
-
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        Graph containing the node of interest.
-    node : int
-        Node ID of the node of interest.
-    generation : Optional[list[int]], optional
-        List of nodes that belong to the generation of the input node. Useful if
-        the generation has already been precomputed. If None, the generation will
-        first be computed. By default None.
-
-    Returns
-    -------
-    int
-        Division time of the node, expressed in nodes.
-    """
-    if generation is not None:
-        assert node in generation
-    else:
-        generation = lin.get_generation(graph, node)
-    return len(generation)
+#     if generation is not None:
+#         assert node in generation
+#     else:
+#         generation = lin.get_generation(graph, node)
+#     if lin.is_root(graph, generation[0]) or lin.is_leaf(graph, generation[-1]):
+#         return False
+#     else:
+#         return True
 
 
-def add_division_time(graph: nx.DiGraph) -> None:
-    """
-    Add the division time feature to the nodes of a graph.
+# def add_generation_completeness(graph: nx.DiGraph) -> None:
+#     """
+#     Add the generation completeness feature to the nodes of a graph.
 
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        Graph to process.
-    """
-    feat.add_custom_attr(
-        graph,
-        "node",
-        "DIV_TIME",
-        "Division time",
-        "Div. time",
-        "TIME",
-        "false",
-        feat.apply_on_nodes,
-        graph,
-        "DIV_TIME",
-        division_time,
-        need_TRACK_ID=True,
-    )
-
-
-def cell_phase(
-    graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
-) -> str:
-    """
-    Compute the phase(s)/stage(s) in which the node of interest is currently in.
-
-    Phases can be:
-    - 'division' -> when the out degree of the node is higher than its in degree
-    - 'birth' -> when the previous node is a division
-    - 'first' -> graph root i.e. beginning of lineage
-    - 'last' -> graph leaf i.e end of lineage
-    - '-' -> when the node is not in one of the above phases.
-
-    Notice that a node can be in different phases simultaneously, e.g. 'first'
-    and 'division'. In that case, a '+' sign is used as separator between phases,
-    e.g. 'first+division'.
-
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        Graph containing the node of interest.
-    node : int
-        Node ID of the node of interest.
-    generation : Optional[list[int]], optional
-        List of nodes that belong to the generation of the input node. Useful if
-        the generation has already been precomputed. If None, the generation will
-        first be computed. By default None.
-
-    Returns
-    -------
-    str
-        Phase(s) of the node.
-    """
-
-    def append_tag(tag, new_tag):
-        if not tag:
-            tag = new_tag
-        else:
-            tag += f"+{new_tag}"
-        return tag
-
-    tag = ""
-    # Straightforward cases.
-    if lin.is_root(graph, node):
-        tag = append_tag(tag, "first")
-    if lin.is_leaf(graph, node):
-        tag = append_tag(tag, "last")
-    if lin.is_division(graph, node):
-        tag = append_tag(tag, "division")
-    # Checking for cell birth.
-    if generation:
-        assert node in generation
-    else:
-        generation = lin.get_generation(graph, node)
-    if node == generation[0]:
-        tag = append_tag(tag, "birth")
-
-    if not tag:
-        return "-"
-    else:
-        return tag
+#     Parameters
+#     ----------
+#     graph : nx.DiGraph
+#         Graph to process.
+#     """
+#     feat.add_custom_attr(
+#         graph,
+#         "node",
+#         "GEN_COMPLETE",
+#         "Generation completeness",
+#         "Gen. complete",
+#         "NONE",
+#         "true",
+#         feat.apply_on_nodes,
+#         graph,
+#         "GEN_COMPLETE",
+#         generation_completeness,
+#         need_TRACK_ID=True,
+#     )
 
 
-def add_cell_phase(graph: nx.DiGraph) -> None:
-    """
-    Add the cell phase feature to the nodes of a graph.
+# def division_time(
+#     graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
+# ) -> int:
+#     """
+#     Compute the division time of a given node, expressed in nodes.
 
-    Notes
-    -----
-    This feature is currently not compatible with TrackMate and thus will not
-    carry over the XML file. TrackMate do not support string features.
+#     Division time is defined as the number of nodes between the 2 divisions surrounding
+#     the node of interest. It is the length of the generation of the node of interest.
+#     This means that all the nodes of a generation will have the same division time.
+#     It also means that when studying division time, it is important to only take one
+#     node per generation into account (usually first or last node of the generation).
+#     Otherwise a bias will be introduced since longer generations will be more
+#     represented.
 
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        Graph to process.
-    """
-    feat.add_custom_attr(
-        graph,
-        "node",
-        "CELL_PHASE",
-        "Cell cycle phase",
-        "Phase",
-        "NONE",
-        "false",
-        feat.apply_on_nodes,
-        graph,
-        "CELL_PHASE",
-        cell_phase,
-    )
+#     Parameters
+#     ----------
+#     graph : nx.DiGraph
+#         Graph containing the node of interest.
+#     node : int
+#         Node ID of the node of interest.
+#     generation : Optional[list[int]], optional
+#         List of nodes that belong to the generation of the input node. Useful if
+#         the generation has already been precomputed. If None, the generation will
+#         first be computed. By default None.
+
+#     Returns
+#     -------
+#     int
+#         Division time of the node, expressed in nodes.
+#     """
+#     if generation is not None:
+#         assert node in generation
+#     else:
+#         generation = lin.get_generation(graph, node)
+#     return len(generation)
 
 
-def absolute_age(graph: nx.DiGraph, node: int) -> int:
+# def add_division_time(graph: nx.DiGraph) -> None:
+#     """
+#     Add the division time feature to the nodes of a graph.
+
+#     Parameters
+#     ----------
+#     graph : nx.DiGraph
+#         Graph to process.
+#     """
+#     feat.add_custom_attr(
+#         graph,
+#         "node",
+#         "DIV_TIME",
+#         "Division time",
+#         "Div. time",
+#         "TIME",
+#         "false",
+#         feat.apply_on_nodes,
+#         graph,
+#         "DIV_TIME",
+#         division_time,
+#         need_TRACK_ID=True,
+#     )
+
+
+# def cell_phase(
+#     graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
+# ) -> str:
+#     """
+#     Compute the phase(s)/stage(s) in which the node of interest is currently in.
+
+#     Phases can be:
+#     - 'division' -> when the out degree of the node is higher than its in degree
+#     - 'birth' -> when the previous node is a division
+#     - 'first' -> graph root i.e. beginning of lineage
+#     - 'last' -> graph leaf i.e end of lineage
+#     - '-' -> when the node is not in one of the above phases.
+
+#     Notice that a node can be in different phases simultaneously, e.g. 'first'
+#     and 'division'. In that case, a '+' sign is used as separator between phases,
+#     e.g. 'first+division'.
+
+#     Parameters
+#     ----------
+#     graph : nx.DiGraph
+#         Graph containing the node of interest.
+#     node : int
+#         Node ID of the node of interest.
+#     generation : Optional[list[int]], optional
+#         List of nodes that belong to the generation of the input node. Useful if
+#         the generation has already been precomputed. If None, the generation will
+#         first be computed. By default None.
+
+#     Returns
+#     -------
+#     str
+#         Phase(s) of the node.
+#     """
+
+#     def append_tag(tag, new_tag):
+#         if not tag:
+#             tag = new_tag
+#         else:
+#             tag += f"+{new_tag}"
+#         return tag
+
+#     tag = ""
+#     # Straightforward cases.
+#     if lin.is_root(graph, node):
+#         tag = append_tag(tag, "first")
+#     if lin.is_leaf(graph, node):
+#         tag = append_tag(tag, "last")
+#     if lin.is_division(graph, node):
+#         tag = append_tag(tag, "division")
+#     # Checking for cell birth.
+#     if generation:
+#         assert node in generation
+#     else:
+#         generation = lin.get_generation(graph, node)
+#     if node == generation[0]:
+#         tag = append_tag(tag, "birth")
+
+#     if not tag:
+#         return "-"
+#     else:
+#         return tag
+
+
+# def add_cell_phase(graph: nx.DiGraph) -> None:
+#     """
+#     Add the cell phase feature to the nodes of a graph.
+
+#     Notes
+#     -----
+#     This feature is currently not compatible with TrackMate and thus will not
+#     carry over the XML file. TrackMate do not support string features.
+
+#     Parameters
+#     ----------
+#     graph : nx.DiGraph
+#         Graph to process.
+#     """
+#     feat.add_custom_attr(
+#         graph,
+#         "node",
+#         "CELL_PHASE",
+#         "Cell cycle phase",
+#         "Phase",
+#         "NONE",
+#         "false",
+#         feat.apply_on_nodes,
+#         graph,
+#         "CELL_PHASE",
+#         cell_phase,
+#     )
+
+
+def get_absolute_age(lineage: CellLineage, node: int) -> int:
     """
     Compute the absolute age of a given node.
 
@@ -316,8 +318,8 @@ def absolute_age(graph: nx.DiGraph, node: int) -> int:
 
     Parameters
     ----------
-    graph : nx.DiGraph
-        Graph containing the node of interest.
+    lineage : CellLineage
+        Lineage graph containing the node of interest.
     node : int
         Node ID of the node of interest.
 
@@ -326,10 +328,10 @@ def absolute_age(graph: nx.DiGraph, node: int) -> int:
     int
         Absolute age of the node.
     """
-    return len(nx.ancestors(graph, node))
+    return len(nx.ancestors(lineage, node))
 
 
-def add_absolute_age(graph: nx.DiGraph) -> None:
+def _add_absolute_age(lineages: list[CellLineage]) -> None:
     """
     Add the absolute age feature to the nodes of a graph.
 
@@ -338,129 +340,119 @@ def add_absolute_age(graph: nx.DiGraph) -> None:
     graph : nx.DiGraph
         Graph to process.
     """
-    feat.add_custom_attr(
-        graph,
-        "node",
-        "ABSOLUTE_AGE",
-        "Absolute age",
-        "Abs. age",
-        "TIME",
-        "false",
-        feat.apply_on_nodes,
-        graph,
-        "ABSOLUTE_AGE",
-        absolute_age,
-    )
+    for lin in lineages:
+        for node in lin.nodes:
+            lin.nodes[node]["absolute_age"] = get_absolute_age(lin, node)
 
 
-def relative_age(
-    graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
-) -> int:
-    """
-    Compute the relative age of a given node.
+# def get_relative_age(
+#     lineage: CellLineage, node: int, generation: Optional[list[int]] = None
+# ) -> int:
+#     """
+#     Compute the relative age of a given node.
 
-    Relative age is defined as the number of nodes between the start of the generation
-    (i.e. previous division, or root) and the node of interest.
+#     Relative age is defined as the number of nodes between the start of the generation
+#     (i.e. previous division, or root) and the node of interest.
 
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        Graph containing the node of interest.
-    node : int
-        Node ID of the node of interest.
-    generation : Optional[list[int]], optional
-        List of nodes that belong to the generation of the input node. Useful if
-        the generation has already been precomputed. If None, the generation will
-        first be computed. By default None.
+#     Parameters
+#     ----------
+#     graph : nx.DiGraph
+#         Graph containing the node of interest.
+#     node : int
+#         Node ID of the node of interest.
+#     generation : Optional[list[int]], optional
+#         List of nodes that belong to the generation of the input node. Useful if
+#         the generation has already been precomputed. If None, the generation will
+#         first be computed. By default None.
 
-    Returns
-    -------
-    int
-        Relative age of the node.
-    """
-    if generation is not None:
-        assert node in generation
-    else:
-        generation = lin.get_generation(graph, node)
-    return generation.index(node)
-
-
-def add_relative_age(graph: nx.DiGraph) -> None:
-    """
-    Add the relative age feature to the nodes of a graph.
-
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        Graph to process.
-    """
-    feat.add_custom_attr(
-        graph,
-        "node",
-        "RELATIVE_AGE",
-        "Relative age",
-        "Rel. age",
-        "TIME",
-        "false",
-        feat.apply_on_nodes,
-        graph,
-        "RELATIVE_AGE",
-        relative_age,
-    )
+#     Returns
+#     -------
+#     int
+#         Relative age of the node.
+#     """
+#     if generation is not None:
+#         assert node in generation
+#     else:
+#         generation = lin.get_generation(graph, node)
+#     return generation.index(node)
 
 
-def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
-    """
-    Compute the generation ID of a given node.
+# def add_relative_age(graph: nx.DiGraph) -> None:
+#     """
+#     Add the relative age feature to the nodes of a graph.
 
-    It is defined as {track_ID}_{generation_last_node} to ensure uniqueness.
-
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        Graph containing the node of interest.
-    node : int
-        Node ID of the node of interest.
-
-    Returns
-    -------
-    Optional[str]
-        Generation ID of the given node.
-    """
-    try:
-        track_ID = graph.nodes[node]["TRACK_ID"]
-    except KeyError as err:
-        print(err, f"Has a tracking been done on node {node}?")
-    else:
-        gen_end_node = lin.get_generation(graph, node)[-1]
-        gen_ID = f"{track_ID}_{gen_end_node}"
-        return gen_ID
+#     Parameters
+#     ----------
+#     graph : nx.DiGraph
+#         Graph to process.
+#     """
+#     feat.add_custom_attr(
+#         graph,
+#         "node",
+#         "RELATIVE_AGE",
+#         "Relative age",
+#         "Rel. age",
+#         "TIME",
+#         "false",
+#         feat.apply_on_nodes,
+#         graph,
+#         "RELATIVE_AGE",
+#         relative_age,
+#     )
 
 
-def add_generation_ID(graph: nx.DiGraph) -> None:
-    """
-    Add the generation ID feature to the nodes of a graph.
+# def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
+#     """
+#     Compute the generation ID of a given node.
 
-    Notes
-    -----
-    This feature is currently not compatible with TrackMate and thus will not
-    carry over the XML file. TrackMate do not support string features.
+#     It is defined as {track_ID}_{generation_last_node} to ensure uniqueness.
 
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        Graph to process.
-    """
-    feat.add_custom_attr(
-        graph,
-        "node",
-        "GEN_ID",
-        "Generation ID",
-        "Gen. ID",
-        "NONE",
-        "false",
-        feat.apply_on_nodes,
-        graph,
-        "GEN_ID",
-        generation_ID,
-    )
+#     Parameters
+#     ----------
+#     graph : nx.DiGraph
+#         Graph containing the node of interest.
+#     node : int
+#         Node ID of the node of interest.
+
+#     Returns
+#     -------
+#     Optional[str]
+#         Generation ID of the given node.
+#     """
+#     try:
+#         track_ID = graph.nodes[node]["TRACK_ID"]
+#     except KeyError as err:
+#         print(err, f"Has a tracking been done on node {node}?")
+#     else:
+#         gen_end_node = lin.get_generation(graph, node)[-1]
+#         gen_ID = f"{track_ID}_{gen_end_node}"
+#         return gen_ID
+
+
+# def add_generation_ID(graph: nx.DiGraph) -> None:
+#     """
+#     Add the generation ID feature to the nodes of a graph.
+
+#     Notes
+#     -----
+#     This feature is currently not compatible with TrackMate and thus will not
+#     carry over the XML file. TrackMate do not support string features.
+
+#     Parameters
+#     ----------
+#     graph : nx.DiGraph
+#         Graph to process.
+#     """
+#     feat.add_custom_attr(
+#         graph,
+#         "node",
+#         "GEN_ID",
+#         "Generation ID",
+#         "Gen. ID",
+#         "NONE",
+#         "false",
+#         feat.apply_on_nodes,
+#         graph,
+#         "GEN_ID",
+#         generation_ID,
+#     )

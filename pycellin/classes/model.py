@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 
 import pickle
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 from pycellin.classes.data import CoreData
-from pycellin.classes.feature import FeaturesDeclaration
+from pycellin.classes.feature import Feature, FeaturesDeclaration
 from pycellin.classes.lineage import CellLineage, CycleLineage
+import pycellin.graph.features as pgf
 
 
 class Model:
@@ -108,6 +109,47 @@ class Model:
     #     # and in others a dict of Lineages...
     #     pass
 
+    def add_custom_feature(
+        self,
+        feat: Feature,
+        feat_type: Literal["node", "edge", "lineage"],
+        func: Callable,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Add a custom feature to the model.
+
+        Parameters
+        ----------
+        feat: Feature
+            Feature to add.
+        feat_type : Literal["node", "edge", "lineage"]
+            Type of feature to add.
+        func : Callable
+            Function to compute the feature.
+        """
+        self.feat_declaration._add_feature(feat, feat_type)
+        func(*args, **kwargs)
+
+    def add_absolute_age(self):
+        # TODO: deal with the case when the unit is not frame
+        # units: dict(str, str | float) = {"type": "frame", "step": 1}
+        feat = Feature(
+            "absolute_age",
+            "Age of the cell since the beginning of the lineage",
+            "cell",
+            "Pycellin",
+            "int",
+            "none",
+        )
+        self.add_custom_feature(
+            feat,
+            "node",
+            pgf.tracking._add_absolute_age,
+            self.coredata.data.values(),
+        )
+
     def add_feature(self, feature_name: str) -> None:
         """
         Add the specified feature to the model.
@@ -119,10 +161,15 @@ class Model:
         feature_name : str
             Name of the feature to add. Need to be an available feature.
         """
-        # Need to update the FeaturesDeclaration and the data
-        # The name of the feature defines if its a node or an edge feature
-        # (or a graph one?), and a cell or a cycle feature.
-        pass
+        match feature_name:
+            case "absolute_age":
+                self.add_absolute_age()
+            case "relative_age":
+                self.add_relative_age()
+            case _:
+                raise ValueError(
+                    f"Feature {feature_name} is not a predefined feature of Pycellin."
+                )
 
     def recompute_feature(self, feature_name: str) -> None:
         """
@@ -138,6 +185,7 @@ class Model:
             raise ValueError(f"Feature {feature_name} does not exist.")
 
         # Then need to update the data.
+        pass
 
     def remove_feature(self, feature_name: str) -> None:
         """
