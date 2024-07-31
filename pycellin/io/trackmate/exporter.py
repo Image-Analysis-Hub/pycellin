@@ -544,7 +544,7 @@ def export_TrackMate_XML(
 if __name__ == "__main__":
 
     xml_in = "sample_data/FakeTracks.xml"
-    xml_out = "sample_data/FakeTracks_exported.xml"
+    xml_out = "sample_data/FakeTracks_exported_TM.xml"
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # print(model.feat_declaration.node_feats)
