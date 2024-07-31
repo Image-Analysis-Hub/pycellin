@@ -39,6 +39,90 @@ from pycellin.classes.lineage import CellLineage
 # import pycellin.graph.features as feat
 
 
+def get_absolute_age(lineage: CellLineage, node: int) -> int:
+    """
+    Compute the absolute age of a given node.
+
+    The absolute age of a cell is defined as the number of nodes since
+    the beginning of the lineage. Absolute age of the root is 0.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        Lineage graph containing the node of interest.
+    node : int
+        Node ID (cell_ID) of the node of interest.
+
+    Returns
+    -------
+    int
+        Absolute age of the node.
+    """
+    return len(nx.ancestors(lineage, node))
+
+
+def _add_absolute_age(lineages: list[CellLineage]) -> None:
+    """
+    Compute and add the absolute age feature to all the nodes of a list of lineages.
+
+    Parameters
+    ----------
+    lineages : list[CellLineage]
+        Lineage graphs to update with the absolute age feature.
+    """
+    for lin in lineages:
+        for node in lin.nodes:
+            lin.nodes[node]["absolute_age"] = get_absolute_age(lin, node)
+
+
+def get_relative_age(
+    lineage: CellLineage, node: int, cell_cycle: Optional[list[int]] = None
+) -> int:
+    """
+    Compute the relative age of a given node.
+
+    The relative age of a cell is defined as the number of nodes since
+    the start of the cell cycle (i.e. previous division, or beginning
+    of the lineage).
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        Lineage graph containing the node of interest.
+    node : int
+        Node ID (cell_ID) of the node of interest.
+    cell_cycle : Optional[list[int]], optional
+        List of nodes that belong to the cell cycle of the input node.
+        Useful if the cell cycle has already been precomputed.
+        If None, the cell cycle will first be computed. By default None.
+
+    Returns
+    -------
+    int
+        Relative age of the node.
+    """
+    if cell_cycle is not None:
+        assert node in cell_cycle
+    else:
+        cell_cycle = lineage.get_cell_cycle(node)
+    return cell_cycle.index(node)
+
+
+def _add_relative_age(lineages: list[CellLineage]) -> None:
+    """
+    Compute and add the relative age feature to all the nodes of a list of lineages.
+
+    Parameters
+    ----------
+    lineages : list[CellLineage]
+        Lineage graphs to update with the relative age feature.
+    """
+    for lin in lineages:
+        for node in lin.nodes:
+            lin.nodes[node]["relative_age"] = get_relative_age(lin, node)
+
+
+# ON CELL CYCLE GRAPH
 # def generation_level(graph: nx.DiGraph, node: int) -> int:
 #     """
 #     Compute the generation level of a given node.
@@ -61,7 +145,7 @@ from pycellin.classes.lineage import CellLineage
 #     divisions = [n for n in nx.ancestors(graph, node) if graph.out_degree(n) > 1]
 #     return len(divisions)
 
-
+# ON CELL CYCLE GRAPH
 # def add_generation_level(graph: nx.DiGraph) -> None:
 #     """
 #     Add the generation level feature to the nodes of a graph.
@@ -85,7 +169,7 @@ from pycellin.classes.lineage import CellLineage
 #         generation_level,
 #     )
 
-
+# ON CELL CYCLE GRAPH
 # def generation_completeness(
 #     graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
 # ) -> bool:
@@ -128,7 +212,7 @@ from pycellin.classes.lineage import CellLineage
 #     else:
 #         return True
 
-
+# ON CELL CYCLE GRAPH
 # def add_generation_completeness(graph: nx.DiGraph) -> None:
 #     """
 #     Add the generation completeness feature to the nodes of a graph.
@@ -153,7 +237,7 @@ from pycellin.classes.lineage import CellLineage
 #         need_TRACK_ID=True,
 #     )
 
-
+# ON CELL CYCLE GRAPH
 # def division_time(
 #     graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
 # ) -> int:
@@ -191,6 +275,7 @@ from pycellin.classes.lineage import CellLineage
 #     return len(generation)
 
 
+# ON CELL CYCLE GRAPH
 # def add_division_time(graph: nx.DiGraph) -> None:
 #     """
 #     Add the division time feature to the nodes of a graph.
@@ -215,6 +300,62 @@ from pycellin.classes.lineage import CellLineage
 #         need_TRACK_ID=True,
 #     )
 
+# ON CELL CYCLE GRAPH
+# def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
+#     """
+#     Compute the generation ID of a given node.
+
+#     It is defined as {track_ID}_{generation_last_node} to ensure uniqueness.
+
+#     Parameters
+#     ----------
+#     graph : nx.DiGraph
+#         Graph containing the node of interest.
+#     node : int
+#         Node ID of the node of interest.
+
+#     Returns
+#     -------
+#     Optional[str]
+#         Generation ID of the given node.
+#     """
+#     try:
+#         track_ID = graph.nodes[node]["TRACK_ID"]
+#     except KeyError as err:
+#         print(err, f"Has a tracking been done on node {node}?")
+#     else:
+#         gen_end_node = lin.get_generation(graph, node)[-1]
+#         gen_ID = f"{track_ID}_{gen_end_node}"
+#         return gen_ID
+
+# ON CELL CYCLE GRAPH
+# def add_generation_ID(graph: nx.DiGraph) -> None:
+#     """
+#     Add the generation ID feature to the nodes of a graph.
+
+#     Notes
+#     -----
+#     This feature is currently not compatible with TrackMate and thus will not
+#     carry over the XML file. TrackMate do not support string features.
+
+#     Parameters
+#     ----------
+#     graph : nx.DiGraph
+#         Graph to process.
+#     """
+#     feat.add_custom_attr(
+#         graph,
+#         "node",
+#         "GEN_ID",
+#         "Generation ID",
+#         "Gen. ID",
+#         "NONE",
+#         "false",
+#         feat.apply_on_nodes,
+#         graph,
+#         "GEN_ID",
+#         generation_ID,
+#     )
 
 # def cell_phase(
 #     graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
@@ -305,144 +446,4 @@ from pycellin.classes.lineage import CellLineage
 #         graph,
 #         "CELL_PHASE",
 #         cell_phase,
-#     )
-
-
-def get_absolute_age(lineage: CellLineage, node: int) -> int:
-    """
-    Compute the absolute age of a given node.
-
-    The absolute age of a cell is defined as the number of nodes since
-    the beginning of the lineage. Absolute age of the root is 0.
-
-    Parameters
-    ----------
-    lineage : CellLineage
-        Lineage graph containing the node of interest.
-    node : int
-        Node ID (cell_ID) of the node of interest.
-
-    Returns
-    -------
-    int
-        Absolute age of the node.
-    """
-    return len(nx.ancestors(lineage, node))
-
-
-def _add_absolute_age(lineages: list[CellLineage]) -> None:
-    """
-    Compute and add the absolute age feature to all the nodes of a list of lineages.
-
-    Parameters
-    ----------
-    lineages : list[CellLineage]
-        Lineage graphs to update with the absolute age feature.
-    """
-    for lin in lineages:
-        for node in lin.nodes:
-            lin.nodes[node]["absolute_age"] = get_absolute_age(lin, node)
-
-
-def get_relative_age(
-    lineage: CellLineage, node: int, cell_cycle: Optional[list[int]] = None
-) -> int:
-    """
-    Compute the relative age of a given node.
-
-    The relative age of a cell is defined as the number of nodes since
-    the start of the cell cycle (i.e. previous division, or beginning
-    of the lineage).
-
-    Parameters
-    ----------
-    lineage : CellLineage
-        Lineage graph containing the node of interest.
-    node : int
-        Node ID (cell_ID) of the node of interest.
-    cell_cycle : Optional[list[int]], optional
-        List of nodes that belong to the cell cycle of the input node.
-        Useful if the cell cycle has already been precomputed.
-        If None, the cell cycle will first be computed. By default None.
-
-    Returns
-    -------
-    int
-        Relative age of the node.
-    """
-    if cell_cycle is not None:
-        assert node in cell_cycle
-    else:
-        cell_cycle = lineage.get_cell_cycle(node)
-    return cell_cycle.index(node)
-
-
-def _add_relative_age(lineages: list[CellLineage]) -> None:
-    """
-    Compute and add the relative age feature to all the nodes of a list of lineages.
-
-    Parameters
-    ----------
-    lineages : list[CellLineage]
-        Lineage graphs to update with the relative age feature.
-    """
-    for lin in lineages:
-        for node in lin.nodes:
-            lin.nodes[node]["relative_age"] = get_relative_age(lin, node)
-
-
-# def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
-#     """
-#     Compute the generation ID of a given node.
-
-#     It is defined as {track_ID}_{generation_last_node} to ensure uniqueness.
-
-#     Parameters
-#     ----------
-#     graph : nx.DiGraph
-#         Graph containing the node of interest.
-#     node : int
-#         Node ID of the node of interest.
-
-#     Returns
-#     -------
-#     Optional[str]
-#         Generation ID of the given node.
-#     """
-#     try:
-#         track_ID = graph.nodes[node]["TRACK_ID"]
-#     except KeyError as err:
-#         print(err, f"Has a tracking been done on node {node}?")
-#     else:
-#         gen_end_node = lin.get_generation(graph, node)[-1]
-#         gen_ID = f"{track_ID}_{gen_end_node}"
-#         return gen_ID
-
-
-# def add_generation_ID(graph: nx.DiGraph) -> None:
-#     """
-#     Add the generation ID feature to the nodes of a graph.
-
-#     Notes
-#     -----
-#     This feature is currently not compatible with TrackMate and thus will not
-#     carry over the XML file. TrackMate do not support string features.
-
-#     Parameters
-#     ----------
-#     graph : nx.DiGraph
-#         Graph to process.
-#     """
-#     feat.add_custom_attr(
-#         graph,
-#         "node",
-#         "GEN_ID",
-#         "Generation ID",
-#         "Gen. ID",
-#         "NONE",
-#         "false",
-#         feat.apply_on_nodes,
-#         graph,
-#         "GEN_ID",
-#         generation_ID,
 #     )
