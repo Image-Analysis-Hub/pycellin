@@ -345,60 +345,50 @@ def _add_absolute_age(lineages: list[CellLineage]) -> None:
             lin.nodes[node]["absolute_age"] = get_absolute_age(lin, node)
 
 
-# def get_relative_age(
-#     lineage: CellLineage, node: int, generation: Optional[list[int]] = None
-# ) -> int:
-#     """
-#     Compute the relative age of a given node.
+def get_relative_age(
+    lineage: CellLineage, node: int, cell_cycle: Optional[list[int]] = None
+) -> int:
+    """
+    Compute the relative age of a given node.
 
-#     Relative age is defined as the number of nodes between the start of the generation
-#     (i.e. previous division, or root) and the node of interest.
+    Relative age is defined as the number of nodes between the start of the generation
+    (i.e. previous division, or root) and the node of interest.
 
-#     Parameters
-#     ----------
-#     graph : nx.DiGraph
-#         Graph containing the node of interest.
-#     node : int
-#         Node ID of the node of interest.
-#     generation : Optional[list[int]], optional
-#         List of nodes that belong to the generation of the input node. Useful if
-#         the generation has already been precomputed. If None, the generation will
-#         first be computed. By default None.
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph containing the node of interest.
+    node : int
+        Node ID of the node of interest.
+    cell_cycle : Optional[list[int]], optional
+        List of nodes that belong to the generation of the input node. Useful if
+        the generation has already been precomputed. If None, the generation will
+        first be computed. By default None.
 
-#     Returns
-#     -------
-#     int
-#         Relative age of the node.
-#     """
-#     if generation is not None:
-#         assert node in generation
-#     else:
-#         generation = lin.get_generation(graph, node)
-#     return generation.index(node)
+    Returns
+    -------
+    int
+        Relative age of the node.
+    """
+    if cell_cycle is not None:
+        assert node in cell_cycle
+    else:
+        cell_cycle = lineage.get_cell_cycle(node)
+    return cell_cycle.index(node)
 
 
-# def add_relative_age(graph: nx.DiGraph) -> None:
-#     """
-#     Add the relative age feature to the nodes of a graph.
+def _add_relative_age(lineages: list[CellLineage]) -> None:
+    """
+    Add the relative age feature to the nodes of a graph.
 
-#     Parameters
-#     ----------
-#     graph : nx.DiGraph
-#         Graph to process.
-#     """
-#     feat.add_custom_attr(
-#         graph,
-#         "node",
-#         "RELATIVE_AGE",
-#         "Relative age",
-#         "Rel. age",
-#         "TIME",
-#         "false",
-#         feat.apply_on_nodes,
-#         graph,
-#         "RELATIVE_AGE",
-#         relative_age,
-#     )
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph to process.
+    """
+    for lin in lineages:
+        for node in lin.nodes:
+            lin.nodes[node]["relative_age"] = get_relative_age(lin, node)
 
 
 # def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
