@@ -128,13 +128,22 @@ class Model:
             Type of feature to add.
         func : Callable
             Function to compute the feature.
+        args : Any
+            Arguments to pass to the function.
+        kwargs : Any
+            Keyword arguments to pass to the function.
         """
         self.feat_declaration._add_feature(feat, feat_type)
         func(*args, **kwargs)
 
     def add_absolute_age(self):
-        # TODO: deal with the case when the unit is not frame
-        # units: dict(str, str | float) = {"type": "frame", "step": 1}
+        """
+        Compute and add the absolute age feature to the cells of the model.
+
+        The absolute age of a cell is defined as the number of nodes since
+        the beginning of the lineage. Absolute age of the root is 0.
+        """
+        # TODO: deal with the case when the unit is not frame?
         feat = Feature(
             "absolute_age",
             "Age of the cell since the beginning of the lineage",
@@ -151,8 +160,14 @@ class Model:
         )
 
     def add_relative_age(self):
-        # TODO: deal with the case when the unit is not frame
-        # units: dict(str, str | float) = {"type": "frame", "step": 1}
+        """
+        Compute and add the relative age feature to the cells of the model.
+
+        The relative age of a cell is defined as the number of nodes since
+        the start of the cell cycle (i.e. previous division, or beginning
+        of the lineage).
+        """
+        # TODO: deal with the case when the unit is not frame?
         feat = Feature(
             "relative_age",
             "Age of the cell since the beginning of current cell cycle",
@@ -172,7 +187,8 @@ class Model:
         """
         Add the specified feature to the model.
 
-        This updates the FeaturesDeclaration and compute the feature values for all lineages.
+        This updates the FeaturesDeclaration and compute the feature values
+        for all lineages.
 
         Parameters
         ----------
@@ -187,6 +203,7 @@ class Model:
             case _:
                 raise ValueError(
                     f"Feature {feature_name} is not a predefined feature of Pycellin."
+                    f"Available Pycellin features are: absolute_age, relative_age."
                 )
 
     def recompute_feature(self, feature_name: str) -> None:
@@ -209,7 +226,8 @@ class Model:
         """
         Remove the specified feature from the model.
 
-        This updates the FeaturesDeclaration and remove the feature values for all lineages.
+        This updates the FeaturesDeclaration and remove the feature values
+        for all lineages.
 
         Parameters
         ----------

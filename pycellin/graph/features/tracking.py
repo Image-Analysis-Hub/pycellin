@@ -312,16 +312,15 @@ def get_absolute_age(lineage: CellLineage, node: int) -> int:
     """
     Compute the absolute age of a given node.
 
-    Absolute age is defined as the number of nodes between the start of the lineage
-    (i.e. root of the graph) and the node of interest.
-    Absolute age of the root is 0.
+    The absolute age of a cell is defined as the number of nodes since
+    the beginning of the lineage. Absolute age of the root is 0.
 
     Parameters
     ----------
     lineage : CellLineage
         Lineage graph containing the node of interest.
     node : int
-        Node ID of the node of interest.
+        Node ID (cell_ID) of the node of interest.
 
     Returns
     -------
@@ -333,12 +332,12 @@ def get_absolute_age(lineage: CellLineage, node: int) -> int:
 
 def _add_absolute_age(lineages: list[CellLineage]) -> None:
     """
-    Add the absolute age feature to the nodes of a graph.
+    Compute and add the absolute age feature to all the nodes of a list of lineages.
 
     Parameters
     ----------
-    graph : nx.DiGraph
-        Graph to process.
+    lineages : list[CellLineage]
+        Lineage graphs to update with the absolute age feature.
     """
     for lin in lineages:
         for node in lin.nodes:
@@ -351,19 +350,20 @@ def get_relative_age(
     """
     Compute the relative age of a given node.
 
-    Relative age is defined as the number of nodes between the start of the generation
-    (i.e. previous division, or root) and the node of interest.
+    The relative age of a cell is defined as the number of nodes since
+    the start of the cell cycle (i.e. previous division, or beginning
+    of the lineage).
 
     Parameters
     ----------
-    graph : nx.DiGraph
-        Graph containing the node of interest.
+    lineage : CellLineage
+        Lineage graph containing the node of interest.
     node : int
-        Node ID of the node of interest.
+        Node ID (cell_ID) of the node of interest.
     cell_cycle : Optional[list[int]], optional
-        List of nodes that belong to the generation of the input node. Useful if
-        the generation has already been precomputed. If None, the generation will
-        first be computed. By default None.
+        List of nodes that belong to the cell cycle of the input node.
+        Useful if the cell cycle has already been precomputed.
+        If None, the cell cycle will first be computed. By default None.
 
     Returns
     -------
@@ -379,12 +379,12 @@ def get_relative_age(
 
 def _add_relative_age(lineages: list[CellLineage]) -> None:
     """
-    Add the relative age feature to the nodes of a graph.
+    Compute and add the relative age feature to all the nodes of a list of lineages.
 
     Parameters
     ----------
-    graph : nx.DiGraph
-        Graph to process.
+    lineages : list[CellLineage]
+        Lineage graphs to update with the relative age feature.
     """
     for lin in lineages:
         for node in lin.nodes:
