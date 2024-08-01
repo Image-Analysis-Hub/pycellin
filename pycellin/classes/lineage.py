@@ -545,4 +545,28 @@ class CellLineage(Lineage):
 
 class CycleLineage(Lineage):
     # This one needs to be frozen: nx.freeze
-    pass
+
+    def __init__(self, cell_lineage: CellLineage | None = None):
+        super().__init__()
+
+        if cell_lineage:
+            # Create nodes.
+            divs = cell_lineage.get_divisions()
+            leaves = cell_lineage.get_leaves()
+            self.add_nodes_from(divs + leaves)
+
+            # Add corresponding edges.
+            for n in divs:
+                for successor in cell_lineage.successors(n):
+                    self.add_edge(n, cell_lineage.get_cell_cycle(successor)[-1])
+
+            # And we freeze the structure since it is mapped on the cell lineage.
+            nx.freeze(self)
+
+            # Add node and graph features.
+            for n in divs + leaves:
+                print(n)
+                self.nodes[n]["cycle_ID"] = n
+                self.nodes[n]["cells"] = cell_lineage.get_cell_cycle(n)
+                # level
+            self.graph["lineage_ID"] = cell_lineage.graph["lineage_ID"]
