@@ -4,7 +4,7 @@
 import pickle
 from typing import Any, Callable, Literal
 
-from pycellin.classes.data import CoreData
+from pycellin.classes.data import Data
 from pycellin.classes.feature import Feature, FeaturesDeclaration
 from pycellin.classes.lineage import CellLineage, CycleLineage
 import pycellin.graph.features as pgf
@@ -17,7 +17,7 @@ class Model:
         self,
         metadata: dict[str, Any] = None,
         feat_declaration: FeaturesDeclaration = None,
-        coredata: CoreData = None,
+        data: Data = None,
     ) -> None:
         """
         Constructs all the necessary attributes for the Model object.
@@ -28,12 +28,12 @@ class Model:
             Metadata of the model (default is None).
         feat_declaration : FeaturesDeclaration, optional
             The declaration of the features present in the model (default is None).
-        coredata : CoreData, optional
+        data : Data, optional
             The lineages data of the model (default is None).
         """
         self.metadata = metadata
         self.feat_declaration = feat_declaration
-        self.coredata = coredata
+        self.data = data
         # self.date = datetime.now()
         # self.pycellin_version = get_distribution("pycellin").version
         # self.name = name
@@ -52,42 +52,42 @@ class Model:
         return (
             f"Model(metadata={self.metadata!r}, "
             f"feat_declaration={self.feat_declaration!r}, "
-            f"coredata={self.coredata!r})"
+            f"data={self.data!r})"
         )
 
     def __str__(self) -> str:
         if "Name" in self.metadata and "Provenance" in self.metadata:
             txt = (
                 f"Model named '{self.metadata['Name']}' "
-                f"with {self.coredata.number_of_lineages()} lineages, "
+                f"with {self.data.number_of_lineages()} lineages, "
                 f"built from {self.metadata['Provenance']}."
             )
         elif "Name" in self.metadata:
             txt = (
                 f"Model named '{self.metadata['Name']}' "
-                f"with {self.coredata.number_of_lineages()} lineages."
+                f"with {self.data.number_of_lineages()} lineages."
             )
         elif "Provenance" in self.metadata:
             txt = (
-                f"Model with {self.coredata.number_of_lineages()} lineages, "
+                f"Model with {self.data.number_of_lineages()} lineages, "
                 f"built from {self.metadata['Provenance']}."
             )
         else:
-            txt = f"Model with {self.coredata.number_of_lineages()} lineages."
+            txt = f"Model with {self.data.number_of_lineages()} lineages."
         return txt
 
     # TODO: do I need these methods?
     # def get_cell_lineages(self) -> list[CellLineage]:
-    #     return self.coredata.data
+    #     return self.data.cell_data
 
     # def get_cycle_lineages(self) -> list[CycleLineage]:
-    #     return self.cycledata.data
+    #     return self.data.cycle_data
 
     # def get_cell_lineage_from_ID(self, lineage_id: int) -> CellLineage:
-    #     return self.coredata.data[lineage_id]
+    #     return self.data.cell_data[lineage_id]
 
     # def get_cycle_lineage_from_ID(self, lineage_id: int) -> CycleLineage:
-    #     return self.cycledata.data[lineage_id]
+    #     return self.data.cycle_data[lineage_id]
 
     # def get_lineage_from_name(self, name: str, lineage_type: Literal["cell", "cycle", "both"] = "both") -> CellLineage:
     #     """
@@ -156,7 +156,7 @@ class Model:
             feat,
             "node",
             pgf.tracking._add_absolute_age,
-            self.coredata.data.values(),
+            self.data.cell_data.values(),
         )
 
     def add_relative_age(self):
@@ -180,7 +180,7 @@ class Model:
             feat,
             "node",
             pgf.tracking._add_relative_age,
-            self.coredata.data.values(),
+            self.data.cell_data.values(),
         )
 
     def add_feature(self, feature_name: str) -> None:
@@ -240,14 +240,12 @@ class Model:
 
         # Then need to update the FeaturesDeclaration and the data.
 
-    # Should I have methods to process several features at once?
-    # Yes if I need it at some point.
-
-    def compute_CycleLineage(self) -> None:
+    def add_cycle_data(self) -> None:
         """
-        Compute the CycleLineage from the CellLineage.
+        Compute and add the cycle lineages of the model.
         """
-        pass
+        self.data._compute_cycle_lineages()
+        # TODO: update FeaturesDeclaration
 
     def save_to_pickle(
         self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL

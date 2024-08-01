@@ -12,7 +12,7 @@ import networkx as nx
 
 from pycellin.classes.model import Model
 from pycellin.classes.feature import FeaturesDeclaration, Feature
-from pycellin.classes.data import CoreData
+from pycellin.classes.data import Data
 from pycellin.classes.lineage import CellLineage
 
 # TODO: maybe TRACK_ID / lineage_ID should not be added as a node feature,
@@ -732,7 +732,7 @@ def _parse_model_tag(
     xml_path: str,
     keep_all_spots: bool,
     keep_all_tracks: bool,
-) -> tuple[FeaturesDeclaration, CoreData]:
+) -> tuple[FeaturesDeclaration, Data]:
     """
     Read an XML file and convert the model data into several graphs.
 
@@ -752,7 +752,7 @@ def _parse_model_tag(
 
     Returns
     -------
-    tuple[FeaturesDeclaration, CoreData]
+    tuple[FeaturesDeclaration, Data]
         A tuple containing the features declaration and the data of the model.
     """
     fd = FeaturesDeclaration()
@@ -837,7 +837,7 @@ def _parse_model_tag(
         else:
             lin.graph["FilteredTrack"] = False
 
-    return fd, CoreData({lin.graph["lineage_ID"]: lin for lin in lineages})
+    return fd, Data({lin.graph["lineage_ID"]: lin for lin in lineages})
 
 
 def _get_specific_tags(
@@ -978,13 +978,13 @@ if __name__ == "__main__":
     model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
     # print(model.metadata)
     # print(model.feat_declaration)
-    # print(model.coredata)
+    # print(model.data)
 
-    for id, lin in model.coredata.data.items():
+    for id, lin in model.data.cell_data.items():
         print(f"ID: {id} - {lin}")
 
-    # print(model.coredata.data[-2094].nodes[2094])
-    # model.coredata.data[0].plot_with_plotly()
+    # print(model.data.cell_data[-2094].nodes[2094])
+    # model.data.cell_data[0].plot()
 
     # TODO: for now one-node graph do not have track features like "real" lineages.
     # Should I add these features even if the value is None for consistency?

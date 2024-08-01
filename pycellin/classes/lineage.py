@@ -4,8 +4,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import Any
 
-from igraph import Graph, EdgeSeq
-import matplotlib.pyplot as plt
+from igraph import Graph
 import networkx as nx
 import plotly.graph_objects as go
 
@@ -31,7 +30,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     #         print("All good, there is no merge in the graph.")
 
     # For all the following methods, we might need to recompute features.
-    #   => put it in the abstract method and then use super() in the subclasses after modifying the graph
+    #   => put it in the abstract method and then use super() in the subclasses
+    #      after modifying the graph
     # Abstract method because for CellLineages, we first need to unfreeze the graph.
     # Can I reuse already implemented methods from networkx?
 
@@ -639,34 +639,38 @@ class CellLineage(Lineage):
 
 
 class CycleLineage(Lineage):
-    # This one needs to be frozen: nx.freeze
 
     def __init__(self, cell_lineage: CellLineage | None = None):
         super().__init__()
 
         if cell_lineage:
-            # Create nodes.
+            # Creating nodes.
             divs = cell_lineage.get_divisions()
             leaves = cell_lineage.get_leaves()
             self.add_nodes_from(divs + leaves)
 
-            # Add corresponding edges.
+            # Adding corresponding edges.
             for n in divs:
                 for successor in cell_lineage.successors(n):
                     self.add_edge(n, cell_lineage.get_cell_cycle(successor)[-1])
 
-            # And we freeze the structure since it is mapped on the cell lineage.
+            # Freezing the structure since it's mapped on the cell lineage one.
             nx.freeze(self)
 
-            # Add node and graph features.
+            # Adding node and graph features.
             for n in divs + leaves:
                 self.nodes[n]["cycle_ID"] = n
                 self.nodes[n]["cells"] = cell_lineage.get_cell_cycle(n)
-                # level: number of nodes between the root and the node
+                self.nodes[n]["duration"] = len(self.nodes[n]["cells"])  # or `length`?
                 self.nodes[n]["level"] = nx.shortest_path_length(
                     self, self.get_root(), n
                 )
+            # cell_cycle completeness?
+            # div_time?
+            # Or I add it later with add_custom_feature()?
             self.graph["lineage_ID"] = cell_lineage.graph["lineage_ID"]
+
+    # Methods to freeze / unfreeze?
 
     def plot(
         self,

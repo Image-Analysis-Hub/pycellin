@@ -212,8 +212,7 @@ def export_CTC_file(model: Model, ctc_file_out):
     ctc_file_out : str
         The path to the CTC file to write.
     """
-    lineages = model.coredata.data
-    lineages = [lineage for lineage in lineages.values()]
+    lineages = [lineage for lineage in model.data.cell_data.values()]
     current_track_label = 1  # 0 is kept for no parent track
     tracks_to_write = []
     for lin in lineages:

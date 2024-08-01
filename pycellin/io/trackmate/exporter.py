@@ -16,7 +16,7 @@ import networkx as nx
 
 from pycellin.classes.model import Model
 from pycellin.classes.feature import FeaturesDeclaration, Feature
-from pycellin.classes.data import CoreData
+from pycellin.classes.data import Data
 from pycellin.classes.lineage import CellLineage
 from pycellin.io.trackmate.loader import load_TrackMate_XML
 
@@ -45,6 +45,10 @@ def _unit_to_dimension(
 
     # TrackMate features
     # Mapping between TrackMate features and their dimensions.
+    # FIXME: deal with the possibility of several channels (unknown number).
+    # Otherwise we get:
+    # WARNING: MEAN_INTENSITY_CH2 is a feature listed as coming from TrackMate
+    # but it is not a known feature of TrackMate. Dimension is set to UNKNOWN.
     trackmate_dict = {
         # Spot features
         "QUALITY": "QUALITY",
@@ -297,7 +301,7 @@ def _create_Spot(
 
 def _write_AllSpots(
     xf: ET.xmlfile,
-    data: CoreData,
+    data: Data,
 ) -> None:
     """
     Write the nodes/spots data into an XML file.
@@ -306,7 +310,7 @@ def _write_AllSpots(
     ----------
     xf : ET.xmlfile
         Context manager for the XML file to write.
-    data : CoreData
+    data : Data
         Lineages containing the data to write.
     """
     xf.write(f"\n{' '*4}")
@@ -334,7 +338,7 @@ def _write_AllSpots(
 
 def _write_AllTracks(
     xf: ET.xmlfile,
-    data: CoreData,
+    data: Data,
 ) -> None:
     """
     Write the tracks data into an XML file.
@@ -343,7 +347,7 @@ def _write_AllTracks(
     ----------
     xf : ET.xmlfile
         Context manager for the XML file to write.
-    data : CoreData
+    data : Data
         Lineages containing the data to write.
     """
     xf.write(f"\n{' '*4}")
@@ -375,7 +379,7 @@ def _write_AllTracks(
 
 def _write_FilteredTracks(
     xf: ET.xmlfile,
-    data: CoreData,
+    data: Data,
 ) -> None:
     """
     Write the filtered tracks data into an XML file.
@@ -384,7 +388,7 @@ def _write_FilteredTracks(
     ----------
     xf : ET.xmlfile
         Context manager for the XML file to write.
-    data : CoreData
+    data : Data
         Lineages containing the data to write.z
     """
     xf.write(f"\n{' '*4}")
@@ -424,7 +428,7 @@ def _prepare_model_for_export(
     model.feat_declaration._remove_feature("name", "node")
     model.feat_declaration._remove_feature("ROI_coords", "node")
 
-    for lin in model.coredata.data.values():
+    for lin in model.data.cell_data.values():
         lin.graph["TRACK_ID"] = lin.graph.pop("lineage_ID")
         for node in lin.nodes:
             lin.nodes[node].pop("lineage_ID")
@@ -529,9 +533,9 @@ def export_TrackMate_XML(
             xf.write("\n  ")
             with xf.element("Model", units):
                 _write_FeatureDeclarations(xf, model)
-                _write_AllSpots(xf, model.coredata.data)
-                _write_AllTracks(xf, model.coredata.data)
-                _write_FilteredTracks(xf, model.coredata.data)
+                _write_AllSpots(xf, model.data.cell_data)
+                _write_AllTracks(xf, model.data.cell_data)
+                _write_FilteredTracks(xf, model.data.cell_data)
             xf.write("\n  ")
             for tag in ["Settings", "GUIState", "DisplaySettings"]:
                 _write_metadata_tag(xf, model.metadata, tag)

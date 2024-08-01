@@ -11,7 +11,7 @@ import networkx as nx
 
 from pycellin.classes.model import Model
 from pycellin.classes.feature import FeaturesDeclaration, Feature
-from pycellin.classes.data import CoreData
+from pycellin.classes.data import Data
 from pycellin.classes.lineage import CellLineage
 
 
@@ -245,7 +245,7 @@ def load_CTC_file(
             data[lin_id] = lin
 
     model = Model(
-        _create_metadata(file_path), _create_FeaturesDeclaration(), CoreData(data)
+        _create_metadata(file_path), _create_FeaturesDeclaration(), Data(data)
     )
     return model
 
@@ -257,8 +257,8 @@ if __name__ == "__main__":
     print(model)
     print(model.feat_declaration)
 
-    for lin_id, lin in model.coredata.data.items():
+    for lin_id, lin in model.data.cell_data.items():
         print(f"{lin_id} - {lin}")
-        lin.plot_with_plotly()
+        lin.plot()
 
-    print(model.coredata.data[1].nodes(data=True))
+    print(model.data.cell_data[1].nodes(data=True))
