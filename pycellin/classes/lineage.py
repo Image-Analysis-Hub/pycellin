@@ -175,8 +175,12 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         else:
             return False
 
+    @abstractmethod
     def plot(
         self,
+        ID_feature: str,
+        y_feature: str,
+        y_legend: str,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -196,6 +200,12 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
+        ID_feature : str
+            The feature of the nodes to use as identifier.
+        y_feature : str
+            The feature of the nodes to use for the y-axis.
+        y_legend : str
+            The label of the y-axis.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -216,7 +226,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             defaults to current Plotly template.
         node_hover_features : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and `frame`.
+            displaying `cell_ID` and the value of the y_feature.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
@@ -316,7 +326,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                     node_hover_text.append(text)
             else:
                 node_hover_text = [
-                    f"cell_ID: {node['cell_ID']}<br>frame: {node['frame']}"
+                    f"{ID_feature}: {node[ID_feature]}<br>{y_feature}: {node[y_feature]}"
                     for node in G.vs
                 ]
             if "lineage_ID" in G.attributes():
@@ -329,8 +339,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         G = Graph.from_networkx(self)
         nodes_count = G.vcount()
         layout = G.layout("rt")  # Basic tree layout.
-        # Updating the layout so the y position of the nodes is the frame number.
-        layout = [(layout[k][0], G.vs["frame"][k]) for k in range(nodes_count)]
+        # Updating the layout so the y position of the nodes is given
+        # by the value of y_feature.
+        layout = [(layout[k][0], G.vs[y_feature][k]) for k in range(nodes_count)]
 
         # Computing the exact positions of nodes and edges.
         positions = {k: layout[k] for k in range(nodes_count)}
@@ -387,7 +398,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             autorange="reversed",
             showgrid=show_horizontal_grid,
             zeroline=show_horizontal_grid,
-            title="Time (frames)",
+            title=y_legend,
         )
         fig.show()
 
@@ -542,6 +553,90 @@ class CellLineage(Lineage):
         else:
             return False
 
+    def plot(
+        self,
+        title: str | None = None,
+        node_text: str | None = None,
+        node_text_font: dict[str, Any] | None = None,
+        node_marker_style: dict[str, Any] | None = None,
+        node_colormap_feature: str | None = None,
+        node_color_scale: str | None = None,
+        node_hover_features: list[str] | None = None,
+        edge_line_style: dict[str, Any] | None = None,
+        plot_bgcolor: str | None = None,
+        show_horizontal_grid: bool = True,
+        showlegend: bool = True,
+    ):
+        """
+        Plot the cell lineage as a tree using Plotly.
+
+        Parameters
+        ----------
+        title : str, optional
+            The title of the plot. If None, no title is displayed.
+        node_text : str, optional
+            The feature of the nodes to display as text inside the nodes
+            of the plot. If None, no text is displayed. None by default.
+        node_text_font : dict, optional
+            The font style of the text inside the nodes (size, color, etc).
+            If None, defaults to current Plotly template.
+        node_marker_style : dict, optional
+            The style of the markers representing the nodes in the plot
+            (symbol, size, color, line, etc). If None, defaults to
+            current Plotly template.
+        node_colormap_feature : str, optional
+            The feature of the nodes to use for coloring the nodes.
+            If None, no color mapping is applied.
+        node_color_scale : str, optional
+            The color scale to use for coloring the nodes. If None,
+            defaults to current Plotly template.
+        node_hover_features : list[str], optional
+            The hover template for the nodes. If None, defaults to
+            displaying `cell_ID` and the value of the y_feature.
+        edge_line_style : dict, optional
+            The style of the lines representing the edges in the plot
+            (color, width, etc). If None, defaults to current Plotly template.
+        plot_bgcolor : str, optional
+            The background color of the plot. If None, defaults to current
+            Plotly template.
+        show_horizontal_grid : bool, optional
+            True to display the horizontal grid, False otherwise. True by default.
+        showlegend : bool, optional
+            True to display the legend, False otherwise. True by default.
+
+        Examples
+        --------
+        For styling the graph:
+
+        node_text_font = dict(
+            color="black",
+            size=10,
+        )
+
+        node_marker_style = dict(
+            symbol="circle",
+            size=20,
+            color="white",
+            line=dict(color="black", width=1),
+        )
+        """
+        super().plot(
+            ID_feature="cell_ID",
+            y_feature="frame",
+            y_legend="Time (frames)",
+            title=title,
+            node_text=node_text,
+            node_text_font=node_text_font,
+            node_marker_style=node_marker_style,
+            node_colormap_feature=node_colormap_feature,
+            node_color_scale=node_color_scale,
+            node_hover_features=node_hover_features,
+            edge_line_style=edge_line_style,
+            plot_bgcolor=plot_bgcolor,
+            show_horizontal_grid=show_horizontal_grid,
+            showlegend=showlegend,
+        )
+
 
 class CycleLineage(Lineage):
     # This one needs to be frozen: nx.freeze
@@ -565,8 +660,94 @@ class CycleLineage(Lineage):
 
             # Add node and graph features.
             for n in divs + leaves:
-                print(n)
                 self.nodes[n]["cycle_ID"] = n
                 self.nodes[n]["cells"] = cell_lineage.get_cell_cycle(n)
-                # level
+                # level: number of nodes between the root and the node
+                self.nodes[n]["level"] = nx.shortest_path_length(
+                    self, self.get_root(), n
+                )
             self.graph["lineage_ID"] = cell_lineage.graph["lineage_ID"]
+
+    def plot(
+        self,
+        title: str | None = None,
+        node_text: str | None = None,
+        node_text_font: dict[str, Any] | None = None,
+        node_marker_style: dict[str, Any] | None = None,
+        node_colormap_feature: str | None = None,
+        node_color_scale: str | None = None,
+        node_hover_features: list[str] | None = None,
+        edge_line_style: dict[str, Any] | None = None,
+        plot_bgcolor: str | None = None,
+        show_horizontal_grid: bool = True,
+        showlegend: bool = True,
+    ):
+        """
+        Plot the cell cycle lineage as a tree using Plotly.
+
+        Parameters
+        ----------
+        title : str, optional
+            The title of the plot. If None, no title is displayed.
+        node_text : str, optional
+            The feature of the nodes to display as text inside the nodes
+            of the plot. If None, no text is displayed. None by default.
+        node_text_font : dict, optional
+            The font style of the text inside the nodes (size, color, etc).
+            If None, defaults to current Plotly template.
+        node_marker_style : dict, optional
+            The style of the markers representing the nodes in the plot
+            (symbol, size, color, line, etc). If None, defaults to
+            current Plotly template.
+        node_colormap_feature : str, optional
+            The feature of the nodes to use for coloring the nodes.
+            If None, no color mapping is applied.
+        node_color_scale : str, optional
+            The color scale to use for coloring the nodes. If None,
+            defaults to current Plotly template.
+        node_hover_features : list[str], optional
+            The hover template for the nodes. If None, defaults to
+            displaying `cell_ID` and the value of the y_feature.
+        edge_line_style : dict, optional
+            The style of the lines representing the edges in the plot
+            (color, width, etc). If None, defaults to current Plotly template.
+        plot_bgcolor : str, optional
+            The background color of the plot. If None, defaults to current
+            Plotly template.
+        show_horizontal_grid : bool, optional
+            True to display the horizontal grid, False otherwise. True by default.
+        showlegend : bool, optional
+            True to display the legend, False otherwise. True by default.
+
+        Examples
+        --------
+        For styling the graph:
+
+        node_text_font = dict(
+            color="black",
+            size=10,
+        )
+
+        node_marker_style = dict(
+            symbol="circle",
+            size=20,
+            color="white",
+            line=dict(color="black", width=1),
+        )
+        """
+        super().plot(
+            ID_feature="cycle_ID",
+            y_feature="level",
+            y_legend="Cell cycle level",
+            title=title,
+            node_text=node_text,
+            node_text_font=node_text_font,
+            node_marker_style=node_marker_style,
+            node_colormap_feature=node_colormap_feature,
+            node_color_scale=node_color_scale,
+            node_hover_features=node_hover_features,
+            edge_line_style=edge_line_style,
+            plot_bgcolor=plot_bgcolor,
+            show_horizontal_grid=show_horizontal_grid,
+            showlegend=showlegend,
+        )
