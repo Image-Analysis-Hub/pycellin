@@ -209,6 +209,28 @@ class Model:
             self.data.cycle_data.values(),
         )
 
+    def add_division_time(self):
+        """
+        Compute and add the division time feature to the cell cycles of the model.
+
+        The division time of a cell cycle is defined as the difference
+        between the absolute ages of the two daughter cells.
+        """
+        feat = Feature(
+            "division_time",
+            "Number of frames between the birth of a cell and its division",
+            "cycle",
+            "Pycellin",
+            "int",
+            "none",
+        )
+        self.add_custom_feature(
+            feat,
+            "node",
+            pgf.tracking._add_division_time,
+            self.data.cycle_data.values(),
+        )
+
     def add_feature(self, feature_name: str) -> None:
         """
         Add the specified feature to the model.
@@ -228,11 +250,28 @@ class Model:
                 self.add_relative_age()
             case "cell_cycle_completeness":
                 self.add_cell_cycle_completeness()
+            case "division_time":
+                self.add_division_time()
             case _:
                 raise ValueError(
                     f"Feature {feature_name} is not a predefined feature of Pycellin."
                     f"Available Pycellin features are: absolute_age, relative_age."
                 )
+
+    def add_features(self, feature_names: list[str]) -> None:
+        """
+        Add the specified features to the model.
+
+        This updates the FeaturesDeclaration and compute the feature values
+        for all lineages.
+
+        Parameters
+        ----------
+        feature_names : list[str]
+            Names of the features to add. Need to be available features.
+        """
+        for feature_name in feature_names:
+            self.add_feature(feature_name)
 
     def recompute_feature(self, feature_name: str) -> None:
         """

@@ -170,7 +170,7 @@ def _add_relative_age(lineages: list[CellLineage]) -> None:
 #     )
 
 
-def get_cell_cycle_completeness(lineage: Lineage, node: int) -> bool:
+def get_cell_cycle_completeness(lineage: CellLineage | CycleLineage, node: int) -> bool:
     """
     Compute the cell cycle completeness of a given node.
 
@@ -183,7 +183,7 @@ def get_cell_cycle_completeness(lineage: Lineage, node: int) -> bool:
 
     Parameters
     ----------
-    lineage: Lineage
+    lineage: CellLineage | CycleLineage
         Lineage graph containing the node of interest.
     node : int
         Node ID of the node of interest.
@@ -204,10 +204,6 @@ def get_cell_cycle_completeness(lineage: Lineage, node: int) -> bool:
             return False
         else:
             return True
-    else:
-        raise ValueError(
-            "Lineage type not recognized, must be CellLineage or CycleLineage."
-        )
 
 
 def _add_cell_cycle_completeness(lineages: list[CycleLineage]) -> None:
@@ -226,68 +222,46 @@ def _add_cell_cycle_completeness(lineages: list[CycleLineage]) -> None:
             )
 
 
-# ON CELL CYCLE GRAPH
-# def division_time(
-#     graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
-# ) -> int:
-#     """
-#     Compute the division time of a given node, expressed in nodes.
+def get_division_time(lineage: CellLineage | CycleLineage, node: int) -> int:
+    """
+    Compute the division time of a given node, expressed in frames.
 
-#     Division time is defined as the number of nodes between the 2 divisions surrounding
-#     the node of interest. It is the length of the generation of the node of interest.
-#     This means that all the nodes of a generation will have the same division time.
-#     It also means that when studying division time, it is important to only take one
-#     node per generation into account (usually first or last node of the generation).
-#     Otherwise a bias will be introduced since longer generations will be more
-#     represented.
+    Division time is defined as the number of frames between 2 divisions.
+    It is also the length of the cell cycle of the node of interest.
 
-#     Parameters
-#     ----------
-#     graph : nx.DiGraph
-#         Graph containing the node of interest.
-#     node : int
-#         Node ID of the node of interest.
-#     generation : Optional[list[int]], optional
-#         List of nodes that belong to the generation of the input node. Useful if
-#         the generation has already been precomputed. If None, the generation will
-#         first be computed. By default None.
+    Parameters
+    ----------
+    lineage : CellLineage | CycleLineage
+        Lineage graph containing the node of interest.
+    node : int
+        Node ID of the node of interest.
 
-#     Returns
-#     -------
-#     int
-#         Division time of the node, expressed in nodes.
-#     """
-#     if generation is not None:
-#         assert node in generation
-#     else:
-#         generation = lin.get_generation(graph, node)
-#     return len(generation)
+    Returns
+    -------
+    int
+        Division time of the node, expressed in frames.
+    """
+    if isinstance(lineage, CellLineage):
+        cell_cycle = lineage.get_cell_cycle(node)
+        return len(cell_cycle)
+    elif isinstance(lineage, CycleLineage):
+        # It's the same as the cell cycle length / duration...
+        return lineage.nodes[node]["duration"]
 
 
-# ON CELL CYCLE GRAPH
-# def add_division_time(graph: nx.DiGraph) -> None:
-#     """
-#     Add the division time feature to the nodes of a graph.
+def _add_division_time(lineages: list[CycleLineage]) -> None:
+    """
+    Compute and add the division time feature to all the nodes of a list of lineages.
 
-#     Parameters
-#     ----------
-#     graph : nx.DiGraph
-#         Graph to process.
-#     """
-#     feat.add_custom_attr(
-#         graph,
-#         "node",
-#         "DIV_TIME",
-#         "Division time",
-#         "Div. time",
-#         "TIME",
-#         "false",
-#         feat.apply_on_nodes,
-#         graph,
-#         "DIV_TIME",
-#         division_time,
-#         need_TRACK_ID=True,
-#     )
+    Parameters
+    ----------
+    lineages : list[CellLineage]
+        Lineage graphs to update with the relative age feature.
+    """
+    for lin in lineages:
+        for node in lin.nodes:
+            lin.nodes[node]["division_time"] = get_division_time(lin, node)
+
 
 # ON CELL CYCLE GRAPH
 # def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
