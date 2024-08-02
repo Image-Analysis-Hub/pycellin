@@ -34,18 +34,26 @@ class Data:
             )
         return len(self.cell_data)
 
+    def get_closest_cell():
+        """ """
+        # TODO: implement
+        # Closest in terms of space, but take into account several frames?
+        # => time window, by default just the current frame
+        # Based on the distance between the center of the cells? or the boundaries?
+        # How to identify the correct feature? pass it as argument?
+        # In TM it's POSITION_X and POSITION_Y
+        pass
 
-# class CoreData(Data):
-#     """
-#     dict of cell lineage: {lineage_id: CellLineage}
-#     """
-
-#     pass
-
-
-# class BranchData(Data):
-#     """
-#     dict of cycle lineage: {lineage_id: CycleLineage}
-#     """
-
-#     pass
+    def get_neighbouring_cells(
+        lineage: CellLineage,
+        node: int,
+        radius: float,
+        time_window: int | tuple[int, int],
+    ) -> list[tuple[CellLineage, int]]:
+        """ """
+        # TODO: implement
+        # Parameter to define sort order? By default closest to farthest
+        # Need to implement get_distance() between 2 nodes, not necessarily
+        # from the same lineage...
+        # To identify a node, need to have lineage_ID and cell_ID
+        pass
