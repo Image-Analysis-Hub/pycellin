@@ -183,6 +183,32 @@ class Model:
             self.data.cell_data.values(),
         )
 
+    def add_cell_cycle_completeness(self):
+        """
+        Compute and add the cell cycle completeness feature to the cell cycles of the model.
+
+        A cell cycle is defined as complete when it starts by a division
+        AND ends by a division. Cell cycles that start at the root
+        or end with a leaf are thus incomplete.
+        This can be useful when analyzing features like division time. It avoids
+        the introduction of a bias since we have no information on what happened
+        before the root or after the leaves.
+        """
+        feat = Feature(
+            "cell_cycle_completeness",
+            "Completeness of the cell cycle",
+            "cycle",
+            "Pycellin",
+            "bool",
+            "none",
+        )
+        self.add_custom_feature(
+            feat,
+            "node",
+            pgf.tracking._add_cell_cycle_completeness,
+            self.data.cycle_data.values(),
+        )
+
     def add_feature(self, feature_name: str) -> None:
         """
         Add the specified feature to the model.
@@ -200,6 +226,8 @@ class Model:
                 self.add_absolute_age()
             case "relative_age":
                 self.add_relative_age()
+            case "cell_cycle_completeness":
+                self.add_cell_cycle_completeness()
             case _:
                 raise ValueError(
                     f"Feature {feature_name} is not a predefined feature of Pycellin."

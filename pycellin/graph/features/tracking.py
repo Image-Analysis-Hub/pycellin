@@ -33,7 +33,7 @@ from typing import Optional
 
 import networkx as nx
 
-from pycellin.classes.lineage import CellLineage
+from pycellin.classes.lineage import CellLineage, CycleLineage, Lineage
 
 # from pycellin.graph import lineage as lin
 # import pycellin.graph.features as feat
@@ -169,73 +169,62 @@ def _add_relative_age(lineages: list[CellLineage]) -> None:
 #         generation_level,
 #     )
 
-# ON CELL CYCLE GRAPH
-# def generation_completeness(
-#     graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
-# ) -> bool:
-#     """
-#     Compute the generation completeness of a given node.
 
-#     A generation is defined as complete when it starts by a division
-#     AND ends by a division. Generations that start at the root or end with a leaf
-#     are thus incomplete.nodes,
-#         graph,
-#         "GEN_COMPLETE",
-#         generation_completen
-#     This can be useful when analyzing features like division time. It avoids
-#     the introduction of a bias since we have no information on what happened before
-#     the root or after the leaves.
+def get_cell_cycle_completeness(lineage: Lineage, node: int) -> bool:
+    """
+    Compute the cell cycle completeness of a given node.
 
-#     Parameters
-#     ----------
-#     graph : nx.DiGraph
-#         Graph containing the node of interest.
-#     node : int
-#         Node ID of the node of interest.
-#     generation : Optional[list[int]], optional
-#         List of nodes that belong to the generation of the input node. Useful if
-#         the generation has already been precomputed. If None, the generation will
-#         first be computed. By default None.
+    A cell cycle is defined as complete when it starts by a division
+    AND ends by a division. Cell cycles that start at the root
+    or end with a leaf are thus incomplete.
+    This can be useful when analyzing features like division time. It avoids
+    the introduction of a bias since we have no information on what happened
+    before the root or after the leaves.
 
-#     Returns
-#     -------
-#     bool
-#         True if the generation is complete, False otherwise.
-#     """
+    Parameters
+    ----------
+    lineage: Lineage
+        Lineage graph containing the node of interest.
+    node : int
+        Node ID of the node of interest.
 
-#     if generation is not None:
-#         assert node in generation
-#     else:
-#         generation = lin.get_generation(graph, node)
-#     if lin.is_root(graph, generation[0]) or lin.is_leaf(graph, generation[-1]):
-#         return False
-#     else:
-#         return True
+    Returns
+    -------
+    bool
+        True if the cell cycle is complete, False otherwise.
+    """
+    if isinstance(lineage, CellLineage):
+        cell_cycle = lineage.get_cell_cycle(node)
+        if lineage.is_root(cell_cycle[0]) or lineage.is_leaf(cell_cycle[-1]):
+            return False
+        else:
+            return True
+    elif isinstance(lineage, CycleLineage):
+        if lineage.is_root(node) or lineage.is_leaf(node):
+            return False
+        else:
+            return True
+    else:
+        raise ValueError(
+            "Lineage type not recognized, must be CellLineage or CycleLineage."
+        )
 
-# ON CELL CYCLE GRAPH
-# def add_generation_completeness(graph: nx.DiGraph) -> None:
-#     """
-#     Add the generation completeness feature to the nodes of a graph.
 
-#     Parameters
-#     ----------
-#     graph : nx.DiGraph
-#         Graph to process.
-#     """
-#     feat.add_custom_attr(
-#         graph,
-#         "node",
-#         "GEN_COMPLETE",
-#         "Generation completeness",
-#         "Gen. complete",
-#         "NONE",
-#         "true",
-#         feat.apply_on_nodes,
-#         graph,
-#         "GEN_COMPLETE",
-#         generation_completeness,
-#         need_TRACK_ID=True,
-#     )
+def _add_cell_cycle_completeness(lineages: list[CycleLineage]) -> None:
+    """
+    Add the cell cycle completeness feature to the nodes of a cycle lineage.
+
+    Parameters
+    ----------
+    lineages: list[CycleLineage]
+        Cell cycle lineages to update with the cell cycle completeness feature.
+    """
+    for lin in lineages:
+        for node in lin.nodes:
+            lin.nodes[node]["cell_cycle_completeness"] = get_cell_cycle_completeness(
+                lin, node
+            )
+
 
 # ON CELL CYCLE GRAPH
 # def division_time(
