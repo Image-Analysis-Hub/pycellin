@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from itertools import chain
-from typing import Optional
+from typing import Literal, Optional
 
 
 class Feature:
@@ -12,7 +12,7 @@ class Feature:
         self,
         name: str,
         description: str,
-        lineage_type: str,
+        lineage_type: Literal["cell", "cycle"],
         provenance: str,
         data_type: str,
         unit: Optional[str] = None,
@@ -27,7 +27,8 @@ class Feature:
         description : str
             A description of the feature.
         lineage_type : str
-            The type of lineage the feature is associated with (cell, cycle, or both).
+            The type of lineage the feature is associated with: cell lineage
+            or cell cycle lineage.
         provenance : str
             The provenance of the feature (TrackMate, CTC, Pycellin, custom...).
         data_type : str
