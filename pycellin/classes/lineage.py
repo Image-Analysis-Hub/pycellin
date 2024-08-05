@@ -553,6 +553,63 @@ class CellLineage(Lineage):
         else:
             return False
 
+    def get_cousin_cells(
+        self, node: int, max_ancestry_level: int = 0
+    ) -> dict[int, list[int]]:
+        """
+        Return the cousin cells of a given cell.
+
+        Cousin cells are cells that are on the same frame
+        and share a common ancestor.
+
+        Parameters
+        ----------
+        node : int
+            The cell for which to identify the cousin cells.
+        max_ancestry_level : int, optional
+            The maximum level of ancestry to consider. If 0, all ancestry levels
+            are considered. 0 by default.
+        """
+        if self.is_root(node):
+            return []
+
+        candidate_nodes = [
+            n
+            for n in self.nodes()
+            if self.nodes[n]["frame"] == self.nodes[node]["frame"]
+        ]
+        # How to define
+        # ancestors = self.get_ancestors(self.get_root(), node)
+        # ancestor_divs = [a for a in ancestors if self.is_division(a)]
+        # for div in ancestor_divs:
+        #     pass
+
+    def get_sister_cells(self, node: int) -> list[int]:
+        """
+        Return the sister cells of a given cell.
+
+        Sister cells are cells that are on the same frame
+        and share the same parent cell.
+
+        Parameters
+        ----------
+        node : int
+            The cell for which to identify the sister cells.
+
+        Returns
+        -------
+        list[int]
+            The list of sister cells of the given node.
+        """
+        # max level, max ancestry level... How to call this?
+        # if self.is_root(node):
+        #     return []
+        # else:
+        #     pass
+        # parent = list(self.predecessors(node))[0]
+        # return list(self.successors(parent))
+        return self.get_cousin_cells(node, 1)
+
     def plot(
         self,
         title: str | None = None,
