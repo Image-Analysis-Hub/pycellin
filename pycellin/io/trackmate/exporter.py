@@ -417,23 +417,68 @@ def _prepare_model_for_export(
     model : Model
         Model to prepare for export.
     """
+    # Update of the features declaration.
     model.feat_declaration._rename_feature("lineage_ID", "TRACK_ID", "lineage")
     model.feat_declaration._modify_feature_description(
         "TRACK_ID", "Track ID", "lineage"
     )
-    model.feat_declaration._remove_feature("FilteredTrack", "lineage")
-    model.feat_declaration._remove_feature("name", "lineage")
+    model.feat_declaration._remove_features(["FilteredTrack", "name"], ["lineage"] * 2)
     model.feat_declaration._rename_feature("frame", "FRAME", "node")
-    model.feat_declaration._remove_feature("cell_ID", "node")
-    model.feat_declaration._remove_feature("name", "node")
-    model.feat_declaration._remove_feature("ROI_coords", "node")
+    model.feat_declaration._remove_features(
+        ["cell_ID", "name", "ROI_coords"], ["node"] * 3
+    )
+    # Location related features.
+    # TrackMate is expecting one feature per dimension instead of a triplet.
+    model.feat_declaration._remove_features(
+        ["location"] * 3, ["lineage", "node", "edge"]
+    )
+    for dim in ["X", "Y", "Z"]:
+        feat_lineage = Feature(
+            f"TRACK_{dim}_LOCATION",
+            f"Track mean {dim}",
+            "CellLineage",
+            "TrackMate",
+            "float",
+            "pixel",
+        )
+        feat_node = Feature(
+            f"POSITION_{dim}",
+            f"{dim}",
+            "CellLineage",
+            "TrackMate",
+            "float",
+            "pixel",
+        )
+        feat_edge = Feature(
+            f"EDGE_{dim}_LOCATION",
+            f"Edge {dim}",
+            "CellLineage",
+            "TrackMate",
+            "float",
+            "pixel",
+        )
+        model.feat_declaration._add_features(
+            [feat_lineage, feat_node, feat_edge], ["lineage", "node", "edge"]
+        )
 
+    # Update of the data.
     for lin in model.data.cell_data.values():
         lin.graph["TRACK_ID"] = lin.graph.pop("lineage_ID")
+        if "location" in lin.graph:  # One-node lineage don't have a location for now.
+            xyz = lin.graph.pop("location")
+            for feat, val in zip(["X", "Y", "Z"], xyz):
+                lin.graph[f"TRACK_{feat}_LOCATION"] = val
         for node in lin.nodes:
             lin.nodes[node].pop("lineage_ID")
             lin.nodes[node]["ID"] = lin.nodes[node].pop("cell_ID")
             lin.nodes[node]["FRAME"] = lin.nodes[node].pop("frame")
+            xyz = lin.nodes[node].pop("location")
+            for feat, val in zip(["X", "Y", "Z"], xyz):
+                lin.nodes[node][f"POSITION_{feat}"] = val
+        for edge in lin.edges:
+            xyz = lin.edges[edge].pop("location")
+            for feat, val in zip(["X", "Y", "Z"], xyz):
+                lin.edges[edge][f"EDGE_{feat}_LOCATION"] = val
 
 
 def _write_metadata_tag(
@@ -516,17 +561,14 @@ def export_TrackMate_XML(
 
     if not units:
         units = _ask_units(model.feat_declaration)
-
+    if "TrackMate_version" in model.metadata:
+        tm_version = model.metadata["TrackMate_version"]
+    else:
+        tm_version = "unknown"
     _prepare_model_for_export(model)
 
     with ET.xmlfile(xml_path, encoding="utf-8", close=True) as xf:
         xf.write_declaration()
-
-        if "TrackMate_version" in model.metadata:
-            tm_version = model.metadata["TrackMate_version"]
-        else:
-            tm_version = "unknown"
-
         with xf.element("TrackMate", {"version": tm_version}):
             xf.write("\n  ")
             _write_metadata_tag(xf, model.metadata, "Log")

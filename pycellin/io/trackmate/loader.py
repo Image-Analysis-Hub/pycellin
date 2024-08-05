@@ -132,7 +132,8 @@ def _convert_and_add_feature(
     feat_declaration : FeaturesDeclaration
         The FeaturesDeclaration object to add the feature to.
     units : dict[str, str]
-        The temporal and spatial units of the TrackMate model.
+        The temporal and spatial units of the TrackMate model
+        (`timeunits` and `spatialunits`).
     """
     feat_name = trackmate_feature["feature"]
     feat_description = trackmate_feature["name"]
@@ -185,6 +186,7 @@ def _add_all_features(
         An iterator over XML elements.
     ancestor : ET._Element
         The XML element that encompasses the information to be added.
+    # TODO: add missing parameters.
     """
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
@@ -636,6 +638,7 @@ def _split_graph_into_lineages(
 
 def _update_features_declaration(
     feat_declaration: FeaturesDeclaration,
+    units: dict[str, str],
 ):
     """
     Update the features declaration to match Pycellin conventions.
@@ -644,6 +647,9 @@ def _update_features_declaration(
     ----------
     feat_declaration : FeaturesDeclaration
         The features declaration to update.
+    units : dict[str, str]
+        The temporal and spatial units of the TrackMate model
+        (`timeunits` and `spatialunits`).
     """
     # Lineage features.
     feat_declaration._rename_feature("TRACK_ID", "lineage_ID", "lineage")
@@ -658,7 +664,20 @@ def _update_features_declaration(
         "int",
         "none",
     )
-    feat_declaration._add_feature(feat_filtered_track, "lineage")
+    feat_declaration._remove_features(
+        ["TRACK_X_LOCATION", "TRACK_Y_LOCATION", "TRACK_Z_LOCATION"], ["lineage"] * 3
+    )  # Replaced by the following `location` feature, a triplet of floats.
+    feat_location = Feature(
+        "location",
+        "Location of the lineage",  # TODO: what does it mean? Mean location of nodes?
+        "CellLineage",
+        "TrackMate",
+        "float",
+        units["spatialunits"],
+    )
+    feat_declaration._add_features(
+        [feat_filtered_track, feat_location], ["lineage"] * 2
+    )
 
     # Node features.
     feat_cell_id = Feature(
@@ -669,11 +688,36 @@ def _update_features_declaration(
         "int",
         "none",
     )
-    feat_declaration._add_feature(feat_cell_id, "node")
+    feat_declaration._remove_features(
+        ["POSITION_X", "POSITION_Y", "POSITION_Z"], ["node"] * 3
+    )  # Replaced by the following `location` feature, a triplet of floats.
+    feat_location = Feature(
+        "location",
+        "Location of the cell",
+        "CellLineage",
+        "TrackMate",
+        "float",
+        units["spatialunits"],
+    )
+    feat_declaration._add_features([feat_cell_id, feat_location], ["node"] * 2)
     feat_declaration._modify_feature_description(
         "cell_ID", "Unique identifier of the cell", "node"
     )
     feat_declaration._rename_feature("FRAME", "frame", "node")
+
+    # Edge features.
+    feat_declaration._remove_features(
+        ["EDGE_X_LOCATION", "EDGE_Y_LOCATION", "EDGE_Z_LOCATION"], ["edge"] * 3
+    )  # Replaced by the following `location` feature, a triplet of floats.
+    feat_location = Feature(
+        "location",
+        "Location of the edge",
+        "CellLineage",
+        "TrackMate",
+        "float",
+        units["spatialunits"],
+    )
+    feat_declaration._add_feature(feat_location, "edge")
 
 
 def _update_node_feature_key(
@@ -714,7 +758,7 @@ def _update_TRACK_ID(
     lineage : CellLineage
         The lineage to update.
     """
-    # If the TRACK_ID is a node feature, we need to update it in the nodes.
+    # If TRACK_ID is a node feature, we need to update it in the nodes.
     _update_node_feature_key(lineage, "TRACK_ID", "lineage_ID")
     # And in the graph.
     if "TRACK_ID" in lineage.graph:
@@ -726,6 +770,46 @@ def _update_TRACK_ID(
         node = [n for n in lineage.nodes][0]
         lineage.graph["lineage_ID"] = -node
         lineage.nodes[node]["lineage_ID"] = -node
+
+
+def _update_location_related_features(
+    lineage: CellLineage,
+):
+    """
+    Update features related to location of lineage, nodes and edges in a lineage.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The lineage to update.
+    """
+    # Lineage
+    # TODO: add a location for one-node lineage?
+    if "TRACK_X_LOCATION" in lineage.graph:
+        location = (
+            lineage.graph.pop("TRACK_X_LOCATION"),
+            lineage.graph.pop("TRACK_Y_LOCATION"),
+            lineage.graph.pop("TRACK_Z_LOCATION"),
+        )
+        lineage.graph["location"] = location
+
+    # Nodes
+    for node in lineage.nodes:
+        location = (
+            lineage.nodes[node].pop("POSITION_X"),
+            lineage.nodes[node].pop("POSITION_Y"),
+            lineage.nodes[node].pop("POSITION_Z"),
+        )
+        lineage.nodes[node]["location"] = location
+
+    # Edges
+    for edge in lineage.edges:
+        location = (
+            lineage.edges[edge].pop("EDGE_X_LOCATION"),
+            lineage.edges[edge].pop("EDGE_Y_LOCATION"),
+            lineage.edges[edge].pop("EDGE_Z_LOCATION"),
+        )
+        lineage.edges[edge]["location"] = location
 
 
 def _parse_model_tag(
@@ -817,17 +901,15 @@ def _parse_model_tag(
     lineages = _split_graph_into_lineages(graph, tracks_attributes)
 
     # For Pycellin compatibility, some TrackMate features have to be renamed.
-    _update_features_declaration(fd)
+    _update_features_declaration(fd, units)
     for lin in lineages:
-        # Updating the node features.
         for key_name, new_key in [
             ("ID", "cell_ID"),
             ("FRAME", "frame"),
         ]:
             _update_node_feature_key(lin, key_name, new_key)
-        # TRACK_ID is a node and a graph feature, so we need to update it
-        # in both places.
         _update_TRACK_ID(lin)
+        _update_location_related_features(lin)
 
         # Adding if each track was present in the 'FilteredTracks' tag
         # because this info is needed when reconstructing TrackMate XMLs
