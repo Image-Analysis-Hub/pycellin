@@ -655,34 +655,6 @@ def _update_features_declaration(
         The temporal and spatial units of the TrackMate model
         (`timeunits` and `spatialunits`).
     """
-    # Lineage features.
-    feat_declaration._rename_feature("TRACK_ID", "lineage_ID", "lineage")
-    feat_declaration._modify_feature_description(
-        "lineage_ID", "Unique identifier of the lineage", "lineage"
-    )
-    feat_filtered_track = Feature(
-        "FilteredTrack",
-        "True if the track was not filtered out in TrackMate",
-        "CellLineage",
-        "TrackMate",
-        "int",
-        "none",
-    )
-    feat_declaration._remove_features(
-        ["TRACK_X_LOCATION", "TRACK_Y_LOCATION", "TRACK_Z_LOCATION"], ["lineage"] * 3
-    )  # Replaced by the following `location` feature, a triplet of floats.
-    feat_location = Feature(
-        "location",
-        "Location of the lineage (i.e. mean location its nodes)",
-        "CellLineage",
-        "TrackMate",
-        "float",
-        units["spatialunits"],
-    )
-    feat_declaration._add_features(
-        [feat_filtered_track, feat_location], ["lineage"] * 2
-    )
-
     # Node features.
     feat_cell_id = Feature(
         "cell_ID",
@@ -722,6 +694,34 @@ def _update_features_declaration(
         units["spatialunits"],
     )
     feat_declaration._add_feature(feat_location, "edge")
+
+    # Lineage features.
+    feat_declaration._rename_feature("TRACK_ID", "lineage_ID", "lineage")
+    feat_declaration._modify_feature_description(
+        "lineage_ID", "Unique identifier of the lineage", "lineage"
+    )
+    feat_filtered_track = Feature(
+        "FilteredTrack",
+        "True if the track was not filtered out in TrackMate",
+        "CellLineage",
+        "TrackMate",
+        "int",
+        "none",
+    )
+    feat_declaration._remove_features(
+        ["TRACK_X_LOCATION", "TRACK_Y_LOCATION", "TRACK_Z_LOCATION"], ["lineage"] * 3
+    )  # Replaced by the following `location` feature, a triplet of floats.
+    feat_location = Feature(
+        "location",
+        "Location of the lineage (i.e. mean location its nodes)",
+        "CellLineage",
+        "TrackMate",
+        "float",
+        units["spatialunits"],
+    )
+    feat_declaration._add_features(
+        [feat_filtered_track, feat_location], ["lineage"] * 2
+    )
 
 
 def _update_node_feature_key(
@@ -787,16 +787,6 @@ def _update_location_related_features(
     lineage : CellLineage
         The lineage to update.
     """
-    # Lineage
-    # TODO: add a location for one-node lineage?
-    if "TRACK_X_LOCATION" in lineage.graph:
-        location = (
-            lineage.graph.pop("TRACK_X_LOCATION"),
-            lineage.graph.pop("TRACK_Y_LOCATION"),
-            lineage.graph.pop("TRACK_Z_LOCATION"),
-        )
-        lineage.graph["location"] = location
-
     # Nodes
     for node in lineage.nodes:
         location = (
@@ -814,6 +804,23 @@ def _update_location_related_features(
             lineage.edges[edge].pop("EDGE_Z_LOCATION"),
         )
         lineage.edges[edge]["location"] = location
+
+    # Lineage
+    if "TRACK_X_LOCATION" in lineage.graph:
+        location = (
+            lineage.graph.pop("TRACK_X_LOCATION"),
+            lineage.graph.pop("TRACK_Y_LOCATION"),
+            lineage.graph.pop("TRACK_Z_LOCATION"),
+        )
+        lineage.graph["location"] = location
+    else:
+        # One-node graph don't have the TRACK_X_LOCATION, TRACK_Y_LOCATION
+        # and TRACK_Z_LOCATION features in the graph, so we have to create it.
+        assert (
+            len(lineage) == 1
+        ), "TRACK_X_LOCATION not found and not a one-node lineage."
+        node = [n for n in lineage.nodes][0]
+        lineage.graph["location"] = lineage.nodes[node]["location"]
 
 
 def _parse_model_tag(
