@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from typing import Literal
+
 from pycellin.classes.lineage import CellLineage, CycleLineage
 
 
@@ -34,26 +36,86 @@ class Data:
             )
         return len(self.cell_data)
 
-    def get_closest_cell():
-        """ """
+    def get_closest_cell(
+        node: int,
+        lineage: CellLineage,
+        radius: float = 0,
+        time_window: int = 0,
+        lineages_to_search: list[CellLineage] = None,
+        reference: Literal["center", "border"] = "center",
+    ) -> tuple[CellLineage, int] | None:
+        """
+        Find the closest cell to a given cell of a lineage.
+
+        Parameters
+        ----------
+        node : int
+            The node for which to find the closest cell.
+        lineage : CellLineage
+            The lineage the node belongs to.
+        radius : float, optional
+            The maximum distance to consider, by default 0.
+            If 0, the whole space is considered.
+        time_window : int, optional
+            The time window to consider, by default 0 i.e. only the current frame.
+        lineages_to_search : list[CellLineage], optional
+            The lineages to search in, by default None i.e. all lineages.
+        reference : Literal["center", "border"], optional
+            The reference point to consider for the distance, by default "center".
+
+        Returns
+        -------
+        tuple[CellLineage, int] | None
+            The node ID of the closest cell and the lineage it belongs to.
+        """
         # TODO: implement
-        # Closest in terms of space, but take into account several frames?
-        # => time window, by default just the current frame
-        # Based on the distance between the center of the cells? or the boundaries?
-        # How to identify the correct feature? pass it as argument?
-        # In TM it's POSITION_X and POSITION_Y
         pass
 
-    def get_neighbouring_cells(
-        lineage: CellLineage,
+    def get_closest_cells(
         node: int,
-        radius: float,
-        time_window: int | tuple[int, int],
-    ) -> list[tuple[CellLineage, int]]:
-        """ """
+        lineage: CellLineage,
+        radius: float = 0,
+        time_window: int = 0,
+        lineages_to_search: list[CellLineage] = None,
+        reference: Literal["center", "border"] = "center",
+    ) -> list[tuple[CellLineage, int]] | None:
+        """
+        Find the closest cells to a given cell of a lineage.
+
+        Parameters
+        ----------
+        node : int
+            The node for which to find the closest cell.
+        lineage : CellLineage
+            The lineage the node belongs to.
+        radius : float, optional
+            The maximum distance to consider, by default 0.
+            If 0, the whole space is considered.
+        time_window : int, optional
+            The time window to consider, by default 0 i.e. only the current frame.
+        lineages_to_search : list[CellLineage], optional
+            The lineages to search in, by default None i.e. all lineages.
+        reference : Literal["center", "border"], optional
+            The reference point to consider for the distance, by default "center".
+
+        Returns
+        -------
+        list[tuple[CellLineage, int]] | None
+            The node IDs of the closest cells and the lineages they belong to.
+        """
         # TODO: implement
-        # Parameter to define sort order? By default closest to farthest
-        # Need to implement get_distance() between 2 nodes, not necessarily
-        # from the same lineage...
-        # To identify a node, need to have lineage_ID and cell_ID
         pass
+
+    # def get_neighbouring_cells(
+    #     lineage: CellLineage,
+    #     node: int,
+    #     radius: float,
+    #     time_window: int | tuple[int, int],
+    # ) -> list[tuple[CellLineage, int]]:
+    #     """ """
+    #     # TODO: implement
+    #     # Parameter to define sort order? By default closest to farthest
+    #     # Need to implement get_distance() between 2 nodes, not necessarily
+    #     # from the same lineage...
+    #     # To identify a node, need to have lineage_ID and cell_ID
+    #     pass
