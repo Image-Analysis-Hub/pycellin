@@ -186,7 +186,11 @@ def _add_all_features(
         An iterator over XML elements.
     ancestor : ET._Element
         The XML element that encompasses the information to be added.
-    # TODO: add missing parameters.
+    feat_declaration : FeaturesDeclaration
+        The FeaturesDeclaration object to add the features to.
+    units : dict[str, str]
+        The temporal and spatial units of the TrackMate model
+        (`timeunits` and `spatialunits`).
     """
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
