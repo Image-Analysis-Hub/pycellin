@@ -12,7 +12,7 @@ class Feature:
         self,
         name: str,
         description: str,
-        lineage_type: Literal["cell", "cycle"],
+        lineage_type: Literal["CellLineage", "CycleLineage"],
         provenance: str,
         data_type: str,
         unit: Optional[str] = None,
