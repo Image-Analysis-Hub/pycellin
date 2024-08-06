@@ -131,7 +131,23 @@ class Data:
                 distance = math.dist(
                     lineage.nodes[noi]["location"], lin.nodes[node]["location"]
                 )
-                cells_distance.append((lin, node, distance))
+                if distance <= radius:
+                    cells_distance.append((lin, node, distance))
+        # TODO: Another way of doing it, is it more efficient?
+        # cells_distance = [
+        #     (
+        #         lin,
+        #         node,
+        #         math.dist(lineage.nodes[noi]["location"], lin.nodes[node]["location"]),
+        #     )
+        #     for lin, nodes in candidate_cells.items()
+        #     for node in nodes
+        # ]
+        # cells_distance = [
+        #     (lin, node, distance)
+        #     for lin, node, distance in cells_distance
+        #     if distance <= radius
+        # ]
         print(cells_distance)
         cells_distance.sort(key=lambda x: x[2])
         closest = cells_distance[0]
