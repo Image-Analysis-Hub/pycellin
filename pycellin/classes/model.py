@@ -324,21 +324,6 @@ class Model:
                 f"Available Pycellin features are: {available_features}."
             )
 
-        # match feature_name:
-        #     case "absolute_age":
-        #         self.add_absolute_age()
-        #     case "relative_age":
-        #         self.add_relative_age()
-        #     case "cell_cycle_completeness":
-        #         self.add_cell_cycle_completeness()
-        #     case "division_time":
-        #         self.add_division_time()
-        #     case _:
-        #         raise ValueError(
-        #             f"Feature {feature_name} is not a predefined feature of Pycellin."
-        #             f"Available Pycellin features are: absolute_age, relative_age."
-        #         )
-
     def add_pycellin_features(self, feature_names: list[str]) -> None:
         """
         Add the specified predefined Pycellin features to the model.
