@@ -233,7 +233,7 @@ class Model:
 
     def add_feature(self, feature_name: str) -> None:
         """
-        Add the specified feature to the model.
+        Add the specified predefined Pycellin feature to the model.
 
         This updates the FeaturesDeclaration and compute the feature values
         for all lineages.
@@ -242,25 +242,45 @@ class Model:
         ----------
         feature_name : str
             Name of the feature to add. Need to be an available feature.
+
+        Raises
+        ------
+        KeyError
+            If the feature is not a predefined feature of Pycellin.
         """
-        match feature_name:
-            case "absolute_age":
-                self.add_absolute_age()
-            case "relative_age":
-                self.add_relative_age()
-            case "cell_cycle_completeness":
-                self.add_cell_cycle_completeness()
-            case "division_time":
-                self.add_division_time()
-            case _:
-                raise ValueError(
-                    f"Feature {feature_name} is not a predefined feature of Pycellin."
-                    f"Available Pycellin features are: absolute_age, relative_age."
-                )
+        feat_dict = {
+            "absolute_age": self.add_absolute_age,
+            "relative_age": self.add_relative_age,
+            "cell_cycle_completeness": self.add_cell_cycle_completeness,
+            "division_time": self.add_division_time,
+        }
+        try:
+            feat_dict[feature_name]()
+        except KeyError:
+            available_features = ", ".join(feat_dict.keys())
+            raise KeyError(
+                f"Feature {feature_name} is not a predefined feature of Pycellin. "
+                f"Available Pycellin features are: {available_features}."
+            )
+
+        # match feature_name:
+        #     case "absolute_age":
+        #         self.add_absolute_age()
+        #     case "relative_age":
+        #         self.add_relative_age()
+        #     case "cell_cycle_completeness":
+        #         self.add_cell_cycle_completeness()
+        #     case "division_time":
+        #         self.add_division_time()
+        #     case _:
+        #         raise ValueError(
+        #             f"Feature {feature_name} is not a predefined feature of Pycellin."
+        #             f"Available Pycellin features are: absolute_age, relative_age."
+        #         )
 
     def add_features(self, feature_names: list[str]) -> None:
         """
-        Add the specified features to the model.
+        Add the specified predefined Pycellin features to the model.
 
         This updates the FeaturesDeclaration and compute the feature values
         for all lineages.
