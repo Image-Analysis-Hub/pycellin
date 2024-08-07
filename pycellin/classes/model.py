@@ -123,7 +123,7 @@ class Model:
         str
             The spatial unit of the model.
         """
-        return self.metadata["Space_unit"]
+        return self.metadata["space_unit"]
 
     def get_temporal_unit(self) -> str:
         """
@@ -134,7 +134,7 @@ class Model:
         str
             The temporal unit of the model.
         """
-        return self.metadata["Time_unit"]
+        return self.metadata["time_unit"]
 
     def add_custom_feature(
         self,
