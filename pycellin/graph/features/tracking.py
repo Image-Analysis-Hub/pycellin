@@ -29,7 +29,7 @@ Vocabulary:
   If we take the previous example, the only complete generation is [2, 4, 6].
 """
 
-from typing import Optional
+from typing import Literal, Optional
 
 import networkx as nx
 
@@ -39,12 +39,14 @@ from pycellin.classes.lineage import CellLineage, CycleLineage, Lineage
 # import pycellin.graph.features as feat
 
 
-def get_absolute_age(lineage: CellLineage, node: int) -> int:
+def get_absolute_age(lineage: CellLineage, node: int, time_step: float = 1) -> int:
     """
     Compute the absolute age of a given node.
 
     The absolute age of a cell is defined as the number of nodes since
     the beginning of the lineage. Absolute age of the root is 0.
+    Is is given in frames by default, but can be converted
+    to the time unit of the model if specified.
 
     Parameters
     ----------
@@ -52,16 +54,18 @@ def get_absolute_age(lineage: CellLineage, node: int) -> int:
         Lineage graph containing the node of interest.
     node : int
         Node ID (cell_ID) of the node of interest.
+    time_step : float, optional
+        Time step between 2 frames, by default 1.
 
     Returns
     -------
     int
         Absolute age of the node.
     """
-    return len(nx.ancestors(lineage, node))
+    return len(nx.ancestors(lineage, node)) * time_step
 
 
-def _add_absolute_age(lineages: list[CellLineage]) -> None:
+def _add_absolute_age(lineages: list[CellLineage], time_step: float = 1) -> None:
     """
     Compute and add the absolute age feature to all the nodes of a list of lineages.
 
@@ -69,10 +73,12 @@ def _add_absolute_age(lineages: list[CellLineage]) -> None:
     ----------
     lineages : list[CellLineage]
         Lineage graphs to update with the absolute age feature.
+    time_step : float, optional
+        Time step between 2 frames, by default 1.
     """
     for lin in lineages:
         for node in lin.nodes:
-            lin.nodes[node]["absolute_age"] = get_absolute_age(lin, node)
+            lin.nodes[node]["absolute_age"] = get_absolute_age(lin, node, time_step)
 
 
 def get_relative_age(

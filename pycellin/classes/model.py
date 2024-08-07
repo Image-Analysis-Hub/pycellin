@@ -42,6 +42,7 @@ class Model:
         # self.provenance = provenance
         # self.space_unit
         # self.time_unit
+        # self.time_step
         # TODO: I think these fields should be made mandatory
 
         # Add an optional argument to ask to compute the CycleLineage?
@@ -114,7 +115,7 @@ class Model:
     #     # and in others a dict of Lineages...
     #     pass
 
-    def get_spatial_unit(self) -> str:
+    def get_space_unit(self) -> str:
         """
         Return the spatial unit of the model.
 
@@ -125,7 +126,7 @@ class Model:
         """
         return self.metadata["space_unit"]
 
-    def get_temporal_unit(self) -> str:
+    def get_time_unit(self) -> str:
         """
         Return the temporal unit of the model.
 
@@ -135,6 +136,17 @@ class Model:
             The temporal unit of the model.
         """
         return self.metadata["time_unit"]
+
+    def get_time_step(self) -> float:
+        """
+        Return the time step of the model.
+
+        Returns
+        -------
+        int
+            The time step of the model.
+        """
+        return self.metadata["time_step"]
 
     def add_custom_feature(
         self,
@@ -163,27 +175,35 @@ class Model:
         self.feat_declaration._add_feature(feat, feat_type)
         func(*args, **kwargs)
 
-    def add_absolute_age(self) -> None:
+    def add_absolute_age(self, use_time_unit: bool = False) -> None:
         """
         Compute and add the absolute age feature to the cells of the model.
 
         The absolute age of a cell is defined as the number of nodes since
         the beginning of the lineage. Absolute age of the root is 0.
+        Is is given in frames by default, but can be converted
+        to the time unit of the model if specified.
+
+        Parameters
+        ----------
+        use_time_unit : bool, optional
+            Whether to use the time unit of the model (default is False).
+            If False, absolute age will be given in frames.
         """
-        # TODO: deal with the case when the unit is not frame?
         feat = Feature(
             "absolute_age",
             "Age of the cell since the beginning of the lineage",
             "CellLineage",
             "Pycellin",
-            "int",
-            "none",
+            "float" if use_time_unit else "int",
+            self.metadata["time_unit"] if use_time_unit else "frame",
         )
         self.add_custom_feature(
             feat,
             "node",
             pgf.tracking._add_absolute_age,
             self.data.cell_data.values(),
+            self.metadata["time_step"] if use_time_unit else 1,
         )
 
     def add_relative_age(self) -> None:
