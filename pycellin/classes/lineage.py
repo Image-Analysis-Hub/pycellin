@@ -725,7 +725,7 @@ class CycleLineage(Lineage):
             # cell_cycle completeness?
             # div_time?
             # Or I add it later with add_custom_feature()?
-            self.graph["lineage_ID"] = cell_lineage.graph["lineage_ID"]
+            self.graph["cycle_lineage_ID"] = cell_lineage.graph["lineage_ID"]
 
     # Methods to freeze / unfreeze?
 

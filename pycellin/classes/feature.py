@@ -241,6 +241,56 @@ class FeaturesDeclaration:
         for feature, feature_type in zip(features, feature_types):
             self._add_feature(feature, feature_type)
 
+    def _add_cycle_lineage_features(self) -> None:
+        """
+        Add the basic features of cell cycle lineages.
+        """
+        common_fields = {
+            "lineage_type": "CycleLineage",
+            "provenance": "Pycellin",
+            "data_type": "int",
+        }
+
+        # Node features.
+        feat_ID = Feature(
+            name="cycle_ID",
+            description=(
+                "Node ID of the cell cycle, "
+                "i.e. node ID of the last cell in the cell cycle."
+            ),
+            **common_fields,
+        )
+        feat_cells = Feature(
+            name="cells",
+            description="Node ID of the cells in the cell cycle.",
+            **common_fields,
+        )
+        feat_length = Feature(
+            name="length",
+            description="Number of cells in the cell cycle.",
+            **common_fields,
+        )
+        feat_level = Feature(
+            name="level",
+            description=(
+                "Level of the cell cycle in the lineage, "
+                "i.e. number of cell cycles upstream of the current one."
+            ),
+            **common_fields,
+        )
+        self._add_features([feat_ID, feat_cells, feat_length, feat_level], ["node"] * 4)
+
+        # Lineage features.
+        feat_ID = Feature(
+            name="cycle_lineage_ID",
+            description=(
+                "ID of the cell cycle lineage, "
+                "which is the same ID as its associated cell lineage."
+            ),
+            **common_fields,
+        )
+        self._add_feature(feat_ID, "lineage")
+
     def _remove_feature(self, feature_name: str, feature_type: str):
         """
         Remove the specified feature from the FeaturesDeclaration.

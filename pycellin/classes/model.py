@@ -312,7 +312,7 @@ class Model:
         Compute and add the cycle lineages of the model.
         """
         self.data._compute_cycle_lineages()
-        # TODO: update FeaturesDeclaration
+        self.feat_declaration._add_cycle_lineage_features()
 
     def save_to_pickle(
         self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL
