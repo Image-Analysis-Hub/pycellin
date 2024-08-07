@@ -1018,6 +1018,44 @@ def _get_trackmate_version(
             return version
 
 
+def get_time_step(settings: ET._Element) -> float:
+    """
+    Extract the time step of the TrackMate model.
+
+    Parameters
+    ----------
+    settings : ET._Element
+        The XML element containing the settings of the TrackMate model.
+
+    Returns
+    -------
+    float
+        The time step of the TrackMate model.
+
+    Raises
+    ------
+    ValueError
+        If the 'timeinterval' attribute is missing or cannot be converted to float.
+    KeyError
+        If the 'ImageData' element is not found in the settings.
+    """
+    for element in settings.iterchildren():
+        if element.tag == "ImageData":
+            try:
+                return float(element.attrib["timeinterval"])
+            except KeyError:
+                raise KeyError(
+                    "The 'timeinterval' attribute is missing "
+                    "in the 'ImageData' element."
+                )
+            except ValueError:
+                raise ValueError(
+                    "The 'timeinterval' attribute cannot " "be converted to float."
+                )
+
+    raise KeyError("The 'ImageData' element is not found in the settings.")
+
+
 def load_TrackMate_XML(
     xml_path: str,
     keep_all_spots: bool = False,
@@ -1070,6 +1108,7 @@ def load_TrackMate_XML(
     for tag_name, tag in dict_tags.items():
         element_string = ET.tostring(tag, encoding="utf-8").decode()
         metadata[tag_name] = element_string
+    metadata["time_step"] = get_time_step(dict_tags["Settings"])
 
     model = Model(metadata, feat_declaration, data)
     return model

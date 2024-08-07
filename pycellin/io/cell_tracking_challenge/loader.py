@@ -36,6 +36,7 @@ def _create_metadata(
     metadata["provenance"] = "CTC"
     metadata["date"] = datetime.now()
     metadata["time_unit"] = "frame"
+    metadata["time_step"] = 1
     # TODO: is it possible to get space_unit with the labels data?
     # or a better time_unit with the images metadata?
     # or maybe ask the user...
