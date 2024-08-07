@@ -231,7 +231,7 @@ class Model:
             self.data.cycle_data.values(),
         )
 
-    def add_feature(self, feature_name: str) -> None:
+    def add_pycellin_feature(self, feature_name: str) -> None:
         """
         Add the specified predefined Pycellin feature to the model.
 
@@ -278,7 +278,7 @@ class Model:
         #             f"Available Pycellin features are: absolute_age, relative_age."
         #         )
 
-    def add_features(self, feature_names: list[str]) -> None:
+    def add_pycellin_features(self, feature_names: list[str]) -> None:
         """
         Add the specified predefined Pycellin features to the model.
 
@@ -291,7 +291,7 @@ class Model:
             Names of the features to add. Need to be available features.
         """
         for feature_name in feature_names:
-            self.add_feature(feature_name)
+            self.add_pycellin_feature(feature_name)
 
     def recompute_feature(self, feature_name: str) -> None:
         """
