@@ -109,6 +109,28 @@ class Model:
     #     # and in others a dict of Lineages...
     #     pass
 
+    def get_spatial_unit(self) -> str:
+        """
+        Return the spatial unit of the model.
+
+        Returns
+        -------
+        str
+            The spatial unit of the model.
+        """
+        return self.metadata["Space_unit"]
+
+    def get_temporal_unit(self) -> str:
+        """
+        Return the temporal unit of the model.
+
+        Returns
+        -------
+        str
+            The temporal unit of the model.
+        """
+        return self.metadata["Time_unit"]
+
     def add_custom_feature(
         self,
         feat: Feature,
@@ -218,7 +240,7 @@ class Model:
         """
         feat = Feature(
             "division_time",
-            "Number of frames between the birth of a cell and its division",
+            "Time elapsed between the birth of a cell and its division",
             "CycleLineage",
             "Pycellin",
             "int",

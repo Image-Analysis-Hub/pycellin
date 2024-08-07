@@ -845,7 +845,7 @@ def _parse_model_tag(
     xml_path: str,
     keep_all_spots: bool,
     keep_all_tracks: bool,
-) -> tuple[FeaturesDeclaration, Data]:
+) -> tuple[dict[str, str], FeaturesDeclaration, Data]:
     """
     Read an XML file and convert the model data into several graphs.
 
@@ -865,8 +865,9 @@ def _parse_model_tag(
 
     Returns
     -------
-    tuple[FeaturesDeclaration, Data]
-        A tuple containing the features declaration and the data of the model.
+    tuple[dict[str, str], FeaturesDeclaration, Data]
+        A tuple containing the space and time units, the features declaration
+        and the data of the model.
     """
     fd = FeaturesDeclaration()
 
@@ -948,7 +949,7 @@ def _parse_model_tag(
         else:
             lin.graph["FilteredTrack"] = False
 
-    return fd, Data({lin.graph["lineage_ID"]: lin for lin in lineages})
+    return units, fd, Data({lin.graph["lineage_ID"]: lin for lin in lineages})
 
 
 def _get_specific_tags(
@@ -1049,7 +1050,9 @@ def load_TrackMate_XML(
     Model
         A Pycellin Model that contains all the data from the TrackMate XML file.
     """
-    feat_declaration, data = _parse_model_tag(xml_path, keep_all_spots, keep_all_tracks)
+    units, feat_declaration, data = _parse_model_tag(
+        xml_path, keep_all_spots, keep_all_tracks
+    )
 
     # Add in the metadata all the TrackMate info that was not in the
     # TrackMate XML `Model` tag.
@@ -1057,6 +1060,8 @@ def load_TrackMate_XML(
     metadata["Name"] = Path(xml_path).stem
     metadata["Provenance"] = "TrackMate"
     metadata["Date"] = datetime.now()
+    metadata["Space_unit"] = units["spatialunits"]
+    metadata["Time_unit"] = units["timeunits"]
     metadata["Pycellin_version"] = get_distribution("pycellin").version
     metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
     dict_tags = _get_specific_tags(
