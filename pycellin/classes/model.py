@@ -298,7 +298,7 @@ class Model:
         ----------
         feature_name : str
             Name of the feature to add. Need to be an available feature.
-        kwargs : Any
+        kwargs : bool
             Additional keyword arguments to pass to the function
             computing the feature. For example, for absolute_age,
             in_time_unit=True can be used to yield the age
@@ -324,7 +324,7 @@ class Model:
                 f"Available Pycellin features are: {available_features}."
             )
 
-    def add_pycellin_features(self, feature_names: list[str]) -> None:
+    def add_pycellin_features(self, feature_names: list[str], **kwargs: bool) -> None:
         """
         Add the specified predefined Pycellin features to the model.
 
@@ -335,9 +335,14 @@ class Model:
         ----------
         feature_names : list[str]
             Names of the features to add. Need to be available features.
+        kwargs : bool
+            Additional keyword arguments to pass to the function
+            computing the feature. For example, for absolute_age,
+            in_time_unit=True can be used to yield the age
+            in the time unit of the model instead of in frames.
         """
         for feature_name in feature_names:
-            self.add_pycellin_feature(feature_name)
+            self.add_pycellin_feature(feature_name, **kwargs)
 
     def recompute_feature(self, feature_name: str) -> None:
         """
