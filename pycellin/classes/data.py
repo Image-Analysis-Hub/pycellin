@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import math
-
 from typing import Literal
 
 from pycellin.classes.lineage import CellLineage, CycleLineage
@@ -10,9 +9,7 @@ from pycellin.classes.lineage import CellLineage, CycleLineage
 
 class Data:
     """
-    Do I really need this one?
-      => do I have something that is applicable for both core and branch data?
-    Or maybe I need only the Data class and no subclasses.
+    Class to store and manipulate cell lineages and cell cycle lineages.
     """
 
     def __init__(
@@ -25,11 +22,17 @@ class Data:
             self.cycle_data = None
 
     def _compute_cycle_lineages(self):
+        """
+        Compute the cell cycle lineages from the cell lineages.
+        """
         self.cycle_data = {
             lin_id: CycleLineage(lin) for lin_id, lin in self.cell_data.items()
         }
 
     def number_of_lineages(self) -> int:
+        """
+        Return the number of lineages in the data.
+        """
         if self.cycle_data:
             assert len(self.cell_data) == len(self.cycle_data), (
                 f"Impossible state:"
@@ -175,21 +178,6 @@ class Data:
                 )
                 if radius == 0 or distance <= radius:
                     distances.append((node, lin, distance))
-        # TODO: Another way of doing it, is it more efficient?
-        # distances = [
-        #     (
-        #         node,
-        #         lin,
-        #         math.dist(lineage.nodes[noi]["location"], lin.nodes[node]["location"]),
-        #     )
-        #     for nodes, lin in candidate_cells.items()
-        #     for node in nodes
-        # ]
-        # cells_distance = [
-        #     (node, lin, distance)
-        #     for node, lin, distance in cells_distance
-        #     if distance <= radius
-        # ]
         distances.sort(key=lambda x: x[2])
         return [(node, lin) for node, lin, _ in distances]
 
