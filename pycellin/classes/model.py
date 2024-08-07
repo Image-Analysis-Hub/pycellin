@@ -181,14 +181,14 @@ class Model:
 
         The absolute age of a cell is defined as the number of nodes since
         the beginning of the lineage. Absolute age of the root is 0.
-        Is is given in frames by default, but can be converted
+        It is given in frames by default, but can be converted
         to the time unit of the model if specified.
 
         Parameters
         ----------
         in_time_unit : bool, optional
-            Whether to use the time unit of the model (default is False).
-            If False, absolute age will be given in frames.
+            True to give the relative age in the time unit of the model,
+            False to give it in frames (default is False).
         """
         feat = Feature(
             "absolute_age",
@@ -206,28 +206,36 @@ class Model:
             self.metadata["time_step"] if in_time_unit else 1,
         )
 
-    def add_relative_age(self) -> None:
+    def add_relative_age(self, in_time_unit: bool = False) -> None:
         """
         Compute and add the relative age feature to the cells of the model.
 
         The relative age of a cell is defined as the number of nodes since
         the start of the cell cycle (i.e. previous division, or beginning
         of the lineage).
+        It is given in frames by default, but can be converted
+        to the time unit of the model if specified.
+
+        Parameters
+        ----------
+        in_time_unit : bool, optional
+            True to give the relative age in the time unit of the model,
+            False to give it in frames (default is False).
         """
-        # TODO: deal with the case when the unit is not frame?
         feat = Feature(
             "relative_age",
             "Age of the cell since the beginning of current cell cycle",
             "CellLineage",
             "Pycellin",
-            "int",
-            "none",
+            "float" if in_time_unit else "int",
+            self.metadata["time_unit"] if in_time_unit else "frame",
         )
         self.add_custom_feature(
             feat,
             "node",
             pgf.tracking._add_relative_age,
             self.data.cell_data.values(),
+            self.metadata["time_step"] if in_time_unit else 1,
         )
 
     def add_cell_cycle_completeness(self) -> None:

@@ -39,13 +39,15 @@ from pycellin.classes.lineage import CellLineage, CycleLineage, Lineage
 # import pycellin.graph.features as feat
 
 
-def get_absolute_age(lineage: CellLineage, node: int, time_step: float = 1) -> int:
+def get_absolute_age(
+    lineage: CellLineage, node: int, time_step: float = 1
+) -> int | float:
     """
     Compute the absolute age of a given node.
 
     The absolute age of a cell is defined as the number of nodes since
     the beginning of the lineage. Absolute age of the root is 0.
-    Is is given in frames by default, but can be converted
+    It is given in frames by default, but can be converted
     to the time unit of the model if specified.
 
     Parameters
@@ -59,7 +61,7 @@ def get_absolute_age(lineage: CellLineage, node: int, time_step: float = 1) -> i
 
     Returns
     -------
-    int
+    int | float
         Absolute age of the node.
     """
     return len(nx.ancestors(lineage, node)) * time_step
@@ -82,14 +84,19 @@ def _add_absolute_age(lineages: list[CellLineage], time_step: float = 1) -> None
 
 
 def get_relative_age(
-    lineage: CellLineage, node: int, cell_cycle: Optional[list[int]] = None
-) -> int:
+    lineage: CellLineage,
+    node: int,
+    time_step: float = 1,
+    cell_cycle: list[int] | None = None,
+) -> int | float:
     """
     Compute the relative age of a given node.
 
     The relative age of a cell is defined as the number of nodes since
     the start of the cell cycle (i.e. previous division, or beginning
     of the lineage).
+    It is given in frames by default, but can be converted
+    to the time unit of the model if specified.
 
     Parameters
     ----------
@@ -97,24 +104,26 @@ def get_relative_age(
         Lineage graph containing the node of interest.
     node : int
         Node ID (cell_ID) of the node of interest.
-    cell_cycle : Optional[list[int]], optional
+    time_step : float, optional
+        Time step between 2 frames, by default 1.
+    cell_cycle : list[int] | None, optional
         List of nodes that belong to the cell cycle of the input node.
         Useful if the cell cycle has already been precomputed.
         If None, the cell cycle will first be computed. By default None.
 
     Returns
     -------
-    int
+    int | float
         Relative age of the node.
     """
     if cell_cycle is not None:
         assert node in cell_cycle
     else:
         cell_cycle = lineage.get_cell_cycle(node)
-    return cell_cycle.index(node)
+    return cell_cycle.index(node) * time_step
 
 
-def _add_relative_age(lineages: list[CellLineage]) -> None:
+def _add_relative_age(lineages: list[CellLineage], time_step: float = 1) -> None:
     """
     Compute and add the relative age feature to all the nodes of a list of lineages.
 
@@ -122,10 +131,12 @@ def _add_relative_age(lineages: list[CellLineage]) -> None:
     ----------
     lineages : list[CellLineage]
         Lineage graphs to update with the relative age feature.
+    time_step : float, optional
+        Time step between 2 frames, by default 1.
     """
     for lin in lineages:
         for node in lin.nodes:
-            lin.nodes[node]["relative_age"] = get_relative_age(lin, node)
+            lin.nodes[node]["relative_age"] = get_relative_age(lin, node, time_step)
 
 
 # ON CELL CYCLE GRAPH
