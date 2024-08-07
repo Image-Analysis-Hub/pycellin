@@ -175,7 +175,7 @@ class Model:
         self.feat_declaration._add_feature(feat, feat_type)
         func(*args, **kwargs)
 
-    def add_absolute_age(self, use_time_unit: bool = False) -> None:
+    def add_absolute_age(self, in_time_unit: bool = False) -> None:
         """
         Compute and add the absolute age feature to the cells of the model.
 
@@ -186,7 +186,7 @@ class Model:
 
         Parameters
         ----------
-        use_time_unit : bool, optional
+        in_time_unit : bool, optional
             Whether to use the time unit of the model (default is False).
             If False, absolute age will be given in frames.
         """
@@ -195,15 +195,15 @@ class Model:
             "Age of the cell since the beginning of the lineage",
             "CellLineage",
             "Pycellin",
-            "float" if use_time_unit else "int",
-            self.metadata["time_unit"] if use_time_unit else "frame",
+            "float" if in_time_unit else "int",
+            self.metadata["time_unit"] if in_time_unit else "frame",
         )
         self.add_custom_feature(
             feat,
             "node",
             pgf.tracking._add_absolute_age,
             self.data.cell_data.values(),
-            self.metadata["time_step"] if use_time_unit else 1,
+            self.metadata["time_step"] if in_time_unit else 1,
         )
 
     def add_relative_age(self) -> None:
