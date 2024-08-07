@@ -492,7 +492,7 @@ class CellLineage(Lineage):
 
     def get_cell_cycles(
         self, keep_incomplete_cell_cycles: bool = False, debug: bool = False
-    ) -> list(list(int)):
+    ) -> list[list[int]]:
         """
         Identify all the nodes of each cell cycle in a lineage.
 
