@@ -136,7 +136,7 @@ class Model:
         self.feat_declaration._add_feature(feat, feat_type)
         func(*args, **kwargs)
 
-    def add_absolute_age(self):
+    def add_absolute_age(self) -> None:
         """
         Compute and add the absolute age feature to the cells of the model.
 
@@ -159,7 +159,7 @@ class Model:
             self.data.cell_data.values(),
         )
 
-    def add_relative_age(self):
+    def add_relative_age(self) -> None:
         """
         Compute and add the relative age feature to the cells of the model.
 
@@ -183,7 +183,7 @@ class Model:
             self.data.cell_data.values(),
         )
 
-    def add_cell_cycle_completeness(self):
+    def add_cell_cycle_completeness(self) -> None:
         """
         Compute and add the cell cycle completeness feature to the cell cycles of the model.
 
@@ -209,7 +209,7 @@ class Model:
             self.data.cycle_data.values(),
         )
 
-    def add_division_time(self):
+    def add_division_time(self) -> None:
         """
         Compute and add the division time feature to the cell cycles of the model.
 
@@ -306,6 +306,7 @@ class Model:
             raise ValueError(f"Feature {feature_name} does not exist.")
 
         # Then need to update the FeaturesDeclaration and the data.
+        # TODO
 
     def add_cycle_data(self) -> None:
         """

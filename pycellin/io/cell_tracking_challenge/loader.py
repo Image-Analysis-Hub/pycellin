@@ -5,7 +5,7 @@ from datetime import datetime
 from itertools import pairwise
 from pathlib import Path
 from pkg_resources import get_distribution
-from typing import Any, Tuple, List, Dict
+from typing import Any, Tuple
 
 import networkx as nx
 
@@ -17,7 +17,7 @@ from pycellin.classes.lineage import CellLineage
 
 def _create_metadata(
     file_path: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Create a dictionary of basic Pycellin metadata for a given file.
 
@@ -28,7 +28,7 @@ def _create_metadata(
 
     Returns
     -------
-    Dict[str, Any]
+    dict[str, Any]
         A dictionary containing the generated metadata.
     """
     metadata = {}
@@ -74,7 +74,7 @@ def _create_FeaturesDeclaration() -> FeaturesDeclaration:
 def _read_track_line(
     line: str,
     current_node_id: int,
-) -> Tuple[List[Tuple[int, Dict[str, Any]]], int]:
+) -> Tuple[list[Tuple[int, dict[str, Any]]], int]:
     """
     Parse a single track line to generate a list of the nodes present in the track.
 
@@ -114,7 +114,7 @@ def _read_track_line(
 
 def _add_nodes_and_edges(
     graph: nx.DiGraph,
-    nodes: List[Tuple[int, Dict[str, Any]]],
+    nodes: list[Tuple[int, dict[str, Any]]],
 ) -> None:
     """
     Add nodes and edges to a directed graph from a list of nodes.
@@ -138,7 +138,7 @@ def _add_nodes_and_edges(
 
 def _merge_tracks(
     graph: nx.DiGraph,
-    nodes: List[Tuple[int, Dict[str, Any]]],
+    nodes: list[Tuple[int, dict[str, Any]]],
 ) -> None:
     """
     Merge a track with its parent track in the directed graph.
@@ -259,6 +259,10 @@ if __name__ == "__main__":
 
     for lin_id, lin in model.data.cell_data.items():
         print(f"{lin_id} - {lin}")
+        lin.plot()
+
+    model.add_cycle_data()
+    for lin_id, lin in model.data.cycle_data.items():
         lin.plot()
 
     print(model.data.cell_data[1].nodes(data=True))

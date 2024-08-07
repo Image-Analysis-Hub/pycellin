@@ -70,7 +70,7 @@ def _add_track(
     ctc_tracks: dict[int, dict[str, int]],
     node_to_parent_track: dict[int, int],
     current_track_label: int,
-):
+) -> int:
     """
     Add a CTC track to the CTC output.
 
@@ -174,7 +174,7 @@ def _add_parent_track(
     lineage: CellLineage,
     track_info: dict[str, int],
     node_to_parent_track: dict[int, int],
-):
+) -> None:
     """
     Add the parent track label to the CTC track information.
 
@@ -201,7 +201,7 @@ def _add_parent_track(
         track_info["P"] = 0
 
 
-def export_CTC_file(model: Model, ctc_file_out):
+def export_CTC_file(model: Model, ctc_file_out) -> None:
     """
     Export lineage data from a Model to CTC file format.
 

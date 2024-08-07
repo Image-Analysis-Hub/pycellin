@@ -291,7 +291,7 @@ class FeaturesDeclaration:
         )
         self._add_feature(feat_ID, "lineage")
 
-    def _remove_feature(self, feature_name: str, feature_type: str):
+    def _remove_feature(self, feature_name: str, feature_type: str) -> None:
         """
         Remove the specified feature from the FeaturesDeclaration.
 
@@ -321,7 +321,9 @@ class FeaturesDeclaration:
 
         del dict_feats[feature_name]
 
-    def _remove_features(self, feature_names: list[str], feature_types: list[str]):
+    def _remove_features(
+        self, feature_names: list[str], feature_types: list[str]
+    ) -> None:
         """
         Remove the specified features from the FeaturesDeclaration.
 
@@ -335,7 +337,9 @@ class FeaturesDeclaration:
         for feature_name, feature_type in zip(feature_names, feature_types):
             self._remove_feature(feature_name, feature_type)
 
-    def _rename_feature(self, feature_name: str, new_name: str, feature_type: str):
+    def _rename_feature(
+        self, feature_name: str, new_name: str, feature_type: str
+    ) -> None:
         """
         Rename a specified feature.
 
@@ -374,7 +378,7 @@ class FeaturesDeclaration:
 
     def _modify_feature_description(
         self, feature_name: str, new_description: str, feature_type: str
-    ):
+    ) -> None:
         """
         Modify the description of a specified feature.
 

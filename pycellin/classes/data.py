@@ -21,7 +21,7 @@ class Data:
         else:
             self.cycle_data = None
 
-    def _compute_cycle_lineages(self):
+    def _compute_cycle_lineages(self) -> None:
         """
         Compute the cell cycle lineages from the cell lineages.
         """

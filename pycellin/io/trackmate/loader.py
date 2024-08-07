@@ -78,7 +78,7 @@ def _get_features_dict(
     return features
 
 
-def _dimension_to_unit(trackmate_feature, units):
+def _dimension_to_unit(trackmate_feature, units) -> str:
     """
     Convert the dimension of a feature to its unit.
 
@@ -119,7 +119,7 @@ def _convert_and_add_feature(
     feature_type: str,
     feat_declaration: FeaturesDeclaration,
     units: dict[str, str],
-):
+) -> None:
     """
     Convert a TrackMate feature to a Pycellin one to add it to the features declaration.
 
@@ -134,6 +134,11 @@ def _convert_and_add_feature(
     units : dict[str, str]
         The temporal and spatial units of the TrackMate model
         (`timeunits` and `spatialunits`).
+
+    Raises
+    ------
+    ValueError
+        If the feature type is invalid.
     """
     feat_name = trackmate_feature["feature"]
     feat_description = trackmate_feature["name"]
@@ -171,7 +176,7 @@ def _add_all_features(
     ancestor: ET._Element,
     feat_declaration: FeaturesDeclaration,
     units: dict[str, str],
-):
+) -> None:
     """
     Add all the TrackMate model features to a FeaturesDeclaration object.
 
@@ -230,7 +235,7 @@ def _add_all_features(
 def _convert_attributes(
     attributes: dict[str, str],
     features: dict[str, CellLineage],
-):
+) -> None:
     """
     Convert the values of `attributes` from string to int or float.
 
@@ -281,7 +286,7 @@ def _convert_attributes(
 def _convert_ROI_coordinates(
     element: ET._Element,
     attribs: dict[str, Any],
-):
+) -> None:
     """
     Extract, format and add ROI coordinates to the attributes dict.
 
@@ -336,6 +341,13 @@ def _add_all_nodes(
         node attributes.
     graph : nx.DiGraph
         Graph to add the nodes to.
+
+    Raises
+    ------
+    ValueError
+        If a node attribute cannot be converted to the expected type.
+    KeyError
+        If a node attribute is not found in the features declaration.
     """
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
@@ -383,7 +395,7 @@ def _add_edge(
     feat_declaration: FeaturesDeclaration,
     graph: nx.DiGraph,
     current_track_id: int,
-):
+) -> None:
     """
     Add an edge between two nodes in the graph based on the XML element.
 
@@ -516,6 +528,12 @@ def _get_filtered_tracks_ID(
     -------
     list[int]
         List of tracks ID to identify the tracks to keep.
+
+    Raises
+    ------
+    KeyError
+        If the "TRACK_ID" attribute is not found
+        in the attributes of the current element.
     """
     filtered_tracks_ID = []
     event, element = next(iterator)
@@ -546,7 +564,7 @@ def _get_filtered_tracks_ID(
 def _add_tracks_info(
     lineages: list[CellLineage],
     tracks_attributes: list[dict[str, Any]],
-):
+) -> None:
     """
     Update each CellLineage in the list with corresponding track attributes.
 
@@ -643,7 +661,7 @@ def _split_graph_into_lineages(
 def _update_features_declaration(
     feat_declaration: FeaturesDeclaration,
     units: dict[str, str],
-):
+) -> None:
     """
     Update the features declaration to match Pycellin conventions.
 
@@ -728,7 +746,7 @@ def _update_node_feature_key(
     lineage: CellLineage,
     old_key: str,
     new_key: str,
-):
+) -> None:
     """
     Update the key of a feature in all the nodes of a lineage.
 
@@ -748,7 +766,7 @@ def _update_node_feature_key(
 
 def _update_TRACK_ID(
     lineage: CellLineage,
-):
+) -> None:
     """
     Update the TRACK_ID feature in the nodes and in the graph of a lineage.
 
@@ -778,7 +796,7 @@ def _update_TRACK_ID(
 
 def _update_location_related_features(
     lineage: CellLineage,
-):
+) -> None:
     """
     Update features related to location of lineage, nodes and edges in a lineage.
 
@@ -1054,6 +1072,8 @@ def load_TrackMate_XML(
 
 if __name__ == "__main__":
 
+    import math
+
     xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
 
@@ -1073,8 +1093,19 @@ if __name__ == "__main__":
     # print(model.feat_declaration)
     # print(model.data)
 
-    for id, lin in model.data.cell_data.items():
-        print(f"ID: {id} - {lin}")
+    lineage = model.data.cell_data[0]
+    print(lineage, type(lineage))
+    # print(lin.nodes)
+    closest_cells = model.data.get_closest_cells(2046, lineage)
+    for cell, lin in closest_cells:
+        print(math.dist(lineage.nodes[2046]["location"], lin.nodes[cell]["location"]))
+
+    # for id, lin in model.data.cell_data.items():
+    #     print(f"ID: {id} - {lin}")
+
+    # for lin in model.data.cell_data.values():
+    #     if len(lin) > 1:
+    #         lin.plot()
 
     # print(model.data.cell_data[-2094].nodes[2094])
     # model.data.cell_data[0].plot()

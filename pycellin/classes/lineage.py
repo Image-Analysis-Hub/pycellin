@@ -14,7 +14,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     Abstract class for a lineage graph.
     """
 
-    def __init__(self, nx_digraph: nx.DiGraph | None = None):
+    def __init__(self, nx_digraph: nx.DiGraph | None = None) -> None:
         super().__init__(incoming_graph_data=nx_digraph)
 
     # TODO: A method to check that there is no merge (i. e. in_degree > 1)
@@ -131,7 +131,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         return nx.shortest_path(self, source=root, target=target_node)
 
-    def is_root(self, node: int):
+    def is_root(self, node: int) -> bool:
         """
         Check if a given node is a root node.
 
@@ -153,7 +153,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         else:
             return False
 
-    def is_leaf(self, node: int):
+    def is_leaf(self, node: int) -> bool:
         """
         Check if a given node is a leaf node.
 
@@ -192,7 +192,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
-    ):
+    ) -> None:
         """
         Plot the lineage as a tree using Plotly.
 
@@ -492,7 +492,7 @@ class CellLineage(Lineage):
 
     def get_cell_cycles(
         self, keep_incomplete_cell_cycles: bool = False, debug: bool = False
-    ):
+    ) -> list(list(int)):
         """
         Identify all the nodes of each cell cycle in a lineage.
 
@@ -531,7 +531,7 @@ class CellLineage(Lineage):
 
         return cell_cycles
 
-    def is_division(self, node: int):
+    def is_division(self, node: int) -> bool:
         """
         Check if a given node is a division node.
 
@@ -623,7 +623,7 @@ class CellLineage(Lineage):
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
-    ):
+    ) -> None:
         """
         Plot the cell lineage as a tree using Plotly.
 
@@ -697,7 +697,7 @@ class CellLineage(Lineage):
 
 class CycleLineage(Lineage):
 
-    def __init__(self, cell_lineage: CellLineage | None = None):
+    def __init__(self, cell_lineage: CellLineage | None = None) -> None:
         super().__init__()
 
         if cell_lineage:
@@ -742,7 +742,7 @@ class CycleLineage(Lineage):
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
-    ):
+    ) -> None:
         """
         Plot the cell cycle lineage as a tree using Plotly.
 
