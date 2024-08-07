@@ -147,7 +147,7 @@ class Model:
         feat = Feature(
             "absolute_age",
             "Age of the cell since the beginning of the lineage",
-            "cell",
+            "CellLineage",
             "Pycellin",
             "int",
             "none",
@@ -171,7 +171,7 @@ class Model:
         feat = Feature(
             "relative_age",
             "Age of the cell since the beginning of current cell cycle",
-            "cell",
+            "CellLineage",
             "Pycellin",
             "int",
             "none",
@@ -197,7 +197,7 @@ class Model:
         feat = Feature(
             "cell_cycle_completeness",
             "Completeness of the cell cycle",
-            "cycle",
+            "CycleLineage",
             "Pycellin",
             "bool",
             "none",
@@ -219,7 +219,7 @@ class Model:
         feat = Feature(
             "division_time",
             "Number of frames between the birth of a cell and its division",
-            "cycle",
+            "CycleLineage",
             "Pycellin",
             "int",
             "none",
