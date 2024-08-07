@@ -47,7 +47,7 @@ class Data:
         time_window_type: Literal["before", "after", "symetric"] = "symetric",
         lineages_to_search: list[CellLineage] = None,
         reference: Literal["center", "border"] = "center",
-    ) -> tuple[CellLineage, int] | None:
+    ) -> tuple[CellLineage, int]:
         """
         Find the closest cell to a given cell of a lineage.
 
@@ -71,15 +71,59 @@ class Data:
 
         Returns
         -------
-        tuple[CellLineage, int] | None
+        tuple[int, CellLineage]
             The node ID of the closest cell and the lineage it belongs to.
         """
+        distances = self.get_closest_cells(
+            noi=noi,
+            lineage=lineage,
+            radius=radius,
+            time_window=time_window,
+            time_window_type=time_window_type,
+            lineages_to_search=lineages_to_search,
+            reference=reference,
+        )
+        return distances[0]
+
+    def get_closest_cells(
+        self,
+        noi: int,
+        lineage: CellLineage,
+        radius: float = 0,
+        time_window: int = 0,
+        time_window_type: Literal["before", "after", "symetric"] = "symetric",
+        lineages_to_search: list[CellLineage] = None,
+        reference: Literal["center", "border"] = "center",
+    ) -> list[tuple[int, CellLineage]]:
+        """
+        Find the closest cells to a given cell of a lineage.
+
+        Parameters
+        ----------
+        noi : int
+            Node of interest, the one for which to find the closest cell.
+        lineage : CellLineage
+            The lineage the node belongs to.
+        radius : float, optional
+            The maximum distance to consider, by default 0.
+            If 0, the whole space is considered.
+        time_window : int, optional
+            The time window to consider, by default 0 i.e. only the current frame.
+        time_window_type : Literal["before", "after", "symetric"], optional
+            The type of time window to consider, by default "symetric".
+        lineages_to_search : list[CellLineage], optional
+            The lineages to search in, by default None i.e. all lineages.
+        reference : Literal["center", "border"], optional
+            The reference point to consider for the distance, by default "center".
+
+        Returns
+        -------
+        tuple[int, CellLineage]
+            The node ID of the closest cells and the lineages it belongs to,
+            sorted by increasing distance.
+        """
         # TODO:
-        # - Implement the radius parameter.
         # - Implement the reference parameter.
-        # - Do I also return the distance itself?
-        # - Return a tuple or a dict?
-        # - Use a tuple for (noi, lin)? In which order?
 
         # Identification of the frames to search in.
         center_frame = lineage.nodes[noi]["frame"]
@@ -104,7 +148,6 @@ class Data:
                     " Should be 'before', 'after' or 'symetric'."
                 )
             frames_to_search.sort()
-        print(frames_to_search)
 
         # Identification of nodes that are good candidates,
         # i.e. nodes that are in the time window
@@ -122,72 +165,33 @@ class Data:
                 candidate_cells[lin] = nodes
         # Need to remove the node itself from the candidates.
         candidate_cells[lineage].remove(noi)
-        print(candidate_cells)
 
         # Identification of the closest cell.
-        cells_distance = []
+        distances = []
         for lin, nodes in candidate_cells.items():
             for node in nodes:
                 distance = math.dist(
                     lineage.nodes[noi]["location"], lin.nodes[node]["location"]
                 )
-                if distance <= radius:
-                    cells_distance.append((lin, node, distance))
+                if radius == 0 or distance <= radius:
+                    distances.append((node, lin, distance))
         # TODO: Another way of doing it, is it more efficient?
-        # cells_distance = [
+        # distances = [
         #     (
-        #         lin,
         #         node,
+        #         lin,
         #         math.dist(lineage.nodes[noi]["location"], lin.nodes[node]["location"]),
         #     )
-        #     for lin, nodes in candidate_cells.items()
+        #     for nodes, lin in candidate_cells.items()
         #     for node in nodes
         # ]
         # cells_distance = [
-        #     (lin, node, distance)
-        #     for lin, node, distance in cells_distance
+        #     (node, lin, distance)
+        #     for node, lin, distance in cells_distance
         #     if distance <= radius
         # ]
-        print(cells_distance)
-        cells_distance.sort(key=lambda x: x[2])
-        closest = cells_distance[0]
-
-        return closest[0], closest[1]
-
-    def get_closest_cells(
-        node: int,
-        lineage: CellLineage,
-        radius: float = 0,
-        time_window: int = 0,
-        lineages_to_search: list[CellLineage] = None,
-        reference: Literal["center", "border"] = "center",
-    ) -> list[tuple[CellLineage, int]] | None:
-        """
-        Find the closest cells to a given cell of a lineage.
-
-        Parameters
-        ----------
-        node : int
-            The node for which to find the closest cell.
-        lineage : CellLineage
-            The lineage the node belongs to.
-        radius : float, optional
-            The maximum distance to consider, by default 0.
-            If 0, the whole space is considered.
-        time_window : int, optional
-            The time window to consider, by default 0 i.e. only the current frame.
-        lineages_to_search : list[CellLineage], optional
-            The lineages to search in, by default None i.e. all lineages.
-        reference : Literal["center", "border"], optional
-            The reference point to consider for the distance, by default "center".
-
-        Returns
-        -------
-        list[tuple[CellLineage, int]] | None
-            The node IDs of the closest cells and the lineages they belong to.
-        """
-        # TODO: implement
-        pass
+        distances.sort(key=lambda x: x[2])
+        return [(node, lin) for node, lin, _ in distances]
 
     # def get_neighbouring_cells(
     #     lineage: CellLineage,
