@@ -35,6 +35,10 @@ def _create_metadata(
     metadata["name"] = Path(file_path).stem
     metadata["provenance"] = "CTC"
     metadata["date"] = datetime.now()
+    metadata["time_unit"] = "frame"
+    # TODO: is it possible to get space_unit with the labels data?
+    # or a better time_unit with the images metadata?
+    # or maybe ask the user...
     metadata["pycellin_version"] = get_distribution("pycellin").version
     return metadata
 
