@@ -1057,12 +1057,12 @@ def load_TrackMate_XML(
     # Add in the metadata all the TrackMate info that was not in the
     # TrackMate XML `Model` tag.
     metadata = {}
-    metadata["Name"] = Path(xml_path).stem
-    metadata["Provenance"] = "TrackMate"
-    metadata["Date"] = datetime.now()
-    metadata["Space_unit"] = units["spatialunits"]
-    metadata["Time_unit"] = units["timeunits"]
-    metadata["Pycellin_version"] = get_distribution("pycellin").version
+    metadata["name"] = Path(xml_path).stem
+    metadata["provenance"] = "TrackMate"
+    metadata["date"] = datetime.now()
+    metadata["space_unit"] = units["spatialunits"]
+    metadata["time_unit"] = units["timeunits"]
+    metadata["pycellin_version"] = get_distribution("pycellin").version
     metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
     dict_tags = _get_specific_tags(
         xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]

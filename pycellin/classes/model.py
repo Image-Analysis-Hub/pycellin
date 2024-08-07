@@ -34,10 +34,15 @@ class Model:
         self.metadata = metadata
         self.feat_declaration = feat_declaration
         self.data = data
+
+        # This in the metadata now.
         # self.date = datetime.now()
         # self.pycellin_version = get_distribution("pycellin").version
         # self.name = name
         # self.provenance = provenance
+        # self.space_unit
+        # self.time_unit
+        # TODO: I think these fields should be made mandatory
 
         # Add an optional argument to ask to compute the CycleLineage?
         # Add a description in which people can put whatever they want
