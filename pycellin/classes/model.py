@@ -271,6 +271,7 @@ class Model:
         The division time of a cell cycle is defined as the difference
         between the absolute ages of the two daughter cells.
         """
+        # TODO: add time_unit option
         feat = Feature(
             "division_time",
             "Time elapsed between the birth of a cell and its division",
@@ -286,7 +287,7 @@ class Model:
             self.data.cycle_data.values(),
         )
 
-    def add_pycellin_feature(self, feature_name: str) -> None:
+    def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:
         """
         Add the specified predefined Pycellin feature to the model.
 
@@ -297,6 +298,11 @@ class Model:
         ----------
         feature_name : str
             Name of the feature to add. Need to be an available feature.
+        kwargs : Any
+            Additional keyword arguments to pass to the function
+            computing the feature. For example, for absolute_age,
+            in_time_unit=True can be used to yield the age
+            in the time unit of the model instead of in frames.
 
         Raises
         ------
@@ -310,7 +316,7 @@ class Model:
             "division_time": self.add_division_time,
         }
         try:
-            feat_dict[feature_name]()
+            feat_dict[feature_name](**kwargs)
         except KeyError:
             available_features = ", ".join(feat_dict.keys())
             raise KeyError(
