@@ -263,6 +263,52 @@ class Model:
         self.feat_declaration._add_feature(feat, feat_type)
         func(*args, **kwargs)
 
+    def add_width_and_lenght(
+        self,
+        skel_algo: str = "zhang",
+        tolerance: float = 0.5,
+        method_width: str = "mean",
+        width_ignore_tips: bool = False,
+    ) -> None:
+        """
+        Compute and add the width and length features to the cells of the model.
+        """
+        # TODO: deal with pixel size
+        feat_width = Feature(
+            "width",
+            "Width of the cell",
+            "CellLineage",
+            "Pycellin",
+            "float",
+            self.metadata["space_unit"],
+        )
+        feat_length = Feature(
+            "length",
+            "Length of the cell",
+            "CellLineage",
+            "Pycellin",
+            "float",
+            self.metadata["space_unit"],
+        )
+        self.add_custom_feature(
+            feat_width,
+            "node",
+            pgf.morphology._add_width_and_length,
+            self.data.cell_data.values(),
+            skel_algo=skel_algo,
+            tolerance=tolerance,
+            method_width=method_width,
+            width_ignore_tips=width_ignore_tips,
+        )
+        self.add_custom_feature(
+            feat_length,
+            "node",
+            pgf.morphology._add_length,
+            self.data.cell_data.values(),
+            skel_algo=skel_algo,
+            tolerance=tolerance,
+        )
+
     def add_absolute_age(self, in_time_unit: bool = False) -> None:
         """
         Compute and add the absolute age feature to the cells of the model.

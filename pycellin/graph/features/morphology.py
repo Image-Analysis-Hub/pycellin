@@ -429,7 +429,7 @@ def get_width_and_length(
     return width, length
 
 
-def add_width_and_length(
+def _add_width(
     lineages: list[CellLineage],
     pixel_size: float,
     skel_algo: str = "zhang",
@@ -439,7 +439,7 @@ def add_width_and_length(
 ) -> None:
     for lin in lineages:
         for node in lin.nodes:
-            width, length = get_width_and_length(
+            width, _ = get_width_and_length(
                 node,
                 lin,
                 pixel_size,
@@ -449,6 +449,23 @@ def add_width_and_length(
                 width_ignore_tips=width_ignore_tips,
             )
             lin.nodes[node]["width"] = width
+
+
+def _add_length(
+    lineages: list[CellLineage],
+    pixel_size: float,
+    skel_algo: str = "zhang",
+    tolerance: float = 0.5,
+) -> None:
+    for lin in lineages:
+        for node in lin.nodes:
+            _, length = get_width_and_length(
+                node,
+                lin,
+                pixel_size,
+                skel_algo=skel_algo,
+                tolerance=tolerance,
+            )
             lin.nodes[node]["length"] = length
 
 
