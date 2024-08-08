@@ -18,13 +18,14 @@ from scipy import ndimage as ndi
 from shapely.geometry import Point, LineString
 from skimage.morphology import skeletonize
 
-import pycellin.graph.features as feat
+from pycellin.classes.lineage import CellLineage
 
 # TODO:
 # - remove debug code
 # - always return a value even if weird skeleton shape (but put a warning in that case)
 # - separate width and length. Width only requires skeleton length and the distance
 # transform so I should compute the skeleton in a separate function.
+# - recode every thing and avoid drawing
 
 
 def from_roi_to_array(roi, width, height):
@@ -102,9 +103,9 @@ def from_path_to_line(path, tol):
     return simplified_line
 
 
-def width_and_length(
-    graph: nx.DiGraph,
-    node: int,
+def get_width_and_length(
+    noi: int,
+    lineage: CellLineage,
     pixel_size: float,
     skel_algo: str = "zhang",
     tolerance: float = 0.5,
@@ -118,10 +119,10 @@ def width_and_length(
 
     Parameters
     ----------
-    graph : nx.DiGraph
-        Graph on which to work.
-    node : int
-        Node on which to work.
+    noi : int
+        Node ID (cell_ID) of the cell of interest.
+    lineage : CellLineage
+        Lineage graph containing the node of interest.
     pixel_size : float
         Pixel size in micrometer.
     skel_algo : str, optional
@@ -145,7 +146,7 @@ def width_and_length(
         Width and length of the ROI.
     """
     if debug:
-        print("NODE", node)
+        print("NODE", noi)
         if skel_algo == "zhang":
             not_skel_algo = "lee"
         elif skel_algo == "lee":
@@ -154,7 +155,7 @@ def width_and_length(
     # First we need to reconstruct the image of the object we are working on.
     # This is done by drawing and filling a polygon defined by the points
     # in the ROI list.
-    roi = graph.nodes[node]["ROI_N_POINTS"]
+    roi = lineage.nodes[noi]["ROI_coords"]
     # The coordinates extracted from the graph are in microns, not in pixels.
     # roi = [(int(x * x_resolution), int(y * x_resolution)) for (x, y) in roi]
     roi = [(int(x * 1 / pixel_size), int(y * 1 / pixel_size)) for (x, y) in roi]
@@ -181,7 +182,7 @@ def width_and_length(
         ax[0, 0].imshow(img, cmap="gray")
         ax[0, 0].set_aspect("equal")
         ax[0, 0].axis("off")
-        ax[0, 0].set_title(f"ROI node {node}", fontsize=6)
+        ax[0, 0].set_title(f"ROI node {noi}", fontsize=6)
 
     # Now that we have a numpy array modelling our object, we can compute
     # its distance transform and its skeleton.
@@ -239,17 +240,17 @@ def width_and_length(
         # is probably roundish. The method for mesuring length is not
         # adapted to this kind of morphology.
         try:
-            track_ID = graph.nodes[node]["TRACK_ID"]
+            track_ID = lineage.nodes[noi]["TRACK_ID"]
         except KeyError:
             print(
-                f"WARNING: One pixel skeleton on node {node}! "
+                f"WARNING: One pixel skeleton on node {noi}! "
                 f"The object is probably roundish and the radius "
                 f"is a better metric in that case. Setting the length and "
                 f"width to NaN."
             )
         else:
             print(
-                f"WARNING: One pixel skeleton on node {node} of track "
+                f"WARNING: One pixel skeleton on node {noi} of track "
                 f"{track_ID}! The object is probably roundish and the radius"
                 f" is a better metric in that case. Setting the length and "
                 f"width to NaN."
@@ -261,17 +262,17 @@ def width_and_length(
         # probably roundish. The method for mesuring length is not adapted to
         # this kind of morphology.
         try:
-            track_ID = graph.nodes[node]["TRACK_ID"]
+            track_ID = lineage.nodes[noi]["TRACK_ID"]
         except KeyError:
             print(
-                f"WARNING: One pixel skeleton on node {node}! "
+                f"WARNING: One pixel skeleton on node {noi}! "
                 f"The object is probably roundish and the radius "
                 f"is a better metric in that case. Setting the length and "
                 f"width to NaN."
             )
         else:
             print(
-                f"WARNING: Circular skeleton on node {node} of track "
+                f"WARNING: Circular skeleton on node {noi} of track "
                 f"{track_ID}! The object is probably roundish and the radius "
                 f"is a better metric in that case. Setting the length and "
                 f"width to NaN."
@@ -417,8 +418,8 @@ def width_and_length(
 
             ax[1, 0].remove()
             plt.show()
-            track_ID = graph.nodes[node]["TRACK_ID"]
-            file = f"{debug_folder}/Track{track_ID}_Node{node}_{skel_algo}"
+            lin_id = lineage.nodes[noi]["lineage_ID"]
+            file = f"{debug_folder}/Lineage{lin_id}_Node{noi}_{skel_algo}"
             plt.savefig(file)
             plt.close()
 
@@ -429,68 +430,70 @@ def width_and_length(
 
 
 def add_width_and_length(
-    graph: nx.DiGraph,
+    lineages: list[CellLineage],
     pixel_size: float,
     skel_algo: str = "zhang",
     tolerance: float = 0.5,
     method_width: str = "mean",
     width_ignore_tips: bool = False,
 ) -> None:
-    # Updating the nodes attributes.
-    for n in graph:
-        width, length = width_and_length(
-            graph,
-            n,
-            pixel_size,
-            skel_algo=skel_algo,
-            tolerance=tolerance,
-            method_width=method_width,
-            width_ignore_tips=width_ignore_tips,
-        )
-        graph.nodes[n]["WIDTH"] = width
-        graph.nodes[n]["LENGTH"] = length
-
-    # Updating the graph attributes.
-    graph.graph["Model"]["SpotFeatures"]["WIDTH"] = {
-        "feature": "WIDTH",
-        "name": "Width",
-        "shortname": "Width",
-        "dimension": "LENGTH",
-        "isint": "false",
-    }
-    graph.graph["Model"]["SpotFeatures"]["LENGTH"] = {
-        "feature": "LENGTH",
-        "name": "Length",
-        "shortname": "Length",
-        "dimension": "LENGTH",
-        "isint": "false",
-    }
+    for lin in lineages:
+        for node in lin.nodes:
+            width, length = get_width_and_length(
+                node,
+                lin,
+                pixel_size,
+                skel_algo=skel_algo,
+                tolerance=tolerance,
+                method_width=method_width,
+                width_ignore_tips=width_ignore_tips,
+            )
+            lin.nodes[node]["width"] = width
+            lin.nodes[node]["length"] = length
 
 
-def area_increment(graph: nx.DiGraph, node: int) -> float:
+def get_area_increment(noi: int, lineage: CellLineage) -> float:
+    """
+    Compute the area increment of a node.
+
+    Parameters
+    ----------
+    noi : int
+        Node ID (cell_ID) of the cell of interest.
+    lineage : CellLineage
+        Lineage graph containing the node of interest.
+
+    Returns
+    -------
+    float
+        Area increment of the node.
+    """
+    # TODO: rework: name/definition is not intuitive.
+    # Why specifically between t and t-1? And not t and t+1?
+    # Should give 2 nodes as input and compute the area increment between them.
+    # Or add a parameter to specify if t-1 or t+1.
     # Area of node at t minus area at t-1.
-    predecessors = list(graph.predecessors(node))
+    predecessors = list(lineage.predecessors(noi))
     if len(predecessors) == 0:
         return np.NaN
     else:
         err_mes = (
-            f'Node {node} in track {graph.graph["name"]} has multiple predecessors.'
+            f'Node {noi} in track {lineage.graph["name"]} has multiple predecessors.'
         )
         assert len(predecessors) == 1, err_mes
         # print(predecessors)
-        return graph.nodes[node]["AREA"] - graph.nodes[predecessors[0]]["AREA"]
+        return lineage.nodes[noi]["AREA"] - lineage.nodes[predecessors[0]]["AREA"]
 
 
-def add_area_increment(graph: nx.DiGraph) -> None:
-    # Updating the nodes attributes.
-    for n in graph:
-        graph.nodes[n]["AREA_INCREMENT"] = area_increment(graph, n)
+def _add_area_increment(lineages: list[CellLineage]) -> None:
+    """
+    Add the area increment feature to the nodes of the lineages.
 
-    # Updating the graph attributes.
-    graph.graph["Model"]["SpotFeatures"]["AREA_INCREMENT"] = {
-        "feature": "AREA_INCREMENT",
-        "name": "Area increment",
-        "shortname": "Area increment",
-        "dimension": "AREA",
-        "isint": "false",
-    }
+    Parameters
+    ----------
+    lineages : list[CellLineage]
+        Cell lineages to update with the area increment feature.
+    """
+    for lin in lineages:
+        for node in lin.nodes:
+            lin.nodes[node]["AREA_INCREMENT"] = get_area_increment(node, lin)
