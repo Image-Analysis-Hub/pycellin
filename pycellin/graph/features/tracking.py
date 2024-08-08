@@ -29,7 +29,6 @@ Vocabulary:
   If we take the previous example, the only complete generation is [2, 4, 6].
 """
 
-
 import networkx as nx
 
 from pycellin.classes.lineage import CellLineage, CycleLineage
