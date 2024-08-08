@@ -8,6 +8,8 @@ from igraph import Graph
 import networkx as nx
 import plotly.graph_objects as go
 
+from pycellin.classes.exceptions import LineageStructureError
+
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
     """
@@ -553,38 +555,38 @@ class CellLineage(Lineage):
         else:
             return False
 
-    def get_cousin_cells(
-        self, node: int, max_ancestry_level: int = 0
-    ) -> dict[int, list[int]]:
-        """
-        Return the cousin cells of a given cell.
+    # def get_cousin_cells(
+    #     self, node: int, max_ancestry_level: int = 0
+    # ) -> dict[int, list[int]]:
+    #     """
+    #     Return the cousin cells of a given cell.
 
-        Cousin cells are cells that are on the same frame
-        and share a common ancestor.
+    #     Cousin cells are cells that are on the same frame
+    #     and share a common ancestor.
 
-        Parameters
-        ----------
-        node : int
-            The cell for which to identify the cousin cells.
-        max_ancestry_level : int, optional
-            The maximum level of ancestry to consider. If 0, all ancestry levels
-            are considered. 0 by default.
-        """
-        if self.is_root(node):
-            return []
+    #     Parameters
+    #     ----------
+    #     node : int
+    #         The cell for which to identify the cousin cells.
+    #     max_ancestry_level : int, optional
+    #         The maximum level of ancestry to consider. If 0, all ancestry levels
+    #         are considered. 0 by default.
+    #     """
+    #     if self.is_root(node):
+    #         return []
 
-        candidate_nodes = [
-            n
-            for n in self.nodes()
-            if self.nodes[n]["frame"] == self.nodes[node]["frame"]
-        ]
-        # How to define
-        # ancestors = self.get_ancestors(self.get_root(), node)
-        # ancestor_divs = [a for a in ancestors if self.is_division(a)]
-        # for div in ancestor_divs:
-        #     pass
+    #     candidate_nodes = [
+    #         n
+    #         for n in self.nodes()
+    #         if self.nodes[n]["frame"] == self.nodes[node]["frame"]
+    #     ]
+    #     # How to define
+    #     # ancestors = self.get_ancestors(self.get_root(), node)
+    #     # ancestor_divs = [a for a in ancestors if self.is_division(a)]
+    #     # for div in ancestor_divs:
+    #     #     pass
 
-    def get_sister_cells(self, node: int) -> list[int]:
+    def get_sister_cells(self, noi: int) -> list[int]:
         """
         Return the sister cells of a given cell.
 
@@ -593,22 +595,41 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        node : int
-            The cell for which to identify the sister cells.
+        noi : int
+            Node ID of the cell of interest, for which
+            to find the sister cells.
 
         Returns
         -------
         list[int]
-            The list of sister cells of the given node.
+            The list of node IDs of the sister cells of the given node.
+
+        Raises
+        ------
+        LineageStructureError
+            If the node has more than one parent.
         """
-        # max level, max ancestry level... How to call this?
-        # if self.is_root(node):
-        #     return []
-        # else:
-        #     pass
-        # parent = list(self.predecessors(node))[0]
-        # return list(self.successors(parent))
-        return self.get_cousin_cells(node, 1)
+        sister_cells = []
+        current_frame = self.nodes[noi]["frame"]
+        if not self.is_root(noi):
+            current_cell_cycle = self.get_cell_cycle(noi)
+            parents = list(self.predecessors(current_cell_cycle[0]))
+            if len(parents) == 1:
+                children = list(self.successors(parents[0]))
+                children.remove(current_cell_cycle[0])
+                for child in children:
+                    sister_cell_cycle = self.get_cell_cycle(child)
+                    sister_cells.extend(
+                        [
+                            n
+                            for n in sister_cell_cycle
+                            if self.nodes[n]["frame"] == current_frame
+                        ]
+                    )
+            elif len(parents) > 1:
+                msg = f"Node {noi} has more than 1 parents: it has {len(parents)}."
+                raise LineageStructureError(msg)
+        return sister_cells
 
     def plot(
         self,
