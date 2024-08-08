@@ -165,8 +165,8 @@ class Model:
             ),
         }
         return cell_lineage_feats
-    
-    def get_present_cell_lineage_features(self):
+
+    def get_cell_lineage_features(self):
         """
         Return the cell lineages features present in the model.
 
@@ -212,7 +212,7 @@ class Model:
         }
         return cycle_lineage_feats
 
-    def get_present_cycle_lineage_features(self):
+    def get_cycle_lineage_features(self):
         """
         Return the cycle lineages features present in the model.
 
