@@ -287,6 +287,52 @@ def _add_division_time(lineages: list[CycleLineage], time_step: float = 1) -> No
             lin.nodes[node]["division_time"] = get_division_time(lin, node, time_step)
 
 
+def get_division_rate(
+    lineage: CellLineage | CycleLineage, node: int, time_step: float = 1
+) -> float:
+    """
+    Compute the division rate of a given node.
+
+    Division rate is defined as the number of divisions per time unit.
+    It is the inverse of the division time.
+    It is given in frames by default, but can be converted
+    to the time unit of the model if specified.
+
+    Parameters
+    ----------
+    lineage : CellLineage | CycleLineage
+        Lineage graph containing the node of interest.
+    node : int
+        Node ID of the node of interest.
+    time_step : float, optional
+        Time step between 2 frames, by default 1.
+
+    Returns
+    -------
+    float
+        Division rate of the node.
+    """
+    return 1 / get_division_time(lineage, node, time_step)
+
+
+def _add_division_rate(lineages: list[CycleLineage], time_step: float = 1) -> None:
+    """
+    Compute and add the division rate feature to all the nodes of a list of lineages.
+
+    Parameters
+    ----------
+    lineages : list[CellLineage]
+        Lineage graphs to update with the division rate feature.
+    time_step : float, optional
+        Time step between 2 frames, by default 1.
+    """
+    for lin in lineages:
+        for node in lin.nodes:
+            lin.nodes[node]["division_rate"] = 1 / get_division_time(
+                lin, node, time_step
+            )
+
+
 # ON CELL CYCLE GRAPH
 # def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
 #     """

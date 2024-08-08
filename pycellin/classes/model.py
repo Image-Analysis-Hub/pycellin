@@ -295,6 +295,37 @@ class Model:
             self.metadata["time_step"] if in_time_unit else 1,
         )
 
+    def add_division_rate(self, in_time_unit: bool = False) -> None:
+        """
+        Compute and add the division rate feature to the cell cycles of the model.
+
+        Division rate is defined as the number of divisions per time unit.
+        It is the inverse of the division time.
+        It is given in frames by default, but can be converted
+        to the time unit of the model if specified.
+
+        Parameters
+        ----------
+        in_time_unit : bool, optional
+            True to give the division rate in the time unit of the model,
+            False to give it in frames (default is False).
+        """
+        feat = Feature(
+            "division_rate",
+            "Number of divisions per time unit",
+            "CycleLineage",
+            "Pycellin",
+            "float",
+            self.metadata["time_unit"] if in_time_unit else "frame",
+        )
+        self.add_custom_feature(
+            feat,
+            "node",
+            pgf.tracking._add_division_rate,
+            self.data.cycle_data.values(),
+            self.metadata["time_step"] if in_time_unit else 1,
+        )
+
     def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:
         """
         Add the specified predefined Pycellin feature to the model.
@@ -322,6 +353,7 @@ class Model:
             "relative_age": self.add_relative_age,
             "cell_cycle_completeness": self.add_cell_cycle_completeness,
             "division_time": self.add_division_time,
+            "division_rate": self.add_division_rate,
         }
         try:
             feat_dict[feature_name](**kwargs)
