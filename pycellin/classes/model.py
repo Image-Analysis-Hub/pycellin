@@ -187,7 +187,7 @@ class Model:
         Parameters
         ----------
         in_time_unit : bool, optional
-            True to give the relative age in the time unit of the model,
+            True to give the absolute age in the time unit of the model,
             False to give it in frames (default is False).
         """
         feat = Feature(
@@ -264,27 +264,35 @@ class Model:
             self.data.cycle_data.values(),
         )
 
-    def add_division_time(self) -> None:
+    def add_division_time(self, in_time_unit: bool = False) -> None:
         """
         Compute and add the division time feature to the cell cycles of the model.
 
         The division time of a cell cycle is defined as the difference
         between the absolute ages of the two daughter cells.
+        It is given in frames by default, but can be converted
+        to the time unit of the model if specified.
+
+        Parameters
+        ----------
+        in_time_unit : bool, optional
+            True to give the division time in the time unit of the model,
+            False to give it in frames (default is False).
         """
-        # TODO: add time_unit option
         feat = Feature(
             "division_time",
             "Time elapsed between the birth of a cell and its division",
             "CycleLineage",
             "Pycellin",
-            "int",
-            "none",
+            "float" if in_time_unit else "int",
+            self.metadata["time_unit"] if in_time_unit else "frame",
         )
         self.add_custom_feature(
             feat,
             "node",
             pgf.tracking._add_division_time,
             self.data.cycle_data.values(),
+            self.metadata["time_step"] if in_time_unit else 1,
         )
 
     def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:

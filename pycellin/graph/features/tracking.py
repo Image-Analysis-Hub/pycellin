@@ -239,12 +239,16 @@ def _add_cell_cycle_completeness(lineages: list[CycleLineage]) -> None:
             )
 
 
-def get_division_time(lineage: CellLineage | CycleLineage, node: int) -> int:
+def get_division_time(
+    lineage: CellLineage | CycleLineage, node: int, time_step: float = 1
+) -> int | float:
     """
     Compute the division time of a given node, expressed in frames.
 
     Division time is defined as the number of frames between 2 divisions.
     It is also the length of the cell cycle of the node of interest.
+    It is given in frames by default, but can be converted
+    to the time unit of the model if specified.
 
     Parameters
     ----------
@@ -252,21 +256,22 @@ def get_division_time(lineage: CellLineage | CycleLineage, node: int) -> int:
         Lineage graph containing the node of interest.
     node : int
         Node ID of the node of interest.
+    time_step : float, optional
+        Time step between 2 frames, by default 1.
 
     Returns
     -------
-    int
+    int | float
         Division time of the node, expressed in frames.
     """
     if isinstance(lineage, CellLineage):
         cell_cycle = lineage.get_cell_cycle(node)
-        return len(cell_cycle)
+        return len(cell_cycle) * time_step
     elif isinstance(lineage, CycleLineage):
-        # It's the same as the cell cycle length / duration...
-        return lineage.nodes[node]["duration"]
+        return lineage.nodes[node]["length"] * time_step
 
 
-def _add_division_time(lineages: list[CycleLineage]) -> None:
+def _add_division_time(lineages: list[CycleLineage], time_step: float = 1) -> None:
     """
     Compute and add the division time feature to all the nodes of a list of lineages.
 
@@ -274,10 +279,12 @@ def _add_division_time(lineages: list[CycleLineage]) -> None:
     ----------
     lineages : list[CellLineage]
         Lineage graphs to update with the relative age feature.
+    time_step : float, optional
+        Time step between 2 frames, by default 1.
     """
     for lin in lineages:
         for node in lin.nodes:
-            lin.nodes[node]["division_time"] = get_division_time(lin, node)
+            lin.nodes[node]["division_time"] = get_division_time(lin, node, time_step)
 
 
 # ON CELL CYCLE GRAPH
