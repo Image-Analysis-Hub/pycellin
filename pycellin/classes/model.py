@@ -148,6 +148,52 @@ class Model:
         """
         return self.metadata["time_step"]
 
+    def get_pycellin_cycle_lineage_features(self) -> dict[str, str]:
+        """
+        Return the Pycellin features that can be computed on cycle lineages.
+
+        Returns
+        -------
+        dict[str, str]
+            Dictionary of features of the cycle lineages,
+            with features name as keys and features description as values.
+        """
+        cycle_lineage_feats = {
+            "cell_cycle_completeness": (
+                "Completeness of the cell cycle, "
+                "i.e. does it start and end with a division"
+            ),
+            "division_time": (
+                "Time elapsed between the birth of a cell and its division"
+            ),
+            "division_rate": "Number of divisions per time unit",
+        }
+        return cycle_lineage_feats
+
+    def get_present_cycle_lineage_features(self):
+        """
+        Return the cycle lineages features present in the model.
+
+        Returns
+        -------
+        list[str]
+            List of the names of the cycle lineages features present in the model.
+        """
+        cycle_lineage_feats = []
+        for feat_dict in [
+            self.feat_declaration.node_feats,
+            self.feat_declaration.edge_feats,
+            self.feat_declaration.lin_feats,
+        ]:
+            cycle_lineage_feats.extend(
+                [
+                    feat.name
+                    for feat in feat_dict.values()
+                    if feat.lineage_type == "CycleLineage"
+                ]
+            )
+        return cycle_lineage_feats
+
     def add_custom_feature(
         self,
         feat: Feature,
@@ -348,6 +394,15 @@ class Model:
         KeyError
             If the feature is not a predefined feature of Pycellin.
         """
+        if (
+            feature_name in self.get_pycellin_cycle_lineage_features()
+            and not self.data.cycle_data
+        ):
+            raise ValueError(
+                f"Feature {feature_name} is a feature of cycle lineages, "
+                "but the cycle lineages have not been computed yet. "
+                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+            )
         feat_dict = {
             "absolute_age": self.add_absolute_age,
             "relative_age": self.add_relative_age,
