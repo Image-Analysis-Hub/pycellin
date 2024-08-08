@@ -29,14 +29,10 @@ Vocabulary:
   If we take the previous example, the only complete generation is [2, 4, 6].
 """
 
-from typing import Literal, Optional
 
 import networkx as nx
 
-from pycellin.classes.lineage import CellLineage, CycleLineage, Lineage
-
-# from pycellin.graph import lineage as lin
-# import pycellin.graph.features as feat
+from pycellin.classes.lineage import CellLineage, CycleLineage
 
 
 def get_absolute_age(
@@ -137,54 +133,6 @@ def _add_relative_age(lineages: list[CellLineage], time_step: float = 1) -> None
     for lin in lineages:
         for node in lin.nodes:
             lin.nodes[node]["relative_age"] = get_relative_age(lin, node, time_step)
-
-
-# ON CELL CYCLE GRAPH
-# def generation_level(graph: nx.DiGraph, node: int) -> int:
-#     """
-#     Compute the generation level of a given node.
-
-#     Generation level is defined by how ancient the generation is,
-#     i.e. how many divisions there was upstream.
-
-#     Parameters
-#     ----------
-#     graph : nx.DiGraph
-#         Graph containing the node of interest.
-#     node : int
-#         Node ID of the node of interest.
-
-#     Returns
-#     -------
-#     int
-#         Generation level of the node.
-#     """
-#     divisions = [n for n in nx.ancestors(graph, node) if graph.out_degree(n) > 1]
-#     return len(divisions)
-
-# ON CELL CYCLE GRAPH
-# def add_generation_level(graph: nx.DiGraph) -> None:
-#     """
-#     Add the generation level feature to the nodes of a graph.
-
-#     Parameters
-#     ----------
-#     graph : nx.DiGraph
-#         Graph to process.
-#     """
-#     feat.add_custom_attr(
-#         graph,
-#         "node",
-#         "GEN_LVL",
-#         "Generation level",
-#         "Gen. lvl",
-#         "NONE",
-#         "true",
-#         feat.apply_on_nodes,
-#         graph,
-#         "GEN_LVL",
-#         generation_level,
-#     )
 
 
 def get_cell_cycle_completeness(lineage: CellLineage | CycleLineage, node: int) -> bool:
@@ -332,63 +280,6 @@ def _add_division_rate(lineages: list[CycleLineage], time_step: float = 1) -> No
                 lin, node, time_step
             )
 
-
-# ON CELL CYCLE GRAPH
-# def generation_ID(graph: nx.DiGraph, node: int) -> Optional[str]:
-#     """
-#     Compute the generation ID of a given node.
-
-#     It is defined as {track_ID}_{generation_last_node} to ensure uniqueness.
-
-#     Parameters
-#     ----------
-#     graph : nx.DiGraph
-#         Graph containing the node of interest.
-#     node : int
-#         Node ID of the node of interest.
-
-#     Returns
-#     -------
-#     Optional[str]
-#         Generation ID of the given node.
-#     """
-#     try:
-#         track_ID = graph.nodes[node]["TRACK_ID"]
-#     except KeyError as err:
-#         print(err, f"Has a tracking been done on node {node}?")
-#     else:
-#         gen_end_node = lin.get_generation(graph, node)[-1]
-#         gen_ID = f"{track_ID}_{gen_end_node}"
-#         return gen_ID
-
-# ON CELL CYCLE GRAPH
-# def add_generation_ID(graph: nx.DiGraph) -> None:
-#     """
-#     Add the generation ID feature to the nodes of a graph.
-
-#     Notes
-#     -----
-#     This feature is currently not compatible with TrackMate and thus will not
-#     carry over the XML file. TrackMate do not support string features.
-
-#     Parameters
-#     ----------
-#     graph : nx.DiGraph
-#         Graph to process.
-#     """
-#     feat.add_custom_attr(
-#         graph,
-#         "node",
-#         "GEN_ID",
-#         "Generation ID",
-#         "Gen. ID",
-#         "NONE",
-#         "false",
-#         feat.apply_on_nodes,
-#         graph,
-#         "GEN_ID",
-#         generation_ID,
-#     )
 
 # def cell_phase(
 #     graph: nx.DiGraph, node: int, generation: Optional[list[int]] = None
