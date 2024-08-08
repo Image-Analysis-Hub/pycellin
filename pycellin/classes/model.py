@@ -148,6 +148,48 @@ class Model:
         """
         return self.metadata["time_step"]
 
+    def get_pycellin_cell_lineage_features(self) -> dict[str, str]:
+        """
+        Return the Pycellin features that can be computed on cell lineages.
+
+        Returns
+        -------
+        dict[str, str]
+            Dictionary of features of the cell lineages,
+            with features name as keys and features description as values.
+        """
+        cell_lineage_feats = {
+            "absolute_age": "Age of the cell since the beginning of the lineage",
+            "relative_age": (
+                "Age of the cell since the beginning of the current cell cycle"
+            ),
+        }
+        return cell_lineage_feats
+    
+    def get_present_cell_lineage_features(self):
+        """
+        Return the cell lineages features present in the model.
+
+        Returns
+        -------
+        list[str]
+            List of the names of the cell lineages features present in the model.
+        """
+        cell_lineage_feats = []
+        for feat_dict in [
+            self.feat_declaration.node_feats,
+            self.feat_declaration.edge_feats,
+            self.feat_declaration.lin_feats,
+        ]:
+            cell_lineage_feats.extend(
+                [
+                    feat.name
+                    for feat in feat_dict.values()
+                    if feat.lineage_type == "CellLineage"
+                ]
+            )
+        return cell_lineage_feats
+
     def get_pycellin_cycle_lineage_features(self) -> dict[str, str]:
         """
         Return the Pycellin features that can be computed on cycle lineages.
@@ -270,7 +312,7 @@ class Model:
         """
         feat = Feature(
             "relative_age",
-            "Age of the cell since the beginning of current cell cycle",
+            "Age of the cell since the beginning of the current cell cycle",
             "CellLineage",
             "Pycellin",
             "float" if in_time_unit else "int",
