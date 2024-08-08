@@ -35,7 +35,7 @@ from pycellin.classes.lineage import CellLineage, CycleLineage
 
 
 def get_absolute_age(
-    lineage: CellLineage, node: int, time_step: float = 1
+    noi: int, lineage: CellLineage, time_step: float = 1
 ) -> int | float:
     """
     Compute the absolute age of a given node.
@@ -47,10 +47,10 @@ def get_absolute_age(
 
     Parameters
     ----------
+    noi : int
+        Node ID (cell_ID) of the cell of interest.
     lineage : CellLineage
         Lineage graph containing the node of interest.
-    node : int
-        Node ID (cell_ID) of the node of interest.
     time_step : float, optional
         Time step between 2 frames, by default 1.
 
@@ -59,7 +59,7 @@ def get_absolute_age(
     int | float
         Absolute age of the node.
     """
-    return len(nx.ancestors(lineage, node)) * time_step
+    return len(nx.ancestors(lineage, noi)) * time_step
 
 
 def _add_absolute_age(lineages: list[CellLineage], time_step: float = 1) -> None:
@@ -75,12 +75,12 @@ def _add_absolute_age(lineages: list[CellLineage], time_step: float = 1) -> None
     """
     for lin in lineages:
         for node in lin.nodes:
-            lin.nodes[node]["absolute_age"] = get_absolute_age(lin, node, time_step)
+            lin.nodes[node]["absolute_age"] = get_absolute_age(node, lin, time_step)
 
 
 def get_relative_age(
+    noi: int,
     lineage: CellLineage,
-    node: int,
     time_step: float = 1,
     cell_cycle: list[int] | None = None,
 ) -> int | float:
@@ -95,10 +95,10 @@ def get_relative_age(
 
     Parameters
     ----------
+    noi : int
+        Node ID (cell_ID) of the cell of interest.
     lineage : CellLineage
         Lineage graph containing the node of interest.
-    node : int
-        Node ID (cell_ID) of the node of interest.
     time_step : float, optional
         Time step between 2 frames, by default 1.
     cell_cycle : list[int] | None, optional
@@ -112,10 +112,10 @@ def get_relative_age(
         Relative age of the node.
     """
     if cell_cycle is not None:
-        assert node in cell_cycle
+        assert noi in cell_cycle
     else:
-        cell_cycle = lineage.get_cell_cycle(node)
-    return cell_cycle.index(node) * time_step
+        cell_cycle = lineage.get_cell_cycle(noi)
+    return cell_cycle.index(noi) * time_step
 
 
 def _add_relative_age(lineages: list[CellLineage], time_step: float = 1) -> None:
@@ -131,10 +131,10 @@ def _add_relative_age(lineages: list[CellLineage], time_step: float = 1) -> None
     """
     for lin in lineages:
         for node in lin.nodes:
-            lin.nodes[node]["relative_age"] = get_relative_age(lin, node, time_step)
+            lin.nodes[node]["relative_age"] = get_relative_age(node, lin, time_step)
 
 
-def get_cell_cycle_completeness(lineage: CellLineage | CycleLineage, node: int) -> bool:
+def get_cell_cycle_completeness(noi: int, lineage: CellLineage | CycleLineage) -> bool:
     """
     Compute the cell cycle completeness of a given node.
 
@@ -147,10 +147,10 @@ def get_cell_cycle_completeness(lineage: CellLineage | CycleLineage, node: int) 
 
     Parameters
     ----------
+    noi : int
+        Node ID (cell_ID) of the cell of interest.
     lineage: CellLineage | CycleLineage
         Lineage graph containing the node of interest.
-    node : int
-        Node ID of the node of interest.
 
     Returns
     -------
@@ -158,13 +158,13 @@ def get_cell_cycle_completeness(lineage: CellLineage | CycleLineage, node: int) 
         True if the cell cycle is complete, False otherwise.
     """
     if isinstance(lineage, CellLineage):
-        cell_cycle = lineage.get_cell_cycle(node)
+        cell_cycle = lineage.get_cell_cycle(noi)
         if lineage.is_root(cell_cycle[0]) or lineage.is_leaf(cell_cycle[-1]):
             return False
         else:
             return True
     elif isinstance(lineage, CycleLineage):
-        if lineage.is_root(node) or lineage.is_leaf(node):
+        if lineage.is_root(noi) or lineage.is_leaf(noi):
             return False
         else:
             return True
@@ -182,12 +182,12 @@ def _add_cell_cycle_completeness(lineages: list[CycleLineage]) -> None:
     for lin in lineages:
         for node in lin.nodes:
             lin.nodes[node]["cell_cycle_completeness"] = get_cell_cycle_completeness(
-                lin, node
+                node, lin
             )
 
 
 def get_division_time(
-    lineage: CellLineage | CycleLineage, node: int, time_step: float = 1
+    noi: int, lineage: CellLineage | CycleLineage, time_step: float = 1
 ) -> int | float:
     """
     Compute the division time of a given node, expressed in frames.
@@ -199,10 +199,10 @@ def get_division_time(
 
     Parameters
     ----------
+    noi : int
+        Node ID (cell_ID) of the cell of interest.
     lineage : CellLineage | CycleLineage
         Lineage graph containing the node of interest.
-    node : int
-        Node ID of the node of interest.
     time_step : float, optional
         Time step between 2 frames, by default 1.
 
@@ -212,10 +212,10 @@ def get_division_time(
         Division time of the node, expressed in frames.
     """
     if isinstance(lineage, CellLineage):
-        cell_cycle = lineage.get_cell_cycle(node)
+        cell_cycle = lineage.get_cell_cycle(noi)
         return len(cell_cycle) * time_step
     elif isinstance(lineage, CycleLineage):
-        return lineage.nodes[node]["length"] * time_step
+        return lineage.nodes[noi]["length"] * time_step
 
 
 def _add_division_time(lineages: list[CycleLineage], time_step: float = 1) -> None:
@@ -231,11 +231,11 @@ def _add_division_time(lineages: list[CycleLineage], time_step: float = 1) -> No
     """
     for lin in lineages:
         for node in lin.nodes:
-            lin.nodes[node]["division_time"] = get_division_time(lin, node, time_step)
+            lin.nodes[node]["division_time"] = get_division_time(node, lin, time_step)
 
 
 def get_division_rate(
-    lineage: CellLineage | CycleLineage, node: int, time_step: float = 1
+    noi: int, lineage: CellLineage | CycleLineage, time_step: float = 1
 ) -> float:
     """
     Compute the division rate of a given node.
@@ -247,10 +247,10 @@ def get_division_rate(
 
     Parameters
     ----------
+    noi : int
+        Node ID (cell_ID) of the cell of interest.
     lineage : CellLineage | CycleLineage
         Lineage graph containing the node of interest.
-    node : int
-        Node ID of the node of interest.
     time_step : float, optional
         Time step between 2 frames, by default 1.
 
@@ -259,7 +259,7 @@ def get_division_rate(
     float
         Division rate of the node.
     """
-    return 1 / get_division_time(lineage, node, time_step)
+    return 1 / get_division_time(noi, lineage, time_step)
 
 
 def _add_division_rate(lineages: list[CycleLineage], time_step: float = 1) -> None:
@@ -276,7 +276,7 @@ def _add_division_rate(lineages: list[CycleLineage], time_step: float = 1) -> No
     for lin in lineages:
         for node in lin.nodes:
             lin.nodes[node]["division_rate"] = 1 / get_division_time(
-                lin, node, time_step
+                node, lin, time_step
             )
 
 
