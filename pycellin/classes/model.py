@@ -126,6 +126,17 @@ class Model:
         """
         return self.metadata["space_unit"]
 
+    def get_pixel_size(self) -> dict[str, float]:
+        """
+        Return the pixel size of the model.
+
+        Returns
+        -------
+        dict[str, float]
+            The pixel size of the model.
+        """
+        return self.metadata["pixel_size"]
+
     def get_time_unit(self) -> str:
         """
         Return the temporal unit of the model.
