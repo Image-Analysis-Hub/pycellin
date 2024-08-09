@@ -1018,7 +1018,7 @@ def _get_trackmate_version(
             return version
 
 
-def get_time_step(settings: ET._Element) -> float:
+def _get_time_step(settings: ET._Element) -> float:
     """
     Extract the time step of the TrackMate model.
 
@@ -1030,7 +1030,7 @@ def get_time_step(settings: ET._Element) -> float:
     Returns
     -------
     float
-        The time step of the TrackMate model.
+        The time step in the TrackMate model.
 
     Raises
     ------
@@ -1050,8 +1050,54 @@ def get_time_step(settings: ET._Element) -> float:
                 )
             except ValueError:
                 raise ValueError(
-                    "The 'timeinterval' attribute cannot " "be converted to float."
+                    "The 'timeinterval' attribute cannot be converted to float."
                 )
+
+    raise KeyError("The 'ImageData' element is not found in the settings.")
+
+
+def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
+    """
+    Extract the pixel size of the TrackMate model.
+
+    Parameters
+    ----------
+    settings : ET._Element
+        The XML element containing the settings of the TrackMate model.
+
+    Returns
+    -------
+    dict[str, float]
+        The pixel width and heigth in the TrackMate model.
+
+    Raises
+    ------
+    ValueError
+        If the 'pixelwidth', 'pixelheight' or 'voxeldepth' attribute
+        cannot be converted to float.
+    KeyError
+        If the 'pixelwidth', 'pixelheight' or 'voxeldepth' attribute is missing,
+        or if the 'ImageData' element is not found in the settings.
+    """
+    for element in settings.iterchildren():
+        if element.tag == "ImageData":
+            pixel_size = {}
+            for key_TM, key_pycellin in zip(
+                ["pixelwidth", "pixelheight", "voxeldepth"],
+                ["width", "height", "depth"],
+            ):
+                try:
+                    pixel_size[key_pycellin] = float(element.attrib[key_TM])
+                except KeyError:
+                    raise KeyError(
+                        f"The {key_TM} attribute is missing "
+                        "in the 'ImageData' element."
+                    )
+                except ValueError:
+                    raise ValueError(
+                        "The {key_TM} attribute cannot be converted to float."
+                    )
+            return pixel_size
 
     raise KeyError("The 'ImageData' element is not found in the settings.")
 
@@ -1108,7 +1154,8 @@ def load_TrackMate_XML(
     for tag_name, tag in dict_tags.items():
         element_string = ET.tostring(tag, encoding="utf-8").decode()
         metadata[tag_name] = element_string
-    metadata["time_step"] = get_time_step(dict_tags["Settings"])
+    metadata["time_step"] = _get_time_step(dict_tags["Settings"])
+    metadata["pixel_size"] = _get_pixel_size(dict_tags["Settings"])
 
     model = Model(metadata, feat_declaration, data)
     return model
