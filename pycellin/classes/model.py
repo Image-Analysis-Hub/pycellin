@@ -274,7 +274,7 @@ class Model:
         self.feat_declaration._add_feature(feat, feat_type)
         func(*args, **kwargs)
 
-    def add_width_and_lenght(
+    def add_width_and_length(
         self,
         skel_algo: str = "zhang",
         tolerance: float = 0.5,
@@ -284,7 +284,7 @@ class Model:
         """
         Compute and add the width and length features to the cells of the model.
         """
-        # TODO: deal with pixel size
+        # Updating the features declaration.
         feat_width = Feature(
             "width",
             "Width of the cell",
@@ -301,24 +301,26 @@ class Model:
             "float",
             self.metadata["space_unit"],
         )
-        self.add_custom_feature(
-            feat_width,
-            "node",
-            pgf.morphology._add_width_and_length,
-            self.data.cell_data.values(),
-            skel_algo=skel_algo,
-            tolerance=tolerance,
-            method_width=method_width,
-            width_ignore_tips=width_ignore_tips,
-        )
-        self.add_custom_feature(
-            feat_length,
-            "node",
-            pgf.morphology._add_length,
-            self.data.cell_data.values(),
-            skel_algo=skel_algo,
-            tolerance=tolerance,
-        )
+        self.feat_declaration._add_features([feat_width, feat_length], ["node"] * 2)
+
+        # Computing the features values.
+        assert (
+            self.metadata["pixel_size"]["width"]
+            == self.metadata["pixel_size"]["height"]
+        ), "Pixel size should be the same for width and height."
+        for lin in self.data.cell_data.values():
+            for node in lin.nodes:
+                width, length = pgf.get_width_and_length(
+                    node,
+                    lin,
+                    self.metadata["pixel_size"]["width"],
+                    skel_algo=skel_algo,
+                    tolerance=tolerance,
+                    method_width=method_width,
+                    width_ignore_tips=width_ignore_tips,
+                )
+                lin.nodes[node]["width"] = width
+                lin.nodes[node]["length"] = length
 
     def add_absolute_age(self, in_time_unit: bool = False) -> None:
         """
