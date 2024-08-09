@@ -698,6 +698,10 @@ def _update_features_declaration(
         "cell_ID", "Unique identifier of the cell", "node"
     )
     feat_declaration._rename_feature("FRAME", "frame", "node")
+    feat_declaration._rename_feature("AREA", "area", "node")
+    feat_declaration._modify_feature_description(
+        "area", "Area of the cell", "node"
+    )
 
     # Edge features.
     feat_declaration._remove_features(
@@ -936,6 +940,7 @@ def _parse_model_tag(
         for key_name, new_key in [
             ("ID", "cell_ID"),
             ("FRAME", "frame"),
+            ("AREA", "area"),
         ]:
             _update_node_feature_key(lin, key_name, new_key)
         _update_TRACK_ID(lin)
@@ -1181,15 +1186,17 @@ if __name__ == "__main__":
 
     model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
     # print(model.metadata)
-    # print(model.feat_declaration)
+    print(model.feat_declaration.node_feats)
     # print(model.data)
-
+    
     lineage = model.data.cell_data[0]
-    print(lineage, type(lineage))
-    # print(lin.nodes)
-    closest_cells = model.data.get_closest_cells(2046, lineage)
-    for cell, lin in closest_cells:
-        print(math.dist(lineage.nodes[2046]["location"], lin.nodes[cell]["location"]))
+
+
+    # print(lineage, type(lineage))
+    # # print(lin.nodes)
+    # closest_cells = model.data.get_closest_cells(2046, lineage)
+    # for cell, lin in closest_cells:
+    #     print(math.dist(lineage.nodes[2046]["location"], lin.nodes[cell]["location"]))
 
     # for id, lin in model.data.cell_data.items():
     #     print(f"ID: {id} - {lin}")
