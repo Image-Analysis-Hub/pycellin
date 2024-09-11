@@ -33,6 +33,7 @@ def _create_metadata(
     """
     metadata = {}
     metadata["name"] = Path(file_path).stem
+    metadata["file_location"] = file_path
     metadata["provenance"] = "CTC"
     metadata["date"] = datetime.now()
     metadata["time_unit"] = "frame"

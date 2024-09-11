@@ -699,9 +699,7 @@ def _update_features_declaration(
     )
     feat_declaration._rename_feature("FRAME", "frame", "node")
     feat_declaration._rename_feature("AREA", "area", "node")
-    feat_declaration._modify_feature_description(
-        "area", "Area of the cell", "node"
-    )
+    feat_declaration._modify_feature_description("area", "Area of the cell", "node")
 
     # Edge features.
     feat_declaration._remove_features(
@@ -1147,6 +1145,7 @@ def load_TrackMate_XML(
     # TrackMate XML `Model` tag.
     metadata = {}
     metadata["name"] = Path(xml_path).stem
+    metadata["file_location"] = xml_path
     metadata["provenance"] = "TrackMate"
     metadata["date"] = datetime.now()
     metadata["space_unit"] = units["spatialunits"]
@@ -1188,9 +1187,8 @@ if __name__ == "__main__":
     # print(model.metadata)
     print(model.feat_declaration.node_feats)
     # print(model.data)
-    
-    lineage = model.data.cell_data[0]
 
+    lineage = model.data.cell_data[0]
 
     # print(lineage, type(lineage))
     # # print(lin.nodes)
