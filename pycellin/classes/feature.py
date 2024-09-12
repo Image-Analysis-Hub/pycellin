@@ -266,7 +266,7 @@ class FeaturesDeclaration:
             **common_fields,
         )
         feat_length = Feature(
-            name="cell_cycle_length",
+            name="cycle_length",
             description="Number of cells in the cell cycle.",
             **common_fields,
         )

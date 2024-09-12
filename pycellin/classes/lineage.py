@@ -739,7 +739,7 @@ class CycleLineage(Lineage):
             for n in divs + leaves:
                 self.nodes[n]["cycle_ID"] = n
                 self.nodes[n]["cells"] = cell_lineage.get_cell_cycle(n)
-                self.nodes[n]["length"] = len(self.nodes[n]["cells"])
+                self.nodes[n]["cycle_length"] = len(self.nodes[n]["cells"])
                 self.nodes[n]["level"] = nx.shortest_path_length(
                     self, self.get_root(), n
                 )

@@ -215,7 +215,7 @@ def get_division_time(
         cell_cycle = lineage.get_cell_cycle(noi)
         return len(cell_cycle) * time_step
     elif isinstance(lineage, CycleLineage):
-        return lineage.nodes[noi]["length"] * time_step
+        return lineage.nodes[noi]["cycle_length"] * time_step
 
 
 def _add_division_time(lineages: list[CycleLineage], time_step: float = 1) -> None:
