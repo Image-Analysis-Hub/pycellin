@@ -4,7 +4,9 @@
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from pkg_resources import get_distribution
+
+# from pkg_resources import get_distribution => deprecated
+# from importlib.metadata import version
 from typing import Any
 
 from lxml import etree as ET
@@ -1150,7 +1152,11 @@ def load_TrackMate_XML(
     metadata["date"] = datetime.now()
     metadata["space_unit"] = units["spatialunits"]
     metadata["time_unit"] = units["timeunits"]
-    metadata["pycellin_version"] = get_distribution("pycellin").version
+    # metadata["pycellin_version"] = get_distribution("pycellin").version
+    # metadata["pycellin_version"] = version("pycellin")
+    metadata["pycellin_version"] = "0.2.0"
+    # TODO: see how to get the version of the package.
+    # Maybe by using the toml created by Stephane?
     metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
     dict_tags = _get_specific_tags(
         xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
