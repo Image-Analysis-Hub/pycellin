@@ -138,7 +138,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         Check if a given node is a root node.
 
         The root is defined as the first node of the lineage temporally speaking,
-        i.e. the node with no incoming edges and at least one outgoing edge.
+        i.e. the node with no incoming edges.
 
         Parameters
         ----------
@@ -150,7 +150,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         bool
             True if the node is a root node, False otherwise.
         """
-        if self.in_degree(node) == 0 and self.out_degree(node) != 0:
+        if self.in_degree(node) == 0:
             return True
         else:
             return False
@@ -159,8 +159,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         Check if a given node is a leaf node.
 
-        A leaf node is defined as a node with at least one incoming edge
-        and no outgoing edges.
+        A leaf node is defined as a node with no outgoing edges.
 
         Parameters
         ----------
@@ -172,7 +171,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         bool
             True if the node is a leaf node, False otherwise.
         """
-        if self.in_degree(node) != 0 and self.out_degree(node) == 0:
+        if self.out_degree(node) == 0:
             return True
         else:
             return False
