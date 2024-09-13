@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from itertools import chain
-from typing import Literal, Optional
+from typing import Literal
 
 
 class Feature:
@@ -15,7 +15,7 @@ class Feature:
         lineage_type: Literal["CellLineage", "CycleLineage"],
         provenance: str,
         data_type: str,
-        unit: Optional[str] = None,
+        unit: str | None = None,
     ) -> None:
         """
         Constructs all the necessary attributes for the Feature object.
@@ -34,7 +34,7 @@ class Feature:
         data_type : str
             The data type of the feature (int, float, string).
         unit : str, optional
-            The unit of the feature (default is None).
+            The unit of the feature (e.g. µm, min, cell).
         """
         self.name = name
         self.description = description
@@ -169,7 +169,7 @@ class FeaturesDeclaration:
             f"Lineage features: {lineage_features}"
         )
 
-    def has_feature(self, feature_name: str, feature_type: Optional[str]) -> bool:
+    def has_feature(self, feature_name: str, feature_type: str | None) -> bool:
         """
         Check if the FeaturesDeclaration contains the specified feature.
 
