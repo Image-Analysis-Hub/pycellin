@@ -106,13 +106,35 @@ class FeaturesDeclaration:
 
     def __init__(
         self,
-        node_features: dict = {},
-        edge_features: dict = {},
-        lineage_features: dict = {},
+        node_features: dict[str, Feature] | None = None,
+        edge_features: dict[str, Feature] | None = None,
+        lineage_features: dict[str, Feature] | None = None,
     ) -> None:
-        self.node_feats = node_features
-        self.edge_feats = edge_features
-        self.lin_feats = lineage_features
+        self.node_feats = node_features if node_features else {}
+        self.edge_feats = edge_features if edge_features else {}
+        self.lin_feats = lineage_features if lineage_features else {}
+
+        # TODO: are the versions below a better way?
+
+        # if node_features is None:
+        #     node_features = {}
+        # else:
+        #     self.node_feats = node_features
+        # if edge_features is None:
+        #     edge_features = {}
+        # else:
+        #     self.edge_feats = edge_features
+        # if lineage_features is None:
+        #     lineage_features = {}
+        # else:
+        #     self.lin_feats = lineage_features
+
+        # if node_features is not None:
+        #     self.node_feats = node_features
+        # if edge_features is not None:
+        #     self.edge_feats = edge_features
+        # if lineage_features is not None:
+        #     self.lin_feats = lineage_features
 
     def __repr__(self) -> str:
         """
@@ -186,6 +208,7 @@ class FeaturesDeclaration:
             If the feature type is invalid.
         """
         # TODO: use literals instead of strings for feature types
+        # TODO: should I raise an error if no node_feats, edge_feats, or lin_feats?
         match feature_type:
             case "node":
                 return self.node_feats
@@ -219,12 +242,12 @@ class FeaturesDeclaration:
         except ValueError as e:
             raise ValueError(e)
 
-        if feature.name in dict_feats:
-            raise ValueError(
-                f"A Feature called {feature.name} already exists in "
-                f"{feature_type} features."
-            )
-
+        if dict_feats:
+            if feature.name in dict_feats:
+                raise ValueError(
+                    f"A Feature called {feature.name} already exists in "
+                    f"{feature_type} features."
+                )
         dict_feats[feature.name] = feature
 
     def _add_features(self, features: list[Feature], feature_types: list[str]) -> None:
