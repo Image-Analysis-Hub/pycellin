@@ -247,6 +247,40 @@ class Model:
             )
         return cycle_lineage_feats
 
+    def add_lineage(self, lineage: CellLineage, with_CycleLineage: bool = True) -> None:
+        """
+        Add a lineage to the model.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage to add.
+        with_CycleLineage : bool, optional
+            True to compute the cycle lineage, False otherwise (default is True).
+        """
+        # TODO: implement this method
+        pass
+
+    def remove_lineage(self, lineage_ID: int) -> CellLineage:
+        """
+        Remove the specified lineage from the model.
+
+        Parameters
+        ----------
+        lineage_id : int
+            ID of the lineage to remove.
+
+        Returns
+        -------
+        CellLineage
+            The removed lineage.
+        """
+        # TODO: implement this method
+        # Also need to remove the associated CycleLineage.
+        # Is there a use case for removing the CycleLineage only?
+        # Or removing just the CellLineage?
+        pass
+
     def add_custom_feature(
         self,
         feat: Feature,
