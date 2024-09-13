@@ -15,7 +15,7 @@ class Model:
 
     def __init__(
         self,
-        metadata: dict[str, Any] = None,
+        metadata: dict[str, Any] | None = None,
         feat_declaration: FeaturesDeclaration = None,
         data: Data = None,
     ) -> None:
@@ -24,7 +24,7 @@ class Model:
 
         Parameters
         ----------
-        metadata : dict[str, Any], optional
+        metadata : dict[str, Any] | None, optional
             Metadata of the model (default is None).
         feat_declaration : FeaturesDeclaration, optional
             The declaration of the features present in the model (default is None).
