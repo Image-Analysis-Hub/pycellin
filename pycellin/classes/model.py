@@ -297,7 +297,7 @@ class Model:
             lineage = self.data.cell_data.pop(lineage_ID)
         except KeyError:
             raise KeyError(f"Lineage with ID {lineage_ID} does not exist.")
-        if lineage_ID in self.data.cycle_data:
+        if self.data.cycle_data and lineage_ID in self.data.cycle_data:
             self.data.cycle_data.pop(lineage_ID)
         return lineage
 
@@ -633,7 +633,7 @@ class Model:
         """
         Compute and add the cycle lineages of the model.
         """
-        self.data._compute_cycle_lineage()
+        self.data._add_cycle_lineages()
         self.feat_declaration._add_cycle_lineage_features()
 
     def save_to_pickle(
