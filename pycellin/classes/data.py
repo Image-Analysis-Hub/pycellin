@@ -21,13 +21,37 @@ class Data:
         else:
             self.cycle_data = None
 
-    def _compute_cycle_lineages(self) -> None:
+    def _add_cycle_lineages(self, lineage_IDs: list[int] | None = None) -> None:
         """
-        Compute the cell cycle lineages from the cell lineages.
+        Add the cell cycle lineages from the cell lineages.
+
+        Parameters
+        ----------
+        lineage_IDs : list[int], optional
+            The IDs of the lineages to compute the cycle lineages for,
+            by default None i.e. all lineages.
         """
+        if lineage_IDs is None:
+            lineage_IDs = list(self.cell_data.keys())
         self.cycle_data = {
-            lin_id: CycleLineage(lin) for lin_id, lin in self.cell_data.items()
+            lin_id: self._compute_cycle_lineage(lin_id) for lin_id in lineage_IDs
         }
+
+    def _compute_cycle_lineage(self, lineage_ID: int) -> CycleLineage:
+        """
+        Compute and return the cycle lineage corresponding to a given cell lineage.
+
+        Parameters
+        ----------
+        lineage_ID : int
+            The ID of the cell lineage.
+
+        Returns
+        -------
+        CycleLineage
+            The cycle lineage corresponding to the cell lineage.
+        """
+        return CycleLineage(self.cell_data[lineage_ID])
 
     def number_of_lineages(self) -> int:
         """
