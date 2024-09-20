@@ -257,6 +257,11 @@ class Model:
             Lineage to add.
         with_CycleLineage : bool, optional
             True to compute the cycle lineage, False otherwise (default is True).
+
+        Raises
+        ------
+        KeyError
+            If the lineage does not have a lineage_ID.
         """
         try:
             lin_ID = lineage.graph["lineage_ID"]
@@ -281,6 +286,12 @@ class Model:
         -------
         CellLineage
             The removed lineage.
+
+        Raises
+        ------
+        KeyError
+            If the lineage with the specified ID does not
+            exist in the model.
         """
         try:
             lineage = self.data.cell_data.pop(lineage_ID)
