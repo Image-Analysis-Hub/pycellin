@@ -602,6 +602,11 @@ class Model:
         ----------
         feature_name : str
             Name of the feature to recompute.
+
+        Raises
+        ------
+        ValueError
+            If the feature does not exist.
         """
         # First need to check if the feature exists.
         if not self.feat_declaration.has_feature(feature_name):
@@ -621,6 +626,11 @@ class Model:
         ----------
         feature_name : str
             Name of the feature to remove.
+
+        Raises
+        ------
+        ValueError
+            If the feature does not exist.
         """
         # First need to check if the feature exists.
         if not self.feat_declaration.has_feature(feature_name):
