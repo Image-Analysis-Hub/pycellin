@@ -258,8 +258,15 @@ class Model:
         with_CycleLineage : bool, optional
             True to compute the cycle lineage, False otherwise (default is True).
         """
-        # TODO: implement this method
-        pass
+        try:
+            lin_ID = lineage.graph["lineage_ID"]
+        except KeyError:
+            raise KeyError("Lineage does not have a lineage_ID.")
+        self.data.cell_data["lineage_ID"] = lineage
+
+        if with_CycleLineage:
+            cycle_lineage = self.data._compute_cycle_lineage(lin_ID)
+            self.data.cycle_data["cycle_lineage_ID"] = cycle_lineage
 
     def remove_lineage(self, lineage_ID: int) -> CellLineage:
         """
@@ -615,7 +622,7 @@ class Model:
         """
         Compute and add the cycle lineages of the model.
         """
-        self.data._compute_cycle_lineages()
+        self.data._compute_cycle_lineage()
         self.feat_declaration._add_cycle_lineage_features()
 
     def save_to_pickle(
