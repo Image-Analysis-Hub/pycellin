@@ -275,11 +275,13 @@ class Model:
         CellLineage
             The removed lineage.
         """
-        # TODO: implement this method
-        # Also need to remove the associated CycleLineage.
-        # Is there a use case for removing the CycleLineage only?
-        # Or removing just the CellLineage?
-        pass
+        try:
+            lineage = self.data.cell_data.pop(lineage_ID)
+        except KeyError:
+            raise KeyError(f"Lineage with ID {lineage_ID} does not exist.")
+        if lineage_ID in self.data.cycle_data:
+            self.data.cycle_data.pop(lineage_ID)
+        return lineage
 
     def add_custom_feature(
         self,
