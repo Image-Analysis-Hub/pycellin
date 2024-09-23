@@ -593,6 +593,7 @@ class Model:
         """
         for feature_name in feature_names:
             self.add_pycellin_feature(feature_name, **kwargs)
+        # FIXME: will crash when some features need kwargs and others do not.
 
     def recompute_feature(self, feature_name: str) -> None:
         """
