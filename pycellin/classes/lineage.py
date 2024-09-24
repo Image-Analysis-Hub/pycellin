@@ -532,6 +532,51 @@ class CellLineage(Lineage):
 
         return cell_cycles
 
+    def get_sister_cells(self, noi: int) -> list[int]:
+        """
+        Return the sister cells of a given cell.
+
+        Sister cells are cells that are on the same frame
+        and share the same parent cell.
+
+        Parameters
+        ----------
+        noi : int
+            Node ID of the cell of interest, for which
+            to find the sister cells.
+
+        Returns
+        -------
+        list[int]
+            The list of node IDs of the sister cells of the given node.
+
+        Raises
+        ------
+        LineageStructureError
+            If the node has more than one parent.
+        """
+        sister_cells = []
+        current_frame = self.nodes[noi]["frame"]
+        if not self.is_root(noi):
+            current_cell_cycle = self.get_cell_cycle(noi)
+            parents = list(self.predecessors(current_cell_cycle[0]))
+            if len(parents) == 1:
+                children = list(self.successors(parents[0]))
+                children.remove(current_cell_cycle[0])
+                for child in children:
+                    sister_cell_cycle = self.get_cell_cycle(child)
+                    sister_cells.extend(
+                        [
+                            n
+                            for n in sister_cell_cycle
+                            if self.nodes[n]["frame"] == current_frame
+                        ]
+                    )
+            elif len(parents) > 1:
+                msg = f"Node {noi} has more than 1 parents: it has {len(parents)}."
+                raise LineageStructureError(msg)
+        return sister_cells
+
     def is_division(self, node: int) -> bool:
         """
         Check if a given node is a division node.
@@ -584,51 +629,6 @@ class CellLineage(Lineage):
     #     # ancestor_divs = [a for a in ancestors if self.is_division(a)]
     #     # for div in ancestor_divs:
     #     #     pass
-
-    def get_sister_cells(self, noi: int) -> list[int]:
-        """
-        Return the sister cells of a given cell.
-
-        Sister cells are cells that are on the same frame
-        and share the same parent cell.
-
-        Parameters
-        ----------
-        noi : int
-            Node ID of the cell of interest, for which
-            to find the sister cells.
-
-        Returns
-        -------
-        list[int]
-            The list of node IDs of the sister cells of the given node.
-
-        Raises
-        ------
-        LineageStructureError
-            If the node has more than one parent.
-        """
-        sister_cells = []
-        current_frame = self.nodes[noi]["frame"]
-        if not self.is_root(noi):
-            current_cell_cycle = self.get_cell_cycle(noi)
-            parents = list(self.predecessors(current_cell_cycle[0]))
-            if len(parents) == 1:
-                children = list(self.successors(parents[0]))
-                children.remove(current_cell_cycle[0])
-                for child in children:
-                    sister_cell_cycle = self.get_cell_cycle(child)
-                    sister_cells.extend(
-                        [
-                            n
-                            for n in sister_cell_cycle
-                            if self.nodes[n]["frame"] == current_frame
-                        ]
-                    )
-            elif len(parents) > 1:
-                msg = f"Node {noi} has more than 1 parents: it has {len(parents)}."
-                raise LineageStructureError(msg)
-        return sister_cells
 
     def plot(
         self,
