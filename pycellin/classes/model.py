@@ -301,6 +301,59 @@ class Model:
             self.data.cycle_data.pop(lineage_ID)
         return lineage
 
+    def add_cell(
+        self,
+        cell_ID: int,
+        lineage_ID: int,
+        cell_attributes: dict[str, Any] | None = None,
+    ) -> None:
+        """
+        Add a cell to the lineage.
+
+        Parameters
+        ----------
+        cell_ID : int
+            The ID of the cell to add.
+        lineage_ID : int
+            The ID of the lineage to which the cell belongs.
+        cell_attributes : dict
+            A dictionary containing the features value of the cell to add.
+        """
+        # add the node
+        # add the attributes (check validity of features?)
+        # flag the lineage
+        pass
+
+    def link_cells(
+        self,
+        source_cell_ID: int,
+        source_lineage_ID: int,
+        target_cell_ID: int,
+        target_lineage_ID: int | None = None,
+        link_attributes: dict[str, Any] | None = None,
+    ) -> None:
+        """
+        Link two cells in the lineage.
+
+        Parameters
+        ----------
+        source_cell_ID : int
+            The ID of the source cell.
+        source_lineage_ID : int
+            The ID of the source lineage.
+        target_cell_ID : int
+            The ID of the target cell.
+        target_lineage_ID : int, optional
+            The ID of the target lineage (default is None).
+        link_attributes : dict, optional
+            A dictionary containing the features value of
+            the link between the two cells.
+        """
+        # add the edge
+        # add the attributes (check validity of features?)
+        # flag the lineage
+        pass
+
     def add_custom_feature(
         self,
         feat: Feature,
