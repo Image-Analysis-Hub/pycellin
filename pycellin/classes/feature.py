@@ -4,8 +4,6 @@
 from itertools import chain
 from typing import Literal
 
-# TODO: use literals instead of strings for feature types
-
 
 class Feature:
     """ """
@@ -38,6 +36,7 @@ class Feature:
         unit : str, optional
             The unit of the feature (e.g. µm, min, cell).
         """
+        # TODO: should the feature type be stored as an attribute?
         self.name = name
         self.description = description
         # TODO: deal with the case where lineage_type is not a valid value
@@ -193,6 +192,7 @@ class FeaturesDeclaration:
         bool
             True if the feature has been declared, False otherwise.
         """
+        # TODO: should probably be made accessible from model.
         match feature_type:
             case "node":
                 return feature_name in self.node_feats
@@ -243,7 +243,10 @@ class FeaturesDeclaration:
             case "lineage":
                 return self.lin_feats
             case _:
-                raise ValueError(f"Invalid feature type: {feature_type}")
+                raise ValueError(
+                    f"Invalid feature type: {feature_type}."
+                    f"Feature type be must 'node', 'edge', 'lineage'."
+                )
 
     def _add_feature(
         self, feature: Feature, feature_type: Literal["node", "edge", "lineage"]
