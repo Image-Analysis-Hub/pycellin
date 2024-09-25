@@ -37,9 +37,27 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     # Abstract method because for CellLineages, we first need to unfreeze the graph.
     # Can I reuse already implemented methods from networkx?
 
-    # @abstractmethod
-    # def add_node(self):
-    #     pass
+    @abstractmethod
+    def _add_node(self, noi: int, **kwargs) -> None:
+        """
+        Add a node to the lineage graph.
+
+        Parameters
+        ----------
+        noi : int
+            The node ID to assign to the new node.
+        **kwargs
+            Dictionary of attributes to set for the node.
+
+        Raises
+        ------
+        ValueError
+            If the node ID already exists in the lineage.
+        """
+        if noi in self.nodes():
+            raise ValueError(f"Node {noi} already exists in the lineage.")
+        self.add_node(noi, **kwargs)
+        self.nodes[noi]["lineage_ID"] = self.graph["lineage_ID"]
 
     # @abstractmethod
     # def remove_node(self):
@@ -405,6 +423,40 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
 
 class CellLineage(Lineage):
+
+    def _get_next_available_node_ID(self) -> int:
+        """
+        Return the next available node ID in the lineage.
+
+        Returns
+        -------
+        int
+            The next available node ID.
+        """
+        return max(self.nodes()) + 1
+
+    def _add_node(self, noi: int | None = None, **kwargs) -> int:
+        """
+        Add a node to the lineage graph.
+
+        Parameters
+        ----------
+        noi : int, optional
+            The node ID to assign to the new node. If None, the next
+            available node ID is used.
+        **kwargs
+            Dictionary of attributes to set for the node.
+
+        Returns
+        -------
+        int
+            The ID of the newly added node.
+        """
+        if not noi:
+            noi = self._get_next_available_node_ID()
+        super()._add_node(noi, **kwargs)
+        self.nodes[noi]["cell_ID"] = noi
+        return noi
 
     def get_divisions(self, nodes: list[int] | None = None) -> list[int]:
         """
