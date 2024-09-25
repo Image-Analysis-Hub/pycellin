@@ -4,6 +4,8 @@
 from itertools import chain
 from typing import Literal
 
+# TODO: use literals instead of strings for feature types
+
 
 class Feature:
     """ """
@@ -38,6 +40,7 @@ class Feature:
         """
         self.name = name
         self.description = description
+        # TODO: deal with the case where lineage_type is not a valid value
         self.lineage_type = lineage_type
         self.provenance = provenance
         self.data_type = data_type
@@ -203,6 +206,12 @@ class FeaturesDeclaration:
                     or feature_name in self.edge_feats
                     or feature_name in self.lin_feats
                 )
+            case _:
+                raise ValueError(
+                    f"Invalid feature type: {feature_type}."
+                    f"Feature type be must 'node', 'edge', "
+                    f"'lineage' or unspecified."
+                )
 
     def _get_feat_dict_from_feat_type(self, feature_type: str) -> dict:
         """
@@ -223,7 +232,6 @@ class FeaturesDeclaration:
         ValueError
             If the feature type is invalid.
         """
-        # TODO: use literals instead of strings for feature types
         # TODO: should I raise an error if no node_feats, edge_feats, or lin_feats?
         match feature_type:
             case "node":
