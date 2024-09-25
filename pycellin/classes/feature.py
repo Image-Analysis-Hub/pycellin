@@ -213,7 +213,9 @@ class FeaturesDeclaration:
                     f"'lineage' or unspecified."
                 )
 
-    def _get_feat_dict_from_feat_type(self, feature_type: str) -> dict:
+    def _get_feat_dict_from_feat_type(
+        self, feature_type: Literal["node", "edge", "lineage"]
+    ) -> dict:
         """
         Return the dictionary of features corresponding to the specified type.
 
@@ -243,7 +245,9 @@ class FeaturesDeclaration:
             case _:
                 raise ValueError(f"Invalid feature type: {feature_type}")
 
-    def _add_feature(self, feature: Feature, feature_type: str) -> None:
+    def _add_feature(
+        self, feature: Feature, feature_type: Literal["node", "edge", "lineage"]
+    ) -> None:
         """
         Add the specified feature to the FeaturesDeclaration.
 
@@ -274,7 +278,11 @@ class FeaturesDeclaration:
                 )
         dict_feats[feature.name] = feature
 
-    def _add_features(self, features: list[Feature], feature_types: list[str]) -> None:
+    def _add_features(
+        self,
+        features: list[Feature],
+        feature_types: list[Literal["node", "edge", "lineage"]],
+    ) -> None:
         """
         Add the specified features to the FeaturesDeclaration.
 
@@ -338,7 +346,9 @@ class FeaturesDeclaration:
         )
         self._add_feature(feat_ID, "lineage")
 
-    def _remove_feature(self, feature_name: str, feature_type: str) -> None:
+    def _remove_feature(
+        self, feature_name: str, feature_type: Literal["node", "edge", "lineage"]
+    ) -> None:
         """
         Remove the specified feature from the FeaturesDeclaration.
 
@@ -369,7 +379,9 @@ class FeaturesDeclaration:
         del dict_feats[feature_name]
 
     def _remove_features(
-        self, feature_names: list[str], feature_types: list[str]
+        self,
+        feature_names: list[str],
+        feature_types: list[Literal["node", "edge", "lineage"]],
     ) -> None:
         """
         Remove the specified features from the FeaturesDeclaration.
@@ -385,7 +397,10 @@ class FeaturesDeclaration:
             self._remove_feature(feature_name, feature_type)
 
     def _rename_feature(
-        self, feature_name: str, new_name: str, feature_type: str
+        self,
+        feature_name: str,
+        new_name: str,
+        feature_type: Literal["node", "edge", "lineage"],
     ) -> None:
         """
         Rename a specified feature.
@@ -424,7 +439,10 @@ class FeaturesDeclaration:
         dict_feats[new_name]._rename(new_name)
 
     def _modify_feature_description(
-        self, feature_name: str, new_description: str, feature_type: str
+        self,
+        feature_name: str,
+        new_description: str,
+        feature_type: Literal["node", "edge", "lineage"],
     ) -> None:
         """
         Modify the description of a specified feature.
