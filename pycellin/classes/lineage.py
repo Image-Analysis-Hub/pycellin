@@ -38,7 +38,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     # Can I reuse already implemented methods from networkx?
 
     @abstractmethod
-    def _add_node(self, noi: int, **kwargs) -> None:
+    def _add_node(self, noi: int, **node_attrs) -> None:
         """
         Add a node to the lineage graph.
 
@@ -46,8 +46,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ----------
         noi : int
             The node ID to assign to the new node.
-        **kwargs
-            Dictionary of attributes to set for the node.
+        **node_attrs
+            Attributes to set for the node.
 
         Raises
         ------
@@ -56,7 +56,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         if noi in self.nodes():
             raise ValueError(f"Node {noi} already exists in the lineage.")
-        self.add_node(noi, **kwargs)
+        self.add_node(noi, **node_attrs)
         self.nodes[noi]["lineage_ID"] = self.graph["lineage_ID"]
 
     # @abstractmethod
@@ -435,7 +435,7 @@ class CellLineage(Lineage):
         """
         return max(self.nodes()) + 1
 
-    def _add_node(self, noi: int | None = None, **kwargs) -> int:
+    def _add_node(self, noi: int | None = None, **node_attrs) -> int:
         """
         Add a node to the lineage graph.
 
@@ -444,17 +444,17 @@ class CellLineage(Lineage):
         noi : int, optional
             The node ID to assign to the new node. If None, the next
             available node ID is used.
-        **kwargs
-            Dictionary of attributes to set for the node.
+        **node_attrs
+            Attributes to set for the node.
 
         Returns
         -------
         int
             The ID of the newly added node.
         """
-        if not noi:
+        if noi is None:
             noi = self._get_next_available_node_ID()
-        super()._add_node(noi, **kwargs)
+        super()._add_node(noi, **node_attrs)
         self.nodes[noi]["cell_ID"] = noi
         return noi
 

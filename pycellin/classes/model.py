@@ -303,26 +303,43 @@ class Model:
 
     def add_cell(
         self,
-        cell_ID: int,
         lineage_ID: int,
-        cell_attributes: dict[str, Any] | None = None,
-    ) -> None:
+        cell_ID: int | None = None,
+        **cell_attributes,
+    ) -> int:
         """
         Add a cell to the lineage.
 
         Parameters
         ----------
-        cell_ID : int
-            The ID of the cell to add.
         lineage_ID : int
             The ID of the lineage to which the cell belongs.
-        cell_attributes : dict
+        cell_ID : int, optional
+            The ID of the cell to add (default is None).
+        cell_attributes : dict, optional
             A dictionary containing the features value of the cell to add.
+
+        Raises
+        ------
+        KeyError
+            If the lineage with the specified ID does not exist in the model.
         """
-        # add the node
-        # add the attributes (check validity of features?)
-        # flag the lineage
-        pass
+        try:
+            lineage = self.data.cell_data[lineage_ID]
+        except KeyError:
+            raise KeyError(f"Lineage with ID {lineage_ID} does not exist.")
+
+        # TODO: works like this but maybe I do want to force the use
+        # of a dict for the attributes?
+        if cell_attributes is not None:
+            for feat in cell_attributes:
+                if not self.feat_declaration.has_feature(feat):
+                    raise KeyError(f"The feature {feat} has not been declared.")
+        cell_ID = lineage._add_node(cell_ID, **cell_attributes)
+
+        # TODO: flag the lineage
+
+        return cell_ID
 
     def link_cells(
         self,
