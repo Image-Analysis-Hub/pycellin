@@ -764,7 +764,9 @@ class Model:
         # Then need to update the data.
         pass
 
-    def remove_feature(self, feature_name: str) -> None:
+    def remove_feature(
+        self, feature_name: str, feature_type: Literal["node", "edge", "lineage"]
+    ) -> None:
         """
         Remove the specified feature from the model.
 
@@ -775,20 +777,46 @@ class Model:
         ----------
         feature_name : str
             Name of the feature to remove.
+        feature_type : str, optional
+            The type of the feature to check (node, edge, or lineage).
 
         Raises
         ------
         ValueError
             If the feature does not exist.
         """
-        # FIXME: what happens if 2 features have the same name (but a different type)?
-
         # First need to check if the feature exists.
-        if not self.feat_declaration.has_feature(feature_name):
-            raise ValueError(f"Feature {feature_name} does not exist.")
+        if not self.feat_declaration.has_feature(feature_name, feature_type):
+            raise ValueError(
+                f"There is no feature {feature_name} in {feature_type} features."
+            )
 
-        # Then need to update the FeaturesDeclaration and the data.
-        # TODO
+        # Then need to update the FeaturesDeclaration...
+        feat_dict = self.feat_declaration._get_feat_dict_from_feat_type(feature_type)
+        lineage_type = feat_dict[feature_name].lineage_type
+        feat_dict.pop(feature_name)
+
+        # ... and remove the feature values.
+        if lineage_type == "CellLineage":
+            lineage_data = self.data.cell_data
+        elif lineage_type == "CycleLineage":
+            lineage_data = self.data.cycle_data
+        else:
+            raise ValueError(
+                "Lineage type not recognized. Must be 'CellLineage' or 'CycleLineage'."
+            )
+        match feature_type:
+            case "node":
+                for lin in lineage_data.values():
+                    for node, data in lin.nodes(data=True):
+                        del data[feature_name]
+            case "edge":
+                for lin in lineage_data.values():
+                    for in_node, out_node, data in lin.edges:
+                        del data[feature_name]
+            case "lineage":
+                for lin in lineage_data.values():
+                    del lin.graph[feature_name]
 
     def add_cycle_data(self) -> None:
         """
@@ -837,4 +865,5 @@ class Model:
         format : str
             Format of the exported file.
         """
+        # TODO: implement
         pass
