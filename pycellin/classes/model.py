@@ -280,8 +280,11 @@ class Model:
             print("Model is already up to date.")
             return
 
+        # Update the nodes
+        self._updater._update_nodes(self.feat_declaration, self.data)
+
+        # Update the edges
         # TODO: implement
-        pass
 
     def add_lineage(self, lineage: CellLineage, with_CycleLineage: bool = True) -> None:
         """
@@ -336,6 +339,37 @@ class Model:
         if self.data.cycle_data and lineage_ID in self.data.cycle_data:
             self.data.cycle_data.pop(lineage_ID)
         return lineage
+
+    def split_lineage(
+        self, cell_ID: int, lineage_ID: int, new_lineage_ID: int | None = None
+    ) -> CellLineage:
+        """
+        Split a lineage at the specified cell.
+
+        The specified cell will be the root of the new lineage.
+
+        Parameters
+        ----------
+        cell_ID : int
+            ID of the cell at which to split the lineage.
+        lineage_ID : int
+            ID of the lineage to split.
+        new_lineage_ID : int, optional
+            ID of the new lineage (default is None). If None, a new ID
+            will be generated.
+
+        Returns
+        -------
+        CellLineage
+            The new lineage.
+
+        Raises
+        ------
+        KeyError
+            If the lineage with the specified ID does not exist in the model.
+        """
+        # TODO: implement
+        pass
 
     def add_cell(
         self,
