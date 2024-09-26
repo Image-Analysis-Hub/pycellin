@@ -781,6 +781,8 @@ class Model:
         ValueError
             If the feature does not exist.
         """
+        # FIXME: what happens if 2 features have the same name (but a different type)?
+
         # First need to check if the feature exists.
         if not self.feat_declaration.has_feature(feature_name):
             raise ValueError(f"Feature {feature_name} does not exist.")
