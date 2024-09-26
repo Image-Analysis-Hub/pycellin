@@ -46,16 +46,6 @@ class Model:
 
         self._updater = ModelUpdater()
 
-        # This in the metadata now.
-        # self.date = datetime.now()
-        # self.pycellin_version = get_distribution("pycellin").version
-        # self.name = name
-        # self.provenance = provenance
-        # self.space_unit
-        # self.time_unit
-        # self.time_step
-        # TODO: I think these fields should be made mandatory
-
         # Add an optional argument to ask to compute the CycleLineage?
         # Add a description in which people can put whatever they want
         # (string, facultative), or maybe a dict with a few keys (description,
@@ -447,6 +437,7 @@ class Model:
         # add the edge
         # add the attributes (check validity of features?)
         # flag the lineage
+        # TODO: implement
         pass
 
     def add_custom_feature(
@@ -808,11 +799,11 @@ class Model:
         match feature_type:
             case "node":
                 for lin in lineage_data.values():
-                    for node, data in lin.nodes(data=True):
+                    for _, data in lin.nodes(data=True):
                         del data[feature_name]
             case "edge":
                 for lin in lineage_data.values():
-                    for in_node, out_node, data in lin.edges:
+                    for _, _, data in lin.edges:
                         del data[feature_name]
             case "lineage":
                 for lin in lineage_data.values():
