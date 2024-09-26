@@ -281,7 +281,7 @@ class Model:
             return
 
         # Update the nodes
-        self._updater._update_nodes(self.feat_declaration, self.data)
+        self._updater._update_cells(self.feat_declaration, self.data)
 
         # Update the edges
         # TODO: implement
@@ -415,7 +415,7 @@ class Model:
         cell_ID = lineage._add_node(cell_ID, **cell_attributes)
 
         self._updater._update_required = True
-        self._updater._added_cells.add(Cell(lineage_ID, cell_ID))
+        self._updater._added_cells.add(Cell(cell_ID, lineage_ID))
 
         return cell_ID
 
