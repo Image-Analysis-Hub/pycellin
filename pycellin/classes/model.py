@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from collections import namedtuple
 import pickle
 from typing import Any, Callable, Literal
 
 from pycellin.classes.data import Data
 from pycellin.classes.feature import Feature, FeaturesDeclaration
 from pycellin.classes.lineage import CellLineage, CycleLineage
+from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features as pgf
+
+
+Cell = namedtuple("Cell", ["cell_ID", "lineage_ID"])
+Link = namedtuple(
+    "Link",
+    ["source_cell_ID", "source_lineage_ID", "target_cell_ID", "target_lineage_ID"],
+)
 
 
 class Model:
@@ -34,6 +43,8 @@ class Model:
         self.metadata = metadata
         self.feat_declaration = feat_declaration
         self.data = data
+
+        self._updater = ModelUpdater()
 
         # This in the metadata now.
         # self.date = datetime.now()
@@ -247,6 +258,31 @@ class Model:
             )
         return cycle_lineage_feats
 
+    def require_update(self) -> bool:
+        """
+        Check if the model requires an update.
+
+        The model requires an update if new cells or links have been added.
+        In that case, some features need to be recomputed to account for the changes.
+
+        Returns
+        -------
+        bool
+            True if the model requires an update, False otherwise.
+        """
+        return self._updater._update_required
+
+    def update(self) -> None:
+        """
+        Bring the model up to date by recomputing features.
+        """
+        if not self._updater._update_required:
+            print("Model is already up to date.")
+            return
+
+        # TODO: implement
+        pass
+
     def add_lineage(self, lineage: CellLineage, with_CycleLineage: bool = True) -> None:
         """
         Add a lineage to the model.
@@ -319,6 +355,11 @@ class Model:
         cell_attributes : dict, optional
             A dictionary containing the features value of the cell to add.
 
+        Returns
+        -------
+        int
+            The ID of the added cell.
+
         Raises
         ------
         KeyError
@@ -339,7 +380,8 @@ class Model:
             cell_attributes = dict()
         cell_ID = lineage._add_node(cell_ID, **cell_attributes)
 
-        # TODO: flag the lineage (and the node?)
+        self._updater._update_required = True
+        self._updater._added_cells.add(Cell(lineage_ID, cell_ID))
 
         return cell_ID
 
