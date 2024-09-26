@@ -305,7 +305,7 @@ class Model:
         self,
         lineage_ID: int,
         cell_ID: int | None = None,
-        **cell_attributes,
+        cell_attributes: dict[str, Any] | None = None,
     ) -> int:
         """
         Add a cell to the lineage.
@@ -323,21 +323,23 @@ class Model:
         ------
         KeyError
             If the lineage with the specified ID does not exist in the model.
+        KeyError
+            If a feature in the cell_attributes is not declared.
         """
         try:
             lineage = self.data.cell_data[lineage_ID]
         except KeyError:
             raise KeyError(f"Lineage with ID {lineage_ID} does not exist.")
 
-        # TODO: works like this but maybe I do want to force the use
-        # of a dict for the attributes?
         if cell_attributes is not None:
             for feat in cell_attributes:
                 if not self.feat_declaration.has_feature(feat):
                     raise KeyError(f"The feature {feat} has not been declared.")
+        else:
+            cell_attributes = dict()
         cell_ID = lineage._add_node(cell_ID, **cell_attributes)
 
-        # TODO: flag the lineage
+        # TODO: flag the lineage (and the node?)
 
         return cell_ID
 
