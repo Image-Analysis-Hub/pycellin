@@ -555,7 +555,7 @@ class Model:
 
     def add_cell_cycle_completeness(self) -> None:
         """
-        Compute and add the cell cycle completeness feature to the cell cycles of the model.
+        Compute and add the cell cycle completeness feature to the model cell cycles.
 
         A cell cycle is defined as complete when it starts by a division
         AND ends by a division. Cell cycles that start at the root
@@ -581,7 +581,7 @@ class Model:
 
     def add_division_time(self, in_time_unit: bool = False) -> None:
         """
-        Compute and add the division time feature to the cell cycles of the model.
+        Compute and add the division time feature to the model cell cycles.
 
         The division time of a cell cycle is defined as the difference
         between the absolute ages of the two daughter cells.
@@ -612,7 +612,7 @@ class Model:
 
     def add_division_rate(self, in_time_unit: bool = False) -> None:
         """
-        Compute and add the division rate feature to the cell cycles of the model.
+        Compute and add the division rate feature to the model cell cycles.
 
         Division rate is defined as the number of divisions per time unit.
         It is the inverse of the division time.
