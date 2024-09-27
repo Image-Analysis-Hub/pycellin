@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Any
+from typing import Any, Literal
 
 from igraph import Graph
 import networkx as nx
@@ -98,10 +98,91 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The lineage of the target node.
         """
         # TODO: implement
+        # Need to check:
+        # - doesn't create fusion
+        # - respect flow of time (only for CellLineage)
 
-    # @abstractmethod
-    # def remove_edge(self):
-    #     pass
+    @abstractmethod
+    def _remove_edge(self, source_noi: int, target_noi: int) -> dict[str, Any]:
+        """
+        Remove an edge from the lineage graph.
+
+        It doesn't create a new lineage but divides the libneage graph into
+        two weakly connected components: one for all the nodes upstream
+        of the removed edge, and one for all the nodes downstream.
+        To divide a lineage into two separate lineages, use the `split` method.
+
+        Parameters
+        ----------
+        source_noi : int
+            The node ID of the source node.
+        target_noi : int
+            The node ID of the target node.
+
+        Returns
+        -------
+        dict[str, Any]
+            The features value of the removed edge.
+        """
+        # TODO: implement
+
+    def _split_from_node(
+        self,
+        noi: int,
+        new_lineage_ID: int,
+        split: Literal["upstream", "downstream"] = "upstream",
+    ) -> tuple["Lineage", "Lineage"]:
+        """
+        Split the lineage into two separate lineages from a given node.
+
+        Parameters
+        ----------
+        noi : int
+            The ID of the node from which to split the lineage.
+        new_lineage_ID : int
+            The ID of the new lineage to create.
+        split : {"upstream", "downstream"}, optional
+            Where to cut the lineage relative to the given node.
+            If upstream, the given node is included in the second lineage.
+            If downstream, the given node is included in the first lineage.
+            "upstream" by default.
+
+        Returns
+        -------
+        tuple(Lineage, Lineage)
+            The two separate lineages.
+        """
+        # TODO: implement
+
+    def _split_from_edge(
+        self,
+        source_noi: int,
+        target_noi: int,
+        new_lineage_ID: int,
+    ) -> tuple["Lineage", "Lineage"]:
+        """
+        Split the lineage into two separate lineages from a given edge.
+
+        The given edge is removed. The source node of the edge
+        and all the nodes upstream are included in the first lineage,
+        and the target node of the edge and all the nodes downstream
+        are included in the second lineage.
+
+        Parameters
+        ----------
+        source_noi : int
+            The node ID of the source node of the edge.
+        target_noi : int
+            The node ID of the target node of the edge.
+        new_lineage_ID : int
+            The ID of the new lineage to create.
+
+        Returns
+        -------
+        tuple(Lineage, Lineage)
+            The two separate lineages.
+        """
+        # TODO: implement
 
     def get_root(self) -> int:
         """
