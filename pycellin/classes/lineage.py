@@ -526,7 +526,11 @@ class CellLineage(Lineage):
         return cell_attrs
 
     def _add_edge(
-        self, source_noi: int, target_noi: int, target_lineage: CellLineage
+        self,
+        source_noi: int,
+        target_noi: int,
+        target_lineage: CellLineage | None = None,
+        **link_attrs,
     ) -> None:
         """
         Link 2 cells.
@@ -541,8 +545,11 @@ class CellLineage(Lineage):
             The node ID of the source cell.
         target_noi : int
             The node ID of the target cell.
-        target_lineage : CellLineage
-            The lineage of the target cell.
+        target_lineage : CellLineage, optional
+            The lineage of the target cell. If None, the target cell is
+            assumed to be in the same lineage as the source cell.
+        **link_attrs
+            Feature values to set for the edge.
         """
         # TODO: implement
 
