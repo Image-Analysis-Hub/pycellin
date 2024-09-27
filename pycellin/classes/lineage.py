@@ -9,7 +9,7 @@ from igraph import Graph
 import networkx as nx
 import plotly.graph_objects as go
 
-from pycellin.classes.exceptions import LineageStructureError
+from pycellin.classes.exceptions import FusionError
 
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
@@ -94,7 +94,17 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The node ID of the target node.
         target_lineage : Lineage
             The lineage of the target node.
+
+        Raises
+        ------
+        LineageStructureError
+            If adding an edge will lead to a fusion event.
         """
+        # # Check that there is no fusion event.
+        # if self.in_degree(target_noi) != 0:
+        #     raise FusionError(target_noi, self.graph["lineage_ID"])
+        raise FusionError(target_noi, self.graph["lineage_ID"])
+
         # TODO: implement
         # Need to check:
         # - doesn't create fusion
@@ -638,6 +648,13 @@ class CellLineage(Lineage):
         **link_attrs
             Feature values to set for the edge.
         """
+        # # Check that the flow of time is respected.
+        # source_frame = self.nodes[source_noi]["frame"]
+        # target_frame = self.nodes[target_noi]["frame"]
+        # msg = (f"The frame of the source cell ({source_frame}) must be before the target cell.")
+        # assert source_frame < target_frame, msg
+        super()._add_edge(source_noi, target_noi, target_lineage, **link_attrs)
+
         # TODO: implement
 
     def _remove_edge(self, source_noi: int, target_noi: int) -> dict[str, Any]:
