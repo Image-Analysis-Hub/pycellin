@@ -836,8 +836,8 @@ class CellLineage(Lineage):
 
         Raises
         ------
-        LineageStructureError
-            If the node has more than one parent.
+        FusionError
+            If the given cell has more than one parent cell.
         """
         sister_cells = []
         current_frame = self.nodes[noi]["frame"]
@@ -857,8 +857,7 @@ class CellLineage(Lineage):
                         ]
                     )
             elif len(parents) > 1:
-                msg = f"Node {noi} has more than 1 parents: it has {len(parents)}."
-                raise LineageStructureError(msg)
+                raise FusionError(noi, self.graph["lineage_ID"])
         return sister_cells
 
     def is_division(self, node: int) -> bool:
