@@ -51,9 +51,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     @abstractmethod
     def _remove_node(self, node: int) -> dict[str, Any]:
         """
-        Remove a node from the lineage graph.
-
-        It also removes all adjacent edges.
+        Remove a node and all its adjacent edges from the lineage graph.
 
         Parameters
         ----------
@@ -107,10 +105,11 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         Remove an edge from the lineage graph.
 
-        It doesn't create a new lineage but divides the libneage graph into
+        This doesn't create a new lineage but divides the lineage graph into
         two weakly connected components: one for all the nodes upstream
         of the removed edge, and one for all the nodes downstream.
-        To divide a lineage into two separate lineages, use the `split` method.
+        To divide a lineage into two separate lineages,
+        use the `split_from_node` or `split_from_edge` methods.
 
         Parameters
         ----------
@@ -124,7 +123,13 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         dict[str, Any]
             The features value of the removed edge.
         """
-        # TODO: implement
+        edge_attrs = self[source_noi][target_noi]
+        # TODO: nx is already raising an error if the edge doesn't exist
+        # Ask someone if I should catch it and raise my own error.
+        # Need to check all the other methods too.
+        # Do I need to add it in the docstring if I don't raise it myself?
+        self.remove_edge(source_noi, target_noi)
+        return edge_attrs
 
     def _split_from_node(
         self,
@@ -635,6 +640,39 @@ class CellLineage(Lineage):
         """
         # TODO: implement
 
+    def _remove_edge(self, source_noi: int, target_noi: int) -> dict[str, Any]:
+        """
+        Remove an edge from the lineage graph.
+
+        This doesn't create a new lineage but divides the lineage graph into
+        two weakly connected components: one for all the cells upstream
+        of the removed edge, and one for all the cells downstream.
+        To divide a lineage into two separate lineages,
+        use the `split_from_node` or `split_from_edge` methods.
+
+        Parameters
+        ----------
+        source_noi : int
+            The node ID of the source cell.
+        target_noi : int
+            The node ID of the target cell.
+
+        Returns
+        -------
+        dict[str, Any]
+            The feature values of the removed edge.
+
+        Raises
+        ------
+        KeyError
+            If the edge does not exist in the lineage.
+        """
+        try:
+            link_attrs = super()._remove_edge(source_noi, target_noi)
+        except nx.NetworkXError:
+            raise ValueError(f"Link {source_noi} -> {target_noi} does not exist.")
+        return link_attrs
+
     def get_divisions(self, nodes: list[int] | None = None) -> list[int]:
         """
         Return the division nodes of the lineage.
@@ -658,7 +696,7 @@ class CellLineage(Lineage):
 
     def get_cell_cycle(self, node: int) -> list[int]:
         """
-        Identify all the nodes in the cell cycle of a given node, in chronological order.
+        Give all the nodes in the cell cycle of a given node, in chronological order.
 
         The cell cycle starts from the root or a division node,
         and ends at a division or leaf node.
