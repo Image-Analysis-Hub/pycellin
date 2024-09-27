@@ -4,7 +4,6 @@
 from typing import Any
 
 from pycellin.classes.data import Data
-from pycellin.classes.feature import FeaturesDeclaration
 
 
 class ModelUpdater:
