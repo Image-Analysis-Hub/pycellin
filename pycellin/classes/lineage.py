@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from typing import Any
@@ -9,7 +10,6 @@ import networkx as nx
 import plotly.graph_objects as go
 
 from pycellin.classes.exceptions import LineageStructureError
-from pycellin.classes.lineage import CellLineage
 
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
@@ -19,18 +19,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
     def __init__(self, nx_digraph: nx.DiGraph | None = None) -> None:
         super().__init__(incoming_graph_data=nx_digraph)
-
-    # TODO: A method to check that there is no merge (i. e. in_degree > 1)
-    # I wrote one for Laure at some point but I cannot find it anymore...?!
-    # def check_no_merge(graph: nx.DiGraph):
-    #     no_merge = True
-    #     for node in graph.nodes():
-    #         if graph.in_degree(node) > 1:
-    #             no_merge = False
-    #             print(f"Node {node} has an in_degree > 1.")
-
-    #     if no_merge:
-    #         print("All good, there is no merge in the graph.")
 
     # For all the following methods, we might need to recompute features.
     #   => put it in the abstract method and then use super() in the subclasses
@@ -91,7 +79,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
     @abstractmethod
     def _add_edge(
-        self, source_noi: int, target_noi: int, target_lineage: CellLineage
+        self, source_noi: int, target_noi: int, target_lineage: "Lineage"
     ) -> None:
         """
         Link 2 nodes.
@@ -106,7 +94,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The node ID of the source node.
         target_noi : int
             The node ID of the target node.
-        target_lineage : CellLineage
+        target_lineage : Lineage
             The lineage of the target node.
         """
         # TODO: implement
@@ -230,6 +218,19 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             return True
         else:
             return False
+
+    def check_for_fusions(self) -> list[int]:
+        """
+        Check if the lineage has fusion events and return the fusion nodes.
+
+        A fusion event is defined as a node with more than one parent.
+
+        Returns
+        -------
+        list[int]
+            The list of fusion nodes in the lineage.
+        """
+        return [node for node in self.nodes() if self.in_degree(node) > 1]
 
     @abstractmethod
     def plot(

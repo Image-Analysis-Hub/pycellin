@@ -507,6 +507,26 @@ class Model:
             Link(source_cell_ID, source_lineage_ID, target_cell_ID, target_lineage_ID)
         )
 
+    def check_for_fusions(self) -> list[Cell]:
+        """
+        Check if the cell lineages have fusion events and return the fusion cells.
+
+        A fusion event is defined as a cell with more than one parent.
+
+        Returns
+        -------
+        list[Cell]
+            List of the fusion cells. Each cell is a named tuple:
+            (cell_ID, lineage_ID).
+        """
+        fusions = []
+        for lineage in self.data.cell_data.values():
+            tmp = lineage.check_for_fusions()
+            if tmp:
+                lineage_ID = lineage.graph["lineage_ID"]
+                fusions.extend([Cell(cell_ID, lineage_ID) for cell_ID in tmp])
+        return fusions
+
     def add_custom_feature(
         self,
         feat: Feature,
