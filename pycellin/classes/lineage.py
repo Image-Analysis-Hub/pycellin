@@ -9,7 +9,7 @@ from igraph import Graph
 import networkx as nx
 import plotly.graph_objects as go
 
-from pycellin.classes.exceptions import FusionError
+from pycellin.classes.exceptions import FusionError, TimeFlowError
 
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
@@ -647,12 +647,21 @@ class CellLineage(Lineage):
             assumed to be in the same lineage as the source cell.
         **link_attrs
             Feature values to set for the edge.
+
+        Raises
+        ------
+        TimeFlowError
+            If the target cell happens before the source cell.
         """
-        # # Check that the flow of time is respected.
-        # source_frame = self.nodes[source_noi]["frame"]
-        # target_frame = self.nodes[target_noi]["frame"]
-        # msg = (f"The frame of the source cell ({source_frame}) must be before the target cell.")
-        # assert source_frame < target_frame, msg
+        # Check that the flow of time is respected.
+        source_frame = self.nodes[source_noi]["frame"]
+        target_frame = self.nodes[target_noi]["frame"]
+        if target_frame < source_frame:
+            source_lineage_ID = self.graph["lineage_ID"]
+            target_lineage_ID = target_lineage.graph["lineage_ID"]
+            raise TimeFlowError(
+                source_noi, source_lineage_ID, target_noi, target_lineage_ID
+            )
         super()._add_edge(source_noi, target_noi, target_lineage, **link_attrs)
 
         # TODO: implement
