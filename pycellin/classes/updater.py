@@ -33,7 +33,7 @@ class ModelUpdater:
     # TODO: need to check somewhere that no fusion were created when
     # modifying the graphs
     # => maybe better in Model?
-    # Implement a higher level function in Modelbut need to check for fusion
+    # Implement a higher level function in Model but need to check for fusion
     # every time an edge is added
     # TODO: also need to check if there are lone nodes in the graph, or a graph with
     # several connected components, or a graph with no nodes.
