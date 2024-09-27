@@ -59,9 +59,34 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         self.add_node(noi, **node_attrs)
         self.nodes[noi]["lineage_ID"] = self.graph["lineage_ID"]
 
-    # @abstractmethod
-    # def remove_node(self):
-    #     pass
+    @abstractmethod
+    def _remove_node(self, node: int) -> dict[str, Any]:
+        """
+        Remove a node from the lineage graph.
+
+        It also removes all adjacent edges.
+
+        Parameters
+        ----------
+        node : int
+            The node ID of the node to remove.
+
+        Returns
+        -------
+        dict[str, Any]
+            The features value of the removed node.
+
+        Raises
+        ------
+        KeyError
+            If the node does not exist in the lineage.
+        """
+        try:
+            node_attrs = self.nodes[node]
+        except KeyError:
+            raise KeyError(f"Node {node} does not exist in the lineage.")
+        self.remove_node(node)
+        return node_attrs
 
     # @abstractmethod
     # def add_edge(self):
@@ -435,28 +460,58 @@ class CellLineage(Lineage):
         """
         return max(self.nodes()) + 1
 
-    def _add_node(self, noi: int | None = None, **node_attrs) -> int:
+    def _add_node(self, noi: int | None = None, **cell_attrs) -> int:
         """
-        Add a node to the lineage graph.
+        Add a cell to the lineage graph.
 
         Parameters
         ----------
         noi : int, optional
-            The node ID to assign to the new node. If None, the next
+            The node ID to assign to the new cell. If None, the next
             available node ID is used.
-        **node_attrs
-            Attributes to set for the node.
+        **cell_attrs
+            Feature values to set for the node.
 
         Returns
         -------
         int
-            The ID of the newly added node.
+            The ID of the newly added cell.
         """
         if noi is None:
             noi = self._get_next_available_node_ID()
-        super()._add_node(noi, **node_attrs)
+        try:
+            super()._add_node(noi, **cell_attrs)
+        except ValueError:
+            raise ValueError(f"Cell {noi} already exists in the lineage.")
         self.nodes[noi]["cell_ID"] = noi
         return noi
+
+    def _remove_node(self, noi: int) -> dict[str, Any]:
+        """
+        Remove a cell from the lineage graph.
+
+        It also removes all adjacent edges.
+
+        Parameters
+        ----------
+        noi : int
+            The node ID of the cell to remove.
+
+        Returns
+        -------
+        dict[str, Any]
+            The feature values of the removed node.
+
+        Raises
+        ------
+        KeyError
+            If the cell does not exist in the lineage.
+        """
+        try:
+            cell_attrs = super()._remove_node(noi)
+        except KeyError:
+            raise KeyError(f"Cell {noi} does not exist in the lineage.")
+        return cell_attrs
 
     def get_divisions(self, nodes: list[int] | None = None) -> list[int]:
         """

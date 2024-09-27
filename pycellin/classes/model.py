@@ -402,12 +402,42 @@ class Model:
                     raise KeyError(f"The feature {feat} has not been declared.")
         else:
             cell_attributes = dict()
-        cell_ID = lineage._add_node(cell_ID, **cell_attributes)
 
         self._updater._update_required = True
         self._updater._added_cells.add(Cell(cell_ID, lineage_ID))
 
-        return cell_ID
+        return lineage._add_node(cell_ID, **cell_attributes)
+
+    def remove_cell(self, cell_ID: int, lineage_ID: int) -> dict[str, Any]:
+        """
+        Remove a cell from a lineage.
+
+        Parameters
+        ----------
+        cell_ID : int
+            The ID of the cell to remove.
+        lineage_ID : int
+            The ID of the lineage to which the cell belongs.
+
+        Returns
+        -------
+        dict
+            Feature values of the removed cell.
+
+        Raises
+        ------
+        KeyError
+            If the lineage with the specified ID does not exist in the model.
+        """
+        try:
+            lineage = self.data.cell_data[lineage_ID]
+        except KeyError:
+            raise KeyError(f"Lineage with ID {lineage_ID} does not exist.")
+
+        self._updater._update_required = True
+        self._updater._removed_cells.add(Cell(cell_ID, lineage_ID))
+
+        return lineage._remove_node(cell_ID)
 
     def link_cells(
         self,
