@@ -9,6 +9,7 @@ import networkx as nx
 import plotly.graph_objects as go
 
 from pycellin.classes.exceptions import LineageStructureError
+from pycellin.classes.lineage import CellLineage
 
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
@@ -88,19 +89,30 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         self.remove_node(node)
         return node_attrs
 
-    # @abstractmethod
-    # def add_edge(self):
-    #     pass
+    @abstractmethod
+    def _add_edge(
+        self, source_noi: int, target_noi: int, target_lineage: CellLineage
+    ) -> None:
+        """
+        Link 2 nodes.
+
+        The 2 nodes can be in the same lineage or in different lineages.
+        However, the linking cannot be done if it leads to a fusion event,
+        i. e. a node with more than one parent.
+
+        Parameters
+        ----------
+        source_noi : int
+            The node ID of the source node.
+        target_noi : int
+            The node ID of the target node.
+        target_lineage : CellLineage
+            The lineage of the target node.
+        """
+        # TODO: implement
 
     # @abstractmethod
     # def remove_edge(self):
-    #     pass
-
-    # # If I use _add_element(), maybe I don't need the other methods to be abstract
-    # # since they all call _add_element() under the hood.
-    # @abstractmethod
-    # def _add_element(self, element_type: str, element: dict):
-    #     # element_type: node or edge, but maybe it could also be 0 for node and 1 for edge
     #     pass
 
     def get_root(self) -> int:
@@ -512,6 +524,27 @@ class CellLineage(Lineage):
         except KeyError:
             raise KeyError(f"Cell {noi} does not exist in the lineage.")
         return cell_attrs
+
+    def _add_edge(
+        self, source_noi: int, target_noi: int, target_lineage: CellLineage
+    ) -> None:
+        """
+        Link 2 cells.
+
+        The 2 cells can be in the same lineage or in different lineages.
+        However, the linking cannot be done if it leads to a fusion event,
+        i. e. a cell with more than one parent.
+
+        Parameters
+        ----------
+        source_noi : int
+            The node ID of the source cell.
+        target_noi : int
+            The node ID of the target cell.
+        target_lineage : CellLineage
+            The lineage of the target cell.
+        """
+        # TODO: implement
 
     def get_divisions(self, nodes: list[int] | None = None) -> list[int]:
         """
