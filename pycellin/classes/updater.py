@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from typing import Any
+
 from pycellin.classes.data import Data
 from pycellin.classes.feature import FeaturesDeclaration
 
@@ -18,12 +20,15 @@ class ModelUpdater:
         self._added_links = set()
         self._removed_links = set()
 
-    def _update_cells(self, feat_declaration: FeaturesDeclaration, data: Data):
+    def _update_cells(self, dict_feat: dict[str, Any], data: Data):
         for cell in self._added_cells:
             print(f"Cell {cell.cell_ID} from lineage {cell.lineage_ID}:")
             print(data.cell_data[cell.lineage_ID].nodes[cell.cell_ID])
+            # TODO:  implement
             # How do I know which features need to be updated?
             # And how to compute custom features?
+            # On regarde si dans les features déclarées, il y a des features de pycellin
+            # qui n'ont pas été éjà calculées
 
     # def _update_edges(self):
     #     pass
