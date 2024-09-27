@@ -8,7 +8,7 @@ class LineageStructureError(Exception):
 
     For now, the only use-case I have for this exception
     is when one of the node has several parents,
-    i.e. there are merges in the lineage.
+    i.e. there are fusions in the lineage.
     """
 
     def __init__(self, message):
