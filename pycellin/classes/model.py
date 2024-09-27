@@ -488,6 +488,7 @@ class Model:
                 print(f"Lineage with ID {target_lineage_ID} does not exist.")
         else:
             target_lineage_ID = source_lineage_ID
+            target_lineage = self.data.cell_data[source_lineage_ID]
 
         if link_attributes is not None:
             for feat in link_attributes:
