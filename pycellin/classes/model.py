@@ -398,15 +398,18 @@ class Model:
 
         if cell_attributes is not None:
             for feat in cell_attributes:
-                if not self.feat_declaration.has_feature(feat):
+                if feat not in self.feat_declaration.node_feats:
                     raise KeyError(f"The feature {feat} has not been declared.")
         else:
             cell_attributes = dict()
 
+        cell_ID = lineage._add_node(cell_ID, **cell_attributes)
+
+        # Notify that an update of the feature values may be required.
         self._updater._update_required = True
         self._updater._added_cells.add(Cell(cell_ID, lineage_ID))
 
-        return lineage._add_node(cell_ID, **cell_attributes)
+        return cell_ID
 
     def remove_cell(self, cell_ID: int, lineage_ID: int) -> dict[str, Any]:
         """
@@ -434,10 +437,13 @@ class Model:
         except KeyError:
             raise KeyError(f"Lineage with ID {lineage_ID} does not exist.")
 
+        cell_attrs = lineage._remove_node(cell_ID)
+
+        # Notify that an update of the feature values may be required.
         self._updater._update_required = True
         self._updater._removed_cells.add(Cell(cell_ID, lineage_ID))
 
-        return lineage._remove_node(cell_ID)
+        return cell_attrs
 
     def link_cells(
         self,
@@ -448,7 +454,7 @@ class Model:
         link_attributes: dict[str, Any] | None = None,
     ) -> None:
         """
-        Link two cells in the lineage.
+        Add a link between two cells.
 
         Parameters
         ----------
@@ -463,12 +469,43 @@ class Model:
         link_attributes : dict, optional
             A dictionary containing the features value of
             the link between the two cells.
+
+        Raises
+        ------
+        KeyError
+            If the lineage with the specified ID does not exist in the model.
+        KeyError
+            If a feature in the link_attributes is not declared.
         """
-        # add the edge
-        # add the attributes (check validity of features?)
-        # flag the lineage
-        # TODO: implement
-        pass
+        try:
+            source_lineage = self.data.cell_data[source_lineage_ID]
+        except KeyError:
+            print(f"Lineage with ID {source_lineage_ID} does not exist.")
+        if target_lineage_ID is not None:
+            try:
+                target_lineage = self.data.cell_data[target_lineage_ID]
+            except KeyError:
+                print(f"Lineage with ID {target_lineage_ID} does not exist.")
+        else:
+            target_lineage_ID = source_lineage_ID
+
+        if link_attributes is not None:
+            for feat in link_attributes:
+                if feat not in self.feat_declaration.edge_feats:
+                    raise KeyError(f"The feature {feat} has not been declared.")
+        else:
+            link_attributes = dict()
+
+        # TODO: potentially add a try except if the linking leads to a fusion.
+        source_lineage._add_edge(
+            source_cell_ID, target_cell_ID, target_lineage, **link_attributes
+        )
+
+        # Notify that an update of the feature values may be required.
+        self._updater._update_required = True
+        self._updater._added_links.add(
+            Link(source_cell_ID, source_lineage_ID, target_cell_ID, target_lineage_ID)
+        )
 
     def add_custom_feature(
         self,
