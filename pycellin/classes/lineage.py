@@ -78,7 +78,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     @abstractmethod
     def _add_edge(self, source_noi: int, target_noi: int) -> None:
         """
-        Link 2 nodes.
+        Add an edge between 2 nodes.
 
         Parameters
         ----------
@@ -86,10 +86,24 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The node ID of the source node.
         target_noi : int
             The node ID of the target node.
+
+        Raises
+        ------
+        ValueError
+            If the source or target node does not exist in the lineage.
+            If the edge already exists in the lineage.
         """
-        # TODO: do I need to:
-        # - check if the edge already exists
-        # - check if the nodes exist
+        # NetworkX does not raise an error if the nodes don't exist,
+        # it creates them along the edge. To avoid any unwanted modifications
+        # to the lineage, we raise an error if the nodes don't exist.
+        if source_noi not in self.nodes():
+            raise ValueError(f"Source node (ID {source_noi}) does not exist.")
+        if target_noi not in self.nodes():
+            raise ValueError(f"Target node (ID {target_noi}) does not exist.")
+        # Idem for the edge, NetworX does not raise an error but updates
+        # the already existing edge, potentially overwriting edge attributes.
+        if self.has_edge(source_noi, target_noi):
+            raise ValueError(f"Edge {source_noi} -> {target_noi} already exists.")
         self.add_edge(source_noi, target_noi)
 
     @abstractmethod
