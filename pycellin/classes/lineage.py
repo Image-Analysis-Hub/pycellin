@@ -701,6 +701,8 @@ class CellLineage(Lineage):
         # TODO: check if the original target lineage is still accessible after the merge
         # TODO: is update() better than union() in my case? It would avoid creating
         # a new lineage and having to modify self.__dict__.
+        # TODO: this method is widely different from the one in the abstract class.
+        # Does it make sense to Lineage._add_edge() abstract?
 
     def _remove_edge(self, source_noi: int, target_noi: int) -> dict[str, Any]:
         """

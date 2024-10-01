@@ -477,6 +477,7 @@ class Model:
         KeyError
             If a feature in the link_attributes is not declared.
         """
+        # TODO: is the name add_link() better?
         try:
             source_lineage = self.data.cell_data[source_lineage_ID]
         except KeyError:
