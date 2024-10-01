@@ -43,6 +43,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ValueError
             If the node ID already exists in the lineage.
         """
+        # TODO: check what nx raises, maybe I don't need to raise it myself.
         if noi in self.nodes():
             raise ValueError(f"Node {noi} already exists in the lineage.")
         self.add_node(noi, **node_attrs)
@@ -68,6 +69,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         KeyError
             If the node does not exist in the lineage.
         """
+        # TODO: check what nx raises, maybe I don't need to raise it myself.
         try:
             node_attrs = self.nodes[node]
         except KeyError:
@@ -76,7 +78,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         return node_attrs
 
     @abstractmethod
-    def _add_edge(self, source_noi: int, target_noi: int) -> None:
+    def _add_edge(self, source_noi: int, target_noi: int, **edge_attrs) -> None:
         """
         Add an edge between 2 nodes.
 
@@ -86,6 +88,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The node ID of the source node.
         target_noi : int
             The node ID of the target node.
+        **edge_attrs
+            Attributes to set for the edge.
 
         Raises
         ------
@@ -104,7 +108,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # the already existing edge, potentially overwriting edge attributes.
         if self.has_edge(source_noi, target_noi):
             raise ValueError(f"Edge {source_noi} -> {target_noi} already exists.")
-        self.add_edge(source_noi, target_noi)
+        self.add_edge(source_noi, target_noi, **edge_attrs)
 
     @abstractmethod
     def _remove_edge(self, source_noi: int, target_noi: int) -> dict[str, Any]:
@@ -691,7 +695,7 @@ class CellLineage(Lineage):
         merged_lineage = nx.union(target_lineage, self)
         self.__dict__.update(merged_lineage.__dict__)
 
-        super()._add_edge(source_noi, target_noi, target_lineage, **link_attrs)
+        super()._add_edge(source_noi, target_noi, **link_attrs)
 
         # TODO: debug
         # TODO: check if the original target lineage is still accessible after the merge
