@@ -168,6 +168,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The new lineage created from the split.
         """
         # TODO: implement
+        # TODO: if I return only one lineage, should I call the method _cut_from_node?
+        # Add an argument to choose which lineage to use for overwriting slef.lineage?
+        # Or return a tuple with the two lineages?
 
     def _split_from_edge(
         self,
@@ -198,6 +201,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The new lineage created from the split.
         """
         # TODO: implement
+        # TODO: if I return only one lineage, should I call the method _cut_from_edge?
+        # Add an argument to choose which lineage to use for overwriting slef.lineage?
+        # Or return a tuple with the two lineages?
 
     def get_root(self) -> int:
         """
@@ -659,7 +665,7 @@ class CellLineage(Lineage):
             target_lineage = self
 
         # Check that the link will not create a fusion event.
-        if self.in_degree(target_noi) != 0:
+        if target_lineage.in_degree(target_noi) != 0:
             raise FusionError(target_noi, self.graph["lineage_ID"])
 
         # Check that the link respects the flow of time.
@@ -684,21 +690,20 @@ class CellLineage(Lineage):
 
             # Create a new lineage from the target node and its descendants,
             # including edges.
-            target_lineage = target_lineage._split_from_node(target_noi, "tmp_ID")
+            tmp_lineage = target_lineage._split_from_node(target_noi, "tmp_ID")
             if conflicting_ids:
-                nx.relabel_nodes(target_lineage, ids_mapping, copy=False)
+                nx.relabel_nodes(tmp_lineage, ids_mapping, copy=False)
                 if target_noi in ids_mapping:
                     target_noi = ids_mapping[target_noi]
-                assert target_lineage.get_root() == target_noi
+                assert tmp_lineage.get_root() == target_noi
 
-        # Merge all the elements of the target lineage into the source lineage.
-        merged_lineage = nx.union(target_lineage, self)
-        self.__dict__.update(merged_lineage.__dict__)
+            # Merge all the elements of the target lineage into the source lineage.
+            merged_lineage = nx.union(tmp_lineage, self)
+            self.__dict__.update(merged_lineage.__dict__)
 
         super()._add_edge(source_noi, target_noi, **link_attrs)
 
         # TODO: debug
-        # TODO: check if the original target lineage is still accessible after the merge
         # TODO: is update() better than union() in my case? It would avoid creating
         # a new lineage and having to modify self.__dict__.
         # TODO: this method is widely different from the one in the abstract class.
