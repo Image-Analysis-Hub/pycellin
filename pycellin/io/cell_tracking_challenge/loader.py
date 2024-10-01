@@ -14,6 +14,8 @@ from pycellin.classes.feature import FeaturesDeclaration, Feature
 from pycellin.classes.data import Data
 from pycellin.classes.lineage import CellLineage
 
+# TODO: check for fusions once the model is built and deal with the fusions
+
 
 def _create_metadata(
     file_path: str,

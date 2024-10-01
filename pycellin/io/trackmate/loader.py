@@ -20,6 +20,8 @@ from pycellin.classes.lineage import CellLineage
 # TODO: maybe TRACK_ID / lineage_ID should not be added as a node feature,
 # and a fonction get_lineage_ID() should be implemented instead?
 
+# TODO: check for fusions once the model is built and deal with the fusions
+
 
 def _get_units(
     element: ET._Element,
