@@ -76,15 +76,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         return node_attrs
 
     @abstractmethod
-    def _add_edge(
-        self, source_noi: int, target_noi: int, target_lineage: "Lineage"
-    ) -> None:
+    def _add_edge(self, source_noi: int, target_noi: int) -> None:
         """
         Link 2 nodes.
-
-        The 2 nodes can be in the same lineage or in different lineages.
-        However, the linking cannot be done if it leads to a fusion event,
-        i. e. a node with more than one parent.
 
         Parameters
         ----------
@@ -92,23 +86,11 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The node ID of the source node.
         target_noi : int
             The node ID of the target node.
-        target_lineage : Lineage
-            The lineage of the target node.
-
-        Raises
-        ------
-        LineageStructureError
-            If adding an edge will lead to a fusion event.
         """
-        # # Check that there is no fusion event.
-        # if self.in_degree(target_noi) != 0:
-        #     raise FusionError(target_noi, self.graph["lineage_ID"])
-        raise FusionError(target_noi, self.graph["lineage_ID"])
-
-        # TODO: implement
-        # Need to check:
-        # - doesn't create fusion
-        # - respect flow of time (only for CellLineage)
+        # TODO: do I need to:
+        # - check if the edge already exists
+        # - check if the nodes exist
+        self.add_edge(source_noi, target_noi)
 
     @abstractmethod
     def _remove_edge(self, source_noi: int, target_noi: int) -> dict[str, Any]:
@@ -146,7 +128,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         noi: int,
         new_lineage_ID: int,
         split: Literal["upstream", "downstream"] = "upstream",
-    ) -> tuple["Lineage", "Lineage"]:
+    ) -> "Lineage":
         """
         Split the lineage into two separate lineages from a given node.
 
@@ -164,8 +146,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Returns
         -------
-        tuple(Lineage, Lineage)
-            The two separate lineages.
+        Lineage
+            The new lineage created from the split.
         """
         # TODO: implement
 
@@ -174,7 +156,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         source_noi: int,
         target_noi: int,
         new_lineage_ID: int,
-    ) -> tuple["Lineage", "Lineage"]:
+    ) -> "Lineage":
         """
         Split the lineage into two separate lineages from a given edge.
 
@@ -194,8 +176,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Returns
         -------
-        tuple(Lineage, Lineage)
-            The two separate lineages.
+        Lineage
+            The new lineage created from the split.
         """
         # TODO: implement
 
@@ -650,21 +632,57 @@ class CellLineage(Lineage):
 
         Raises
         ------
+        FusionError
+            If the target cell already has a parent cell.
         TimeFlowError
             If the target cell happens before the source cell.
         """
-        # Check that the flow of time is respected.
-        source_frame = self.nodes[source_noi]["frame"]
-        target_frame = self.nodes[target_noi]["frame"]
-        if target_frame < source_frame:
-            source_lineage_ID = self.graph["lineage_ID"]
-            target_lineage_ID = target_lineage.graph["lineage_ID"]
+        if target_lineage is None:
+            target_lineage = self
+
+        # Check that the link will not create a fusion event.
+        if self.in_degree(target_noi) != 0:
+            raise FusionError(target_noi, self.graph["lineage_ID"])
+
+        # Check that the link respects the flow of time.
+        if self.nodes[source_noi]["frame"] >= target_lineage.nodes[target_noi]["frame"]:
             raise TimeFlowError(
-                source_noi, source_lineage_ID, target_noi, target_lineage_ID
+                source_noi,
+                self.graph["lineage_ID"],
+                target_noi,
+                target_lineage.graph["lineage_ID"],
             )
+
+        if target_lineage != self:
+            # Identify node ID conflict between lineages.
+            target_descendants = nx.descendants(target_lineage, target_noi)
+            conflicting_ids = set(self.nodes()) & set(target_descendants)
+            if conflicting_ids:
+                next_id = self._get_next_available_node_ID()
+                ids_mapping = {}
+                for id in conflicting_ids:
+                    ids_mapping[id] = next_id
+                    next_id += 1
+
+            # Create a new lineage from the target node and its descendants,
+            # including edges.
+            target_lineage = target_lineage._split_from_node(target_noi, "tmp_ID")
+            if conflicting_ids:
+                nx.relabel_nodes(target_lineage, ids_mapping, copy=False)
+                if target_noi in ids_mapping:
+                    target_noi = ids_mapping[target_noi]
+                assert target_lineage.get_root() == target_noi
+
+        # Merge all the elements of the target lineage into the source lineage.
+        merged_lineage = nx.union(target_lineage, self)
+        self.__dict__.update(merged_lineage.__dict__)
+
         super()._add_edge(source_noi, target_noi, target_lineage, **link_attrs)
 
-        # TODO: implement
+        # TODO: debug
+        # TODO: check if the original target lineage is still accessible after the merge
+        # TODO: is update() better than union() in my case? It would avoid creating
+        # a new lineage and having to modify self.__dict__.
 
     def _remove_edge(self, source_noi: int, target_noi: int) -> dict[str, Any]:
         """
