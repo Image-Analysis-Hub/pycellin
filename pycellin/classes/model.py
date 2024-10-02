@@ -7,11 +7,9 @@ from typing import Any, Callable, Literal
 
 from pycellin.classes.data import Data
 from pycellin.classes.feature import Feature, FeaturesDeclaration
-from pycellin.classes.lineage import CellLineage, CycleLineage
+from pycellin.classes.lineage import CellLineage
 from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features as pgf
-
-# TODO: check if I need to add error chaining
 
 # TODO: should I force the user to use the Cell and Link named tuples?
 # Would impact the signature of a lot of methods, but would make these

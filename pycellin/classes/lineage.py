@@ -11,8 +11,6 @@ import plotly.graph_objects as go
 
 from pycellin.classes.exceptions import FusionError, TimeFlowError
 
-# TODO: maybe _add_node and _remove_node shouldn't be abstract
-
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
     """
@@ -27,121 +25,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     #      after modifying the graph
     # Abstract method because for CellLineages, we first need to unfreeze the graph.
     # Can I reuse already implemented methods from networkx?
-
-    # @abstractmethod
-    # def _add_node(self, noi: int, **node_attrs) -> None:
-    #     """
-    #     Add a node to the lineage graph.
-
-    #     Parameters
-    #     ----------
-    #     noi : int
-    #         The node ID to assign to the new node.
-    #     **node_attrs
-    #         Attributes to set for the node.
-
-    #     Raises
-    #     ------
-    #     ValueError
-    #         If the node ID already exists in the lineage.
-    #     """
-    #     # TODO: check what nx raises, maybe I don't need to raise it myself.
-    #     if noi in self.nodes():
-    #         raise ValueError(f"Node {noi} already exists in the lineage.")
-    #     self.add_node(noi, **node_attrs)
-    #     self.nodes[noi]["lineage_ID"] = self.graph["lineage_ID"]
-
-    # @abstractmethod
-    # def _remove_node(self, node: int) -> dict[str, Any]:
-    #     """
-    #     Remove a node and all its adjacent edges from the lineage graph.
-
-    #     Parameters
-    #     ----------
-    #     node : int
-    #         The node ID of the node to remove.
-
-    #     Returns
-    #     -------
-    #     dict[str, Any]
-    #         The features value of the removed node.
-
-    #     Raises
-    #     ------
-    #     KeyError
-    #         If the node does not exist in the lineage.
-    #     """
-    #     # TODO: check what nx raises, maybe I don't need to raise it myself.
-    #     try:
-    #         node_attrs = self.nodes[node]
-    #     except KeyError:
-    #         raise KeyError(f"Node {node} does not exist in the lineage.")
-    #     self.remove_node(node)
-    #     return node_attrs
-
-    # @abstractmethod
-    # def _add_edge(self, source_noi: int, target_noi: int, **edge_attrs) -> None:
-    #     """
-    #     Add an edge between 2 nodes.
-
-    #     Parameters
-    #     ----------
-    #     source_noi : int
-    #         The node ID of the source node.
-    #     target_noi : int
-    #         The node ID of the target node.
-    #     **edge_attrs
-    #         Attributes to set for the edge.
-
-    #     Raises
-    #     ------
-    #     ValueError
-    #         If the source or target node does not exist in the lineage.
-    #         If the edge already exists in the lineage.
-    #     """
-    #     # NetworkX does not raise an error if the nodes don't exist,
-    #     # it creates them along the edge. To avoid any unwanted modifications
-    #     # to the lineage, we raise an error if the nodes don't exist.
-    #     if source_noi not in self.nodes():
-    #         raise ValueError(f"Source node (ID {source_noi}) does not exist.")
-    #     if target_noi not in self.nodes():
-    #         raise ValueError(f"Target node (ID {target_noi}) does not exist.")
-    #     # Idem for the edge, NetworX does not raise an error but updates
-    #     # the already existing edge, potentially overwriting edge attributes.
-    #     if self.has_edge(source_noi, target_noi):
-    #         raise ValueError(f"Edge {source_noi} -> {target_noi} already exists.")
-    #     self.add_edge(source_noi, target_noi, **edge_attrs)
-
-    # @abstractmethod
-    # def _remove_edge(self, source_noi: int, target_noi: int) -> dict[str, Any]:
-    #     """
-    #     Remove an edge from the lineage graph.
-
-    #     This doesn't create a new lineage but divides the lineage graph into
-    #     two weakly connected components: one for all the nodes upstream
-    #     of the removed edge, and one for all the nodes downstream.
-    #     To divide a lineage into two separate lineages,
-    #     use the `split_from_node` or `split_from_edge` methods.
-
-    #     Parameters
-    #     ----------
-    #     source_noi : int
-    #         The node ID of the source node.
-    #     target_noi : int
-    #         The node ID of the target node.
-
-    #     Returns
-    #     -------
-    #     dict[str, Any]
-    #         The features value of the removed edge.
-    #     """
-    #     edge_attrs = self[source_noi][target_noi]
-    #     # TODO: nx is already raising an error if the edge doesn't exist
-    #     # Ask someone if I should catch it and raise my own error.
-    #     # Need to check all the other methods too.
-    #     # Do I need to add it in the docstring if I don't raise it myself?
-    #     self.remove_edge(source_noi, target_noi)
-    #     return edge_attrs
 
     def get_root(self) -> int:
         """
@@ -423,7 +306,10 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                     node_hover_text.append(text)
             else:
                 node_hover_text = [
-                    f"{ID_feature}: {node[ID_feature]}<br>{y_feature}: {node[y_feature]}"
+                    (
+                        f"{ID_feature}: {node[ID_feature]}<br>"
+                        f"{y_feature}: {node[y_feature]}"
+                    )
                     for node in G.vs
                 ]
             if "lineage_ID" in G.attributes():
