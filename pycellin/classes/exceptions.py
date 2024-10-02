@@ -44,16 +44,11 @@ class FusionError(LineageStructureError):
         self.lineage_ID = lineage_ID
         if message is None:
             if lineage_ID is None:
-                message = (
-                    f"Node {node_ID} already has a parent node.\n"
-                    f"Remove any incoming edge to node {node_ID} "
-                    f"before adding a new incoming edge."
-                )
+                message = f"Node {node_ID} already has a parent node."
             else:
                 message = (
-                    f"Node {node_ID} already has a parent node in lineage "
-                    f"{lineage_ID}.\nRemove any incoming edge to node {node_ID} "
-                    f"before adding a new incoming edge."
+                    f"Node {node_ID} in lineage {lineage_ID} already has "
+                    f"a parent node."
                 )
         super().__init__(message)
 
