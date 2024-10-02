@@ -28,28 +28,28 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     # Abstract method because for CellLineages, we first need to unfreeze the graph.
     # Can I reuse already implemented methods from networkx?
 
-    @abstractmethod
-    def _add_node(self, noi: int, **node_attrs) -> None:
-        """
-        Add a node to the lineage graph.
+    # @abstractmethod
+    # def _add_node(self, noi: int, **node_attrs) -> None:
+    #     """
+    #     Add a node to the lineage graph.
 
-        Parameters
-        ----------
-        noi : int
-            The node ID to assign to the new node.
-        **node_attrs
-            Attributes to set for the node.
+    #     Parameters
+    #     ----------
+    #     noi : int
+    #         The node ID to assign to the new node.
+    #     **node_attrs
+    #         Attributes to set for the node.
 
-        Raises
-        ------
-        ValueError
-            If the node ID already exists in the lineage.
-        """
-        # TODO: check what nx raises, maybe I don't need to raise it myself.
-        if noi in self.nodes():
-            raise ValueError(f"Node {noi} already exists in the lineage.")
-        self.add_node(noi, **node_attrs)
-        self.nodes[noi]["lineage_ID"] = self.graph["lineage_ID"]
+    #     Raises
+    #     ------
+    #     ValueError
+    #         If the node ID already exists in the lineage.
+    #     """
+    #     # TODO: check what nx raises, maybe I don't need to raise it myself.
+    #     if noi in self.nodes():
+    #         raise ValueError(f"Node {noi} already exists in the lineage.")
+    #     self.add_node(noi, **node_attrs)
+    #     self.nodes[noi]["lineage_ID"] = self.graph["lineage_ID"]
 
     @abstractmethod
     def _remove_node(self, node: int) -> dict[str, Any]:
@@ -513,7 +513,7 @@ class CellLineage(Lineage):
         """
         return max(self.nodes()) + 1
 
-    def _add_node(self, noi: int | None = None, **cell_attrs) -> int:
+    def _add_cell(self, noi: int | None = None, **cell_attrs) -> int:
         """
         Add a cell to the lineage graph.
 
@@ -529,14 +529,27 @@ class CellLineage(Lineage):
         -------
         int
             The ID of the newly added cell.
+
+        Raises
+        ------
+        KeyError
+            If the lineage does not have a lineage ID.
+        ValueError
+            If the cell already exists in the lineage.
         """
+        # TODO: should a frame be required? Here or in Model?
+        try:
+            lineage_ID = self.graph["lineage_ID"]
+        except KeyError as err:
+            raise KeyError("The lineage does not have a lineage ID.") from err
         if noi is None:
             noi = self._get_next_available_node_ID()
-        try:
-            super()._add_node(noi, **cell_attrs)
-        except ValueError:
-            raise ValueError(f"Cell {noi} already exists in the lineage.")
+        elif noi in self.nodes():
+            raise ValueError(
+                f"Cell {noi} already exists in the lineage with ID {lineage_ID}."
+            )
         self.nodes[noi]["cell_ID"] = noi
+        self.nodes[noi]["lineage_ID"] = lineage_ID
         return noi
 
     def _remove_node(self, noi: int) -> dict[str, Any]:

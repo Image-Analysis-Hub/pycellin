@@ -13,6 +13,10 @@ import pycellin.graph.features as pgf
 
 # TODO: check if I need to add error chaining
 
+# TODO: should I force the user to use the Cell and Link named tuples?
+# Would impact the signature of a lot of methods, but would make these
+# signatures more structured and consistent (looking at you, add_cell()).
+
 Cell = namedtuple("Cell", ["cell_ID", "lineage_ID"])
 Link = namedtuple(
     "Link",
@@ -394,8 +398,8 @@ class Model:
         """
         try:
             lineage = self.data.cell_data[lineage_ID]
-        except KeyError:
-            raise KeyError(f"Lineage with ID {lineage_ID} does not exist.")
+        except KeyError as err:
+            raise KeyError(f"Lineage with ID {lineage_ID} does not exist.") from err
 
         if cell_attributes is not None:
             for feat in cell_attributes:
@@ -404,7 +408,7 @@ class Model:
         else:
             cell_attributes = dict()
 
-        cell_ID = lineage._add_node(cell_ID, **cell_attributes)
+        cell_ID = lineage._add_cell(cell_ID, **cell_attributes)
 
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
