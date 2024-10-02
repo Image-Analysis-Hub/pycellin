@@ -439,10 +439,10 @@ class Model:
         """
         try:
             lineage = self.data.cell_data[lineage_ID]
-        except KeyError:
-            raise KeyError(f"Lineage with ID {lineage_ID} does not exist.")
+        except KeyError as err:
+            raise KeyError(f"Lineage with ID {lineage_ID} does not exist.") from err
 
-        cell_attrs = lineage._remove_node(cell_ID)
+        cell_attrs = lineage._remove_cell(cell_ID)
 
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True

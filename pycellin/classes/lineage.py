@@ -51,33 +51,33 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     #     self.add_node(noi, **node_attrs)
     #     self.nodes[noi]["lineage_ID"] = self.graph["lineage_ID"]
 
-    @abstractmethod
-    def _remove_node(self, node: int) -> dict[str, Any]:
-        """
-        Remove a node and all its adjacent edges from the lineage graph.
+    # @abstractmethod
+    # def _remove_node(self, node: int) -> dict[str, Any]:
+    #     """
+    #     Remove a node and all its adjacent edges from the lineage graph.
 
-        Parameters
-        ----------
-        node : int
-            The node ID of the node to remove.
+    #     Parameters
+    #     ----------
+    #     node : int
+    #         The node ID of the node to remove.
 
-        Returns
-        -------
-        dict[str, Any]
-            The features value of the removed node.
+    #     Returns
+    #     -------
+    #     dict[str, Any]
+    #         The features value of the removed node.
 
-        Raises
-        ------
-        KeyError
-            If the node does not exist in the lineage.
-        """
-        # TODO: check what nx raises, maybe I don't need to raise it myself.
-        try:
-            node_attrs = self.nodes[node]
-        except KeyError:
-            raise KeyError(f"Node {node} does not exist in the lineage.")
-        self.remove_node(node)
-        return node_attrs
+    #     Raises
+    #     ------
+    #     KeyError
+    #         If the node does not exist in the lineage.
+    #     """
+    #     # TODO: check what nx raises, maybe I don't need to raise it myself.
+    #     try:
+    #         node_attrs = self.nodes[node]
+    #     except KeyError:
+    #         raise KeyError(f"Node {node} does not exist in the lineage.")
+    #     self.remove_node(node)
+    #     return node_attrs
 
     # @abstractmethod
     # def _add_edge(self, source_noi: int, target_noi: int, **edge_attrs) -> None:
@@ -552,7 +552,7 @@ class CellLineage(Lineage):
         self.nodes[noi]["lineage_ID"] = lineage_ID
         return noi
 
-    def _remove_node(self, noi: int) -> dict[str, Any]:
+    def _remove_cell(self, noi: int) -> dict[str, Any]:
         """
         Remove a cell from the lineage graph.
 
@@ -574,9 +574,17 @@ class CellLineage(Lineage):
             If the cell does not exist in the lineage.
         """
         try:
-            cell_attrs = super()._remove_node(noi)
-        except KeyError:
-            raise KeyError(f"Cell {noi} does not exist in the lineage.")
+            cell_attrs = self.nodes[noi]
+        except KeyError as err:
+            if "lineage_ID" not in self.graph:
+                msg = f"Cell {noi} does not exist in the lineage."
+            else:
+                msg = (
+                    f"Cell {noi} does not exist in the lineage with ID "
+                    f"{self.graph['lineage_ID']}."
+                )
+            raise KeyError(msg) from err
+        self.remove_node(noi)
         return cell_attrs
 
     def _add_link(
