@@ -548,6 +548,7 @@ class CellLineage(Lineage):
             raise ValueError(
                 f"Cell {noi} already exists in the lineage with ID {lineage_ID}."
             )
+        self.add_node(noi, **cell_attrs)
         self.nodes[noi]["cell_ID"] = noi
         self.nodes[noi]["lineage_ID"] = lineage_ID
         return noi
@@ -643,15 +644,26 @@ class CellLineage(Lineage):
 
         # Check that the link will not create a fusion event.
         if target_lineage.in_degree(target_noi) != 0:
-            raise FusionError(target_noi, self.graph["lineage_ID"])
+            source_lineage_ID = (
+                self.graph["lineage_ID"] if "lineage_ID" in self.graph else None
+            )
+            raise FusionError(target_noi, source_lineage_ID)
 
         # Check that the link respects the flow of time.
         if self.nodes[source_noi]["frame"] >= target_lineage.nodes[target_noi]["frame"]:
+            source_lineage_ID = (
+                self.graph["lineage_ID"] if "lineage_ID" in self.graph else None
+            )
+            target_lineage_ID = (
+                target_lineage.graph["lineage_ID"]
+                if "lineage_ID" in target_lineage.graph
+                else None
+            )
             raise TimeFlowError(
                 source_noi,
-                self.graph["lineage_ID"],
                 target_noi,
-                target_lineage.graph["lineage_ID"],
+                source_lineage_ID,
+                target_lineage_ID,
             )
 
         if target_lineage != self:
@@ -960,7 +972,10 @@ class CellLineage(Lineage):
                         ]
                     )
             elif len(parents) > 1:
-                raise FusionError(noi, self.graph["lineage_ID"])
+                lineage_ID = (
+                    self.graph["lineage_ID"] if "lineage_ID" in self.graph else None
+                )
+                raise FusionError(noi, lineage_ID)
         return sister_cells
 
     def is_division(self, node: int) -> bool:
