@@ -26,22 +26,35 @@ class FusionError(LineageStructureError):
     ----------
     node_ID : int
         The ID of the node where the fusion event was detected.
-    lineage_ID : int
+    lineage_ID : int, optional
         The ID of the lineage where the fusion event was detected.
+        None by default.
     message : str, optional
         The error message to display.
         If not provided, a default message is displayed.
     """
 
-    def __init__(self, node_ID: int, lineage_ID: int, message: str = None):
+    def __init__(
+        self,
+        node_ID: int,
+        lineage_ID: int | None = None,
+        message: str = None,
+    ):
         self.node_ID = node_ID
         self.lineage_ID = lineage_ID
         if message is None:
-            message = (
-                f"Node {node_ID} already has a parent node in lineage {lineage_ID}.\n"
-                f"Remove any incoming edge to node {node_ID} "
-                f"before adding a new incoming edge."
-            )
+            if lineage_ID is None:
+                message = (
+                    f"Node {node_ID} already has a parent node.\n"
+                    f"Remove any incoming edge to node {node_ID} "
+                    f"before adding a new incoming edge."
+                )
+            else:
+                message = (
+                    f"Node {node_ID} already has a parent node in lineage "
+                    f"{lineage_ID}.\nRemove any incoming edge to node {node_ID} "
+                    f"before adding a new incoming edge."
+                )
         super().__init__(message)
 
 
@@ -56,12 +69,14 @@ class TimeFlowError(LineageStructureError):
     ----------
     source_noi : int
         The ID of the source node.
-    source_lineage_ID : int
-        The ID of the lineage of the source node.
     target_noi : int
         The ID of the target node.
-    target_lineage_ID : int
+    source_lineage_ID : int, optional
+        The ID of the lineage of the source node.
+        None by default.
+    target_lineage_ID : int, optional
         The ID of the lineage of the target node.
+        None by default.
     message : str, optional
         The error message to display.
         If not provided, a default message is displayed.
@@ -70,9 +85,9 @@ class TimeFlowError(LineageStructureError):
     def __init__(
         self,
         source_noi: int,
-        source_lineage_ID: int,
         target_noi: int,
-        target_lineage_ID: int,
+        source_lineage_ID: int | None = None,
+        target_lineage_ID: int | None = None,
         message: str = None,
     ):
         self.source_noi = source_noi
@@ -80,9 +95,15 @@ class TimeFlowError(LineageStructureError):
         self.target_noi = target_noi
         self.target_lineage_ID = target_lineage_ID
         if message is None:
+            txt_source_lin = (
+                "" if source_lineage_ID is None else f" in lineage {source_lineage_ID}"
+            )
+            txt_target_lin = (
+                "" if target_lineage_ID is None else f" in lineage {target_lineage_ID}"
+            )
             message = (
-                f"Node {target_noi} from lineage {target_lineage_ID} "
+                f"Node {target_noi}{txt_target_lin} "
                 f"has a time value lower than its parent node, "
-                f"node {source_noi} from lineage {source_lineage_ID}."
+                f"node {source_noi}{txt_source_lin}."
             )
         super().__init__(message)
