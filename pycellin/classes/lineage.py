@@ -11,6 +11,8 @@ import plotly.graph_objects as go
 
 from pycellin.classes.exceptions import FusionError, TimeFlowError
 
+# TODO: maybe _add_node and _remove_node shouldn't be abstract
+
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
     """
@@ -110,36 +112,36 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     #         raise ValueError(f"Edge {source_noi} -> {target_noi} already exists.")
     #     self.add_edge(source_noi, target_noi, **edge_attrs)
 
-    @abstractmethod
-    def _remove_edge(self, source_noi: int, target_noi: int) -> dict[str, Any]:
-        """
-        Remove an edge from the lineage graph.
+    # @abstractmethod
+    # def _remove_edge(self, source_noi: int, target_noi: int) -> dict[str, Any]:
+    #     """
+    #     Remove an edge from the lineage graph.
 
-        This doesn't create a new lineage but divides the lineage graph into
-        two weakly connected components: one for all the nodes upstream
-        of the removed edge, and one for all the nodes downstream.
-        To divide a lineage into two separate lineages,
-        use the `split_from_node` or `split_from_edge` methods.
+    #     This doesn't create a new lineage but divides the lineage graph into
+    #     two weakly connected components: one for all the nodes upstream
+    #     of the removed edge, and one for all the nodes downstream.
+    #     To divide a lineage into two separate lineages,
+    #     use the `split_from_node` or `split_from_edge` methods.
 
-        Parameters
-        ----------
-        source_noi : int
-            The node ID of the source node.
-        target_noi : int
-            The node ID of the target node.
+    #     Parameters
+    #     ----------
+    #     source_noi : int
+    #         The node ID of the source node.
+    #     target_noi : int
+    #         The node ID of the target node.
 
-        Returns
-        -------
-        dict[str, Any]
-            The features value of the removed edge.
-        """
-        edge_attrs = self[source_noi][target_noi]
-        # TODO: nx is already raising an error if the edge doesn't exist
-        # Ask someone if I should catch it and raise my own error.
-        # Need to check all the other methods too.
-        # Do I need to add it in the docstring if I don't raise it myself?
-        self.remove_edge(source_noi, target_noi)
-        return edge_attrs
+    #     Returns
+    #     -------
+    #     dict[str, Any]
+    #         The features value of the removed edge.
+    #     """
+    #     edge_attrs = self[source_noi][target_noi]
+    #     # TODO: nx is already raising an error if the edge doesn't exist
+    #     # Ask someone if I should catch it and raise my own error.
+    #     # Need to check all the other methods too.
+    #     # Do I need to add it in the docstring if I don't raise it myself?
+    #     self.remove_edge(source_noi, target_noi)
+    #     return edge_attrs
 
     def get_root(self) -> int:
         """
@@ -657,15 +659,15 @@ class CellLineage(Lineage):
 
         self.add_edge(source_noi, target_noi, **link_attrs)
 
-    def _remove_edge(self, source_noi: int, target_noi: int) -> dict[str, Any]:
+    def _remove_link(self, source_noi: int, target_noi: int) -> dict[str, Any]:
         """
-        Remove an edge from the lineage graph.
+        Remove a link between 2 cells.
 
         This doesn't create a new lineage but divides the lineage graph into
         two weakly connected components: one for all the cells upstream
         of the removed edge, and one for all the cells downstream.
         To divide a lineage into two separate lineages,
-        use the `split_from_node` or `split_from_edge` methods.
+        use the `_split_from_cell` or `_split_from_link` methods.
 
         Parameters
         ----------
@@ -681,13 +683,22 @@ class CellLineage(Lineage):
 
         Raises
         ------
+        ValueError
+            If the source or target cell does not exist in the lineage.
         KeyError
-            If the edge does not exist in the lineage.
+            If the link does not exist in the lineage.
         """
+        if source_noi not in self.nodes():
+            raise ValueError(f"Source cell (ID {source_noi}) does not exist.")
+        if target_noi not in self.nodes():
+            raise ValueError(f"Target cell (ID {target_noi}) does not exist.")
         try:
-            link_attrs = super()._remove_edge(source_noi, target_noi)
-        except nx.NetworkXError:
-            raise ValueError(f"Link {source_noi} -> {target_noi} does not exist.")
+            link_attrs = self[source_noi][target_noi]
+        except KeyError:
+            raise KeyError(
+                f"Link 'Cell {source_noi} -> Cell {target_noi}' does not exist."
+            ) from None
+        self.remove_edge(source_noi, target_noi)
         return link_attrs
 
     def _split_from_cell(
