@@ -494,7 +494,7 @@ class Model:
         if link_attributes is not None:
             for feat in link_attributes:
                 if feat not in self.feat_declaration.edge_feats:
-                    raise KeyError(f"The feature {feat} has not been declared.")
+                    raise KeyError(f"The feature '{feat}' has not been declared.")
         else:
             link_attributes = dict()
 
@@ -510,6 +510,37 @@ class Model:
                 Cell(target_cell_ID, target_lineage_ID),
             )
         )
+
+    def unlink_cells(
+        self, source_cell_ID: int, target_cell_ID: int, lineage_ID: int
+    ) -> dict[str, Any]:
+        """
+        Remove a link between two cells.
+
+        Parameters
+        ----------
+        source_cell_ID : int
+            The ID of the source cell.
+        target_cell_ID : int
+            The ID of the target cell.
+        lineage_ID : int
+            The ID of the lineage to which the cells belong.
+
+        Returns
+        -------
+        dict
+            Feature values of the removed link.
+
+        Raises
+        ------
+        KeyError
+            If the link between the two cells does not exist.
+        """
+        try:
+            lineage = self.data.cell_data[lineage_ID]
+        except KeyError as err:
+            raise KeyError(f"Lineage with ID {lineage_ID} does not exist.") from err
+        return lineage._remove_link(source_cell_ID, target_cell_ID)
 
     def check_for_fusions(self) -> list[Cell]:
         """
