@@ -15,7 +15,7 @@ import pycellin.graph.features as pgf
 Cell = namedtuple("Cell", ["cell_ID", "lineage_ID"])
 Link = namedtuple(
     "Link",
-    ["source_cell_ID", "source_lineage_ID", "target_cell_ID", "target_lineage_ID"],
+    ["source_cell", "target_cell"],
 )
 
 
@@ -498,15 +498,17 @@ class Model:
         else:
             link_attributes = dict()
 
-        # TODO: potentially add a try except if the linking leads to a fusion.
-        source_lineage._add_edge(
+        source_lineage._add_link(
             source_cell_ID, target_cell_ID, target_lineage, **link_attributes
         )
 
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
         self._updater._added_links.add(
-            Link(source_cell_ID, source_lineage_ID, target_cell_ID, target_lineage_ID)
+            Link(
+                Cell(source_cell_ID, source_lineage_ID),
+                Cell(target_cell_ID, target_lineage_ID),
+            )
         )
 
     def check_for_fusions(self) -> list[Cell]:
