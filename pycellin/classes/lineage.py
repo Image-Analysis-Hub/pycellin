@@ -647,7 +647,15 @@ class CellLineage(Lineage):
             source_lineage_ID = (
                 self.graph["lineage_ID"] if "lineage_ID" in self.graph else None
             )
-            raise FusionError(target_noi, source_lineage_ID)
+            try:
+                raise FusionError(target_noi, source_lineage_ID)
+            except Exception as err:
+                note = (
+                    f"Remove any incoming edge to node {target_noi} "
+                    f"before adding a new incoming edge."
+                )
+                err.add_note(note)
+                raise err
 
         # Check that the link respects the flow of time.
         if self.nodes[source_noi]["frame"] >= target_lineage.nodes[target_noi]["frame"]:
@@ -843,7 +851,14 @@ class CellLineage(Lineage):
         list[int]
             A chronologically ordered list of nodes representing
             the cell cycle for the given node.
+
+        Raises
+        ------
+        FusionError
+            If the given node has more than one predecessor.
         """
+        # TODO: factorize
+        lineage_ID = self.graph["lineage_ID"] if "lineage_ID" in self.graph else None
         cell_cycle = [node]
         start = False
         end = False
@@ -855,18 +870,26 @@ class CellLineage(Lineage):
 
         if not start:
             predecessors = list(self.predecessors(node))
-            assert len(predecessors) == 1
+            if len(predecessors) != 1:
+                try:
+                    raise FusionError(node, lineage_ID)
+                except Exception as err:
+                    note = f"This node has {len(predecessors)} predecessors."
+                    err.add_note(note)
+                    raise err
             while not self.is_division(*predecessors) and not self.is_root(
                 *predecessors
             ):
                 # While not the generation birth.
                 cell_cycle.append(*predecessors)
                 predecessors = list(self.predecessors(*predecessors))
-                err = (
-                    f"Node {node} in lineage of ID {self.graph['lineage_ID']} "
-                    f"has {len(predecessors)} predecessors."
-                )
-                assert len(predecessors) == 1, err
+                if len(predecessors) != 1:
+                    try:
+                        raise FusionError(node, lineage_ID)
+                    except Exception as err:
+                        note = f"This node has {len(predecessors)} predecessors."
+                        err.add_note(note)
+                        raise err
             if self.is_root(*predecessors) and not self.is_division(*predecessors):
                 cell_cycle.append(*predecessors)
             cell_cycle.reverse()  # We built it from the end.
@@ -874,16 +897,16 @@ class CellLineage(Lineage):
         if not end:
             successors = list(self.successors(node))
             err = (
-                f"Node {node} in lineage of ID {self.graph['lineage_ID']} "
-                f"has {len(successors)} successors."
+                f"Something went wrong: division detected in the cell cycle "
+                f"of node {node}. This node has {len(successors)} successors."
             )
             assert len(successors) == 1, err
             while not self.is_division(*successors) and not self.is_leaf(*successors):
                 cell_cycle.append(*successors)
                 successors = list(self.successors(*successors))
                 err = (
-                    f"Node {node} in lineage of ID {self.graph['lineage_ID']} "
-                    f"has {len(successors)} successors."
+                    f"Something went wrong: division detected in the cell cycle "
+                    f"of node {node}. This node has {len(successors)} successors."
                 )
                 assert len(successors) == 1, err
             cell_cycle.append(*successors)
@@ -975,7 +998,15 @@ class CellLineage(Lineage):
                 lineage_ID = (
                     self.graph["lineage_ID"] if "lineage_ID" in self.graph else None
                 )
-                raise FusionError(noi, lineage_ID)
+                try:
+                    raise FusionError(noi, lineage_ID)
+                except Exception as err:
+                    note = (
+                        f"Remove any incoming edge to node {noi} "
+                        f"before adding a new incoming edge."
+                    )
+                    err.add_note(note)
+                    raise err
         return sister_cells
 
     def is_division(self, node: int) -> bool:
