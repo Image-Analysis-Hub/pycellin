@@ -77,38 +77,38 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         self.remove_node(node)
         return node_attrs
 
-    @abstractmethod
-    def _add_edge(self, source_noi: int, target_noi: int, **edge_attrs) -> None:
-        """
-        Add an edge between 2 nodes.
+    # @abstractmethod
+    # def _add_edge(self, source_noi: int, target_noi: int, **edge_attrs) -> None:
+    #     """
+    #     Add an edge between 2 nodes.
 
-        Parameters
-        ----------
-        source_noi : int
-            The node ID of the source node.
-        target_noi : int
-            The node ID of the target node.
-        **edge_attrs
-            Attributes to set for the edge.
+    #     Parameters
+    #     ----------
+    #     source_noi : int
+    #         The node ID of the source node.
+    #     target_noi : int
+    #         The node ID of the target node.
+    #     **edge_attrs
+    #         Attributes to set for the edge.
 
-        Raises
-        ------
-        ValueError
-            If the source or target node does not exist in the lineage.
-            If the edge already exists in the lineage.
-        """
-        # NetworkX does not raise an error if the nodes don't exist,
-        # it creates them along the edge. To avoid any unwanted modifications
-        # to the lineage, we raise an error if the nodes don't exist.
-        if source_noi not in self.nodes():
-            raise ValueError(f"Source node (ID {source_noi}) does not exist.")
-        if target_noi not in self.nodes():
-            raise ValueError(f"Target node (ID {target_noi}) does not exist.")
-        # Idem for the edge, NetworX does not raise an error but updates
-        # the already existing edge, potentially overwriting edge attributes.
-        if self.has_edge(source_noi, target_noi):
-            raise ValueError(f"Edge {source_noi} -> {target_noi} already exists.")
-        self.add_edge(source_noi, target_noi, **edge_attrs)
+    #     Raises
+    #     ------
+    #     ValueError
+    #         If the source or target node does not exist in the lineage.
+    #         If the edge already exists in the lineage.
+    #     """
+    #     # NetworkX does not raise an error if the nodes don't exist,
+    #     # it creates them along the edge. To avoid any unwanted modifications
+    #     # to the lineage, we raise an error if the nodes don't exist.
+    #     if source_noi not in self.nodes():
+    #         raise ValueError(f"Source node (ID {source_noi}) does not exist.")
+    #     if target_noi not in self.nodes():
+    #         raise ValueError(f"Target node (ID {target_noi}) does not exist.")
+    #     # Idem for the edge, NetworX does not raise an error but updates
+    #     # the already existing edge, potentially overwriting edge attributes.
+    #     if self.has_edge(source_noi, target_noi):
+    #         raise ValueError(f"Edge {source_noi} -> {target_noi} already exists.")
+    #     self.add_edge(source_noi, target_noi, **edge_attrs)
 
     @abstractmethod
     def _remove_edge(self, source_noi: int, target_noi: int) -> dict[str, Any]:
@@ -140,70 +140,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # Do I need to add it in the docstring if I don't raise it myself?
         self.remove_edge(source_noi, target_noi)
         return edge_attrs
-
-    def _split_from_node(
-        self,
-        noi: int,
-        new_lineage_ID: int,
-        split: Literal["upstream", "downstream"] = "upstream",
-    ) -> "Lineage":
-        """
-        Split the lineage into two separate lineages from a given node.
-
-        Parameters
-        ----------
-        noi : int
-            The ID of the node from which to split the lineage.
-        new_lineage_ID : int
-            The ID of the new lineage to create.
-        split : {"upstream", "downstream"}, optional
-            Where to cut the lineage relative to the given node.
-            If upstream, the given node is included in the second lineage.
-            If downstream, the given node is included in the first lineage.
-            "upstream" by default.
-
-        Returns
-        -------
-        Lineage
-            The new lineage created from the split.
-        """
-        # TODO: implement
-        # TODO: if I return only one lineage, should I call the method _cut_from_node?
-        # Add an argument to choose which lineage to use for overwriting slef.lineage?
-        # Or return a tuple with the two lineages?
-
-    def _split_from_edge(
-        self,
-        source_noi: int,
-        target_noi: int,
-        new_lineage_ID: int,
-    ) -> "Lineage":
-        """
-        Split the lineage into two separate lineages from a given edge.
-
-        The given edge is removed. The source node of the edge
-        and all the nodes upstream are included in the first lineage,
-        and the target node of the edge and all the nodes downstream
-        are included in the second lineage.
-
-        Parameters
-        ----------
-        source_noi : int
-            The node ID of the source node of the edge.
-        target_noi : int
-            The node ID of the target node of the edge.
-        new_lineage_ID : int
-            The ID of the new lineage to create.
-
-        Returns
-        -------
-        Lineage
-            The new lineage created from the split.
-        """
-        # TODO: implement
-        # TODO: if I return only one lineage, should I call the method _cut_from_edge?
-        # Add an argument to choose which lineage to use for overwriting slef.lineage?
-        # Or return a tuple with the two lineages?
 
     def get_root(self) -> int:
         """
@@ -628,7 +564,7 @@ class CellLineage(Lineage):
             raise KeyError(f"Cell {noi} does not exist in the lineage.")
         return cell_attrs
 
-    def _add_edge(
+    def _add_link(
         self,
         source_noi: int,
         target_noi: int,
@@ -636,7 +572,7 @@ class CellLineage(Lineage):
         **link_attrs,
     ) -> None:
         """
-        Link 2 cells.
+        Create a link beween 2 cells.
 
         The 2 cells can be in the same lineage or in different lineages.
         However, the linking cannot be done if it leads to a fusion event,
@@ -656,6 +592,9 @@ class CellLineage(Lineage):
 
         Raises
         ------
+        ValueError
+            If the source or target cell does not exist in the lineage.
+            If the edge already exists in the lineage.
         FusionError
             If the target cell already has a parent cell.
         TimeFlowError
@@ -663,6 +602,21 @@ class CellLineage(Lineage):
         """
         if target_lineage is None:
             target_lineage = self
+            # If the link already exists, NetworX does not raise an error but updates
+            # the already existing link, potentially overwriting edge attributes.
+            # To avoid any unwanted modifications to the lineage, we raise an error.
+            if self.has_edge(source_noi, target_noi):
+                raise ValueError(
+                    f"Link: Cell {source_noi} -> Cell {target_noi} already exists."
+                )
+
+        # NetworkX does not raise an error if the cells don't exist,
+        # it creates them along the link. To avoid any unwanted modifications
+        # to the lineage, we raise an error if the cells don't exist.
+        if source_noi not in self.nodes():
+            raise ValueError(f"Source cell (ID {source_noi}) does not exist.")
+        if target_noi not in target_lineage.nodes():
+            raise ValueError(f"Target cell (ID {target_noi}) does not exist.")
 
         # Check that the link will not create a fusion event.
         if target_lineage.in_degree(target_noi) != 0:
@@ -678,7 +632,7 @@ class CellLineage(Lineage):
             )
 
         if target_lineage != self:
-            # Identify node ID conflict between lineages.
+            # Identify cell ID conflict between lineages.
             target_descendants = nx.descendants(target_lineage, target_noi)
             conflicting_ids = set(self.nodes()) & set(target_descendants)
             if conflicting_ids:
@@ -688,9 +642,9 @@ class CellLineage(Lineage):
                     ids_mapping[id] = next_id
                     next_id += 1
 
-            # Create a new lineage from the target node and its descendants,
-            # including edges.
-            tmp_lineage = target_lineage._split_from_node(target_noi, "tmp_ID")
+            # Create a new lineage from the target cell and its descendants,
+            # including links.
+            tmp_lineage = target_lineage._split_from_cell(target_noi)
             if conflicting_ids:
                 nx.relabel_nodes(tmp_lineage, ids_mapping, copy=False)
                 if target_noi in ids_mapping:
@@ -698,16 +652,10 @@ class CellLineage(Lineage):
                 assert tmp_lineage.get_root() == target_noi
 
             # Merge all the elements of the target lineage into the source lineage.
-            merged_lineage = nx.union(tmp_lineage, self)
-            self.__dict__.update(merged_lineage.__dict__)
+            self.update(tmp_lineage)
+            del tmp_lineage
 
-        super()._add_edge(source_noi, target_noi, **link_attrs)
-
-        # TODO: debug
-        # TODO: is update() better than union() in my case? It would avoid creating
-        # a new lineage and having to modify self.__dict__.
-        # TODO: this method is widely different from the one in the abstract class.
-        # Does it make sense to Lineage._add_edge() abstract?
+        self.add_edge(source_noi, target_noi, **link_attrs)
 
     def _remove_edge(self, source_noi: int, target_noi: int) -> dict[str, Any]:
         """
@@ -741,6 +689,77 @@ class CellLineage(Lineage):
         except nx.NetworkXError:
             raise ValueError(f"Link {source_noi} -> {target_noi} does not exist.")
         return link_attrs
+
+    def _split_from_cell(
+        self,
+        noi: int,
+        split: Literal["upstream", "downstream"] = "upstream",
+    ) -> CellLineage:
+        """
+        From a given cell, split a part of the lineage into a new lineage.
+
+        Parameters
+        ----------
+        noi : int
+            The node ID of the cell from which to split the lineage.
+        split : {"upstream", "downstream"}, optional
+            Where to split the lineage relative to the given cell.
+            If upstream, the given cell is included in the second lineage.
+            If downstream, the given cell is included in the first lineage.
+            "upstream" by default.
+
+        Returns
+        -------
+        CellLineage
+            The new lineage created from the split.
+
+        Raises
+        ------
+        ValueError
+            If the split parameter is not "upstream" or "downstream".
+        """
+        if split == "upstream":
+            nodes = nx.descendants(self, noi) | {noi}
+        elif split == "downstream":
+            nodes = nx.descendants(self, noi)
+        else:
+            raise ValueError("The split parameter must be 'upstream' or 'downstream'.")
+        new_lineage = self.subgraph(nodes).copy()
+        self.remove_nodes_from(nodes)
+        return new_lineage
+
+    def _split_from_link(
+        self,
+        source_noi: int,
+        target_noi: int,
+        new_lineage_ID: int,
+    ) -> "Lineage":
+        """
+        Split the lineage into two separate lineages from a given edge.
+
+        The given edge is removed. The source node of the edge
+        and all the nodes upstream are included in the first lineage,
+        and the target node of the edge and all the nodes downstream
+        are included in the second lineage.
+
+        Parameters
+        ----------
+        source_noi : int
+            The node ID of the source node of the edge.
+        target_noi : int
+            The node ID of the target node of the edge.
+        new_lineage_ID : int
+            The ID of the new lineage to create.
+
+        Returns
+        -------
+        Lineage
+            The new lineage created from the split.
+        """
+        # TODO: implement
+        # TODO: if I return only one lineage, should I call the method _cut_from_edge?
+        # Add an argument to choose which lineage to use for overwriting slef.lineage?
+        # Or return a tuple with the two lineages?
 
     def get_divisions(self, nodes: list[int] | None = None) -> list[int]:
         """
