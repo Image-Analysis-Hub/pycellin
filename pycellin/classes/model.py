@@ -11,6 +11,7 @@ from pycellin.classes.lineage import CellLineage, CycleLineage
 from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features as pgf
 
+# TODO: check if I need to add error chaining
 
 Cell = namedtuple("Cell", ["cell_ID", "lineage_ID"])
 Link = namedtuple(
@@ -480,13 +481,17 @@ class Model:
         # TODO: is the name add_link() better?
         try:
             source_lineage = self.data.cell_data[source_lineage_ID]
-        except KeyError:
-            print(f"Lineage with ID {source_lineage_ID} does not exist.")
+        except KeyError as err:
+            raise KeyError(
+                f"Lineage with ID {source_lineage_ID} does not exist."
+            ) from err
         if target_lineage_ID is not None:
             try:
                 target_lineage = self.data.cell_data[target_lineage_ID]
-            except KeyError:
-                print(f"Lineage with ID {target_lineage_ID} does not exist.")
+            except KeyError as err:
+                raise KeyError(
+                    f"Lineage with ID {target_lineage_ID} does not exist."
+                ) from err
         else:
             target_lineage_ID = source_lineage_ID
             target_lineage = self.data.cell_data[source_lineage_ID]
