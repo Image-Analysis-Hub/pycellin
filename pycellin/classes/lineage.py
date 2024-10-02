@@ -661,7 +661,7 @@ class CellLineage(Lineage):
 
     def _remove_link(self, source_noi: int, target_noi: int) -> dict[str, Any]:
         """
-        Remove a link between 2 cells.
+        Remove a link between two cells.
 
         This doesn't create a new lineage but divides the lineage graph into
         two weakly connected components: one for all the cells upstream
@@ -694,10 +694,10 @@ class CellLineage(Lineage):
             raise ValueError(f"Target cell (ID {target_noi}) does not exist.")
         try:
             link_attrs = self[source_noi][target_noi]
-        except KeyError:
+        except KeyError as err:
             raise KeyError(
                 f"Link 'Cell {source_noi} -> Cell {target_noi}' does not exist."
-            ) from None
+            ) from err
         self.remove_edge(source_noi, target_noi)
         return link_attrs
 
