@@ -607,7 +607,7 @@ class CellLineage(Lineage):
             # To avoid any unwanted modifications to the lineage, we raise an error.
             if self.has_edge(source_noi, target_noi):
                 raise ValueError(
-                    f"Link: Cell {source_noi} -> Cell {target_noi} already exists."
+                    f"Link 'Cell {source_noi} -> Cell {target_noi}' already exists."
                 )
 
         # NetworkX does not raise an error if the cells don't exist,
