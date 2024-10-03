@@ -1018,6 +1018,21 @@ class CellLineage(Lineage):
 
     @staticmethod
     def _get_lineage_id_and_text(lineage):
+        """
+        Return the lineage ID and a text to display in error messages.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            The lineage from which to extract the lineage ID.
+
+        Returns
+        -------
+        int | None
+            The lineage ID.
+        str
+            The text to display in error messages.
+        """
         try:
             lineage_ID = lineage.graph["lineage_ID"]
             txt = f" in lineage {lineage_ID}"
