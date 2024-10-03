@@ -279,7 +279,9 @@ class Model:
         # Update the edges
         # TODO: implement
 
-    def add_lineage(self, lineage: CellLineage, with_CycleLineage: bool = True) -> None:
+    def add_lineage(
+        self, lineage: CellLineage, with_CycleLineage: bool = False
+    ) -> None:
         """
         Add a lineage to the model.
 
@@ -288,7 +290,7 @@ class Model:
         lineage : CellLineage
             Lineage to add.
         with_CycleLineage : bool, optional
-            True to compute the cycle lineage, False otherwise (default is True).
+            True to compute the cycle lineage, False otherwise (default is False).
 
         Raises
         ------
