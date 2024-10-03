@@ -351,11 +351,12 @@ class Model:
         cell_ID: int,
         lineage_ID: int,
         new_lineage_ID: int | None = None,
+        split: Literal["upstream", "downstream"] = "upstream",
     ) -> CellLineage:
         """
-        Split a lineage at the specified cell.
+        From a given cell, split a part of the given lineage into a new lineage.
 
-        The specified cell will be the root of the new lineage.
+        By default, the given cell will be the root of the new lineage.
 
         Parameters
         ----------
@@ -366,6 +367,11 @@ class Model:
         new_lineage_ID : int, optional
             ID of the new lineage (default is None). If None, a new ID
             will be generated.
+        split : {"upstream", "downstream"}, optional
+            Where to split the lineage relative to the given cell.
+            If upstream, the given cell is included in the second lineage.
+            If downstream, the given cell is included in the first lineage.
+            "upstream" by default.
 
         Returns
         -------
@@ -383,7 +389,7 @@ class Model:
             raise KeyError(f"Lineage with ID {lineage_ID} does not exist.") from err
 
         # Create the new lineage.
-        new_lineage = lineage._split_from_cell(cell_ID)
+        new_lineage = lineage._split_from_cell(cell_ID, split)
         if new_lineage_ID is None:
             new_lineage_ID = self.get_next_available_lineage_ID()
         new_lineage.graph["lineage_ID"] = new_lineage_ID
@@ -403,6 +409,7 @@ class Model:
         self._updater._update_required = True
         self._updater._added_lineages.add(new_lineage_ID)
         self._updater._modified_lineages.add(lineage_ID)
+        # TODO: should I instead list all the removed cells and links?
 
         return new_lineage
 

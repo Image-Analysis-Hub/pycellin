@@ -660,39 +660,6 @@ class CellLineage(Lineage):
         self.remove_nodes_from(nodes)
         return new_lineage
 
-    def _split_from_link(
-        self,
-        source_noi: int,
-        target_noi: int,
-        new_lineage_ID: int,
-    ) -> "Lineage":
-        """
-        Split the lineage into two separate lineages from a given edge.
-
-        The given edge is removed. The source node of the edge
-        and all the nodes upstream are included in the first lineage,
-        and the target node of the edge and all the nodes downstream
-        are included in the second lineage.
-
-        Parameters
-        ----------
-        source_noi : int
-            The node ID of the source node of the edge.
-        target_noi : int
-            The node ID of the target node of the edge.
-        new_lineage_ID : int
-            The ID of the new lineage to create.
-
-        Returns
-        -------
-        Lineage
-            The new lineage created from the split.
-        """
-        # TODO: implement
-        # TODO: if I return only one lineage, should I call the method _cut_from_edge?
-        # Add an argument to choose which lineage to use for overwriting slef.lineage?
-        # Or return a tuple with the two lineages?
-
     def get_divisions(self, nodes: list[int] | None = None) -> list[int]:
         """
         Return the division nodes of the lineage.
