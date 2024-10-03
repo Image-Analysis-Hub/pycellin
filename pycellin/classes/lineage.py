@@ -457,13 +457,8 @@ class CellLineage(Lineage):
         try:
             cell_attrs = self.nodes[noi]
         except KeyError as err:
-            if "lineage_ID" not in self.graph:
-                msg = f"Cell {noi} does not exist in the lineage."
-            else:
-                msg = (
-                    f"Cell {noi} does not exist in the lineage with ID "
-                    f"{self.graph['lineage_ID']}."
-                )
+            _, txt = CellLineage._get_lineage_id_and_text(self)
+            msg = f"Cell {noi} does not exist{txt}."
             raise KeyError(msg) from err
         self.remove_node(noi)
         return cell_attrs
@@ -504,29 +499,35 @@ class CellLineage(Lineage):
         TimeFlowError
             If the target cell happens before the source cell.
         """
-        if target_lineage is None:
+        source_lineage_ID, txt_src = CellLineage._get_lineage_id_and_text(self)
+
+        if target_lineage is not None:
+            target_lineage_ID, txt_tgt = CellLineage._get_lineage_id_and_text(
+                target_lineage
+            )
+        else:
             target_lineage = self
+            target_lineage_ID = source_lineage_ID
+            txt_tgt = txt_src
             # If the link already exists, NetworX does not raise an error but updates
             # the already existing link, potentially overwriting edge attributes.
             # To avoid any unwanted modifications to the lineage, we raise an error.
             if self.has_edge(source_noi, target_noi):
                 raise ValueError(
-                    f"Link 'Cell {source_noi} -> Cell {target_noi}' already exists."
+                    f"Link 'Cell {source_noi} -> Cell {target_noi}' "
+                    f"already exists{txt_tgt}."
                 )
 
         # NetworkX does not raise an error if the cells don't exist,
         # it creates them along the link. To avoid any unwanted modifications
         # to the lineage, we raise an error if the cells don't exist.
         if source_noi not in self.nodes():
-            raise ValueError(f"Source cell (ID {source_noi}) does not exist.")
+            raise ValueError(f"Source cell (ID {source_noi}) does not exist{txt_src}.")
         if target_noi not in target_lineage.nodes():
-            raise ValueError(f"Target cell (ID {target_noi}) does not exist.")
+            raise ValueError(f"Target cell (ID {target_noi}) does not exist{txt_tgt}.")
 
         # Check that the link will not create a fusion event.
         if target_lineage.in_degree(target_noi) != 0:
-            source_lineage_ID = (
-                self.graph["lineage_ID"] if "lineage_ID" in self.graph else None
-            )
             try:
                 raise FusionError(target_noi, source_lineage_ID)
             except Exception as err:
@@ -539,14 +540,6 @@ class CellLineage(Lineage):
 
         # Check that the link respects the flow of time.
         if self.nodes[source_noi]["frame"] >= target_lineage.nodes[target_noi]["frame"]:
-            source_lineage_ID = (
-                self.graph["lineage_ID"] if "lineage_ID" in self.graph else None
-            )
-            target_lineage_ID = (
-                target_lineage.graph["lineage_ID"]
-                if "lineage_ID" in target_lineage.graph
-                else None
-            )
             raise TimeFlowError(
                 source_noi,
                 target_noi,
@@ -609,15 +602,17 @@ class CellLineage(Lineage):
         KeyError
             If the link does not exist in the lineage.
         """
+        _, txt = CellLineage._get_lineage_id_and_text(self)
         if source_noi not in self.nodes():
-            raise ValueError(f"Source cell (ID {source_noi}) does not exist.")
+            raise ValueError(f"Source cell (ID {source_noi}) does not exist{txt}.")
         if target_noi not in self.nodes():
-            raise ValueError(f"Target cell (ID {target_noi}) does not exist.")
+            raise ValueError(f"Target cell (ID {target_noi}) does not exist{txt}.")
+
         try:
             link_attrs = self[source_noi][target_noi]
         except KeyError as err:
             raise KeyError(
-                f"Link 'Cell {source_noi} -> Cell {target_noi}' does not exist."
+                f"Link 'Cell {source_noi} -> Cell {target_noi}' does not exist{txt}."
             ) from err
         self.remove_edge(source_noi, target_noi)
         return link_attrs
@@ -648,8 +643,13 @@ class CellLineage(Lineage):
         Raises
         ------
         ValueError
-            If the split parameter is not "upstream" or "downstream".
+            If the cell does not exist in the lineage.
+            If the split parameter is not "upstream" or "downstream"
         """
+        _, txt = CellLineage._get_lineage_id_and_text(self)
+        if noi not in self.nodes():
+            raise ValueError(f"Source cell (ID {noi}) does not exist{txt}.")
+
         if split == "upstream":
             nodes = nx.descendants(self, noi) | {noi}
         elif split == "downstream":
@@ -738,7 +738,7 @@ class CellLineage(Lineage):
             If the given node has more than one predecessor.
         """
         # TODO: factorize
-        lineage_ID = self.graph["lineage_ID"] if "lineage_ID" in self.graph else None
+        lineage_ID, _ = CellLineage._get_lineage_id_and_text(self)
         cell_cycle = [node]
         start = False
         end = False
@@ -875,9 +875,7 @@ class CellLineage(Lineage):
                         ]
                     )
             elif len(parents) > 1:
-                lineage_ID = (
-                    self.graph["lineage_ID"] if "lineage_ID" in self.graph else None
-                )
+                lineage_ID, _ = CellLineage._get_lineage_id_and_text(self)
                 raise FusionError(noi, lineage_ID)
         return sister_cells
 
@@ -1017,6 +1015,16 @@ class CellLineage(Lineage):
             show_horizontal_grid=show_horizontal_grid,
             showlegend=showlegend,
         )
+
+    @staticmethod
+    def _get_lineage_id_and_text(lineage):
+        try:
+            lineage_ID = lineage.graph["lineage_ID"]
+            txt = f" in lineage {lineage_ID}"
+        except KeyError:
+            lineage_ID = None
+            txt = ""
+        return lineage_ID, txt
 
 
 class CycleLineage(Lineage):
