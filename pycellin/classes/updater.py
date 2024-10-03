@@ -32,6 +32,9 @@ class ModelUpdater:
             # On regarde si dans les features déclarées, il y a des features de pycellin
             # qui n'ont pas été déjà calculées
 
+        # Update is done.
+        self._update_required = False
+
     # TODO: need to check somewhere that no fusion were created when
     # modifying the graphs
     # => maybe better in Model?
