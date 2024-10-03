@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# TODO: add a WWarning when a feature is not present across all cells,
+# TODO: add a Warning when a feature is not present across all cells,
 # links, or lineages?
 
 
