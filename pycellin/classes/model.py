@@ -251,6 +251,17 @@ class Model:
             )
         return cycle_lineage_feats
 
+    def get_next_available_lineage_ID(self) -> int:
+        """
+        Return the next available lineage ID.
+
+        Returns
+        -------
+        int
+            The next available lineage ID.
+        """
+        return max(self.data.cell_data.keys()) + 1
+
     def require_update(self) -> bool:
         """
         Check if the model requires an update.
@@ -371,13 +382,29 @@ class Model:
         except KeyError as err:
             raise KeyError(f"Lineage with ID {lineage_ID} does not exist.") from err
 
+        # Create the new lineage.
         new_lineage = lineage._split_from_cell(cell_ID)
         if new_lineage_ID is None:
             new_lineage_ID = self.get_next_available_lineage_ID()
         new_lineage.graph["lineage_ID"] = new_lineage_ID
-        return new_lineage
 
-    # TODO: implement get_next_available_lineage_ID()
+        # Update the model data.
+        self.data.cell_data[new_lineage_ID] = new_lineage
+        # The update of the cycle lineages (if needed) will be
+        # done by the updater.
+        # TODO: see with JY if we should update the cycle lineages here
+        # if self.data.cycle_data:
+        #     cycle_lineage = self.data._compute_cycle_lineage(lineage_ID)
+        #     self.data.cycle_data[lineage_ID] = cycle_lineage
+        #     new_cycle_lineage = self.data._compute_cycle_lineage(new_lineage_ID)
+        #     self.data.cycle_data[new_lineage_ID] = new_cycle_lineage
+
+        # Notify that an update of the feature values may be required.
+        self._updater._update_required = True
+        self._updater._added_lineages.add(new_lineage_ID)
+        self._updater._modified_lineages.add(lineage_ID)
+
+        return new_lineage
 
     def add_cell(
         self,

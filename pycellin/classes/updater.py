@@ -18,6 +18,9 @@ class ModelUpdater:
         self._removed_cells = set()
         self._added_links = set()  # set of Link()
         self._removed_links = set()
+        self._added_lineages = set()  # set of lineage_ID
+        self._removed_lineages = set()
+        self._modified_lineages = set()
 
     def _update_cells(self, dict_feat: dict[str, Any], data: Data):
         for cell in self._added_cells:
