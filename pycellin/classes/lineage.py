@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+import types
 from typing import Any, Literal
 
 from igraph import Graph
 import networkx as nx
+from networkx.classes.digraph import DiGraph
 import plotly.graph_objects as go
 
 from pycellin.classes.exceptions import FusionError, TimeFlowError
@@ -378,6 +380,32 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             title=y_legend,
         )
         fig.show()
+
+    @staticmethod
+    def unfreeze(lin: Lineage) -> None:
+        """
+        Modify graph to allow changes by adding or removing nodes or edges.
+
+        Parameters
+        ----------
+        lin : Lineage
+            The lineage to unfreeze.
+        """
+        if nx.is_frozen(lin):
+            lin.add_node = types.MethodType(DiGraph.add_node, lin)
+            lin.add_nodes_from = types.MethodType(DiGraph.add_nodes_from, lin)
+            lin.remove_node = types.MethodType(DiGraph.remove_node, lin)
+            lin.remove_nodes_from = types.MethodType(DiGraph.remove_nodes_from, lin)
+            lin.add_edge = types.MethodType(DiGraph.add_edge, lin)
+            lin.add_edges_from = types.MethodType(DiGraph.add_edges_from, lin)
+            lin.add_weighted_edges_from = types.MethodType(
+                DiGraph.add_weighted_edges_from, lin
+            )
+            lin.remove_edge = types.MethodType(DiGraph.remove_edge, lin)
+            lin.remove_edges_from = types.MethodType(DiGraph.remove_edges_from, lin)
+            lin.clear = types.MethodType(DiGraph.clear, lin)
+            lin.clear_edges = types.MethodType(DiGraph.clear_edges, lin)
+            del lin.frozen
 
 
 class CellLineage(Lineage):

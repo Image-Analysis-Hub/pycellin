@@ -3,11 +3,10 @@
 
 import math
 from typing import Literal
-import warnings
 
 import networkx as nx
 
-from pycellin.classes.lineage import CellLineage, CycleLineage
+from pycellin.classes.lineage import Lineage, CellLineage, CycleLineage
 
 
 class Data:
@@ -71,27 +70,9 @@ class Data:
     def _unfreeze_lineage_data(self):
         """
         Unfreeze all cell lineages.
-
-        Notes
-        -----
-        Since unfreezing a lineage requires to create a new lineage object,
-        any previously made reference to the lineage will be lost.
-
-        >>> import networkx as nx
-        >>> lineage1 = model.data.cell_data[1]
-        >>> model.data._freeze_lineage_data()
-        >>> model.data._unfreeze_lineage_data()
-        >>> nx.is_frozen(lineage1)
-        False
-        >>> nx.is_frozen(model.data.cell_data[1])
-        True
-        >>> lineage1 == model.data.cell_data[1]
-        False
         """
-        # TODO: should add a warning about the potential loss of references.
-        for lineage_ID, lineage in self.cell_data.items():
-            if nx.is_frozen(lineage):
-                self.cell_data[lineage_ID] = CellLineage(lineage)
+        for lineage in self.cell_data.values():
+            Lineage.unfreeze(lineage)
 
     def number_of_lineages(self) -> int:
         """
