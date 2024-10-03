@@ -3,6 +3,9 @@
 
 import math
 from typing import Literal
+import warnings
+
+import networkx as nx
 
 from pycellin.classes.lineage import CellLineage, CycleLineage
 
@@ -53,10 +56,49 @@ class Data:
         """
         return CycleLineage(self.cell_data[lineage_ID])
 
+    def _freeze_lineage_data(self):
+        """
+        Freeze all cell lineages.
+
+        When a cell lineage is frozen, its structure cannot be modified:
+        nodes and edges cannot be added or removed. However, graph, node and edge
+        attributes can still be modified.
+        """
+        for lineage in self.cell_data.values():
+            if not nx.is_frozen(lineage):
+                nx.freeze(lineage)
+
+    def _unfreeze_lineage_data(self):
+        """
+        Unfreeze all cell lineages.
+
+        Notes
+        -----
+        Since unfreezing a lineage requires to create a new lineage object,
+        any previously made reference to the lineage will be lost.
+
+        >>> import networkx as nx
+        >>> lineage1 = model.data.cell_data[1]
+        >>> model.data._freeze_lineage_data()
+        >>> model.data._unfreeze_lineage_data()
+        >>> nx.is_frozen(lineage1)
+        False
+        >>> nx.is_frozen(model.data.cell_data[1])
+        True
+        >>> lineage1 == model.data.cell_data[1]
+        False
+        """
+        # TODO: should add a warning about the potential loss of references.
+        for lineage_ID, lineage in self.cell_data.items():
+            if nx.is_frozen(lineage):
+                self.cell_data[lineage_ID] = CellLineage(lineage)
+
     def number_of_lineages(self) -> int:
         """
         Return the number of lineages in the data.
         """
+        # TODO: replace the assertion by a warning or an exception
+        # so that the user can handle the case however they want.
         if self.cycle_data:
             assert len(self.cell_data) == len(self.cycle_data), (
                 f"Impossible state:"

@@ -284,11 +284,21 @@ class Model:
             print("Model is already up to date.")
             return
 
+        self.data._freeze_lineage_data()
+
+        # TODO: need to handle all the errors that can be raised
+        # by the updater methods to avoid incoherent states.
+
         # Update the nodes
         self._updater._update_cells(self.feat_declaration, self.data)
 
         # Update the edges
         # TODO: implement
+
+        # Update the lineages
+        # TODO: implement
+
+        self.data._unfreeze_lineage_data()
 
     def add_lineage(
         self, lineage: CellLineage, with_CycleLineage: bool = False
