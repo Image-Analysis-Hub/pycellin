@@ -335,8 +335,11 @@ class Model:
             self.data.cycle_data.pop(lineage_ID)
         return lineage
 
-    def split_lineage(
-        self, cell_ID: int, lineage_ID: int, new_lineage_ID: int | None = None
+    def split_lineage_from_cell(
+        self,
+        cell_ID: int,
+        lineage_ID: int,
+        new_lineage_ID: int | None = None,
     ) -> CellLineage:
         """
         Split a lineage at the specified cell.
@@ -363,8 +366,18 @@ class Model:
         KeyError
             If the lineage with the specified ID does not exist in the model.
         """
-        # TODO: implement
-        pass
+        try:
+            lineage = self.data.cell_data[lineage_ID]
+        except KeyError as err:
+            raise KeyError(f"Lineage with ID {lineage_ID} does not exist.") from err
+
+        new_lineage = lineage._split_from_cell(cell_ID)
+        if new_lineage_ID is None:
+            new_lineage_ID = self.get_next_available_lineage_ID()
+        new_lineage.graph["lineage_ID"] = new_lineage_ID
+        return new_lineage
+
+    # TODO: implement get_next_available_lineage_ID()
 
     def add_cell(
         self,
