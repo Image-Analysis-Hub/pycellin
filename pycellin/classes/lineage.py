@@ -20,12 +20,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     def __init__(self, nx_digraph: nx.DiGraph | None = None) -> None:
         super().__init__(incoming_graph_data=nx_digraph)
 
-    # For all the following methods, we might need to recompute features.
-    #   => put it in the abstract method and then use super() in the subclasses
-    #      after modifying the graph
-    # Abstract method because for CellLineages, we first need to unfreeze the graph.
-    # Can I reuse already implemented methods from networkx?
-
     def get_root(self) -> int:
         """
         Return the root of the lineage.
@@ -884,15 +878,7 @@ class CellLineage(Lineage):
                 lineage_ID = (
                     self.graph["lineage_ID"] if "lineage_ID" in self.graph else None
                 )
-                try:
-                    raise FusionError(noi, lineage_ID)
-                except Exception as err:
-                    note = (
-                        f"Remove any incoming edge to node {noi} "
-                        f"before adding a new incoming edge."
-                    )
-                    err.add_note(note)
-                    raise err
+                raise FusionError(noi, lineage_ID)
         return sister_cells
 
     def is_division(self, node: int) -> bool:
