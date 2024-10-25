@@ -7,6 +7,10 @@ from typing import Any, Callable, Literal
 
 from pycellin.classes.data import Data
 from pycellin.classes.feature import Feature, FeaturesDeclaration
+from pycellin.classes.feature_calculator import (
+    FeatureCalculator,
+    FeatureCalculatorFactory,
+)
 from pycellin.classes.lineage import CellLineage
 from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features as pgf
@@ -47,6 +51,7 @@ class Model:
         self.feat_declaration = feat_declaration
         self.data = data
 
+        self._factory = (FeatureCalculatorFactory(),)
         self._updater = ModelUpdater()
 
         # Add an optional argument to ask to compute the CycleLineage?
@@ -632,12 +637,15 @@ class Model:
         self,
         feat: Feature,
         feat_type: Literal["node", "edge", "lineage"],
-        func: Callable,
-        *args: Any,
-        **kwargs: Any,
+        calculator: FeatureCalculator,
     ) -> None:
         """
-        Add a custom feature to the model.
+        compute and add a custom feature to the model.
+
+        This method adds the feature to the FeaturesDeclaration,
+        registers the way to compute the feature in case we need
+        to recompute it later on, and then actually computes
+        the feature values for all the data.
 
         Parameters
         ----------
@@ -645,282 +653,279 @@ class Model:
             Feature to add.
         feat_type : Literal["node", "edge", "lineage"]
             Type of feature to add.
-        func : Callable
-            Function to compute the feature.
-        args : Any
-            Arguments to pass to the function.
-        kwargs : Any
-            Keyword arguments to pass to the function.
+        calculator : FeatureCalculator
+            Calculator to compute the feature.
         """
         self.feat_declaration._add_feature(feat, feat_type)
-        func(*args, **kwargs)
+        self._factory.register_calculator(feat, calculator)
+        calculator.compute(feat, self.data)
 
-    def add_width_and_length(
-        self,
-        skel_algo: str = "zhang",
-        tolerance: float = 0.5,
-        method_width: str = "mean",
-        width_ignore_tips: bool = False,
-    ) -> None:
-        """
-        Compute and add the width and length features to the cells of the model.
-        """
-        # Updating the features declaration.
-        feat_width = Feature(
-            "width",
-            "Width of the cell",
-            "CellLineage",
-            "Pycellin",
-            "float",
-            self.metadata["space_unit"],
-        )
-        feat_length = Feature(
-            "length",
-            "Length of the cell",
-            "CellLineage",
-            "Pycellin",
-            "float",
-            self.metadata["space_unit"],
-        )
-        self.feat_declaration._add_features([feat_width, feat_length], ["node"] * 2)
+    # def add_width_and_length(
+    #     self,
+    #     skel_algo: str = "zhang",
+    #     tolerance: float = 0.5,
+    #     method_width: str = "mean",
+    #     width_ignore_tips: bool = False,
+    # ) -> None:
+    #     """
+    #     Compute and add the width and length features to the cells of the model.
+    #     """
+    #     # Updating the features declaration.
+    #     feat_width = Feature(
+    #         "width",
+    #         "Width of the cell",
+    #         "CellLineage",
+    #         "Pycellin",
+    #         "float",
+    #         self.metadata["space_unit"],
+    #     )
+    #     feat_length = Feature(
+    #         "length",
+    #         "Length of the cell",
+    #         "CellLineage",
+    #         "Pycellin",
+    #         "float",
+    #         self.metadata["space_unit"],
+    #     )
+    #     self.feat_declaration._add_features([feat_width, feat_length], ["node"] * 2)
 
-        # Computing the features values.
-        assert (
-            self.metadata["pixel_size"]["width"]
-            == self.metadata["pixel_size"]["height"]
-        ), "Pixel size should be the same for width and height."
-        for lin in self.data.cell_data.values():
-            for node in lin.nodes:
-                width, length = pgf.get_width_and_length(
-                    node,
-                    lin,
-                    self.metadata["pixel_size"]["width"],
-                    skel_algo=skel_algo,
-                    tolerance=tolerance,
-                    method_width=method_width,
-                    width_ignore_tips=width_ignore_tips,
-                )
-                lin.nodes[node]["width"] = width
-                lin.nodes[node]["length"] = length
+    #     # Computing the features values.
+    #     assert (
+    #         self.metadata["pixel_size"]["width"]
+    #         == self.metadata["pixel_size"]["height"]
+    #     ), "Pixel size should be the same for width and height."
+    #     for lin in self.data.cell_data.values():
+    #         for node in lin.nodes:
+    #             width, length = pgf.get_width_and_length(
+    #                 node,
+    #                 lin,
+    #                 self.metadata["pixel_size"]["width"],
+    #                 skel_algo=skel_algo,
+    #                 tolerance=tolerance,
+    #                 method_width=method_width,
+    #                 width_ignore_tips=width_ignore_tips,
+    #             )
+    #             lin.nodes[node]["width"] = width
+    #             lin.nodes[node]["length"] = length
 
-    def add_absolute_age(self, in_time_unit: bool = False) -> None:
-        """
-        Compute and add the absolute age feature to the cells of the model.
+    # def add_absolute_age(self, in_time_unit: bool = False) -> None:
+    #     """
+    #     Compute and add the absolute age feature to the cells of the model.
 
-        The absolute age of a cell is defined as the number of nodes since
-        the beginning of the lineage. Absolute age of the root is 0.
-        It is given in frames by default, but can be converted
-        to the time unit of the model if specified.
+    #     The absolute age of a cell is defined as the number of nodes since
+    #     the beginning of the lineage. Absolute age of the root is 0.
+    #     It is given in frames by default, but can be converted
+    #     to the time unit of the model if specified.
 
-        Parameters
-        ----------
-        in_time_unit : bool, optional
-            True to give the absolute age in the time unit of the model,
-            False to give it in frames (default is False).
-        """
-        feat = Feature(
-            "absolute_age",
-            "Age of the cell since the beginning of the lineage",
-            "CellLineage",
-            "Pycellin",
-            "float" if in_time_unit else "int",
-            self.metadata["time_unit"] if in_time_unit else "frame",
-        )
-        self.add_custom_feature(
-            feat,
-            "node",
-            pgf.tracking._add_absolute_age,
-            self.data.cell_data.values(),
-            self.metadata["time_step"] if in_time_unit else 1,
-        )
+    #     Parameters
+    #     ----------
+    #     in_time_unit : bool, optional
+    #         True to give the absolute age in the time unit of the model,
+    #         False to give it in frames (default is False).
+    #     """
+    #     feat = Feature(
+    #         "absolute_age",
+    #         "Age of the cell since the beginning of the lineage",
+    #         "CellLineage",
+    #         "Pycellin",
+    #         "float" if in_time_unit else "int",
+    #         self.metadata["time_unit"] if in_time_unit else "frame",
+    #     )
+    #     self.add_custom_feature(
+    #         feat,
+    #         "node",
+    #         pgf.tracking._add_absolute_age,
+    #         self.data.cell_data.values(),
+    #         self.metadata["time_step"] if in_time_unit else 1,
+    #     )
 
-    def add_relative_age(self, in_time_unit: bool = False) -> None:
-        """
-        Compute and add the relative age feature to the cells of the model.
+    # def add_relative_age(self, in_time_unit: bool = False) -> None:
+    #     """
+    #     Compute and add the relative age feature to the cells of the model.
 
-        The relative age of a cell is defined as the number of nodes since
-        the start of the cell cycle (i.e. previous division, or beginning
-        of the lineage).
-        It is given in frames by default, but can be converted
-        to the time unit of the model if specified.
+    #     The relative age of a cell is defined as the number of nodes since
+    #     the start of the cell cycle (i.e. previous division, or beginning
+    #     of the lineage).
+    #     It is given in frames by default, but can be converted
+    #     to the time unit of the model if specified.
 
-        Parameters
-        ----------
-        in_time_unit : bool, optional
-            True to give the relative age in the time unit of the model,
-            False to give it in frames (default is False).
-        """
-        feat = Feature(
-            "relative_age",
-            "Age of the cell since the beginning of the current cell cycle",
-            "CellLineage",
-            "Pycellin",
-            "float" if in_time_unit else "int",
-            self.metadata["time_unit"] if in_time_unit else "frame",
-        )
-        self.add_custom_feature(
-            feat,
-            "node",
-            pgf.tracking._add_relative_age,
-            self.data.cell_data.values(),
-            self.metadata["time_step"] if in_time_unit else 1,
-        )
+    #     Parameters
+    #     ----------
+    #     in_time_unit : bool, optional
+    #         True to give the relative age in the time unit of the model,
+    #         False to give it in frames (default is False).
+    #     """
+    #     feat = Feature(
+    #         "relative_age",
+    #         "Age of the cell since the beginning of the current cell cycle",
+    #         "CellLineage",
+    #         "Pycellin",
+    #         "float" if in_time_unit else "int",
+    #         self.metadata["time_unit"] if in_time_unit else "frame",
+    #     )
+    #     self.add_custom_feature(
+    #         feat,
+    #         "node",
+    #         pgf.tracking._add_relative_age,
+    #         self.data.cell_data.values(),
+    #         self.metadata["time_step"] if in_time_unit else 1,
+    #     )
 
-    def add_cell_cycle_completeness(self) -> None:
-        """
-        Compute and add the cell cycle completeness feature to the model cell cycles.
+    # def add_cell_cycle_completeness(self) -> None:
+    #     """
+    #     Compute and add the cell cycle completeness feature to the model cell cycles.
 
-        A cell cycle is defined as complete when it starts by a division
-        AND ends by a division. Cell cycles that start at the root
-        or end with a leaf are thus incomplete.
-        This can be useful when analyzing features like division time. It avoids
-        the introduction of a bias since we have no information on what happened
-        before the root or after the leaves.
-        """
-        feat = Feature(
-            "cell_cycle_completeness",
-            "Completeness of the cell cycle",
-            "CycleLineage",
-            "Pycellin",
-            "bool",
-            "none",
-        )
-        self.add_custom_feature(
-            feat,
-            "node",
-            pgf.tracking._add_cell_cycle_completeness,
-            self.data.cycle_data.values(),
-        )
+    #     A cell cycle is defined as complete when it starts by a division
+    #     AND ends by a division. Cell cycles that start at the root
+    #     or end with a leaf are thus incomplete.
+    #     This can be useful when analyzing features like division time. It avoids
+    #     the introduction of a bias since we have no information on what happened
+    #     before the root or after the leaves.
+    #     """
+    #     feat = Feature(
+    #         "cell_cycle_completeness",
+    #         "Completeness of the cell cycle",
+    #         "CycleLineage",
+    #         "Pycellin",
+    #         "bool",
+    #         "none",
+    #     )
+    #     self.add_custom_feature(
+    #         feat,
+    #         "node",
+    #         pgf.tracking._add_cell_cycle_completeness,
+    #         self.data.cycle_data.values(),
+    #     )
 
-    def add_division_time(self, in_time_unit: bool = False) -> None:
-        """
-        Compute and add the division time feature to the model cell cycles.
+    # def add_division_time(self, in_time_unit: bool = False) -> None:
+    #     """
+    #     Compute and add the division time feature to the model cell cycles.
 
-        The division time of a cell cycle is defined as the difference
-        between the absolute ages of the two daughter cells.
-        It is given in frames by default, but can be converted
-        to the time unit of the model if specified.
+    #     The division time of a cell cycle is defined as the difference
+    #     between the absolute ages of the two daughter cells.
+    #     It is given in frames by default, but can be converted
+    #     to the time unit of the model if specified.
 
-        Parameters
-        ----------
-        in_time_unit : bool, optional
-            True to give the division time in the time unit of the model,
-            False to give it in frames (default is False).
-        """
-        feat = Feature(
-            "division_time",
-            "Time elapsed between the birth of a cell and its division",
-            "CycleLineage",
-            "Pycellin",
-            "float" if in_time_unit else "int",
-            self.metadata["time_unit"] if in_time_unit else "frame",
-        )
-        self.add_custom_feature(
-            feat,
-            "node",
-            pgf.tracking._add_division_time,
-            self.data.cycle_data.values(),
-            self.metadata["time_step"] if in_time_unit else 1,
-        )
+    #     Parameters
+    #     ----------
+    #     in_time_unit : bool, optional
+    #         True to give the division time in the time unit of the model,
+    #         False to give it in frames (default is False).
+    #     """
+    #     feat = Feature(
+    #         "division_time",
+    #         "Time elapsed between the birth of a cell and its division",
+    #         "CycleLineage",
+    #         "Pycellin",
+    #         "float" if in_time_unit else "int",
+    #         self.metadata["time_unit"] if in_time_unit else "frame",
+    #     )
+    #     self.add_custom_feature(
+    #         feat,
+    #         "node",
+    #         pgf.tracking._add_division_time,
+    #         self.data.cycle_data.values(),
+    #         self.metadata["time_step"] if in_time_unit else 1,
+    #     )
 
-    def add_division_rate(self, in_time_unit: bool = False) -> None:
-        """
-        Compute and add the division rate feature to the model cell cycles.
+    # def add_division_rate(self, in_time_unit: bool = False) -> None:
+    #     """
+    #     Compute and add the division rate feature to the model cell cycles.
 
-        Division rate is defined as the number of divisions per time unit.
-        It is the inverse of the division time.
-        It is given in frames by default, but can be converted
-        to the time unit of the model if specified.
+    #     Division rate is defined as the number of divisions per time unit.
+    #     It is the inverse of the division time.
+    #     It is given in frames by default, but can be converted
+    #     to the time unit of the model if specified.
 
-        Parameters
-        ----------
-        in_time_unit : bool, optional
-            True to give the division rate in the time unit of the model,
-            False to give it in frames (default is False).
-        """
-        feat = Feature(
-            "division_rate",
-            "Number of divisions per time unit",
-            "CycleLineage",
-            "Pycellin",
-            "float",
-            self.metadata["time_unit"] if in_time_unit else "frame",
-        )
-        self.add_custom_feature(
-            feat,
-            "node",
-            pgf.tracking._add_division_rate,
-            self.data.cycle_data.values(),
-            self.metadata["time_step"] if in_time_unit else 1,
-        )
+    #     Parameters
+    #     ----------
+    #     in_time_unit : bool, optional
+    #         True to give the division rate in the time unit of the model,
+    #         False to give it in frames (default is False).
+    #     """
+    #     feat = Feature(
+    #         "division_rate",
+    #         "Number of divisions per time unit",
+    #         "CycleLineage",
+    #         "Pycellin",
+    #         "float",
+    #         self.metadata["time_unit"] if in_time_unit else "frame",
+    #     )
+    #     self.add_custom_feature(
+    #         feat,
+    #         "node",
+    #         pgf.tracking._add_division_rate,
+    #         self.data.cycle_data.values(),
+    #         self.metadata["time_step"] if in_time_unit else 1,
+    #     )
 
-    def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:
-        """
-        Add the specified predefined Pycellin feature to the model.
+    # def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:
+    #     """
+    #     Add the specified predefined Pycellin feature to the model.
 
-        This updates the FeaturesDeclaration and compute the feature values
-        for all lineages.
+    #     This updates the FeaturesDeclaration and compute the feature values
+    #     for all lineages.
 
-        Parameters
-        ----------
-        feature_name : str
-            Name of the feature to add. Need to be an available feature.
-        kwargs : bool
-            Additional keyword arguments to pass to the function
-            computing the feature. For example, for absolute_age,
-            in_time_unit=True can be used to yield the age
-            in the time unit of the model instead of in frames.
+    #     Parameters
+    #     ----------
+    #     feature_name : str
+    #         Name of the feature to add. Need to be an available feature.
+    #     kwargs : bool
+    #         Additional keyword arguments to pass to the function
+    #         computing the feature. For example, for absolute_age,
+    #         in_time_unit=True can be used to yield the age
+    #         in the time unit of the model instead of in frames.
 
-        Raises
-        ------
-        KeyError
-            If the feature is not a predefined feature of Pycellin.
-        """
-        if (
-            feature_name in self.get_pycellin_cycle_lineage_features()
-            and not self.data.cycle_data
-        ):
-            raise ValueError(
-                f"Feature {feature_name} is a feature of cycle lineages, "
-                "but the cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with `model.add_cycle_data()`."
-            )
-        feat_dict = {
-            "absolute_age": self.add_absolute_age,
-            "relative_age": self.add_relative_age,
-            "cell_cycle_completeness": self.add_cell_cycle_completeness,
-            "division_time": self.add_division_time,
-            "division_rate": self.add_division_rate,
-        }
-        try:
-            feat_dict[feature_name](**kwargs)
-        except KeyError:
-            available_features = ", ".join(feat_dict.keys())
-            raise KeyError(
-                f"Feature {feature_name} is not a predefined feature of Pycellin. "
-                f"Available Pycellin features are: {available_features}."
-            )
+    #     Raises
+    #     ------
+    #     KeyError
+    #         If the feature is not a predefined feature of Pycellin.
+    #     """
+    #     if (
+    #         feature_name in self.get_pycellin_cycle_lineage_features()
+    #         and not self.data.cycle_data
+    #     ):
+    #         raise ValueError(
+    #             f"Feature {feature_name} is a feature of cycle lineages, "
+    #             "but the cycle lineages have not been computed yet. "
+    #             "Please compute the cycle lineages first with `model.add_cycle_data()`."
+    #         )
+    #     feat_dict = {
+    #         "absolute_age": self.add_absolute_age,
+    #         "relative_age": self.add_relative_age,
+    #         "cell_cycle_completeness": self.add_cell_cycle_completeness,
+    #         "division_time": self.add_division_time,
+    #         "division_rate": self.add_division_rate,
+    #     }
+    #     try:
+    #         feat_dict[feature_name](**kwargs)
+    #     except KeyError:
+    #         available_features = ", ".join(feat_dict.keys())
+    #         raise KeyError(
+    #             f"Feature {feature_name} is not a predefined feature of Pycellin. "
+    #             f"Available Pycellin features are: {available_features}."
+    #         )
 
-    def add_pycellin_features(self, feature_names: list[str], **kwargs: bool) -> None:
-        """
-        Add the specified predefined Pycellin features to the model.
+    # def add_pycellin_features(self, feature_names: list[str], **kwargs: bool) -> None:
+    #     """
+    #     Add the specified predefined Pycellin features to the model.
 
-        This updates the FeaturesDeclaration and compute the feature values
-        for all lineages.
+    #     This updates the FeaturesDeclaration and compute the feature values
+    #     for all lineages.
 
-        Parameters
-        ----------
-        feature_names : list[str]
-            Names of the features to add. Need to be available features.
-        kwargs : bool
-            Additional keyword arguments to pass to the function
-            computing the feature. For example, for absolute_age,
-            in_time_unit=True can be used to yield the age
-            in the time unit of the model instead of in frames.
-        """
-        for feature_name in feature_names:
-            self.add_pycellin_feature(feature_name, **kwargs)
-        # FIXME: will crash when some features need kwargs and others do not.
+    #     Parameters
+    #     ----------
+    #     feature_names : list[str]
+    #         Names of the features to add. Need to be available features.
+    #     kwargs : bool
+    #         Additional keyword arguments to pass to the function
+    #         computing the feature. For example, for absolute_age,
+    #         in_time_unit=True can be used to yield the age
+    #         in the time unit of the model instead of in frames.
+    #     """
+    #     for feature_name in feature_names:
+    #         self.add_pycellin_feature(feature_name, **kwargs)
+    #     # FIXME: will crash when some features need kwargs and others do not.
 
     def recompute_feature(self, feature_name: str) -> None:
         """
