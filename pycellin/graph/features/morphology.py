@@ -514,3 +514,38 @@ def _add_area_increment(lineages: list[CellLineage]) -> None:
     for lin in lineages:
         for node in lin.nodes:
             lin.nodes[node]["AREA_INCREMENT"] = get_area_increment(node, lin)
+
+
+if __name__ == "__main__":
+
+    import itertools
+    import math
+    from shapely.geometry import Polygon
+    from pycellin.io.trackmate import load_TrackMate_XML
+
+    xml = "sample_data/FakeTracks.xml"
+
+    model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
+    lineage = model.data.cell_data[0]
+    # print(lineage.nodes[2004]["ROI_coords"])
+    node = 2035
+    print(lineage.nodes[node]["area"])
+
+    # Shapely
+    roi = Polygon(lineage.nodes[node]["ROI_coords"])
+    print(roi.area)
+
+    # Shoelace formula
+    vertices = lineage.nodes[node]["ROI_coords"]
+    border = vertices + [vertices[0]]
+    area = sum(
+        [p1[0] * p2[1] - p1[1] * p2[0] for (p1, p2) in itertools.pairwise(border)]
+    )
+    print(abs(area) / 2)
+
+    # Perimeter shapely vs by hand
+    print(roi.length)
+    print(sum([math.dist(p1, p2) for (p1, p2) in itertools.pairwise(border)]))
+
+    # print(lineage.nodes[node]["location"])
+    # print(roi.centroid)
