@@ -5,6 +5,7 @@ from typing import Any
 
 from pycellin.classes.data import Data
 from pycellin.classes.feature import Feature
+from pycellin.classes.feature_calculator import FeatureCalculator
 
 # from pycellin.classes.feature_calculator import FeatureCalculatorFactory
 
@@ -30,25 +31,32 @@ class ModelUpdater:
         # us info on the type of object to which the feature applies
         # (node, edge, lineage) as well as the return type of the feature
         # (int, float, str...).
-        self._calculators = dict()  # {Feature: function}
+        self._calculators = dict()  # {Feature: FeatureCalculator}
         # Since the calculator is just a function, why not store it in the Feature object?
         # self._factory = FeatureCalculatorFactory()
 
-    def register_calculator(self, feature: Feature, calculator: callable):
+    def register_calculator(self, feature: Feature, calculator: FeatureCalculator):
         self._calculators[Feature] = calculator
 
-    # TODO: need an unregister_calculator method?
-    # Should I name these methods add_calculator and remove_calculator?
+    def delete_calculator(self, feature: Feature):
+        del self._calculators[Feature]
 
-    def _update_cells(self, dict_feat: dict[str, Any], data: Data):
+    def _update_cells(self, data: Data):
         for cell in self._added_cells:
             print(f"Cell {cell.cell_ID} from lineage {cell.lineage_ID}:")
             print(data.cell_data[cell.lineage_ID].nodes[cell.cell_ID])
-            # TODO: implement
-            # How do I know which features need to be updated?
-            # And how to compute custom features?
-            # On regarde si dans les features déclarées, il y a des features de pycellin
-            # qui n'ont pas été déjà calculées
+        # TODO: implement
+        # How do I know which features need to be updated?
+        # And how to compute custom features?
+        # On regarde si dans les features déclarées, il y a des features de pycellin
+        # qui n'ont pas été déjà calculées
+
+        # If I do the following, I recompute every feature for every object
+        # => not efficient
+        # How to do it for a subset of objects? Add optional subset argument to
+        # all the calculators?
+        for feat, feat_calculator in self._calculators.items():
+            feat_calculator.add_to_lineages(feat, data)
 
         # Update is done.
         self._update_required = False
@@ -60,44 +68,6 @@ class ModelUpdater:
     # every time an edge is added
     # TODO: also need to check if there are lone nodes in the graph, or a graph with
     # several connected components, or a graph with no nodes.
-
-    def feature_calculator(
-        self,
-        data: Data,
-        feature: Feature,
-    ):
-
-        feat_name = feature.name
-        feat_type = feature.feature_type
-        lin_type = feature.lineage_type
-        # feature_type is not stored in the Feature object for now,
-        # but let's suppose it is.
-
-        # Need to check if lin_type is a valid lineage type...? Same for feat_type?
-        # => should be checked when the feature is created
-        lineages = data.cell_data if lin_type == "CellLineage" else data.cycle_data
-
-        match feat_type:
-            case "node":
-                for lin in lineages:
-                    for node in lin.nodes:
-                        lin.nodes[node][feat_name] = self._calculators[feat_name](
-                            node, lin
-                        )
-            case "edge":
-                for lin in lineages:
-                    for edge in lin.edges:
-                        lin.edges[edge][feat_name] = self._calculators[feat_name](
-                            edge, lin
-                        )
-            case "lineage":
-                for lin in lineages:
-                    lin[feat_name] = self._calculators[feat_name](lin)
-            case _:
-                raise ValueError("Invalid feature type.")
-
-    # def global_feature_calculator(self, data: Data, feature: Feature):
-    #     pass
 
     # def _update_edges(self):
     #     pass
