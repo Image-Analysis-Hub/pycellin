@@ -39,10 +39,12 @@ class ModelUpdater:
     def register_calculator(
         self, feature: Feature, calculator: FeatureCalculator
     ) -> None:
+        # TODO: is it the correct place to instantiate the calculator?
+        # Should I register the class or an instance...?
         if calculator.LOCAL_FEATURE:
-            self._local_calculators[feature] = calculator
+            self._local_calculators[feature] = calculator()
         else:
-            self._global_calculators[feature] = calculator
+            self._global_calculators[feature] = calculator()
 
     def delete_calculator(self, feature: Feature) -> None:
         if feature in self._local_calculators:
@@ -82,6 +84,8 @@ class ModelUpdater:
 
         # Global features: we recompute them for all objects.
         for feat, calc in self._global_calculators.items():
+            # print(calc)
+            # print(calc.add_to_all)
             calc.add_to_all(feat, data)
 
         # Update is done, we can clean up.
