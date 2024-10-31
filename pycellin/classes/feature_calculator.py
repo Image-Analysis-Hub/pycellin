@@ -52,6 +52,8 @@ class LocalFeatureCalculator(FeatureCalculator):
       (number of timepoints).
     """
 
+    LOCAL_FEATURE = True
+
     @abstractmethod
     def compute(self, lineage: Lineage, *args, **kwargs) -> Any:
         pass
@@ -114,6 +116,8 @@ class GlobalFeatureCalculator(FeatureCalculator):
     - TODO: edge feature, find relevant example?
     - TODO: lineage feature, find relevant example?
     """
+
+    LOCAL_FEATURE = False
 
     @abstractmethod
     def compute(self, data: Data, lineage: Lineage, *args, **kwargs) -> Any:
