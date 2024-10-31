@@ -138,7 +138,7 @@ class GlobalFeatureCalculator(ABC):
     def compute(self, data: Data, lineage: Lineage, *args, **kwargs) -> Any:
         pass
 
-    def add_to_lineages(self, feature: Feature, data: Data) -> None:
+    def add_to_all(self, feature: Feature, data: Data) -> None:
         feat_name = feature.name
         lin_type = feature.lineage_type
         if lin_type == "CellLineage":
@@ -150,7 +150,7 @@ class GlobalFeatureCalculator(ABC):
             self._add_feature_to_lineage(feat_name, lin, data)
 
     @abstractmethod
-    def _add_feature_to_lineage(self, feat_name: str, lineage: Lineage) -> None:
+    def _add_to_lineage(self, feat_name: str, lineage: Lineage) -> None:
         pass
 
 
@@ -160,9 +160,7 @@ class NodeGlobalFeatureCalculator(GlobalFeatureCalculator):
     def compute(self, data: Data, lineage: Lineage, noi: int) -> Any:
         pass
 
-    def _add_feature_to_lineage(
-        self, feat_name: str, lineage: Lineage, data: Data
-    ) -> None:
+    def _add_to_lineage(self, feat_name: str, lineage: Lineage, data: Data) -> None:
         for noi in lineage.nodes:
             lineage.nodes[noi][feat_name] = self.compute(noi, lineage, data)
 
@@ -173,9 +171,7 @@ class EdgeGlobalFeatureCalculator(GlobalFeatureCalculator):
     def compute(self, data: Data, lineage: Lineage, edge: tuple[int, int]) -> Any:
         pass
 
-    def _add_feature_to_lineage(
-        self, feat_name: str, lineage: Lineage, data: Data
-    ) -> None:
+    def _add_to_lineage(self, feat_name: str, lineage: Lineage, data: Data) -> None:
         for edge in lineage.edges:
             lineage.edges[edge][feat_name] = self.compute(edge, lineage, data)
 
@@ -186,9 +182,7 @@ class LineageGlobalFeatureCalculator(GlobalFeatureCalculator):
     def compute(self, data: Data, lineage: Lineage) -> Any:
         pass
 
-    def _add_feature_to_lineage(
-        self, feat_name: str, lineage: Lineage, data: Data
-    ) -> None:
+    def _add_to_lineage(self, feat_name: str, lineage: Lineage, data: Data) -> None:
         lineage.graph[feat_name] = self.compute(lineage, data)
 
 
