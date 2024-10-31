@@ -12,32 +12,32 @@ from pycellin.classes.lineage import Lineage
 # dictionary, with getters to access the features of a specific type?
 
 
-class FeatureCalculator(ABC):
-    """
-    Abstract class to compute feature values.
-    """
+# class FeatureCalculator(ABC):
+#     """
+#     Abstract class to compute feature values.
+#     """
 
-    @abstractmethod
-    def compute(self, *args, **kwargs) -> Any:
-        """
-        Compute the value of a feature.
+#     @abstractmethod
+#     def compute(self, *args, **kwargs) -> Any:
+#         """
+#         Compute the value of a feature.
 
-        Parameters
-        ----------
+#         Parameters
+#         ----------
 
-        """
-        pass
+#         """
+#         pass
 
-    @abstractmethod
-    def add_to_lineages(self, feature: Feature, data: Data) -> None:
-        pass
+#     @abstractmethod
+#     def add_to_lineages(self, feature: Feature, data: Data) -> None:
+#         pass
 
-    @abstractmethod
-    def _add_feature_to_lineage(self, feat_name: str, lineage: Lineage) -> None:
-        pass
+#     @abstractmethod
+#     def _add_feature_to_lineage(self, feat_name: str, lineage: Lineage) -> None:
+#         pass
 
 
-class LocalFeatureCalculator(FeatureCalculator):
+class LocalFeatureCalculator(ABC):
     """
     Abstract class to compute local feature values and add them to lineages.
 
@@ -58,19 +58,23 @@ class LocalFeatureCalculator(FeatureCalculator):
     def compute(self, lineage: Lineage, *args, **kwargs) -> Any:
         pass
 
-    def add_to_lineages(self, feature: Feature, data: Data) -> None:
-        feat_name = feature.name
-        lin_type = feature.lineage_type
-        if lin_type == "CellLineage":
-            lineages = data.cell_data.values()
-        else:
-            lineages = data.cycle_data.values()
+    # def add_to_lineages(self, feature: Feature, data: Data) -> None:
+    #     feat_name = feature.name
+    #     lin_type = feature.lineage_type
+    #     if lin_type == "CellLineage":
+    #         lineages = data.cell_data.values()
+    #     else:
+    #         lineages = data.cycle_data.values()
 
-        for lin in lineages:
-            self._add_feature_to_lineage(lin, feat_name)
+    #     for lin in lineages:
+    #         self._add_feature_to_lineage(lin, feat_name)
+
+    # @abstractmethod
+    # def _add_feature_to_lineage(self, feat_name: str, lineage: Lineage) -> None:
+    #     pass
 
     @abstractmethod
-    def _add_feature_to_lineage(self, feat_name: str, lineage: Lineage) -> None:
+    def add_to_all(self, feat_name: str, lineage: Lineage, *args, **kwargs) -> None:
         pass
 
 
@@ -80,9 +84,12 @@ class NodeLocalFeatureCalculator(LocalFeatureCalculator):
     def compute(self, lineage: Lineage, noi: int) -> Any:
         pass
 
-    def _add_feature_to_lineage(self, feat_name: str, lineage: Lineage) -> None:
-        for noi in lineage.nodes:
-            lineage.nodes[noi][feat_name] = self.compute(lineage, noi)
+    # def _add_feature_to_lineage(self, feat_name: str, lineage: Lineage) -> None:
+    #     for noi in lineage.nodes:
+    #         lineage.nodes[noi][feat_name] = self.compute(lineage, noi)
+
+    def add_to_all(self, feat_name: str, lineage: Lineage, noi: int) -> None:
+        lineage.nodes[noi][feat_name] = self.compute(lineage, noi)
 
 
 class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
@@ -91,9 +98,14 @@ class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
     def compute(self, lineage: Lineage, edge: tuple[int, int]) -> Any:
         pass
 
-    def _add_feature_to_lineage(self, feat_name: str, lineage: Lineage) -> None:
-        for edge in lineage.edges:
-            lineage.edges[edge][feat_name] = self.compute(lineage, edge)
+    # def _add_feature_to_lineage(self, feat_name: str, lineage: Lineage) -> None:
+    #     for edge in lineage.edges:
+    #         lineage.edges[edge][feat_name] = self.compute(lineage, edge)
+
+    def add_to_all(
+        self, feat_name: str, lineage: Lineage, edge: tuple[int, int]
+    ) -> None:
+        lineage.edges[edge][feat_name] = self.compute(lineage, edge)
 
 
 class LineageLocalFeatureCalculator(LocalFeatureCalculator):
@@ -102,11 +114,14 @@ class LineageLocalFeatureCalculator(LocalFeatureCalculator):
     def compute(self, lineage: Lineage) -> Any:
         pass
 
-    def _add_feature_to_lineage(self, feat_name: str, lineage: Lineage) -> None:
+    # def _add_feature_to_lineage(self, feat_name: str, lineage: Lineage) -> None:
+    #     lineage.graph[feat_name] = self.compute(lineage)
+
+    def add_to_all(self, feat_name: str, lineage: Lineage) -> None:
         lineage.graph[feat_name] = self.compute(lineage)
 
 
-class GlobalFeatureCalculator(FeatureCalculator):
+class GlobalFeatureCalculator(ABC):
     """
     Abstract class to compute global feature values and add them to lineages.
 
