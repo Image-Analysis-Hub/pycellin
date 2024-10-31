@@ -19,7 +19,7 @@ import pycellin.graph.features as pgf
 Cell = namedtuple("Cell", ["cell_ID", "lineage_ID"])
 Link = namedtuple(
     "Link",
-    ["source_cell", "target_cell"],
+    ["source_cell_ID", "target_cell_ID", "lineage_ID"],
 )
 
 
@@ -573,10 +573,7 @@ class Model:
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
         self._updater._added_links.add(
-            Link(
-                Cell(source_cell_ID, source_lineage_ID),
-                Cell(target_cell_ID, target_lineage_ID),
-            )
+            Link(source_cell_ID, source_lineage_ID, source_lineage_ID)
         )
 
     def unlink_cells(
