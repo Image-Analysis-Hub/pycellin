@@ -74,7 +74,7 @@ class LocalFeatureCalculator(ABC):
     #     pass
 
     @abstractmethod
-    def add_to_all(self, feat_name: str, lineage: Lineage, *args, **kwargs) -> None:
+    def add_to_one(self, feat_name: str, lineage: Lineage, *args, **kwargs) -> None:
         pass
 
 
@@ -88,7 +88,7 @@ class NodeLocalFeatureCalculator(LocalFeatureCalculator):
     #     for noi in lineage.nodes:
     #         lineage.nodes[noi][feat_name] = self.compute(lineage, noi)
 
-    def add_to_all(self, feat_name: str, lineage: Lineage, noi: int) -> None:
+    def add_to_one(self, feat_name: str, lineage: Lineage, noi: int) -> None:
         lineage.nodes[noi][feat_name] = self.compute(lineage, noi)
 
 
@@ -102,7 +102,7 @@ class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
     #     for edge in lineage.edges:
     #         lineage.edges[edge][feat_name] = self.compute(lineage, edge)
 
-    def add_to_all(
+    def add_to_one(
         self, feat_name: str, lineage: Lineage, edge: tuple[int, int]
     ) -> None:
         lineage.edges[edge][feat_name] = self.compute(lineage, edge)
@@ -117,7 +117,7 @@ class LineageLocalFeatureCalculator(LocalFeatureCalculator):
     # def _add_feature_to_lineage(self, feat_name: str, lineage: Lineage) -> None:
     #     lineage.graph[feat_name] = self.compute(lineage)
 
-    def add_to_all(self, feat_name: str, lineage: Lineage) -> None:
+    def add_to_one(self, feat_name: str, lineage: Lineage) -> None:
         lineage.graph[feat_name] = self.compute(lineage)
 
 
