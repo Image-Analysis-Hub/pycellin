@@ -527,6 +527,7 @@ class CellLineage(Lineage):
         TimeFlowError
             If the target cell happens before the source cell.
         """
+        # TODO: rename _get_lineage_id_and_text into _get_lineage_ID_and_err_msg?
         source_lineage_ID, txt_src = CellLineage._get_lineage_id_and_text(self)
 
         if target_lineage is not None:
