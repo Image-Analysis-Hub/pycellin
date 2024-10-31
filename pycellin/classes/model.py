@@ -645,8 +645,19 @@ class Model:
             Calculator to compute the feature.
         """
         self.feat_declaration._add_feature(feat, feat_type)
-        self._updater._factory.register_calculator(feat, calculator)
-        # calculator.compute(feat, self.data)
+        self._updater.register_calculator(feat, calculator)
+        # TODO: need to add all the elements possibly modified by the calculator
+        # to the updater. Rough version below, see if it should be dealt with
+        # in another place or way (like when the data is created directly...?)
+        self._updater._update_required = True
+        self._updater._added_cells = set()
+        self._updater._added_links = set()
+        for lin_ID, lin in self.data.cell_data.items():
+            for noi in lin.nodes:
+                self._updater._added_cells.add(Cell(noi, lin_ID))
+            for edge in lin.edges:
+                self._updater._added_links.add(Link(edge[0], edge[1], lin_ID))
+        self._updater._added_lineages = set(self.data.cell_data.keys())
 
     # def add_width_and_length(
     #     self,
@@ -696,36 +707,36 @@ class Model:
     #             lin.nodes[node]["width"] = width
     #             lin.nodes[node]["length"] = length
 
-    def add_absolute_age(self, in_time_unit: bool = False) -> None:
-        """
-        Compute and add the absolute age feature to the cells of the model.
+    # def add_absolute_age(self, in_time_unit: bool = False) -> None:
+    #     """
+    #     Compute and add the absolute age feature to the cells of the model.
 
-        The absolute age of a cell is defined as the number of nodes since
-        the beginning of the lineage. Absolute age of the root is 0.
-        It is given in frames by default, but can be converted
-        to the time unit of the model if specified.
+    #     The absolute age of a cell is defined as the number of nodes since
+    #     the beginning of the lineage. Absolute age of the root is 0.
+    #     It is given in frames by default, but can be converted
+    #     to the time unit of the model if specified.
 
-        Parameters
-        ----------
-        in_time_unit : bool, optional
-            True to give the absolute age in the time unit of the model,
-            False to give it in frames (default is False).
-        """
-        feat = Feature(
-            "absolute_age",
-            "Age of the cell since the beginning of the lineage",
-            "CellLineage",
-            "Pycellin",
-            "float" if in_time_unit else "int",
-            self.metadata["time_unit"] if in_time_unit else "frame",
-        )
-        self.add_custom_feature(
-            feat,
-            "node",
-            pgf.tracking._add_absolute_age,
-            self.data.cell_data.values(),
-            self.metadata["time_step"] if in_time_unit else 1,
-        )
+    #     Parameters
+    #     ----------
+    #     in_time_unit : bool, optional
+    #         True to give the absolute age in the time unit of the model,
+    #         False to give it in frames (default is False).
+    #     """
+    #     feat = Feature(
+    #         "absolute_age",
+    #         "Age of the cell since the beginning of the lineage",
+    #         "CellLineage",
+    #         "Pycellin",
+    #         "float" if in_time_unit else "int",
+    #         self.metadata["time_unit"] if in_time_unit else "frame",
+    #     )
+    #     self.add_custom_feature(
+    #         feat,
+    #         "node",
+    #         pgf.tracking._add_absolute_age,
+    #         self.data.cell_data.values(),
+    #         self.metadata["time_step"] if in_time_unit else 1,
+    #     )
 
     # def add_relative_age(self, in_time_unit: bool = False) -> None:
     #     """
