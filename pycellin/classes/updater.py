@@ -93,3 +93,5 @@ class ModelUpdater:
         self._added_lineages.clear()
         self._removed_lineages.clear()
         self._modified_lineages.clear()
+
+        # TODO: maybe separate in 3 different methods?
