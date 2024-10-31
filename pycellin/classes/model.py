@@ -292,7 +292,7 @@ class Model:
         # by the updater methods to avoid incoherent states.
         # => saving a copy of the model before the update so we can roll back?
 
-        self._updater._update(self.feat_declaration, self.data)
+        self._updater._update(self.data)
 
         # self.data._unfreeze_lineage_data()
 
