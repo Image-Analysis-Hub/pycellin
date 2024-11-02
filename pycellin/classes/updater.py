@@ -59,28 +59,35 @@ class ModelUpdater:
         # TODO: For now we ignore cycle lineages.
         # TODO: What if we have interdependencies between features?
         # Maybe we need something to define the order in which features are computed?
-        # Something saved in the ModelUpdater object? An argumentto the
+        # Something saved in the ModelUpdater object? An argument to the
         # update method?
         # => not implementing this for now to keep things "simple",
         # but I definitely need to address this later.
         # In any case, we need to recompute local features BEFORE global ones.
 
         # Local features: we recompute them for added / modified objects only.
-        for cell_ID, lin_ID in self._added_cells:
-            for feat, calc in self._local_calculators.items():
-                lineage = data.cell_data[lin_ID]
-                calc.add_to_one(feat.name, lineage, cell_ID)
-
-        for link in self._added_links:
-            for feat, calc in self._local_calculators.items():
-                lineage = data.cell_data[link.lineage_ID]
-                link_node_IDs = (link.source_cell_ID, link.target_cell_ID)
-                calc.add_to_one(feat.name, lineage, link_node_IDs)
-
-        for lin_ID in self._added_lineages | self._modified_lineages:
-            for feat, calc in self._local_calculators.items():
-                lineage = data.cell_data[lin_ID]
-                calc.add_to_one(feat.name, lineage)
+        # TODO: inelegant to have to check the type of object to which
+        # the feature applies. Maybe I can use genericity if I refactor
+        # the calculators...?
+        for feat, calc in self._local_calculators.items():
+            match calc.FEATURE_TYPE:
+                case "node":
+                    for cell_ID, lin_ID in self._added_cells:
+                        lineage = data.cell_data[lin_ID]
+                        calc.add_to_one(feat.name, lineage, cell_ID)
+                case "edge":
+                    for link in self._added_links:
+                        lineage = data.cell_data[link.lineage_ID]
+                        link_node_IDs = (link.source_cell_ID, link.target_cell_ID)
+                        calc.add_to_one(feat.name, lineage, link_node_IDs)
+                case "lineage":
+                    for lin_ID in self._added_lineages | self._modified_lineages:
+                        lineage = data.cell_data[lin_ID]
+                        calc.add_to_one(feat.name, lineage)
+                case _:
+                    raise ValueError(
+                        f"Unknown feature type in calculator: {calc.FEATURE_TYPE}"
+                    )
 
         # Global features: we recompute them for all objects.
         for feat, calc in self._global_calculators.items():

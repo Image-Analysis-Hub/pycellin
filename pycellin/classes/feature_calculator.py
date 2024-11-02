@@ -80,6 +80,8 @@ class LocalFeatureCalculator(FeatureCalculator):
 
 class NodeLocalFeatureCalculator(LocalFeatureCalculator):
 
+    FEATURE_TYPE = "node"
+
     @abstractmethod
     def compute(self, lineage: Lineage, noi: int) -> Any:
         pass
@@ -93,6 +95,8 @@ class NodeLocalFeatureCalculator(LocalFeatureCalculator):
 
 
 class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
+
+    FEATURE_TYPE = "edge"
 
     @abstractmethod
     def compute(self, lineage: Lineage, edge: tuple[int, int]) -> Any:
@@ -109,6 +113,8 @@ class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
 
 
 class LineageLocalFeatureCalculator(LocalFeatureCalculator):
+
+    FEATURE_TYPE = "lineage"
 
     @abstractmethod
     def compute(self, lineage: Lineage) -> Any:
@@ -157,6 +163,8 @@ class GlobalFeatureCalculator(FeatureCalculator):
 
 class NodeGlobalFeatureCalculator(GlobalFeatureCalculator):
 
+    FEATURE_TYPE = "node"
+
     @abstractmethod
     def compute(self, data: Data, lineage: Lineage, noi: int) -> Any:
         pass
@@ -168,6 +176,8 @@ class NodeGlobalFeatureCalculator(GlobalFeatureCalculator):
 
 class EdgeGlobalFeatureCalculator(GlobalFeatureCalculator):
 
+    FEATURE_TYPE = "edge"
+
     @abstractmethod
     def compute(self, data: Data, lineage: Lineage, edge: tuple[int, int]) -> Any:
         pass
@@ -178,6 +188,8 @@ class EdgeGlobalFeatureCalculator(GlobalFeatureCalculator):
 
 
 class LineageGlobalFeatureCalculator(GlobalFeatureCalculator):
+
+    FEATURE_TYPE = "lineage"
 
     @abstractmethod
     def compute(self, data: Data, lineage: Lineage) -> Any:
