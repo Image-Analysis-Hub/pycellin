@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from pycellin.classes.data import Data
-from pycellin.classes.feature import Feature
+from pycellin.classes import Data
+from pycellin.classes import Feature
 from pycellin.classes.feature_calculator import FeatureCalculator
-
-# from pycellin.classes.feature_calculator import FeatureCalculatorFactory
 
 
 class ModelUpdater:
@@ -36,15 +34,20 @@ class ModelUpdater:
         # in the Feature object? => I feel it's wrong to do that
         # self._factory = FeatureCalculatorFactory()
 
+        # TODO: add something to store the order in which features are computed?
+        # Or maybe add an argument to update() to specify the order? We need to be able
+        # to specify the order only for features that have dependencies. So it might be
+        # easier to put this as an argument to the update() method, and have a default
+        # order for the other features that is the order of registration (order of keys
+        # in the _local_calculators and _global_calculators dictionary).
+
     def register_calculator(
         self, feature: Feature, calculator: FeatureCalculator
     ) -> None:
-        # TODO: is it the correct place to instantiate the calculator?
-        # Should I register the class or an instance...?
         if calculator.is_for_local_feature():
-            self._local_calculators[feature] = calculator()
+            self._local_calculators[feature] = calculator(feature)
         else:
-            self._global_calculators[feature] = calculator()
+            self._global_calculators[feature] = calculator(feature)
 
     def delete_calculator(self, feature: Feature) -> None:
         if feature in self._local_calculators:
@@ -69,32 +72,30 @@ class ModelUpdater:
         # TODO: inelegant to have to check the type of object to which
         # the feature applies. Maybe I can use genericity if I refactor
         # the calculators...?
-        for feat, calc in self._local_calculators.items():
+        for calc in self._local_calculators.values():
             feature_type = calc.get_feature_type()
             match feature_type:
                 case "node":
                     for cell_ID, lin_ID in self._added_cells:
                         lineage = data.cell_data[lin_ID]
-                        calc.add_to_one(feat, lineage, cell_ID)
+                        calc.add_to_one(lineage, cell_ID)
                 case "edge":
                     for link in self._added_links:
                         lineage = data.cell_data[link.lineage_ID]
                         link_node_IDs = (link.source_cell_ID, link.target_cell_ID)
-                        calc.add_to_one(feat, lineage, link_node_IDs)
+                        calc.add_to_one(lineage, link_node_IDs)
                 case "lineage":
                     for lin_ID in self._added_lineages | self._modified_lineages:
                         lineage = data.cell_data[lin_ID]
-                        calc.add_to_one(feat, lineage)
+                        calc.add_to_one(lineage)
                 case _:
                     raise ValueError(
                         f"Unknown feature type in calculator: {feature_type}"
                     )
 
         # Global features: we recompute them for all objects.
-        for feat, calc in self._global_calculators.items():
-            # print(calc)
-            # print(calc.add_to_all)
-            calc.add_to_all(feat, data)
+        for calc in self._global_calculators.values():
+            calc.add_to_all(data)
 
         # Update is done, we can clean up.
         self._update_required = False

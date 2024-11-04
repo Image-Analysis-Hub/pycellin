@@ -20,13 +20,16 @@ class FeatureCalculator(ABC):
     _LOCAL_FEATURE = None
     _FEATURE_TYPE = None
 
+    def __init__(self, feature: Feature):
+        self.feature = feature
+
     @classmethod
     def is_for_local_feature(self) -> bool | None:
         """
         Accessor to the _LOCAL_FEATURE attribute.
 
-        Return True if the calculator is for local features,
-        False if it is for global features.
+        Return True if the calculator is for a local feature,
+        False if it is for a global feature.
         """
         return self._LOCAL_FEATURE
 
@@ -75,7 +78,7 @@ class LocalFeatureCalculator(FeatureCalculator):
         pass
 
     @abstractmethod
-    def add_to_one(self, feat: Feature, lineage: Lineage, *args, **kwargs) -> None:
+    def add_to_one(self, lineage: Lineage, *args, **kwargs) -> None:
         """
         Compute and add the value of a local feature to a single object.
         """
@@ -94,20 +97,18 @@ class NodeLocalFeatureCalculator(LocalFeatureCalculator):
         """
         pass
 
-    def add_to_one(self, feat: Feature, lineage: Lineage, noi: int) -> None:
+    def add_to_one(self, lineage: Lineage, noi: int) -> None:
         """
         Compute and add the value of a local feature to a single node.
 
         Parameters
         ----------
-        feat : Feature
-            Feature associated with the calculator.
         lineage : Lineage
             Lineage object containing the node of interest.
         noi : int
             Node ID of the node of interest.
         """
-        lineage.nodes[noi][feat.name] = self.compute(lineage, noi)
+        lineage.nodes[noi][self.feature.name] = self.compute(lineage, noi)
 
 
 class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
@@ -122,22 +123,18 @@ class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
         """
         pass
 
-    def add_to_one(
-        self, feat: Feature, lineage: Lineage, edge: tuple[int, int]
-    ) -> None:
+    def add_to_one(self, lineage: Lineage, edge: tuple[int, int]) -> None:
         """
         Compute and add the value of a local feature to a single edge.
 
         Parameters
         ----------
-        feat : Feature
-            Feature associated with the calculator.
         lineage : Lineage
             Lineage object containing the edge of interest.
         edge : tuple[int, int]
             Directed edge of interest, as a tuple of two node IDs.
         """
-        lineage.edges[edge][feat.name] = self.compute(lineage, edge)
+        lineage.edges[edge][self.feature.name] = self.compute(lineage, edge)
 
 
 class LineageLocalFeatureCalculator(LocalFeatureCalculator):
@@ -152,18 +149,16 @@ class LineageLocalFeatureCalculator(LocalFeatureCalculator):
         """
         pass
 
-    def add_to_one(self, feat: Feature, lineage: Lineage) -> None:
+    def add_to_one(self, lineage: Lineage) -> None:
         """
         Compute and add the value of a local feature to a single lineage.
 
         Parameters
         ----------
-        feat : Feature
-            Feature associated with the calculator.
         lineage : Lineage
             Lineage object containing the node of interest.
         """
-        lineage.graph[feat.name] = self.compute(lineage)
+        lineage.graph[self.feature.name] = self.compute(lineage)
 
 
 class GlobalFeatureCalculator(FeatureCalculator):
@@ -188,32 +183,30 @@ class GlobalFeatureCalculator(FeatureCalculator):
         pass
 
     @abstractmethod
-    def _add_to_lineage(self, feat_name: str, data: Data, lineage: Lineage) -> None:
+    def _add_to_lineage(self, data: Data, lineage: Lineage) -> None:
         """
         Compute and add the value of a global feature to all objects in a lineage.
         Need to be implemented in subclasses.
         """
         pass
 
-    def add_to_all(self, feat: Feature, data: Data) -> None:
+    def add_to_all(self, data: Data) -> None:
         """
         Compute and add the value of a global feature to all objects in all lineages
         of the data.
 
         Parameters
         ----------
-        feat : Feature
-            Feature associated with the calculator.
         data : Data
             Data object containing the lineages.
         """
-        if feat.lineage_type == "CellLineage":
+        if self.feature.lineage_type == "CellLineage":
             lineages = data.cell_data.values()
         else:
             lineages = data.cycle_data.values()
 
         for lin in lineages:
-            self._add_to_lineage(feat.name, data, lin)
+            self._add_to_lineage(data, lin)
 
 
 class NodeGlobalFeatureCalculator(GlobalFeatureCalculator):
@@ -228,21 +221,19 @@ class NodeGlobalFeatureCalculator(GlobalFeatureCalculator):
         """
         pass
 
-    def _add_to_lineage(self, feat_name: str, data: Data, lineage: Lineage) -> None:
+    def _add_to_lineage(self, data: Data, lineage: Lineage) -> None:
         """
         Compute and add the value of a global feature to all nodes in a lineage.
 
         Parameters
         ----------
-        feat_name : str
-            Name of the global feature to compute.
         data : Data
             Data object containing all the lineages.
         lineage : Lineage
             Lineage containing the nodes of interest.
         """
         for noi in lineage.nodes:
-            lineage.nodes[noi][feat_name] = self.compute(data, lineage, noi)
+            lineage.nodes[noi][self.feature.name] = self.compute(data, lineage, noi)
 
 
 class EdgeGlobalFeatureCalculator(GlobalFeatureCalculator):
@@ -257,21 +248,19 @@ class EdgeGlobalFeatureCalculator(GlobalFeatureCalculator):
         """
         pass
 
-    def _add_to_lineage(self, feat_name: str, data: Data, lineage: Lineage) -> None:
+    def _add_to_lineage(self, data: Data, lineage: Lineage) -> None:
         """
         Compute and add the value of a global feature to all edges in a lineage.
 
         Parameters
         ----------
-        feat_name : str
-            Name of the global feature to compute.
         data : Data
             Data object containing all the lineages.
         lineage : Lineage
             Lineage containing the edges of interest.
         """
         for edge in lineage.edges:
-            lineage.edges[edge][feat_name] = self.compute(data, lineage, edge)
+            lineage.edges[edge][self.feature.name] = self.compute(data, lineage, edge)
 
 
 class LineageGlobalFeatureCalculator(GlobalFeatureCalculator):
@@ -286,17 +275,15 @@ class LineageGlobalFeatureCalculator(GlobalFeatureCalculator):
         """
         pass
 
-    def _add_to_lineage(self, feat_name: str, data: Data, lineage: Lineage) -> None:
+    def _add_to_lineage(self, data: Data, lineage: Lineage) -> None:
         """
         Compute and add the value of a global feature to a lineage.
 
         Parameters
         ----------
-        feat_name : str
-            Name of the global feature to compute.
         data : Data
             Data object containing all the lineages.
         lineage : Lineage
             Lineage of interest.
         """
-        lineage.graph[feat_name] = self.compute(data, lineage)
+        lineage.graph[self.feature.name] = self.compute(data, lineage)
