@@ -12,10 +12,10 @@ from typing import Any
 from lxml import etree as ET
 import networkx as nx
 
-from pycellin.classes.model import Model
-from pycellin.classes.feature import FeaturesDeclaration, Feature
-from pycellin.classes.data import Data
-from pycellin.classes.lineage import CellLineage
+from pycellin.classes import Model
+from pycellin.classes import FeaturesDeclaration, Feature
+from pycellin.classes import Data
+from pycellin.classes import CellLineage
 
 # TODO: maybe TRACK_ID / lineage_ID should not be added as a node feature,
 # and a fonction get_lineage_ID() should be implemented instead?
@@ -1177,7 +1177,7 @@ def load_TrackMate_XML(
 
 if __name__ == "__main__":
 
-    import math
+    # import math
 
     xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
