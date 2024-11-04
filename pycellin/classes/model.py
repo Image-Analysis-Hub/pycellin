@@ -953,8 +953,8 @@ class Model:
         """
         Remove the specified feature from the model.
 
-        This updates the FeaturesDeclaration and remove the feature values
-        for all lineages.
+        This updates the FeaturesDeclaration, remove the feature values
+        for all lineages, and notify the updater to unregister the calculator.
 
         Parameters
         ----------
@@ -968,18 +968,18 @@ class Model:
         ValueError
             If the feature does not exist.
         """
-        # First need to check if the feature exists.
+        # First we check if the feature exists.
         if not self.feat_declaration.has_feature(feature_name, feature_type):
             raise ValueError(
                 f"There is no feature {feature_name} in {feature_type} features."
             )
 
-        # Then need to update the FeaturesDeclaration...
+        # Then we update the FeaturesDeclaration...
         feat_dict = self.feat_declaration._get_feat_dict_from_feat_type(feature_type)
         lineage_type = feat_dict[feature_name].lineage_type
         feat_dict.pop(feature_name)
 
-        # ... and remove the feature values.
+        # ... we remove the feature values...
         if lineage_type == "CellLineage":
             lineage_data = self.data.cell_data
         elif lineage_type == "CycleLineage":
@@ -1000,6 +1000,9 @@ class Model:
             case "lineage":
                 for lin in lineage_data.values():
                     del lin.graph[feature_name]
+
+        # ... and finally we update the updater.
+        self._updater.delete_calculator(feature_name)
 
     def add_cycle_data(self) -> None:
         """

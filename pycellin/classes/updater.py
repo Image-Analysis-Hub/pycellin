@@ -22,17 +22,8 @@ class ModelUpdater:
         self._removed_lineages = set()
         self._modified_lineages = set()
 
-        # self._calculators = dict()  # {str: function}
-        # TODO: Keys are the feature name or the Feature itself? Feature itself
-        # would give us info on the type of object to which the feature applies
-        # (node, edge, lineage) as well as the return type of the feature
-        # (int, float, str...).
-        self._local_calculators = dict()  # {Feature: FeatureCalculator}
-        self._global_calculators = dict()  # {Feature: FeatureCalculator}
-        # TODO: is it useful to divide into local and global calculators?
-        # TODO: Since the calculator is just a function, why not store it
-        # in the Feature object? => I feel it's wrong to do that
-        # self._factory = FeatureCalculatorFactory()
+        self._local_calculators = dict()  # {feat_name: FeatureCalculator}
+        self._global_calculators = dict()  # {feat_name: FeatureCalculator}
 
         # TODO: add something to store the order in which features are computed?
         # Or maybe add an argument to update() to specify the order? We need to be able
@@ -45,17 +36,17 @@ class ModelUpdater:
         self, feature: Feature, calculator: FeatureCalculator
     ) -> None:
         if calculator.is_for_local_feature():
-            self._local_calculators[feature] = calculator(feature)
+            self._local_calculators[feature.name] = calculator(feature)
         else:
-            self._global_calculators[feature] = calculator(feature)
+            self._global_calculators[feature.name] = calculator(feature)
 
-    def delete_calculator(self, feature: Feature) -> None:
-        if feature in self._local_calculators:
-            del self._local_calculators[feature]
-        elif feature in self._global_calculators:
-            del self._global_calculators[feature]
+    def delete_calculator(self, feature_name: str) -> None:
+        if feature_name in self._local_calculators:
+            del self._local_calculators[feature_name]
+        elif feature_name in self._global_calculators:
+            del self._global_calculators[feature_name]
         else:
-            raise KeyError(f"Feature {feature} has no registered calculator.")
+            raise KeyError(f"Feature {feature_name} has no registered calculator.")
 
     def _update(self, data: Data) -> None:
 
