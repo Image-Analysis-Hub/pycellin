@@ -31,7 +31,41 @@ Vocabulary:
 
 import networkx as nx
 
-from pycellin.classes.lineage import CellLineage, CycleLineage
+from pycellin.classes import CellLineage, CycleLineage
+from pycellin.classes.feature_calculator import (
+    NodeGlobalFeatureCalculator,
+    NodeLocalFeatureCalculator,
+)
+
+
+class AbsoluteAgeInFramesCalculator(NodeGlobalFeatureCalculator):
+    """
+    Calculator to compute the absolute age of cells.
+
+    The absolute age of a cell is defined as the number of nodes since
+    the beginning of the lineage. Absolute age of the root is 0.
+    It is given in frames.
+    """
+
+    def compute(self, data, lineage, noi):
+        """
+        Compute the absolute age of a given node.
+
+        Parameters
+        ----------
+        data : Data
+            Data object containing the lineage.
+        lineage : CellLineage
+            Lineage graph containing the node of interest.
+        noi : int
+            Node ID (cell_ID) of the cell of interest.
+
+        Returns
+        -------
+        int
+            Absolute age of the node, in frames.
+        """
+        return len(nx.ancestors(lineage, noi))
 
 
 def get_absolute_age(
