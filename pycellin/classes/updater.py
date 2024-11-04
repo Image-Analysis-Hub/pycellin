@@ -41,7 +41,7 @@ class ModelUpdater:
     ) -> None:
         # TODO: is it the correct place to instantiate the calculator?
         # Should I register the class or an instance...?
-        if calculator.LOCAL_FEATURE:
+        if calculator.is_for_local_feature():
             self._local_calculators[feature] = calculator()
         else:
             self._global_calculators[feature] = calculator()
@@ -70,7 +70,8 @@ class ModelUpdater:
         # the feature applies. Maybe I can use genericity if I refactor
         # the calculators...?
         for feat, calc in self._local_calculators.items():
-            match calc.FEATURE_TYPE:
+            feature_type = calc.get_feature_type()
+            match feature_type:
                 case "node":
                     for cell_ID, lin_ID in self._added_cells:
                         lineage = data.cell_data[lin_ID]
@@ -86,7 +87,7 @@ class ModelUpdater:
                         calc.add_to_one(feat.name, lineage)
                 case _:
                     raise ValueError(
-                        f"Unknown feature type in calculator: {calc.FEATURE_TYPE}"
+                        f"Unknown feature type in calculator: {feature_type}"
                     )
 
         # Global features: we recompute them for all objects.
