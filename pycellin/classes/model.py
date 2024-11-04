@@ -3,12 +3,12 @@
 
 from collections import namedtuple
 import pickle
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
-from pycellin.classes.data import Data
-from pycellin.classes.feature import Feature, FeaturesDeclaration
+from pycellin.classes import Data
+from pycellin.classes import Feature, FeaturesDeclaration
 from pycellin.classes.feature_calculator import FeatureCalculator
-from pycellin.classes.lineage import CellLineage
+from pycellin.classes import CellLineage
 from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features as pgf
 
