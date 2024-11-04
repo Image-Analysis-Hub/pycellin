@@ -75,16 +75,16 @@ class ModelUpdater:
                 case "node":
                     for cell_ID, lin_ID in self._added_cells:
                         lineage = data.cell_data[lin_ID]
-                        calc.add_to_one(feat.name, lineage, cell_ID)
+                        calc.add_to_one(feat, lineage, cell_ID)
                 case "edge":
                     for link in self._added_links:
                         lineage = data.cell_data[link.lineage_ID]
                         link_node_IDs = (link.source_cell_ID, link.target_cell_ID)
-                        calc.add_to_one(feat.name, lineage, link_node_IDs)
+                        calc.add_to_one(feat, lineage, link_node_IDs)
                 case "lineage":
                     for lin_ID in self._added_lineages | self._modified_lineages:
                         lineage = data.cell_data[lin_ID]
-                        calc.add_to_one(feat.name, lineage)
+                        calc.add_to_one(feat, lineage)
                 case _:
                     raise ValueError(
                         f"Unknown feature type in calculator: {feature_type}"

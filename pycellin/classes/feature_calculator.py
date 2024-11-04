@@ -75,7 +75,7 @@ class LocalFeatureCalculator(FeatureCalculator):
         pass
 
     @abstractmethod
-    def add_to_one(self, feat_name: str, lineage: Lineage, *args, **kwargs) -> None:
+    def add_to_one(self, feat: Feature, lineage: Lineage, *args, **kwargs) -> None:
         """
         Compute and add the value of a local feature to a single object.
         """
@@ -94,20 +94,20 @@ class NodeLocalFeatureCalculator(LocalFeatureCalculator):
         """
         pass
 
-    def add_to_one(self, feat_name: str, lineage: Lineage, noi: int) -> None:
+    def add_to_one(self, feat: Feature, lineage: Lineage, noi: int) -> None:
         """
         Compute and add the value of a local feature to a single node.
 
         Parameters
         ----------
-        feat_name : str
-            Name of the local feature to compute.
+        feat : Feature
+            Feature associated with the calculator.
         lineage : Lineage
             Lineage object containing the node of interest.
         noi : int
             Node ID of the node of interest.
         """
-        lineage.nodes[noi][feat_name] = self.compute(lineage, noi)
+        lineage.nodes[noi][feat.name] = self.compute(lineage, noi)
 
 
 class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
@@ -123,21 +123,21 @@ class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
         pass
 
     def add_to_one(
-        self, feat_name: str, lineage: Lineage, edge: tuple[int, int]
+        self, feat: Feature, lineage: Lineage, edge: tuple[int, int]
     ) -> None:
         """
         Compute and add the value of a local feature to a single edge.
 
         Parameters
         ----------
-        feat_name : str
-            Name of the local feature to compute.
+        feat : Feature
+            Feature associated with the calculator.
         lineage : Lineage
             Lineage object containing the edge of interest.
         edge : tuple[int, int]
             Directed edge of interest, as a tuple of two node IDs.
         """
-        lineage.edges[edge][feat_name] = self.compute(lineage, edge)
+        lineage.edges[edge][feat.name] = self.compute(lineage, edge)
 
 
 class LineageLocalFeatureCalculator(LocalFeatureCalculator):
@@ -152,18 +152,18 @@ class LineageLocalFeatureCalculator(LocalFeatureCalculator):
         """
         pass
 
-    def add_to_one(self, feat_name: str, lineage: Lineage) -> None:
+    def add_to_one(self, feat: Feature, lineage: Lineage) -> None:
         """
         Compute and add the value of a local feature to a single lineage.
 
         Parameters
         ----------
-        feat_name : str
-            Name of the local feature to compute.
+        feat : Feature
+            Feature associated with the calculator.
         lineage : Lineage
             Lineage object containing the node of interest.
         """
-        lineage.graph[feat_name] = self.compute(lineage)
+        lineage.graph[feat.name] = self.compute(lineage)
 
 
 class GlobalFeatureCalculator(FeatureCalculator):
@@ -195,27 +195,25 @@ class GlobalFeatureCalculator(FeatureCalculator):
         """
         pass
 
-    def add_to_all(self, feature: Feature, data: Data) -> None:
+    def add_to_all(self, feat: Feature, data: Data) -> None:
         """
         Compute and add the value of a global feature to all objects in all lineages
         of the data.
 
         Parameters
         ----------
-        feature : Feature
+        feat : Feature
             Feature associated with the calculator.
         data : Data
             Data object containing the lineages.
         """
-        feat_name = feature.name
-        lin_type = feature.lineage_type
-        if lin_type == "CellLineage":
+        if feat.lineage_type == "CellLineage":
             lineages = data.cell_data.values()
         else:
             lineages = data.cycle_data.values()
 
         for lin in lineages:
-            self._add_to_lineage(feat_name, data, lin)
+            self._add_to_lineage(feat.name, data, lin)
 
 
 class NodeGlobalFeatureCalculator(GlobalFeatureCalculator):
