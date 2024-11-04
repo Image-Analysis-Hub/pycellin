@@ -50,7 +50,7 @@ class AbsoluteAgeInFrames(NodeGlobalFeatureCalculator):
 
     def compute(self, data, lineage, noi):
         """
-        Compute the absolute age of a given node.
+        Compute the absolute age of a given node, in frames.
 
         Parameters
         ----------
@@ -76,6 +76,23 @@ class AbsoluteAgeInTime(NodeGlobalFeatureCalculator):
         self.time_step = time_step
 
     def compute(self, data, lineage, noi):
+        """
+        Compute the absolute age of a given node, in time units.
+
+        Parameters
+        ----------
+        data : Data
+            Data object containing the lineage.
+        lineage : CellLineage
+            Lineage graph containing the node of interest.
+        noi : int
+            Node ID (cell_ID) of the cell of interest.
+
+        Returns
+        -------
+        int
+            Absolute age of the node, in time units.
+        """
         return len(nx.ancestors(lineage, noi)) * self.time_step
 
 
