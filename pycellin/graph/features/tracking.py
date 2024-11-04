@@ -32,13 +32,14 @@ Vocabulary:
 import networkx as nx
 
 from pycellin.classes import CellLineage, CycleLineage
+from pycellin.classes import Feature
 from pycellin.classes.feature_calculator import (
     NodeGlobalFeatureCalculator,
     NodeLocalFeatureCalculator,
 )
 
 
-class AbsoluteAgeInFramesCalculator(NodeGlobalFeatureCalculator):
+class AbsoluteAgeInFrames(NodeGlobalFeatureCalculator):
     """
     Calculator to compute the absolute age of cells.
 
@@ -66,6 +67,16 @@ class AbsoluteAgeInFramesCalculator(NodeGlobalFeatureCalculator):
             Absolute age of the node, in frames.
         """
         return len(nx.ancestors(lineage, noi))
+
+
+class AbsoluteAgeInTime(NodeGlobalFeatureCalculator):
+
+    def __init__(self, feature: Feature, time_step: float):
+        super().__init__(feature)
+        self.time_step = time_step
+
+    def compute(self, data, lineage, noi):
+        return len(nx.ancestors(lineage, noi)) * self.time_step
 
 
 def get_absolute_age(

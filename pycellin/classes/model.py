@@ -626,6 +626,8 @@ class Model:
         feat: Feature,
         feat_type: Literal["node", "edge", "lineage"],
         calculator: FeatureCalculator,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         compute and add a custom feature to the model.
@@ -645,7 +647,7 @@ class Model:
             Calculator to compute the feature.
         """
         self.feat_declaration._add_feature(feat, feat_type)
-        self._updater.register_calculator(feat, calculator)
+        self._updater.register_calculator(feat, calculator, *args, **kwargs)
         # TODO: need to add all the elements possibly modified by the calculator
         # to the updater. Rough version below, see if it should be dealt with
         # in another place or way (like when the data is created directly...?)

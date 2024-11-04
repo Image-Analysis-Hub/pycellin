@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from typing import Any
+
 from pycellin.classes import Data
 from pycellin.classes import Feature
 from pycellin.classes.feature_calculator import FeatureCalculator
@@ -32,9 +34,13 @@ class ModelUpdater:
         # in the _calculators dictionary).
 
     def register_calculator(
-        self, feature: Feature, calculator: FeatureCalculator
+        self,
+        feature: Feature,
+        calculator: FeatureCalculator,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
-        self._calculators[feature.name] = calculator(feature)
+        self._calculators[feature.name] = calculator(feature, *args, **kwargs)
 
     def delete_calculator(self, feature_name: str) -> None:
         if feature_name in self._calculators:
