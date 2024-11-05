@@ -732,143 +732,120 @@ class Model:
             True to give the absolute age in the time unit of the model,
             False to give it in frames (default is False).
         """
-        if in_time_unit:
-            data_type = "float"
-            unit = self.metadata["time_unit"]
-            time_unit = self.metadata["time_step"]
-        else:
-            data_type = "int"
-            unit = "frame"
-            time_unit = 1
         feat = Feature(
             "absolute_age",
             "Age of the cell since the beginning of the lineage",
             "CellLineage",
             "Pycellin",
-            data_type,
-            unit,
+            "float" if in_time_unit else "int",
+            self.metadata["time_step"] if in_time_unit else "frame",
         )
-        self.add_custom_feature(feat, "node", pgf.tracking.AbsoluteAge, time_unit)
+        time_step = self.metadata["time_step"] if in_time_unit else 1
+        self.add_custom_feature(feat, "node", pgf.tracking.AbsoluteAge, time_step)
 
-    # def add_relative_age(self, in_time_unit: bool = False) -> None:
-    #     """
-    #     Compute and add the relative age feature to the cells of the model.
+    def add_relative_age(self, in_time_unit: bool = False) -> None:
+        """
+        Add the cell relative age feature to the model.
 
-    #     The relative age of a cell is defined as the number of nodes since
-    #     the start of the cell cycle (i.e. previous division, or beginning
-    #     of the lineage).
-    #     It is given in frames by default, but can be converted
-    #     to the time unit of the model if specified.
+        The relative age of a cell is defined as the number of nodes since
+        the start of the cell cycle (i.e. previous division, or beginning
+        of the lineage).
+        It is given in frames by default, but can be converted
+        to the time unit of the model if specified.
 
-    #     Parameters
-    #     ----------
-    #     in_time_unit : bool, optional
-    #         True to give the relative age in the time unit of the model,
-    #         False to give it in frames (default is False).
-    #     """
-    #     feat = Feature(
-    #         "relative_age",
-    #         "Age of the cell since the beginning of the current cell cycle",
-    #         "CellLineage",
-    #         "Pycellin",
-    #         "float" if in_time_unit else "int",
-    #         self.metadata["time_unit"] if in_time_unit else "frame",
-    #     )
-    #     self.add_custom_feature(
-    #         feat,
-    #         "node",
-    #         pgf.tracking._add_relative_age,
-    #         self.data.cell_data.values(),
-    #         self.metadata["time_step"] if in_time_unit else 1,
-    #     )
+        Parameters
+        ----------
+        in_time_unit : bool, optional
+            True to give the relative age in the time unit of the model,
+            False to give it in frames (default is False).
+        """
+        feat = Feature(
+            "relative_age",
+            "Age of the cell since the beginning of the current cell cycle",
+            "CellLineage",
+            "Pycellin",
+            "float" if in_time_unit else "int",
+            self.metadata["time_step"] if in_time_unit else "frame",
+        )
+        time_step = self.metadata["time_step"] if in_time_unit else 1
+        self.add_custom_feature(feat, "node", pgf.tracking.RelativeAge, time_step)
 
-    # def add_cell_cycle_completeness(self) -> None:
-    #     """
-    #     Compute and add the cell cycle completeness feature to the model cell cycles.
+    def add_cell_cycle_completeness(self) -> None:
+        """
+        Add the cell cycle completeness feature to the model.
 
-    #     A cell cycle is defined as complete when it starts by a division
-    #     AND ends by a division. Cell cycles that start at the root
-    #     or end with a leaf are thus incomplete.
-    #     This can be useful when analyzing features like division time. It avoids
-    #     the introduction of a bias since we have no information on what happened
-    #     before the root or after the leaves.
-    #     """
-    #     feat = Feature(
-    #         "cell_cycle_completeness",
-    #         "Completeness of the cell cycle",
-    #         "CycleLineage",
-    #         "Pycellin",
-    #         "bool",
-    #         "none",
-    #     )
-    #     self.add_custom_feature(
-    #         feat,
-    #         "node",
-    #         pgf.tracking._add_cell_cycle_completeness,
-    #         self.data.cycle_data.values(),
-    #     )
+        A cell cycle is defined as complete when it starts by a division
+        AND ends by a division. Cell cycles that start at the root
+        or end with a leaf are thus incomplete.
+        This can be useful when analyzing features like division time. It avoids
+        the introduction of a bias since we have no information on what happened
+        before the root or after the leaves.
+        """
+        feat = Feature(
+            "cell_cycle_completeness",
+            "Completeness of the cell cycle",
+            "CycleLineage",
+            "Pycellin",
+            "bool",
+            "none",
+        )
+        self.add_custom_feature(
+            feat,
+            "node",
+            pgf.tracking.CellCycleCompleteness,
+        )
 
-    # def add_division_time(self, in_time_unit: bool = False) -> None:
-    #     """
-    #     Compute and add the division time feature to the model cell cycles.
+    def add_division_time(self, in_time_unit: bool = False) -> None:
+        """
+        Add the division time feature to the model.
 
-    #     The division time of a cell cycle is defined as the difference
-    #     between the absolute ages of the two daughter cells.
-    #     It is given in frames by default, but can be converted
-    #     to the time unit of the model if specified.
+        Division time is defined as the time between 2 divisions.
+        It is also the length of the cell cycle of the cell of interest.
+        It is given in frames by default, but can be converted
+        to the time unit of the model if specified.
 
-    #     Parameters
-    #     ----------
-    #     in_time_unit : bool, optional
-    #         True to give the division time in the time unit of the model,
-    #         False to give it in frames (default is False).
-    #     """
-    #     feat = Feature(
-    #         "division_time",
-    #         "Time elapsed between the birth of a cell and its division",
-    #         "CycleLineage",
-    #         "Pycellin",
-    #         "float" if in_time_unit else "int",
-    #         self.metadata["time_unit"] if in_time_unit else "frame",
-    #     )
-    #     self.add_custom_feature(
-    #         feat,
-    #         "node",
-    #         pgf.tracking._add_division_time,
-    #         self.data.cycle_data.values(),
-    #         self.metadata["time_step"] if in_time_unit else 1,
-    #     )
+        Parameters
+        ----------
+        in_time_unit : bool, optional
+            True to give the division time in the time unit of the model,
+            False to give it in frames (default is False).
+        """
+        feat = Feature(
+            "division_time",
+            "Time elapsed between the birth of a cell and its division",
+            "CycleLineage",
+            "Pycellin",
+            "float" if in_time_unit else "int",
+            self.metadata["time_step"] if in_time_unit else "frame",
+        )
+        time_step = self.metadata["time_step"] if in_time_unit else 1
+        self.add_custom_feature(feat, "node", pgf.tracking.DivisionTime, time_step)
 
-    # def add_division_rate(self, in_time_unit: bool = False) -> None:
-    #     """
-    #     Compute and add the division rate feature to the model cell cycles.
+    def add_division_rate(self, in_time_unit: bool = False) -> None:
+        """
+        Add the division rate feature to the model.
 
-    #     Division rate is defined as the number of divisions per time unit.
-    #     It is the inverse of the division time.
-    #     It is given in frames by default, but can be converted
-    #     to the time unit of the model if specified.
+        Division rate is defined as the number of divisions per time unit.
+        It is the inverse of the division time.
+        It is given in divisions per frame by default, but can be converted
+        to divisions per time unit of the model if specified.
 
-    #     Parameters
-    #     ----------
-    #     in_time_unit : bool, optional
-    #         True to give the division rate in the time unit of the model,
-    #         False to give it in frames (default is False).
-    #     """
-    #     feat = Feature(
-    #         "division_rate",
-    #         "Number of divisions per time unit",
-    #         "CycleLineage",
-    #         "Pycellin",
-    #         "float",
-    #         self.metadata["time_unit"] if in_time_unit else "frame",
-    #     )
-    #     self.add_custom_feature(
-    #         feat,
-    #         "node",
-    #         pgf.tracking._add_division_rate,
-    #         self.data.cycle_data.values(),
-    #         self.metadata["time_step"] if in_time_unit else 1,
-    #     )
+        Parameters
+        ----------
+        in_time_unit : bool, optional
+            True to give the division rate in the time unit of the model,
+            False to give it in frames (default is False).
+        """
+        feat = Feature(
+            "division_rate",
+            "Number of divisions per time unit",
+            "CycleLineage",
+            "Pycellin",
+            "float",
+            f'1/{self.metadata["time_unit"]}' if in_time_unit else "1/frame",
+        )
+        time_step = self.metadata["time_step"] if in_time_unit else 1
+        self.add_custom_feature(feat, "node", pgf.tracking.DivisionRate, time_step)
 
     # def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:
     #     """
