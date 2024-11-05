@@ -268,7 +268,8 @@ class Model:
         """
         Check if the model requires an update.
 
-        The model requires an update if new cells or links have been added.
+        The model requires an update if new features have been added to the model,
+        or if cells, links or lineages have been added or removed.
         In that case, some features need to be recomputed to account for the changes.
 
         Returns
