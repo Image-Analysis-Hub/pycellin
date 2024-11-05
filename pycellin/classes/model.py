@@ -717,36 +717,38 @@ class Model:
     #             lin.nodes[node]["width"] = width
     #             lin.nodes[node]["length"] = length
 
-    # def add_absolute_age(self, in_time_unit: bool = False) -> None:
-    #     """
-    #     Compute and add the absolute age feature to the cells of the model.
+    def add_absolute_age(self, in_time_unit: bool = False) -> None:
+        """
+        Add the cell absolute age feature to the model.
 
-    #     The absolute age of a cell is defined as the number of nodes since
-    #     the beginning of the lineage. Absolute age of the root is 0.
-    #     It is given in frames by default, but can be converted
-    #     to the time unit of the model if specified.
+        The absolute age of a cell is defined as the number of nodes since
+        the beginning of the lineage. Absolute age of the root is 0.
+        It is given in frames by default, but can be converted
+        to the time unit of the model if specified.
 
-    #     Parameters
-    #     ----------
-    #     in_time_unit : bool, optional
-    #         True to give the absolute age in the time unit of the model,
-    #         False to give it in frames (default is False).
-    #     """
-    #     feat = Feature(
-    #         "absolute_age",
-    #         "Age of the cell since the beginning of the lineage",
-    #         "CellLineage",
-    #         "Pycellin",
-    #         "float" if in_time_unit else "int",
-    #         self.metadata["time_unit"] if in_time_unit else "frame",
-    #     )
-    #     self.add_custom_feature(
-    #         feat,
-    #         "node",
-    #         pgf.tracking._add_absolute_age,
-    #         self.data.cell_data.values(),
-    #         self.metadata["time_step"] if in_time_unit else 1,
-    #     )
+        Parameters
+        ----------
+        in_time_unit : bool, optional
+            True to give the absolute age in the time unit of the model,
+            False to give it in frames (default is False).
+        """
+        if in_time_unit:
+            data_type = "float"
+            unit = self.metadata["time_unit"]
+            time_unit = self.metadata["time_step"]
+        else:
+            data_type = "int"
+            unit = "frame"
+            time_unit = 1
+        feat = Feature(
+            "absolute_age",
+            "Age of the cell since the beginning of the lineage",
+            "CellLineage",
+            "Pycellin",
+            data_type,
+            unit,
+        )
+        self.add_custom_feature(feat, "node", pgf.tracking.AbsoluteAge, time_unit)
 
     # def add_relative_age(self, in_time_unit: bool = False) -> None:
     #     """
