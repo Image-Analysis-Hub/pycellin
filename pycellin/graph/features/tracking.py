@@ -39,52 +39,31 @@ from pycellin.classes.feature_calculator import NodeGlobalFeatureCalculator
 # TODO: should I add the word Calc or Calculator to the class names?
 
 
-class AbsoluteAgeInFrames(NodeGlobalFeatureCalculator):
+class AbsoluteAge(NodeGlobalFeatureCalculator):
     """
     Calculator to compute the absolute age of cells.
 
     The absolute age of a cell is defined as the time elapsed since
     the beginning of the lineage. Absolute age of the root is 0.
-    Here, it is given in frames.
+    It is given in frames by default, but can be converted
+    to the time unit of the model if specified.
     """
 
-    def compute(self, data: Data, lineage: CellLineage, noi: int) -> int:
+    def __init__(self, feature: Feature, time_step: int | float = 1):
         """
-        Compute the absolute age of a given node, in frames.
-
         Parameters
         ----------
-        data : Data
-            Data object containing the lineage.
-        lineage : CellLineage
-            Lineage graph containing the node of interest.
-        noi : int
-            Node ID (cell_ID) of the cell of interest.
-
-        Returns
-        -------
-        int
-            Absolute age of the node, in frames.
+        feature : Feature
+            Feature object to which the calculator is associated.
+        time_step : int | float, optional
+            Time step between 2 frames, in time unit. Default is 1.
         """
-        return len(nx.ancestors(lineage, noi))
-
-
-class AbsoluteAgeInTime(NodeGlobalFeatureCalculator):
-    """
-    Calculator to compute the absolute age of cells, in time units.
-
-    The absolute age of a cell is defined as the time elapsed since
-    the beginning of the lineage. Absolute age of the root is 0.
-    Here, it is given in time units.
-    """
-
-    def __init__(self, feature: Feature, time_step: float):
         super().__init__(feature)
         self.time_step = time_step
 
-    def compute(self, data: Data, lineage: CellLineage, noi: int) -> float:
+    def compute(self, data: Data, lineage: CellLineage, noi: int) -> int | float:
         """
-        Compute the absolute age of a given node, in time units.
+        Compute the absolute age of a given cell.
 
         Parameters
         ----------
@@ -97,61 +76,38 @@ class AbsoluteAgeInTime(NodeGlobalFeatureCalculator):
 
         Returns
         -------
-        float
-            Absolute age of the node, in time units.
+        int | float
+            Absolute age of the node.
         """
         return len(nx.ancestors(lineage, noi)) * self.time_step
 
 
-class RelativeAgeInFrames(NodeGlobalFeatureCalculator):
+class RelativeAge(NodeGlobalFeatureCalculator):
     """
-    Calculator to compute the relative age of cells, in frames.
+    Calculator to compute the relative age of cells.
 
     The relative age of a cell is defined as the time elapsed since
     the start of the cell cycle (i.e. previous division, or beginning
     of the lineage).
-    Here, it is given in frames.
+    It is given in frames by default, but can be converted
+    to the time unit of the model if specified.
     """
 
-    def compute(self, data: Data, lineage: CellLineage, noi: int) -> int:
+    def __init__(self, feature: Feature, time_step: int | float = 1):
         """
-        Compute the relative age of a given node, in frames.
-
         Parameters
         ----------
-        data : Data
-            Data object containing the lineage.
-        lineage : CellLineage
-            Lineage graph containing the node of interest.
-        noi : int
-            Node ID (cell_ID) of the cell of interest.
-
-        Returns
-        -------
-        int
-            Relative age of the node, in frames.
+        feature : Feature
+            Feature object to which the calculator is associated.
+        time_step : int | float, optional
+            Time step between 2 frames, in time unit. Default is 1.
         """
-        cell_cycle = lineage.get_cell_cycle(noi)
-        return cell_cycle.index(noi)
-
-
-class RelativeAgeInTime(NodeGlobalFeatureCalculator):
-    """
-    Calculator to compute the relative age of cells, in time units.
-
-    The relative age of a cell is defined as the time elapsed since
-    the start of the cell cycle (i.e. previous division, or beginning
-    of the lineage).
-    Here, it is given in time units.
-    """
-
-    def __init__(self, feature: Feature, time_step: float):
         super().__init__(feature)
         self.time_step = time_step
 
-    def compute(self, data: Data, lineage: CellLineage, noi: int) -> float:
+    def compute(self, data: Data, lineage: CellLineage, noi: int) -> int | float:
         """
-        Compute the relative age of a given node, in time units.
+        Compute the relative age of a given cell.
 
         Parameters
         ----------
@@ -164,8 +120,8 @@ class RelativeAgeInTime(NodeGlobalFeatureCalculator):
 
         Returns
         -------
-        float
-            Relative age of the node, in time units.
+        int | float
+            Relative age of the node.
         """
         cell_cycle = lineage.get_cell_cycle(noi)
         return cell_cycle.index(noi) * self.time_step
@@ -216,58 +172,33 @@ class CellCycleCompleteness(NodeGlobalFeatureCalculator):
                 return True
 
 
-class DivisionTimeInFrames(NodeGlobalFeatureCalculator):
+class DivisionTime(NodeGlobalFeatureCalculator):
     """
-    Calculator to compute the division time of cells, in frames.
+    Calculator to compute the division time of cells.
 
     Division time is defined as the time between 2 divisions.
     It is also the length of the cell cycle of the cell of interest.
-    Here, it is given in frames.
+    It is given in frames by default, but can be converted
+    to the time unit of the model if specified.
     """
 
-    def compute(self, data: Data, lineage: CellLineage | CycleLineage, noi: int) -> int:
+    def __init__(self, feature: Feature, time_step: int | float = 1):
         """
-        Compute the division time of a given cell or cell cycle, in frames.
-
         Parameters
         ----------
-        data : Data
-            Data object containing the lineage.
-        lineage : CellLineage | CycleLineage
-            Lineage graph containing the node (cell or cell cycle) of interest.
-        noi : int
-            Node ID of the node (cell or cell cycle) of interest.
-
-        Returns
-        -------
-        int
-            Division time, in frames.
+        feature : Feature
+            Feature object to which the calculator is associated.
+        time_step : int | float, optional
+            Time step between 2 frames, in time unit. Default is 1.
         """
-        if isinstance(lineage, CellLineage):
-            cell_cycle = lineage.get_cell_cycle(noi)
-            return len(cell_cycle)
-        elif isinstance(lineage, CycleLineage):
-            return lineage.nodes[noi]["cycle_length"]
-
-
-class DivisionTimeInTime(NodeGlobalFeatureCalculator):
-    """
-    Calculator to compute the division time of cells, in time units.
-
-    Division time is defined as the time between 2 divisions.
-    It is also the length of the cell cycle of the cell of interest.
-    Here, it is given in time units.
-    """
-
-    def __init__(self, feature: Feature, time_step: float):
         super().__init__(feature)
         self.time_step = time_step
 
     def compute(
         self, data: Data, lineage: CellLineage | CycleLineage, noi: int
-    ) -> float:
+    ) -> int | float:
         """
-        Compute the division time of a given cell or cell cycle, in time units.
+        Compute the division time of a given cell or cell cycle.
 
         Parameters
         ----------
@@ -280,8 +211,8 @@ class DivisionTimeInTime(NodeGlobalFeatureCalculator):
 
         Returns
         -------
-        float
-            Division time, in time units.
+        int | float
+            Division time.
         """
         if isinstance(lineage, CellLineage):
             cell_cycle = lineage.get_cell_cycle(noi)
@@ -290,60 +221,33 @@ class DivisionTimeInTime(NodeGlobalFeatureCalculator):
             return lineage.nodes[noi]["cycle_length"] * self.time_step
 
 
-class DivisionRateInFrames(NodeGlobalFeatureCalculator):
+class DivisionRate(NodeGlobalFeatureCalculator):
     """
-    Calculator to compute the division rate of cells, in frames.
+    Calculator to compute the division rate of cells.
 
     Division rate is defined as the number of divisions per time unit.
     It is the inverse of the division time.
-    Here, it is given in frames.
+    It is given in divisions per frame by default, but can be converted
+    to divisions per time unit of the model if specified.
     """
 
-    def compute(
-        self, data: Data, lineage: CellLineage | CycleLineage, noi: int
-    ) -> float:
+    def __init__(self, feature: Feature, time_step: int | float = 1):
         """
-        Compute the division rate of a given cell or cell cycle, in frames.
-
         Parameters
         ----------
-        data : Data
-            Data object containing the lineage.
-        lineage : CellLineage | CycleLineage
-            Lineage graph containing the node (cell or cell cycle) of interest.
-        noi : int
-            Node ID of the node (cell or cell cycle) of interest.
-
-        Returns
-        -------
-        float
-            Division rate, in frames.
+        feature : Feature
+            Feature object to which the calculator is associated.
+        time_step : int | float, optional
+            Time step between 2 frames, in time unit. Default is 1.
         """
-        if isinstance(lineage, CellLineage):
-            cell_cycle = lineage.get_cell_cycle(noi)
-            return 1 / len(cell_cycle)
-        elif isinstance(lineage, CycleLineage):
-            return 1 / lineage.nodes[noi]["cycle_length"]
-
-
-class DivisionRateInTime(NodeGlobalFeatureCalculator):
-    """
-    Calculator to compute the division rate of cells, in time units.
-
-    Division rate is defined as the number of divisions per time unit.
-    It is the inverse of the division time.
-    Here, it is given in time units.
-    """
-
-    def __init__(self, feature: Feature, time_step: float):
         super().__init__(feature)
         self.time_step = time_step
 
     def compute(
         self, data: Data, lineage: CellLineage | CycleLineage, noi: int
-    ) -> float:
+    ) -> int | float:
         """
-        Compute the division rate of a given cell or cell cycle, in time units.
+        Compute the division rate of a given cell or cell cycle.
 
         Parameters
         ----------
@@ -356,8 +260,8 @@ class DivisionRateInTime(NodeGlobalFeatureCalculator):
 
         Returns
         -------
-        float
-            Division rate, in time units.
+        int | float
+            Division rate.
         """
         if isinstance(lineage, CellLineage):
             cell_cycle = lineage.get_cell_cycle(noi)
