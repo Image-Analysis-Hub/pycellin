@@ -847,73 +847,67 @@ class Model:
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(feat, "node", pgf.tracking.DivisionRate, time_step)
 
-    # def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:
-    #     """
-    #     Add the specified predefined Pycellin feature to the model.
+    def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:
+        """
+        Add a single predefined Pycellin feature to the model.
 
-    #     This updates the FeaturesDeclaration and compute the feature values
-    #     for all lineages.
+        Parameters
+        ----------
+        feature_name : str
+            Name of the feature to add. Needs to be an available feature.
+        kwargs : bool
+            Additional keyword arguments to pass to the function
+            computing the feature. For example, for absolute_age,
+            in_time_unit=True can be used to yield the age
+            in the time unit of the model instead of in frames.
 
-    #     Parameters
-    #     ----------
-    #     feature_name : str
-    #         Name of the feature to add. Need to be an available feature.
-    #     kwargs : bool
-    #         Additional keyword arguments to pass to the function
-    #         computing the feature. For example, for absolute_age,
-    #         in_time_unit=True can be used to yield the age
-    #         in the time unit of the model instead of in frames.
+        Raises
+        ------
+        KeyError
+            If the feature is not a predefined feature of Pycellin.
+        """
+        if (
+            feature_name in self.get_pycellin_cycle_lineage_features()
+            and not self.data.cycle_data
+        ):
+            raise ValueError(
+                f"Feature {feature_name} is a feature of cycle lineages, "
+                "but the cycle lineages have not been computed yet. "
+                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+            )
+        feat_dict = {
+            "absolute_age": self.add_absolute_age,
+            "relative_age": self.add_relative_age,
+            "cell_cycle_completeness": self.add_cell_cycle_completeness,
+            "division_time": self.add_division_time,
+            "division_rate": self.add_division_rate,
+        }
+        try:
+            feat_dict[feature_name](**kwargs)
+        except KeyError:
+            available_features = ", ".join(feat_dict.keys())
+            raise KeyError(
+                f"Feature {feature_name} is not a predefined feature of Pycellin. "
+                f"Available Pycellin features are: {available_features}."
+            )
 
-    #     Raises
-    #     ------
-    #     KeyError
-    #         If the feature is not a predefined feature of Pycellin.
-    #     """
-    #     if (
-    #         feature_name in self.get_pycellin_cycle_lineage_features()
-    #         and not self.data.cycle_data
-    #     ):
-    #         raise ValueError(
-    #             f"Feature {feature_name} is a feature of cycle lineages, "
-    #             "but the cycle lineages have not been computed yet. "
-    #             "Please compute the cycle lineages first with `model.add_cycle_data()`."
-    #         )
-    #     feat_dict = {
-    #         "absolute_age": self.add_absolute_age,
-    #         "relative_age": self.add_relative_age,
-    #         "cell_cycle_completeness": self.add_cell_cycle_completeness,
-    #         "division_time": self.add_division_time,
-    #         "division_rate": self.add_division_rate,
-    #     }
-    #     try:
-    #         feat_dict[feature_name](**kwargs)
-    #     except KeyError:
-    #         available_features = ", ".join(feat_dict.keys())
-    #         raise KeyError(
-    #             f"Feature {feature_name} is not a predefined feature of Pycellin. "
-    #             f"Available Pycellin features are: {available_features}."
-    #         )
+    def add_pycellin_features(self, features_info: list[str | dict[str, Any]]) -> None:
+        """
+        Add the specified predefined Pycellin features to the model.
 
-    # def add_pycellin_features(self, feature_names: list[str], **kwargs: bool) -> None:
-    #     """
-    #     Add the specified predefined Pycellin features to the model.
-
-    #     This updates the FeaturesDeclaration and compute the feature values
-    #     for all lineages.
-
-    #     Parameters
-    #     ----------
-    #     feature_names : list[str]
-    #         Names of the features to add. Need to be available features.
-    #     kwargs : bool
-    #         Additional keyword arguments to pass to the function
-    #         computing the feature. For example, for absolute_age,
-    #         in_time_unit=True can be used to yield the age
-    #         in the time unit of the model instead of in frames.
-    #     """
-    #     for feature_name in feature_names:
-    #         self.add_pycellin_feature(feature_name, **kwargs)
-    #     # FIXME: will crash when some features need kwargs and others do not.
+        Parameters
+        ----------
+        features_info : list[str | dict[str, Any]]
+            List of the features to add. Each feature can be a string
+            (the name of the feature) or a dictionary with the name of the
+            feature as the key and additional keyword arguments as values.
+        """
+        for feat_info in features_info:
+            if isinstance(feat_info, str):
+                self.add_pycellin_feature(feat_info)
+            elif isinstance(feat_info, dict):
+                for feature_name, kwargs in feat_info.items():4
+                    self.add_pycellin_feature(feature_name, **kwargs)
 
     def recompute_feature(self, feature_name: str) -> None:
         """
