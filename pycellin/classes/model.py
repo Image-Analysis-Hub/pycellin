@@ -621,6 +621,24 @@ class Model:
                 fusions.extend([Cell(cell_ID, lineage_ID) for cell_ID in tmp])
         return fusions
 
+    def prepare_full_data_update(self) -> None:
+        """
+        Prepare the updater for a full data update.
+
+        All cells, links and lineages in the model data will see
+        their feature values recomputed during the next update.
+        """
+        if self._updater._full_data_update:
+            return
+        self._updater._full_data_update = True
+        self._updater._update_required = True
+        for lin_ID, lin in self.data.cell_data.items():
+            for noi in lin.nodes:
+                self._updater._added_cells.add(Cell(noi, lin_ID))
+            for edge in lin.edges:
+                self._updater._added_links.add(Link(edge[0], edge[1], lin_ID))
+        self._updater._added_lineages = set(self.data.cell_data.keys())
+
     def add_custom_feature(
         self,
         feat: Feature,
@@ -630,12 +648,12 @@ class Model:
         **kwargs: Any,
     ) -> None:
         """
-        compute and add a custom feature to the model.
+        Add a custom feature to the model.
 
         This method adds the feature to the FeaturesDeclaration,
-        registers the way to compute the feature in case we need
-        to recompute it later on, and then actually computes
-        the feature values for all the data.
+        register the way to compute the feature,
+        and notify the updater that all data needs to be updated.
+        To actually update the data, the user needs to call the update() method.
 
         Parameters
         ----------
@@ -648,18 +666,7 @@ class Model:
         """
         self.feat_declaration._add_feature(feat, feat_type)
         self._updater.register_calculator(feat, calculator, *args, **kwargs)
-        # TODO: need to add all the elements possibly modified by the calculator
-        # to the updater. Rough version below, see if it should be dealt with
-        # in another place or way (like when the data is created directly...?)
-        self._updater._update_required = True
-        self._updater._added_cells = set()
-        self._updater._added_links = set()
-        for lin_ID, lin in self.data.cell_data.items():
-            for noi in lin.nodes:
-                self._updater._added_cells.add(Cell(noi, lin_ID))
-            for edge in lin.edges:
-                self._updater._added_links.add(Link(edge[0], edge[1], lin_ID))
-        self._updater._added_lineages = set(self.data.cell_data.keys())
+        self.prepare_full_data_update()
 
     # def add_width_and_length(
     #     self,

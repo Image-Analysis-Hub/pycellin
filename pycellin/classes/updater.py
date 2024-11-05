@@ -13,6 +13,7 @@ class ModelUpdater:
     def __init__(self):
 
         self._update_required = False
+        self._full_data_update = False
 
         # TODO: is a set a good idea? Maybe better to pool the nodes per lineage...
         # In this case I need to be able to modify the content of the collection
