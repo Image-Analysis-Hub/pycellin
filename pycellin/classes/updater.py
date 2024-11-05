@@ -48,18 +48,26 @@ class ModelUpdater:
         else:
             raise KeyError(f"Feature {feature_name} has no registered calculator.")
 
-    def _update(self, data: Data) -> None:
+    def _update(self, data: Data, features_to_update: list[str] | None = None) -> None:
+        """
+        Update the feature values of the data.
 
+        Parameters
+        ----------
+        data : Data
+            The data to update.
+        features_to_update : list of str, optional
+            List of features to update. If None, all features are updated.
+        """
         # TODO: For now we ignore cycle lineages.
-        # TODO: What if we have interdependencies between features?
-        # Maybe we need something to define the order in which features are computed?
-        # Something saved in the ModelUpdater object? An argument to the
-        # update method?
-        # => not implementing this for now to keep things "simple",
-        # but I definitely need to address this later.
-        # In any case, we need to recompute local features BEFORE global ones.
+        # TODO: Deal with feature dependencies.
 
-        for calc in self._calculators.values():
+        if features_to_update is None:
+            calculators = self._calculators.values()
+        else:
+            calculators = [self._calculators[feat] for feat in features_to_update]
+
+        for calc in calculators:
             if calc.is_for_local_feature():
                 # Local features: we recompute them for added / modified objects only.
                 feature_type = calc.get_feature_type()
