@@ -96,6 +96,7 @@ class ModelUpdater:
 
         # Update is done, we can clean up.
         self._update_required = False
+        self._full_data_update = False
         self._added_cells.clear()
         self._removed_cells.clear()
         self._added_links.clear()
