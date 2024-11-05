@@ -901,12 +901,32 @@ class Model:
             List of the features to add. Each feature can be a string
             (the name of the feature) or a dictionary with the name of the
             feature as the key and additional keyword arguments as values.
+
+        Examples
+        --------
+        With no additional arguments:
+        >>> model.add_pycellin_features(["absolute_age", "relative_age"])
+        With additional arguments:
+        >>> model.add_pycellin_features(
+        ...     [
+        ...         {"absolute_age": {"in_time_unit": True}},
+        ...         {"relative_age": {"in_time_unit": True}},
+        ...     ]
+        )
+        It is possible to mix features with and without additional arguments:
+        >>> model.add_pycellin_features(
+        ...     [
+        ...         {"absolute_age": {"in_time_unit": True}},
+        ...         "cell_cycle_completeness",
+        ...         {"relative_age": {"in_time_unit": True}},
+        ...     ]
+        )
         """
         for feat_info in features_info:
             if isinstance(feat_info, str):
                 self.add_pycellin_feature(feat_info)
             elif isinstance(feat_info, dict):
-                for feature_name, kwargs in feat_info.items():4
+                for feature_name, kwargs in feat_info.items():
                     self.add_pycellin_feature(feature_name, **kwargs)
 
     def recompute_feature(self, feature_name: str) -> None:
