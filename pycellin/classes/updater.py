@@ -17,6 +17,8 @@ class ModelUpdater:
 
         # TODO: is a set a good idea? Maybe better to pool the nodes per lineage...
         # In this case I need to be able to modify the content of the collection
+        # TODO: what is the use of saving which objects have been removed? Do
+        # we have features that need recomputing in that case?
         self._added_cells = set()  # set of Cell()
         self._removed_cells = set()
         self._added_links = set()  # set of Link()
@@ -33,6 +35,20 @@ class ModelUpdater:
         # easier to put this as an argument to the update() method, and have a default
         # order for the other features that is the order of registration (order of keys
         # in the _calculators dictionary).
+
+    def _reinit(self) -> None:
+        """
+        Reset the state of the updater.
+        """
+        self._update_required = False
+        self._full_data_update = False
+        self._added_cells.clear()
+        self._removed_cells.clear()
+        self._added_links.clear()
+        self._removed_links.clear()
+        self._added_lineages.clear()
+        self._removed_lineages.clear()
+        self._modified_lineages.clear()
 
     def register_calculator(
         self,
@@ -95,14 +111,4 @@ class ModelUpdater:
                 calc.add_to_all(data)
 
         # Update is done, we can clean up.
-        self._update_required = False
-        self._full_data_update = False
-        self._added_cells.clear()
-        self._removed_cells.clear()
-        self._added_links.clear()
-        self._removed_links.clear()
-        self._added_lineages.clear()
-        self._removed_lineages.clear()
-        self._modified_lineages.clear()
-
-        # TODO: maybe separate in 3 different methods?
+        self._reinit()
