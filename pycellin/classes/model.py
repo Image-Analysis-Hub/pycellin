@@ -690,6 +690,9 @@ class Model:
         self._updater.register_calculator(feat, calculator, *args, **kwargs)
         self.prepare_full_data_update()
 
+    # TODO: in case of data coming from a loader, there is no calculator associated
+    # with the declared features.
+
     # def add_width_and_length(
     #     self,
     #     skel_algo: str = "zhang",
