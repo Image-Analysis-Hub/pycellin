@@ -467,6 +467,7 @@ class Model:
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
         self._updater._added_cells.add(Cell(cell_ID, lineage_ID))
+        self._updater._modified_lineages.add(lineage_ID)
 
         return cell_ID
 
@@ -501,6 +502,7 @@ class Model:
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
         self._updater._removed_cells.add(Cell(cell_ID, lineage_ID))
+        self._updater._modified_lineages.add(lineage_ID)
 
         return cell_attrs
 
@@ -570,6 +572,7 @@ class Model:
         self._updater._added_links.add(
             Link(source_cell_ID, source_lineage_ID, source_lineage_ID)
         )
+        self._updater._modified_lineages.add(source_lineage_ID)
 
     def unlink_cells(
         self, source_cell_ID: int, target_cell_ID: int, lineage_ID: int
@@ -600,7 +603,16 @@ class Model:
             lineage = self.data.cell_data[lineage_ID]
         except KeyError as err:
             raise KeyError(f"Lineage with ID {lineage_ID} does not exist.") from err
-        return lineage._remove_link(source_cell_ID, target_cell_ID)
+        link_attrs = lineage._remove_link(source_cell_ID, target_cell_ID)
+
+        # Notify that an update of the feature values may be required.
+        self._updater._update_required = True
+        self._updater._removed_links.add(
+            Link(source_cell_ID, target_cell_ID, lineage_ID)
+        )
+        self._updater._modified_lineages.add(lineage_ID)
+
+        return link_attrs
 
     def check_for_fusions(self) -> list[Cell]:
         """
