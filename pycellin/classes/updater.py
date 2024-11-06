@@ -57,9 +57,36 @@ class ModelUpdater:
         *args: Any,
         **kwargs: Any,
     ) -> None:
+        """
+        Register a calculator for a feature.
+
+        Parameters
+        ----------
+        feature : Feature
+            The feature of interest.
+        calculator : FeatureCalculator
+            The calculator to use to compute the feature.
+        args : tuple
+            Positional arguments to pass to the calculator.
+        kwargs : dict
+            Keyword arguments to pass to the calculator.
+        """
         self._calculators[feature.name] = calculator(feature, *args, **kwargs)
 
     def delete_calculator(self, feature_name: str) -> None:
+        """
+        Delete the calculator for a feature.
+
+        Parameters
+        ----------
+        feature_name : str
+            The name of the feature for which to delete the calculator.
+
+        Raises
+        ------
+        KeyError
+            If the feature has no registered calculator.
+        """
         if feature_name in self._calculators:
             del self._calculators[feature_name]
         else:
