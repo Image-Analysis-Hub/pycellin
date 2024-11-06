@@ -325,6 +325,10 @@ class Model:
             cycle_lineage = self.data._compute_cycle_lineage(lin_ID)
             self.data.cycle_data["cycle_lineage_ID"] = cycle_lineage
 
+        # Notify that an update of the feature values may be required.
+        self._updater._update_required = True
+        self._updater._added_lineages.add(lin_ID)
+
     def remove_lineage(self, lineage_ID: int) -> CellLineage:
         """
         Remove the specified lineage from the model.
@@ -351,6 +355,11 @@ class Model:
             raise KeyError(f"Lineage with ID {lineage_ID} does not exist.")
         if self.data.cycle_data and lineage_ID in self.data.cycle_data:
             self.data.cycle_data.pop(lineage_ID)
+
+        # Notify that an update of the feature values may be required.
+        self._updater._update_required = True
+        self._updater._removed_lineages.add(lineage_ID)
+        
         return lineage
 
     def split_lineage_from_cell(
