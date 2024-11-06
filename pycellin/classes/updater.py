@@ -50,6 +50,20 @@ class ModelUpdater:
         self._removed_lineages.clear()
         self._modified_lineages.clear()
 
+    def _print_state(self) -> None:
+        """
+        Print the state of the updater.
+        """
+        print("Update required:", self._update_required)
+        print("Full data update:", self._full_data_update)
+        print("Added cells:", self._added_cells)
+        print("Removed cells:", self._removed_cells)
+        print("Added links:", self._added_links)
+        print("Removed links:", self._removed_links)
+        print("Added lineages:", self._added_lineages)
+        print("Removed lineages:", self._removed_lineages)
+        print("Modified lineages:", self._modified_lineages)
+
     def register_calculator(
         self,
         feature: Feature,
