@@ -359,7 +359,7 @@ class Model:
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
         self._updater._removed_lineages.add(lineage_ID)
-        
+
         return lineage
 
     def split_lineage_from_cell(
@@ -579,7 +579,7 @@ class Model:
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
         self._updater._added_links.add(
-            Link(source_cell_ID, source_lineage_ID, source_lineage_ID)
+            Link(source_cell_ID, target_cell_ID, source_lineage_ID)
         )
         self._updater._modified_lineages.add(source_lineage_ID)
 
