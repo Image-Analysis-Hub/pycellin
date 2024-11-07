@@ -8,7 +8,6 @@ lineage graphs.
 
 from itertools import product, combinations
 from operator import itemgetter
-from typing import Optional
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -19,6 +18,7 @@ from shapely.geometry import Point, LineString
 from skimage.morphology import skeletonize
 
 from pycellin.classes.lineage import CellLineage
+from pycellin.classes.feature_calculator import NodeLocalFeatureCalculator
 
 # TODO:
 # - remove debug code
@@ -113,7 +113,7 @@ def get_width_and_length(
     method_width: str = "mean",
     width_ignore_tips: bool = False,
     debug: bool = False,
-    debug_folder: Optional[str] = None,
+    debug_folder: str | None = None,
 ) -> tuple[int, int]:
     """
     Compute the width and length of the ROI associated with a node.
@@ -428,6 +428,76 @@ def get_width_and_length(
     width *= pixel_size
 
     return width, length
+
+
+class CellWidth(NodeLocalFeatureCalculator):
+    def __init__(
+        self,
+        feature,
+        pixel_size: float,
+        skel_algo: str = "zhang",
+        tolerance: float = 0.5,
+        method_width: str = "mean",
+        width_ignore_tips: bool = False,
+        debug: bool = False,
+        debug_folder: str | None = None,
+    ):
+        super().__init__(feature)
+        self.pixel_size = pixel_size
+        self.skel_algo = skel_algo
+        self.tolerance = tolerance
+        self.method_width = method_width
+        self.width_ignore_tips = width_ignore_tips
+        self.debug = debug
+        self.debug_folder = debug_folder
+
+    def compute(self, lineage: CellLineage, noi: int) -> float:
+        return get_width_and_length(
+            noi,
+            lineage,
+            self.pixel_size,
+            self.skel_algo,
+            self.tolerance,
+            self.method_width,
+            self.width_ignore_tips,
+            self.debug,
+            self.debug_folder,
+        )[0]
+
+
+class CellLength(NodeLocalFeatureCalculator):
+    def __init__(
+        self,
+        feature,
+        pixel_size: float,
+        skel_algo: str = "zhang",
+        tolerance: float = 0.5,
+        method_width: str = "mean",
+        width_ignore_tips: bool = False,
+        debug: bool = False,
+        debug_folder: str | None = None,
+    ):
+        super().__init__(feature)
+        self.pixel_size = pixel_size
+        self.skel_algo = skel_algo
+        self.tolerance = tolerance
+        self.method_width = method_width
+        self.width_ignore_tips = width_ignore_tips
+        self.debug = debug
+        self.debug_folder = debug_folder
+
+    def compute(self, lineage: CellLineage, noi: int) -> float:
+        return get_width_and_length(
+            noi,
+            lineage,
+            self.pixel_size,
+            self.skel_algo,
+            self.tolerance,
+            self.method_width,
+            self.width_ignore_tips,
+            self.debug,
+            self.debug_folder,
+        )[1]
 
 
 # TODO: this is a feature that should not be in Pycellin, too many ways to define
