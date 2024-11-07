@@ -117,13 +117,18 @@ class ModelUpdater:
         features_to_update : list of str, optional
             List of features to update. If None, all features are updated.
         """
-        # TODO: For now we ignore cycle lineages.
         # TODO: Deal with feature dependencies.
 
         if features_to_update is None:
             calculators = self._calculators.values()
         else:
             calculators = [self._calculators[feat] for feat in features_to_update]
+
+        # In case of modifications in the structure of some cell lineages,
+        # we need to recompute the cycle lineages and their features.
+        # TODO: optimize so we don't have to recompute EVERYTHING for cycle lineages.
+        for lin_ID in self._modified_lineages:
+            data.cycle_data[lin_ID] = data._compute_cycle_lineage(lin_ID)
 
         for calc in calculators:
             if calc.is_for_local_feature():

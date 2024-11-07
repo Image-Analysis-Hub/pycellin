@@ -414,12 +414,6 @@ class Model:
         self.data.cell_data[new_lineage_ID] = new_lineage
         # The update of the cycle lineages (if needed) will be
         # done by the updater.
-        # TODO: see with JY if we should update the cycle lineages here
-        # if self.data.cycle_data:
-        #     cycle_lineage = self.data._compute_cycle_lineage(lineage_ID)
-        #     self.data.cycle_data[lineage_ID] = cycle_lineage
-        #     new_cycle_lineage = self.data._compute_cycle_lineage(new_lineage_ID)
-        #     self.data.cycle_data[new_lineage_ID] = new_cycle_lineage
 
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
