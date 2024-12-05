@@ -130,8 +130,14 @@ class ModelUpdater:
         for lin_ID in self._modified_lineages:
             data.cycle_data[lin_ID] = data._compute_cycle_lineage(lin_ID)
 
+        # TODO: avoid having to do a case depending on data to update
+        # I can try:
+        # - passing the data to update to the feature calculator
+        # - create an intermediary class, maybe called ModelUpdate
+        # mu = ModelUpdate(self._added_cells, self._added_links, ...)
         for calc in calculators:
             if calc.is_for_local_feature():
+                # calc.calc(mu)
                 # Local features: we recompute them for added / modified objects only.
                 feature_type = calc.get_feature_type()
                 match feature_type:
