@@ -680,6 +680,9 @@ class Model:
         calculator : FeatureCalculator
             Calculator to compute the feature.
         """
+        # TODO: feature type can be infered thanks to the calculator
+        # This would simplify the syntax for the user.
+        # Need to remove this argument.
         self.feat_declaration._add_feature(feat, feat_type)
         self._updater.register_calculator(feat, calculator, *args, **kwargs)
         self.prepare_full_data_update()
