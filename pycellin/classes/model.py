@@ -636,9 +636,19 @@ class Model:
             Feature to add.
         calculator : FeatureCalculator
             Calculator to compute the feature.
+
+        Raises
+        ------
+        ValueError
+            If the feature is a cycle lineage feature and cycle lineages
+            have not been computed yet.
         """
-        feat_type = calculator.get_feature_type()
-        self.feat_declaration._add_feature(feat, feat_type)
+        if feat.lineage_type == "CycleLineage" and not self.data.cycle_data:
+            raise ValueError(
+                "Cycle lineages have not been computed yet. "
+                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+            )
+        self.feat_declaration._add_feature(feat, calculator.get_feature_type())
         self._updater.register_calculator(feat, calculator, *args, **kwargs)
         self.prepare_full_data_update()
 
