@@ -5,6 +5,4 @@ __pycache__/
 .coverage
 
 *.gz
-*.xml
-!FakeTracks.xml
 sample_data/FakeTracks.tif
