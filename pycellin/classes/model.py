@@ -658,7 +658,6 @@ class Model:
     def add_custom_feature(
         self,
         feat: Feature,
-        feat_type: Literal["node", "edge", "lineage"],
         calculator: FeatureCalculator,
         *args: Any,
         **kwargs: Any,
@@ -675,14 +674,10 @@ class Model:
         ----------
         feat: Feature
             Feature to add.
-        feat_type : Literal["node", "edge", "lineage"]
-            Type of feature to add.
         calculator : FeatureCalculator
             Calculator to compute the feature.
         """
-        # TODO: feature type can be infered thanks to the calculator
-        # This would simplify the syntax for the user.
-        # Need to remove this argument.
+        feat_type = calculator.get_feature_type()
         self.feat_declaration._add_feature(feat, feat_type)
         self._updater.register_calculator(feat, calculator, *args, **kwargs)
         self.prepare_full_data_update()
