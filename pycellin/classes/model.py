@@ -264,7 +264,7 @@ class Model:
         """
         return max(self.data.cell_data.keys()) + 1
 
-    def require_update(self) -> bool:
+    def is_update_required(self) -> bool:
         """
         Check if the model requires an update.
 
