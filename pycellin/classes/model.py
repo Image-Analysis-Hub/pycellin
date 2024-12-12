@@ -994,7 +994,10 @@ class Model:
         # ... and finally we update the updater.
         self._updater.delete_calculator(feature_name)
 
-    def remove_features():
+    # TODO: add a method to remove several features at the same time?
+    # When no argument is provided, remove all features?
+    # def remove_features(self, features_info: list[str | dict[str, Any]]) -> None:
+    #     pass
 
     def add_cycle_data(self) -> None:
         """
