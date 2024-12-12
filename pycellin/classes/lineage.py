@@ -995,6 +995,7 @@ class CellLineage(Lineage):
             line=dict(color="black", width=1),
         )
         """
+        # TODO: and if we want to plot in time units instead of frames?
         super().plot(
             ID_feature="cell_ID",
             y_feature="frame",
