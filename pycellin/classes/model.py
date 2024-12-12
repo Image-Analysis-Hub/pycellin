@@ -865,6 +865,8 @@ class Model:
         feat_dict = {
             "absolute_age": self.add_absolute_age,
             "relative_age": self.add_relative_age,
+            "cell_width": self.add_cell_width,
+            "cell_length": self.add_cell_length,
             "cell_cycle_completeness": self.add_cell_cycle_completeness,
             "division_time": self.add_division_time,
             "division_rate": self.add_division_rate,
