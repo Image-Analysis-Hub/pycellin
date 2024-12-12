@@ -854,7 +854,7 @@ class Model:
             If the feature is not a predefined feature of Pycellin.
         """
         if (
-            feature_name in self.get_pycellin_cycle_lineage_features()
+            feature_name in pgf.get_pycellin_cycle_lineage_features()
             and not self.data.cycle_data
         ):
             raise ValueError(
