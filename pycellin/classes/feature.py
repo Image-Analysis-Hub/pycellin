@@ -320,7 +320,9 @@ class FeaturesDeclaration:
         )
         feat_cells = Feature(
             name="cells",
-            description="Node ID of the cells in the cell cycle.",
+            description=(
+                "Node IDs of the cells in the cell cycle, in chronological order."
+            ),
             **common_fields,
         )
         feat_length = Feature(
