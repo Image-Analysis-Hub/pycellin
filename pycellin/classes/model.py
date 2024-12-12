@@ -672,7 +672,6 @@ class Model:
         )
         self.add_custom_feature(
             feat,
-            "node",
             pgf.morphology.CellWidth,
             self.metadata["pixel_size"]["width"],
             skel_algo=skel_algo,
@@ -698,7 +697,6 @@ class Model:
         )
         self.add_custom_feature(
             feat,
-            "node",
             pgf.morphology.CellLength,
             self.metadata["pixel_size"]["width"],
             skel_algo=skel_algo,
@@ -731,7 +729,7 @@ class Model:
             self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(feat, "node", pgf.tracking.AbsoluteAge, time_step)
+        self.add_custom_feature(feat, pgf.tracking.AbsoluteAge, time_step)
 
     def add_relative_age(self, in_time_unit: bool = False) -> None:
         """
@@ -758,7 +756,7 @@ class Model:
             self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(feat, "node", pgf.tracking.RelativeAge, time_step)
+        self.add_custom_feature(feat, pgf.tracking.RelativeAge, time_step)
 
     def add_cell_cycle_completeness(self) -> None:
         """
@@ -781,7 +779,6 @@ class Model:
         )
         self.add_custom_feature(
             feat,
-            "node",
             pgf.tracking.CellCycleCompleteness,
         )
 
@@ -809,7 +806,7 @@ class Model:
             self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(feat, "node", pgf.tracking.DivisionTime, time_step)
+        self.add_custom_feature(feat, pgf.tracking.DivisionTime, time_step)
 
     def add_division_rate(self, in_time_unit: bool = False) -> None:
         """
@@ -835,7 +832,7 @@ class Model:
             f'1/{self.metadata["time_unit"]}' if in_time_unit else "1/frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(feat, "node", pgf.tracking.DivisionRate, time_step)
+        self.add_custom_feature(feat, pgf.tracking.DivisionRate, time_step)
 
     def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:
         """
