@@ -937,6 +937,7 @@ class Model:
             raise ValueError(f"Feature {feature_name} does not exist.")
 
         # Then need to update the data.
+        # TODO: implement
         pass
 
     def remove_feature(
