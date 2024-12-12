@@ -663,7 +663,7 @@ class Model:
         width_ignore_tips: bool = False,
     ) -> None:
         feat = Feature(
-            "width",
+            "cell_width",
             "Width of the cell",
             "CellLineage",
             "Pycellin",
@@ -688,7 +688,7 @@ class Model:
         width_ignore_tips: bool = False,
     ) -> None:
         feat = Feature(
-            "length",
+            "cell_length",
             "Length of the cell",
             "CellLineage",
             "Pycellin",
@@ -993,6 +993,8 @@ class Model:
 
         # ... and finally we update the updater.
         self._updater.delete_calculator(feature_name)
+
+    def remove_features():
 
     def add_cycle_data(self) -> None:
         """
