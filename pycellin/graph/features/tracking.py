@@ -37,6 +37,7 @@ from pycellin.classes import Data
 from pycellin.classes.feature_calculator import NodeGlobalFeatureCalculator
 
 # TODO: should I add the word Calc or Calculator to the class names?
+# TODO: add calculator for mandatory cycle lineage features (e.g. cycle length)
 
 
 class AbsoluteAge(NodeGlobalFeatureCalculator):
