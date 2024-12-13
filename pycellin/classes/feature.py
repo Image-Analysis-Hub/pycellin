@@ -208,7 +208,7 @@ class FeaturesDeclaration:
                 )
             case _:
                 raise ValueError(
-                    f"Invalid feature type: {feature_type}."
+                    f"Invalid feature type: {feature_type}. "
                     f"Feature type be must 'node', 'edge', "
                     f"'lineage' or unspecified."
                 )
