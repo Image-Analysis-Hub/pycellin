@@ -941,7 +941,9 @@ class Model:
         pass
 
     def remove_feature(
-        self, feature_name: str, feature_type: Literal["node", "edge", "lineage"]
+        self,
+        feature_name: str,
+        feature_type: Literal["node", "edge", "lineage"],
     ) -> None:
         """
         Remove the specified feature from the model.
@@ -988,7 +990,7 @@ class Model:
                         del data[feature_name]
             case "edge":
                 for lin in lineage_data.values():
-                    for _, _, data in lin.edges:
+                    for _, _, data in lin.edges(data=True):
                         del data[feature_name]
             case "lineage":
                 for lin in lineage_data.values():
