@@ -46,7 +46,7 @@ class Model:
         data : Data, optional
             The lineages data of the model (default is None).
         """
-        # TODO: pretty sure creating an empty model will create issues
+        # FIXME: pretty sure creating an empty model will create issues
         self.metadata = metadata
         self.feat_declaration = feat_declaration
         self.data = data
