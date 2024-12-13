@@ -10,7 +10,9 @@ from pycellin.classes import Feature, FeaturesDeclaration
 from pycellin.classes.feature_calculator import FeatureCalculator
 from pycellin.classes import CellLineage
 from pycellin.classes.updater import ModelUpdater
-import pycellin.graph.features as pgf
+import pycellin.graph.features.tracking as tracking
+import pycellin.graph.features.morphology as morpho
+import pycellin.graph.features.utils as futils
 
 # TODO: should I force the user to use the Cell and Link named tuples?
 # Would impact the signature of a lot of methods, but would make these
@@ -672,7 +674,7 @@ class Model:
         )
         self.add_custom_feature(
             feat,
-            pgf.morphology.CellWidth,
+            morpho.CellWidth,
             self.metadata["pixel_size"]["width"],
             skel_algo=skel_algo,
             tolerance=tolerance,
@@ -697,7 +699,7 @@ class Model:
         )
         self.add_custom_feature(
             feat,
-            pgf.morphology.CellLength,
+            morpho.CellLength,
             self.metadata["pixel_size"]["width"],
             skel_algo=skel_algo,
             tolerance=tolerance,
@@ -729,7 +731,7 @@ class Model:
             self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(feat, pgf.tracking.AbsoluteAge, time_step)
+        self.add_custom_feature(feat, tracking.AbsoluteAge, time_step)
 
     def add_relative_age(self, in_time_unit: bool = False) -> None:
         """
@@ -756,7 +758,7 @@ class Model:
             self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(feat, pgf.tracking.RelativeAge, time_step)
+        self.add_custom_feature(feat, tracking.RelativeAge, time_step)
 
     def add_cell_cycle_completeness(self) -> None:
         """
@@ -779,7 +781,7 @@ class Model:
         )
         self.add_custom_feature(
             feat,
-            pgf.tracking.CellCycleCompleteness,
+            tracking.CellCycleCompleteness,
         )
 
     def add_division_time(self, in_time_unit: bool = False) -> None:
@@ -806,7 +808,7 @@ class Model:
             self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(feat, pgf.tracking.DivisionTime, time_step)
+        self.add_custom_feature(feat, tracking.DivisionTime, time_step)
 
     def add_division_rate(self, in_time_unit: bool = False) -> None:
         """
@@ -832,7 +834,7 @@ class Model:
             f'1/{self.metadata["time_unit"]}' if in_time_unit else "1/frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(feat, pgf.tracking.DivisionRate, time_step)
+        self.add_custom_feature(feat, tracking.DivisionRate, time_step)
 
     def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:
         """
@@ -854,7 +856,7 @@ class Model:
             If the feature is not a predefined feature of Pycellin.
         """
         if (
-            feature_name in pgf.get_pycellin_cycle_lineage_features()
+            feature_name in futils.get_pycellin_cycle_lineage_features()
             and not self.data.cycle_data
         ):
             raise ValueError(
