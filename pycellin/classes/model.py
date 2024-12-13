@@ -995,7 +995,12 @@ class Model:
                     del lin.graph[feature_name]
 
         # ... and finally we update the updater.
-        self._updater.delete_calculator(feature_name)
+        try:
+            self._updater.delete_calculator(feature_name)
+        except KeyError:
+            # No calculator doesn't mean there is something wrong,
+            # maybe it's just an imported feature.
+            pass
 
     # TODO: add a method to remove several features at the same time?
     # When no argument is provided, remove all features?
