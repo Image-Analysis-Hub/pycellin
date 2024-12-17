@@ -86,6 +86,9 @@ class ModelUpdater:
             Keyword arguments to pass to the calculator.
         """
         self._calculators[feature.name] = calculator(feature, *args, **kwargs)
+        # TODO: isn't it better to pass an instance of the calculator instead of a class?
+        # I feel like maybe it is easier / more intuitive for the user...?
+        # Discuss with Marie.
 
     def delete_calculator(self, feature_name: str) -> None:
         """
