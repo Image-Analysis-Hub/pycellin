@@ -80,6 +80,7 @@ class AbsoluteAge(NodeGlobalFeatureCalculator):
         int | float
             Absolute age of the node.
         """
+        # FIXME: incorrect when there is a gap!!!!
         return len(nx.ancestors(lineage, noi)) * self.time_step
 
 
@@ -124,6 +125,7 @@ class RelativeAge(NodeGlobalFeatureCalculator):
         int | float
             Relative age of the node.
         """
+        # FIXME: incorrect when there is a gap!!!!
         cell_cycle = lineage.get_cell_cycle(noi)
         return cell_cycle.index(noi) * self.time_step
 
