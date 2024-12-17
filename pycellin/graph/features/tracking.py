@@ -80,8 +80,9 @@ class AbsoluteAge(NodeGlobalFeatureCalculator):
         int | float
             Absolute age of the node.
         """
-        # FIXME: incorrect when there is a gap!!!!
-        return len(nx.ancestors(lineage, noi)) * self.time_step
+        root = lineage.get_root()
+        age_in_frame = lineage.nodes[noi]["frame"] - lineage.nodes[root]["frame"]
+        return age_in_frame * self.time_step
 
 
 class RelativeAge(NodeGlobalFeatureCalculator):
@@ -90,7 +91,7 @@ class RelativeAge(NodeGlobalFeatureCalculator):
 
     The relative age of a cell is defined as the time elapsed since
     the start of the cell cycle (i.e. previous division, or beginning
-    of the lineage).
+    of the lineage). Relative age of the first cell of a cell cycle is 0.
     It is given in frames by default, but can be converted
     to the time unit of the model if specified.
     """
@@ -125,9 +126,9 @@ class RelativeAge(NodeGlobalFeatureCalculator):
         int | float
             Relative age of the node.
         """
-        # FIXME: incorrect when there is a gap!!!!
-        cell_cycle = lineage.get_cell_cycle(noi)
-        return cell_cycle.index(noi) * self.time_step
+        first_cell = lineage.get_cell_cycle(noi)[0]
+        age_in_frame = lineage.nodes[noi]["frame"] - lineage.nodes[first_cell]["frame"]
+        return age_in_frame * self.time_step
 
 
 class CellCycleCompleteness(NodeGlobalFeatureCalculator):
