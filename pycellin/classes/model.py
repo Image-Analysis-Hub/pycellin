@@ -1007,14 +1007,29 @@ class Model:
             case "node":
                 for lin in lineage_data.values():
                     for _, data in lin.nodes(data=True):
-                        del data[feature_name]
+                        try:
+                            del data[feature_name]
+                        except KeyError:
+                            # No feature doesn't mean there is something wrong,
+                            # maybe no update were done.
+                            pass
             case "edge":
                 for lin in lineage_data.values():
                     for _, _, data in lin.edges(data=True):
-                        del data[feature_name]
+                        try:
+                            del data[feature_name]
+                        except KeyError:
+                            # No feature doesn't mean there is something wrong,
+                            # maybe no update were done.
+                            pass
             case "lineage":
                 for lin in lineage_data.values():
-                    del lin.graph[feature_name]
+                    try:
+                        del lin.graph[feature_name]
+                    except KeyError:
+                        # No feature doesn't mean there is something wrong,
+                        # maybe no update were done.
+                        pass
 
         # ... and finally we update the updater.
         try:
