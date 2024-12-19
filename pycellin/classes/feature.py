@@ -225,12 +225,6 @@ class FeaturesDeclaration:
                     or feature_name in self.edge_feats
                     or feature_name in self.lin_feats
                 )
-            case _:
-                raise ValueError(
-                    f"Invalid feature type: {feature_type}. "
-                    f"Feature type be must 'node', 'edge', "
-                    f"'lineage' or unspecified."
-                )
 
     def _get_feat_dict_from_feat_type(self, feature_type: FeatureType) -> dict:
         """
