@@ -46,7 +46,6 @@ class Feature:
         # TODO: should the feature type be stored as an attribute?
         self.name = name
         self.description = description
-        # TODO: deal with the case where lineage_type is not a valid value
         if not check_literal_type(lineage_type, LineageType):
             raise ValueError(
                 f"Feature type must be one of {', '.join(LineageType.__args__)}."
