@@ -35,7 +35,6 @@ class Model:
         data : Data, optional
             The lineages data of the model (default is None).
         """
-        # FIXME: pretty sure creating an empty model will create issues
         self.metadata = metadata
         self.feat_declaration = feat_declaration
         self.data = data
@@ -428,7 +427,6 @@ class Model:
         self._updater._update_required = True
         self._updater._added_lineages.add(new_lineage_ID)
         self._updater._modified_lineages.add(lineage_ID)
-        # TODO: should I instead list all the removed cells and links?
 
         return new_lineage
 
@@ -553,7 +551,6 @@ class Model:
         KeyError
             If a feature in the link_attributes is not declared.
         """
-        # TODO: is the name add_link() better?
         try:
             source_lineage = self.data.cell_data[source_lineage_ID]
         except KeyError as err:
@@ -989,7 +986,7 @@ class Model:
             raise ValueError(f"Feature {feature_name} does not exist.")
 
         # Then need to update the data.
-        # TODO: implement
+        # TODO: implement recompute_feature
         pass
 
     def remove_feature(
@@ -1128,5 +1125,5 @@ class Model:
         format : str
             Format of the exported file.
         """
-        # TODO: implement
+        # TODO: implement export model
         pass

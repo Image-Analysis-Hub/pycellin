@@ -19,6 +19,7 @@ class ModelUpdater:
         # In this case I need to be able to modify the content of the collection
         # TODO: what is the use of saving which objects have been removed? Do
         # we have features that need recomputing in that case?
+        # => no but in that case we can remove the matching cycle lineage
         self._added_cells = set()  # set of Cell()
         self._removed_cells = set()
         self._added_links = set()  # set of Link()
@@ -34,7 +35,8 @@ class ModelUpdater:
         # to specify the order only for features that have dependencies. So it might be
         # easier to put this as an argument to the update() method, and have a default
         # order for the other features that is the order of registration (order of keys
-        # in the _calculators dictionary).
+        # in the _calculators dictionary). Even better would be to have a solver.
+        # => keep this for later
 
     def _reinit(self) -> None:
         """
@@ -124,7 +126,7 @@ class ModelUpdater:
         features_to_update : list of str, optional
             List of features to update. If None, all features are updated.
         """
-        # TODO: Deal with feature dependencies.
+        # TODO: Deal with feature dependencies. See comments in __init__.
 
         if features_to_update is None:
             calculators = self._calculators.values()
@@ -133,7 +135,7 @@ class ModelUpdater:
 
         # In case of modifications in the structure of some cell lineages,
         # we need to recompute the cycle lineages and their features.
-        # TODO: optimize so we don't have to recompute EVERYTHING for cycle lineages.
+        # TODO: optimize so we don't have to recompute EVERYTHING for cycle lineages?
         for lin_ID in self._modified_lineages:
             data.cycle_data[lin_ID] = data._compute_cycle_lineage(lin_ID)
 

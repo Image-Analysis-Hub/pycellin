@@ -489,7 +489,7 @@ class CellLineage(Lineage):
         try:
             cell_attrs = self.nodes[noi]
         except KeyError as err:
-            _, txt = CellLineage._get_lineage_id_and_text(self)
+            _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
             msg = f"Cell {noi} does not exist{txt}."
             raise KeyError(msg) from err
         self.remove_node(noi)
@@ -531,11 +531,10 @@ class CellLineage(Lineage):
         TimeFlowError
             If the target cell happens before the source cell.
         """
-        # TODO: rename _get_lineage_id_and_text into _get_lineage_ID_and_err_msg?
-        source_lineage_ID, txt_src = CellLineage._get_lineage_id_and_text(self)
+        source_lineage_ID, txt_src = CellLineage._get_lineage_ID_and_err_msg(self)
 
         if target_lineage is not None:
-            target_lineage_ID, txt_tgt = CellLineage._get_lineage_id_and_text(
+            target_lineage_ID, txt_tgt = CellLineage._get_lineage_ID_and_err_msg(
                 target_lineage
             )
         else:
@@ -635,7 +634,7 @@ class CellLineage(Lineage):
         KeyError
             If the link does not exist in the lineage.
         """
-        _, txt = CellLineage._get_lineage_id_and_text(self)
+        _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
         if source_noi not in self.nodes():
             raise ValueError(f"Source cell (ID {source_noi}) does not exist{txt}.")
         if target_noi not in self.nodes():
@@ -679,7 +678,7 @@ class CellLineage(Lineage):
             If the cell does not exist in the lineage.
             If the split parameter is not "upstream" or "downstream"
         """
-        _, txt = CellLineage._get_lineage_id_and_text(self)
+        _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
         if noi not in self.nodes():
             raise ValueError(f"Source cell (ID {noi}) does not exist{txt}.")
 
@@ -738,7 +737,7 @@ class CellLineage(Lineage):
             If the given node has more than one predecessor.
         """
         # TODO: factorize
-        lineage_ID, _ = CellLineage._get_lineage_id_and_text(self)
+        lineage_ID, _ = CellLineage._get_lineage_ID_and_err_msg(self)
         cell_cycle = [node]
         start = False
         end = False
@@ -875,7 +874,7 @@ class CellLineage(Lineage):
                         ]
                     )
             elif len(parents) > 1:
-                lineage_ID, _ = CellLineage._get_lineage_id_and_text(self)
+                lineage_ID, _ = CellLineage._get_lineage_ID_and_err_msg(self)
                 raise FusionError(noi, lineage_ID)
         return sister_cells
 
@@ -1018,7 +1017,8 @@ class CellLineage(Lineage):
         )
 
     @staticmethod
-    def _get_lineage_id_and_text(lineage):
+    # TODO: I don't think this function is good design, even if it factorises code.
+    def _get_lineage_ID_and_err_msg(lineage):
         """
         Return the lineage ID and a text to display in error messages.
 
