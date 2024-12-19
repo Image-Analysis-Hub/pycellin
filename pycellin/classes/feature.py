@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 
 from itertools import chain
-from typing import Literal
+
+from pycellin.custom_types import FeatureType, LineageType
+from pycellin.utils import check_literal_type
 
 
 class Feature:
@@ -12,7 +14,7 @@ class Feature:
         self,
         name: str,
         description: str,
-        lineage_type: Literal["CellLineage", "CycleLineage"],
+        lineage_type: LineageType,
         provenance: str,
         data_type: str,
         unit: str | None = None,
@@ -26,7 +28,7 @@ class Feature:
             The name of the feature.
         description : str
             A description of the feature.
-        lineage_type : str
+        lineage_type : LineageType
             The type of lineage the feature is associated with: cell lineage
             or cell cycle lineage.
         provenance : str
@@ -35,11 +37,20 @@ class Feature:
             The data type of the feature (int, float, string).
         unit : str, optional
             The unit of the feature (e.g. µm, min, cell).
+
+        Raises
+        ------
+        ValueError
+            If the lineage type is not a valid value.
         """
         # TODO: should the feature type be stored as an attribute?
         self.name = name
         self.description = description
         # TODO: deal with the case where lineage_type is not a valid value
+        if not check_literal_type(lineage_type, LineageType):
+            raise ValueError(
+                f"Feature type must be one of {', '.join(LineageType.__args__)}."
+            )
         self.lineage_type = lineage_type
         self.provenance = provenance
         self.data_type = data_type
@@ -174,7 +185,7 @@ class FeaturesDeclaration:
     def has_feature(
         self,
         feature_name: str,
-        feature_type: Literal["node", "edge", "lineage"] | None = None,
+        feature_type: FeatureType | None = None,
     ) -> bool:
         """
         Check if the FeaturesDeclaration contains the specified feature.
@@ -183,7 +194,7 @@ class FeaturesDeclaration:
         ----------
         feature_name : str
             The name of the feature to check.
-        feature_type : str, optional
+        feature_type : FeatureType, optional
             The type of the feature to check (node, edge, or lineage).
             If not specified, the method will check all types.
 
@@ -191,8 +202,17 @@ class FeaturesDeclaration:
         -------
         bool
             True if the feature has been declared, False otherwise.
+
+        Raises
+        ------
+        ValueError
+            If the feature type is invalid.
         """
         # TODO: should probably be made accessible from model.
+        if not check_literal_type(feature_type, FeatureType):
+            raise ValueError(
+                f"Feature type must be one of {', '.join(FeatureType.__args__)}."
+            )
         match feature_type:
             case "node":
                 return feature_name in self.node_feats
@@ -213,15 +233,13 @@ class FeaturesDeclaration:
                     f"'lineage' or unspecified."
                 )
 
-    def _get_feat_dict_from_feat_type(
-        self, feature_type: Literal["node", "edge", "lineage"]
-    ) -> dict:
+    def _get_feat_dict_from_feat_type(self, feature_type: FeatureType) -> dict:
         """
         Return the dictionary of features corresponding to the specified type.
 
         Parameters
         ----------
-        feature_type : str
+        feature_type : FeatureType
             The type of the features to return (node, edge, or lineage).
 
         Returns
@@ -235,6 +253,10 @@ class FeaturesDeclaration:
             If the feature type is invalid.
         """
         # TODO: should I raise an error if no node_feats, edge_feats, or lin_feats?
+        if not check_literal_type(feature_type, FeatureType):
+            raise ValueError(
+                f"Feature type must be one of {', '.join(FeatureType.__args__)}."
+            )
         match feature_type:
             case "node":
                 return self.node_feats
@@ -242,15 +264,8 @@ class FeaturesDeclaration:
                 return self.edge_feats
             case "lineage":
                 return self.lin_feats
-            case _:
-                raise ValueError(
-                    f"Invalid feature type: {feature_type}."
-                    f"Feature type be must 'node', 'edge', 'lineage'."
-                )
 
-    def _add_feature(
-        self, feature: Feature, feature_type: Literal["node", "edge", "lineage"]
-    ) -> None:
+    def _add_feature(self, feature: Feature, feature_type: FeatureType) -> None:
         """
         Add the specified feature to the FeaturesDeclaration.
 
@@ -258,7 +273,7 @@ class FeaturesDeclaration:
         ----------
         feature : Feature
             The feature to add.
-        feature_type : str
+        feature_type : FeatureType
             The type of the feature to add (node, edge, or lineage).
 
         Raises
@@ -284,7 +299,7 @@ class FeaturesDeclaration:
     def _add_features(
         self,
         features: list[Feature],
-        feature_types: list[Literal["node", "edge", "lineage"]],
+        feature_types: list[FeatureType],
     ) -> None:
         """
         Add the specified features to the FeaturesDeclaration.
@@ -293,7 +308,7 @@ class FeaturesDeclaration:
         ----------
         features : list[Feature]
             The features to add.
-        feature_types : list[str]
+        feature_types : list[FeatureType]
             The types of the features to add (node, edge, or lineage).
         """
         for feature, feature_type in zip(features, feature_types):
@@ -351,9 +366,7 @@ class FeaturesDeclaration:
         )
         self._add_feature(feat_ID, "lineage")
 
-    def _remove_feature(
-        self, feature_name: str, feature_type: Literal["node", "edge", "lineage"]
-    ) -> None:
+    def _remove_feature(self, feature_name: str, feature_type: FeatureType) -> None:
         """
         Remove the specified feature from the FeaturesDeclaration.
 
@@ -361,7 +374,7 @@ class FeaturesDeclaration:
         ----------
         feature_name : str
             The name of the feature to remove.
-        feature_type : str
+        feature_type : FeatureType
             The type of the feature to add (node, edge, or lineage).
 
         Raises
@@ -386,7 +399,7 @@ class FeaturesDeclaration:
     def _remove_features(
         self,
         feature_names: list[str],
-        feature_types: list[Literal["node", "edge", "lineage"]],
+        feature_types: list[FeatureType],
     ) -> None:
         """
         Remove the specified features from the FeaturesDeclaration.
@@ -395,7 +408,7 @@ class FeaturesDeclaration:
         ----------
         feature_names : list[str]
             The names of the features to remove.
-        feature_types : list[str]
+        feature_types : list[FeatureType]
             The types of the features to remove (node, edge, or lineage).
         """
         for feature_name, feature_type in zip(feature_names, feature_types):
@@ -405,7 +418,7 @@ class FeaturesDeclaration:
         self,
         feature_name: str,
         new_name: str,
-        feature_type: Literal["node", "edge", "lineage"],
+        feature_type: FeatureType,
     ) -> None:
         """
         Rename a specified feature.
@@ -416,7 +429,7 @@ class FeaturesDeclaration:
             The name of the feature to rename.
         new_name : str
             The new name for the feature.
-        feature_type : str
+        feature_type : FeatureType
             The type of the feature to rename. Valid values are "node",
             "edge", or "lineage".
 
@@ -447,7 +460,7 @@ class FeaturesDeclaration:
         self,
         feature_name: str,
         new_description: str,
-        feature_type: Literal["node", "edge", "lineage"],
+        feature_type: FeatureType,
     ) -> None:
         """
         Modify the description of a specified feature.
@@ -458,7 +471,7 @@ class FeaturesDeclaration:
             The name of the feature whose description is to be modified.
         new_description : str
             The new description for the feature.
-        feature_type : str
+        feature_type : FeatureType
             The type of the feature to be modified. Valid values are "node",
             "edge", or "lineage".
 

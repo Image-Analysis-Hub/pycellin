@@ -1,28 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from collections import namedtuple
 import pickle
 from typing import Any, Literal
 
-from pycellin.classes import Data
-from pycellin.classes import Feature, FeaturesDeclaration
+from pycellin.classes import CellLineage, Data, Feature, FeaturesDeclaration
 from pycellin.classes.feature_calculator import FeatureCalculator
-from pycellin.classes import CellLineage
 from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features.tracking as tracking
 import pycellin.graph.features.morphology as morpho
 import pycellin.graph.features.utils as futils
-
-# TODO: should I force the user to use the Cell and Link named tuples?
-# Would impact the signature of a lot of methods, but would make these
-# signatures more structured and consistent (looking at you, add_cell()).
-
-Cell = namedtuple("Cell", ["cell_ID", "lineage_ID"])
-Link = namedtuple(
-    "Link",
-    ["source_cell_ID", "target_cell_ID", "lineage_ID"],
-)
+from pycellin.custom_types import Cell, Link, FeatureType
+from pycellin.utils import check_literal_type
 
 
 class Model:
@@ -963,7 +952,7 @@ class Model:
     def remove_feature(
         self,
         feature_name: str,
-        feature_type: Literal["node", "edge", "lineage"],
+        feature_type: FeatureType,
     ) -> None:
         """
         Remove the specified feature from the model.
@@ -975,21 +964,26 @@ class Model:
         ----------
         feature_name : str
             Name of the feature to remove.
-        feature_type : str, optional
+        feature_type : FeatureType
             The type of the feature to check (node, edge, or lineage).
 
         Raises
         ------
         ValueError
+            If the feature type is not recognized.
             If the feature does not exist.
         """
-        # First we check if the feature exists.
+        # Preliminary checks.
+        if not check_literal_type(feature_type, FeatureType):
+            raise ValueError(
+                f"Feature type must be one of {', '.join(FeatureType.__args__)}."
+            )
         if not self.feat_declaration.has_feature(feature_name, feature_type):
             raise ValueError(
                 f"There is no feature {feature_name} in {feature_type} features."
             )
 
-        # Then we update the FeaturesDeclaration...
+        # First we update the FeaturesDeclaration...
         feat_dict = self.feat_declaration._get_feat_dict_from_feat_type(feature_type)
         lineage_type = feat_dict[feature_name].lineage_type
         feat_dict.pop(feature_name)

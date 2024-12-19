@@ -172,8 +172,7 @@ class Data:
             The node ID of the closest cells and the lineages it belongs to,
             sorted by increasing distance.
         """
-        # TODO:
-        # - Implement the reference parameter.
+        # TODO: implement the reference parameter
 
         # Identification of the frames to search in.
         center_frame = lineage.nodes[noi]["frame"]
@@ -235,7 +234,7 @@ class Data:
     #     time_window: int | tuple[int, int],
     # ) -> list[tuple[CellLineage, int]]:
     #     """ """
-    #     # TODO: implement
+    #     # TODO: implement get_neighbouring_cells()
     #     # Parameter to define sort order? By default closest to farthest
     #     # Need to implement get_distance() between 2 nodes, not necessarily
     #     # from the same lineage...
