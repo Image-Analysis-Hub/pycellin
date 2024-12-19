@@ -110,7 +110,8 @@ class Model:
     # def get_cycle_lineage_from_ID(self, lineage_id: int) -> CycleLineage:
     #     return self.data.cycle_data[lineage_id]
 
-    # def get_lineage_from_name(self, name: str, lineage_type: Literal["cell", "cycle", "both"] = "both") -> CellLineage:
+    # def get_lineage_from_name(self, name: str,
+    #    lineage_type: Literal["cell", "cycle", "both"] = "both") -> CellLineage:
     #     """
     #     Return the cell lineage with the specified name.
 

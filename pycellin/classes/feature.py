@@ -166,7 +166,7 @@ class FeaturesDeclaration:
 
     def __str__(self) -> str:
         """
-        Compute a human-readable string representation of the FeaturesDeclaration object.
+        Compute a human-readable str representation of the FeaturesDeclaration object.
 
         Returns
         -------
