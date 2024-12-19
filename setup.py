@@ -5,9 +5,9 @@ from distutils.core import setup
 
 setup(
     name="pycellin",
-    version="0.2",
+    version="0.3",
     licence="BSD-3-Clause",
-    description="Conversion and analysis of TrackMate tracks as networkX directed graphs",
+    description="Graph-based framework to analyze cell lineages",
     author="Laura Xénard",
     author_email="laura.xenard@pasteur.fr",
     packages=["pycellin", "pycellin.tmio", "pycellin.graph", "pycellin.graph.features"],
