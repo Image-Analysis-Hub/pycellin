@@ -953,7 +953,7 @@ class Model:
     def remove_feature(
         self,
         feature_name: str,
-        feature_type: FeatureType,
+        feature_type: Literal["node", "edge", "lineage"],
     ) -> None:
         """
         Remove the specified feature from the model.
@@ -965,7 +965,7 @@ class Model:
         ----------
         feature_name : str
             Name of the feature to remove.
-        feature_type : FeatureType
+        feature_type : Literal["node", "edge", "lineage"]
             The type of the feature to check (node, edge, or lineage).
 
         Raises

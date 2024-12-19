@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from itertools import chain
+from typing import Literal
 
 from pycellin.custom_types import FeatureType, LineageType
 from pycellin.utils import check_literal_type
@@ -14,7 +15,7 @@ class Feature:
         self,
         name: str,
         description: str,
-        lineage_type: LineageType,
+        lineage_type: Literal["CellLineage", "CycleLineage"],
         provenance: str,
         data_type: str,
         unit: str | None = None,
@@ -28,7 +29,7 @@ class Feature:
             The name of the feature.
         description : str
             A description of the feature.
-        lineage_type : LineageType
+        lineage_type : Literal["CellLineage", "CycleLineage"]
             The type of lineage the feature is associated with: cell lineage
             or cell cycle lineage.
         provenance : str
@@ -184,7 +185,7 @@ class FeaturesDeclaration:
     def has_feature(
         self,
         feature_name: str,
-        feature_type: FeatureType | None = None,
+        feature_type: Literal["node", "edge", "lineage"] | None = None,
     ) -> bool:
         """
         Check if the FeaturesDeclaration contains the specified feature.
@@ -193,7 +194,7 @@ class FeaturesDeclaration:
         ----------
         feature_name : str
             The name of the feature to check.
-        feature_type : FeatureType, optional
+        feature_type : Literal["node", "edge", "lineage"], optional
             The type of the feature to check (node, edge, or lineage).
             If not specified, the method will check all types.
 
@@ -226,13 +227,15 @@ class FeaturesDeclaration:
                     or feature_name in self.lin_feats
                 )
 
-    def _get_feat_dict_from_feat_type(self, feature_type: FeatureType) -> dict:
+    def _get_feat_dict_from_feat_type(
+        self, feature_type: Literal["node", "edge", "lineage"]
+    ) -> dict:
         """
         Return the dictionary of features corresponding to the specified type.
 
         Parameters
         ----------
-        feature_type : FeatureType
+        feature_type : Literal["node", "edge", "lineage"]
             The type of the features to return (node, edge, or lineage).
 
         Returns
@@ -258,7 +261,9 @@ class FeaturesDeclaration:
             case "lineage":
                 return self.lin_feats
 
-    def _add_feature(self, feature: Feature, feature_type: FeatureType) -> None:
+    def _add_feature(
+        self, feature: Feature, feature_type: Literal["node", "edge", "lineage"]
+    ) -> None:
         """
         Add the specified feature to the FeaturesDeclaration.
 
@@ -266,7 +271,7 @@ class FeaturesDeclaration:
         ----------
         feature : Feature
             The feature to add.
-        feature_type : FeatureType
+        feature_type : Literal["node", "edge", "lineage"]
             The type of the feature to add (node, edge, or lineage).
 
         Raises
@@ -292,7 +297,7 @@ class FeaturesDeclaration:
     def _add_features(
         self,
         features: list[Feature],
-        feature_types: list[FeatureType],
+        feature_types: list[Literal["node", "edge", "lineage"]],
     ) -> None:
         """
         Add the specified features to the FeaturesDeclaration.
@@ -301,7 +306,7 @@ class FeaturesDeclaration:
         ----------
         features : list[Feature]
             The features to add.
-        feature_types : list[FeatureType]
+        feature_types : list[Literal["node", "edge", "lineage"]]
             The types of the features to add (node, edge, or lineage).
         """
         for feature, feature_type in zip(features, feature_types):
@@ -359,7 +364,9 @@ class FeaturesDeclaration:
         )
         self._add_feature(feat_ID, "lineage")
 
-    def _remove_feature(self, feature_name: str, feature_type: FeatureType) -> None:
+    def _remove_feature(
+        self, feature_name: str, feature_type: Literal["node", "edge", "lineage"]
+    ) -> None:
         """
         Remove the specified feature from the FeaturesDeclaration.
 
@@ -367,7 +374,7 @@ class FeaturesDeclaration:
         ----------
         feature_name : str
             The name of the feature to remove.
-        feature_type : FeatureType
+        feature_type : Literal["node", "edge", "lineage"]
             The type of the feature to add (node, edge, or lineage).
 
         Raises
@@ -392,7 +399,7 @@ class FeaturesDeclaration:
     def _remove_features(
         self,
         feature_names: list[str],
-        feature_types: list[FeatureType],
+        feature_types: list[Literal["node", "edge", "lineage"]],
     ) -> None:
         """
         Remove the specified features from the FeaturesDeclaration.
@@ -401,7 +408,7 @@ class FeaturesDeclaration:
         ----------
         feature_names : list[str]
             The names of the features to remove.
-        feature_types : list[FeatureType]
+        feature_types : list[Literal["node", "edge", "lineage"]]
             The types of the features to remove (node, edge, or lineage).
         """
         for feature_name, feature_type in zip(feature_names, feature_types):
@@ -411,7 +418,7 @@ class FeaturesDeclaration:
         self,
         feature_name: str,
         new_name: str,
-        feature_type: FeatureType,
+        feature_type: Literal["node", "edge", "lineage"],
     ) -> None:
         """
         Rename a specified feature.
@@ -422,7 +429,7 @@ class FeaturesDeclaration:
             The name of the feature to rename.
         new_name : str
             The new name for the feature.
-        feature_type : FeatureType
+        feature_type : Literal["node", "edge", "lineage"]
             The type of the feature to rename. Valid values are "node",
             "edge", or "lineage".
 
@@ -453,7 +460,7 @@ class FeaturesDeclaration:
         self,
         feature_name: str,
         new_description: str,
-        feature_type: FeatureType,
+        feature_type: Literal["node", "edge", "lineage"],
     ) -> None:
         """
         Modify the description of a specified feature.
@@ -464,7 +471,7 @@ class FeaturesDeclaration:
             The name of the feature whose description is to be modified.
         new_description : str
             The new description for the feature.
-        feature_type : FeatureType
+        feature_type : Literal["node", "edge", "lineage"]
             The type of the feature to be modified. Valid values are "node",
             "edge", or "lineage".
 
