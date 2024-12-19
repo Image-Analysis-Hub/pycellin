@@ -421,7 +421,9 @@ class CellLineage(Lineage):
         """
         return max(self.nodes()) + 1
 
-    def _add_cell(self, noi: int | None = None, **cell_attrs) -> int:
+    def _add_cell(
+        self, noi: int | None = None, frame: int | None = 0, **cell_attrs
+    ) -> int:
         """
         Add a cell to the lineage graph.
 
@@ -430,6 +432,8 @@ class CellLineage(Lineage):
         noi : int, optional
             The node ID to assign to the new cell. If None, the next
             available node ID is used.
+        frame : int, optional
+            The frame of the cell. If None, the frame is set to 0.
         **cell_attrs
             Feature values to set for the node.
 
@@ -445,7 +449,6 @@ class CellLineage(Lineage):
         ValueError
             If the cell already exists in the lineage.
         """
-        # TODO: should a frame be required? Here or in Model?
         try:
             lineage_ID = self.graph["lineage_ID"]
         except KeyError as err:
@@ -459,6 +462,7 @@ class CellLineage(Lineage):
         self.add_node(noi, **cell_attrs)
         self.nodes[noi]["cell_ID"] = noi
         self.nodes[noi]["lineage_ID"] = lineage_ID
+        self.nodes[noi]["frame"] = frame
         return noi
 
     def _remove_cell(self, noi: int) -> dict[str, Any]:

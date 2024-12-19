@@ -436,6 +436,7 @@ class Model:
         self,
         lineage_ID: int,
         cell_ID: int | None = None,
+        frame: int | None = 0,
         cell_attributes: dict[str, Any] | None = None,
     ) -> int:
         """
@@ -447,6 +448,8 @@ class Model:
             The ID of the lineage to which the cell belongs.
         cell_ID : int, optional
             The ID of the cell to add (default is None).
+        frame : int, optional
+            The frame of the cell (default is 0).
         cell_attributes : dict, optional
             A dictionary containing the features value of the cell to add.
 
@@ -474,7 +477,7 @@ class Model:
         else:
             cell_attributes = dict()
 
-        cell_ID = lineage._add_cell(cell_ID, **cell_attributes)
+        cell_ID = lineage._add_cell(cell_ID, frame, **cell_attributes)
 
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
