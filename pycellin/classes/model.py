@@ -175,6 +175,22 @@ class Model:
         """
         return self.metadata["time_step"]
 
+    def get_units_per_features(self) -> dict[str, list[str]]:
+        """
+        Return a dict of units and the features associated with each unit.
+
+        The method iterates over the node, edge, and lineage features
+        of the features declaration object, grouping them by unit.
+
+        Returns
+        -------
+        dict[str, list[str]]
+            A dictionary where the keys are units and the values are lists
+            of feature names. For example:
+            {'unit1': ['feature1', 'feature2'], 'unit2': ['feature3']}.
+        """
+        return self.feat_declaration._get_units_per_features()
+
     def get_cell_lineage_features(self):
         """
         Return the cell lineages features present in the model.

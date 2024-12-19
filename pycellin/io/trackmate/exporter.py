@@ -532,7 +532,7 @@ def _ask_units(
         "across all features. If not, convert your features to the same unit "
         "before reattempting to export to TrackMate format."
     )
-    model_units = feat_declaration.get_units_per_features()
+    model_units = feat_declaration._get_units_per_features()
     for unit, feats in model_units.items():
         print(f"{unit}: {feats}")
     trackmate_units = {}

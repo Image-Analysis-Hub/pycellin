@@ -247,7 +247,6 @@ class FeaturesDeclaration:
         ValueError
             If the feature type is invalid.
         """
-        # TODO: should I raise an error if no node_feats, edge_feats, or lin_feats?
         if not check_literal_type(feature_type, FeatureType):
             raise ValueError(
                 f"Feature type must be one of {', '.join(FeatureType.__args__)}."
@@ -493,11 +492,7 @@ class FeaturesDeclaration:
 
         dict_feats[feature_name]._modify_description(new_description)
 
-    # TODO: should this method be at the Model level?
-    # Should I add a wrapper at the higher level?
-    # => Stephane confirms that it should stay here and that I should add
-    # a wrapper in Model.
-    def get_units_per_features(self) -> dict[str, list[str]]:
+    def _get_units_per_features(self) -> dict[str, list[str]]:
         """
         Return a dict of units and the features associated with each unit.
 
