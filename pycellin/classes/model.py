@@ -3,13 +3,16 @@
 
 from collections import namedtuple
 import pickle
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
-from pycellin.classes.data import Data
-from pycellin.classes.feature import Feature, FeaturesDeclaration
-from pycellin.classes.lineage import CellLineage
+from pycellin.classes import Data
+from pycellin.classes import Feature, FeaturesDeclaration
+from pycellin.classes.feature_calculator import FeatureCalculator
+from pycellin.classes import CellLineage
 from pycellin.classes.updater import ModelUpdater
-import pycellin.graph.features as pgf
+import pycellin.graph.features.tracking as tracking
+import pycellin.graph.features.morphology as morpho
+import pycellin.graph.features.utils as futils
 
 # TODO: should I force the user to use the Cell and Link named tuples?
 # Would impact the signature of a lot of methods, but would make these
@@ -18,7 +21,7 @@ import pycellin.graph.features as pgf
 Cell = namedtuple("Cell", ["cell_ID", "lineage_ID"])
 Link = namedtuple(
     "Link",
-    ["source_cell", "target_cell"],
+    ["source_cell_ID", "target_cell_ID", "lineage_ID"],
 )
 
 
@@ -43,11 +46,13 @@ class Model:
         data : Data, optional
             The lineages data of the model (default is None).
         """
+        # FIXME: pretty sure creating an empty model will create issues
         self.metadata = metadata
         self.feat_declaration = feat_declaration
         self.data = data
 
         self._updater = ModelUpdater()
+        # self._updater = ModelUpdater(self)
 
         # Add an optional argument to ask to compute the CycleLineage?
         # Add a description in which people can put whatever they want
@@ -66,24 +71,41 @@ class Model:
         )
 
     def __str__(self) -> str:
-        if "Name" in self.metadata and "Provenance" in self.metadata:
-            txt = (
-                f"Model named '{self.metadata['Name']}' "
-                f"with {self.data.number_of_lineages()} lineages, "
-                f"built from {self.metadata['Provenance']}."
-            )
-        elif "Name" in self.metadata:
-            txt = (
-                f"Model named '{self.metadata['Name']}' "
-                f"with {self.data.number_of_lineages()} lineages."
-            )
-        elif "Provenance" in self.metadata:
-            txt = (
-                f"Model with {self.data.number_of_lineages()} lineages, "
-                f"built from {self.metadata['Provenance']}."
-            )
-        else:
+        if self.metadata and self.data:
+            if "Name" in self.metadata and "Provenance" in self.metadata:
+                txt = (
+                    f"Model named '{self.metadata['Name']}' "
+                    f"with {self.data.number_of_lineages()} lineages, "
+                    f"built from {self.metadata['Provenance']}."
+                )
+            elif "Name" in self.metadata:
+                txt = (
+                    f"Model named '{self.metadata['Name']}' "
+                    f"with {self.data.number_of_lineages()} lineages."
+                )
+            elif "Provenance" in self.metadata:
+                txt = (
+                    f"Model with {self.data.number_of_lineages()} lineages, "
+                    f"built from {self.metadata['Provenance']}."
+                )
+            else:
+                txt = f"Model with {self.data.number_of_lineages()} lineages."
+        elif self.data:
             txt = f"Model with {self.data.number_of_lineages()} lineages."
+        elif self.metadata:
+            if "Name" in self.metadata and "Provenance" in self.metadata:
+                txt = (
+                    f"Model named '{self.metadata['Name']}' "
+                    f"built from {self.metadata['Provenance']}."
+                )
+            elif "Name" in self.metadata:
+                txt = f"Model named '{self.metadata['Name']}'."
+            elif "Provenance" in self.metadata:
+                txt = f"Model built from {self.metadata['Provenance']}."
+            else:
+                txt = "Empty model."
+        else:
+            txt = "Empty model."
         return txt
 
     # TODO: do I need these methods?
@@ -163,24 +185,6 @@ class Model:
         """
         return self.metadata["time_step"]
 
-    def get_pycellin_cell_lineage_features(self) -> dict[str, str]:
-        """
-        Return the Pycellin features that can be computed on cell lineages.
-
-        Returns
-        -------
-        dict[str, str]
-            Dictionary of features of the cell lineages,
-            with features name as keys and features description as values.
-        """
-        cell_lineage_feats = {
-            "absolute_age": "Age of the cell since the beginning of the lineage",
-            "relative_age": (
-                "Age of the cell since the beginning of the current cell cycle"
-            ),
-        }
-        return cell_lineage_feats
-
     def get_cell_lineage_features(self):
         """
         Return the cell lineages features present in the model.
@@ -204,28 +208,6 @@ class Model:
                 ]
             )
         return cell_lineage_feats
-
-    def get_pycellin_cycle_lineage_features(self) -> dict[str, str]:
-        """
-        Return the Pycellin features that can be computed on cycle lineages.
-
-        Returns
-        -------
-        dict[str, str]
-            Dictionary of features of the cycle lineages,
-            with features name as keys and features description as values.
-        """
-        cycle_lineage_feats = {
-            "cell_cycle_completeness": (
-                "Completeness of the cell cycle, "
-                "i.e. does it start and end with a division"
-            ),
-            "division_time": (
-                "Time elapsed between the birth of a cell and its division"
-            ),
-            "division_rate": "Number of divisions per time unit",
-        }
-        return cycle_lineage_feats
 
     def get_cycle_lineage_features(self):
         """
@@ -262,11 +244,12 @@ class Model:
         """
         return max(self.data.cell_data.keys()) + 1
 
-    def require_update(self) -> bool:
+    def is_update_required(self) -> bool:
         """
         Check if the model requires an update.
 
-        The model requires an update if new cells or links have been added.
+        The model requires an update if new features have been added to the model,
+        or if cells, links or lineages have been added or removed.
         In that case, some features need to be recomputed to account for the changes.
 
         Returns
@@ -284,21 +267,15 @@ class Model:
             print("Model is already up to date.")
             return
 
-        self.data._freeze_lineage_data()
+        # self.data._freeze_lineage_data()
 
         # TODO: need to handle all the errors that can be raised
         # by the updater methods to avoid incoherent states.
+        # => saving a copy of the model before the update so we can roll back?
 
-        # Update the nodes
-        self._updater._update_cells(self.feat_declaration, self.data)
+        self._updater._update(self.data)
 
-        # Update the edges
-        # TODO: implement
-
-        # Update the lineages
-        # TODO: implement
-
-        self.data._unfreeze_lineage_data()
+        # self.data._unfreeze_lineage_data()
 
     def add_lineage(
         self, lineage: CellLineage, with_CycleLineage: bool = False
@@ -328,6 +305,10 @@ class Model:
             cycle_lineage = self.data._compute_cycle_lineage(lin_ID)
             self.data.cycle_data["cycle_lineage_ID"] = cycle_lineage
 
+        # Notify that an update of the feature values may be required.
+        self._updater._update_required = True
+        self._updater._added_lineages.add(lin_ID)
+
     def remove_lineage(self, lineage_ID: int) -> CellLineage:
         """
         Remove the specified lineage from the model.
@@ -354,6 +335,11 @@ class Model:
             raise KeyError(f"Lineage with ID {lineage_ID} does not exist.")
         if self.data.cycle_data and lineage_ID in self.data.cycle_data:
             self.data.cycle_data.pop(lineage_ID)
+
+        # Notify that an update of the feature values may be required.
+        self._updater._update_required = True
+        self._updater._removed_lineages.add(lineage_ID)
+
         return lineage
 
     def split_lineage_from_cell(
@@ -408,12 +394,6 @@ class Model:
         self.data.cell_data[new_lineage_ID] = new_lineage
         # The update of the cycle lineages (if needed) will be
         # done by the updater.
-        # TODO: see with JY if we should update the cycle lineages here
-        # if self.data.cycle_data:
-        #     cycle_lineage = self.data._compute_cycle_lineage(lineage_ID)
-        #     self.data.cycle_data[lineage_ID] = cycle_lineage
-        #     new_cycle_lineage = self.data._compute_cycle_lineage(new_lineage_ID)
-        #     self.data.cycle_data[new_lineage_ID] = new_cycle_lineage
 
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
@@ -470,6 +450,7 @@ class Model:
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
         self._updater._added_cells.add(Cell(cell_ID, lineage_ID))
+        self._updater._modified_lineages.add(lineage_ID)
 
         return cell_ID
 
@@ -504,6 +485,7 @@ class Model:
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
         self._updater._removed_cells.add(Cell(cell_ID, lineage_ID))
+        self._updater._modified_lineages.add(lineage_ID)
 
         return cell_attrs
 
@@ -571,11 +553,9 @@ class Model:
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
         self._updater._added_links.add(
-            Link(
-                Cell(source_cell_ID, source_lineage_ID),
-                Cell(target_cell_ID, target_lineage_ID),
-            )
+            Link(source_cell_ID, target_cell_ID, source_lineage_ID)
         )
+        self._updater._modified_lineages.add(source_lineage_ID)
 
     def unlink_cells(
         self, source_cell_ID: int, target_cell_ID: int, lineage_ID: int
@@ -606,7 +586,16 @@ class Model:
             lineage = self.data.cell_data[lineage_ID]
         except KeyError as err:
             raise KeyError(f"Lineage with ID {lineage_ID} does not exist.") from err
-        return lineage._remove_link(source_cell_ID, target_cell_ID)
+        link_attrs = lineage._remove_link(source_cell_ID, target_cell_ID)
+
+        # Notify that an update of the feature values may be required.
+        self._updater._update_required = True
+        self._updater._removed_links.add(
+            Link(source_cell_ID, target_cell_ID, lineage_ID)
+        )
+        self._updater._modified_lineages.add(lineage_ID)
+
+        return link_attrs
 
     def check_for_fusions(self) -> list[Cell]:
         """
@@ -628,84 +617,117 @@ class Model:
                 fusions.extend([Cell(cell_ID, lineage_ID) for cell_ID in tmp])
         return fusions
 
+    def prepare_full_data_update(self) -> None:
+        """
+        Prepare the updater for a full data update.
+
+        All cells, links and lineages in the model data will see
+        their feature values recomputed during the next update.
+        """
+        if self._updater._full_data_update:
+            return
+        self._updater._full_data_update = True
+        self._updater._update_required = True
+        for lin_ID, lin in self.data.cell_data.items():
+            for noi in lin.nodes:
+                self._updater._added_cells.add(Cell(noi, lin_ID))
+            for edge in lin.edges:
+                self._updater._added_links.add(Link(edge[0], edge[1], lin_ID))
+        self._updater._added_lineages = set(self.data.cell_data.keys())
+
     def add_custom_feature(
         self,
         feat: Feature,
-        feat_type: Literal["node", "edge", "lineage"],
-        func: Callable,
+        calculator: FeatureCalculator,
         *args: Any,
         **kwargs: Any,
     ) -> None:
         """
         Add a custom feature to the model.
 
+        This method adds the feature to the FeaturesDeclaration,
+        register the way to compute the feature,
+        and notify the updater that all data needs to be updated.
+        To actually update the data, the user needs to call the update() method.
+
         Parameters
         ----------
         feat: Feature
             Feature to add.
-        feat_type : Literal["node", "edge", "lineage"]
-            Type of feature to add.
-        func : Callable
-            Function to compute the feature.
-        args : Any
-            Arguments to pass to the function.
-        kwargs : Any
-            Keyword arguments to pass to the function.
-        """
-        self.feat_declaration._add_feature(feat, feat_type)
-        func(*args, **kwargs)
+        calculator : FeatureCalculator
+            Calculator to compute the feature.
 
-    def add_width_and_length(
+        Raises
+        ------
+        ValueError
+            If the feature is a cycle lineage feature and cycle lineages
+            have not been computed yet.
+        """
+        if feat.lineage_type == "CycleLineage" and not self.data.cycle_data:
+            raise ValueError(
+                "Cycle lineages have not been computed yet. "
+                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+            )
+        self.feat_declaration._add_feature(feat, calculator.get_feature_type())
+        self._updater.register_calculator(feat, calculator, *args, **kwargs)
+        self.prepare_full_data_update()
+
+    # TODO: in case of data coming from a loader, there is no calculator associated
+    # with the declared features.
+
+    def add_cell_width(
         self,
         skel_algo: str = "zhang",
         tolerance: float = 0.5,
         method_width: str = "mean",
         width_ignore_tips: bool = False,
     ) -> None:
-        """
-        Compute and add the width and length features to the cells of the model.
-        """
-        # Updating the features declaration.
-        feat_width = Feature(
-            "width",
+        feat = Feature(
+            "cell_width",
             "Width of the cell",
             "CellLineage",
             "Pycellin",
             "float",
             self.metadata["space_unit"],
         )
-        feat_length = Feature(
-            "length",
+        self.add_custom_feature(
+            feat,
+            morpho.CellWidth,
+            self.metadata["pixel_size"]["width"],
+            skel_algo=skel_algo,
+            tolerance=tolerance,
+            method_width=method_width,
+            width_ignore_tips=width_ignore_tips,
+        )
+
+    def add_cell_length(
+        self,
+        skel_algo: str = "zhang",
+        tolerance: float = 0.5,
+        method_width: str = "mean",
+        width_ignore_tips: bool = False,
+    ) -> None:
+        feat = Feature(
+            "cell_length",
             "Length of the cell",
             "CellLineage",
             "Pycellin",
             "float",
             self.metadata["space_unit"],
         )
-        self.feat_declaration._add_features([feat_width, feat_length], ["node"] * 2)
-
-        # Computing the features values.
-        assert (
-            self.metadata["pixel_size"]["width"]
-            == self.metadata["pixel_size"]["height"]
-        ), "Pixel size should be the same for width and height."
-        for lin in self.data.cell_data.values():
-            for node in lin.nodes:
-                width, length = pgf.get_width_and_length(
-                    node,
-                    lin,
-                    self.metadata["pixel_size"]["width"],
-                    skel_algo=skel_algo,
-                    tolerance=tolerance,
-                    method_width=method_width,
-                    width_ignore_tips=width_ignore_tips,
-                )
-                lin.nodes[node]["width"] = width
-                lin.nodes[node]["length"] = length
+        self.add_custom_feature(
+            feat,
+            morpho.CellLength,
+            self.metadata["pixel_size"]["width"],
+            skel_algo=skel_algo,
+            tolerance=tolerance,
+            method_width=method_width,
+            width_ignore_tips=width_ignore_tips,
+        )
 
     def add_absolute_age(self, in_time_unit: bool = False) -> None:
         """
-        Compute and add the absolute age feature to the cells of the model.
+        Add the cell absolute age feature to the model.
 
         The absolute age of a cell is defined as the number of nodes since
         the beginning of the lineage. Absolute age of the root is 0.
@@ -724,19 +746,14 @@ class Model:
             "CellLineage",
             "Pycellin",
             "float" if in_time_unit else "int",
-            self.metadata["time_unit"] if in_time_unit else "frame",
+            self.metadata["time_step"] if in_time_unit else "frame",
         )
-        self.add_custom_feature(
-            feat,
-            "node",
-            pgf.tracking._add_absolute_age,
-            self.data.cell_data.values(),
-            self.metadata["time_step"] if in_time_unit else 1,
-        )
+        time_step = self.metadata["time_step"] if in_time_unit else 1
+        self.add_custom_feature(feat, tracking.AbsoluteAge, time_step)
 
     def add_relative_age(self, in_time_unit: bool = False) -> None:
         """
-        Compute and add the relative age feature to the cells of the model.
+        Add the cell relative age feature to the model.
 
         The relative age of a cell is defined as the number of nodes since
         the start of the cell cycle (i.e. previous division, or beginning
@@ -756,19 +773,14 @@ class Model:
             "CellLineage",
             "Pycellin",
             "float" if in_time_unit else "int",
-            self.metadata["time_unit"] if in_time_unit else "frame",
+            self.metadata["time_step"] if in_time_unit else "frame",
         )
-        self.add_custom_feature(
-            feat,
-            "node",
-            pgf.tracking._add_relative_age,
-            self.data.cell_data.values(),
-            self.metadata["time_step"] if in_time_unit else 1,
-        )
+        time_step = self.metadata["time_step"] if in_time_unit else 1
+        self.add_custom_feature(feat, tracking.RelativeAge, time_step)
 
     def add_cell_cycle_completeness(self) -> None:
         """
-        Compute and add the cell cycle completeness feature to the model cell cycles.
+        Add the cell cycle completeness feature to the model.
 
         A cell cycle is defined as complete when it starts by a division
         AND ends by a division. Cell cycles that start at the root
@@ -787,17 +799,15 @@ class Model:
         )
         self.add_custom_feature(
             feat,
-            "node",
-            pgf.tracking._add_cell_cycle_completeness,
-            self.data.cycle_data.values(),
+            tracking.CellCycleCompleteness,
         )
 
     def add_division_time(self, in_time_unit: bool = False) -> None:
         """
-        Compute and add the division time feature to the model cell cycles.
+        Add the division time feature to the model.
 
-        The division time of a cell cycle is defined as the difference
-        between the absolute ages of the two daughter cells.
+        Division time is defined as the time between 2 divisions.
+        It is also the length of the cell cycle of the cell of interest.
         It is given in frames by default, but can be converted
         to the time unit of the model if specified.
 
@@ -813,24 +823,19 @@ class Model:
             "CycleLineage",
             "Pycellin",
             "float" if in_time_unit else "int",
-            self.metadata["time_unit"] if in_time_unit else "frame",
+            self.metadata["time_step"] if in_time_unit else "frame",
         )
-        self.add_custom_feature(
-            feat,
-            "node",
-            pgf.tracking._add_division_time,
-            self.data.cycle_data.values(),
-            self.metadata["time_step"] if in_time_unit else 1,
-        )
+        time_step = self.metadata["time_step"] if in_time_unit else 1
+        self.add_custom_feature(feat, tracking.DivisionTime, time_step)
 
     def add_division_rate(self, in_time_unit: bool = False) -> None:
         """
-        Compute and add the division rate feature to the model cell cycles.
+        Add the division rate feature to the model.
 
         Division rate is defined as the number of divisions per time unit.
         It is the inverse of the division time.
-        It is given in frames by default, but can be converted
-        to the time unit of the model if specified.
+        It is given in divisions per frame by default, but can be converted
+        to divisions per time unit of the model if specified.
 
         Parameters
         ----------
@@ -844,27 +849,19 @@ class Model:
             "CycleLineage",
             "Pycellin",
             "float",
-            self.metadata["time_unit"] if in_time_unit else "frame",
+            f'1/{self.metadata["time_unit"]}' if in_time_unit else "1/frame",
         )
-        self.add_custom_feature(
-            feat,
-            "node",
-            pgf.tracking._add_division_rate,
-            self.data.cycle_data.values(),
-            self.metadata["time_step"] if in_time_unit else 1,
-        )
+        time_step = self.metadata["time_step"] if in_time_unit else 1
+        self.add_custom_feature(feat, tracking.DivisionRate, time_step)
 
     def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:
         """
-        Add the specified predefined Pycellin feature to the model.
-
-        This updates the FeaturesDeclaration and compute the feature values
-        for all lineages.
+        Add a single predefined Pycellin feature to the model.
 
         Parameters
         ----------
         feature_name : str
-            Name of the feature to add. Need to be an available feature.
+            Name of the feature to add. Needs to be an available feature.
         kwargs : bool
             Additional keyword arguments to pass to the function
             computing the feature. For example, for absolute_age,
@@ -877,7 +874,7 @@ class Model:
             If the feature is not a predefined feature of Pycellin.
         """
         if (
-            feature_name in self.get_pycellin_cycle_lineage_features()
+            feature_name in futils.get_pycellin_cycle_lineage_features()
             and not self.data.cycle_data
         ):
             raise ValueError(
@@ -888,6 +885,8 @@ class Model:
         feat_dict = {
             "absolute_age": self.add_absolute_age,
             "relative_age": self.add_relative_age,
+            "cell_width": self.add_cell_width,
+            "cell_length": self.add_cell_length,
             "cell_cycle_completeness": self.add_cell_cycle_completeness,
             "division_time": self.add_division_time,
             "division_rate": self.add_division_rate,
@@ -901,26 +900,43 @@ class Model:
                 f"Available Pycellin features are: {available_features}."
             )
 
-    def add_pycellin_features(self, feature_names: list[str], **kwargs: bool) -> None:
+    def add_pycellin_features(self, features_info: list[str | dict[str, Any]]) -> None:
         """
         Add the specified predefined Pycellin features to the model.
 
-        This updates the FeaturesDeclaration and compute the feature values
-        for all lineages.
-
         Parameters
         ----------
-        feature_names : list[str]
-            Names of the features to add. Need to be available features.
-        kwargs : bool
-            Additional keyword arguments to pass to the function
-            computing the feature. For example, for absolute_age,
-            in_time_unit=True can be used to yield the age
-            in the time unit of the model instead of in frames.
+        features_info : list[str | dict[str, Any]]
+            List of the features to add. Each feature can be a string
+            (the name of the feature) or a dictionary with the name of the
+            feature as the key and additional keyword arguments as values.
+
+        Examples
+        --------
+        With no additional arguments:
+        >>> model.add_pycellin_features(["absolute_age", "relative_age"])
+        With additional arguments:
+        >>> model.add_pycellin_features(
+        ...     [
+        ...         {"absolute_age": {"in_time_unit": True}},
+        ...         {"relative_age": {"in_time_unit": True}},
+        ...     ]
+        )
+        It is possible to mix features with and without additional arguments:
+        >>> model.add_pycellin_features(
+        ...     [
+        ...         {"absolute_age": {"in_time_unit": True}},
+        ...         "cell_cycle_completeness",
+        ...         {"relative_age": {"in_time_unit": True}},
+        ...     ]
+        )
         """
-        for feature_name in feature_names:
-            self.add_pycellin_feature(feature_name, **kwargs)
-        # FIXME: will crash when some features need kwargs and others do not.
+        for feat_info in features_info:
+            if isinstance(feat_info, str):
+                self.add_pycellin_feature(feat_info)
+            elif isinstance(feat_info, dict):
+                for feature_name, kwargs in feat_info.items():
+                    self.add_pycellin_feature(feature_name, **kwargs)
 
     def recompute_feature(self, feature_name: str) -> None:
         """
@@ -941,16 +957,19 @@ class Model:
             raise ValueError(f"Feature {feature_name} does not exist.")
 
         # Then need to update the data.
+        # TODO: implement
         pass
 
     def remove_feature(
-        self, feature_name: str, feature_type: Literal["node", "edge", "lineage"]
+        self,
+        feature_name: str,
+        feature_type: Literal["node", "edge", "lineage"],
     ) -> None:
         """
         Remove the specified feature from the model.
 
-        This updates the FeaturesDeclaration and remove the feature values
-        for all lineages.
+        This updates the FeaturesDeclaration, remove the feature values
+        for all lineages, and notify the updater to unregister the calculator.
 
         Parameters
         ----------
@@ -964,18 +983,18 @@ class Model:
         ValueError
             If the feature does not exist.
         """
-        # First need to check if the feature exists.
+        # First we check if the feature exists.
         if not self.feat_declaration.has_feature(feature_name, feature_type):
             raise ValueError(
                 f"There is no feature {feature_name} in {feature_type} features."
             )
 
-        # Then need to update the FeaturesDeclaration...
+        # Then we update the FeaturesDeclaration...
         feat_dict = self.feat_declaration._get_feat_dict_from_feat_type(feature_type)
         lineage_type = feat_dict[feature_name].lineage_type
         feat_dict.pop(feature_name)
 
-        # ... and remove the feature values.
+        # ... we remove the feature values...
         if lineage_type == "CellLineage":
             lineage_data = self.data.cell_data
         elif lineage_type == "CycleLineage":
@@ -988,14 +1007,42 @@ class Model:
             case "node":
                 for lin in lineage_data.values():
                     for _, data in lin.nodes(data=True):
-                        del data[feature_name]
+                        try:
+                            del data[feature_name]
+                        except KeyError:
+                            # No feature doesn't mean there is something wrong,
+                            # maybe no update were done.
+                            pass
             case "edge":
                 for lin in lineage_data.values():
-                    for _, _, data in lin.edges:
-                        del data[feature_name]
+                    for _, _, data in lin.edges(data=True):
+                        try:
+                            del data[feature_name]
+                        except KeyError:
+                            # No feature doesn't mean there is something wrong,
+                            # maybe no update were done.
+                            pass
             case "lineage":
                 for lin in lineage_data.values():
-                    del lin.graph[feature_name]
+                    try:
+                        del lin.graph[feature_name]
+                    except KeyError:
+                        # No feature doesn't mean there is something wrong,
+                        # maybe no update were done.
+                        pass
+
+        # ... and finally we update the updater.
+        try:
+            self._updater.delete_calculator(feature_name)
+        except KeyError:
+            # No calculator doesn't mean there is something wrong,
+            # maybe it's just an imported feature.
+            pass
+
+    # TODO: add a method to remove several features at the same time?
+    # When no argument is provided, remove all features?
+    # def remove_features(self, features_info: list[str | dict[str, Any]]) -> None:
+    #     pass
 
     def add_cycle_data(self) -> None:
         """

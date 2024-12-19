@@ -8,7 +8,6 @@ lineage graphs.
 
 from itertools import product, combinations
 from operator import itemgetter
-from typing import Optional
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -19,6 +18,7 @@ from shapely.geometry import Point, LineString
 from skimage.morphology import skeletonize
 
 from pycellin.classes.lineage import CellLineage
+from pycellin.classes.feature_calculator import NodeLocalFeatureCalculator
 
 # TODO:
 # - remove debug code
@@ -26,6 +26,7 @@ from pycellin.classes.lineage import CellLineage
 # - separate width and length. Width only requires skeleton length and the distance
 # transform so I should compute the skeleton in a separate function.
 # - recode every thing and avoid drawing
+# - move area_increment to a notebook as an example of custom feature
 
 
 def from_roi_to_array(roi, width, height):
@@ -112,7 +113,7 @@ def get_width_and_length(
     method_width: str = "mean",
     width_ignore_tips: bool = False,
     debug: bool = False,
-    debug_folder: Optional[str] = None,
+    debug_folder: str | None = None,
 ) -> tuple[int, int]:
     """
     Compute the width and length of the ROI associated with a node.
@@ -429,91 +430,125 @@ def get_width_and_length(
     return width, length
 
 
-# def _add_width(
-#     lineages: list[CellLineage],
-#     pixel_size: float,
-#     skel_algo: str = "zhang",
-#     tolerance: float = 0.5,
-#     method_width: str = "mean",
-#     width_ignore_tips: bool = False,
-# ) -> None:
+class CellWidth(NodeLocalFeatureCalculator):
+    def __init__(
+        self,
+        feature,
+        pixel_size: float,
+        skel_algo: str = "zhang",
+        tolerance: float = 0.5,
+        method_width: str = "mean",
+        width_ignore_tips: bool = False,
+        debug: bool = False,
+        debug_folder: str | None = None,
+    ):
+        super().__init__(feature)
+        self.pixel_size = pixel_size
+        self.skel_algo = skel_algo
+        self.tolerance = tolerance
+        self.method_width = method_width
+        self.width_ignore_tips = width_ignore_tips
+        self.debug = debug
+        self.debug_folder = debug_folder
+
+    def compute(self, lineage: CellLineage, noi: int) -> float:
+        return get_width_and_length(
+            noi,
+            lineage,
+            self.pixel_size,
+            self.skel_algo,
+            self.tolerance,
+            self.method_width,
+            self.width_ignore_tips,
+            self.debug,
+            self.debug_folder,
+        )[0]
+
+
+class CellLength(NodeLocalFeatureCalculator):
+    def __init__(
+        self,
+        feature,
+        pixel_size: float,
+        skel_algo: str = "zhang",
+        tolerance: float = 0.5,
+        method_width: str = "mean",
+        width_ignore_tips: bool = False,
+        debug: bool = False,
+        debug_folder: str | None = None,
+    ):
+        super().__init__(feature)
+        self.pixel_size = pixel_size
+        self.skel_algo = skel_algo
+        self.tolerance = tolerance
+        self.method_width = method_width
+        self.width_ignore_tips = width_ignore_tips
+        self.debug = debug
+        self.debug_folder = debug_folder
+
+    def compute(self, lineage: CellLineage, noi: int) -> float:
+        return get_width_and_length(
+            noi,
+            lineage,
+            self.pixel_size,
+            self.skel_algo,
+            self.tolerance,
+            self.method_width,
+            self.width_ignore_tips,
+            self.debug,
+            self.debug_folder,
+        )[1]
+
+
+# TODO: this is a feature that should not be in Pycellin, too many ways to define
+# the area increment. Since it is user dependent, I should put it in a notebook
+# as an example of custom feature.
+
+# def get_area_increment(noi: int, lineage: CellLineage) -> float:
+#     """
+#     Compute the area increment of a node.
+
+#     Parameters
+#     ----------
+#     noi : int
+#         Node ID (cell_ID) of the cell of interest.
+#     lineage : CellLineage
+#         Lineage graph containing the node of interest.
+
+#     Returns
+#     -------
+#     float
+#         Area increment of the node.
+#     """
+#     # TODO: rework: name/definition is not intuitive.
+#     # Why specifically between t and t-1? And not t and t+1?
+#     # Should give 2 nodes as input and compute the area increment between them.
+#     # Or add a parameter to specify if t-1 or t+1.
+#     # Area of node at t minus area at t-1.
+#     predecessors = list(lineage.predecessors(noi))
+#     if len(predecessors) == 0:
+#         return np.NaN
+#     else:
+#         err_mes = (
+#             f'Node {noi} in track {lineage.graph["name"]} has multiple predecessors.'
+#         )
+#         assert len(predecessors) == 1, err_mes
+#         # print(predecessors)
+#         return lineage.nodes[noi]["AREA"] - lineage.nodes[predecessors[0]]["AREA"]
+
+
+# def _add_area_increment(lineages: list[CellLineage]) -> None:
+#     """
+#     Add the area increment feature to the nodes of the lineages.
+
+#     Parameters
+#     ----------
+#     lineages : list[CellLineage]
+#         Cell lineages to update with the area increment feature.
+#     """
 #     for lin in lineages:
 #         for node in lin.nodes:
-#             width, _ = get_width_and_length(
-#                 node,
-#                 lin,
-#                 pixel_size,
-#                 skel_algo=skel_algo,
-#                 tolerance=tolerance,
-#                 method_width=method_width,
-#                 width_ignore_tips=width_ignore_tips,
-#             )
-#             lin.nodes[node]["width"] = width
-
-
-# def _add_length(
-#     lineages: list[CellLineage],
-#     pixel_size: float,
-#     skel_algo: str = "zhang",
-#     tolerance: float = 0.5,
-# ) -> None:
-#     for lin in lineages:
-#         for node in lin.nodes:
-#             _, length = get_width_and_length(
-#                 node,
-#                 lin,
-#                 pixel_size,
-#                 skel_algo=skel_algo,
-#                 tolerance=tolerance,
-#             )
-#             lin.nodes[node]["length"] = length
-
-
-def get_area_increment(noi: int, lineage: CellLineage) -> float:
-    """
-    Compute the area increment of a node.
-
-    Parameters
-    ----------
-    noi : int
-        Node ID (cell_ID) of the cell of interest.
-    lineage : CellLineage
-        Lineage graph containing the node of interest.
-
-    Returns
-    -------
-    float
-        Area increment of the node.
-    """
-    # TODO: rework: name/definition is not intuitive.
-    # Why specifically between t and t-1? And not t and t+1?
-    # Should give 2 nodes as input and compute the area increment between them.
-    # Or add a parameter to specify if t-1 or t+1.
-    # Area of node at t minus area at t-1.
-    predecessors = list(lineage.predecessors(noi))
-    if len(predecessors) == 0:
-        return np.NaN
-    else:
-        err_mes = (
-            f'Node {noi} in track {lineage.graph["name"]} has multiple predecessors.'
-        )
-        assert len(predecessors) == 1, err_mes
-        # print(predecessors)
-        return lineage.nodes[noi]["AREA"] - lineage.nodes[predecessors[0]]["AREA"]
-
-
-def _add_area_increment(lineages: list[CellLineage]) -> None:
-    """
-    Add the area increment feature to the nodes of the lineages.
-
-    Parameters
-    ----------
-    lineages : list[CellLineage]
-        Cell lineages to update with the area increment feature.
-    """
-    for lin in lineages:
-        for node in lin.nodes:
-            lin.nodes[node]["AREA_INCREMENT"] = get_area_increment(node, lin)
+#             lin.nodes[node]["AREA_INCREMENT"] = get_area_increment(node, lin)
 
 
 if __name__ == "__main__":
