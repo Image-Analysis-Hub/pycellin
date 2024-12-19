@@ -234,6 +234,29 @@ class Model:
         """
         return max(self.data.cell_data.keys()) + 1
 
+    def has_feature(
+        self,
+        feature_name: str,
+        feature_type: Literal["node", "edge", "lineage"] | None = None,
+    ) -> bool:
+        """
+        Check if the model contains the specified feature.
+
+        Parameters
+        ----------
+        feature_name : str
+            The name of the feature to check.
+        feature_type : Literal["node", "edge", "lineage"], optional
+            The type of the feature to check (node, edge, or lineage).
+            If not specified, the method will check all types.
+
+        Returns
+        -------
+        bool
+            True if the feature is in the model, False otherwise.
+        """
+        return self.feat_declaration._has_feature(feature_name, feature_type)
+
     def is_update_required(self) -> bool:
         """
         Check if the model requires an update.
@@ -943,7 +966,7 @@ class Model:
             If the feature does not exist.
         """
         # First need to check if the feature exists.
-        if not self.feat_declaration.has_feature(feature_name):
+        if not self.feat_declaration._has_feature(feature_name):
             raise ValueError(f"Feature {feature_name} does not exist.")
 
         # Then need to update the data.
@@ -979,7 +1002,7 @@ class Model:
             raise ValueError(
                 f"Feature type must be one of {', '.join(FeatureType.__args__)}."
             )
-        if not self.feat_declaration.has_feature(feature_name, feature_type):
+        if not self.feat_declaration._has_feature(feature_name, feature_type):
             raise ValueError(
                 f"There is no feature {feature_name} in {feature_type} features."
             )

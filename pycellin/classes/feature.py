@@ -182,7 +182,7 @@ class FeaturesDeclaration:
             f"Lineage features: {lineage_features}"
         )
 
-    def has_feature(
+    def _has_feature(
         self,
         feature_name: str,
         feature_type: Literal["node", "edge", "lineage"] | None = None,
@@ -208,7 +208,6 @@ class FeaturesDeclaration:
         ValueError
             If the feature type is invalid.
         """
-        # TODO: should probably be made accessible from model.
         if not check_literal_type(feature_type, FeatureType):
             raise ValueError(
                 f"Feature type must be one of {', '.join(FeatureType.__args__)}."
