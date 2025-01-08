@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from datetime import datetime
 import numpy as np
+from pathlib import Path
 import pickle
 
 import networkx as nx
 import tifffile as tiff
 
-from pycellin.classes import Model, CellLineage
+from pycellin.classes import CellLineage, Data, Model
 
 
 def _extract_labels(
@@ -184,6 +186,39 @@ def _split_graph_into_lineages(
     return lineages
 
 
+def _check_for_fusions(
+    lineages: list[CellLineage],
+) -> None:
+    """
+    Check if there are fusions in the lineages and notify the user.
+
+    Parameters
+    ----------
+    lineages : list[CellLineage]
+        The lineages to check for fusions.
+    """
+    fusion_dict = {}
+    for lin in lineages:
+        fusions = lin.check_for_fusions()
+        if len(fusions) > 0:
+            fusion_dict[lin.graph["lineage_ID"]] = lin.check_for_fusions()
+    if fusion_dict:
+        cell_txt = f"{'s' if len(fusion_dict) > 1 else ''}"
+        fusion_txt = "\n".join(
+            f"  Lineage {lin_id} => cell IDs: {fusions}"
+            for lin_id, fusions in fusion_dict.items()
+        )
+        print(
+            f"WARNING: Cell fusion{cell_txt} detected!! "
+            f"Since Pycellin does not support fusions, it is advised to "
+            f"deal with them before any other processing. Be especially "
+            f"careful with tracking related features. Crashes and incorrect "
+            f"results can occur.\n"
+            f"Fusion{cell_txt} location:\n"
+            f"{fusion_txt}"
+        )
+
+
 def load_EpiCure_data(
     pickle_path: str,
     label_img_path: str,
@@ -217,6 +252,22 @@ def load_EpiCure_data(
     print("Nb lineages:", len(lineages))
     print(lineages[0])
     print(lineages[0].graph)
+    # Pycellin DOES NOT support fusion events.
+    _check_for_fusions(lineages)
+
+    metadata = {}
+    metadata["name"] = Path(pickle_path).stem
+    metadata["pickle_location"] = pickle_path
+    metadata["label_img_location"] = label_img_path
+    metadata["provenance"] = "EpiCure"
+    metadata["date"] = datetime.now()
+    metadata["space_unit"] = epidata["EpiMetaData"]["UnitXY"]
+    metadata["time_unit"] = epidata["EpiMetaData"]["UnitT"]
+    feat_declaration = {}  # No features for now.
+    data = Data({lin.graph["lineage_ID"]: lin for lin in lineages})
+
+    model = Model(metadata, feat_declaration, data)
+    return model
 
 
 if __name__ == "__main__":
@@ -224,4 +275,5 @@ if __name__ == "__main__":
     epi_file = "/mnt/data/Code/EpiCure_small_example/epics/013_crop_epidata.pkl"
     stack_file = "/mnt/data/Code/EpiCure_small_example/epics/013_crop_labels.tif"
 
-    load_EpiCure_data(epi_file, stack_file)
+    model = load_EpiCure_data(epi_file, stack_file)
+    print(model)
