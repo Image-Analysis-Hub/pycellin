@@ -662,6 +662,39 @@ def _split_graph_into_lineages(
     return lineages
 
 
+def _check_for_fusions(
+    lineages: list[CellLineage],
+) -> None:
+    """
+    Check if there are fusions in the lineages and notify the user.
+
+    Parameters
+    ----------
+    lineages : list[CellLineage]
+        The lineages to check for fusions.
+    """
+    fusion_dict = {}
+    for lin in lineages:
+        fusions = lin.check_for_fusions()
+        if len(fusions) > 0:
+            fusion_dict[lin.graph["lineage_ID"]] = lin.check_for_fusions()
+    if fusion_dict:
+        cell_txt = f"{'s' if len(fusion_dict) > 1 else ''}"
+        fusion_txt = "\n".join(
+            f"  Lineage {lin_id} => cell IDs: {fusions}"
+            for lin_id, fusions in fusion_dict.items()
+        )
+        print(
+            f"WARNING: Cell fusion{cell_txt} detected!! "
+            f"Since Pycellin does not support fusions, it is advised to "
+            f"deal with them before any other processing. Be especially "
+            f"careful with tracking related features. Crashes and incorrect "
+            f"results can occur.\n"
+            f"Fusion{cell_txt} location:\n"
+            f"{fusion_txt}"
+        )
+
+
 def _update_features_declaration(
     feat_declaration: FeaturesDeclaration,
     units: dict[str, str],
@@ -937,6 +970,8 @@ def _parse_model_tag(
     # We want one lineage per track, so we need to split the graph
     # into its connected components.
     lineages = _split_graph_into_lineages(graph, tracks_attributes)
+    # Pycellin DOES NOT support fusion events.
+    _check_for_fusions(lineages)
 
     # For Pycellin compatibility, some TrackMate features have to be renamed.
     _update_features_declaration(fd, units)
