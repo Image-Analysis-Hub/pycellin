@@ -624,7 +624,7 @@ def _add_tracks_info(
 
 
 def _split_graph_into_lineages(
-    graph: CellLineage,
+    graph: nx.DiGraph,
     tracks_attributes: list[dict[str, Any]],
 ) -> list[CellLineage]:
     """
@@ -632,7 +632,7 @@ def _split_graph_into_lineages(
 
     Parameters
     ----------
-    lineage : CellLineage
+    lineage : nx.DiGraph
         The graph to split.
     tracks_attributes : list[dict[str, Any]]
         A list of dictionaries, where each dictionary contains TrackMate
