@@ -2,11 +2,13 @@
 # -*- coding: utf-8 -*-
 
 from datetime import datetime
+from itertools import pairwise
 import numpy as np
 from pathlib import Path
 import pickle
 
 import networkx as nx
+from skimage import measure
 import tifffile as tiff
 
 from pycellin.classes import CellLineage, Data, Feature, FeaturesDeclaration, Model
@@ -37,6 +39,40 @@ def _extract_labels(
     return all_labels
 
 
+def _extract_label_coord_array(
+    stack_array: np.ndarray,
+) -> np.ndarray:
+    """
+    Extract the labels and their coordinates from a 3D numpy array.
+
+    Parameters
+    ----------
+    stack_array : np.ndarray
+        A 3D numpy array representing a stack of labels.
+
+    Returns
+    -------
+    np.ndarray
+        A numpy array where each row is a label and the coordinates of its centroid.
+    """
+    nb_row = 0
+    all_props = []
+    properties = ["label", "centroid"]
+    for frame in range(stack_array.shape[0]):
+        props = measure.regionprops_table(stack_array[frame], properties=properties)
+        props["frame"] = [frame] * len(props["label"])
+        all_props.append(props)
+        nb_row += len(props["label"])
+    # Reorganize the data as a numpy array with columns: label, pos_t, pos_x, pos_y.
+    # This is the EpiCure format.
+    props_array = np.zeros((nb_row, 4))
+    props_array[:, 0] = np.concatenate([props["label"] for props in all_props])
+    props_array[:, 1] = np.concatenate([props["frame"] for props in all_props])
+    props_array[:, 2] = np.concatenate([props["centroid-1"] for props in all_props])
+    props_array[:, 3] = np.concatenate([props["centroid-0"] for props in all_props])
+    return props_array
+
+
 def _add_all_nodes(
     graph: nx.DiGraph,
     labels_dict: dict[int, list[int]],
@@ -64,6 +100,35 @@ def _add_all_nodes(
             for label, nid in zip(labels, nois)
         ]
         graph.add_nodes_from(nodes)
+
+
+def _add_all_nodes_from_coord_array(
+    graph: nx.DiGraph,
+    coord_array: np.ndarray,
+) -> None:
+    """
+    Add one node per label to the graph.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        The graph to which the nodes will be added.
+    coord_array : np.ndarray
+        A numpy array where each row is a label and the coordinates of its centroid.
+    """
+    # Labels are not unique across frames, so we need to create a unique
+    # node ID for each label.
+    current_nid = 0  # Unique node ID.
+
+    for label, frame, pos_x, pos_y in coord_array:
+        graph.add_node(
+            current_nid,
+            frame=int(frame),
+            label=int(label),
+            cell_ID=current_nid,
+            location=(pos_x, pos_y),
+        )
+        current_nid += 1
 
 
 def _add_same_label_edges(
@@ -96,6 +161,41 @@ def _add_same_label_edges(
                 assert len(next_node) <= 1
                 if next_node:
                     graph.add_edge(node, next_node[0])
+
+
+def _add_same_label_edges_from_coord_array(
+    graph: nx.DiGraph,
+    label_array: np.ndarray,
+) -> None:
+    """
+    Add edges between nodes having the same label in consecutive frames.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        The graph to which the edges will be added.
+    label_array : np.ndarray
+        A numpy array where the rows are the labels and their frames.
+    """
+    frames = np.unique(label_array[:, 1]).astype(int)
+    for current_frame, next_frame in pairwise(frames):
+        current_nodes = [
+            node for node in graph.nodes if graph.nodes[node]["frame"] == current_frame
+        ]
+        next_nodes = [
+            node for node in graph.nodes if graph.nodes[node]["frame"] == next_frame
+        ]
+        for node in current_nodes:
+            label = graph.nodes[node]["label"]
+            next_node = [
+                n
+                for n in next_nodes
+                if graph.nodes[n]["label"] == label
+                and graph.nodes[n]["frame"] == next_frame
+            ]
+            assert len(next_node) <= 1
+            if next_node:
+                graph.add_edge(node, next_node[0])
 
 
 def _add_division_edges(
@@ -264,15 +364,18 @@ def _build_lineages(
     list[CellLineage]
         The built cell lineages.
     """
-    # For now just getting the nodes, no features like position, ROI or area.
-    # TODO: extract features.
-    labels_dict = _extract_labels(stack_array)
+    # TODO: extract ROI to have access to morphology.
+    # labels_dict = _extract_labels(stack_array)
+    # Extracting all the labels and their space and time coordinates.
+    coord_array = _extract_label_coord_array(stack_array)
 
     # Populating the graph with nodes and edges.
     graph = nx.DiGraph()
-    _add_all_nodes(graph, labels_dict)
+    # _add_all_nodes(graph, labels_dict)
+    _add_all_nodes_from_coord_array(graph, coord_array)
     # Adding edges between identical labels in consecutive frames.
-    _add_same_label_edges(graph, labels_dict)
+    # _add_same_label_edges(graph, labels_dict)
+    _add_same_label_edges_from_coord_array(graph, coord_array[:, 0:2])
     # Adding edges between mother and daughter cells.
     _add_division_edges(graph, epidata["Graph"])
     # TODO: parse the other fields in the pickle file and save the data somewhere
@@ -321,9 +424,14 @@ def _build_metadata(
     return metadata
 
 
-def _build_features_declaration() -> FeaturesDeclaration:
+def _build_features_declaration(unit: str) -> FeaturesDeclaration:
     """
     Build the Pycellin features declaration.
+
+    Parameters
+    ----------
+    unit : str
+        The unit of the spatial coordinates.
 
     Returns
     -------
@@ -333,6 +441,7 @@ def _build_features_declaration() -> FeaturesDeclaration:
     feat_declaration = FeaturesDeclaration()
     feat_declaration._add_feature(pgfu.define_frame_Feature(), "node")
     feat_declaration._add_feature(pgfu.define_cell_ID_Feature(), "node")
+    feat_declaration._add_feature(pgfu.define_cell_location_Feature(unit), "node")
     feat_declaration._add_feature(pgfu.define_lineage_ID_Feature(), "lineage")
     group_feat = Feature(
         name="group",
@@ -346,13 +455,17 @@ def _build_features_declaration() -> FeaturesDeclaration:
     return feat_declaration
 
 
+def _load_from_napari():
+    pass
+
+
 def load_EpiCure_data(
     pickle_path: str,
     label_img_path: str,
 ) -> Model:
 
     # Load the data from the label stack tiff and the pickle file.
-    stack_array = tiff.imread(label_img_path)
+    stack_array = tiff.imread(label_img_path).astype(np.uint32)
     print(stack_array.shape)
     with open(pickle_path, "rb") as f:
         epidata = pickle.load(f)
@@ -361,7 +474,7 @@ def load_EpiCure_data(
     lineages = _build_lineages(stack_array, epidata)
     data = Data({lin.graph["lineage_ID"]: lin for lin in lineages})
     metadata = _build_metadata(pickle_path, label_img_path, epidata["EpiMetaData"])
-    feat_declaration = _build_features_declaration()
+    feat_declaration = _build_features_declaration(epidata["EpiMetaData"]["UnitXY"])
     model = Model(metadata, feat_declaration, data)
 
     return model

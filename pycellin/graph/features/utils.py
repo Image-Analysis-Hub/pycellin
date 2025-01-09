@@ -84,3 +84,15 @@ def define_lineage_ID_Feature(provenance: str = "Pycellin") -> Feature:
         unit="none",
     )
     return feat
+
+
+def define_cell_location_Feature(unit: str, provenance: str = "Pycellin") -> Feature:
+    feat = Feature(
+        name="location",
+        description="Location of the cell",
+        lineage_type="CellLineage",
+        provenance=provenance,
+        data_type="float",
+        unit=unit,
+    )
+    return feat
