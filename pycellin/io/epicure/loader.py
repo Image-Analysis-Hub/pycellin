@@ -9,7 +9,7 @@ import pickle
 import networkx as nx
 import tifffile as tiff
 
-from pycellin.classes import CellLineage, Data, FeaturesDeclaration, Model
+from pycellin.classes import CellLineage, Data, Feature, FeaturesDeclaration, Model
 import pycellin.graph.features.utils as pgfu
 
 
@@ -154,6 +154,31 @@ def _add_division_edges(
             print(f"Daughter cell {daughter_cell} not found in label image.")
 
 
+def _add_groups(
+    graph: nx.DiGraph,
+    groups: dict[str, list[int]],
+) -> None:
+    """
+    Add the groups to the nodes in the graph.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        The graph to which the groups will be added.
+    groups : dict[str, list[int]]
+        A dictionary where the keys are the group names and the values are
+        lists of the labels of the cells in the corresponding group.
+    """
+    for group_name, group in groups.items():
+        for label in group:
+            # We need to find the nodes corresponding to the labels.
+            nodes = [
+                node for node in graph.nodes if graph.nodes[node]["label"] == label
+            ]
+            for nid in nodes:
+                graph.nodes[nid]["group"] = group_name
+
+
 def _split_graph_into_lineages(
     graph: nx.DiGraph,
 ) -> list[CellLineage]:
@@ -222,7 +247,7 @@ def _check_for_fusions(
 
 def _build_lineages(
     stack_array: np.ndarray,
-    graph_data: dict[int, list[int]],
+    epidata: dict,
 ) -> list[CellLineage]:
     """
     Build Pycellin cell lineages from EpiCure data.
@@ -231,10 +256,8 @@ def _build_lineages(
     ----------
     stack_array : np.ndarray
         A 3D numpy array representing a stack of labels.
-    graph_data : dict[int, list[int]]
-        The dictionary of mother-daughter cell labels. The keys are the
-        labels of the daughter cells and the values are lists of the labels
-        of the mother cells.
+    epidata : dict
+        The EpiCure data dictionary.
 
     Returns
     -------
@@ -251,9 +274,10 @@ def _build_lineages(
     # Adding edges between identical labels in consecutive frames.
     _add_same_label_edges(graph, labels_dict)
     # Adding edges between mother and daughter cells.
-    _add_division_edges(graph, graph_data)
+    _add_division_edges(graph, epidata["Graph"])
     # TODO: parse the other fields in the pickle file and save the data somewhere
     # (will be useful for exporter).
+    _add_groups(graph, epidata["Group"])
 
     # For now all the lineages are in the same graph.
     # Pycellin expects one lineage per graph so we need to split the graph
@@ -310,6 +334,15 @@ def _build_features_declaration() -> FeaturesDeclaration:
     feat_declaration._add_feature(pgfu.define_frame_Feature(), "node")
     feat_declaration._add_feature(pgfu.define_cell_ID_Feature(), "node")
     feat_declaration._add_feature(pgfu.define_lineage_ID_Feature(), "lineage")
+    group_feat = Feature(
+        name="group",
+        description="Name of the group to which the cell belongs",
+        lineage_type="CellLineage",
+        provenance="EpiCure",
+        data_type="str",
+        unit="none",
+    )
+    feat_declaration._add_feature(group_feat, "node")
     return feat_declaration
 
 
@@ -325,7 +358,7 @@ def load_EpiCure_data(
         epidata = pickle.load(f)
 
     # Build the Pycellin model.
-    lineages = _build_lineages(stack_array, epidata["Graph"])
+    lineages = _build_lineages(stack_array, epidata)
     data = Data({lin.graph["lineage_ID"]: lin for lin in lineages})
     metadata = _build_metadata(pickle_path, label_img_path, epidata["EpiMetaData"])
     feat_declaration = _build_features_declaration()
