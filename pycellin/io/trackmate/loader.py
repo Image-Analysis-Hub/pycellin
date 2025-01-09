@@ -970,8 +970,6 @@ def _parse_model_tag(
     # We want one lineage per track, so we need to split the graph
     # into its connected components.
     lineages = _split_graph_into_lineages(graph, tracks_attributes)
-    # Pycellin DOES NOT support fusion events.
-    _check_for_fusions(lineages)
 
     # For Pycellin compatibility, some TrackMate features have to be renamed.
     _update_features_declaration(fd, units)
@@ -992,6 +990,9 @@ def _parse_model_tag(
             lin.graph["FilteredTrack"] = True
         else:
             lin.graph["FilteredTrack"] = False
+
+    # Pycellin DOES NOT support fusion events.
+    _check_for_fusions(lineages)
 
     return units, fd, Data({lin.graph["lineage_ID"]: lin for lin in lineages})
 
@@ -1214,7 +1215,8 @@ if __name__ == "__main__":
 
     # import math
 
-    xml = "sample_data/FakeTracks.xml"
+    xml = "E:/Pasteur/Code/pycellin/pycellin/sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
+    # xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
 
     # trackmate_version = _get_trackmate_version(xml)
