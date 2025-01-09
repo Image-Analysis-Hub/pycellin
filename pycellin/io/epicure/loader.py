@@ -220,14 +220,27 @@ def _check_for_fusions(
         )
 
 
-def load_EpiCure_data(
-    pickle_path: str,
-    label_img_path: str,
-) -> Model:
+def _build_lineages(
+    stack_array: np.ndarray,
+    graph_data: dict[int, list[int]],
+) -> list[CellLineage]:
+    """
+    Build Pycellin cell lineages from EpiCure data.
 
-    # Nodes are extracted from the tif stack of labels.
-    stack_array = tiff.imread(label_img_path)
-    print(stack_array.shape)
+    Parameters
+    ----------
+    stack_array : np.ndarray
+        A 3D numpy array representing a stack of labels.
+    graph_data : dict[int, list[int]]
+        The dictionary of mother-daughter cell labels. The keys are the
+        labels of the daughter cells and the values are lists of the labels
+        of the mother cells.
+
+    Returns
+    -------
+    list[CellLineage]
+        The built cell lineages.
+    """
     # For now just getting the nodes, no features like position, ROI or area.
     # TODO: extract features.
     labels_dict = _extract_labels(stack_array)
@@ -236,13 +249,10 @@ def load_EpiCure_data(
     # Populating the graph with nodes and edges.
     graph = nx.DiGraph()
     _add_all_nodes(graph, labels_dict)
-    print(graph)
+    # print(graph)
     # Adding edges between identical labels in consecutive frames.
     _add_same_label_edges(graph, labels_dict)
-    # Adding edges between mother and daughter cells by parsing the pickle file.
-    with open(pickle_path, "rb") as f:
-        epidata = pickle.load(f)
-    graph_data = epidata["Graph"]
+    # Adding edges between mother and daughter cells.
     _add_division_edges(graph, graph_data)
     # TODO: parse the other fields in the pickle file and save the data somewhere
 
@@ -250,28 +260,82 @@ def load_EpiCure_data(
     # Pycellin expects one lineage per graph so we need to split the graph
     # into its connected components.
     lineages = _split_graph_into_lineages(graph)
-    print("Nb lineages:", len(lineages))
-    print(lineages[0])
-    print(lineages[0].graph)
+    # print("Nb lineages:", len(lineages))
+    # print(lineages[0])
+    # print(lineages[0].graph)
     # Pycellin DOES NOT support fusion events.
     _check_for_fusions(lineages)
-    data = Data({lin.graph["lineage_ID"]: lin for lin in lineages})
 
+    return lineages
+
+
+def _build_metadata(
+    pickle_path: str,
+    label_img_path: str,
+    epimetadata: dict,
+) -> dict:
+    """
+    Build the Pycellin metadata dictionary.
+
+    Parameters
+    ----------
+    pickle_path : str
+        The path to the pickle file.
+    label_img_path : str
+        The path to the label image file.
+    epidata : dict
+        The EpiCure metadata dictionary.
+
+    Returns
+    -------
+    dict
+        The metadata dictionary.
+    """
     metadata = {}
     metadata["name"] = Path(pickle_path).stem
     metadata["pickle_location"] = pickle_path
     metadata["label_img_location"] = label_img_path
     metadata["provenance"] = "EpiCure"
+    metadata["space_unit"] = epimetadata["UnitXY"]
+    metadata["time_unit"] = epimetadata["UnitT"]
     metadata["date"] = datetime.now()
-    metadata["space_unit"] = epidata["EpiMetaData"]["UnitXY"]
-    metadata["time_unit"] = epidata["EpiMetaData"]["UnitT"]
+    return metadata
 
+
+def _build_features_declaration() -> FeaturesDeclaration:
+    """
+    Build the Pycellin features declaration.
+
+    Returns
+    -------
+    FeaturesDeclaration
+        The features declaration.
+    """
     feat_declaration = FeaturesDeclaration()
     feat_declaration._add_feature(pgfu.define_cell_ID_Feature(), "node")
     feat_declaration._add_feature(pgfu.define_frame_Feature(), "node")
     feat_declaration._add_feature(pgfu.define_lineage_ID_Feature(), "lineage")
+    return feat_declaration
 
+
+def load_EpiCure_data(
+    pickle_path: str,
+    label_img_path: str,
+) -> Model:
+
+    # Load the data from the label stack tiff and the pickle file.
+    stack_array = tiff.imread(label_img_path)
+    print(stack_array.shape)
+    with open(pickle_path, "rb") as f:
+        epidata = pickle.load(f)
+
+    # Build the Pycellin model.
+    lineages = _build_lineages(stack_array, epidata["Graph"])
+    data = Data({lin.graph["lineage_ID"]: lin for lin in lineages})
+    metadata = _build_metadata(pickle_path, label_img_path, epidata["EpiMetaData"])
+    feat_declaration = _build_features_declaration()
     model = Model(metadata, feat_declaration, data)
+
     return model
 
 
