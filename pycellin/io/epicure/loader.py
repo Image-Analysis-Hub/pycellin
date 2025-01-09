@@ -455,15 +455,69 @@ def _build_features_declaration(unit: str) -> FeaturesDeclaration:
     return feat_declaration
 
 
-def _load_from_napari():
-    pass
+def _load_from_napari(
+    coord_array: np.ndarray,
+    epigraph: dict[int, list[int]],
+) -> Model:
+    """
+    Load EpiCure data from a napari session into a Pycellin model.
+
+    Parameters
+    ----------
+    coord_array : np.ndarray
+        A numpy array where the rows are the labels and their frames.
+    epigraph : dict[int, list[int]]
+        A dictionary where the keys are the labels of the daughter cells
+        and the values are lists of the labels of the mother cells.
+
+    Returns
+    -------
+    Model
+        A Pycellin model of the data.
+    """
+    # Populating the graph with nodes and edges.
+    graph = nx.DiGraph()
+    _add_all_nodes_from_coord_array(graph, coord_array)
+    # Adding edges between identical labels in consecutive frames.
+    _add_same_label_edges_from_coord_array(graph, coord_array[:, 0:2])
+    # Adding edges between mother and daughter cells.
+    _add_division_edges(graph, epigraph["Graph"])
+    # Pycellin expects one lineage per graph so we need to split the graph
+    # into its connected components.
+    lineages = _split_graph_into_lineages(graph)
+    _check_for_fusions(lineages)  # Pycellin DOES NOT support fusion events.
+    data = Data({lin.graph["lineage_ID"]: lin for lin in lineages})
+
+    # No metadata nor units for now.
+    # TODO: see with Gaëlle
+    # metadata = _build_metadata(pickle_path, label_img_path, epidata["EpiMetaData"])
+    metadata = {}
+    # feat_declaration = _build_features_declaration(epidata["EpiMetaData"]["UnitXY"])
+    feat_declaration = FeaturesDeclaration()
+    model = Model(metadata, feat_declaration, data)
+
+    return model
 
 
 def load_EpiCure_data(
     pickle_path: str,
     label_img_path: str,
 ) -> Model:
+    """
+    Load EpiCure data into a Pycellin model.
 
+    Parameters
+    ----------
+    pickle_path : str
+        The path to the exported EpiCure pickle file.
+    label_img_path : str
+        The path to the exported EpiCure label image file.
+
+    Returns
+    -------
+    Model
+        A Pycellin model of the data.
+    """
     # Load the data from the label stack tiff and the pickle file.
     stack_array = tiff.imread(label_img_path).astype(np.uint32)
     print(stack_array.shape)
