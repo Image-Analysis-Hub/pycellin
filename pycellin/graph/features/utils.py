@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from pycellin.classes import Feature
+
 
 # TODO: see if there is way to get the same info without hard coding
 # the list of available features.
@@ -46,3 +48,39 @@ def get_pycellin_cycle_lineage_features() -> dict[str, str]:
         "division_rate": "Number of divisions per time unit",
     }
     return cycle_lineage_feats
+
+
+def define_frame_Feature(provenance: str = "Pycellin") -> Feature:
+    feat = Feature(
+        name="frame",
+        description="Frame number of the cell ",
+        lineage_type="CellLineage",
+        provenance=provenance,
+        data_type="int",
+        unit="frame",
+    )
+    return feat
+
+
+def define_cell_ID_Feature(provenance: str = "Pycellin") -> Feature:
+    feat = Feature(
+        name="cell_ID",
+        description="Unique identifier of the cell",
+        lineage_type="CellLineage",
+        provenance=provenance,
+        data_type="int",
+        unit="none",
+    )
+    return feat
+
+
+def define_lineage_ID_Feature(provenance: str = "Pycellin") -> Feature:
+    feat = Feature(
+        name="lineage_ID",
+        description="Unique identifier of the lineage",
+        lineage_type="CellLineage",
+        provenance=provenance,
+        data_type="int",
+        unit="none",
+    )
+    return feat
