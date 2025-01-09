@@ -114,7 +114,7 @@ def _add_division_edges(
         and the values are lists of the labels of the mother cells.
     """
     for daughter_cell, mother_cells in graph_data.items():
-        print(daughter_cell, mother_cells)
+        # print(daughter_cell, mother_cells)
 
         # What we have here are labels, not cell IDs.
         # So we need to find the corresponding cell IDs.
@@ -130,7 +130,7 @@ def _add_division_edges(
             # the label appears in the image.
             candidate_daughter_cell.sort(key=lambda x: x[1])
             daughter_cell_nid = candidate_daughter_cell[0][0]
-            print("daughter_cell:", daughter_cell_nid)
+            # print("daughter_cell:", daughter_cell_nid)
 
             for mother_cell in mother_cells:
                 # Same as above but with the mother cell.
@@ -143,7 +143,7 @@ def _add_division_edges(
                 if len(candidate_mother_cell) > 0:
                     candidate_mother_cell.sort(key=lambda x: x[1], reverse=True)
                     mother_cell_nid = candidate_mother_cell[0][0]
-                    print("mother_cell:", mother_cell_nid)
+                    # print("mother_cell:", mother_cell_nid)
 
                     # Then we can add the edge to the graph.
                     graph.add_edge(mother_cell_nid, daughter_cell_nid)
@@ -244,27 +244,22 @@ def _build_lineages(
     # For now just getting the nodes, no features like position, ROI or area.
     # TODO: extract features.
     labels_dict = _extract_labels(stack_array)
-    # print(labels_dict)
 
     # Populating the graph with nodes and edges.
     graph = nx.DiGraph()
     _add_all_nodes(graph, labels_dict)
-    # print(graph)
     # Adding edges between identical labels in consecutive frames.
     _add_same_label_edges(graph, labels_dict)
     # Adding edges between mother and daughter cells.
     _add_division_edges(graph, graph_data)
     # TODO: parse the other fields in the pickle file and save the data somewhere
+    # (will be useful for exporter).
 
     # For now all the lineages are in the same graph.
     # Pycellin expects one lineage per graph so we need to split the graph
     # into its connected components.
     lineages = _split_graph_into_lineages(graph)
-    # print("Nb lineages:", len(lineages))
-    # print(lineages[0])
-    # print(lineages[0].graph)
-    # Pycellin DOES NOT support fusion events.
-    _check_for_fusions(lineages)
+    _check_for_fusions(lineages)  # Pycellin DOES NOT support fusion events.
 
     return lineages
 
@@ -289,7 +284,7 @@ def _build_metadata(
     Returns
     -------
     dict
-        The metadata dictionary.
+        The built metadata dictionary.
     """
     metadata = {}
     metadata["name"] = Path(pickle_path).stem
@@ -309,11 +304,11 @@ def _build_features_declaration() -> FeaturesDeclaration:
     Returns
     -------
     FeaturesDeclaration
-        The features declaration.
+        The built features declaration.
     """
     feat_declaration = FeaturesDeclaration()
-    feat_declaration._add_feature(pgfu.define_cell_ID_Feature(), "node")
     feat_declaration._add_feature(pgfu.define_frame_Feature(), "node")
+    feat_declaration._add_feature(pgfu.define_cell_ID_Feature(), "node")
     feat_declaration._add_feature(pgfu.define_lineage_ID_Feature(), "lineage")
     return feat_declaration
 
