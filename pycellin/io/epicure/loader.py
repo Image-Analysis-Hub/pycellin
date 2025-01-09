@@ -9,7 +9,8 @@ import pickle
 import networkx as nx
 import tifffile as tiff
 
-from pycellin.classes import CellLineage, Data, Model
+from pycellin.classes import CellLineage, Data, FeaturesDeclaration, Model
+import pycellin.graph.features.utils as pgfu
 
 
 def _extract_labels(
@@ -177,11 +178,11 @@ def _split_graph_into_lineages(
     ]
     del graph  # Redondant with the subgraphs.
 
-    # Adding a unique lineage_ID to each lineage and their nodes.
+    # Adding a unique lineage_ID to each lineage.
     for i, lin in enumerate(lineages):
         lin.graph["lineage_ID"] = i
-        for node in lin.nodes:
-            lin.nodes[node]["lineage_ID"] = i
+        # for node in lin.nodes:
+        #     lin.nodes[node]["lineage_ID"] = i
 
     return lineages
 
@@ -254,6 +255,7 @@ def load_EpiCure_data(
     print(lineages[0].graph)
     # Pycellin DOES NOT support fusion events.
     _check_for_fusions(lineages)
+    data = Data({lin.graph["lineage_ID"]: lin for lin in lineages})
 
     metadata = {}
     metadata["name"] = Path(pickle_path).stem
@@ -263,8 +265,11 @@ def load_EpiCure_data(
     metadata["date"] = datetime.now()
     metadata["space_unit"] = epidata["EpiMetaData"]["UnitXY"]
     metadata["time_unit"] = epidata["EpiMetaData"]["UnitT"]
-    feat_declaration = {}  # No features for now.
-    data = Data({lin.graph["lineage_ID"]: lin for lin in lineages})
+
+    feat_declaration = FeaturesDeclaration()
+    feat_declaration._add_feature(pgfu.define_cell_ID_Feature(), "node")
+    feat_declaration._add_feature(pgfu.define_frame_Feature(), "node")
+    feat_declaration._add_feature(pgfu.define_lineage_ID_Feature(), "lineage")
 
     model = Model(metadata, feat_declaration, data)
     return model
@@ -277,3 +282,5 @@ if __name__ == "__main__":
 
     model = load_EpiCure_data(epi_file, stack_file)
     print(model)
+    print(model.metadata)
+    print(model.feat_declaration)
