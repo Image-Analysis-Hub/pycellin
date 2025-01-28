@@ -133,7 +133,7 @@ class ModelUpdater:
         else:
             calculators = [self._calculators[feat] for feat in features_to_update]
 
-        # Recomputing the features as needed.
+        # Recompute the features as needed.
         for calc in calculators:
             # Depending on the class of the calculator, a different version of
             # the enrich() method is called.
