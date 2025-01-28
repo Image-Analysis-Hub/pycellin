@@ -173,7 +173,9 @@ class NodeLocalFeatureCalculator(LocalFeatureCalculator):
         """
         pass
 
-    def enrich(self, data: Data, nodes_to_enrich: list[tuple[int, int]]) -> None:
+    def enrich(
+        self, data: Data, nodes_to_enrich: list[tuple[int, int]], **kwargs
+    ) -> None:
         """
         Enrich the data with the value of a local feature for a list of nodes.
 
@@ -228,7 +230,9 @@ class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
         """
         pass
 
-    def enrich(self, data: Data, edges_to_enrich: list[tuple[int, int, int]]) -> None:
+    def enrich(
+        self, data: Data, edges_to_enrich: list[tuple[int, int, int]], **kwargs
+    ) -> None:
         """
         Enrich the data with the value of a local feature for a list of edges.
 
@@ -282,7 +286,7 @@ class LineageLocalFeatureCalculator(LocalFeatureCalculator):
         """
         pass
 
-    def enrich(self, data: Data, lineages_to_enrich: list[int]) -> None:
+    def enrich(self, data: Data, lineages_to_enrich: list[int], **kwargs) -> None:
         """
         Enrich the data with the value of a local feature for all lineages.
 
@@ -348,7 +352,7 @@ class GlobalFeatureCalculator(FeatureCalculator):
     #     pass
 
     @abstractmethod
-    def enrich(self, data: Data) -> None:
+    def enrich(self, data: Data, **kwargs) -> None:
         """
         Enrich the data with the value of a global feature for all objects in all lineages.
 
@@ -404,7 +408,7 @@ class NodeGlobalFeatureCalculator(GlobalFeatureCalculator):
         """
         pass
 
-    def enrich(self, data: Data) -> None:
+    def enrich(self, data: Data, **kwargs) -> None:
         """
         Enrich the data with the value of a global feature for all nodes in all lineages.
 
@@ -459,7 +463,7 @@ class EdgeGlobalFeatureCalculator(GlobalFeatureCalculator):
         """
         pass
 
-    def enrich(self, data: Data) -> None:
+    def enrich(self, data: Data, **kwargs) -> None:
         """
         Enrich the data with the value of a global feature for all edges in all lineages.
 
@@ -512,7 +516,7 @@ class LineageGlobalFeatureCalculator(GlobalFeatureCalculator):
         """
         pass
 
-    def enrich(self, data: Data) -> None:
+    def enrich(self, data: Data, **kwargs) -> None:
         """
         Enrich the data with the value of a global feature for all lineages.
 
