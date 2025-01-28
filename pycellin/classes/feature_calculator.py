@@ -30,9 +30,9 @@ def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> list[Lineage]:
         List of lineages of the specified type.
     """
     if lineage_type == "CellLineage":
-        return data.cell_data.values()
+        return list(data.cell_data.values())
     elif lineage_type == "CycleLineage":
-        return data.cycle_data.values()
+        return list(data.cycle_data.values())
     else:
         raise ValueError("Invalid lineage type.")
 
