@@ -15,6 +15,9 @@ from pycellin.classes import CellLineage, Data, Feature, FeaturesDeclaration, Mo
 import pycellin.graph.features.utils as pgfu
 
 
+# TODO: check if the labels are correctly stored as cell feature
+
+
 def _extract_labels(
     stack_array: np.ndarray,
 ) -> dict[int, list[int]]:
@@ -489,7 +492,7 @@ def _load_from_napari(
     data = Data({lin.graph["lineage_ID"]: lin for lin in lineages})
 
     # No metadata nor units for now.
-    # TODO: see with Gaëlle
+    # TODO: need to add an argument to get the data from EpiMetaData
     # metadata = _build_metadata(pickle_path, label_img_path, epidata["EpiMetaData"])
     metadata = {}
     # feat_declaration = _build_features_declaration(epidata["EpiMetaData"]["UnitXY"])
