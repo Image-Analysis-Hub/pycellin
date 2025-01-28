@@ -145,31 +145,50 @@ class ModelUpdater:
         # - create an intermediary class, maybe called ModelUpdate
         # mu = ModelUpdate(self._added_cells, self._added_links, ...)
         for calc in calculators:
-            if calc.is_for_local_feature():
-                # calc.calc(mu)
-                # Local features: we recompute them for added / modified objects only.
-                feature_type = calc.get_feature_type()
-                match feature_type:
-                    case "node":
-                        for cell_ID, lin_ID in self._added_cells:
-                            lineage = data.cell_data[lin_ID]
-                            calc.add_to_one(lineage, cell_ID)
-                    case "edge":
-                        for link in self._added_links:
-                            lineage = data.cell_data[link.lineage_ID]
-                            link_node_IDs = (link.source_cell_ID, link.target_cell_ID)
-                            calc.add_to_one(lineage, link_node_IDs)
-                    case "lineage":
-                        for lin_ID in self._added_lineages | self._modified_lineages:
-                            lineage = data.cell_data[lin_ID]
-                            calc.add_to_one(lineage)
-                    case _:
-                        raise ValueError(
-                            f"Unknown feature type in calculator: {feature_type}"
-                        )
-            else:
-                # Global features: we recompute them for all objects.
-                calc.add_to_all(data)
+            # Depending on the class of the calculator, a different version of
+            # the enrich() method is called.
+            calc.enrich(
+                data,
+                nodes_to_enrich=self._added_cells,
+                links_to_enrich=self._added_links,
+                lineages_to_enrich=self._added_lineages | self._modified_lineages,
+            )
+            # calc.enrich(data)
+            # if calc.is_for_local_feature():
+            #     calc.enrich(
+            #         data,
+            #         nodes_to_enrich=self._added_cells,
+            #         links_to_enrich=self._added_links,
+            #         lineages_to_enrich=self._added_lineages | self._modified_lineages,
+            #     )
+            # calc.enrich(data, self._added_cells)
+            # calc.enrich(data, self._added_links)
+            # calc.enrich(data, self._added_lineages | self._modified_lineages)
+            # calc.calc(mu)
+            # Local features: we recompute them for added / modified objects only.
+            # feature_type = calc.get_feature_type()
+            # match feature_type:
+            #     case "node":
+            #         for cell_ID, lin_ID in self._added_cells:
+            #             lineage = data.cell_data[lin_ID]
+            #             calc.add_to_one(lineage, cell_ID)
+            #     case "edge":
+            #         for link in self._added_links:
+            #             lineage = data.cell_data[link.lineage_ID]
+            #             link_node_IDs = (link.source_cell_ID, link.target_cell_ID)
+            #             calc.add_to_one(lineage, link_node_IDs)
+            #     case "lineage":
+            #         for lin_ID in self._added_lineages | self._modified_lineages:
+            #             lineage = data.cell_data[lin_ID]
+            #             calc.add_to_one(lineage)
+            #     case _:
+            #         raise ValueError(
+            #             f"Unknown feature type in calculator: {feature_type}"
+            #         )
+            # else:
+            #     # Global features: we recompute them for all objects.
+            #     calc.enrich(data)
+            # calc.add_to_all(data)
 
         # Update is done, we can clean up.
         self._reinit()
