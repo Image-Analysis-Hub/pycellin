@@ -373,6 +373,8 @@ def _add_all_nodes(
 
             # The ROI coordinates are not stored in a tag attribute but in
             # the tag text. So we need to extract then format them.
+            # In case of a single-point detection, the `ROI_N_POINTS` attribute
+            # is not present.
             try:
                 _convert_ROI_coordinates(element, attribs)
             except KeyError as err:
@@ -702,8 +704,8 @@ def _update_features_declaration(
         "cell_ID", "Unique identifier of the cell", "node"
     )
     feat_declaration._rename_feature("FRAME", "frame", "node")
-    feat_declaration._rename_feature("AREA", "area", "node")
-    feat_declaration._modify_feature_description("area", "Area of the cell", "node")
+    # feat_declaration._rename_feature("AREA", "area", "node")
+    # feat_declaration._modify_feature_description("area", "Area of the cell", "node")
 
     # Edge features.
     if "EDGE_X_LOCATION" in feat_declaration.edge_feats:
@@ -939,12 +941,13 @@ def _parse_model_tag(
     lineages = _split_graph_into_lineages(graph, tracks_attributes)
 
     # For Pycellin compatibility, some TrackMate features have to be renamed.
+    # We only rename features that are essential to the functioning of Pycellin.
     _update_features_declaration(fd, units)
     for lin in lineages:
         for key_name, new_key in [
             ("ID", "cell_ID"),
             ("FRAME", "frame"),
-            ("AREA", "area"),
+            # ("AREA", "area"),
         ]:
             _update_node_feature_key(lin, key_name, new_key)
         _update_TRACK_ID(lin)
@@ -1179,8 +1182,9 @@ if __name__ == "__main__":
 
     # import math
 
-    xml = "sample_data/FakeTracks.xml"
+    # xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
+    xml = "E:/Pasteur/SARDE_Liza/LStoLX/230328GreffeGakaYFPMyogTdtmdxFDBTryplen1-movie01-01-Scene-15-TR37-A01.xml"
 
     # trackmate_version = _get_trackmate_version(xml)
     # print(trackmate_version)
