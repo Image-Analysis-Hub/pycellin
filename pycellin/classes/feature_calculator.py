@@ -12,7 +12,7 @@ from pycellin.classes.lineage import Lineage
 # dictionary, with getters to access the features of a specific type?
 
 
-def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> list[Lineage]:
+def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Lineage]:
     """
     Get the lineages from the data object based on the lineage type.
 
@@ -26,13 +26,14 @@ def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> list[Lineage]:
 
     Returns
     -------
-    list of Lineage
-        List of lineages of the specified type.
+    dict[int, Lineage]
+        Dictionary of lineages extracted from the data object.
+        Keys are the lineage IDs.
     """
     if lineage_type == "CellLineage":
-        return list(data.cell_data.values())
+        return data.cell_data
     elif lineage_type == "CycleLineage":
-        return list(data.cycle_data.values())
+        return data.cycle_data
     else:
         raise ValueError("Invalid lineage type.")
 
@@ -348,7 +349,7 @@ class NodeGlobalFeatureCalculator(GlobalFeatureCalculator):
             Data object containing the lineages to enrich.
         """
         lineages = _get_lin_data_from_lin_type(data, self.feature.lineage_type)
-        for lin in lineages:
+        for lin in lineages.values():
             for noi in lin.nodes:
                 lin.nodes[noi][self.feature.name] = self.compute(data, lin, noi)
 
@@ -389,7 +390,7 @@ class EdgeGlobalFeatureCalculator(GlobalFeatureCalculator):
             Data object containing the lineages to enrich.
         """
         lineages = _get_lin_data_from_lin_type(data, self.feature.lineage_type)
-        for lin in lineages:
+        for lin in lineages.values():
             for edge in lin.edges:
                 lin.edges[edge][self.feature.name] = self.compute(data, lin, edge)
 
@@ -429,5 +430,5 @@ class LineageGlobalFeatureCalculator(GlobalFeatureCalculator):
             Data object containing the lineages to enrich.
         """
         lineages = _get_lin_data_from_lin_type(data, self.feature.lineage_type)
-        for lin in lineages:
+        for lin in lineages.values():
             lin.graph[self.feature.name] = self.compute(data, lin)
