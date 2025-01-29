@@ -180,7 +180,7 @@ def _add_all_features(
     ancestor: ET._Element,
     feat_declaration: FeaturesDeclaration,
     units: dict[str, str],
-) -> None:
+) -> bool:
     """
     Add all the TrackMate model features to a FeaturesDeclaration object.
 
@@ -200,6 +200,11 @@ def _add_all_features(
     units : dict[str, str]
         The temporal and spatial units of the TrackMate model
         (`timeunits` and `spatialunits`).
+
+    Returns
+    -------
+    bool
+        True if the TM data has segmentation, False otherwise.
     """
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
@@ -207,20 +212,30 @@ def _add_all_features(
         features = _get_features_dict(iterator, element)
         for feat in features:
             _convert_and_add_feature(feat, element.tag, feat_declaration, units)
+
         # Features used in Spot tags but not declared in the FeatureDeclarations tag.
         if element.tag == "SpotFeatures":
             name_feat = Feature(
                 "name", "Name of the spot", "CellLineage", "TrackMate", "string", "none"
             )
-            roi_coord_feat = Feature(
-                "ROI_coords",
-                "List of coordinates of the region of interest",
-                "CellLineage",
-                "TrackMate",
-                "float",
-                units["spatialunits"],
-            )
-            feat_declaration._add_features([name_feat, roi_coord_feat], ["node"] * 2)
+            # Do we have segmentation in the data?
+            # If we have, we need to know it to properly handle the ROI coordinates
+            # later on.
+            segmentation = False
+            if "ROI_N_POINTS" in [f["feature"] for f in features]:
+                segmentation = True
+                roi_coord_feat = Feature(
+                    "ROI_coords",
+                    "List of coordinates of the region of interest",
+                    "CellLineage",
+                    "TrackMate",
+                    "float",
+                    units["spatialunits"],
+                )
+                feat_declaration._add_features(
+                    [name_feat, roi_coord_feat], ["node"] * 2
+                )
+
         # Feature used in Track tags but not declared in the FeatureDeclarations tag.
         if element.tag == "TrackFeatures":
             name_feat = Feature(
@@ -234,6 +249,8 @@ def _add_all_features(
             feat_declaration._add_feature(name_feat, "lineage")
         element.clear()
         event, element = next(iterator)
+
+    return segmentation
 
 
 def _convert_attributes(
@@ -328,6 +345,7 @@ def _add_all_nodes(
     ancestor: ET._Element,
     feat_declaration: FeaturesDeclaration,
     graph: nx.DiGraph,
+    segmentation: bool,
 ) -> None:
     """
     Add nodes and their attributes to a graph.
@@ -345,6 +363,8 @@ def _add_all_nodes(
         node attributes.
     graph : nx.DiGraph
         Graph to add the nodes to.
+    segmentation : bool
+        True if the TM data has segmentation, False otherwise.
 
     Raises
     ------
@@ -375,12 +395,11 @@ def _add_all_nodes(
             # the tag text. So we need to extract then format them.
             # In case of a single-point detection, the `ROI_N_POINTS` attribute
             # is not present.
-            try:
-                _convert_ROI_coordinates(element, attribs)
-            except KeyError as err:
-                print(err)
-                # TODO: check the behavior when the key is not found.
-                # Does it happen when TrackMate do a single-point segmentation?
+            if segmentation:
+                try:
+                    _convert_ROI_coordinates(element, attribs)
+                except KeyError as err:
+                    print(err)
 
             # Now that all the node attributes have been updated, we can add
             # them to the graph.
@@ -904,12 +923,12 @@ def _parse_model_tag(
         # Get the spot, edge and track features and add them to the
         # features declaration.
         if element.tag == "FeatureDeclarations" and event == "start":
-            _add_all_features(it, element, fd, units)
+            segmentation = _add_all_features(it, element, fd, units)
             root.clear()
 
         # Adding the spots as nodes.
         if element.tag == "AllSpots" and event == "start":
-            _add_all_nodes(it, element, fd, graph)
+            _add_all_nodes(it, element, fd, graph, segmentation)
             root.clear()
 
         # Adding the tracks as edges.
@@ -1184,7 +1203,7 @@ if __name__ == "__main__":
 
     # xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
-    xml = "E:/Pasteur/SARDE_Liza/LStoLX/230328GreffeGakaYFPMyogTdtmdxFDBTryplen1-movie01-01-Scene-15-TR37-A01.xml"
+    # xml = "E:/Pasteur/SARDE_Liza/LStoLX/230328GreffeGakaYFPMyogTdtmdxFDBTryplen1-movie01-01-Scene-15-TR37-A01.xml"
 
     # trackmate_version = _get_trackmate_version(xml)
     # print(trackmate_version)
@@ -1198,11 +1217,12 @@ if __name__ == "__main__":
     # print(elem_from_string.tag)
 
     model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
+    print(model)
     # print(model.metadata)
-    print(model.feat_declaration.node_feats)
+    # print(model.feat_declaration.node_feats)
     # print(model.data)
 
-    lineage = model.data.cell_data[0]
+    # lineage = model.data.cell_data[0]
 
     # print(lineage, type(lineage))
     # # print(lin.nodes)
