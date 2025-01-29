@@ -60,26 +60,28 @@ class Model:
 
     def __str__(self) -> str:
         if self.metadata and self.data:
+            nb_lin = self.data.number_of_lineages()
             if "Name" in self.metadata and "Provenance" in self.metadata:
                 txt = (
                     f"Model named '{self.metadata['Name']}' "
-                    f"with {self.data.number_of_lineages()} lineages, "
+                    f"with {nb_lin} lineage{'s' if nb_lin > 1 else ''}, "
                     f"built from {self.metadata['Provenance']}."
                 )
             elif "Name" in self.metadata:
                 txt = (
                     f"Model named '{self.metadata['Name']}' "
-                    f"with {self.data.number_of_lineages()} lineages."
+                    f"with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
                 )
             elif "Provenance" in self.metadata:
                 txt = (
-                    f"Model with {self.data.number_of_lineages()} lineages, "
+                    f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}, "
                     f"built from {self.metadata['Provenance']}."
                 )
             else:
-                txt = f"Model with {self.data.number_of_lineages()} lineages."
+                txt = f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
         elif self.data:
-            txt = f"Model with {self.data.number_of_lineages()} lineages."
+            nb_lin = self.data.number_of_lineages()
+            txt = f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
         elif self.metadata:
             if "Name" in self.metadata and "Provenance" in self.metadata:
                 txt = (
