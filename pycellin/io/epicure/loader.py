@@ -15,9 +15,6 @@ from pycellin.classes import CellLineage, Data, Feature, FeaturesDeclaration, Mo
 import pycellin.graph.features.utils as pgfu
 
 
-# TODO: check if the labels are correctly stored as cell feature
-
-
 def _extract_labels(
     stack_array: np.ndarray,
 ) -> dict[int, list[int]]:
@@ -441,11 +438,14 @@ def _build_features_declaration(unit: str) -> FeaturesDeclaration:
     FeaturesDeclaration
         The built features declaration.
     """
-    feat_declaration = FeaturesDeclaration()
-    feat_declaration._add_feature(pgfu.define_frame_Feature(), "node")
-    feat_declaration._add_feature(pgfu.define_cell_ID_Feature(), "node")
-    feat_declaration._add_feature(pgfu.define_cell_location_Feature(unit), "node")
-    feat_declaration._add_feature(pgfu.define_lineage_ID_Feature(), "lineage")
+    label_feat = Feature(
+        name="label",
+        description="Identifier of the cell in EpiCure",
+        lineage_type="CellLineage",
+        provenance="EpiCure",
+        data_type="int",
+        unit="none",
+    )
     group_feat = Feature(
         name="group",
         description="Name of the group to which the cell belongs",
@@ -454,7 +454,14 @@ def _build_features_declaration(unit: str) -> FeaturesDeclaration:
         data_type="str",
         unit="none",
     )
+
+    feat_declaration = FeaturesDeclaration()
+    feat_declaration._add_feature(pgfu.define_frame_Feature(), "node")
+    feat_declaration._add_feature(pgfu.define_cell_ID_Feature(), "node")
+    feat_declaration._add_feature(label_feat, "node")
+    feat_declaration._add_feature(pgfu.define_cell_location_Feature(unit), "node")
     feat_declaration._add_feature(group_feat, "node")
+    feat_declaration._add_feature(pgfu.define_lineage_ID_Feature(), "lineage")
     return feat_declaration
 
 
@@ -544,5 +551,12 @@ if __name__ == "__main__":
 
     model = load_EpiCure_data(epi_file, stack_file)
     print(model)
-    print(model.metadata)
+    # print(model.metadata)
+
+    # for lin in model.data.cell_data.values():
+    #     print(lin.nodes(data="group"))
+
     print(model.feat_declaration)
+    # lin0 = model.data.cell_data[0]
+
+    # print(lin0.nodes(data=True))
