@@ -522,7 +522,7 @@ def _ask_units(
     feat_declaration: FeaturesDeclaration,
 ) -> dict[str, str]:
     """
-    Ask the user to check units consistency and to give a unique spatial and a unique temporal units.
+    Ask the user to check units consistency and to give unique spatio-temporal units.
 
     Parameters
     ----------
