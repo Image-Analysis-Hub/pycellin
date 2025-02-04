@@ -133,10 +133,12 @@ def _unit_to_dimension(
                 print(
                     f"WARNING: {name} is a feature listed as coming from TrackMate"
                     f" but it is not a known feature of TrackMate. Dimension is set"
-                    f" to UNKNOWN."
+                    f" to NONE."
                 )
-                # TODO: Does TM crashes if the dimension is "UNKNOWN"?
-                dimension = "UNKNOWN"
+                # I'm using NONE here, which is already used in TM, for example
+                # with the FRAME or VISIBILITY features. I tried to use UNKNOWN
+                # but it's a dimension not recognized by TM and it crashes.
+                dimension = "NONE"
 
     elif provenance == "Pycellin":
         dimension = "TODO1"
