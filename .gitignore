@@ -6,3 +6,4 @@ __pycache__/
 
 *.gz
 sample_data/FakeTracks.tif
+sample_data/*.csv

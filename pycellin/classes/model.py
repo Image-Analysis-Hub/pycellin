@@ -60,26 +60,28 @@ class Model:
 
     def __str__(self) -> str:
         if self.metadata and self.data:
+            nb_lin = self.data.number_of_lineages()
             if "Name" in self.metadata and "Provenance" in self.metadata:
                 txt = (
                     f"Model named '{self.metadata['Name']}' "
-                    f"with {self.data.number_of_lineages()} lineages, "
+                    f"with {nb_lin} lineage{'s' if nb_lin > 1 else ''}, "
                     f"built from {self.metadata['Provenance']}."
                 )
             elif "Name" in self.metadata:
                 txt = (
                     f"Model named '{self.metadata['Name']}' "
-                    f"with {self.data.number_of_lineages()} lineages."
+                    f"with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
                 )
             elif "Provenance" in self.metadata:
                 txt = (
-                    f"Model with {self.data.number_of_lineages()} lineages, "
+                    f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}, "
                     f"built from {self.metadata['Provenance']}."
                 )
             else:
-                txt = f"Model with {self.data.number_of_lineages()} lineages."
+                txt = f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
         elif self.data:
-            txt = f"Model with {self.data.number_of_lineages()} lineages."
+            nb_lin = self.data.number_of_lineages()
+            txt = f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
         elif self.metadata:
             if "Name" in self.metadata and "Provenance" in self.metadata:
                 txt = (
@@ -710,9 +712,10 @@ class Model:
         tolerance: float = 0.5,
         method_width: str = "mean",
         width_ignore_tips: bool = False,
+        rename: str | None = None,
     ) -> None:
         feat = Feature(
-            "cell_width",
+            rename if rename else "cell_width",
             "Width of the cell",
             "CellLineage",
             "Pycellin",
@@ -735,9 +738,10 @@ class Model:
         tolerance: float = 0.5,
         method_width: str = "mean",
         width_ignore_tips: bool = False,
+        rename: str | None = None,
     ) -> None:
         feat = Feature(
-            "cell_length",
+            rename if rename else "cell_length",
             "Length of the cell",
             "CellLineage",
             "Pycellin",
@@ -754,7 +758,11 @@ class Model:
             width_ignore_tips=width_ignore_tips,
         )
 
-    def add_absolute_age(self, in_time_unit: bool = False) -> None:
+    def add_absolute_age(
+        self,
+        in_time_unit: bool = False,
+        rename: str | None = None,
+    ) -> None:
         """
         Add the cell absolute age feature to the model.
 
@@ -768,9 +776,11 @@ class Model:
         in_time_unit : bool, optional
             True to give the absolute age in the time unit of the model,
             False to give it in frames (default is False).
+        rename : str, optional
+            New name for the feature (default is None).
         """
         feat = Feature(
-            "absolute_age",
+            rename if rename else "absolute_age",
             "Age of the cell since the beginning of the lineage",
             "CellLineage",
             "Pycellin",
@@ -780,7 +790,11 @@ class Model:
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(feat, tracking.AbsoluteAge, time_step)
 
-    def add_relative_age(self, in_time_unit: bool = False) -> None:
+    def add_relative_age(
+        self,
+        in_time_unit: bool = False,
+        rename: str | None = None,
+    ) -> None:
         """
         Add the cell relative age feature to the model.
 
@@ -795,9 +809,11 @@ class Model:
         in_time_unit : bool, optional
             True to give the relative age in the time unit of the model,
             False to give it in frames (default is False).
+        rename : str, optional
+            New name for the feature (default is None).
         """
         feat = Feature(
-            "relative_age",
+            rename if rename else "relative_age",
             "Age of the cell since the beginning of the current cell cycle",
             "CellLineage",
             "Pycellin",
@@ -807,7 +823,10 @@ class Model:
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(feat, tracking.RelativeAge, time_step)
 
-    def add_cell_cycle_completeness(self) -> None:
+    def add_cell_cycle_completeness(
+        self,
+        rename: str | None = None,
+    ) -> None:
         """
         Add the cell cycle completeness feature to the model.
 
@@ -817,9 +836,14 @@ class Model:
         This can be useful when analyzing features like division time. It avoids
         the introduction of a bias since we have no information on what happened
         before the root or after the leaves.
+
+        Parameters
+        ----------
+        rename : str, optional
+            New name for the feature (default is None).
         """
         feat = Feature(
-            "cell_cycle_completeness",
+            rename if rename else "cell_cycle_completeness",
             "Completeness of the cell cycle",
             "CycleLineage",
             "Pycellin",
@@ -831,7 +855,11 @@ class Model:
             tracking.CellCycleCompleteness,
         )
 
-    def add_division_time(self, in_time_unit: bool = False) -> None:
+    def add_division_time(
+        self,
+        in_time_unit: bool = False,
+        rename: str | None = None,
+    ) -> None:
         """
         Add the division time feature to the model.
 
@@ -845,9 +873,11 @@ class Model:
         in_time_unit : bool, optional
             True to give the division time in the time unit of the model,
             False to give it in frames (default is False).
+        rename : str, optional
+            New name for the feature (default is None).
         """
         feat = Feature(
-            "division_time",
+            rename if rename else "division_time",
             "Time elapsed between the birth of a cell and its division",
             "CycleLineage",
             "Pycellin",
@@ -857,7 +887,11 @@ class Model:
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(feat, tracking.DivisionTime, time_step)
 
-    def add_division_rate(self, in_time_unit: bool = False) -> None:
+    def add_division_rate(
+        self,
+        in_time_unit: bool = False,
+        rename: str | None = None,
+    ) -> None:
         """
         Add the division rate feature to the model.
 
@@ -871,9 +905,11 @@ class Model:
         in_time_unit : bool, optional
             True to give the division rate in the time unit of the model,
             False to give it in frames (default is False).
+        rename : str, optional
+            New name for the feature (default is None).
         """
         feat = Feature(
-            "division_rate",
+            rename if rename else "division_rate",
             "Number of divisions per time unit",
             "CycleLineage",
             "Pycellin",

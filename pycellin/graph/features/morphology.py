@@ -133,7 +133,8 @@ def get_width_and_length(
         The higher the tolerance, the more simplified the line will be.
         By default 0.5.
     method_width : str, optional
-        Method to compute width along skeleton: min, max, mean or median. By default mean.
+        Method to compute width along skeleton: min, max, mean or median.
+        By default mean.
     width_ignore_tips : bool, optional
         True to ignore the skeleton tips while computing width, by default False.
     debug : bool, optional
