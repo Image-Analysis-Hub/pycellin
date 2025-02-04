@@ -424,9 +424,10 @@ def _prepare_model_for_export(
     )
     model.feat_declaration._remove_features(["FilteredTrack", "name"], ["lineage"] * 2)
     model.feat_declaration._rename_feature("frame", "FRAME", "node")
-    model.feat_declaration._remove_features(
-        ["cell_ID", "name", "ROI_coords"], ["node"] * 3
-    )
+    model.feat_declaration._remove_features(["cell_ID", "name"], ["node"] * 2)
+    if "ROI_coords" in model.feat_declaration.node_feats:
+        model.feat_declaration._remove_feature("ROI_coords", "node")
+
     # Location related features.
     # TrackMate is expecting one feature per dimension instead of a triplet.
     model.feat_declaration._remove_features(
@@ -591,6 +592,8 @@ if __name__ == "__main__":
 
     xml_in = "sample_data/FakeTracks.xml"
     xml_out = "sample_data/FakeTracks_exported_TM.xml"
+    xml_in = "/mnt/data/Code/pycellin_paper/pycellin_paper/data/LS/230328GreffeGakaYFPMyogTdtmdxFDBTryplen1-movie01-01-Scene-15-TR37-A01.xml"
+    xml_out = "sample_data/to_delete.xml"
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # print(model.feat_declaration.node_feats)
