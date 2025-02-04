@@ -289,13 +289,14 @@ def _create_Spot(
         for k, v in lineage.nodes[node].items()
         if k not in exluded_keys
     }
-    n_attr["ROI_N_POINTS"] = str(len(lineage.nodes[node]["ROI_coords"]))
-
-    # Building Spot text: coordinates of ROI points.
-    coords = [item for pt in lineage.nodes[node]["ROI_coords"] for item in pt]
+    if "ROI_coords" in lineage.nodes[node]:
+        n_attr["ROI_N_POINTS"] = str(len(lineage.nodes[node]["ROI_coords"]))
+        # The text of a Spot is the coordinates of its ROI points, in a flattened list.
+        coords = [item for pt in lineage.nodes[node]["ROI_coords"] for item in pt]
 
     el_node = ET.Element("Spot", n_attr)
-    el_node.text = " ".join(map(str, coords))
+    if "ROI_coords" in lineage.nodes[node]:
+        el_node.text = " ".join(map(str, coords))
     return el_node
 
 
@@ -596,7 +597,9 @@ if __name__ == "__main__":
     xml_out = "sample_data/to_delete.xml"
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
-    # print(model.feat_declaration.node_feats)
+    lin0 = model.data.cell_data[0]
+    # print(lin0.edges[(8247, 8243)])
+    # print(model.feat_declaration.edge_feats["location"])
     # model.metadata.pop("GUIState")
     export_TrackMate_XML(
         model, xml_out, {"spatialunits": "pixel", "temporalunits": "sec"}
