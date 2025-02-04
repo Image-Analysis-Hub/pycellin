@@ -19,8 +19,9 @@ from pycellin.classes import CellLineage
 
 # TODO: maybe TRACK_ID / lineage_ID should not be added as a node feature,
 # and a fonction get_lineage_ID() should be implemented instead?
-
-# TODO: check for fusions once the model is built and deal with the fusions
+# Another issue is that we currently have 2 features called lineage_ID,
+# one on nodes and one on lineages. However only the one in the lineage
+# is in the features declaration.
 
 
 def _get_units(
@@ -631,7 +632,7 @@ def _add_tracks_info(
 
 
 def _split_graph_into_lineages(
-    graph: CellLineage,
+    graph: nx.DiGraph,
     tracks_attributes: list[dict[str, Any]],
 ) -> list[CellLineage]:
     """
@@ -639,7 +640,7 @@ def _split_graph_into_lineages(
 
     Parameters
     ----------
-    lineage : CellLineage
+    lineage : nx.DiGraph
         The graph to split.
     tracks_attributes : list[dict[str, Any]]
         A list of dictionaries, where each dictionary contains TrackMate
@@ -667,6 +668,39 @@ def _split_graph_into_lineages(
         raise
 
     return lineages
+
+
+def _check_for_fusions(
+    lineages: list[CellLineage],
+) -> None:
+    """
+    Check if there are fusions in the lineages and notify the user.
+
+    Parameters
+    ----------
+    lineages : list[CellLineage]
+        The lineages to check for fusions.
+    """
+    fusion_dict = {}
+    for lin in lineages:
+        fusions = lin.check_for_fusions()
+        if len(fusions) > 0:
+            fusion_dict[lin.graph["lineage_ID"]] = lin.check_for_fusions()
+    if fusion_dict:
+        cell_txt = f"{'s' if len(fusion_dict) > 1 else ''}"
+        fusion_txt = "\n".join(
+            f"  Lineage {lin_id} => cell IDs: {fusions}"
+            for lin_id, fusions in fusion_dict.items()
+        )
+        print(
+            f"WARNING: Cell fusion{cell_txt} detected!! "
+            f"Since Pycellin does not support fusions, it is advised to "
+            f"deal with them before any other processing. Be especially "
+            f"careful with tracking related features. Crashes and incorrect "
+            f"results can occur.\n"
+            f"Fusion{cell_txt} location:\n"
+            f"{fusion_txt}"
+        )
 
 
 def _update_features_declaration(
@@ -976,6 +1010,9 @@ def _parse_model_tag(
         else:
             lin.graph["FilteredTrack"] = False
 
+    # Pycellin DOES NOT support fusion events.
+    _check_for_fusions(lineages)
+
     return units, fd, Data({lin.graph["lineage_ID"]: lin for lin in lineages})
 
 
@@ -1197,7 +1234,8 @@ if __name__ == "__main__":
 
     # import math
 
-    xml = "sample_data/FakeTracks.xml"
+    xml = "E:/Pasteur/Code/pycellin/pycellin/sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
+    # xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
     # xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
     # xml = "E:/Pasteur/LS_data/LStoLX/230328GreffeGakaYFPMyogTdtmdxFDBTryplen1-movie01-01-Scene-15-TR37-A01.xml"
