@@ -759,7 +759,7 @@ def _update_features_declaration(
         )  # Replaced by the following `location` feature, a triplet of floats.
         feat_location = Feature(
             "location",
-            "Location of the lineage (i.e. mean location its nodes)",
+            "Location of the lineage (i.e. mean location of its nodes)",
             "CellLineage",
             "TrackMate",
             "float",
