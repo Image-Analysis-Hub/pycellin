@@ -40,16 +40,12 @@ def _unit_to_dimension(
     """
     unit = feat.unit
     name = feat.name
-    desc = feat.description
+    # desc = feat.description
     provenance = feat.provenance
 
     # TrackMate features
     # Mapping between TrackMate features and their dimensions.
-    # FIXME: deal with the possibility of several channels (unknown number).
-    # Otherwise we get:
-    # WARNING: MEAN_INTENSITY_CH2 is a feature listed as coming from TrackMate
-    # but it is not a known feature of TrackMate. Dimension is set to UNKNOWN.
-    trackmate_dict = {
+    trackmate_feats = {
         # Spot features
         "QUALITY": "QUALITY",
         "POSITION_X": "POSITION",
@@ -60,14 +56,6 @@ def _unit_to_dimension(
         "RADIUS": "LENGTH",
         "VISIBILITY": "NONE",
         "MANUAL_SPOT_COLOR": "NONE",
-        "MEAN_INTENSITY_CH1": "INTENSITY",
-        "MEDIAN_INTENSITY_CH1": "INTENSITY",
-        "MIN_INTENSITY_CH1": "INTENSITY",
-        "MAX_INTENSITY_CH1": "INTENSITY",
-        "TOTAL_INTENSITY_CH1": "INTENSITY",
-        "STD_INTENSITY_CH1": "INTENSITY",
-        "CONTRAST_CH1": "NONE",
-        "SNR_CH1": "NONE",
         "ELLIPSE_X0": "LENGTH",
         "ELLIPSE_Y0": "LENGTH",
         "ELLIPSE_MAJOR": "LENGTH",
@@ -120,17 +108,37 @@ def _unit_to_dimension(
         "LINEARITY_OF_FORWARD_PROGRESSION": "NONE",
         "MEAN_DIRECTIONAL_CHANGE_RATE": "ANGLE_RATE",
     }
+    # Channel dependent features.
+    channel_feats = {
+        "MEAN_INTENSITY_CH": "INTENSITY",
+        "MEDIAN_INTENSITY_CH": "INTENSITY",
+        "MIN_INTENSITY_CH": "INTENSITY",
+        "MAX_INTENSITY_CH": "INTENSITY",
+        "TOTAL_INTENSITY_CH": "INTENSITY",
+        "STD_INTENSITY_CH": "INTENSITY",
+        "CONTRAST_CH": "NONE",
+        "SNR_CH": "NONE",
+    }
+
     if provenance == "TrackMate":
-        if name in trackmate_dict:
-            dimension = trackmate_dict[name]
+        if name in trackmate_feats:
+            dimension = trackmate_feats[name]
         else:
-            print(
-                f"WARNING: {name} is a feature listed as coming from TrackMate"
-                f" but it is not a known feature of TrackMate. Dimension is set"
-                f" to UNKNOWN."
-            )
-            # TODO: Does TM crashes if the dimension is "UNKNOWN"?
-            dimension = "UNKNOWN"
+            dimension = None
+            for key, dim in channel_feats.items():
+                if name.startswith(key):
+                    dimension = dim
+                    break
+            if dimension is None:
+                print(
+                    f"WARNING: {name} is a feature listed as coming from TrackMate"
+                    f" but it is not a known feature of TrackMate. Dimension is set"
+                    f" to NONE."
+                )
+                # I'm using NONE here, which is already used in TM, for example
+                # with the FRAME or VISIBILITY features. I tried to use UNKNOWN
+                # but it's a dimension not recognized by TM and it crashes.
+                dimension = "NONE"
 
     elif provenance == "Pycellin":
         dimension = "TODO1"
@@ -289,13 +297,14 @@ def _create_Spot(
         for k, v in lineage.nodes[node].items()
         if k not in exluded_keys
     }
-    n_attr["ROI_N_POINTS"] = str(len(lineage.nodes[node]["ROI_coords"]))
-
-    # Building Spot text: coordinates of ROI points.
-    coords = [item for pt in lineage.nodes[node]["ROI_coords"] for item in pt]
+    if "ROI_coords" in lineage.nodes[node]:
+        n_attr["ROI_N_POINTS"] = str(len(lineage.nodes[node]["ROI_coords"]))
+        # The text of a Spot is the coordinates of its ROI points, in a flattened list.
+        coords = [item for pt in lineage.nodes[node]["ROI_coords"] for item in pt]
 
     el_node = ET.Element("Spot", n_attr)
-    el_node.text = " ".join(map(str, coords))
+    if "ROI_coords" in lineage.nodes[node]:
+        el_node.text = " ".join(map(str, coords))
     return el_node
 
 
@@ -424,11 +433,10 @@ def _prepare_model_for_export(
     )
     model.feat_declaration._remove_features(["FilteredTrack", "name"], ["lineage"] * 2)
     model.feat_declaration._rename_feature("frame", "FRAME", "node")
-    model.feat_declaration._rename_feature("area", "AREA", "node")
-    model.feat_declaration._modify_feature_description("AREA", "Area", "node")
-    model.feat_declaration._remove_features(
-        ["cell_ID", "name", "ROI_coords"], ["node"] * 3
-    )
+    model.feat_declaration._remove_features(["cell_ID", "name"], ["node"] * 2)
+    if "ROI_coords" in model.feat_declaration.node_feats:
+        model.feat_declaration._remove_feature("ROI_coords", "node")
+
     # Location related features.
     # TrackMate is expecting one feature per dimension instead of a triplet.
     model.feat_declaration._remove_features(
@@ -514,7 +522,7 @@ def _ask_units(
     feat_declaration: FeaturesDeclaration,
 ) -> dict[str, str]:
     """
-    Ask the user to check units consistency and to give a unique spatial and a unique temporal units.
+    Ask the user to check units consistency and to give unique spatio-temporal units.
 
     Parameters
     ----------
@@ -595,8 +603,7 @@ if __name__ == "__main__":
     xml_out = "sample_data/FakeTracks_exported_TM.xml"
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
-    # print(model.feat_declaration.node_feats)
-    # model.metadata.pop("GUIState")
+    lin0 = model.data.cell_data[0]
     export_TrackMate_XML(
         model, xml_out, {"spatialunits": "pixel", "temporalunits": "sec"}
     )

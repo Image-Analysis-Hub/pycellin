@@ -752,14 +752,14 @@ def _update_features_declaration(
         "none",
     )
     feat_declaration._add_feature(feat_filtered_track, "lineage")
-    if "TRACK_X_LOCATION" in feat_declaration.edge_feats:
+    if "TRACK_X_LOCATION" in feat_declaration.lin_feats:
         feat_declaration._remove_features(
             ["TRACK_X_LOCATION", "TRACK_Y_LOCATION", "TRACK_Z_LOCATION"],
             ["lineage"] * 3,
         )  # Replaced by the following `location` feature, a triplet of floats.
         feat_location = Feature(
             "location",
-            "Location of the lineage (i.e. mean location its nodes)",
+            "Location of the lineage (i.e. mean location of its nodes)",
             "CellLineage",
             "TrackMate",
             "float",
