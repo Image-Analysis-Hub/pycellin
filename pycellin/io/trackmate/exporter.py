@@ -45,11 +45,7 @@ def _unit_to_dimension(
 
     # TrackMate features
     # Mapping between TrackMate features and their dimensions.
-    # FIXME: deal with the possibility of several channels (unknown number).
-    # Otherwise we get:
-    # WARNING: MEAN_INTENSITY_CH2 is a feature listed as coming from TrackMate
-    # but it is not a known feature of TrackMate. Dimension is set to UNKNOWN.
-    trackmate_dict = {
+    trackmate_feats = {
         # Spot features
         "QUALITY": "QUALITY",
         "POSITION_X": "POSITION",
@@ -60,14 +56,6 @@ def _unit_to_dimension(
         "RADIUS": "LENGTH",
         "VISIBILITY": "NONE",
         "MANUAL_SPOT_COLOR": "NONE",
-        "MEAN_INTENSITY_CH1": "INTENSITY",
-        "MEDIAN_INTENSITY_CH1": "INTENSITY",
-        "MIN_INTENSITY_CH1": "INTENSITY",
-        "MAX_INTENSITY_CH1": "INTENSITY",
-        "TOTAL_INTENSITY_CH1": "INTENSITY",
-        "STD_INTENSITY_CH1": "INTENSITY",
-        "CONTRAST_CH1": "NONE",
-        "SNR_CH1": "NONE",
         "ELLIPSE_X0": "LENGTH",
         "ELLIPSE_Y0": "LENGTH",
         "ELLIPSE_MAJOR": "LENGTH",
@@ -120,17 +108,35 @@ def _unit_to_dimension(
         "LINEARITY_OF_FORWARD_PROGRESSION": "NONE",
         "MEAN_DIRECTIONAL_CHANGE_RATE": "ANGLE_RATE",
     }
+    # Channel dependent features.
+    channel_feats = {
+        "MEAN_INTENSITY_CH": "INTENSITY",
+        "MEDIAN_INTENSITY_CH": "INTENSITY",
+        "MIN_INTENSITY_CH": "INTENSITY",
+        "MAX_INTENSITY_CH": "INTENSITY",
+        "TOTAL_INTENSITY_CH": "INTENSITY",
+        "STD_INTENSITY_CH": "INTENSITY",
+        "CONTRAST_CH": "NONE",
+        "SNR_CH": "NONE",
+    }
+
     if provenance == "TrackMate":
-        if name in trackmate_dict:
-            dimension = trackmate_dict[name]
+        if name in trackmate_feats:
+            dimension = trackmate_feats[name]
         else:
-            print(
-                f"WARNING: {name} is a feature listed as coming from TrackMate"
-                f" but it is not a known feature of TrackMate. Dimension is set"
-                f" to UNKNOWN."
-            )
-            # TODO: Does TM crashes if the dimension is "UNKNOWN"?
-            dimension = "UNKNOWN"
+            dimension = None
+            for key, dim in channel_feats.items():
+                if name.startswith(key):
+                    dimension = dim
+                    break
+            if dimension is None:
+                print(
+                    f"WARNING: {name} is a feature listed as coming from TrackMate"
+                    f" but it is not a known feature of TrackMate. Dimension is set"
+                    f" to UNKNOWN."
+                )
+                # TODO: Does TM crashes if the dimension is "UNKNOWN"?
+                dimension = "UNKNOWN"
 
     elif provenance == "Pycellin":
         dimension = "TODO1"
