@@ -593,8 +593,6 @@ if __name__ == "__main__":
 
     xml_in = "sample_data/FakeTracks.xml"
     xml_out = "sample_data/FakeTracks_exported_TM.xml"
-    xml_in = "/mnt/data/Code/pycellin_paper/pycellin_paper/data/LS/230328GreffeGakaYFPMyogTdtmdxFDBTryplen1-movie01-01-Scene-15-TR37-A01.xml"
-    xml_out = "sample_data/to_delete.xml"
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     lin0 = model.data.cell_data[0]
@@ -604,3 +602,45 @@ if __name__ == "__main__":
     export_TrackMate_XML(
         model, xml_out, {"spatialunits": "pixel", "temporalunits": "sec"}
     )
+
+    import pandas as pd
+
+    # Check that we get the same TM data after import/export.
+    all_exp = "sample_data/FakeTracks_exported_allspots.csv"
+    spot_exp = "sample_data/FakeTracks_exported_spots.csv"
+    edge_exp = "sample_data/FakeTracks_exported_edges.csv"
+    track_exp = "sample_data/FakeTracks_exported_tracks.csv"
+    all = "sample_data/FakeTracks_allspots.csv"
+    spot = "sample_data/FakeTracks_spots.csv"
+    edge = "sample_data/FakeTracks_edges.csv"
+    track = "sample_data/FakeTracks_tracks.csv"
+
+    df_all_exp = pd.read_csv(all_exp, header="infer", skiprows=[1, 2, 3])
+    df_all = pd.read_csv(all, skiprows=[1, 2, 3])
+    differences = df_all_exp.compare(df_all)
+    assert differences.empty, f"Differences found: {differences}"
+
+    df_spot_exp = pd.read_csv(spot_exp, skiprows=[1, 2, 3])
+    df_spot_exp = df_spot_exp.sort_values(by=["ID"], ignore_index=True)
+    df_spot = pd.read_csv(spot, skiprows=[1, 2, 3])
+    df_spot = df_spot.sort_values(by=["ID"], ignore_index=True)
+    differences = df_spot_exp.compare(df_spot)
+    assert differences.empty, f"Differences found: {differences}"
+
+    df_edge_exp = pd.read_csv(edge_exp, skiprows=[1, 2, 3])
+    df_edge_exp = df_edge_exp.sort_values(by=["LABEL"], ignore_index=True)
+    df_edge = pd.read_csv(edge, skiprows=[1, 2, 3])
+    df_edge = df_edge.sort_values(by=["LABEL"], ignore_index=True)
+    # Put the columns in the same order as in the other dataframe
+    df_edge_exp = df_edge_exp[df_edge.columns]
+    differences = df_edge_exp.compare(df_edge)
+    assert differences.empty, f"Differences found: {differences}"
+
+    df_track_exp = pd.read_csv(track_exp, skiprows=[1, 2, 3])
+    df_track_exp = df_track_exp.sort_values(by=["TRACK_ID"], ignore_index=True)
+    df_track = pd.read_csv(track, skiprows=[1, 2, 3])
+    df_track = df_track.sort_values(by=["TRACK_ID"], ignore_index=True)
+    # Put the columns in the same order as in the other dataframe
+    df_track_exp = df_track_exp[df_track.columns]
+    differences = df_track_exp.compare(df_track)
+    assert differences.empty, f"Differences found: {differences}"
