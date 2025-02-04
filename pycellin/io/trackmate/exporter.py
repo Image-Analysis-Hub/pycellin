@@ -424,8 +424,6 @@ def _prepare_model_for_export(
     )
     model.feat_declaration._remove_features(["FilteredTrack", "name"], ["lineage"] * 2)
     model.feat_declaration._rename_feature("frame", "FRAME", "node")
-    model.feat_declaration._rename_feature("area", "AREA", "node")
-    model.feat_declaration._modify_feature_description("AREA", "Area", "node")
     model.feat_declaration._remove_features(
         ["cell_ID", "name", "ROI_coords"], ["node"] * 3
     )
