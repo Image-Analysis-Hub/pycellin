@@ -165,6 +165,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_color_scale: str | None = None,
         node_hover_features: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
+        edge_hover_features: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
@@ -206,6 +207,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
+        edge_hover_features : list[str], optional
+            The hover template for the edges. If None, defaults to
+            displaying the source and target nodes.
         plot_bgcolor : str, optional
             The background color of the plot. If None, defaults to current
             Plotly template.
@@ -314,6 +318,25 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 graph_name = ""
             return node_hover_text, graph_name
 
+        def edge_hover_template():
+            if edge_hover_features:
+                edge_hover_text = []
+                for edge in G.es:
+                    text = ""
+                    for feat in edge_hover_features:
+                        if feat not in edge.attributes():
+                            raise KeyError(
+                                f"Feature {feat} is not present in the edge attributes."
+                            )
+                        hover_text = f"{feat}: {edge[feat]}<br>"
+                        text += hover_text
+                    edge_hover_text.append(text)
+            else:
+                edge_hover_text = [
+                    f"Source: {edge.source}<br>Target: {edge.target}" for edge in G.es
+                ]
+            return edge_hover_text
+
         # Conversion of the networkx lineage graph to igraph.
         G = Graph.from_networkx(self)
         nodes_count = G.vcount()
@@ -348,6 +371,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 y=y_edges,
                 mode="lines",
                 line=edge_line_style,
+                text=edge_hover_template(),
                 name="Edges",
             )
         )
@@ -941,6 +965,7 @@ class CellLineage(Lineage):
         node_color_scale: str | None = None,
         node_hover_features: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
+        edge_hover_features: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
@@ -974,6 +999,9 @@ class CellLineage(Lineage):
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
+        edge_hover_features : list[str], optional
+            The hover template for the edges. If None, defaults to
+            displaying the source and target nodes.
         plot_bgcolor : str, optional
             The background color of the plot. If None, defaults to current
             Plotly template.
@@ -1011,6 +1039,7 @@ class CellLineage(Lineage):
             node_color_scale=node_color_scale,
             node_hover_features=node_hover_features,
             edge_line_style=edge_line_style,
+            edge_hover_features=edge_hover_features,
             plot_bgcolor=plot_bgcolor,
             show_horizontal_grid=show_horizontal_grid,
             showlegend=showlegend,
@@ -1087,6 +1116,7 @@ class CycleLineage(Lineage):
         node_color_scale: str | None = None,
         node_hover_features: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
+        edge_hover_features: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
@@ -1120,6 +1150,9 @@ class CycleLineage(Lineage):
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
+        edge_hover_features : list[str], optional
+            The hover template for the edges. If None, defaults to
+            displaying the source and target nodes.
         plot_bgcolor : str, optional
             The background color of the plot. If None, defaults to current
             Plotly template.
@@ -1156,6 +1189,7 @@ class CycleLineage(Lineage):
             node_color_scale=node_color_scale,
             node_hover_features=node_hover_features,
             edge_line_style=edge_line_style,
+            edge_hover_features=edge_hover_features,
             plot_bgcolor=plot_bgcolor,
             show_horizontal_grid=show_horizontal_grid,
             showlegend=showlegend,
