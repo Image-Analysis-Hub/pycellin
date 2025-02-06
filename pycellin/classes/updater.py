@@ -140,7 +140,7 @@ class ModelUpdater:
             calc.enrich(
                 data,
                 nodes_to_enrich=self._added_cells,
-                links_to_enrich=self._added_links,
+                edges_to_enrich=self._added_links,
                 lineages_to_enrich=self._added_lineages | self._modified_lineages,
             )
 
