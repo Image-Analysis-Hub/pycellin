@@ -218,6 +218,12 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         showlegend : bool, optional
             True to display the legend, False otherwise. True by default.
 
+        Warnings
+        --------
+        In case of cell divisions, the hover text of the edges between the parent
+        and child cells will be displayed only for one child cell.
+        This cannot easily be corrected.
+
         Examples
         --------
         For styling the graph:
@@ -319,10 +325,12 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             return node_hover_text, graph_name
 
         def edge_hover_template():
-            if edge_hover_features:
-                edge_hover_text = []
-                for edge in G.es:
-                    text = ""
+            edge_hover_text = []
+            for edge in G.es:
+                source_id = index_to_nx_id[edge.source]
+                target_id = index_to_nx_id[edge.target]
+                text = f"Source cell_ID: {source_id}<br>Target cell_ID: {target_id}<br>"
+                if edge_hover_features:
                     for feat in edge_hover_features:
                         if feat not in edge.attributes():
                             raise KeyError(
@@ -330,15 +338,13 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                             )
                         hover_text = f"{feat}: {edge[feat]}<br>"
                         text += hover_text
-                    edge_hover_text.append(text)
-            else:
-                edge_hover_text = [
-                    f"Source: {edge.source}<br>Target: {edge.target}" for edge in G.es
-                ]
+                    edge_hover_text += [text, text, text]
             return edge_hover_text
 
         # Conversion of the networkx lineage graph to igraph.
         G = Graph.from_networkx(self)
+        # Create a mapping from networkx node names to igraph vertex indices
+        index_to_nx_id = {idx: nx_id for idx, nx_id in enumerate(G.vs["_nx_name"])}
         nodes_count = G.vcount()
         layout = G.layout("rt")  # Basic tree layout.
         # Updating the layout so the y position of the nodes is given
@@ -371,6 +377,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 y=y_edges,
                 mode="lines",
                 line=edge_line_style,
+                # hovertemplate="%{text}",
                 text=edge_hover_template(),
                 name="Edges",
             )
@@ -394,7 +401,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             annotations=node_annotations,
             showlegend=showlegend,
             plot_bgcolor=plot_bgcolor,
-            hovermode="closest",
+            hovermode="closest",  # Not ideal but the other modes are far worse.
         )
         fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
         fig.update_yaxes(
@@ -1010,6 +1017,12 @@ class CellLineage(Lineage):
         showlegend : bool, optional
             True to display the legend, False otherwise. True by default.
 
+        Warnings
+        --------
+        In case of cell divisions, the hover text of the edges between the parent
+        and child cells will be displayed only for one child cell.
+        This cannot easily be corrected.
+
         Examples
         --------
         For styling the graph:
@@ -1160,6 +1173,12 @@ class CycleLineage(Lineage):
             True to display the horizontal grid, False otherwise. True by default.
         showlegend : bool, optional
             True to display the legend, False otherwise. True by default.
+
+        Warnings
+        --------
+        In case of cell divisions, the hover text of the edges between the parent
+        and child cells will be displayed only for one child cell.
+        This cannot easily be corrected.
 
         Examples
         --------
