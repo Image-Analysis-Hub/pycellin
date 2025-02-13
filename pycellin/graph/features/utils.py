@@ -22,9 +22,10 @@ def get_pycellin_cell_lineage_features() -> dict[str, str]:
     """
     cell_lineage_feats = {
         "absolute_age": "Age of the cell since the beginning of the lineage",
-        "relative_age": (
-            "Age of the cell since the beginning of the current cell cycle"
-        ),
+        "angle": "Angle of the cell trajectory between two consecutive detections",
+        "displacement": "Displacement of the cell between two consecutive detections",
+        "relative_age": "Age of the cell since the beginning of the current cell cycle",
+        "speed": "Speed of the cell between two consecutive detections",
     }
     return cell_lineage_feats
 
@@ -41,11 +42,11 @@ def get_pycellin_cycle_lineage_features() -> dict[str, str]:
     """
     cycle_lineage_feats = {
         "cell_cycle_completeness": (
-            "Completeness of the cell cycle, "
-            "i.e. does it start and end with a division"
+            "Completeness of the cell cycle, i.e. does it start and end with a division"
         ),
-        "division_time": ("Time elapsed between the birth of a cell and its division"),
+        "division_time": "Time elapsed between the birth of a cell and its division",
         "division_rate": "Number of divisions per time unit",
+        "straightness": "Straightness of the cell trajectory",
     }
     return cycle_lineage_feats
 

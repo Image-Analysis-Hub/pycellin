@@ -8,6 +8,7 @@ from pycellin.classes import CellLineage, Data, Feature, FeaturesDeclaration
 from pycellin.classes.feature_calculator import FeatureCalculator
 from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features.tracking as tracking
+import pycellin.graph.features.motion as motion
 import pycellin.graph.features.morphology as morpho
 import pycellin.graph.features.utils as futils
 from pycellin.custom_types import Cell, Link, FeatureType
@@ -919,6 +920,126 @@ class Model:
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(feat, tracking.DivisionRate, time_step)
 
+    def add_angle(
+        self,
+        unit: Literal["radian", "degree"] = "radian",
+        rename: str | None = None,
+    ) -> None:
+        """
+        Add the angle feature to the model.
+
+        The angle is defined as the angle between the vectors representing
+        the displacement of the cell at two consecutive detections.
+
+        Parameters
+        ----------
+        unit : Literal["radian", "degree"], optional
+            Unit of the angle (default is "radian").
+        rename : str, optional
+            New name for the feature (default is None).
+        """
+        feat = Feature(
+            rename if rename else "angle",
+            "Angle of the cell trajectory between two consecutive detections",
+            "CellLineage",
+            "Pycellin",
+            "float",
+            unit,
+        )
+        self.add_custom_feature(feat, motion.Angle, unit)
+
+    def add_cell_displacement(
+        self,
+        rename: str | None = None,
+    ) -> None:
+        """
+        Add the displacement feature to the model.
+
+        The displacement is defined as the Euclidean distance between the positions
+        of the cell at two consecutive detections.
+
+        Parameters
+        ----------
+        rename : str, optional
+            New name for the feature (default is None).
+        """
+        feat = Feature(
+            rename if rename else "cell_displacement",
+            "Displacement of the cell between two consecutive detections",
+            "CellLineage",
+            "Pycellin",
+            "float",
+            self.metadata["space_unit"],
+        )
+        self.add_custom_feature(feat, motion.CellDisplacement)
+
+    def add_cell_speed(
+        self,
+        in_time_unit: bool = False,
+        rename: str | None = None,
+    ) -> None:
+        """
+        Add the speed feature to the model.
+
+        The speed is defined as the displacement of the cell between two consecutive
+        detections divided by the time elapsed between these two detections.
+        It is given in the spatial unit of the model per time unit by default,
+        but can be converted to the spatial unit of the model per frame if specified.
+
+        Parameters
+        ----------
+        in_time_unit : bool, optional
+            True to give the speed in the time unit of the model,
+            False to give it in frames (default is False).
+        rename : str, optional
+            New name for the feature (default is None).
+        """
+        feat = Feature(
+            rename if rename else "cell_speed",
+            "Speed of the cell between two consecutive detections",
+            "CellLineage",
+            "Pycellin",
+            "float",
+            (
+                f"{self.metadata['space_unit']}/{self.metadata['time_unit']}"
+                if in_time_unit
+                else f"{self.metadata['space_unit']}/frame"
+            ),
+        )
+        time_step = self.metadata["time_step"] if in_time_unit else 1
+        self.add_custom_feature(feat, motion.CellSpeed, time_step)
+
+    def add_straightness(
+        self,
+        include_incoming_edge: bool = False,
+        rename: str | None = None,
+    ) -> None:
+        """
+        Add the straightness feature to the model.
+
+        The straightness is defined as the ratio between the Euclidean distance
+        between the first and last positions of the cell and the total length
+        of the cell trajectory.
+        Straightness is a value between 0 and 1. A straight line has a straightness
+        of 1, while a trajectory with many turns has a straightness close to 0.
+
+        Parameters
+        ----------
+        include_incoming_edge : bool, optional
+            Whether to include the distance between the first cell and its predecessor.
+            Default is False.
+        rename : str, optional
+            New name for the feature (default is None).
+        """
+        feat = Feature(
+            rename if rename else "straightness",
+            "Straightness of the cell displacement",
+            "CycleLineage",
+            "Pycellin",
+            "float",
+        )
+        self.add_custom_feature(feat, motion.Straightness, include_incoming_edge)
+
     def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:
         """
         Add a single predefined Pycellin feature to the model.
@@ -947,6 +1068,7 @@ class Model:
                 "but the cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with `model.add_cycle_data()`."
             )
+        # TODO: externalize this
         feat_dict = {
             "absolute_age": self.add_absolute_age,
             "relative_age": self.add_relative_age,
@@ -955,6 +1077,10 @@ class Model:
             "cell_cycle_completeness": self.add_cell_cycle_completeness,
             "division_time": self.add_division_time,
             "division_rate": self.add_division_rate,
+            "angle": self.add_angle,
+            "cell_displacement": self.add_cell_displacement,
+            "cell_speed": self.add_cell_speed,
+            "straightness": self.add_straightness,
         }
         try:
             feat_dict[feature_name](**kwargs)
