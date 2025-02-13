@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from itertools import pairwise
 import types
-from typing import Any, Literal
+from typing import Any, Generator, Iterator, Literal, Tuple
 
 from igraph import Graph
 import networkx as nx
@@ -1118,6 +1119,41 @@ class CycleLineage(Lineage):
             self.graph["cycle_lineage_ID"] = cell_lineage.graph["lineage_ID"]
 
     # Methods to freeze / unfreeze?
+
+    def get_edges_within_cycle(self, noi: int) -> list[tuple[int, int]]:
+        """
+        Return the edges within a cell cycle.
+
+        Parameters
+        ----------
+        noi : int
+            The node ID of the cell cycle.
+
+        Returns
+        -------
+        list[tuple(int, int)]
+            A list of edges within the cell cycle.
+        """
+        return list(pairwise(self.nodes[noi]["cells"]))
+
+    def yield_edges_within_cycle(
+        self, noi: int
+    ) -> Generator[Tuple[int, int], None, None]:
+        """
+        Yield the edges within a cell cycle.
+
+        Parameters
+        ----------
+        noi : int
+            The node ID of the cell cycle.
+
+        Yields
+        ------
+        tuple(int, int)
+            The edges within the cell cycle.
+        """
+        for edge in pairwise(self.nodes[noi]["cells"]):
+            yield edge
 
     def plot(
         self,
