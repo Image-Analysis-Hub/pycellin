@@ -1068,28 +1068,7 @@ class Model:
                 "but the cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with `model.add_cycle_data()`."
             )
-        # TODO: externalize this
-        feat_dict = {
-            "absolute_age": self.add_absolute_age,
-            "relative_age": self.add_relative_age,
-            "cell_width": self.add_cell_width,
-            "cell_length": self.add_cell_length,
-            "cell_cycle_completeness": self.add_cell_cycle_completeness,
-            "division_time": self.add_division_time,
-            "division_rate": self.add_division_rate,
-            "angle": self.add_angle,
-            "cell_displacement": self.add_cell_displacement,
-            "cell_speed": self.add_cell_speed,
-            "straightness": self.add_straightness,
-        }
-        try:
-            feat_dict[feature_name](**kwargs)
-        except KeyError:
-            available_features = ", ".join(feat_dict.keys())
-            raise KeyError(
-                f"Feature {feature_name} is not a predefined feature of Pycellin. "
-                f"Available Pycellin features are: {available_features}."
-            )
+        _get_feature_method(feature_name)(**kwargs)
 
     def add_pycellin_features(self, features_info: list[str | dict[str, Any]]) -> None:
         """
@@ -1289,3 +1268,56 @@ class Model:
         """
         # TODO: implement export model
         pass
+
+
+# Make it more generic with:
+
+# def _get_feature_method(self, feature_name):
+#     method_name = f"add_{feature_name}"
+#     method = getattr(self, method_name, None)
+#     if method:
+#         return method()
+#     else:
+#         raise AttributeError(f"Method {method_name} not found in Model class")
+
+
+def _get_feature_method(feature_name: str) -> callable:
+    """
+    Return the method to compute the feature from its name.
+
+    Parameters
+    ----------
+    feature_name : str
+        Name of the feature.
+
+    Returns
+    -------
+    callable
+        Method to compute the feature
+
+    Raises
+    ------
+    KeyError
+        If the feature is not a predefined feature of Pycellin.
+    """
+    feat_dict = {
+        "absolute_age": Model.add_absolute_age,
+        "relative_age": Model.add_relative_age,
+        "cell_width": Model.add_cell_width,
+        "cell_length": Model.add_cell_length,
+        "cell_cycle_completeness": Model.add_cell_cycle_completeness,
+        "division_time": Model.add_division_time,
+        "division_rate": Model.add_division_rate,
+        "angle": Model.add_angle,
+        "cell_displacement": Model.add_cell_displacement,
+        "cell_speed": Model.add_cell_speed,
+        "straightness": Model.add_straightness,
+    }
+    try:
+        return feat_dict[feature_name]
+    except KeyError:
+        available_features = ", ".join(feat_dict.keys())
+        raise KeyError(
+            f"Feature {feature_name} is not a predefined feature of Pycellin. "
+            f"Available Pycellin features are: {available_features}."
+        )
