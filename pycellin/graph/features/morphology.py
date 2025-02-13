@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-A collection of diverse tracking features/attributes that can be added to 
+A collection of diverse morphology features that can be added to 
 lineage graphs.
 """
 
