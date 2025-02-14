@@ -1040,6 +1040,32 @@ class Model:
         )
         self.add_custom_feature(feat, motion.Straightness, include_incoming_edge)
 
+    def _get_feature_method(self, feature_name):
+        """
+        Return the method to compute the feature from its name.
+
+        Parameters
+        ----------
+        feature_name : str
+            Name of the feature.
+
+        Returns
+        -------
+        callable
+            Method to compute the feature.
+
+        Raises
+        ------
+        AttributeError
+            If the method to compute the feature is not found in the Model class.
+        """
+        method_name = f"add_{feature_name}"
+        method = getattr(self, method_name, None)
+        if method:
+            return method
+        else:
+            raise AttributeError(f"Method {method_name} not found in Model class.")
+
     def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:
         """
         Add a single predefined Pycellin feature to the model.
@@ -1058,17 +1084,23 @@ class Model:
         ------
         KeyError
             If the feature is not a predefined feature of Pycellin.
+        ValueError
+            If the feature is a feature of cycle lineages and the cycle lineages
+            have not been computed yet.
         """
-        if (
-            feature_name in futils.get_pycellin_cycle_lineage_features()
-            and not self.data.cycle_data
-        ):
+        cell_lin_feats = list(futils.get_pycellin_cell_lineage_features().keys())
+        cycle_lin_feats = list(futils.get_pycellin_cycle_lineage_features().keys())
+        if feature_name not in cell_lin_feats + cycle_lin_feats:
+            raise KeyError(
+                f"Feature {feature_name} is not a predefined feature of Pycellin."
+            )
+        elif feature_name in cycle_lin_feats and not self.data.cycle_data:
             raise ValueError(
                 f"Feature {feature_name} is a feature of cycle lineages, "
                 "but the cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with `model.add_cycle_data()`."
             )
-        _get_feature_method(feature_name)(**kwargs)
+        self._get_feature_method(feature_name)(**kwargs)
 
     def add_pycellin_features(self, features_info: list[str | dict[str, Any]]) -> None:
         """
@@ -1268,56 +1300,3 @@ class Model:
         """
         # TODO: implement export model
         pass
-
-
-# Make it more generic with:
-
-# def _get_feature_method(self, feature_name):
-#     method_name = f"add_{feature_name}"
-#     method = getattr(self, method_name, None)
-#     if method:
-#         return method()
-#     else:
-#         raise AttributeError(f"Method {method_name} not found in Model class")
-
-
-def _get_feature_method(feature_name: str) -> callable:
-    """
-    Return the method to compute the feature from its name.
-
-    Parameters
-    ----------
-    feature_name : str
-        Name of the feature.
-
-    Returns
-    -------
-    callable
-        Method to compute the feature
-
-    Raises
-    ------
-    KeyError
-        If the feature is not a predefined feature of Pycellin.
-    """
-    feat_dict = {
-        "absolute_age": Model.add_absolute_age,
-        "relative_age": Model.add_relative_age,
-        "cell_width": Model.add_cell_width,
-        "cell_length": Model.add_cell_length,
-        "cell_cycle_completeness": Model.add_cell_cycle_completeness,
-        "division_time": Model.add_division_time,
-        "division_rate": Model.add_division_rate,
-        "angle": Model.add_angle,
-        "cell_displacement": Model.add_cell_displacement,
-        "cell_speed": Model.add_cell_speed,
-        "straightness": Model.add_straightness,
-    }
-    try:
-        return feat_dict[feature_name]
-    except KeyError:
-        available_features = ", ".join(feat_dict.keys())
-        raise KeyError(
-            f"Feature {feature_name} is not a predefined feature of Pycellin. "
-            f"Available Pycellin features are: {available_features}."
-        )
