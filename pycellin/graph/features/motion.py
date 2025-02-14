@@ -47,7 +47,7 @@ class CellDisplacement(EdgeLocalFeatureCalculator):
         return math.dist(pos1, pos2)
 
 
-class BranchDisplacement(NodeGlobalFeatureCalculator):
+class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
 
     def __init__(self, feature: Feature, include_incoming_edge: bool = False):
         super().__init__(feature)
@@ -69,7 +69,7 @@ class BranchDisplacement(NodeGlobalFeatureCalculator):
                 disps.append(cell_lin.edges[edge]["cell_displacement"])
             elif len(predecessors) > 1:
                 raise FusionError(first_cell, lin_ID)
-        return np.mean(disps)
+        return sum(disps)
 
 
 class CellSpeed(EdgeLocalFeatureCalculator):
