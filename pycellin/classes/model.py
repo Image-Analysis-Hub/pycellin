@@ -973,6 +973,31 @@ class Model:
         )
         self.add_custom_feature(feat, motion.CellDisplacement)
 
+    def add_branch_displacement(
+        self,
+        rename: str | None = None,
+    ) -> None:
+        """
+        Add the branch displacement feature to the model.
+
+        The branch displacement is defined as the mean cell displacement during
+        the cell cycle.
+
+        Parameters
+        ----------
+        rename : str, optional
+            New name for the feature (default is None).
+        """
+        feat = Feature(
+            rename if rename else "branch_displacement",
+            "Mean displacement of the cell during the cell cycle",
+            "CycleLineage",
+            "Pycellin",
+            "float",
+            self.metadata["space_unit"],
+        )
+        self.add_custom_feature(feat, motion.BranchDisplacement)
+
     def add_cell_speed(
         self,
         in_time_unit: bool = False,
@@ -1008,6 +1033,37 @@ class Model:
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(feat, motion.CellSpeed, time_step)
+
+    def add_branch_speed(
+        self,
+        include_incoming_edge: bool = False,
+        rename: str | None = None,
+    ) -> None:
+        """
+        Add the branch displacement feature to the model.
+
+        The branch displacement is defined as the mean cell displacement during
+        the cell cycle.
+
+        Parameters
+        ----------
+        include_incoming_edge : bool, optional
+            Whether to include the distance between the first cell and its predecessor.
+            Default is False.
+        rename : str, optional
+            New name for the feature (default is None).
+        """
+        feat = Feature(
+            rename if rename else "branch_speed",
+            "Mean speed of the cell during the cell cycle",
+            "CycleLineage",
+            "Pycellin",
+            "float",
+            f"{self.metadata['space_unit']} / {self.metadata['time_unit']}",
+        )
+        self.add_custom_feature(
+            feat, motion.BranchSpeed, include_incoming_edge=include_incoming_edge
+        )
 
     def add_straightness(
         self,
@@ -1058,6 +1114,11 @@ class Model:
         ------
         AttributeError
             If the method to compute the feature is not found in the Model class.
+
+        Notes
+        -----
+        The method name must follow the pattern "add_{feature_name}", otherwise
+        it won't be recognized.
         """
         method_name = f"add_{feature_name}"
         method = getattr(self, method_name, None)

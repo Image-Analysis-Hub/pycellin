@@ -47,6 +47,31 @@ class CellDisplacement(EdgeLocalFeatureCalculator):
         return math.dist(pos1, pos2)
 
 
+class BranchDisplacement(NodeGlobalFeatureCalculator):
+
+    def __init__(self, feature: Feature, include_incoming_edge: bool = False):
+        super().__init__(feature)
+        self.include_incoming_edge = include_incoming_edge
+
+    def compute(self, data: Data, lineage: CycleLineage, noi: int) -> float:
+        lin_ID = lineage.graph["cycle_lineage_ID"]
+        cell_lin = data.cell_data[lin_ID]
+        disps = [
+            cell_lin.edges[edge]["cell_displacement"]
+            for edge in lineage.yield_edges_within_cycle(noi)
+        ]
+
+        if self.include_incoming_edge:
+            first_cell = lineage.nodes[noi]["cells"][0]
+            predecessors = list(cell_lin.predecessors(first_cell))
+            if len(predecessors) == 1:
+                edge = (predecessors[0], first_cell)
+                disps.append(cell_lin.edges[edge]["cell_displacement"])
+            elif len(predecessors) > 1:
+                raise FusionError(first_cell, lin_ID)
+        return np.mean(disps)
+
+
 class CellSpeed(EdgeLocalFeatureCalculator):
     """
     Calculator to compute the speed of a cell between two consecutive detections.
@@ -76,6 +101,30 @@ class CellSpeed(EdgeLocalFeatureCalculator):
             pos1 = lineage.nodes[edge[0]]["location"]
             pos2 = lineage.nodes[edge[1]]["location"]
             return math.dist(pos1, pos2) / (time2 - time1)
+
+
+class BranchSpeed(NodeGlobalFeatureCalculator):
+
+    def __init__(self, feature: Feature, include_incoming_edge: bool = False):
+        super().__init__(feature)
+        self.include_incoming_edge = include_incoming_edge
+
+    def compute(self, data: Data, lineage: CycleLineage, noi: int) -> float:
+        lin_ID = lineage.graph["cycle_lineage_ID"]
+        cell_lin = data.cell_data[lin_ID]
+        speeds = [
+            cell_lin.edges[edge]["cell_speed"]
+            for edge in lineage.yield_edges_within_cycle(noi)
+        ]
+        if self.include_incoming_edge:
+            first_cell = lineage.nodes[noi]["cells"][0]
+            predecessors = list(cell_lin.predecessors(first_cell))
+            if len(predecessors) == 1:
+                edge = (predecessors[0], first_cell)
+                speeds.append(cell_lin.edges[edge]["cell_speed"])
+            elif len(predecessors) > 1:
+                raise FusionError(first_cell, lin_ID)
+        return np.mean(speeds)
 
 
 class Straightness(NodeGlobalFeatureCalculator):
