@@ -39,7 +39,7 @@ def _get_branch_edge_feature_values(
     noi : int
         Node ID (cycle_ID) of the cell of interest.
     include_incoming_edge : bool
-        Whether to include the incoming edge of the first cell of the cycle.
+        Whether to include the incoming edge of the first cell of the cell cycle.
 
     Returns
     -------
@@ -105,12 +105,44 @@ class CellDisplacement(EdgeLocalFeatureCalculator):
 
 
 class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
+    """
+    Calculator to compute the total displacement of a cell during a cell cycle.
+
+    The branch total displacement is defined as the displacement of the cell during
+    the cell cycle.
+    """
 
     def __init__(self, feature: Feature, include_incoming_edge: bool = False):
+        """
+        Parameters
+        ----------
+        feature : Feature
+            Feature object to which the calculator is associated.
+        include_incoming_edge : bool, optional
+            Whether to include the incoming edge of the first cell of the cell cycle.
+            Default is False.
+        """
         super().__init__(feature)
         self.include_incoming_edge = include_incoming_edge
 
     def compute(self, data: Data, lineage: CycleLineage, noi: int) -> float:
+        """
+        Compute the total displacement of a cell during the cell cycle.
+
+        Parameters
+        ----------
+        data : Data
+            Data object containing the lineage.
+        lineage : CycleLineage
+            Lineage graph containing the node of interest.
+        noi : int
+            Node ID (cycle_ID) of the cell cycle of interest.
+
+        Returns
+        -------
+        float
+            Total displacement of the cell during the cell cycle.
+        """
         disps = _get_branch_edge_feature_values(
             "cell_displacement", data, lineage, noi, self.include_incoming_edge
         )
@@ -118,12 +150,44 @@ class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
 
 
 class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
+    """
+    Calculator to compute the mean displacement of a cell during a cell cycle.
+
+    The branch mean displacement is defined as the mean displacement of the cell during
+    the cell cycle.
+    """
 
     def __init__(self, feature: Feature, include_incoming_edge: bool = False):
+        """
+        Parameters
+        ----------
+        feature : Feature
+            Feature object to which the calculator is associated.
+        include_incoming_edge : bool, optional
+            Whether to include the incoming edge of the first cell of the cell cycle.
+            Default is False.
+        """
         super().__init__(feature)
         self.include_incoming_edge = include_incoming_edge
 
     def compute(self, data: Data, lineage: CycleLineage, noi: int) -> float:
+        """
+        Compute the mean displacement of a cell during the cell cycle.
+
+        Parameters
+        ----------
+        data : Data
+            Data object containing the lineage.
+        lineage : CycleLineage
+            Lineage graph containing the node of interest.
+        noi : int
+            Node ID (cycle_ID) of the cell cycle of interest.
+
+        Returns
+        -------
+        float
+            Mean displacement of the cell during the cell cycle.
+        """
         disps = _get_branch_edge_feature_values(
             "cell_displacement", data, lineage, noi, self.include_incoming_edge
         )
@@ -151,6 +215,21 @@ class CellSpeed(EdgeLocalFeatureCalculator):
         self.time_step = time_step
 
     def compute(self, lineage: CellLineage, edge: tuple[int, int]) -> float:
+        """
+        Compute the speed of a cell between two consecutive detections.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage graph containing the node of interest.
+        edge : tuple of int
+            A tuple of cell_ID that defines the edge of interest.
+
+        Returns
+        -------
+        float
+            Cell speed between two consecutive detections.
+        """
         time1 = lineage.nodes[edge[0]]["frame"] * self.time_step
         time2 = lineage.nodes[edge[1]]["frame"] * self.time_step
         if "cell_displacement" in lineage.edges[edge]:
@@ -162,12 +241,44 @@ class CellSpeed(EdgeLocalFeatureCalculator):
 
 
 class BranchMeanSpeed(NodeGlobalFeatureCalculator):
+    """
+    Calculator to compute the mean speed of a cell during a cell cycle.
+
+    The branch mean speed is defined as the mean speed of the cell
+    during the cell cycle.
+    """
 
     def __init__(self, feature: Feature, include_incoming_edge: bool = False):
+        """
+        Parameters
+        ----------
+        feature : Feature
+            Feature object to which the calculator is associated.
+        include_incoming_edge : bool, optional
+            Whether to include the incoming edge of the first cell of the cell cycle.
+            Default is False.
+        """
         super().__init__(feature)
         self.include_incoming_edge = include_incoming_edge
 
     def compute(self, data: Data, lineage: CycleLineage, noi: int) -> float:
+        """
+        Compute the mean speed of a cell during the cell cycle.
+
+        Parameters
+        ----------
+        data : Data
+            Data object containing the lineage.
+        lineage : CycleLineage
+            Lineage graph containing the node of interest.
+        noi : int
+            Node ID (cycle_ID) of the cell cycle of interest.
+
+        Returns
+        -------
+        float
+            Mean speed of the cell during the cell cycle.
+        """
         speeds = _get_branch_edge_feature_values(
             "cell_speed", data, lineage, noi, self.include_incoming_edge
         )
@@ -208,7 +319,7 @@ class Straightness(NodeGlobalFeatureCalculator):
         lineage : CycleLineage
             Lineage graph containing the node of interest.
         node : int
-            Node ID (cycle_ID) of the cell of interest.
+            Node ID (cycle_ID) of the cell cycle of interest.
 
         Returns
         -------
@@ -276,7 +387,6 @@ class Angle(NodeGlobalFeatureCalculator):
         float
             Angle between the two consecutive displacements.
         """
-
         # Find the incoming and outgoing edges of the node of interest.
         predecessors = list(lineage.predecessors(noi))
         successors = list(lineage.successors(noi))
