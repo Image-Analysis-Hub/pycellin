@@ -980,7 +980,7 @@ class Model:
         """
         Add the branch displacement feature to the model.
 
-        The branch total displacement is defined as the displacementof the cell during
+        The branch total displacement is defined as the displacement of the cell during
         the cell cycle.
 
         Parameters
