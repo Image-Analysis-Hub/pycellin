@@ -1034,16 +1034,16 @@ class Model:
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(feat, motion.CellSpeed, time_step)
 
-    def add_branch_speed(
+    def add_branch_mean_speed(
         self,
         include_incoming_edge: bool = False,
         rename: str | None = None,
     ) -> None:
         """
-        Add the branch displacement feature to the model.
+        Add the branch mean speed feature to the model.
 
-        The branch displacement is defined as the mean cell displacement during
-        the cell cycle.
+        The branch mean speed is defined as the mean speed of the cell
+        during the cell cycle.
 
         Parameters
         ----------
@@ -1054,7 +1054,7 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            rename if rename else "branch_speed",
+            rename if rename else "branch_mean_speed",
             "Mean speed of the cell during the cell cycle",
             "CycleLineage",
             "Pycellin",
@@ -1062,7 +1062,7 @@ class Model:
             f"{self.metadata['space_unit']} / {self.metadata['time_unit']}",
         )
         self.add_custom_feature(
-            feat, motion.BranchSpeed, include_incoming_edge=include_incoming_edge
+            feat, motion.BranchMeanSpeed, include_incoming_edge=include_incoming_edge
         )
 
     def add_straightness(

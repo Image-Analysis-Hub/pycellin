@@ -103,7 +103,7 @@ class CellSpeed(EdgeLocalFeatureCalculator):
             return math.dist(pos1, pos2) / (time2 - time1)
 
 
-class BranchSpeed(NodeGlobalFeatureCalculator):
+class BranchMeanSpeed(NodeGlobalFeatureCalculator):
 
     def __init__(self, feature: Feature, include_incoming_edge: bool = False):
         super().__init__(feature)
