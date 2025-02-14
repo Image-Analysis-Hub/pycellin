@@ -44,6 +44,9 @@ def get_pycellin_cycle_lineage_features() -> dict[str, str]:
     """
     cycle_lineage_feats = {
         "branch_total_displacement": "Displacement of the cell during the cell cycle",
+        "branch_mean_displacement": (
+            "Mean displacement of the cell during the cell cycle"
+        ),
         "branch_mean_speed": "Mean speed of the cell during the cell cycle",
         "cell_cycle_completeness": (
             "Completeness of the cell cycle, i.e. does it start and end with a division"

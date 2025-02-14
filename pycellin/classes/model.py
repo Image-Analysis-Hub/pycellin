@@ -998,6 +998,31 @@ class Model:
         )
         self.add_custom_feature(feat, motion.BranchTotalDisplacement)
 
+    def add_branch_mean_displacement(
+        self,
+        rename: str | None = None,
+    ) -> None:
+        """
+        Add the branch mean displacement feature to the model.
+
+        The branch mean displacement is defined as the mean displacement of the cell
+        during the cell cycle.
+
+        Parameters
+        ----------
+        rename : str, optional
+            New name for the feature (default is None).
+        """
+        feat = Feature(
+            rename if rename else "branch_mean_displacement",
+            "Mean displacement of the cell during the cell cycle",
+            "CycleLineage",
+            "Pycellin",
+            "float",
+            self.metadata["space_unit"],
+        )
+        self.add_custom_feature(feat, motion.BranchMeanDisplacement)
+
     def add_cell_speed(
         self,
         in_time_unit: bool = False,
