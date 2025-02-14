@@ -8,7 +8,7 @@ A collection of features related to cell mobility/motility.
 from itertools import pairwise
 import math
 import numpy as np
-from typing import Literal
+from typing import Any, Literal
 
 from pycellin.classes import Data, CellLineage, CycleLineage, Feature
 from pycellin.classes.exceptions import FusionError
@@ -16,6 +16,63 @@ from pycellin.classes.feature_calculator import (
     EdgeLocalFeatureCalculator,
     NodeGlobalFeatureCalculator,
 )
+
+
+def _get_branch_edge_feature_values(
+    feat_name: str,
+    data: Data,
+    lineage: CycleLineage,
+    noi: int,
+    include_incoming_edge: bool,
+) -> list[Any]:
+    """
+    Get the values of a given feature for all edges within a cell cycle.
+
+    Parameters
+    ----------
+    feat_name : str
+        Name of the feature to retrieve.
+    data : Data
+        Data object containing the lineage.
+    lineage : CycleLineage
+        Lineage graph containing the node of interest.
+    noi : int
+        Node ID (cycle_ID) of the cell of interest.
+    include_incoming_edge : bool
+        Whether to include the incoming edge of the first cell of the cycle.
+
+    Returns
+    -------
+    list of Any
+        List of values of the feature for all edges within the cell cycle.
+
+    Raises
+    ------
+    KeyError
+        If the feature does not exist in the cell lineage.
+    """
+    lin_ID = lineage.graph["cycle_lineage_ID"]
+    cell_lin = data.cell_data[lin_ID]
+    try:
+        values = [
+            cell_lin.edges[edge][feat_name]
+            for edge in lineage.yield_edges_within_cycle(noi)
+        ]
+    except KeyError:
+        raise KeyError(
+            f"Feature '{feat_name}' does not exist in the cell lineage '{lin_ID}'."
+        )
+
+    if include_incoming_edge:
+        first_cell = lineage.nodes[noi]["cells"][0]
+        predecessors = list(cell_lin.predecessors(first_cell))
+        if len(predecessors) == 1:
+            edge = (predecessors[0], first_cell)
+            values.append(cell_lin.edges[edge][feat_name])
+        elif len(predecessors) > 1:
+            raise FusionError(first_cell, lin_ID)
+
+    return values
 
 
 class CellDisplacement(EdgeLocalFeatureCalculator):
@@ -54,22 +111,10 @@ class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
         self.include_incoming_edge = include_incoming_edge
 
     def compute(self, data: Data, lineage: CycleLineage, noi: int) -> float:
-        lin_ID = lineage.graph["cycle_lineage_ID"]
-        cell_lin = data.cell_data[lin_ID]
-        disps = [
-            cell_lin.edges[edge]["cell_displacement"]
-            for edge in lineage.yield_edges_within_cycle(noi)
-        ]
-
-        if self.include_incoming_edge:
-            first_cell = lineage.nodes[noi]["cells"][0]
-            predecessors = list(cell_lin.predecessors(first_cell))
-            if len(predecessors) == 1:
-                edge = (predecessors[0], first_cell)
-                disps.append(cell_lin.edges[edge]["cell_displacement"])
-            elif len(predecessors) > 1:
-                raise FusionError(first_cell, lin_ID)
-        return sum(disps)
+        disps = _get_branch_edge_feature_values(
+            "cell_displacement", data, lineage, noi, self.include_incoming_edge
+        )
+        return np.nansum(disps)
 
 
 class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
@@ -79,22 +124,10 @@ class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
         self.include_incoming_edge = include_incoming_edge
 
     def compute(self, data: Data, lineage: CycleLineage, noi: int) -> float:
-        lin_ID = lineage.graph["cycle_lineage_ID"]
-        cell_lin = data.cell_data[lin_ID]
-        disps = [
-            cell_lin.edges[edge]["cell_displacement"]
-            for edge in lineage.yield_edges_within_cycle(noi)
-        ]
-
-        if self.include_incoming_edge:
-            first_cell = lineage.nodes[noi]["cells"][0]
-            predecessors = list(cell_lin.predecessors(first_cell))
-            if len(predecessors) == 1:
-                edge = (predecessors[0], first_cell)
-                disps.append(cell_lin.edges[edge]["cell_displacement"])
-            elif len(predecessors) > 1:
-                raise FusionError(first_cell, lin_ID)
-        return np.mean(disps)
+        disps = _get_branch_edge_feature_values(
+            "cell_displacement", data, lineage, noi, self.include_incoming_edge
+        )
+        return np.nanmean(disps)
 
 
 class CellSpeed(EdgeLocalFeatureCalculator):
@@ -135,21 +168,10 @@ class BranchMeanSpeed(NodeGlobalFeatureCalculator):
         self.include_incoming_edge = include_incoming_edge
 
     def compute(self, data: Data, lineage: CycleLineage, noi: int) -> float:
-        lin_ID = lineage.graph["cycle_lineage_ID"]
-        cell_lin = data.cell_data[lin_ID]
-        speeds = [
-            cell_lin.edges[edge]["cell_speed"]
-            for edge in lineage.yield_edges_within_cycle(noi)
-        ]
-        if self.include_incoming_edge:
-            first_cell = lineage.nodes[noi]["cells"][0]
-            predecessors = list(cell_lin.predecessors(first_cell))
-            if len(predecessors) == 1:
-                edge = (predecessors[0], first_cell)
-                speeds.append(cell_lin.edges[edge]["cell_speed"])
-            elif len(predecessors) > 1:
-                raise FusionError(first_cell, lin_ID)
-        return np.mean(speeds)
+        speeds = _get_branch_edge_feature_values(
+            "cell_speed", data, lineage, noi, self.include_incoming_edge
+        )
+        return np.nanmean(speeds)
 
 
 class Straightness(NodeGlobalFeatureCalculator):
