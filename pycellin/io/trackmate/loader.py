@@ -54,7 +54,7 @@ def _get_units(
 def _get_features_dict(
     iterator: ET.iterparse,
     ancestor: ET._Element,
-) -> dict[str, str]:
+) -> list[dict[str, str]]:
     """
     Get all the features of ancestor and return them as a list.
 
@@ -69,8 +69,8 @@ def _get_features_dict(
 
     Returns
     -------
-    list
-        List of features contained in the ancestor element.
+    list[dict[str, str]]
+        A list of dictionaries, each representing a feature.
     """
     features = []
     event, element = next(iterator)  # Feature.
@@ -233,10 +233,10 @@ def _add_all_features(
 
 def _convert_attributes(
     attributes: dict[str, str],
-    features: dict[str, CellLineage],
+    features: dict[str, Feature],
 ) -> None:
     """
-    Convert the values of `attributes` from string to int or float.
+    Convert the values of `attributes` from string to the correct data type.
 
     The type to convert to is given by the features declaration that stores all
     the features info.
@@ -245,7 +245,7 @@ def _convert_attributes(
     ----------
     attributes : dict[str, str]
         The dictionary whose values we want to convert.
-    features : dict[str, CellLineage]
+    features : dict[str, Feature]
         The dictionary of features that contains the information on how to convert
         the values of `attributes`.
 
@@ -268,7 +268,7 @@ def _convert_attributes(
                 case "string":
                     pass  # Nothing to do.
                 case _:
-                    raise ValueError(f"Invalid data type: {features[key]['data_type']}")
+                    raise ValueError(f"Invalid data type: {features[key].data_type}")
         elif key == "ID":
             attributes[key] = int(attributes[key])  # IDs are always integers.
         elif key == "name":
@@ -1234,10 +1234,10 @@ if __name__ == "__main__":
 
     # import math
 
-    xml = "E:/Pasteur/Code/pycellin/pycellin/sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
+    # xml = "E:/Pasteur/Code/pycellin/pycellin/sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
     # xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
-    # xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
     # xml = "E:/Pasteur/LS_data/LStoLX/230328GreffeGakaYFPMyogTdtmdxFDBTryplen1-movie01-01-Scene-15-TR37-A01.xml"
 
     # trackmate_version = _get_trackmate_version(xml)

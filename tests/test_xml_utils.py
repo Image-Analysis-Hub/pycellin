@@ -12,7 +12,8 @@ import networkx as nx
 import networkx.algorithms.isomorphism as iso
 import pytest
 
-import pycellin.tmio.xml_utils as xu
+from pycellin.classes.feature import Feature
+import pycellin.io.trackmate.loader as tml
 
 
 def is_equal(obt, exp):
@@ -82,7 +83,7 @@ def test_add_graph_attrib_from_element():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")))
     _, element = next(it)
     obtained = nx.DiGraph()
-    xu.add_graph_attrib_from_element(obtained, element)
+    tml.add_graph_attrib_from_element(obtained, element)
     model = {"attrib1": "text", "attrib2": "10"}
     expected = nx.DiGraph(Model=model)
     assert is_equal(obtained, expected)
@@ -93,7 +94,7 @@ def test_add_graph_attrib_from_element_no_graph_attributes():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")))
     _, element = next(it)
     obtained = nx.DiGraph()
-    xu.add_graph_attrib_from_element(obtained, element)
+    tml.add_graph_attrib_from_element(obtained, element)
     expected = nx.DiGraph(Model={})
     assert is_equal(obtained, expected)
 
@@ -110,11 +111,11 @@ def test_get_features_dict():
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    features = xu.get_features_dict(it, element)
-    spot_features = {
-        "QUALITY": {"feature": "QUALITY", "isint": "false"},
-        "FRAME": {"feature": "FRAME", "isint": "true"},
-    }
+    features = tml._get_features_dict(it, element)
+    spot_features = [
+        {"feature": "QUALITY", "isint": "false"},
+        {"feature": "FRAME", "isint": "true"},
+    ]
     assert features == spot_features
 
 
@@ -122,8 +123,8 @@ def test_get_features_dict_no_feature_tag():
     xml_data = "<SpotFeatures>" "</SpotFeatures>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    features = xu.get_features_dict(it, element)
-    assert features == {}
+    features = tml._get_features_dict(it, element)
+    assert features == []
 
 
 def test_get_features_dict_other_tag():
@@ -135,8 +136,8 @@ def test_get_features_dict_other_tag():
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    features = xu.get_features_dict(it, element)
-    spot_features = {"QUALITY": {"feature": "QUALITY", "isint": "false"}}
+    features = tml._get_features_dict(it, element)
+    spot_features = [{"feature": "QUALITY", "isint": "false"}]
     assert features == spot_features
 
 
@@ -164,7 +165,7 @@ def test_add_all_features():
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={})
-    xu.add_all_features(obtained, it, element)
+    tml._add_all_features(obtained, it, element)
 
     spot_features = {
         "QUALITY": {"feature": "QUALITY", "isint": "false"},
@@ -195,7 +196,7 @@ def test_add_all_features_empty():
     _, element = next(it)
 
     obtained = nx.DiGraph()
-    xu.add_all_features(obtained, it, element)
+    tml.add_all_features(obtained, it, element)
 
     assert is_equal(obtained, nx.DiGraph())
 
@@ -219,7 +220,7 @@ def test_add_all_features_tag_with_no_feature_tag():
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={})
-    xu.add_all_features(obtained, it, element)
+    tml.add_all_features(obtained, it, element)
 
     spot_features = {
         "QUALITY": {"feature": "QUALITY", "isint": "false"},
@@ -261,7 +262,7 @@ def test_add_all_features_no_feature_attribute():
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={})
-    xu.add_all_features(obtained, it, element)
+    tml.add_all_features(obtained, it, element)
 
     spot_features = {
         "QUALITY": {"feature": "QUALITY", "isint": "false"},
@@ -288,45 +289,57 @@ def test_add_all_features_no_feature_attribute():
 
 def test_convert_attributes():
     features = {
-        "float": {"isint": "false"},
-        "int": {"isint": "true"},
-        "neg": {"isint": "false"},
-        "str": {"isint": "false"},
+        "feat_float": Feature("", "", "CellLineage", "", data_type="float"),
+        "feat_int": Feature("", "", "CellLineage", "", data_type="int"),
+        "feat_neg": Feature("", "", "CellLineage", "", data_type="int"),
+        "feat_string": Feature("", "", "CellLineage", "", data_type="string"),
     }
 
-    obtained_attr = {"float": "30", "int": "20", "neg": "-10", "str": "meep"}
-    xu.convert_attributes(obtained_attr, features)
+    obtained_attr = {
+        "feat_float": "30",
+        "feat_int": "20",
+        "feat_neg": "-10",
+        "feat_string": "nope",
+    }
+    tml._convert_attributes(obtained_attr, features)
 
-    expected_attr = {"float": 30.0, "int": 20, "neg": -10.0, "str": "meep"}
+    expected_attr = {
+        "feat_float": 30.0,
+        "feat_int": 20,
+        "feat_neg": -10.0,
+        "feat_string": "nope",
+    }
 
     assert obtained_attr == expected_attr
 
 
-def test_convert_attributes_mixed_case():
-    features = {"float": {"isint": "FaLsE"}, "int": {"isint": "tRuE"}}
+def test_convert_attributes_ID_name():
+    features = {}
 
-    obtained_attr = {"float": "30", "int": "20"}
-    xu.convert_attributes(obtained_attr, features)
+    obtained_attr = {"ID": "42", "name": "ID42", "ROI_N_POINTS": "something here"}
+    tml._convert_attributes(obtained_attr, features)
 
-    expected_attr = {"float": 30.0, "int": 20}
+    expected_attr = {"ID": 42, "name": "ID42", "ROI_N_POINTS": "something here"}
 
     assert obtained_attr == expected_attr
 
 
 def test_convert_attributes_KeyError():
-    features = {"float": {"not_isint": "false"}, "int": {"not_isint": "true"}}
-    attributes = {"float": "30", "int": "20"}
+    features = {
+        "feat_float": Feature("", "", "CellLineage", "", data_type="float"),
+    }
+    attributes = {"feat_float": "30", "feat_int": "20"}
 
     with pytest.raises(KeyError):
-        xu.convert_attributes(attributes, features)
+        tml._convert_attributes(attributes, features)
 
 
 def test_convert_attributes_ValueError():
-    features = {"float": {"isint": "not false"}, "int": {"isint": "true"}}
-    attributes = {"float": "30", "int": "20"}
+    features = {"feat_int": Feature("", "", "CellLineage", "", data_type="integer")}
+    attributes = {"feat_int": "20"}
 
     with pytest.raises(ValueError):
-        xu.convert_attributes(attributes, features)
+        tml._convert_attributes(attributes, features)
 
 
 ### add_ROI_coordinates ###
@@ -337,7 +350,7 @@ def test_add_ROI_coordinates_2D():
     el_obtained.attrib["ROI_N_POINTS"] = "3"
     el_obtained.text = "1 2.0 -3 -4.0 5.5 6"
     att_obtained = deepcopy(el_obtained.attrib)
-    xu.add_ROI_coordinates(el_obtained, att_obtained)
+    tml.add_ROI_coordinates(el_obtained, att_obtained)
 
     att_expected = {"ROI_N_POINTS": [(1.0, 2.0), (-3.0, -4.0), (5.5, 6.0)]}
 
@@ -349,7 +362,7 @@ def test_add_ROI_coordinates_3D():
     el_obtained.attrib["ROI_N_POINTS"] = "2"
     el_obtained.text = "1 2.0 -3 -4.0 5.5 6"
     att_obtained = deepcopy(el_obtained.attrib)
-    xu.add_ROI_coordinates(el_obtained, att_obtained)
+    tml.add_ROI_coordinates(el_obtained, att_obtained)
 
     att_expected = {"ROI_N_POINTS": [(1.0, 2.0, -3.0), (-4.0, 5.5, 6.0)]}
 
@@ -360,7 +373,7 @@ def test_add_ROI_coordinates_no_ROI_att():
     el_obtained = ET.Element("Spot")
     el_obtained.text = "1 2.0 -3 -4.0 5.5 6"
     att_obtained = deepcopy(el_obtained.attrib)
-    xu.add_ROI_coordinates(el_obtained, att_obtained)
+    tml.add_ROI_coordinates(el_obtained, att_obtained)
 
     assert att_obtained == dict()
 
@@ -369,7 +382,7 @@ def test_add_ROI_coordinates_no_ROI_txt():
     el_obtained = ET.Element("Spot")
     el_obtained.attrib["ROI_N_POINTS"] = "2"
     att_obtained = deepcopy(el_obtained.attrib)
-    xu.add_ROI_coordinates(el_obtained, att_obtained)
+    tml.add_ROI_coordinates(el_obtained, att_obtained)
 
     att_expected = {"ROI_N_POINTS": None}
     assert att_obtained == att_expected
@@ -392,7 +405,7 @@ def test_add_all_nodes_several_attributes():
 
     spot_features = {"x": {"isint": "false"}, "y": {"isint": "true"}}
     obtained = nx.DiGraph(Model={"SpotFeatures": spot_features})
-    xu.add_all_nodes(obtained, it, element)
+    tml.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph(Model={"SpotFeatures": spot_features})
     expected.add_nodes_from(
@@ -418,7 +431,7 @@ def test_add_all_nodes_only_ID_attribute():
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={"SpotFeatures": {}})
-    xu.add_all_nodes(obtained, it, element)
+    tml.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph(Model={"SpotFeatures": {}})
     expected.add_nodes_from([(1001, {"ID": 1001}), (1000, {"ID": 1000})])
@@ -439,7 +452,7 @@ def test_add_all_nodes_no_node_attributes():
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={"SpotFeatures": {}})
-    xu.add_all_nodes(obtained, it, element)
+    tml.add_all_nodes(obtained, it, element)
 
     expected = nx.DiGraph(Model={"SpotFeatures": {}})
     expected.add_nodes_from([(1001, {"ID": 1001})])
@@ -453,7 +466,7 @@ def test_add_all_nodes_no_nodes():
     _, element = next(it)
 
     obtained = nx.DiGraph(Model={"SpotFeatures": {}})
-    xu.add_all_nodes(obtained, it, element)
+    tml.add_all_nodes(obtained, it, element)
 
     assert is_equal(obtained, nx.DiGraph(Model={"SpotFeatures": {}}))
 
@@ -474,7 +487,7 @@ def test_add_edge_from_element():
         "SPOT_TARGET_ID": {"isint": "true"},
     }
     obtained = nx.DiGraph(Model={"EdgeFeatures": edge_features})
-    xu.add_edge_from_element(obtained, element, track_id)
+    tml.add_edge_from_element(obtained, element, track_id)
 
     expected = nx.DiGraph(Model={"EdgeFeatures": edge_features})
     expected.add_edge(1, 2, x=20.0, y=25, SPOT_SOURCE_ID=1, SPOT_TARGET_ID=2)
@@ -496,7 +509,7 @@ def test_add_edge_from_element_no_node_ID():
         "SPOT_SOURCE_ID": {"isint": "true"},
     }
     obtained = nx.DiGraph(Model={"EdgeFeatures": edge_features})
-    xu.add_edge_from_element(obtained, element, track_id)
+    tml.add_edge_from_element(obtained, element, track_id)
 
     expected = nx.DiGraph(Model={"EdgeFeatures": edge_features})
 
@@ -514,7 +527,7 @@ def test_add_edge_from_element_no_edge_attributes():
         "SPOT_TARGET_ID": {"isint": "true"},
     }
     obtained = nx.DiGraph(Model={"EdgeFeatures": edge_features})
-    xu.add_edge_from_element(obtained, element, track_id)
+    tml.add_edge_from_element(obtained, element, track_id)
 
     expected = nx.DiGraph(Model={"EdgeFeatures": edge_features})
     expected.add_edge(1, 2, SPOT_SOURCE_ID=1, SPOT_TARGET_ID=2)
@@ -555,7 +568,7 @@ def test_add_all_edges_several_attributes():
     obtained = nx.DiGraph(
         Model={"EdgeFeatures": edge_features, "TrackFeatures": track_features}
     )
-    obtained_tracks_attrib = xu.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = tml.add_all_edges(obtained, it, element)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
 
     expected = nx.DiGraph(
@@ -603,7 +616,7 @@ def test_add_all_edges_no_nodes_ID():
     obtained = nx.DiGraph(
         Model={"EdgeFeatures": edge_features, "TrackFeatures": track_features}
     )
-    obtained_tracks_attrib = xu.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = tml.add_all_edges(obtained, it, element)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
 
     expected = nx.DiGraph(
@@ -631,7 +644,7 @@ def test_add_all_edges_no_edges():
     track_features = {"TRACK_ID": {"isint": "true"}}
 
     obtained = nx.DiGraph(Model={"TrackFeatures": track_features})
-    obtained_tracks_attrib = xu.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = tml.add_all_edges(obtained, it, element)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
 
     expected = nx.DiGraph(Model={"TrackFeatures": track_features})
@@ -670,7 +683,7 @@ def test_add_all_edges_no_track_id():
     }
 
     obtained = nx.DiGraph(Model={"EdgeFeatures": edge_features, "TrackFeatures": {}})
-    obtained_tracks_attrib = xu.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = tml.add_all_edges(obtained, it, element)
 
     expected = nx.DiGraph(Model={"EdgeFeatures": edge_features, "TrackFeatures": {}})
     expected.add_edge(11, 12, SPOT_SOURCE_ID=11, SPOT_TARGET_ID=12, x=10.0, y=20)
@@ -717,7 +730,7 @@ def test_add_all_edges_no_track_attributes():
     }
 
     obtained = nx.DiGraph(Model={"EdgeFeatures": edge_features, "TrackFeatures": {}})
-    obtained_tracks_attrib = xu.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = tml.add_all_edges(obtained, it, element)
 
     expected = nx.DiGraph(Model={"EdgeFeatures": edge_features, "TrackFeatures": {}})
     expected.add_edge(11, 12, SPOT_SOURCE_ID=11, SPOT_TARGET_ID=12, x=10.0, y=20)
@@ -748,7 +761,7 @@ def test_get_filtered_tracks_ID():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
-    obtained_ID = xu.get_filtered_tracks_ID(it, element)
+    obtained_ID = tml._get_filtered_tracks_ID(it, element)
     expected_ID = [0, 1]
     assert obtained_ID.sort() == expected_ID.sort()
 
@@ -757,7 +770,7 @@ def test_get_filtered_tracks_ID_no_ID():
     xml_data = "<data>" "   <TrackID />" "   <TrackID />" "</data>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    obtained_ID = xu.get_filtered_tracks_ID(it, element)
+    obtained_ID = tml._get_filtered_tracks_ID(it, element)
     assert not obtained_ID
 
 
@@ -765,11 +778,11 @@ def test_get_filtered_tracks_ID_no_tracks():
     xml_data = "<data>" "   <tag />" "   <tag />" "</data>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    obtained_ID = xu.get_filtered_tracks_ID(it, element)
+    obtained_ID = tml._get_filtered_tracks_ID(it, element)
     assert not obtained_ID
 
 
-### add_tracks_info ###
+### _add_tracks_info ###
 
 
 def test_add_tracks_info():
@@ -780,7 +793,7 @@ def test_add_tracks_info():
     g1_obt.add_node(1, TRACK_ID=0)
     g2_obt = nx.DiGraph()
     g2_obt.add_node(2, TRACK_ID=1)
-    xu.add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
+    tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
     g1_exp.graph["name"] = "blob"
@@ -804,7 +817,7 @@ def test_add_tracks_info_no_track_ID_on_all_nodes():
     g1_obt.add_node(3)
     g2_obt = nx.DiGraph()
     g2_obt.add_node(2, TRACK_ID=1)
-    xu.add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
+    tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
     g1_exp.add_node(1)
@@ -829,7 +842,7 @@ def test_add_tracks_info_no_track_ID_on_one_node():
 
     g2_obt = nx.DiGraph()
     g2_obt.add_node(2, TRACK_ID=1)
-    xu.add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
+    tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
     g1_exp.graph["name"] = "blob"
@@ -858,7 +871,7 @@ def test_add_tracks_info_different_ID_for_one_track():
     g2_obt = nx.DiGraph()
     g2_obt.add_node(2, TRACK_ID=1)
     with pytest.raises(ValueError):
-        xu.add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
+        tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
 
 
 def test_add_tracks_info_no_nodes():
@@ -868,7 +881,7 @@ def test_add_tracks_info_no_nodes():
     g1_obt = nx.DiGraph()
     g2_obt = nx.DiGraph()
     g2_obt.add_node(2, TRACK_ID=1)
-    xu.add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
+    tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
 
     g1_exp = nx.DiGraph()
     g2_exp = nx.DiGraph()
