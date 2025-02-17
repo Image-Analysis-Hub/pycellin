@@ -75,7 +75,7 @@ def is_equal(obt, exp):
         return False
 
 
-### add_graph_attrib_from_element ###
+# add_graph_attrib_from_element ###############################################
 
 
 def test_add_graph_attrib_from_element():
@@ -99,7 +99,7 @@ def test_add_graph_attrib_from_element_no_graph_attributes():
     assert is_equal(obtained, expected)
 
 
-# _get_features_dict #
+# _get_features_dict ##########################################################
 
 
 def test_get_features_dict():
@@ -141,7 +141,117 @@ def test_get_features_dict_other_tag():
     assert features == spot_features
 
 
-### add_all_features ###
+# _convert_and_add_feature ####################################################
+
+
+def test_convert_and_add_feature_spot_feature():
+    trackmate_feature = {
+        "feature": "AREA",
+        "name": "Area",
+        "isint": "false",
+        "dimension": "AREA",
+    }
+    feature_type = "SpotFeatures"
+    obtained_feat_decl = FeaturesDeclaration()
+    units = {"timeunits": "s", "spatialunits": "um"}
+    tml._convert_and_add_feature(
+        trackmate_feature, feature_type, obtained_feat_decl, units
+    )
+
+    expected_feat_decl = FeaturesDeclaration(
+        node_features={
+            "AREA": Feature(
+                "AREA",
+                "Area",
+                "CellLineage",
+                "TrackMate",
+                data_type="float",
+                unit="um^2",
+            )
+        }
+    )
+
+    assert obtained_feat_decl == expected_feat_decl
+
+
+def test_convert_and_add_feature_edge_feature():
+    trackmate_feature = {
+        "feature": "SPOT_SOURCE_ID",
+        "name": "Spot Source ID",
+        "isint": "true",
+        "dimension": "NONE",
+    }
+    feature_type = "EdgeFeatures"
+    obtained_feat_decl = FeaturesDeclaration()
+    units = {"timeunits": "s", "spatialunits": "um"}
+    tml._convert_and_add_feature(
+        trackmate_feature, feature_type, obtained_feat_decl, units
+    )
+
+    expected_feat_decl = FeaturesDeclaration(
+        edge_features={
+            "SPOT_SOURCE_ID": Feature(
+                "SPOT_SOURCE_ID",
+                "Spot Source ID",
+                "CellLineage",
+                "TrackMate",
+                data_type="int",
+                unit="none",
+            )
+        }
+    )
+
+    assert obtained_feat_decl == expected_feat_decl
+
+
+def test_convert_and_add_feature_track_feature():
+    trackmate_feature = {
+        "feature": "TRACK_INDEX",
+        "name": "Track Index",
+        "isint": "true",
+        "dimension": "NONE",
+    }
+    feature_type = "TrackFeatures"
+    obtained_feat_decl = FeaturesDeclaration()
+    units = {"timeunits": "s", "spatialunits": "um"}
+    tml._convert_and_add_feature(
+        trackmate_feature, feature_type, obtained_feat_decl, units
+    )
+
+    expected_feat_decl = FeaturesDeclaration(
+        lineage_features={
+            "TRACK_INDEX": Feature(
+                "TRACK_INDEX",
+                "Track Index",
+                "CellLineage",
+                "TrackMate",
+                data_type="int",
+                unit="none",
+            )
+        }
+    )
+
+    assert obtained_feat_decl == expected_feat_decl
+
+
+def test_convert_and_add_feature_invalid_feature_type():
+    trackmate_feature = {
+        "feature": "QUALITY",
+        "name": "Quality",
+        "isint": "false",
+        "dimension": "NONE",
+    }
+    feature_type = "InvalidFeatureType"
+    feat_declaration = FeaturesDeclaration()
+    units = {"timeunits": "s", "spatialunits": "um"}
+
+    with pytest.raises(ValueError, match="Invalid feature type: InvalidFeatureType"):
+        tml._convert_and_add_feature(
+            trackmate_feature, feature_type, feat_declaration, units
+        )
+
+
+# _add_all_features ###########################################################
 
 
 def test_add_all_features():
@@ -164,8 +274,8 @@ def test_add_all_features():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
-    obtained = nx.DiGraph(Model={})
-    tml._add_all_features(obtained, it, element)
+    obtained = FeaturesDeclaration()
+    tml._add_all_features(it, element, obtained, {})
 
     spot_features = {
         "QUALITY": {"feature": "QUALITY", "isint": "false"},
@@ -284,7 +394,7 @@ def test_add_all_features_no_feature_attribute():
     assert is_equal(obtained, expected)
 
 
-# _convert_attributes #
+# _convert_attributes #########################################################
 
 
 def test_convert_attributes():
@@ -342,7 +452,7 @@ def test_convert_attributes_ValueError():
         tml._convert_attributes(attributes, features)
 
 
-# _convert_ROI_coordinates #
+# _convert_ROI_coordinates ####################################################
 
 
 def test_convert_ROI_coordinates_2D():
@@ -395,7 +505,7 @@ def test_convert_ROI_coordinates_no_ROI_txt():
     assert att_obtained == att_expected
 
 
-# _add_all_nodes #
+# _add_all_nodes ##############################################################
 
 
 def test_add_all_nodes_several_attributes():
@@ -482,7 +592,7 @@ def test_add_all_nodes_no_nodes():
     assert is_equal(obtained, nx.DiGraph())
 
 
-# _add_edge #
+# _add_edge ###################################################################
 
 
 def test_add_edge():
@@ -551,7 +661,7 @@ def test_add_edge_no_edge_attributes():
     assert is_equal(obtained, expected)
 
 
-# _build_tracks #
+# _build_tracks ###############################################################
 
 
 def test_build_tracks_several_attributes():
@@ -705,7 +815,7 @@ def test_build_tracks_no_track_ID():
         tml._build_tracks(it, element, feat_decl, obtained)
 
 
-# _get_filtered_tracks_ID #
+# _get_filtered_tracks_ID #####################################################
 
 
 def test_get_filtered_tracks_ID():
@@ -736,7 +846,7 @@ def test_get_filtered_tracks_ID_no_tracks():
     assert not obtained_ID
 
 
-# _add_tracks_info #
+# _add_tracks_info ############################################################
 
 
 def test_add_tracks_info():
