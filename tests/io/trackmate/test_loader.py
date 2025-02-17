@@ -99,7 +99,7 @@ def test_add_graph_attrib_from_element_no_graph_attributes():
     assert is_equal(obtained, expected)
 
 
-### add_features ###
+# _get_features_dict #
 
 
 def test_get_features_dict():
@@ -284,7 +284,7 @@ def test_add_all_features_no_feature_attribute():
     assert is_equal(obtained, expected)
 
 
-### convert_attributes ###
+# _convert_attributes #
 
 
 def test_convert_attributes():
@@ -342,7 +342,7 @@ def test_convert_attributes_ValueError():
         tml._convert_attributes(attributes, features)
 
 
-### _convert_ROI_coordinates ###
+# _convert_ROI_coordinates #
 
 
 def test_convert_ROI_coordinates_2D():
@@ -758,7 +758,7 @@ def test_add_all_edges_no_track_attributes():
     assert obtained_tracks_attrib == expected_tracks_attrib
 
 
-### get_filtered_tracks_ID ###
+# _get_filtered_tracks_ID #
 
 
 def test_get_filtered_tracks_ID():
@@ -789,7 +789,7 @@ def test_get_filtered_tracks_ID_no_tracks():
     assert not obtained_ID
 
 
-### _add_tracks_info ###
+# _add_tracks_info #
 
 
 def test_add_tracks_info():
