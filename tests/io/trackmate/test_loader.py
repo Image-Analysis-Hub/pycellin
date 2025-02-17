@@ -12,7 +12,7 @@ import networkx as nx
 import networkx.algorithms.isomorphism as iso
 import pytest
 
-from pycellin.classes.feature import Feature
+from pycellin.classes import Feature, FeaturesDeclaration
 import pycellin.io.trackmate.loader as tml
 
 
@@ -395,30 +395,34 @@ def test_convert_ROI_coordinates_no_ROI_txt():
     assert att_obtained == att_expected
 
 
-### add_all_nodes ###
+# _add_all_nodes #
 
 
 def test_add_all_nodes_several_attributes():
     xml_data = (
         "<data>"
         "   <frame>"
-        '       <Spot ID="1000" x="10" y="20" />'
-        '       <Spot ID="1001" x="30.5" y="30" />'
+        '       <Spot name="ID1000" ID="1000" x="10" y="20" />'
+        '       <Spot name="ID1001" ID="1001" x="30.5" y="30" />'
         "   </frame>"
         "</data>"
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
-    spot_features = {"x": {"isint": "false"}, "y": {"isint": "true"}}
-    obtained = nx.DiGraph(Model={"SpotFeatures": spot_features})
-    tml.add_all_nodes(obtained, it, element)
+    spot_features = {
+        "x": Feature("", "", "CellLineage", "", data_type="float"),
+        "y": Feature("", "", "CellLineage", "", data_type="int"),
+    }
+    feat_decl = FeaturesDeclaration(node_features=spot_features)
+    obtained = nx.DiGraph()
+    tml._add_all_nodes(it, element, feat_decl, obtained)
 
-    expected = nx.DiGraph(Model={"SpotFeatures": spot_features})
+    expected = nx.DiGraph()
     expected.add_nodes_from(
         [
-            (1001, {"y": 30, "ID": 1001, "x": 30.5}),
-            (1000, {"ID": 1000, "x": 10.0, "y": 20}),
+            (1001, {"name": "ID1001", "y": 30, "ID": 1001, "x": 30.5}),
+            (1000, {"name": "ID1000", "ID": 1000, "x": 10.0, "y": 20}),
         ]
     )
 
@@ -437,10 +441,10 @@ def test_add_all_nodes_only_ID_attribute():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
-    obtained = nx.DiGraph(Model={"SpotFeatures": {}})
-    tml.add_all_nodes(obtained, it, element)
+    obtained = nx.DiGraph()
+    tml._add_all_nodes(it, element, FeaturesDeclaration(), obtained)
 
-    expected = nx.DiGraph(Model={"SpotFeatures": {}})
+    expected = nx.DiGraph()
     expected.add_nodes_from([(1001, {"ID": 1001}), (1000, {"ID": 1000})])
 
     assert is_equal(obtained, expected)
@@ -458,10 +462,10 @@ def test_add_all_nodes_no_node_attributes():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
-    obtained = nx.DiGraph(Model={"SpotFeatures": {}})
-    tml.add_all_nodes(obtained, it, element)
+    obtained = nx.DiGraph()
+    tml._add_all_nodes(it, element, FeaturesDeclaration(), obtained)
 
-    expected = nx.DiGraph(Model={"SpotFeatures": {}})
+    expected = nx.DiGraph()
     expected.add_nodes_from([(1001, {"ID": 1001})])
 
     assert is_equal(obtained, expected)
@@ -472,10 +476,10 @@ def test_add_all_nodes_no_nodes():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
-    obtained = nx.DiGraph(Model={"SpotFeatures": {}})
-    tml.add_all_nodes(obtained, it, element)
+    obtained = nx.DiGraph()
+    tml._add_all_nodes(it, element, FeaturesDeclaration(), obtained)
 
-    assert is_equal(obtained, nx.DiGraph(Model={"SpotFeatures": {}}))
+    assert is_equal(obtained, nx.DiGraph())
 
 
 ### add_edge_from_element ###
