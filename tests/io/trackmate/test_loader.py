@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Unit test for pyTMn XML_reader.
+"""Unit test for TrackMate XML file loader.
 """
 
 from copy import deepcopy
 import io
+from typing import Any
 
 from lxml import etree as ET
 import networkx as nx
@@ -14,6 +15,9 @@ import pytest
 
 from pycellin.classes import Feature, FeaturesDeclaration
 import pycellin.io.trackmate.loader as tml
+
+# TODO: currently only 50% coverage. There are a lot of functions that are not
+# tested for now...
 
 
 def is_equal(obt, exp):
@@ -120,7 +124,7 @@ def feat_spot_name():
 
 
 @pytest.fixture(scope="module")
-def spot_feats(feat_QUALITY, feat_FRAME, feat_spot_name):
+def spot_feats(feat_QUALITY: Feature, feat_FRAME: Feature, feat_spot_name: Feature):
     return {
         "QUALITY": feat_QUALITY,
         "FRAME": feat_FRAME,
@@ -153,7 +157,7 @@ def feat_SPOT_TARGET_ID():
 
 
 @pytest.fixture(scope="module")
-def edge_feats(feat_SPOT_SOURCE_ID, feat_SPOT_TARGET_ID):
+def edge_feats(feat_SPOT_SOURCE_ID: Feature, feat_SPOT_TARGET_ID: Feature):
     return {
         "SPOT_SOURCE_ID": feat_SPOT_SOURCE_ID,
         "SPOT_TARGET_ID": feat_SPOT_TARGET_ID,
@@ -197,7 +201,9 @@ def feat_track_name():
 
 
 @pytest.fixture(scope="module")
-def track_feats(feat_TRACK_INDEX, feat_NUMBER_SPOTS, feat_track_name):
+def track_feats(
+    feat_TRACK_INDEX: Feature, feat_NUMBER_SPOTS: Feature, feat_track_name: Feature
+):
     return {
         "TRACK_INDEX": feat_TRACK_INDEX,
         "NUMBER_SPOTS": feat_NUMBER_SPOTS,
@@ -250,7 +256,9 @@ def test_get_features_dict_other_tag():
 # _convert_and_add_feature ####################################################
 
 
-def test_convert_and_add_feature_spot_feature(units, feat_QUALITY):
+def test_convert_and_add_feature_spot_feature(
+    units: dict[str, str], feat_QUALITY: Feature
+):
     trackmate_feature = {
         "feature": "QUALITY",
         "name": "Quality",
@@ -266,7 +274,9 @@ def test_convert_and_add_feature_spot_feature(units, feat_QUALITY):
     assert obtained == expected
 
 
-def test_convert_and_add_feature_edge_feature(units, feat_SPOT_SOURCE_ID):
+def test_convert_and_add_feature_edge_feature(
+    units: dict[str, str], feat_SPOT_SOURCE_ID: Feature
+):
     trackmate_feature = {
         "feature": "SPOT_SOURCE_ID",
         "name": "Source spot ID",
@@ -284,7 +294,9 @@ def test_convert_and_add_feature_edge_feature(units, feat_SPOT_SOURCE_ID):
     assert obtained == expected
 
 
-def test_convert_and_add_feature_track_feature(units, feat_TRACK_INDEX):
+def test_convert_and_add_feature_track_feature(
+    units: dict[str, str], feat_TRACK_INDEX: Feature
+):
     trackmate_feature = {
         "feature": "TRACK_INDEX",
         "name": "Track index",
@@ -300,7 +312,7 @@ def test_convert_and_add_feature_track_feature(units, feat_TRACK_INDEX):
     assert obtained == expected
 
 
-def test_convert_and_add_feature_invalid_feature_type(units):
+def test_convert_and_add_feature_invalid_feature_type(units: dict[str, str]):
     trackmate_feature = {
         "feature": "QUALITY",
         "name": "Quality",
@@ -319,7 +331,9 @@ def test_convert_and_add_feature_invalid_feature_type(units):
 # _add_all_features ###########################################################
 
 
-def test_add_all_features(spot_feats, edge_feats, track_feats):
+def test_add_all_features(
+    spot_feats: dict[str, Any], edge_feats: dict[str, Any], track_feats: dict[str, Any]
+):
     xml_data = (
         "<FeatureDeclarations>"
         "   <SpotFeatures>"
@@ -362,7 +376,9 @@ def test_add_all_features_empty():
     assert obtained == FeaturesDeclaration()
 
 
-def test_add_all_features_tag_with_no_feature_tag(spot_feats, track_feats):
+def test_add_all_features_tag_with_no_feature_tag(
+    spot_feats: dict[str, Any], track_feats: dict[str, Any]
+):
     xml_data = (
         "<FeatureDeclarations>"
         "   <SpotFeatures>"
