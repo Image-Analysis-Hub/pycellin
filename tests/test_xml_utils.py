@@ -313,7 +313,7 @@ def test_convert_attributes():
     assert obtained_attr == expected_attr
 
 
-def test_convert_attributes_ID_name():
+def test_convert_attributes_specific_keys():
     features = {}
 
     obtained_attr = {"ID": "42", "name": "ID42", "ROI_N_POINTS": "something here"}
