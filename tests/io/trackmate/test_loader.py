@@ -482,25 +482,26 @@ def test_add_all_nodes_no_nodes():
     assert is_equal(obtained, nx.DiGraph())
 
 
-### add_edge_from_element ###
+# _add_edge #
 
 
-def test_add_edge_from_element():
+def test_add_edge():
     xml_data = '<data SPOT_SOURCE_ID="1" SPOT_TARGET_ID="2" x="20" y="25" />'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     track_id = 0
 
-    edge_features = {
-        "x": {"isint": "false"},
-        "y": {"isint": "true"},
-        "SPOT_SOURCE_ID": {"isint": "true"},
-        "SPOT_TARGET_ID": {"isint": "true"},
+    edge_feats = {
+        "x": Feature("", "", "CellLineage", "", data_type="float"),
+        "y": Feature("", "", "CellLineage", "", data_type="int"),
+        "SPOT_SOURCE_ID": Feature("", "", "CellLineage", "", data_type="int"),
+        "SPOT_TARGET_ID": Feature("", "", "CellLineage", "", data_type="int"),
     }
-    obtained = nx.DiGraph(Model={"EdgeFeatures": edge_features})
-    tml.add_edge_from_element(obtained, element, track_id)
+    obtained = nx.DiGraph()
+    feat_decl = FeaturesDeclaration(edge_features=edge_feats)
+    tml._add_edge(element, feat_decl, obtained, track_id)
 
-    expected = nx.DiGraph(Model={"EdgeFeatures": edge_features})
+    expected = nx.DiGraph()
     expected.add_edge(1, 2, x=20.0, y=25, SPOT_SOURCE_ID=1, SPOT_TARGET_ID=2)
     expected.nodes[1]["TRACK_ID"] = track_id
     expected.nodes[2]["TRACK_ID"] = track_id
@@ -508,39 +509,41 @@ def test_add_edge_from_element():
     assert is_equal(obtained, expected)
 
 
-def test_add_edge_from_element_no_node_ID():
+def test_add_edge_no_node_ID():
     xml_data = '<data SPOT_SOURCE_ID="1" x="20" y="25" />'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     track_id = 0
 
-    edge_features = {
-        "x": {"isint": "false"},
-        "y": {"isint": "true"},
-        "SPOT_SOURCE_ID": {"isint": "true"},
+    edge_feats = {
+        "x": Feature("", "", "CellLineage", "", data_type="float"),
+        "y": Feature("", "", "CellLineage", "", data_type="int"),
+        "SPOT_SOURCE_ID": Feature("", "", "CellLineage", "", data_type="int"),
     }
-    obtained = nx.DiGraph(Model={"EdgeFeatures": edge_features})
-    tml.add_edge_from_element(obtained, element, track_id)
+    obtained = nx.DiGraph()
+    feat_decl = FeaturesDeclaration(edge_features=edge_feats)
+    tml._add_edge(element, feat_decl, obtained, track_id)
 
-    expected = nx.DiGraph(Model={"EdgeFeatures": edge_features})
+    expected = nx.DiGraph()
 
     assert is_equal(obtained, expected)
 
 
-def test_add_edge_from_element_no_edge_attributes():
+def test_add_edge_no_edge_attributes():
     xml_data = '<data SPOT_SOURCE_ID="1" SPOT_TARGET_ID="2" />'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     track_id = 0
 
-    edge_features = {
-        "SPOT_SOURCE_ID": {"isint": "true"},
-        "SPOT_TARGET_ID": {"isint": "true"},
+    edge_feats = {
+        "SPOT_SOURCE_ID": Feature("", "", "CellLineage", "", data_type="int"),
+        "SPOT_TARGET_ID": Feature("", "", "CellLineage", "", data_type="int"),
     }
-    obtained = nx.DiGraph(Model={"EdgeFeatures": edge_features})
-    tml.add_edge_from_element(obtained, element, track_id)
+    obtained = nx.DiGraph()
+    feat_decl = FeaturesDeclaration(edge_features=edge_feats)
+    tml._add_edge(element, feat_decl, obtained, track_id)
 
-    expected = nx.DiGraph(Model={"EdgeFeatures": edge_features})
+    expected = nx.DiGraph()
     expected.add_edge(1, 2, SPOT_SOURCE_ID=1, SPOT_TARGET_ID=2)
     expected.nodes[1]["TRACK_ID"] = track_id
     expected.nodes[2]["TRACK_ID"] = track_id
