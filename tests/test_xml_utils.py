@@ -342,49 +342,56 @@ def test_convert_attributes_ValueError():
         tml._convert_attributes(attributes, features)
 
 
-### add_ROI_coordinates ###
+### _convert_ROI_coordinates ###
 
 
-def test_add_ROI_coordinates_2D():
+def test_convert_ROI_coordinates_2D():
     el_obtained = ET.Element("Spot")
     el_obtained.attrib["ROI_N_POINTS"] = "3"
     el_obtained.text = "1 2.0 -3 -4.0 5.5 6"
     att_obtained = deepcopy(el_obtained.attrib)
-    tml.add_ROI_coordinates(el_obtained, att_obtained)
+    tml._convert_ROI_coordinates(el_obtained, att_obtained)
 
-    att_expected = {"ROI_N_POINTS": [(1.0, 2.0), (-3.0, -4.0), (5.5, 6.0)]}
-
-    assert att_obtained == att_expected
-
-
-def test_add_ROI_coordinates_3D():
-    el_obtained = ET.Element("Spot")
-    el_obtained.attrib["ROI_N_POINTS"] = "2"
-    el_obtained.text = "1 2.0 -3 -4.0 5.5 6"
-    att_obtained = deepcopy(el_obtained.attrib)
-    tml.add_ROI_coordinates(el_obtained, att_obtained)
-
-    att_expected = {"ROI_N_POINTS": [(1.0, 2.0, -3.0), (-4.0, 5.5, 6.0)]}
+    att_expected = {
+        "ROI_N_POINTS": "3",
+        "ROI_coords": [(1.0, 2.0), (-3.0, -4.0), (5.5, 6.0)],
+    }
 
     assert att_obtained == att_expected
 
 
-def test_add_ROI_coordinates_no_ROI_att():
+def test_convert_ROI_coordinates_3D():
+    el_obtained = ET.Element("Spot")
+    el_obtained.attrib["ROI_N_POINTS"] = "2"
+    el_obtained.text = "1 2.0 -3 -4.0 5.5 6"
+    att_obtained = deepcopy(el_obtained.attrib)
+    tml._convert_ROI_coordinates(el_obtained, att_obtained)
+
+    att_expected = {
+        "ROI_N_POINTS": "2",
+        "ROI_coords": [(1.0, 2.0, -3.0), (-4.0, 5.5, 6.0)],
+    }
+
+    assert att_obtained == att_expected
+
+
+def test_convert_ROI_coordinates_KeyError():
     el_obtained = ET.Element("Spot")
     el_obtained.text = "1 2.0 -3 -4.0 5.5 6"
     att_obtained = deepcopy(el_obtained.attrib)
-    tml.add_ROI_coordinates(el_obtained, att_obtained)
 
-    assert att_obtained == dict()
+    with pytest.raises(KeyError):
+        tml._convert_ROI_coordinates(el_obtained, att_obtained)
 
 
-def test_add_ROI_coordinates_no_ROI_txt():
+def test_convert_ROI_coordinates_no_ROI_txt():
     el_obtained = ET.Element("Spot")
     el_obtained.attrib["ROI_N_POINTS"] = "2"
     att_obtained = deepcopy(el_obtained.attrib)
-    tml.add_ROI_coordinates(el_obtained, att_obtained)
+    tml._convert_ROI_coordinates(el_obtained, att_obtained)
 
-    att_expected = {"ROI_N_POINTS": None}
+    att_expected = {"ROI_N_POINTS": "2", "ROI_coords": None}
+
     assert att_obtained == att_expected
 
 
