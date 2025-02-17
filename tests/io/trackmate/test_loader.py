@@ -551,10 +551,10 @@ def test_add_edge_no_edge_attributes():
     assert is_equal(obtained, expected)
 
 
-### add_all_edges ###
+# _build_tracks #
 
 
-def test_add_all_edges_several_attributes():
+def test_build_tracks_several_attributes():
     xml_data = (
         "<data>"
         '   <Track TRACK_ID="1" name="blob">'
@@ -571,23 +571,22 @@ def test_add_all_edges_several_attributes():
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    edge_features = {
-        "x": {"isint": "false"},
-        "y": {"isint": "true"},
-        "SPOT_SOURCE_ID": {"isint": "true"},
-        "SPOT_TARGET_ID": {"isint": "true"},
+    edge_feats = {
+        "x": Feature("", "", "CellLineage", "", data_type="float"),
+        "y": Feature("", "", "CellLineage", "", data_type="int"),
+        "SPOT_SOURCE_ID": Feature("", "", "CellLineage", "", data_type="int"),
+        "SPOT_TARGET_ID": Feature("", "", "CellLineage", "", data_type="int"),
     }
-    track_features = {"TRACK_ID": {"isint": "true"}}
+    track_feats = {"TRACK_ID": Feature("", "", "CellLineage", "", data_type="int")}
 
-    obtained = nx.DiGraph(
-        Model={"EdgeFeatures": edge_features, "TrackFeatures": track_features}
+    obtained = nx.DiGraph()
+    feat_decl = FeaturesDeclaration(
+        edge_features=edge_feats, lineage_features=track_feats
     )
-    obtained_tracks_attrib = tml.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = tml._build_tracks(it, element, feat_decl, obtained)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
 
-    expected = nx.DiGraph(
-        Model={"EdgeFeatures": edge_features, "TrackFeatures": track_features}
-    )
+    expected = nx.DiGraph()
     expected.add_edge(11, 12, SPOT_SOURCE_ID=11, SPOT_TARGET_ID=12, x=10.0, y=20)
     expected.add_edge(12, 13, SPOT_SOURCE_ID=12, SPOT_TARGET_ID=13, x=30.0, y=30)
     expected.add_edge(21, 22, SPOT_SOURCE_ID=21, SPOT_TARGET_ID=22, x=15.0, y=25)
@@ -610,7 +609,7 @@ def test_add_all_edges_several_attributes():
     assert obtained_tracks_attrib == expected_tracks_attrib
 
 
-def test_add_all_edges_no_nodes_ID():
+def test_build_tracks_no_nodes_ID():
     xml_data = (
         "<data>"
         '   <Track TRACK_ID="1" name="blob">'
@@ -624,18 +623,20 @@ def test_add_all_edges_no_nodes_ID():
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    edge_features = {"x": {"isint": "false"}, "y": {"isint": "true"}}
-    track_features = {"TRACK_ID": {"isint": "true"}}
+    edge_feats = {
+        "x": Feature("", "", "CellLineage", "", data_type="float"),
+        "y": Feature("", "", "CellLineage", "", data_type="int"),
+    }
+    track_feats = {"TRACK_ID": Feature("", "", "CellLineage", "", data_type="int")}
 
-    obtained = nx.DiGraph(
-        Model={"EdgeFeatures": edge_features, "TrackFeatures": track_features}
+    obtained = nx.DiGraph()
+    feat_decl = FeaturesDeclaration(
+        edge_features=edge_feats, lineage_features=track_feats
     )
-    obtained_tracks_attrib = tml.add_all_edges(obtained, it, element)
+    obtained_tracks_attrib = tml._build_tracks(it, element, feat_decl, obtained)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
 
-    expected = nx.DiGraph(
-        Model={"EdgeFeatures": edge_features, "TrackFeatures": track_features}
-    )
+    expected = nx.DiGraph()
     expected_tracks_attrib = [
         {"TRACK_ID": 2, "name": "blub"},
         {"TRACK_ID": 1, "name": "blob"},
@@ -646,7 +647,7 @@ def test_add_all_edges_no_nodes_ID():
     assert obtained_tracks_attrib == expected_tracks_attrib
 
 
-def test_add_all_edges_no_edges():
+def test_build_tracks_no_edges():
     xml_data = (
         "<data>"
         '   <Track TRACK_ID="1" name="blob" />'
@@ -655,13 +656,14 @@ def test_add_all_edges_no_edges():
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    track_features = {"TRACK_ID": {"isint": "true"}}
+    track_feats = {"TRACK_ID": Feature("", "", "CellLineage", "", data_type="int")}
 
-    obtained = nx.DiGraph(Model={"TrackFeatures": track_features})
-    obtained_tracks_attrib = tml.add_all_edges(obtained, it, element)
+    obtained = nx.DiGraph()
+    feat_decl = FeaturesDeclaration(lineage_features=track_feats)
+    obtained_tracks_attrib = tml._build_tracks(it, element, feat_decl, obtained)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
 
-    expected = nx.DiGraph(Model={"TrackFeatures": track_features})
+    expected = nx.DiGraph()
     expected_tracks_attrib = [
         {"TRACK_ID": 2, "name": "blub"},
         {"TRACK_ID": 1, "name": "blob"},
@@ -672,7 +674,7 @@ def test_add_all_edges_no_edges():
     assert obtained_tracks_attrib == expected_tracks_attrib
 
 
-def test_add_all_edges_no_track_id():
+def test_build_tracks_no_track_ID():
     xml_data = (
         "<data>"
         '   <Track name="blob">'
@@ -689,80 +691,18 @@ def test_add_all_edges_no_track_id():
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    edge_features = {
-        "x": {"isint": "false"},
-        "y": {"isint": "true"},
-        "SPOT_SOURCE_ID": {"isint": "true"},
-        "SPOT_TARGET_ID": {"isint": "true"},
+    edge_feats = {
+        "x": Feature("", "", "CellLineage", "", data_type="float"),
+        "y": Feature("", "", "CellLineage", "", data_type="int"),
+        "SPOT_SOURCE_ID": Feature("", "", "CellLineage", "", data_type="int"),
+        "SPOT_TARGET_ID": Feature("", "", "CellLineage", "", data_type="int"),
     }
 
-    obtained = nx.DiGraph(Model={"EdgeFeatures": edge_features, "TrackFeatures": {}})
-    obtained_tracks_attrib = tml.add_all_edges(obtained, it, element)
+    obtained = nx.DiGraph()
+    feat_decl = FeaturesDeclaration(edge_features=edge_feats)
 
-    expected = nx.DiGraph(Model={"EdgeFeatures": edge_features, "TrackFeatures": {}})
-    expected.add_edge(11, 12, SPOT_SOURCE_ID=11, SPOT_TARGET_ID=12, x=10.0, y=20)
-    expected.add_edge(12, 13, SPOT_SOURCE_ID=12, SPOT_TARGET_ID=13, x=30.0, y=30)
-    expected.add_edge(21, 22, SPOT_SOURCE_ID=21, SPOT_TARGET_ID=22, x=15.0, y=25)
-    expected.add_nodes_from(
-        [
-            (11, {"TRACK_ID": None}),
-            (12, {"TRACK_ID": None}),
-            (13, {"TRACK_ID": None}),
-            (21, {"TRACK_ID": None}),
-            (22, {"TRACK_ID": None}),
-        ]
-    )
-    expected_tracks_attrib = [{"name": "blub"}, {"name": "blob"}]
-    expected_tracks_attrib = sorted(expected_tracks_attrib, key=lambda d: d["name"])
-
-    assert is_equal(obtained, expected)
-    assert obtained_tracks_attrib == expected_tracks_attrib
-
-
-def test_add_all_edges_no_track_attributes():
-    xml_data = (
-        "<data>"
-        "   <Track>"
-        '       <Edge SPOT_SOURCE_ID="11" SPOT_TARGET_ID="12"'
-        '           x="10" y="20" />'
-        '       <Edge SPOT_SOURCE_ID="12" SPOT_TARGET_ID="13"'
-        '           x="30" y="30" />'
-        "   </Track>"
-        "   <Track>"
-        '       <Edge SPOT_SOURCE_ID="21" SPOT_TARGET_ID="22"'
-        '           x="15" y="25" />'
-        "   </Track>"
-        "</data>"
-    )
-    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
-    _, element = next(it)
-    edge_features = {
-        "x": {"isint": "false"},
-        "y": {"isint": "true"},
-        "SPOT_SOURCE_ID": {"isint": "true"},
-        "SPOT_TARGET_ID": {"isint": "true"},
-    }
-
-    obtained = nx.DiGraph(Model={"EdgeFeatures": edge_features, "TrackFeatures": {}})
-    obtained_tracks_attrib = tml.add_all_edges(obtained, it, element)
-
-    expected = nx.DiGraph(Model={"EdgeFeatures": edge_features, "TrackFeatures": {}})
-    expected.add_edge(11, 12, SPOT_SOURCE_ID=11, SPOT_TARGET_ID=12, x=10.0, y=20)
-    expected.add_edge(12, 13, SPOT_SOURCE_ID=12, SPOT_TARGET_ID=13, x=30.0, y=30)
-    expected.add_edge(21, 22, SPOT_SOURCE_ID=21, SPOT_TARGET_ID=22, x=15.0, y=25)
-    expected.add_nodes_from(
-        [
-            (11, {"TRACK_ID": None}),
-            (12, {"TRACK_ID": None}),
-            (13, {"TRACK_ID": None}),
-            (21, {"TRACK_ID": None}),
-            (22, {"TRACK_ID": None}),
-        ]
-    )
-    expected_tracks_attrib = [{}, {}]
-
-    assert is_equal(obtained, expected)
-    assert obtained_tracks_attrib == expected_tracks_attrib
+    with pytest.raises(KeyError):
+        tml._build_tracks(it, element, feat_decl, obtained)
 
 
 # _get_filtered_tracks_ID #

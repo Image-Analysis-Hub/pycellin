@@ -511,7 +511,14 @@ def _build_tracks(
             attribs = deepcopy(element.attrib)
             _convert_attributes(attribs, feat_declaration.lin_feats)
             tracks_attributes.append(attribs)
-            current_track_id = attribs["TRACK_ID"]
+            try:
+                current_track_id = attribs["TRACK_ID"]
+            except KeyError as err:
+                message = (
+                    f"No key {err} in the attributes of current element "
+                    f"'{element.tag}'. Please check the XML file."
+                )
+                raise KeyError(message)
 
         # Edge creation.
         if element.tag == "Edge" and event == "start":
