@@ -75,6 +75,14 @@ def is_equal(obt, exp):
         return False
 
 
+# Fixtures #####################################################################
+
+
+@pytest.fixture(scope="module")
+def units():
+    return {"timeunits": "s", "spatialunits": "um"}
+
+
 @pytest.fixture(scope="module")
 def feat_QUALITY():
     return Feature(
@@ -266,91 +274,57 @@ def test_get_features_dict_other_tag():
 # _convert_and_add_feature ####################################################
 
 
-def test_convert_and_add_feature_spot_feature():
+def test_convert_and_add_feature_spot_feature(units, feat_QUALITY):
     trackmate_feature = {
-        "feature": "AREA",
-        "name": "Area",
+        "feature": "QUALITY",
+        "name": "Quality",
         "isint": "false",
-        "dimension": "AREA",
+        "dimension": "NONE",
     }
     feature_type = "SpotFeatures"
     obtained = FeaturesDeclaration()
-    units = {"timeunits": "s", "spatialunits": "um"}
     tml._convert_and_add_feature(trackmate_feature, feature_type, obtained, units)
 
-    expected = FeaturesDeclaration(
-        node_features={
-            "AREA": Feature(
-                "AREA",
-                "Area",
-                "CellLineage",
-                "TrackMate",
-                data_type="float",
-                unit="um^2",
-            )
-        }
-    )
+    expected = FeaturesDeclaration(node_features={"QUALITY": feat_QUALITY})
 
     assert obtained == expected
 
 
-def test_convert_and_add_feature_edge_feature():
+def test_convert_and_add_feature_edge_feature(units, feat_SPOT_SOURCE_ID):
     trackmate_feature = {
         "feature": "SPOT_SOURCE_ID",
-        "name": "Spot Source ID",
+        "name": "Source spot ID",
         "isint": "true",
         "dimension": "NONE",
     }
     feature_type = "EdgeFeatures"
     obtained = FeaturesDeclaration()
-    units = {"timeunits": "s", "spatialunits": "um"}
     tml._convert_and_add_feature(trackmate_feature, feature_type, obtained, units)
 
     expected = FeaturesDeclaration(
-        edge_features={
-            "SPOT_SOURCE_ID": Feature(
-                "SPOT_SOURCE_ID",
-                "Spot Source ID",
-                "CellLineage",
-                "TrackMate",
-                data_type="int",
-                unit="none",
-            )
-        }
+        edge_features={"SPOT_SOURCE_ID": feat_SPOT_SOURCE_ID}
     )
 
     assert obtained == expected
 
 
-def test_convert_and_add_feature_track_feature():
+def test_convert_and_add_feature_track_feature(units, feat_TRACK_INDEX):
     trackmate_feature = {
         "feature": "TRACK_INDEX",
-        "name": "Track Index",
+        "name": "Track index",
         "isint": "true",
         "dimension": "NONE",
     }
     feature_type = "TrackFeatures"
     obtained = FeaturesDeclaration()
-    units = {"timeunits": "s", "spatialunits": "um"}
     tml._convert_and_add_feature(trackmate_feature, feature_type, obtained, units)
 
-    expected = FeaturesDeclaration(
-        lineage_features={
-            "TRACK_INDEX": Feature(
-                "TRACK_INDEX",
-                "Track Index",
-                "CellLineage",
-                "TrackMate",
-                data_type="int",
-                unit="none",
-            )
-        }
-    )
+    expected = FeaturesDeclaration(lineage_features={"TRACK_INDEX": feat_TRACK_INDEX})
 
     assert obtained == expected
 
 
-def test_convert_and_add_feature_invalid_feature_type():
+def test_convert_and_add_feature_invalid_feature_type(units):
     trackmate_feature = {
         "feature": "QUALITY",
         "name": "Quality",
@@ -359,7 +333,6 @@ def test_convert_and_add_feature_invalid_feature_type():
     }
     feature_type = "InvalidFeatureType"
     feat_declaration = FeaturesDeclaration()
-    units = {"timeunits": "s", "spatialunits": "um"}
 
     with pytest.raises(ValueError, match="Invalid feature type: InvalidFeatureType"):
         tml._convert_and_add_feature(
