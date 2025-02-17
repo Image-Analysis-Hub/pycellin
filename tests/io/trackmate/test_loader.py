@@ -75,6 +75,128 @@ def is_equal(obt, exp):
         return False
 
 
+@pytest.fixture(scope="module")
+def feat_QUALITY():
+    return Feature(
+        "QUALITY",
+        "Quality",
+        "CellLineage",
+        "TrackMate",
+        data_type="float",
+        unit="none",
+    )
+
+
+@pytest.fixture(scope="module")
+def feat_FRAME():
+    return Feature(
+        "FRAME",
+        "Frame",
+        "CellLineage",
+        "TrackMate",
+        data_type="int",
+        unit="none",
+    )
+
+
+@pytest.fixture(scope="module")
+def feat_spot_name():
+    return Feature(
+        "name",
+        "Name of the spot",
+        "CellLineage",
+        "TrackMate",
+        data_type="string",
+        unit="none",
+    )
+
+
+@pytest.fixture(scope="module")
+def spot_feats(feat_QUALITY, feat_FRAME, feat_spot_name):
+    return {
+        "QUALITY": feat_QUALITY,
+        "FRAME": feat_FRAME,
+        "name": feat_spot_name,
+    }
+
+
+@pytest.fixture(scope="module")
+def feat_SPOT_SOURCE_ID():
+    return Feature(
+        "SPOT_SOURCE_ID",
+        "Source spot ID",
+        "CellLineage",
+        "TrackMate",
+        data_type="int",
+        unit="none",
+    )
+
+
+@pytest.fixture(scope="module")
+def feat_SPOT_TARGET_ID():
+    return Feature(
+        "SPOT_TARGET_ID",
+        "Target spot ID",
+        "CellLineage",
+        "TrackMate",
+        data_type="int",
+        unit="none",
+    )
+
+
+@pytest.fixture(scope="module")
+def edge_feats(feat_SPOT_SOURCE_ID, feat_SPOT_TARGET_ID):
+    return {
+        "SPOT_SOURCE_ID": feat_SPOT_SOURCE_ID,
+        "SPOT_TARGET_ID": feat_SPOT_TARGET_ID,
+    }
+
+
+@pytest.fixture(scope="module")
+def feat_TRACK_INDEX():
+    return Feature(
+        "TRACK_INDEX",
+        "Track index",
+        "CellLineage",
+        "TrackMate",
+        data_type="int",
+        unit="none",
+    )
+
+
+@pytest.fixture(scope="module")
+def feat_NUMBER_SPOTS():
+    return Feature(
+        "NUMBER_SPOTS",
+        "Number of spots",
+        "CellLineage",
+        "TrackMate",
+        data_type="int",
+        unit="none",
+    )
+
+
+@pytest.fixture(scope="module")
+def feat_track_name():
+    return Feature(
+        "name",
+        "Name of the track",
+        "CellLineage",
+        "TrackMate",
+        data_type="string",
+        unit="none",
+    )
+
+
+@pytest.fixture(scope="module")
+def track_feats(feat_TRACK_INDEX, feat_NUMBER_SPOTS, feat_track_name):
+    return {
+        "TRACK_INDEX": feat_TRACK_INDEX,
+        "NUMBER_SPOTS": feat_NUMBER_SPOTS,
+        "name": feat_track_name,
+    }
+
+
 # add_graph_attrib_from_element ###############################################
 
 
@@ -152,13 +274,11 @@ def test_convert_and_add_feature_spot_feature():
         "dimension": "AREA",
     }
     feature_type = "SpotFeatures"
-    obtained_feat_decl = FeaturesDeclaration()
+    obtained = FeaturesDeclaration()
     units = {"timeunits": "s", "spatialunits": "um"}
-    tml._convert_and_add_feature(
-        trackmate_feature, feature_type, obtained_feat_decl, units
-    )
+    tml._convert_and_add_feature(trackmate_feature, feature_type, obtained, units)
 
-    expected_feat_decl = FeaturesDeclaration(
+    expected = FeaturesDeclaration(
         node_features={
             "AREA": Feature(
                 "AREA",
@@ -171,7 +291,7 @@ def test_convert_and_add_feature_spot_feature():
         }
     )
 
-    assert obtained_feat_decl == expected_feat_decl
+    assert obtained == expected
 
 
 def test_convert_and_add_feature_edge_feature():
@@ -182,13 +302,11 @@ def test_convert_and_add_feature_edge_feature():
         "dimension": "NONE",
     }
     feature_type = "EdgeFeatures"
-    obtained_feat_decl = FeaturesDeclaration()
+    obtained = FeaturesDeclaration()
     units = {"timeunits": "s", "spatialunits": "um"}
-    tml._convert_and_add_feature(
-        trackmate_feature, feature_type, obtained_feat_decl, units
-    )
+    tml._convert_and_add_feature(trackmate_feature, feature_type, obtained, units)
 
-    expected_feat_decl = FeaturesDeclaration(
+    expected = FeaturesDeclaration(
         edge_features={
             "SPOT_SOURCE_ID": Feature(
                 "SPOT_SOURCE_ID",
@@ -201,7 +319,7 @@ def test_convert_and_add_feature_edge_feature():
         }
     )
 
-    assert obtained_feat_decl == expected_feat_decl
+    assert obtained == expected
 
 
 def test_convert_and_add_feature_track_feature():
@@ -212,13 +330,11 @@ def test_convert_and_add_feature_track_feature():
         "dimension": "NONE",
     }
     feature_type = "TrackFeatures"
-    obtained_feat_decl = FeaturesDeclaration()
+    obtained = FeaturesDeclaration()
     units = {"timeunits": "s", "spatialunits": "um"}
-    tml._convert_and_add_feature(
-        trackmate_feature, feature_type, obtained_feat_decl, units
-    )
+    tml._convert_and_add_feature(trackmate_feature, feature_type, obtained, units)
 
-    expected_feat_decl = FeaturesDeclaration(
+    expected = FeaturesDeclaration(
         lineage_features={
             "TRACK_INDEX": Feature(
                 "TRACK_INDEX",
@@ -231,7 +347,7 @@ def test_convert_and_add_feature_track_feature():
         }
     )
 
-    assert obtained_feat_decl == expected_feat_decl
+    assert obtained == expected
 
 
 def test_convert_and_add_feature_invalid_feature_type():
@@ -254,20 +370,20 @@ def test_convert_and_add_feature_invalid_feature_type():
 # _add_all_features ###########################################################
 
 
-def test_add_all_features():
+def test_add_all_features(spot_feats, edge_feats, track_feats):
     xml_data = (
         "<FeatureDeclarations>"
         "   <SpotFeatures>"
-        '       <Feature feature="QUALITY" isint="false" />'
-        '       <Feature feature="FRAME" isint="true" />'
+        '       <Feature feature="QUALITY" name="Quality" isint="false" dimension="NONE"/>'
+        '       <Feature feature="FRAME" name="Frame" isint="true" dimension="NONE"/>'
         "   </SpotFeatures>"
         "   <EdgeFeatures>"
-        '       <Feature feature="SPOT_SOURCE_ID" isint="true" />'
-        '       <Feature feature="SPOT_TARGET_ID" isint="true" />'
+        '       <Feature feature="SPOT_SOURCE_ID" name="Source spot ID" isint="true" dimension="NONE"/>'
+        '       <Feature feature="SPOT_TARGET_ID" name="Target spot ID" isint="true" dimension="NONE"/>'
         "   </EdgeFeatures>"
         "   <TrackFeatures>"
-        '       <Feature feature="TRACK_INDEX" isint="true" />'
-        '       <Feature feature="NUMBER_SPOTS" isint="true" />'
+        '       <Feature feature="TRACK_INDEX" name="Track index" isint="true" dimension="NONE"/>'
+        '       <Feature feature="NUMBER_SPOTS" name="Number of spots" isint="true" dimension="NONE"/>'
         "   </TrackFeatures>"
         "</FeatureDeclarations>"
     )
@@ -277,27 +393,13 @@ def test_add_all_features():
     obtained = FeaturesDeclaration()
     tml._add_all_features(it, element, obtained, {})
 
-    spot_features = {
-        "QUALITY": {"feature": "QUALITY", "isint": "false"},
-        "FRAME": {"feature": "FRAME", "isint": "true"},
-    }
-    edge_features = {
-        "SPOT_SOURCE_ID": {"feature": "SPOT_SOURCE_ID", "isint": "true"},
-        "SPOT_TARGET_ID": {"feature": "SPOT_TARGET_ID", "isint": "true"},
-    }
-    track_features = {
-        "TRACK_INDEX": {"feature": "TRACK_INDEX", "isint": "true"},
-        "NUMBER_SPOTS": {"feature": "NUMBER_SPOTS", "isint": "true"},
-    }
-    expected = nx.DiGraph(
-        Model={
-            "SpotFeatures": spot_features,
-            "EdgeFeatures": edge_features,
-            "TrackFeatures": track_features,
-        }
+    expected = FeaturesDeclaration(
+        node_features=spot_feats,
+        edge_features=edge_feats,
+        lineage_features=track_feats,
     )
 
-    assert is_equal(obtained, expected)
+    assert obtained == expected
 
 
 def test_add_all_features_empty():
@@ -305,93 +407,38 @@ def test_add_all_features_empty():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
-    obtained = nx.DiGraph()
-    tml.add_all_features(obtained, it, element)
+    obtained = FeaturesDeclaration()
+    tml._add_all_features(it, element, obtained, {})
 
-    assert is_equal(obtained, nx.DiGraph())
+    assert obtained == FeaturesDeclaration()
 
 
-def test_add_all_features_tag_with_no_feature_tag():
+def test_add_all_features_tag_with_no_feature_tag(spot_feats, track_feats):
     xml_data = (
         "<FeatureDeclarations>"
         "   <SpotFeatures>"
-        '       <Feature feature="QUALITY" isint="false" />'
-        '       <Feature feature="FRAME" isint="true" />'
+        '       <Feature feature="QUALITY" name="Quality" isint="false" dimension="NONE"/>'
+        '       <Feature feature="FRAME" name="Frame" isint="true" dimension="NONE"/>'
         "   </SpotFeatures>"
         "   <EdgeFeatures>"
         "   </EdgeFeatures>"
         "   <TrackFeatures>"
-        '       <Feature feature="TRACK_INDEX" isint="true" />'
-        '       <Feature feature="NUMBER_SPOTS" isint="true" />'
+        '       <Feature feature="TRACK_INDEX" name="Track index" isint="true" dimension="NONE"/>'
+        '       <Feature feature="NUMBER_SPOTS" name="Number of spots" isint="true" dimension="NONE"/>'
         "   </TrackFeatures>"
         "</FeatureDeclarations>"
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
-    obtained = nx.DiGraph(Model={})
-    tml.add_all_features(obtained, it, element)
+    obtained = FeaturesDeclaration()
+    tml._add_all_features(it, element, obtained, {})
 
-    spot_features = {
-        "QUALITY": {"feature": "QUALITY", "isint": "false"},
-        "FRAME": {"feature": "FRAME", "isint": "true"},
-    }
-    track_features = {
-        "TRACK_INDEX": {"feature": "TRACK_INDEX", "isint": "true"},
-        "NUMBER_SPOTS": {"feature": "NUMBER_SPOTS", "isint": "true"},
-    }
-    expected = nx.DiGraph(
-        Model={
-            "SpotFeatures": spot_features,
-            "EdgeFeatures": {},
-            "TrackFeatures": track_features,
-        }
+    expected = FeaturesDeclaration(
+        node_features=spot_feats, lineage_features=track_feats
     )
 
-    assert is_equal(obtained, expected)
-
-
-def test_add_all_features_no_feature_attribute():
-    xml_data = (
-        "<FeatureDeclarations>"
-        "   <SpotFeatures>"
-        '       <Feature feature="QUALITY" isint="false" />'
-        '       <Feature feature="FRAME" isint="true" />'
-        "   </SpotFeatures>"
-        "   <EdgeFeatures>"
-        '       <Feature feature="SPOT_SOURCE_ID" isint="true" />'
-        '       <Feature isint="true" />'
-        "   </EdgeFeatures>"
-        "   <TrackFeatures>"
-        '       <Feature feature="TRACK_INDEX" isint="true" />'
-        '       <Feature feature="NUMBER_SPOTS" isint="true" />'
-        "   </TrackFeatures>"
-        "</FeatureDeclarations>"
-    )
-    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
-    _, element = next(it)
-
-    obtained = nx.DiGraph(Model={})
-    tml.add_all_features(obtained, it, element)
-
-    spot_features = {
-        "QUALITY": {"feature": "QUALITY", "isint": "false"},
-        "FRAME": {"feature": "FRAME", "isint": "true"},
-    }
-    edge_features = {"SPOT_SOURCE_ID": {"feature": "SPOT_SOURCE_ID", "isint": "true"}}
-    track_features = {
-        "TRACK_INDEX": {"feature": "TRACK_INDEX", "isint": "true"},
-        "NUMBER_SPOTS": {"feature": "NUMBER_SPOTS", "isint": "true"},
-    }
-    expected = nx.DiGraph(
-        Model={
-            "SpotFeatures": spot_features,
-            "EdgeFeatures": edge_features,
-            "TrackFeatures": track_features,
-        }
-    )
-
-    assert is_equal(obtained, expected)
+    assert obtained == expected
 
 
 # _convert_attributes #########################################################
