@@ -56,6 +56,18 @@ class Feature:
         self.data_type = data_type
         self.unit = unit
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Feature):
+            return NotImplemented
+        return (
+            self.name == other.name
+            and self.description == other.description
+            and self.lineage_type == other.lineage_type
+            and self.provenance == other.provenance
+            and self.data_type == other.data_type
+            and self.unit == other.unit
+        )
+
     def __repr__(self) -> str:
         """
         Compute a string representation of the Feature object.
@@ -148,6 +160,15 @@ class FeaturesDeclaration:
         #     self.edge_feats = edge_features
         # if lineage_features is not None:
         #     self.lin_feats = lineage_features
+
+    def __eq__(self, other):
+        if not isinstance(other, FeaturesDeclaration):
+            return False
+        return (
+            self.node_feats == other.node_feats
+            and self.edge_feats == other.edge_feats
+            and self.lin_feats == other.lin_feats
+        )
 
     def __repr__(self) -> str:
         """
