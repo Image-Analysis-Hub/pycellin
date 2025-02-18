@@ -17,10 +17,6 @@ from pycellin.classes import CellLineage, Feature, FeaturesDeclaration
 import pycellin.io.trackmate.loader as tml
 
 
-# TODO: currently only 50% coverage. There are a lot of functions that are not
-# tested for now...
-
-
 def is_equal(obt, exp):
     """Check if two graphs are perfectly identical.
 
@@ -385,16 +381,21 @@ def test_add_all_features(
     xml_data = (
         "<FeatureDeclarations>"
         "   <SpotFeatures>"
-        '       <Feature feature="QUALITY" name="Quality" isint="false" dimension="NONE"/>'
+        '       <Feature feature="QUALITY" name="Quality" isint="false" '
+        '                dimension="NONE"/>'
         '       <Feature feature="FRAME" name="Frame" isint="true" dimension="NONE"/>'
         "   </SpotFeatures>"
         "   <EdgeFeatures>"
-        '       <Feature feature="SPOT_SOURCE_ID" name="Source spot ID" isint="true" dimension="NONE"/>'
-        '       <Feature feature="SPOT_TARGET_ID" name="Target spot ID" isint="true" dimension="NONE"/>'
+        '       <Feature feature="SPOT_SOURCE_ID" name="Source spot ID" isint="true" '
+        '                dimension="NONE"/>'
+        '       <Feature feature="SPOT_TARGET_ID" name="Target spot ID" isint="true" '
+        '                dimension="NONE"/>'
         "   </EdgeFeatures>"
         "   <TrackFeatures>"
-        '       <Feature feature="TRACK_INDEX" name="Track index" isint="true" dimension="NONE"/>'
-        '       <Feature feature="NUMBER_SPOTS" name="Number of spots" isint="true" dimension="NONE"/>'
+        '       <Feature feature="TRACK_INDEX" name="Track index" isint="true" '
+        '                dimension="NONE"/>'
+        '       <Feature feature="NUMBER_SPOTS" name="Number of spots" isint="true" '
+        '                dimension="NONE"/>'
         "   </TrackFeatures>"
         "</FeatureDeclarations>"
     )
@@ -430,14 +431,17 @@ def test_add_all_features_tag_with_no_feature_tag(
     xml_data = (
         "<FeatureDeclarations>"
         "   <SpotFeatures>"
-        '       <Feature feature="QUALITY" name="Quality" isint="false" dimension="NONE"/>'
+        '       <Feature feature="QUALITY" name="Quality" isint="false" '
+        '                dimension="NONE"/>'
         '       <Feature feature="FRAME" name="Frame" isint="true" dimension="NONE"/>'
         "   </SpotFeatures>"
         "   <EdgeFeatures>"
         "   </EdgeFeatures>"
         "   <TrackFeatures>"
-        '       <Feature feature="TRACK_INDEX" name="Track index" isint="true" dimension="NONE"/>'
-        '       <Feature feature="NUMBER_SPOTS" name="Number of spots" isint="true" dimension="NONE"/>'
+        '       <Feature feature="TRACK_INDEX" name="Track index" isint="true" '
+        '                dimension="NONE"/>'
+        '       <Feature feature="NUMBER_SPOTS" name="Number of spots" isint="true" '
+        '                dimension="NONE"/>'
         "   </TrackFeatures>"
         "</FeatureDeclarations>"
     )
