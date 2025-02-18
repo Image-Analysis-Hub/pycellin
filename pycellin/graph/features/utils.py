@@ -26,7 +26,9 @@ def get_pycellin_cell_lineage_features() -> dict[str, str]:
         "cell_displacement": (
             "Displacement of the cell between two consecutive detections"
         ),
+        "cell_length": "Length of the cell",
         "cell_speed": "Speed of the cell between two consecutive detections",
+        "cell_width": "Width of the cell",
         "relative_age": "Age of the cell since the beginning of the current cell cycle",
     }
     return cell_lineage_feats
