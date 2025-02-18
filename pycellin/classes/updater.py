@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from typing import Any
 
 from pycellin.classes import Data
-from pycellin.classes import Feature
 from pycellin.classes.feature_calculator import FeatureCalculator
 
 
@@ -68,33 +66,17 @@ class ModelUpdater:
 
     def register_calculator(
         self,
-        feature: Feature,
         calculator: FeatureCalculator,
-        *args: Any,
-        **kwargs: Any,
     ) -> None:
         """
         Register a calculator for a feature.
 
         Parameters
         ----------
-        feature : Feature
-            The feature of interest.
         calculator : FeatureCalculator
             The calculator to use to compute the feature.
-        args : tuple
-            Positional arguments to pass to the calculator.
-        kwargs : dict
-            Keyword arguments to pass to the calculator.
         """
-        self._calculators[feature.name] = calculator(feature, *args, **kwargs)
-        # TODO: isn't it better to pass an instance of the calculator
-        # instead of a class?
-        # I feel like maybe it is easier / more intuitive for the user...?
-        # Discuss with Marie.
-        # Also, since the feature is already passed to the calculator,
-        # maybe we don't need it for register_calculator()?
-        # Could get it from the calculator instance.
+        self._calculators[calculator.feature.name] = calculator
 
     def delete_calculator(self, feature_name: str) -> None:
         """

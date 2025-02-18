@@ -669,10 +669,7 @@ class Model:
 
     def add_custom_feature(
         self,
-        feat: Feature,
         calculator: FeatureCalculator,
-        *args: Any,
-        **kwargs: Any,
     ) -> None:
         """
         Add a custom feature to the model.
@@ -684,8 +681,6 @@ class Model:
 
         Parameters
         ----------
-        feat: Feature
-            Feature to add.
         calculator : FeatureCalculator
             Calculator to compute the feature.
 
@@ -695,13 +690,18 @@ class Model:
             If the feature is a cycle lineage feature and cycle lineages
             have not been computed yet.
         """
-        if feat.lineage_type == "CycleLineage" and not self.data.cycle_data:
+        if (
+            calculator.feature.lineage_type == "CycleLineage"
+            and not self.data.cycle_data
+        ):
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with `model.add_cycle_data()`."
             )
-        self.feat_declaration._add_feature(feat, calculator.get_feature_type())
-        self._updater.register_calculator(feat, calculator, *args, **kwargs)
+        self.feat_declaration._add_feature(
+            calculator.feature, calculator.get_feature_type()
+        )
+        self._updater.register_calculator(calculator)
         self.prepare_full_data_update()
 
     # TODO: in case of data coming from a loader, there is no calculator associated
@@ -723,15 +723,15 @@ class Model:
             "float",
             self.metadata["space_unit"],
         )
-        self.add_custom_feature(
+        calc = morpho.CellWidth(
             feat,
-            morpho.CellWidth,
             self.metadata["pixel_size"]["width"],
             skel_algo=skel_algo,
             tolerance=tolerance,
             method_width=method_width,
             width_ignore_tips=width_ignore_tips,
         )
+        self.add_custom_feature(calc)
 
     def add_cell_length(
         self,
@@ -749,15 +749,15 @@ class Model:
             "float",
             self.metadata["space_unit"],
         )
-        self.add_custom_feature(
+        calc = morpho.CellLength(
             feat,
-            morpho.CellLength,
             self.metadata["pixel_size"]["width"],
             skel_algo=skel_algo,
             tolerance=tolerance,
             method_width=method_width,
             width_ignore_tips=width_ignore_tips,
         )
+        self.add_custom_feature(calc)
 
     def add_absolute_age(
         self,
@@ -789,7 +789,7 @@ class Model:
             self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(feat, tracking.AbsoluteAge, time_step)
+        self.add_custom_feature(tracking.AbsoluteAge(feat, time_step))
 
     def add_relative_age(
         self,
@@ -822,7 +822,7 @@ class Model:
             self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(feat, tracking.RelativeAge, time_step)
+        self.add_custom_feature(tracking.RelativeAge(feat, time_step))
 
     def add_cell_cycle_completeness(
         self,
@@ -851,10 +851,7 @@ class Model:
             "bool",
             "none",
         )
-        self.add_custom_feature(
-            feat,
-            tracking.CellCycleCompleteness,
-        )
+        self.add_custom_feature(tracking.CellCycleCompleteness(feat))
 
     def add_division_time(
         self,
@@ -886,7 +883,7 @@ class Model:
             self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(feat, tracking.DivisionTime, time_step)
+        self.add_custom_feature(tracking.DivisionTime(feat, time_step))
 
     def add_division_rate(
         self,
@@ -918,7 +915,7 @@ class Model:
             f'1/{self.metadata["time_unit"]}' if in_time_unit else "1/frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(feat, tracking.DivisionRate, time_step)
+        self.add_custom_feature(tracking.DivisionRate(feat, time_step))
 
     def add_angle(
         self,
@@ -946,7 +943,7 @@ class Model:
             "float",
             unit,
         )
-        self.add_custom_feature(feat, motion.Angle, unit)
+        self.add_custom_feature(motion.Angle(feat, unit))
 
     def add_cell_displacement(
         self,
@@ -971,7 +968,7 @@ class Model:
             "float",
             self.metadata["space_unit"],
         )
-        self.add_custom_feature(feat, motion.CellDisplacement)
+        self.add_custom_feature(motion.CellDisplacement(feat))
 
     def add_branch_total_displacement(
         self,
@@ -996,7 +993,7 @@ class Model:
             "float",
             self.metadata["space_unit"],
         )
-        self.add_custom_feature(feat, motion.BranchTotalDisplacement)
+        self.add_custom_feature(motion.BranchTotalDisplacement(feat))
 
     def add_branch_mean_displacement(
         self,
@@ -1021,7 +1018,7 @@ class Model:
             "float",
             self.metadata["space_unit"],
         )
-        self.add_custom_feature(feat, motion.BranchMeanDisplacement)
+        self.add_custom_feature(motion.BranchMeanDisplacement(feat))
 
     def add_cell_speed(
         self,
@@ -1057,7 +1054,7 @@ class Model:
             ),
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(feat, motion.CellSpeed, time_step)
+        self.add_custom_feature(motion.CellSpeed(feat, time_step))
 
     def add_branch_mean_speed(
         self,
@@ -1086,9 +1083,7 @@ class Model:
             "float",
             f"{self.metadata['space_unit']} / {self.metadata['time_unit']}",
         )
-        self.add_custom_feature(
-            feat, motion.BranchMeanSpeed, include_incoming_edge=include_incoming_edge
-        )
+        self.add_custom_feature(motion.BranchMeanSpeed(feat, include_incoming_edge))
 
     def add_straightness(
         self,
@@ -1119,7 +1114,7 @@ class Model:
             "Pycellin",
             "float",
         )
-        self.add_custom_feature(feat, motion.Straightness, include_incoming_edge)
+        self.add_custom_feature(motion.Straightness(feat, include_incoming_edge))
 
     def _get_feature_method(self, feature_name):
         """
