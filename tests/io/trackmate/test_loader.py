@@ -1136,3 +1136,62 @@ def test_update_TRACK_ID_several_subgraphs():
 
     with pytest.raises(AssertionError):
         tml._update_TRACK_ID(lineage)
+
+
+# _update_location_related_features ###########################################
+
+
+def test_update_location_related_features():
+    lineage = CellLineage()
+    lineage.add_node(1, POSITION_X=1, POSITION_Y=2, POSITION_Z=3)
+    lineage.add_node(2, POSITION_X=4, POSITION_Y=5, POSITION_Z=6)
+    lineage.add_edge(1, 2, EDGE_X_LOCATION=7, EDGE_Y_LOCATION=8, EDGE_Z_LOCATION=9)
+    lineage.graph["TRACK_X_LOCATION"] = 10
+    lineage.graph["TRACK_Y_LOCATION"] = 11
+    lineage.graph["TRACK_Z_LOCATION"] = 12
+
+    tml._update_location_related_features(lineage)
+
+    assert lineage.nodes[1]["location"] == (1, 2, 3)
+    assert lineage.nodes[2]["location"] == (4, 5, 6)
+    assert lineage.edges[(1, 2)]["location"] == (7, 8, 9)
+    assert lineage.graph["location"] == (10, 11, 12)
+
+
+def test_update_location_related_features_one_node():
+    lineage = CellLineage()
+    lineage.add_node(1, POSITION_X=1, POSITION_Y=2, POSITION_Z=3)
+
+    tml._update_location_related_features(lineage)
+
+    assert lineage.graph["location"] == (1, 2, 3)
+
+
+# _get_specific_tags ##########################################################
+
+
+def test_get_specific_tags():
+    xml_path = "sample_data/FakeTracks.xml"
+    tag_names = ["GUIState", "FeaturePenalties"]
+    obtained = tml._get_specific_tags(xml_path, tag_names)
+
+    expected = {
+        "GUIState": ET.Element("GUIState", attrib={"state": "ConfigureViews"}),
+        "FeaturePenalties": ET.Element("FeaturePenalties"),  # empty tag
+    }
+
+    assert obtained.keys() == expected.keys()
+    for k in obtained:
+        assert k in expected
+        assert obtained[k].tag == expected[k].tag
+        assert obtained[k].attrib == expected[k].attrib
+
+
+# _get_trackmate_version ######################################################
+
+
+def test_get_trackmate_version():
+    xml_path = "sample_data/FakeTracks.xml"
+    obtained = tml._get_trackmate_version(xml_path)
+
+    assert obtained == "8.0.0-SNAPSHOT-f411154ed1a4b9de350bbfe91c230cf3ae7639a3"
