@@ -3,6 +3,7 @@ __pycache__/
 *.egg-info/
 .vscode/
 .coverage
+cov.xml
 
 *.gz
 sample_data/FakeTracks.tif
