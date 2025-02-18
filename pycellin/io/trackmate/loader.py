@@ -49,10 +49,10 @@ def _get_units(
     else:
         units = {}
     if "spatialunits" not in units:
-        units["spatialunits"] = "pixel"
+        units["spatialunits"] = "pixel"  # TrackMate default value.
         print("WARNING: No spatial units found in the XML file. Setting to 'pixel'.")
     if "timeunits" not in units:
-        units["timeunits"] = "frame"
+        units["timeunits"] = "frame"  # TrackMate default value.
         print("WARNING: No time units found in the XML file. Setting to 'frame'.")
     element.clear()  # We won't need it anymore so we free up some memory.
     # .clear() does not delete the element: it only removes all subelements
@@ -688,7 +688,7 @@ def _split_graph_into_lineages(
 
 def _check_for_fusions(
     lineages: list[CellLineage],
-) -> None:
+) -> dict[int, list[int]]:
     """
     Check if there are fusions in the lineages and notify the user.
 
@@ -696,6 +696,12 @@ def _check_for_fusions(
     ----------
     lineages : list[CellLineage]
         The lineages to check for fusions.
+
+    Returns
+    -------
+    dict[int, list[int]]
+        A dictionary where the keys are the lineage IDs and the values are
+        the list of cell IDs involved in the fusion.
     """
     fusion_dict = {}
     for lin in lineages:
@@ -717,6 +723,7 @@ def _check_for_fusions(
             f"Fusion{cell_txt} location:\n"
             f"{fusion_txt}"
         )
+    return fusion_dict
 
 
 def _update_features_declaration(

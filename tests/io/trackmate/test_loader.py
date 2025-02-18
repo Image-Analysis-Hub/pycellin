@@ -13,8 +13,9 @@ import networkx as nx
 import networkx.algorithms.isomorphism as iso
 import pytest
 
-from pycellin.classes import Feature, FeaturesDeclaration
+from pycellin.classes import CellLineage, Feature, FeaturesDeclaration
 import pycellin.io.trackmate.loader as tml
+
 
 # TODO: currently only 50% coverage. There are a lot of functions that are not
 # tested for now...
@@ -1014,3 +1015,74 @@ def test_add_tracks_info_no_nodes():
 
     assert is_equal(g1_obt, g1_exp)
     assert is_equal(g2_obt, g2_exp)
+
+
+# _split_graph_into_lineages ##################################################
+
+
+def test_split_graph_into_lineages():
+    g1_attr = {"name": "blob", "TRACK_ID": 1}
+    g2_attr = {"name": "blub", "TRACK_ID": 2}
+
+    g = nx.DiGraph()
+    g.add_node(1, TRACK_ID=1)
+    g.add_node(2, TRACK_ID=1)
+    g.add_edge(1, 2)
+    g.add_node(3, TRACK_ID=2)
+    g.add_node(4, TRACK_ID=2)
+    g.add_edge(3, 4)
+    obtained = tml._split_graph_into_lineages(g, [g1_attr, g2_attr])
+
+    g1_exp = CellLineage(g.subgraph([1, 2]))
+    g1_exp.graph["name"] = "blob"
+    g1_exp.graph["TRACK_ID"] = 1
+    g2_exp = CellLineage(g.subgraph([3, 4]))
+    g2_exp.graph["name"] = "blub"
+    g2_exp.graph["TRACK_ID"] = 2
+
+    assert len(obtained) == 2
+    assert is_equal(obtained[0], g1_exp)
+    assert is_equal(obtained[1], g2_exp)
+
+
+def test_split_graph_into_lineages_different_ID():
+    g1_attr = {"name": "blob", "TRACK_ID": 1}
+    g2_attr = {"name": "blub", "TRACK_ID": 2}
+
+    g = nx.DiGraph()
+    g.add_node(1, TRACK_ID=0)
+    g.add_node(2, TRACK_ID=1)
+    g.add_edge(1, 2)
+    g.add_node(3, TRACK_ID=2)
+    g.add_node(4, TRACK_ID=2)
+    g.add_edge(3, 4)
+
+    with pytest.raises(ValueError):
+        tml._split_graph_into_lineages(g, [g1_attr, g2_attr])
+
+
+# _check_for_fusions ##########################################################
+
+
+def test_check_for_fusions():
+    g = nx.DiGraph()
+    g.graph["lineage_ID"] = 0
+    g.add_nodes_from([1, 2, 3, 4])
+    g.add_edges_from([(1, 2), (1, 3), (2, 4), (3, 4)])
+
+    obtained = tml._check_for_fusions([CellLineage(g)])
+
+    expected = {0: [4]}
+
+    assert obtained == expected
+
+
+def test_check_for_fusions_no_fusion():
+    g = nx.DiGraph()
+    g.graph["lineage_ID"] = 0
+    g.add_nodes_from([1, 2, 3, 4])
+    g.add_edges_from([(1, 2), (1, 3), (2, 4)])
+
+    obtained = tml._check_for_fusions([CellLineage(g)])
+
+    assert obtained == {}
