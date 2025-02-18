@@ -1195,3 +1195,85 @@ def test_get_trackmate_version():
     obtained = tml._get_trackmate_version(xml_path)
 
     assert obtained == "8.0.0-SNAPSHOT-f411154ed1a4b9de350bbfe91c230cf3ae7639a3"
+
+
+# _get_time_step ##############################################################
+
+
+def test_get_time_step():
+    settings = ET.Element("Settings")
+    ET.SubElement(settings, "ImageData", timeinterval="0.5")
+    obtained = tml._get_time_step(settings)
+    expected = 0.5
+    assert obtained == expected
+
+
+def test_get_time_step_missing_timeinterval():
+    settings = ET.Element("Settings")
+    ET.SubElement(settings, "ImageData")
+    with pytest.raises(KeyError, match="The 'timeinterval' attribute is missing"):
+        tml._get_time_step(settings)
+
+
+def test_get_time_step_invalid_timeinterval():
+    settings = ET.Element("Settings")
+    ET.SubElement(settings, "ImageData", timeinterval="invalid")
+    with pytest.raises(
+        ValueError, match="The 'timeinterval' attribute cannot be converted to float"
+    ):
+        tml._get_time_step(settings)
+
+
+def test_get_time_step_missing_image_data():
+    settings = ET.Element("Settings")
+    with pytest.raises(KeyError, match="The 'ImageData' element is not found"):
+        tml._get_time_step(settings)
+
+
+# _get_pixel_size #############################################################
+
+
+def test_get_pixel_size():
+    settings = ET.Element("Settings")
+    image_data = ET.SubElement(settings, "ImageData")
+    image_data.attrib["pixelwidth"] = "1.5"
+    image_data.attrib["pixelheight"] = "2.0"
+    image_data.attrib["voxeldepth"] = "0.5"
+
+    obtained = tml._get_pixel_size(settings)
+
+    expected = {"width": 1.5, "height": 2.0, "depth": 0.5}
+
+    assert obtained == expected
+
+
+def test_get_pixel_size_missing_attribute():
+    settings = ET.Element("Settings")
+    image_data = ET.SubElement(settings, "ImageData")
+    image_data.attrib["pixelwidth"] = "1.5"
+    image_data.attrib["pixelheight"] = "2.0"
+
+    with pytest.raises(KeyError, match="The voxeldepth attribute is missing"):
+        tml._get_pixel_size(settings)
+
+
+def test_get_pixel_size_invalid_attribute():
+    settings = ET.Element("Settings")
+    image_data = ET.SubElement(settings, "ImageData")
+    image_data.attrib["pixelwidth"] = "1.5"
+    image_data.attrib["pixelheight"] = "2.0"
+    image_data.attrib["voxeldepth"] = "invalid"
+
+    with pytest.raises(
+        ValueError, match="The voxeldepth attribute cannot be converted to float."
+    ):
+        tml._get_pixel_size(settings)
+
+
+def test_get_pixel_size_missing_image_data():
+    settings = ET.Element("Settings")
+
+    with pytest.raises(
+        KeyError, match="The 'ImageData' element is not found in the settings."
+    ):
+        tml._get_pixel_size(settings)

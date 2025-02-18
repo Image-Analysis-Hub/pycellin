@@ -1182,7 +1182,7 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
                     )
                 except ValueError:
                     raise ValueError(
-                        "The {key_TM} attribute cannot be converted to float."
+                        f"The {key_TM} attribute cannot be converted to float."
                     )
             return pixel_size
 
