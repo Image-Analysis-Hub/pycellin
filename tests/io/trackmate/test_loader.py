@@ -1086,3 +1086,53 @@ def test_check_for_fusions_no_fusion():
     obtained = tml._check_for_fusions([CellLineage(g)])
 
     assert obtained == {}
+
+
+# _update_node_feature_key ####################################################
+
+
+def test_update_node_feature_key():
+    lineage = CellLineage()
+    old_key_values = ["value1", "value2", "value3"]
+    lineage.add_node(1, old_key=old_key_values[0])
+    lineage.add_node(2, old_key=old_key_values[1])
+    lineage.add_node(3, old_key=old_key_values[2])
+
+    tml._update_node_feature_key(lineage, "old_key", "new_key")
+
+    for i, node in enumerate(lineage.nodes):
+        assert "new_key" in lineage.nodes[node]
+        assert "old_key" not in lineage.nodes[node]
+        assert lineage.nodes[node]["new_key"] == old_key_values[i]
+
+
+# _update_TRACK_ID ############################################################
+
+
+def test_update_TRACK_ID():
+    lineage = CellLineage()
+    lineage.add_node(1)
+    lineage.graph["TRACK_ID"] = 10
+    tml._update_TRACK_ID(lineage)
+    assert "lineage_ID" in lineage.graph
+    assert lineage.graph["lineage_ID"] == 10
+    assert "lineage_ID" not in lineage.nodes[1]
+
+
+def test_update_TRACK_ID_no_TRACK_ID():
+    lineage = CellLineage()
+    lineage.add_node(1)
+    tml._update_TRACK_ID(lineage)
+    assert "lineage_ID" in lineage.graph
+    assert lineage.graph["lineage_ID"] == -1
+    assert "lineage_ID" in lineage.nodes[1]
+    assert lineage.nodes[1]["lineage_ID"] == -1
+
+
+def test_update_TRACK_ID_several_subgraphs():
+    lineage = CellLineage()
+    lineage.add_node(1)
+    lineage.add_node(2)
+
+    with pytest.raises(AssertionError):
+        tml._update_TRACK_ID(lineage)
