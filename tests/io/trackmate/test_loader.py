@@ -211,6 +211,53 @@ def track_feats(
     }
 
 
+# _get_units ##################################################################
+
+
+def test_get_units():
+    xml_data = '<Model spatialunits="µm" timeunits="min">' "</Model>"
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    obtained = tml._get_units(element)
+
+    expected = {"spatialunits": "µm", "timeunits": "min"}
+
+    assert obtained == expected
+
+
+def test_get_units_missing_spaceunits():
+    xml_data = '<Model timeunits="min">' "</Model>"
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    obtained = tml._get_units(element)
+
+    expected = {"spatialunits": "pixel", "timeunits": "min"}
+
+    assert obtained == expected
+
+
+def test_get_units_missing_timeunits():
+    xml_data = '<Model spatialunits="µm">' "</Model>"
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    obtained = tml._get_units(element)
+
+    expected = {"spatialunits": "µm", "timeunits": "frame"}
+
+    assert obtained == expected
+
+
+def test_get_units_no_units():
+    xml_data = "<Model>" "</Model>"
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    obtained = tml._get_units(element)
+
+    expected = {"spatialunits": "pixel", "timeunits": "frame"}
+
+    assert obtained == expected
+
+
 # _get_features_dict ##########################################################
 
 

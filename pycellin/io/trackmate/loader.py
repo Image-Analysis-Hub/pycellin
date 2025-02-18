@@ -44,7 +44,16 @@ def _get_units(
         A dictionary where the keys are the attribute names and the values are the
         corresponding attribute values (units information).
     """
-    units = deepcopy(element.attrib)
+    if element.attrib:
+        units = deepcopy(element.attrib)
+    else:
+        units = {}
+    if "spatialunits" not in units:
+        units["spatialunits"] = "pixel"
+        print("WARNING: No spatial units found in the XML file. Setting to 'pixel'.")
+    if "timeunits" not in units:
+        units["timeunits"] = "frame"
+        print("WARNING: No time units found in the XML file. Setting to 'frame'.")
     element.clear()  # We won't need it anymore so we free up some memory.
     # .clear() does not delete the element: it only removes all subelements
     # and clears or sets to `None` all attributes.
