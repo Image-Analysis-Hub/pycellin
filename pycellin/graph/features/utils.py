@@ -4,12 +4,6 @@
 from pycellin.classes import Feature
 
 
-# TODO: see if there is way to get the same info without hard coding
-# the list of available features.
-# TODO: should these functions be here or in a utils.py at a higher level,
-# like at the root of Pycellin?
-
-
 def get_pycellin_cell_lineage_features() -> dict[str, str]:
     """
     Return the Pycellin features that can be computed on cell lineages.
