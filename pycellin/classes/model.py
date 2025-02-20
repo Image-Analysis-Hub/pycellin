@@ -44,7 +44,6 @@ class Model:
         self.data = data
 
         self._updater = ModelUpdater()
-        # self._updater = ModelUpdater(self)
 
         # Add an optional argument to ask to compute the CycleLineage?
         # Add a description in which people can put whatever they want
@@ -1342,49 +1341,6 @@ class Model:
         self.data._add_cycle_lineages()
         self.feat_declaration._add_cycle_lineage_features()
 
-    def save_to_pickle(
-        self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL
-    ) -> None:
-        """
-        Save the model to a file by pickling it.
-
-        Parameters
-        ----------
-        path : str
-            Path to save the model.
-        protocol : int, optional
-            Pickle protocol to use (default is pickle.HIGHEST_PROTOCOL).
-        """
-        with open(path, "wb") as file:
-            pickle.dump(self, file, protocol=protocol)
-
-    @staticmethod
-    def load_from_pickle(path: str) -> None:
-        """
-        Load a model from a pickled Pycellin file.
-
-        Parameters
-        ----------
-        path : str
-            Path to read the model.
-        """
-        with open(path, "rb") as file:
-            return pickle.load(file)
-
-    def export(self, path: str, format: str) -> None:
-        """
-        Export the model to a file in a specific format (e.g. TrackMate).
-
-        Parameters
-        ----------
-        path : str
-            Path to export the model.
-        format : str
-            Format of the exported file.
-        """
-        # TODO: implement
-        pass
-
     def to_cell_dataframe(self, lineages_ID: list[int] | None = None) -> pd.DataFrame:
         """
         Return the cell data of the model as a pandas DataFrame.
@@ -1558,3 +1514,46 @@ class Model:
         )
 
         return df
+
+    def save_to_pickle(
+        self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL
+    ) -> None:
+        """
+        Save the model to a file by pickling it.
+
+        Parameters
+        ----------
+        path : str
+            Path to save the model.
+        protocol : int, optional
+            Pickle protocol to use (default is pickle.HIGHEST_PROTOCOL).
+        """
+        with open(path, "wb") as file:
+            pickle.dump(self, file, protocol=protocol)
+
+    @staticmethod
+    def load_from_pickle(path: str) -> None:
+        """
+        Load a model from a pickled Pycellin file.
+
+        Parameters
+        ----------
+        path : str
+            Path to read the model.
+        """
+        with open(path, "rb") as file:
+            return pickle.load(file)
+
+    def export(self, path: str, format: str) -> None:
+        """
+        Export the model to a file in a specific format (e.g. TrackMate).
+
+        Parameters
+        ----------
+        path : str
+            Path to export the model.
+        format : str
+            Format of the exported file.
+        """
+        # TODO: implement
+        pass
