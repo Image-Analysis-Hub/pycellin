@@ -342,6 +342,14 @@ class FeaturesDeclaration:
         }
 
         # Node features.
+        feat_lin_ID = Feature(
+            name="lineage_ID",
+            description=(
+                "ID of the cell cycle lineage, "
+                "which is the same ID as its associated cell lineage."
+            ),
+            **common_fields,
+        )
         feat_ID = Feature(
             name="cycle_ID",
             description=(
@@ -370,18 +378,12 @@ class FeaturesDeclaration:
             ),
             **common_fields,
         )
-        self._add_features([feat_ID, feat_cells, feat_length, feat_level], ["node"] * 4)
+        self._add_features(
+            [feat_lin_ID, feat_ID, feat_cells, feat_length, feat_level], ["node"] * 5
+        )
 
         # Lineage features.
-        feat_ID = Feature(
-            name="cycle_lineage_ID",
-            description=(
-                "ID of the cell cycle lineage, "
-                "which is the same ID as its associated cell lineage."
-            ),
-            **common_fields,
-        )
-        self._add_feature(feat_ID, "lineage")
+        self._add_feature(feat_lin_ID, "lineage")
 
     def _remove_feature(
         self, feature_name: str, feature_type: Literal["node", "edge", "lineage"]
