@@ -1106,7 +1106,9 @@ class CycleLineage(Lineage):
             nx.freeze(self)
 
             # Adding node and graph features.
+            self.graph["lineage_ID"] = cell_lineage.graph["lineage_ID"]
             for n in divs + leaves:
+                self.nodes[n]["lineage_ID"] = cell_lineage.graph["lineage_ID"]
                 self.nodes[n]["cycle_ID"] = n
                 self.nodes[n]["cells"] = cell_lineage.get_cell_cycle(n)
                 self.nodes[n]["cycle_length"] = len(self.nodes[n]["cells"])
@@ -1116,7 +1118,6 @@ class CycleLineage(Lineage):
             # cell_cycle completeness?
             # div_time?
             # Or I add it later with add_custom_feature()?
-            self.graph["cycle_lineage_ID"] = cell_lineage.graph["lineage_ID"]
 
     # Methods to freeze / unfreeze?
 
