@@ -1269,6 +1269,11 @@ class Model:
             If the feature type is not recognized.
             If the feature does not exist.
         """
+        # TODO: stop the user from removing mandatory features? With a force argument
+        # set to False to bypass the check?
+        # Or create a list of protected features so people can decide to add some of
+        # their own features to it?
+
         # Preliminary checks.
         if not check_literal_type(feature_type, FeatureType):
             raise ValueError(

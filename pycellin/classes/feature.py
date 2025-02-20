@@ -44,6 +44,8 @@ class Feature:
         ValueError
             If the lineage type is not a valid value.
         """
+        # TODO: add a protect argument to prevent the modification of the feature
+        # and create the related methods to protect / unprotect the feature, and getters
         # TODO: should the feature type be stored as an attribute?
         self.name = name
         self.description = description
