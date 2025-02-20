@@ -382,8 +382,8 @@ class FeaturesDeclaration:
             [feat_lin_ID, feat_ID, feat_cells, feat_length, feat_level], ["node"] * 5
         )
 
-        # Lineage features.
-        self._add_feature(feat_lin_ID, "lineage")
+        # We don't need to add the lineage_ID feature to the lineage features
+        # since it is already present in the cell lineage features.
 
     def _remove_feature(
         self, feature_name: str, feature_type: Literal["node", "edge", "lineage"]
