@@ -4,6 +4,9 @@
 import pickle
 from typing import Any, Literal
 
+import pandas as pd
+import networkx as nx
+
 from pycellin.classes import CellLineage, Data, Feature, FeaturesDeclaration
 from pycellin.classes.feature_calculator import FeatureCalculator
 from pycellin.classes.updater import ModelUpdater
@@ -1356,9 +1359,9 @@ class Model:
             pickle.dump(self, file, protocol=protocol)
 
     @staticmethod
-    def read_from_pickle(path: str) -> None:
+    def load_from_pickle(path: str) -> None:
         """
-        Read a model from a pickled Pycellin file.
+        Load a model from a pickled Pycellin file.
 
         Parameters
         ----------
@@ -1379,5 +1382,179 @@ class Model:
         format : str
             Format of the exported file.
         """
-        # TODO: implement export model
+        # TODO: implement
         pass
+
+    def to_cell_dataframe(self, lineages_ID: list[int] | None = None) -> pd.DataFrame:
+        """
+        Return the cell data of the model as a pandas DataFrame.
+
+        Parameters
+        ----------
+        lineages_ID : list[int], optional
+            List of the lineages ID to export (default is None).
+            If None, all lineages are exported.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame containing the cell data.
+
+        Raises
+        ------
+        ValueError
+            If the `lineage_ID`, `frame` or `cell_ID` feature is not found in the model.
+        """
+        list_df = []
+        nb_nodes = 0
+        for lin_ID, lineage in self.data.cell_data.items():
+            if lineages_ID and lin_ID not in lineages_ID:
+                continue
+            nb_nodes += len(lineage)
+            tmp_df = pd.DataFrame(dict(lineage.nodes(data=True)).values())
+            list_df.append(tmp_df)
+        df = pd.concat(list_df, ignore_index=True)
+        assert nb_nodes == len(df)
+
+        # Reoder the columns to have Pycellin mandatory features first.
+        columns = df.columns.tolist()
+        try:
+            columns.remove("lineage_ID")
+            columns.remove("frame")
+            columns.remove("cell_ID")
+        except ValueError as err:
+            raise err
+        columns = ["lineage_ID", "frame", "cell_ID"] + columns
+        df = df[columns]
+        df.sort_values(
+            ["lineage_ID", "frame", "cell_ID"], ignore_index=True, inplace=True
+        )
+
+        return df
+
+    def to_link_dataframe(self, lineages_ID: list[int] | None = None) -> pd.DataFrame:
+        """
+        Return the link data of the model as a pandas DataFrame.
+
+        Parameters
+        ----------
+        lineages_ID : list[int], optional
+            List of the lineages ID to export (default is None).
+            If None, all lineages are exported.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame containing the link data.
+        """
+        list_df = []
+        nb_edges = 0
+        for lin_ID, lineage in self.data.cell_data.items():
+            if lineages_ID and lin_ID not in lineages_ID:
+                continue
+            nb_edges += len(lineage.edges)
+            tmp_df = nx.to_pandas_edgelist(
+                lineage, source="source_cell_ID", target="target_cell_ID"
+            )
+            list_df.append(tmp_df)
+        df = pd.concat(list_df, ignore_index=True)
+        assert nb_edges == len(df)
+
+        return df
+
+    def to_lineage_dataframe(
+        self, lineages_ID: list[int] | None = None
+    ) -> pd.DataFrame:
+        """
+        Return the lineage data of the model as a pandas DataFrame.
+
+        Parameters
+        ----------
+        lineages_ID : list[int], optional
+            List of the lineages ID to export (default is None).
+            If None, all lineages are exported.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame containing the lineage data.
+
+        Raises
+        ------
+        ValueError
+            If the `lineage_ID` is not found in the model.
+        """
+        list_df = []
+        for lin_ID, lineage in self.data.cell_data.items():
+            if lineages_ID and lin_ID not in lineages_ID:
+                continue
+            tmp_df = pd.DataFrame([lineage.graph])
+            list_df.append(tmp_df)
+        df = pd.concat(list_df, ignore_index=True)
+
+        # Reoder the columns to have Pycellin mandatory features first.
+        columns = df.columns.tolist()
+        try:
+            columns.remove("lineage_ID")
+        except ValueError as err:
+            raise err
+        columns = ["lineage_ID"] + columns
+        df = df[columns]
+        df.sort_values("lineage_ID", ignore_index=True, inplace=True)
+
+        return df
+
+    def to_cycle_dataframe(self, lineages_ID: list[int] | None = None) -> pd.DataFrame:
+        """
+        Return the cell cycle data of the model as a pandas DataFrame.
+
+        Parameters
+        ----------
+        lineages_ID : list[int], optional
+            List of the lineages ID to export (default is None).
+            If None, all lineages are exported.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame containing the cell cycle data.
+
+        Raises
+        ------
+        ValueError
+            If the cycle lineages have not been computed yet.
+        ValueError
+            If the `lineage_ID`, `level` or `cycle_ID` feature is not found
+            in the model.
+        """
+        list_df = []
+        nb_nodes = 0
+        if not self.data.cycle_data:
+            raise ValueError(
+                "Cycle lineages have not been computed yet. "
+                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+            )
+        for lin_ID, lineage in self.data.cycle_data.items():
+            if lineages_ID and lin_ID not in lineages_ID:
+                continue
+            nb_nodes += len(lineage)
+            tmp_df = pd.DataFrame(dict(lineage.nodes(data=True)).values())
+            list_df.append(tmp_df)
+        df = pd.concat(list_df, ignore_index=True)
+        assert nb_nodes == len(df)
+
+        # Reoder the columns to have Pycellin mandatory features first.
+        columns = df.columns.tolist()
+        try:
+            columns.remove("lineage_ID")
+            columns.remove("level")
+            columns.remove("cycle_ID")
+        except ValueError as err:
+            raise err
+        columns = ["lineage_ID", "level", "cycle_ID"] + columns
+        df = df[columns]
+        df.sort_values(
+            ["lineage_ID", "level", "cycle_ID"], ignore_index=True, inplace=True
+        )
+
+        return df
