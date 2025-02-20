@@ -16,12 +16,7 @@ from pycellin.classes import Model
 from pycellin.classes import FeaturesDeclaration, Feature
 from pycellin.classes import Data
 from pycellin.classes import CellLineage
-
-# TODO: maybe TRACK_ID / lineage_ID should not be added as a node feature,
-# and a fonction get_lineage_ID() should be implemented instead?
-# Another issue is that we currently have 2 features called lineage_ID,
-# one on nodes and one on lineages. However only the one in the lineage
-# is in the features declaration.
+import pycellin.graph.features.utils as gfu
 
 
 def _get_units(
@@ -745,28 +740,14 @@ def _update_features_declaration(
         True if the model has segmentation data, False otherwise.
     """
     # Node features.
-    feat_cell_id = Feature(
-        "cell_ID",
-        "Unique identifier of the cell",
-        "CellLineage",
-        "TrackMate",
-        "int",
-        "none",
-    )
+    feat_lin_ID = gfu.define_lineage_ID_Feature("TrackMate")
+    feat_cell_ID = gfu.define_cell_ID_Feature("TrackMate")
     feat_declaration._remove_features(
         ["POSITION_X", "POSITION_Y", "POSITION_Z"], ["node"] * 3
     )  # Replaced by the following `location` feature, a triplet of floats.
-    feat_location = Feature(
-        "location",
-        "Location of the cell",
-        "CellLineage",
-        "TrackMate",
-        "float",
-        units["spatialunits"],
-    )
-    feat_declaration._add_features([feat_cell_id, feat_location], ["node"] * 2)
-    feat_declaration._modify_feature_description(
-        "cell_ID", "Unique identifier of the cell", "node"
+    feat_location = gfu.define_cell_location_Feature(units["spatialunits"], "TrackMate")
+    feat_declaration._add_features(
+        [feat_lin_ID, feat_cell_ID, feat_location], ["node"] * 3
     )
     feat_declaration._rename_feature("FRAME", "frame", "node")
     if segmentation:
