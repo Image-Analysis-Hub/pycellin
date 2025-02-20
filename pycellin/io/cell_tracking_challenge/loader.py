@@ -13,6 +13,7 @@ from pycellin.classes.model import Model
 from pycellin.classes.feature import FeaturesDeclaration, Feature
 from pycellin.classes.data import Data
 from pycellin.classes.lineage import CellLineage
+import pycellin.graph.features.utils as gfu
 
 # TODO: check for fusions once the model is built and deal with the fusions
 
@@ -58,24 +59,16 @@ def _create_FeaturesDeclaration() -> FeaturesDeclaration:
         identification features.
     """
     feat_declaration = FeaturesDeclaration()
-    node_id_feat = Feature(
-        "cell_ID",
-        "Unique identifier of the cell",
-        "CellLineage",
-        "Pycellin",
-        "int",
-        "none",
+    cell_ID_feat = gfu.define_cell_ID_Feature()
+    lin_ID_feat = gfu.define_lineage_ID_Feature()
+    frame_feat = gfu.define_frame_Feature()
+    # TODO: is the frame feature necessary obtained from the CTC file?
+    # Or is it a Pycellin feature?
+    # TODO: And the other features...? PARENT, TRACK...
+    feat_declaration._add_features(
+        [cell_ID_feat, lin_ID_feat, frame_feat], ["node"] * 3
     )
-    lin_id_feat = Feature(
-        "lineage_ID",
-        "Unique identifier of the lineage",
-        "CellLineage",
-        "Pycellin",
-        "int",
-        "none",
-    )
-    feat_declaration._add_features([node_id_feat, lin_id_feat], ["node"] * 2)
-    feat_declaration._add_feature(lin_id_feat, "lineage")
+    feat_declaration._add_feature(lin_ID_feat, "lineage")
     return feat_declaration
 
 
@@ -170,6 +163,7 @@ def _merge_tracks(
             for node, data in graph.nodes(data=True)
             if data["TRACK"] == parent_track
         ]
+        print(parent_nodes)
         parent_node = sorted(parent_nodes, key=lambda x: x[1])[-1]
         graph.add_edge(parent_node[0], nodes[0][0])
 
@@ -261,6 +255,7 @@ def load_CTC_file(
 if __name__ == "__main__":
 
     ctc_file = "C:/Users/haiba/Documents/01_RES/res_track.txt"
+    ctc_file = "/mnt/data/Films_Laure/Benchmarks/CTC/EvaluationSoftware/testing_dataset/03_RES/res_track.txt"
     model = load_CTC_file(ctc_file)
     print(model)
     print(model.feat_declaration)
