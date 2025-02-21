@@ -23,6 +23,16 @@ class Data:
         else:
             self.cycle_data = None
 
+    def __repr__(self) -> str:
+        return f"Data(cell_data={self.cell_data!r}, " f"cycle_data={self.cycle_data!r})"
+
+    def __str__(self) -> str:
+        if self.cycle_data:
+            txt = f" and {self.number_of_lineages()} cycle lineages"
+        else:
+            txt = ""
+        return f"Data object with {self.number_of_lineages()} cell lineages{txt}."
+
     def _add_cycle_lineages(self, lineage_IDs: list[int] | None = None) -> None:
         """
         Add the cell cycle lineages from the cell lineages.
