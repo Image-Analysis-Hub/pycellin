@@ -24,7 +24,7 @@ class Data:
             self.cycle_data = None
 
     def __repr__(self) -> str:
-        return f"Data(cell_data={self.cell_data!r}, " f"cycle_data={self.cycle_data!r})"
+        return f"Data(cell_data={self.cell_data!r}, cycle_data={self.cycle_data!r})"
 
     def __str__(self) -> str:
         if self.cycle_data:
