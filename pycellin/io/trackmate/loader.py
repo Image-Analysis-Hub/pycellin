@@ -1224,11 +1224,11 @@ def load_TrackMate_XML(
     dict_tags = _get_specific_tags(
         xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
     )
+    metadata["time_step"] = _get_time_step(dict_tags["Settings"])
+    metadata["pixel_size"] = _get_pixel_size(dict_tags["Settings"])
     for tag_name, tag in dict_tags.items():
         element_string = ET.tostring(tag, encoding="utf-8").decode()
         metadata[tag_name] = element_string
-    metadata["time_step"] = _get_time_step(dict_tags["Settings"])
-    metadata["pixel_size"] = _get_pixel_size(dict_tags["Settings"])
 
     model = Model(metadata, feat_declaration, data)
     return model
