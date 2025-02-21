@@ -328,6 +328,8 @@ class Model:
         KeyError
             If the lineage does not have a lineage_ID.
         """
+        # FIXME: need to handle the case where we add an empty lineage, i.e. no
+        # lineage_ID
         try:
             lin_ID = lineage.graph["lineage_ID"]
         except KeyError:
