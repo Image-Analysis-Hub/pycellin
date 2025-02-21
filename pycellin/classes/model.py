@@ -64,21 +64,21 @@ class Model:
     def __str__(self) -> str:
         if self.metadata and self.data:
             nb_lin = self.data.number_of_lineages()
-            if "Name" in self.metadata and "Provenance" in self.metadata:
+            if "name" in self.metadata and "provenance" in self.metadata:
                 txt = (
-                    f"Model named '{self.metadata['Name']}' "
+                    f"Model named '{self.metadata['name']}' "
                     f"with {nb_lin} lineage{'s' if nb_lin > 1 else ''}, "
-                    f"built from {self.metadata['Provenance']}."
+                    f"built from {self.metadata['provenance']}."
                 )
-            elif "Name" in self.metadata:
+            elif "name" in self.metadata:
                 txt = (
-                    f"Model named '{self.metadata['Name']}' "
+                    f"Model named '{self.metadata['name']}' "
                     f"with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
                 )
-            elif "Provenance" in self.metadata:
+            elif "provenance" in self.metadata:
                 txt = (
                     f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}, "
-                    f"built from {self.metadata['Provenance']}."
+                    f"built from {self.metadata['provenance']}."
                 )
             else:
                 txt = f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
@@ -86,15 +86,15 @@ class Model:
             nb_lin = self.data.number_of_lineages()
             txt = f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
         elif self.metadata:
-            if "Name" in self.metadata and "Provenance" in self.metadata:
+            if "name" in self.metadata and "provenance" in self.metadata:
                 txt = (
-                    f"Model named '{self.metadata['Name']}' "
-                    f"built from {self.metadata['Provenance']}."
+                    f"Model named '{self.metadata['name']}' "
+                    f"built from {self.metadata['provenance']}."
                 )
-            elif "Name" in self.metadata:
-                txt = f"Model named '{self.metadata['Name']}'."
-            elif "Provenance" in self.metadata:
-                txt = f"Model built from {self.metadata['Provenance']}."
+            elif "name" in self.metadata:
+                txt = f"Model named '{self.metadata['name']}'."
+            elif "provenance" in self.metadata:
+                txt = f"Model built from {self.metadata['provenance']}."
             else:
                 txt = "Empty model."
         else:
