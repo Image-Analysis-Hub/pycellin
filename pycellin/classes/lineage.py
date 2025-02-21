@@ -442,6 +442,14 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
 class CellLineage(Lineage):
 
+    def __str__(self) -> str:
+        name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
+        txt = (
+            f"CellLineage of ID {self.graph['lineage_ID']}{name_txt}"
+            f" with {len(self.nodes())} cells and {len(self.edges())} links."
+        )
+        return txt
+
     def _get_next_available_node_ID(self) -> int:
         """
         Return the next available node ID in the lineage.
@@ -1118,6 +1126,14 @@ class CycleLineage(Lineage):
             # cell_cycle completeness?
             # div_time?
             # Or I add it later with add_custom_feature()?
+
+    def __str__(self) -> str:
+        name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
+        txt = (
+            f"CycleLineage of ID {self.graph['lineage_ID']}{name_txt}"
+            f" with {len(self.nodes())} cell cycles and {len(self.edges())} links."
+        )
+        return txt
 
     # Methods to freeze / unfreeze?
 
