@@ -631,24 +631,40 @@ class Model:
 
         return link_attrs
 
-    def check_for_fusions(self) -> list[Cell]:
+    def check_for_fusions(self, lineage_IDs: list[int] | None = None) -> list[Cell]:
         """
         Check if the cell lineages have fusion events and return the fusion cells.
 
         A fusion event is defined as a cell with more than one parent.
+
+        Parameters
+        ----------
+        lineage_IDs : list[int], optional
+            List of lineage IDs to check for fusions.
+            If not specified, all lineages will be checked (default is None).
 
         Returns
         -------
         list[Cell]
             List of the fusion cells. Each cell is a named tuple:
             (cell_ID, lineage_ID).
+
+        Raises
+        ------
+        KeyError
+            If a lineage with the specified ID does not exist in the model.
         """
         fusions = []
-        for lineage in self.data.cell_data.values():
+        if lineage_IDs is None:
+            lineage_IDs = self.data.cell_data.keys()
+        for lin_ID in lineage_IDs:
+            try:
+                lineage = self.data.cell_data[lin_ID]
+            except KeyError as err:
+                raise KeyError(f"Lineage with ID {lin_ID} does not exist.") from err
             tmp = lineage.check_for_fusions()
             if tmp:
-                lineage_ID = lineage.graph["lineage_ID"]
-                fusions.extend([Cell(cell_ID, lineage_ID) for cell_ID in tmp])
+                fusions.extend([Cell(cell_ID, lin_ID) for cell_ID in tmp])
         return fusions
 
     def prepare_full_data_update(self) -> None:
