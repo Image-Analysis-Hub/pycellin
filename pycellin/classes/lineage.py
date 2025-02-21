@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from itertools import pairwise
 import types
-from typing import Any, Generator, Iterator, Literal, Tuple
+from typing import Any, Generator, Literal, Tuple
 
 from igraph import Graph
 import networkx as nx
