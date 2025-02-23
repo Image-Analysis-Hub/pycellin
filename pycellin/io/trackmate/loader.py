@@ -852,6 +852,7 @@ def _update_TRACK_ID(
     else:
         # One-node graph don't have the TRACK_ID feature in the graph
         # or in the nodes, so we have to create it.
+        # We set the ID of a one-node lineage to the negative of the node ID.
         assert len(lineage) == 1, "TRACK_ID not found and not a one-node lineage."
         node = [n for n in lineage.nodes][0]
         lineage.graph["lineage_ID"] = -node
