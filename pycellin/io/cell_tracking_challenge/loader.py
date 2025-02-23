@@ -1,6 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+loader.py
+
+This module is part of the Pycellin package.
+
+This module provides functions to load and process Cell Tracking Challenge (CTC) files
+into Pycellin models. It includes a function to load a CTC file into Pycellin model
+and helper functions to create metadata, features, and lineage graphs.
+
+References:
+- CTC website: https://celltrackingchallenge.net/
+- CTC tracking annotations conventions:
+https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content%20conventions.pdf
+"""
+
 from datetime import datetime
 from itertools import pairwise
 from pathlib import Path
@@ -15,7 +30,7 @@ from pycellin.classes.data import Data
 from pycellin.classes.lineage import CellLineage
 import pycellin.graph.features.utils as gfu
 
-# TODO: check for fusions once the model is built and deal with the fusions
+# FIXME: get_distribution("pycellin").version is not working
 
 
 def _create_metadata(
@@ -44,7 +59,7 @@ def _create_metadata(
     # TODO: is it possible to get space_unit with the labels data?
     # or a better time_unit with the images metadata?
     # or maybe ask the user...
-    metadata["pycellin_version"] = get_distribution("pycellin").version
+    # metadata["pycellin_version"] = get_distribution("pycellin").version
     return metadata
 
 
@@ -62,9 +77,6 @@ def _create_FeaturesDeclaration() -> FeaturesDeclaration:
     cell_ID_feat = gfu.define_cell_ID_Feature()
     lin_ID_feat = gfu.define_lineage_ID_Feature()
     frame_feat = gfu.define_frame_Feature()
-    # TODO: is the frame feature necessary obtained from the CTC file?
-    # Or is it a Pycellin feature?
-    # TODO: And the other features...? PARENT, TRACK...
     feat_declaration._add_features(
         [cell_ID_feat, lin_ID_feat, frame_feat], ["node"] * 3
     )
@@ -163,7 +175,6 @@ def _merge_tracks(
             for node, data in graph.nodes(data=True)
             if data["TRACK"] == parent_track
         ]
-        print(parent_nodes)
         parent_node = sorted(parent_nodes, key=lambda x: x[1])[-1]
         graph.add_edge(parent_node[0], nodes[0][0])
 
@@ -205,6 +216,7 @@ def load_CTC_file(
 
     Only track topology is read: no cell segmentations are extracted
     from associated label images.
+    The CTC tracking format does not support fusion events.
 
     Parameters
     ----------
@@ -243,7 +255,10 @@ def load_CTC_file(
         else:
             assert len(lin) == 1, "Lineage ID not found and not a one-node lineage."
             node = [n for n in lin.nodes][0]
-            lin_id = f"Node_{node}"
+            # We set the ID of a one-node lineage to the negative of the node ID.
+            lin_id = -node
+            lin.graph["lineage_ID"] = lin_id
+            lin.nodes[node]["lineage_ID"] = lin_id
             data[lin_id] = lin
 
     model = Model(
@@ -254,18 +269,20 @@ def load_CTC_file(
 
 if __name__ == "__main__":
 
-    ctc_file = "C:/Users/haiba/Documents/01_RES/res_track.txt"
-    ctc_file = "/mnt/data/Films_Laure/Benchmarks/CTC/EvaluationSoftware/testing_dataset/03_RES/res_track.txt"
+    ctc_file = "sample_data\FakeTracks_TMtoCTC_res.txt"
+    ctc_file = "sample_data\Ecoli_growth_on_agar_pad_TMtoCTC_res.txt"
+    # ctc_file = "/mnt/data/Films_Laure/Benchmarks/CTC/EvaluationSoftware/testing_dataset/03_RES/res_track.txt"
     model = load_CTC_file(ctc_file)
     print(model)
     print(model.feat_declaration)
+    print(model.data)
 
     for lin_id, lin in model.data.cell_data.items():
         print(f"{lin_id} - {lin}")
         lin.plot()
 
-    model.add_cycle_data()
-    for lin_id, lin in model.data.cycle_data.items():
-        lin.plot()
+    # model.add_cycle_data()
+    # for lin_id, lin in model.data.cycle_data.items():
+    #     lin.plot()
 
-    print(model.data.cell_data[1].nodes(data=True))
+    # print(model.data.cell_data[1].nodes(data=True))
