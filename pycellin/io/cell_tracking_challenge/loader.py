@@ -216,8 +216,8 @@ def load_CTC_file(
 
     Only track topology is read: no cell segmentations are extracted
     from associated label images.
-    The CTC tracking format does not support fusion events and does not allow gaps
-    gap right after division events.
+    The CTC tracking format does not support fusion events and does not allow
+    gaps right after division events.
 
     Parameters
     ----------
