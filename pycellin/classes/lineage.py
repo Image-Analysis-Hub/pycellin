@@ -96,6 +96,23 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ancestors = nx.shortest_path(self, source=root, target=node)[:-1]
         return ancestors
 
+    def get_descendants(self, node: int) -> list[int]:
+        """
+        Return all the descendants of a given node.
+
+        Parameters
+        ----------
+        node : int
+            A node of the lineage.
+
+        Returns
+        -------
+        list[int]
+            A list of all the descendant nodes, from target node to leaf nodes.
+        """
+        descendants = nx.descendants(self, node)
+        return list(descendants)
+
     def is_root(self, node: int) -> bool:
         """
         Check if a given node is a root node.
