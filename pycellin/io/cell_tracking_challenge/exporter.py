@@ -22,7 +22,8 @@ from pycellin.classes.lineage import CellLineage
 
 
 # TODO: need to extensively test this.
-# TODO: detect when gap just after division and raise error (not supported by CTC)
+# TODO: check beforehand for fusions and gap just after division. No need to start
+# the CTC file creation if we know it will fail.
 
 
 def _sort_nodes_by_frame(
