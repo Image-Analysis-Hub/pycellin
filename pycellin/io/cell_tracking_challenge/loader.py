@@ -255,10 +255,10 @@ def load_CTC_file(
     ]
 
     # Adding a unique lineage_ID to each lineage and their nodes.
-    lin_id = 0  # lineage ID
+    lin_ID = 0
     for lin in lineages:
-        _update_node_attributes(lin, lin_id)
-        lin_id += 1
+        _update_node_attributes(lin, lin_ID)
+        lin_ID += 1
 
     data = {}
     for lin in lineages:
@@ -268,10 +268,10 @@ def load_CTC_file(
             assert len(lin) == 1, "Lineage ID not found and not a one-node lineage."
             node = [n for n in lin.nodes][0]
             # We set the ID of a one-node lineage to the negative of the node ID.
-            lin_id = -node
-            lin.graph["lineage_ID"] = lin_id
-            lin.nodes[node]["lineage_ID"] = lin_id
-            data[lin_id] = lin
+            lin_ID = -node
+            lin.graph["lineage_ID"] = lin_ID
+            lin.nodes[node]["lineage_ID"] = lin_ID
+            data[lin_ID] = lin
 
     model = Model(
         _create_metadata(file_path), _create_FeaturesDeclaration(), Data(data)
