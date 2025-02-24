@@ -25,7 +25,7 @@ from typing import Any, Tuple
 import networkx as nx
 
 from pycellin.classes.model import Model
-from pycellin.classes.feature import FeaturesDeclaration, Feature
+from pycellin.classes.feature import FeaturesDeclaration
 from pycellin.classes.data import Data
 from pycellin.classes.lineage import CellLineage
 import pycellin.graph.features.utils as gfu
@@ -216,7 +216,8 @@ def load_CTC_file(
 
     Only track topology is read: no cell segmentations are extracted
     from associated label images.
-    The CTC tracking format does not support fusion events.
+    The CTC tracking format does not support fusion events and does not allow gaps
+    gap right after division events.
 
     Parameters
     ----------
@@ -269,8 +270,8 @@ def load_CTC_file(
 
 if __name__ == "__main__":
 
-    ctc_file = "sample_data\FakeTracks_TMtoCTC_res.txt"
-    ctc_file = "sample_data\Ecoli_growth_on_agar_pad_TMtoCTC_res.txt"
+    ctc_file = "sample_data/FakeTracks_TMtoCTC_res.txt"
+    ctc_file = "sample_data/Ecoli_growth_on_agar_pad_TMtoCTC_res.txt"
     # ctc_file = "/mnt/data/Films_Laure/Benchmarks/CTC/EvaluationSoftware/testing_dataset/03_RES/res_track.txt"
     model = load_CTC_file(ctc_file)
     print(model)
