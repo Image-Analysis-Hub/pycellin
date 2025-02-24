@@ -112,6 +112,7 @@ def _read_track_line(
         after generating all nodes for this track.
     """
     track_id, start_frame, end_frame, parent_track = [int(el) for el in line.split()]
+    print("LINE:", track_id, start_frame, end_frame, parent_track)
     nodes = []
     for frame in range(start_frame, end_frame + 1):
         node_attrs = {
@@ -175,6 +176,7 @@ def _merge_tracks(
             for node, data in graph.nodes(data=True)
             if data["TRACK"] == parent_track
         ]
+        print(parent_nodes)
         parent_node = sorted(parent_nodes, key=lambda x: x[1])[-1]
         graph.add_edge(parent_node[0], nodes[0][0])
 
@@ -232,11 +234,20 @@ def load_CTC_file(
     graph = nx.DiGraph()
     current_node_id = 0
     with open(file_path) as file:
+        nodes_from_tracks = []
+        # The lines in the file are read sequentially to create the nodes.
+        # However, nothing ensures that parent nodes are created before
+        # being referenced by their children.
+        # nodes_from_tracks keeps track of the nodes created for each track
+        # so that they can be merged later.
         for line in file:
             nodes, current_node_id = _read_track_line(line, current_node_id)
+            nodes_from_tracks.append(nodes)
             _add_nodes_and_edges(graph, nodes)
-            _merge_tracks(graph, nodes)
 
+    # Merging tracks that are part of the same lineage.
+    for nodes in nodes_from_tracks:
+        _merge_tracks(graph, nodes)
     # We want one lineage per connected component of the graph.
     lineages = [
         CellLineage(graph.subgraph(c).copy())
