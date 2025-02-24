@@ -74,7 +74,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ]
         return leaves
 
-    def get_ancestors(self, root: int, target_node: int) -> list[int]:
+    def get_ancestors(self, node: int) -> list[int]:
         """
         Return all the ancestors of a given node, in chronological order.
 
@@ -84,9 +84,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        root : int
-            The root node of the lineage.
-        target_node : int
+        node : int
             A node of the lineage.
 
         Returns
@@ -94,7 +92,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         list[int]
             A list of all the ancestor nodes, from root node to target node.
         """
-        return nx.shortest_path(self, source=root, target=target_node)
+        root = self.get_root()
+        ancestors = nx.shortest_path(self, source=root, target=node)[:-1]
+        return ancestors
 
     def is_root(self, node: int) -> bool:
         """
