@@ -112,7 +112,6 @@ def _read_track_line(
         after generating all nodes for this track.
     """
     track_id, start_frame, end_frame, parent_track = [int(el) for el in line.split()]
-    print("LINE:", track_id, start_frame, end_frame, parent_track)
     nodes = []
     for frame in range(start_frame, end_frame + 1):
         node_attrs = {
@@ -176,7 +175,6 @@ def _merge_tracks(
             for node, data in graph.nodes(data=True)
             if data["TRACK"] == parent_track
         ]
-        print(parent_nodes)
         parent_node = sorted(parent_nodes, key=lambda x: x[1])[-1]
         graph.add_edge(parent_node[0], nodes[0][0])
 
