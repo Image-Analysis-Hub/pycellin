@@ -1208,7 +1208,7 @@ def load_TrackMate_XML(
     model = Model(metadata, feat_declaration, data)
 
     # Pycellin DOES NOT support fusion events.
-    all_fusions = model.check_for_fusions()
+    all_fusions = model.get_fusions()
     if all_fusions:
         # TODO: link toward correct documentation when it is written.
         fusion_warning = (
@@ -1226,10 +1226,10 @@ if __name__ == "__main__":
 
     # import math
 
-    xml = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
     # xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
-    # xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    # xml = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
     # xml = "E:/Pasteur/LS_data/LStoLX/230328GreffeGakaYFPMyogTdtmdxFDBTryplen1-movie01-01-Scene-15-TR37-A01.xml"
 
     # trackmate_version = _get_trackmate_version(xml)

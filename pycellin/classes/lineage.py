@@ -156,11 +156,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         else:
             return False
 
-    def check_for_fusions(self) -> list[int]:
+    def get_fusions(self) -> list[int]:
         """
-        Check if the lineage has fusion events and return the fusion nodes.
-
-        A fusion event is defined as a node with more than one parent.
+        Return fusion nodes, i.e. nodes with more than one parent.
 
         Returns
         -------
