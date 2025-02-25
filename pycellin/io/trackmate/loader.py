@@ -4,6 +4,7 @@
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
+import warnings
 
 # from pkg_resources import get_distribution => deprecated
 # from importlib.metadata import version
@@ -681,46 +682,6 @@ def _split_graph_into_lineages(
     return lineages
 
 
-def _check_for_fusions(
-    lineages: list[CellLineage],
-) -> dict[int, list[int]]:
-    """
-    Check if there are fusions in the lineages and notify the user.
-
-    Parameters
-    ----------
-    lineages : list[CellLineage]
-        The lineages to check for fusions.
-
-    Returns
-    -------
-    dict[int, list[int]]
-        A dictionary where the keys are the lineage IDs and the values are
-        the list of cell IDs involved in the fusion.
-    """
-    fusion_dict = {}
-    for lin in lineages:
-        fusions = lin.check_for_fusions()
-        if len(fusions) > 0:
-            fusion_dict[lin.graph["lineage_ID"]] = lin.check_for_fusions()
-    if fusion_dict:
-        cell_txt = f"{'s' if len(fusion_dict) > 1 else ''}"
-        fusion_txt = "\n".join(
-            f"  Lineage {lin_id} => cell IDs: {fusions}"
-            for lin_id, fusions in fusion_dict.items()
-        )
-        print(
-            f"WARNING: Cell fusion{cell_txt} detected!! "
-            f"Since Pycellin does not support fusions, it is advised to "
-            f"deal with them before any other processing. Be especially "
-            f"careful with tracking related features. Crashes and incorrect "
-            f"results can occur.\n"
-            f"Fusion{cell_txt} location:\n"
-            f"{fusion_txt}"
-        )
-    return fusion_dict
-
-
 def _update_features_declaration(
     feat_declaration: FeaturesDeclaration,
     units: dict[str, str],
@@ -1015,8 +976,21 @@ def _parse_model_tag(
         else:
             lin.graph["FilteredTrack"] = False
 
-    # Pycellin DOES NOT support fusion events.
-    _check_for_fusions(lineages)
+    # if fusion_dict:
+    #     cell_txt = f"{'s' if len(fusion_dict) > 1 else ''}"
+    #     fusion_txt = "\n".join(
+    #         f"  Lineage {lin_id} => cell IDs: {fusions}"
+    #         for lin_id, fusions in fusion_dict.items()
+    #     )
+    #     warnings.warn(
+    #         f"WARNING: Cell fusion{cell_txt} detected!! "
+    #         f"Since Pycellin does not support fusions, it is advised to "
+    #         f"deal with them before any other processing. Be especially "
+    #         f"careful with tracking related features. Crashes and incorrect "
+    #         f"results can occur.\n"
+    #         f"Fusion{cell_txt} location:\n"
+    #         f"{fusion_txt}"
+    #     )
 
     return units, fd, Data({lin.graph["lineage_ID"]: lin for lin in lineages})
 
@@ -1232,6 +1206,19 @@ def load_TrackMate_XML(
         metadata[tag_name] = element_string
 
     model = Model(metadata, feat_declaration, data)
+
+    # Pycellin DOES NOT support fusion events.
+    all_fusions = model.check_for_fusions()
+    if all_fusions:
+        # TODO: link toward correct documentation when it is written.
+        fusion_warning = (
+            f"unsupported data, {len(all_fusions)} cell fusions detected. "
+            "It is advised to deal with them before any other processing, "
+            "especially for tracking related features. Crashes and incorrect "
+            "results can occur. See documentation for more details."
+        )
+        warnings.warn(fusion_warning)
+
     return model
 
 
@@ -1239,10 +1226,10 @@ if __name__ == "__main__":
 
     # import math
 
-    # xml = "E:/Pasteur/Code/pycellin/pycellin/sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
+    xml = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
     # xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
-    xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    # xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
     # xml = "E:/Pasteur/LS_data/LStoLX/230328GreffeGakaYFPMyogTdtmdxFDBTryplen1-movie01-01-Scene-15-TR37-A01.xml"
 
     # trackmate_version = _get_trackmate_version(xml)
