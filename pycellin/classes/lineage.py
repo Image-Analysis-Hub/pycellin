@@ -185,6 +185,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
+        width: int | None = None,
+        height: int | None = None,
     ) -> None:
         """
         Plot the lineage as a tree using Plotly.
@@ -233,6 +235,10 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             True to display the horizontal grid, False otherwise. True by default.
         showlegend : bool, optional
             True to display the legend, False otherwise. True by default.
+        width : int, optional
+            The width of the plot. If None, defaults to current Plotly template.
+        height : int, optional
+            The height of the plot. If None, defaults to current Plotly template.
 
         Warnings
         --------
@@ -418,6 +424,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             showlegend=showlegend,
             plot_bgcolor=plot_bgcolor,
             hovermode="closest",  # Not ideal but the other modes are far worse.
+            width=width,
+            height=height,
         )
         fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
         fig.update_yaxes(
@@ -1000,6 +1008,8 @@ class CellLineage(Lineage):
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
+        width: int | None = None,
+        height: int | None = None,
     ) -> None:
         """
         Plot the cell lineage as a tree using Plotly.
@@ -1040,6 +1050,10 @@ class CellLineage(Lineage):
             True to display the horizontal grid, False otherwise. True by default.
         showlegend : bool, optional
             True to display the legend, False otherwise. True by default.
+        width : int, optional
+            The width of the plot. If None, defaults to current Plotly template.
+        height : int, optional
+            The height of the plot. If None, defaults to current Plotly template.
 
         Warnings
         --------
@@ -1080,6 +1094,8 @@ class CellLineage(Lineage):
             plot_bgcolor=plot_bgcolor,
             show_horizontal_grid=show_horizontal_grid,
             showlegend=showlegend,
+            width=width,
+            height=height,
         )
 
     @staticmethod
@@ -1201,6 +1217,8 @@ class CycleLineage(Lineage):
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
+        width: int | None = None,
+        height: int | None = None,
     ) -> None:
         """
         Plot the cell cycle lineage as a tree using Plotly.
@@ -1241,6 +1259,10 @@ class CycleLineage(Lineage):
             True to display the horizontal grid, False otherwise. True by default.
         showlegend : bool, optional
             True to display the legend, False otherwise. True by default.
+        width : int, optional
+            The width of the plot. If None, defaults to current Plotly template.
+        height : int, optional
+            The height of the plot. If None, defaults to current Plotly template.
 
         Warnings
         --------
@@ -1280,4 +1302,6 @@ class CycleLineage(Lineage):
             plot_bgcolor=plot_bgcolor,
             show_horizontal_grid=show_horizontal_grid,
             showlegend=showlegend,
+            width=width,
+            height=height,
         )
