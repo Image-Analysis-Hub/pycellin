@@ -568,6 +568,7 @@ def export_TrackMate_XML(
         Dictionary containing the spatial and temporal units of the model.
         If not specified, the user will be asked to provide them.
     """
+    # FIXME: Copy the model to avoid modifying the original one.
 
     if not units:
         units = _ask_units(model.feat_declaration)
