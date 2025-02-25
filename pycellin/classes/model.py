@@ -1433,9 +1433,20 @@ class Model:
             tmp_df = nx.to_pandas_edgelist(
                 lineage, source="source_cell_ID", target="target_cell_ID"
             )
+            tmp_df["lineage_ID"] = lin_ID
             list_df.append(tmp_df)
         df = pd.concat(list_df, ignore_index=True)
         assert nb_edges == len(df)
+
+        # Reoder the columns to have Pycellin mandatory features first.
+        columns = df.columns.tolist()
+        try:
+            columns.remove("lineage_ID")
+        except ValueError as err:
+            raise err
+        columns = ["lineage_ID"] + columns
+        df = df[columns]
+        df.sort_values("lineage_ID", ignore_index=True, inplace=True)
 
         return df
 
