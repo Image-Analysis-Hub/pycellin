@@ -1369,6 +1369,7 @@ class Model:
                 continue
             nb_nodes += len(lineage)
             tmp_df = pd.DataFrame(dict(lineage.nodes(data=True)).values())
+            tmp_df["lineage_ID"] = lin_ID
             list_df.append(tmp_df)
         df = pd.concat(list_df, ignore_index=True)
         assert nb_nodes == len(df)

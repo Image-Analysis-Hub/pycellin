@@ -480,7 +480,6 @@ def _prepare_model_for_export(
             for feat, val in zip(["X", "Y", "Z"], xyz):
                 lin.graph[f"TRACK_{feat}_LOCATION"] = val
         for node in lin.nodes:
-            lin.nodes[node].pop("lineage_ID")
             lin.nodes[node]["ID"] = lin.nodes[node].pop("cell_ID")
             lin.nodes[node]["FRAME"] = lin.nodes[node].pop("frame")
             xyz = lin.nodes[node].pop("cell_location")

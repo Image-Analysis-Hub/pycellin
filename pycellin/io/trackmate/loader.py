@@ -709,13 +709,12 @@ def _update_features_declaration(
         True if the model has segmentation data, False otherwise.
     """
     # Node features.
-    feat_lin_ID = gfu.define_lineage_ID_Feature("TrackMate")
     feat_cell_ID = gfu.define_cell_ID_Feature("TrackMate")
     feat_declaration._remove_features(
         ["POSITION_X", "POSITION_Y", "POSITION_Z"]
     )  # Replaced by the following `location` feature, a triplet of floats.
     feat_location = gfu.define_cell_location_Feature(units["spatialunits"], "TrackMate")
-    feat_declaration._add_features([feat_lin_ID, feat_cell_ID, feat_location])
+    feat_declaration._add_features([feat_cell_ID, feat_location])
     feat_declaration._rename_feature("FRAME", "frame")
     if segmentation:
         roi_coord_feat = Feature(
@@ -814,9 +813,6 @@ def _update_TRACK_ID(
     lineage : CellLineage
         The lineage to update.
     """
-    # If TRACK_ID is a node feature, we need to update it in the nodes.
-    _update_node_feature_key(lineage, "TRACK_ID", "lineage_ID")
-    # And in the graph.
     if "TRACK_ID" in lineage.graph:
         lineage.graph["lineage_ID"] = lineage.graph.pop("TRACK_ID")
     else:
@@ -826,7 +822,6 @@ def _update_TRACK_ID(
         assert len(lineage) == 1, "TRACK_ID not found and not a one-node lineage."
         node = [n for n in lineage.nodes][0]
         lineage.graph["lineage_ID"] = -node
-        lineage.nodes[node]["lineage_ID"] = -node
 
 
 def _update_location_related_features(

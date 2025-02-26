@@ -198,7 +198,6 @@ def _update_node_attributes(
     """
     lineage.graph["lineage_ID"] = lineage_id
     for _, data in lineage.nodes(data=True):
-        data["lineage_ID"] = lineage_id
         # Removing obsolete attributes.
         if "TRACK" in data:
             del data["TRACK"]
@@ -266,7 +265,6 @@ def load_CTC_file(
             # We set the ID of a one-node lineage to the negative of the node ID.
             lin_ID = -node
             lin.graph["lineage_ID"] = lin_ID
-            lin.nodes[node]["lineage_ID"] = lin_ID
             data[lin_ID] = lin
 
     model = Model(
@@ -285,9 +283,9 @@ if __name__ == "__main__":
     print(model.feat_declaration)
     print(model.data)
 
-    for lin_id, lin in model.data.cell_data.items():
-        print(f"{lin_id} - {lin}")
-        lin.plot()
+    # for lin_id, lin in model.data.cell_data.items():
+    #     print(f"{lin_id} - {lin}")
+    #     lin.plot()
 
     # model.add_cycle_data()
     # for lin_id, lin in model.data.cycle_data.items():
