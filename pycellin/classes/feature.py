@@ -321,26 +321,29 @@ class FeaturesDeclaration:
 
             if feature.is_equal(old_feat, ignore_feat_type=True):
                 if feature.feat_type in old_feat.feat_type:
-                    warnings.warn(
+                    msg = (
                         f"An identical Feature '{feature.name}' "
                         f"has already been declared."
                     )
+                    warnings.warn(msg)
                 else:
                     old_feat.feat_type += "+" + feature.feat_type
             else:
                 if feature.feat_type in old_feat.feat_type:
-                    warnings.warn(
+                    msg = (
                         f"A Feature called '{feature.name}' has already been declared "
                         f"with a different definition. "
                         f"The feature will be overwritten."
                     )
+                    warnings.warn(msg)
                     self.feats_dict[feature.name] = feature
                 else:
-                    warnings.warn(
+                    msg = (
                         f"A Feature called '{feature.name}' has already been declared "
                         f"with a different type and definition. "
                         f"The feature will be overwritten."
                     )
+                    warnings.warn(msg)
                     self.feats_dict[feature.name] = feature
         else:
             self.feats_dict[feature.name] = feature
@@ -366,7 +369,7 @@ class FeaturesDeclaration:
         """
         common_fields = {
             "feat_type": "cycle",
-            "lineage_type": "CycleLineage",
+            "lin_type": "CycleLineage",
             "data_type": "int",
             "provenance": "Pycellin",
         }
