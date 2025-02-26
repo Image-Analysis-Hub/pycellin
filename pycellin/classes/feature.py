@@ -127,55 +127,32 @@ class Feature:
 
 class FeaturesDeclaration:
     """
+    The FeaturesDeclaration class is used to store the features that are
+    associated with the nodes, edges, and lineages of a cell lineage graph.
+
+    Attributes
+    ----------
+    feats_dict : dict[str, Feature]
+        A dictionary of features where the keys are the feature names and
+        the values are the Feature objects.
+
+    Notes
+    -----
     Spatial and temporal units are not part of the FeaturesDeclaration but of the
     features themselves to allow different units for a same dimension (e.g. time
     in seconds or minutes).
-    - dict of node features: {feature_name: Feature}
-    - dict of edge features: {feature_name: Feature}
-    - dict of lineage features: {feature_name: Feature}
-    How to differentiate between cell features and cycle features?
     """
 
     def __init__(
         self,
-        node_features: dict[str, Feature] | None = None,
-        edge_features: dict[str, Feature] | None = None,
-        lineage_features: dict[str, Feature] | None = None,
+        feats_dict: dict[str, Feature] | None = None,
     ) -> None:
-        self.node_feats = node_features if node_features else {}
-        self.edge_feats = edge_features if edge_features else {}
-        self.lin_feats = lineage_features if lineage_features else {}
-
-        # TODO: are the versions below a better way?
-
-        # if node_features is None:
-        #     node_features = {}
-        # else:
-        #     self.node_feats = node_features
-        # if edge_features is None:
-        #     edge_features = {}
-        # else:
-        #     self.edge_feats = edge_features
-        # if lineage_features is None:
-        #     lineage_features = {}
-        # else:
-        #     self.lin_feats = lineage_features
-
-        # if node_features is not None:
-        #     self.node_feats = node_features
-        # if edge_features is not None:
-        #     self.edge_feats = edge_features
-        # if lineage_features is not None:
-        #     self.lin_feats = lineage_features
+        self.feats_dict = feats_dict if feats_dict else {}
 
     def __eq__(self, other):
         if not isinstance(other, FeaturesDeclaration):
             return False
-        return (
-            self.node_feats == other.node_feats
-            and self.edge_feats == other.edge_feats
-            and self.lin_feats == other.lin_feats
-        )
+        return self.feats_dict == other.feats_dict
 
     def __repr__(self) -> str:
         """
@@ -186,11 +163,7 @@ class FeaturesDeclaration:
         str
             A string representation of the FeaturesDeclaration object.
         """
-        return (
-            f"FeaturesDeclaration(node_features={self.node_feats!r}, "
-            f"edge_features={self.edge_feats!r}, "
-            f"lineage_features={self.lin_feats!r})"
-        )
+        return f"FeaturesDeclaration(feats_dict={self.feats_dict!r}"
 
     def __str__(self) -> str:
         """
@@ -201,13 +174,13 @@ class FeaturesDeclaration:
         str
             A human-readable string representation of the FeaturesDeclaration object.
         """
-        node_features = ", ".join(self.node_feats.keys())
-        edge_features = ", ".join(self.edge_feats.keys())
-        lineage_features = ", ".join(self.lin_feats.keys())
+        node_feats = ", ".join(self.get_node_feats().keys())
+        edge_feats = ", ".join(self.get_edge_feats().keys())
+        lin_feats = ", ".join(self.get_lin_feats().keys())
         return (
-            f"Node features: {node_features}\n"
-            f"Edge features: {edge_features}\n"
-            f"Lineage features: {lineage_features}"
+            f"Node features: {node_feats}\n"
+            f"Edge features: {edge_feats}\n"
+            f"Lineage features: {lin_feats}"
         )
 
     def _has_feature(
