@@ -211,14 +211,14 @@ class FeaturesDeclaration:
             return False
 
     def _get_feat_dict_from_feat_type(
-        self, feature_type: Literal["node", "edge", "lineage"]
+        self, feat_type: Literal["node", "edge", "lineage"]
     ) -> dict:
         """
         Return the dictionary of features corresponding to the specified type.
 
         Parameters
         ----------
-        feature_type : Literal["node", "edge", "lineage"]
+        feat_type : Literal["node", "edge", "lineage"]
             The type of the features to return (node, edge, or lineage).
 
         Returns
@@ -231,17 +231,14 @@ class FeaturesDeclaration:
         ValueError
             If the feature type is invalid.
         """
-        if not check_literal_type(feature_type, FeatureType):
+        if not check_literal_type(feat_type, FeatureType):
             raise ValueError(
                 f"Feature type must be one of {', '.join(FeatureType.__args__)}."
             )
-        match feature_type:
-            case "node":
-                return self.node_feats
-            case "edge":
-                return self.edge_feats
-            case "lineage":
-                return self.lin_feats
+        feats_dict = {
+            k: v for k, v in self.feats_dict.items() if feat_type in v.feat_type
+        }
+        return feats_dict
 
     def _add_feature(
         self, feature: Feature, feature_type: Literal["node", "edge", "lineage"]
