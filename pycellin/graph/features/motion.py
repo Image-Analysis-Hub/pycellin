@@ -51,7 +51,7 @@ def _get_branch_edge_feature_values(
     KeyError
         If the feature does not exist in the cell lineage.
     """
-    lin_ID = lineage.graph["cycle_lineage_ID"]
+    lin_ID = lineage.graph["lineage_ID"]
     cell_lin = data.cell_data[lin_ID]
     try:
         values = [
@@ -99,8 +99,8 @@ class CellDisplacement(EdgeLocalFeatureCalculator):
         float
             The cell displacement.
         """
-        pos1 = lineage.nodes[edge[0]]["location"]
-        pos2 = lineage.nodes[edge[1]]["location"]
+        pos1 = lineage.nodes[edge[0]]["cell_location"]
+        pos2 = lineage.nodes[edge[1]]["cell_location"]
         return math.dist(pos1, pos2)
 
 
