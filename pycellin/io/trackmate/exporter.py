@@ -216,11 +216,11 @@ def _write_FeatureDeclarations(
                 xf.write(f"\n{' '*8}")
                 match f_type:
                     case "SpotFeatures":
-                        features = model.feat_declaration.node_feats
+                        features = model.feat_declaration.get_node_feats()
                     case "EdgeFeatures":
-                        features = model.feat_declaration.edge_feats
+                        features = model.feat_declaration.get_edge_feats()
                     case "TrackFeatures":
-                        features = model.feat_declaration.lin_feats
+                        features = model.feat_declaration.get_lin_feats()
                 first_feat_written = False
                 for feat in features.values():
                     trackmate_feat = _convert_feature(feat)
@@ -427,66 +427,67 @@ def _prepare_model_for_export(
         Model to prepare for export.
     """
     # Update of the features declaration.
-    model.feat_declaration._rename_feature("lineage_ID", "TRACK_ID", "lineage")
-    model.feat_declaration._modify_feature_description(
-        "TRACK_ID", "Track ID", "lineage"
-    )
-    model.feat_declaration._remove_features(["FilteredTrack", "name"], ["lineage"] * 2)
-    model.feat_declaration._rename_feature("frame", "FRAME", "node")
-    model.feat_declaration._remove_features(["cell_ID", "name"], ["node"] * 2)
-    if "ROI_coords" in model.feat_declaration.node_feats:
-        model.feat_declaration._remove_feature("ROI_coords", "node")
+    model.feat_declaration._rename_feature("lineage_ID", "TRACK_ID")
+    model.feat_declaration._modify_feature_description("TRACK_ID", "Track ID")
+    model.feat_declaration._remove_features(["FilteredTrack", "lineage_name"])
+    model.feat_declaration._rename_feature("frame", "FRAME")
+    model.feat_declaration._remove_features(["cell_ID", "cell_name"])
+    if "ROI_coords" in model.feat_declaration.feats_dict:
+        model.feat_declaration._remove_feature("ROI_coords")
 
     # Location related features.
     # TrackMate is expecting one feature per dimension instead of a triplet.
     model.feat_declaration._remove_features(
-        ["location"] * 3, ["lineage", "node", "edge"]
+        ["cell_location", "link_location", "lineage_location"]
     )
     for dim in ["X", "Y", "Z"]:
         feat_lineage = Feature(
             f"TRACK_{dim}_LOCATION",
             f"Track mean {dim}",
+            "lineage",
             "CellLineage",
-            "TrackMate",
             "float",
+            "TrackMate",
             "pixel",
         )
         feat_node = Feature(
             f"POSITION_{dim}",
             f"{dim}",
+            "node",
             "CellLineage",
-            "TrackMate",
             "float",
+            "TrackMate",
             "pixel",
         )
         feat_edge = Feature(
             f"EDGE_{dim}_LOCATION",
             f"Edge {dim}",
+            "edge",
             "CellLineage",
-            "TrackMate",
             "float",
+            "TrackMate",
             "pixel",
         )
-        model.feat_declaration._add_features(
-            [feat_lineage, feat_node, feat_edge], ["lineage", "node", "edge"]
-        )
+        model.feat_declaration._add_features([feat_lineage, feat_node, feat_edge])
 
     # Update of the data.
     for lin in model.data.cell_data.values():
         lin.graph["TRACK_ID"] = lin.graph.pop("lineage_ID")
-        if "location" in lin.graph:  # One-node lineage don't have a location for now.
-            xyz = lin.graph.pop("location")
+        if (
+            "lineage_location" in lin.graph
+        ):  # One-node lineage don't have a location for now.
+            xyz = lin.graph.pop("lineage_location")
             for feat, val in zip(["X", "Y", "Z"], xyz):
                 lin.graph[f"TRACK_{feat}_LOCATION"] = val
         for node in lin.nodes:
             lin.nodes[node].pop("lineage_ID")
             lin.nodes[node]["ID"] = lin.nodes[node].pop("cell_ID")
             lin.nodes[node]["FRAME"] = lin.nodes[node].pop("frame")
-            xyz = lin.nodes[node].pop("location")
+            xyz = lin.nodes[node].pop("cell_location")
             for feat, val in zip(["X", "Y", "Z"], xyz):
                 lin.nodes[node][f"POSITION_{feat}"] = val
         for edge in lin.edges:
-            xyz = lin.edges[edge].pop("location")
+            xyz = lin.edges[edge].pop("link_location")
             for feat, val in zip(["X", "Y", "Z"], xyz):
                 lin.edges[edge][f"EDGE_{feat}_LOCATION"] = val
 

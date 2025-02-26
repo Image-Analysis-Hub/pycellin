@@ -77,10 +77,8 @@ def _create_FeaturesDeclaration() -> FeaturesDeclaration:
     cell_ID_feat = gfu.define_cell_ID_Feature()
     lin_ID_feat = gfu.define_lineage_ID_Feature()
     frame_feat = gfu.define_frame_Feature()
-    feat_declaration._add_features(
-        [cell_ID_feat, lin_ID_feat, frame_feat], ["node"] * 3
-    )
-    feat_declaration._add_feature(lin_ID_feat, "lineage")
+    feat_declaration._add_features([cell_ID_feat, lin_ID_feat, frame_feat])
+    feat_declaration._add_feature(lin_ID_feat)
     return feat_declaration
 
 

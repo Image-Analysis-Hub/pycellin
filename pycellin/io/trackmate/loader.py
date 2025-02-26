@@ -160,15 +160,6 @@ def _convert_and_add_feature(
     feat_provenance = "TrackMate"
     feat_unit = _dimension_to_unit(trackmate_feature, units)
 
-    feature = Feature(
-        feat_name,
-        feat_description,
-        feat_lineage_type,
-        feat_provenance,
-        feat_data_type,
-        feat_unit,
-    )
-
     match feature_type:
         case "SpotFeatures":
             feat_type = "node"
@@ -178,7 +169,17 @@ def _convert_and_add_feature(
             feat_type = "lineage"
         case _:
             raise ValueError(f"Invalid feature type: {feature_type}")
-    feat_declaration._add_feature(feature, feat_type)
+    feature = Feature(
+        feat_name,
+        feat_description,
+        feat_type,
+        feat_lineage_type,
+        feat_data_type,
+        feat_provenance,
+        feat_unit,
+    )
+
+    feat_declaration._add_feature(feature)
 
 
 def _add_all_features(
@@ -217,21 +218,28 @@ def _add_all_features(
         # Features used in Spot tags but not declared in the FeatureDeclarations tag.
         if element.tag == "SpotFeatures":
             name_feat = Feature(
-                "name", "Name of the spot", "CellLineage", "TrackMate", "string", "none"
+                "cell_name",
+                "Name of the spot",
+                "node",
+                "CellLineage",
+                "string",
+                "TrackMate",
+                "none",
             )
-            feat_declaration._add_feature(name_feat, "node")
+            feat_declaration._add_feature(name_feat)
 
         # Feature used in Track tags but not declared in the FeatureDeclarations tag.
         if element.tag == "TrackFeatures":
             name_feat = Feature(
-                "name",
+                "lineage_name",
                 "Name of the track",
+                "lineage",
                 "CellLineage",
-                "TrackMate",
                 "string",
+                "TrackMate",
                 "none",
             )
-            feat_declaration._add_feature(name_feat, "lineage")
+            feat_declaration._add_feature(name_feat)
         element.clear()
         event, element = next(iterator)
 
@@ -369,7 +377,7 @@ def _add_all_nodes(
             # as defined in the features declaration.
             attribs = deepcopy(element.attrib)
             try:
-                _convert_attributes(attribs, feat_declaration.node_feats)
+                _convert_attributes(attribs, feat_declaration.feats_dict)
             except ValueError as err:
                 print(f"ERROR: {err} Please check the XML file.")
                 raise
@@ -442,7 +450,7 @@ def _add_edge(
         in track assignment.
     """
     attribs = deepcopy(element.attrib)
-    _convert_attributes(attribs, feat_declaration.edge_feats)
+    _convert_attributes(attribs, feat_declaration.feats_dict)
     try:
         entry_node_id = attribs["SPOT_SOURCE_ID"]
         exit_node_id = attribs["SPOT_TARGET_ID"]
@@ -514,7 +522,7 @@ def _build_tracks(
         # Saving the current track information.
         if element.tag == "Track" and event == "start":
             attribs = deepcopy(element.attrib)
-            _convert_attributes(attribs, feat_declaration.lin_feats)
+            _convert_attributes(attribs, feat_declaration.feats_dict)
             tracks_attributes.append(attribs)
             try:
                 current_track_id = attribs["TRACK_ID"]
@@ -704,67 +712,68 @@ def _update_features_declaration(
     feat_lin_ID = gfu.define_lineage_ID_Feature("TrackMate")
     feat_cell_ID = gfu.define_cell_ID_Feature("TrackMate")
     feat_declaration._remove_features(
-        ["POSITION_X", "POSITION_Y", "POSITION_Z"], ["node"] * 3
+        ["POSITION_X", "POSITION_Y", "POSITION_Z"]
     )  # Replaced by the following `location` feature, a triplet of floats.
     feat_location = gfu.define_cell_location_Feature(units["spatialunits"], "TrackMate")
-    feat_declaration._add_features(
-        [feat_lin_ID, feat_cell_ID, feat_location], ["node"] * 3
-    )
-    feat_declaration._rename_feature("FRAME", "frame", "node")
+    feat_declaration._add_features([feat_lin_ID, feat_cell_ID, feat_location])
+    feat_declaration._rename_feature("FRAME", "frame")
     if segmentation:
         roi_coord_feat = Feature(
             "ROI_coords",
             "List of coordinates of the region of interest",
+            "node",
             "CellLineage",
-            "TrackMate",
             "float",
+            "TrackMate",
             units["spatialunits"],
         )
-        feat_declaration._add_feature(roi_coord_feat, "node")
+        feat_declaration._add_feature(roi_coord_feat)
 
     # Edge features.
-    if "EDGE_X_LOCATION" in feat_declaration.edge_feats:
+    if "EDGE_X_LOCATION" in feat_declaration.feats_dict:
         feat_declaration._remove_features(
-            ["EDGE_X_LOCATION", "EDGE_Y_LOCATION", "EDGE_Z_LOCATION"], ["edge"] * 3
+            ["EDGE_X_LOCATION", "EDGE_Y_LOCATION", "EDGE_Z_LOCATION"]
         )  # Replaced by the following `location` feature, a triplet of floats.
         feat_location = Feature(
-            "location",
+            "link_location",
             "Location of the edge (i.e. mean location of its nodes)",
+            "edge",
             "CellLineage",
-            "TrackMate",
             "float",
+            "TrackMate",
             units["spatialunits"],
         )
-        feat_declaration._add_feature(feat_location, "edge")
+        feat_declaration._add_feature(feat_location)
 
     # Lineage features.
-    feat_declaration._rename_feature("TRACK_ID", "lineage_ID", "lineage")
+    feat_declaration._rename_feature("TRACK_ID", "lineage_ID")
     feat_declaration._modify_feature_description(
-        "lineage_ID", "Unique identifier of the lineage", "lineage"
+        "lineage_ID", "Unique identifier of the lineage"
     )
     feat_filtered_track = Feature(
         "FilteredTrack",
         "True if the track was not filtered out in TrackMate",
+        "lineage",
         "CellLineage",
-        "TrackMate",
         "int",
+        "TrackMate",
         "none",
     )
-    feat_declaration._add_feature(feat_filtered_track, "lineage")
-    if "TRACK_X_LOCATION" in feat_declaration.lin_feats:
+    feat_declaration._add_feature(feat_filtered_track)
+    if "TRACK_X_LOCATION" in feat_declaration.feats_dict:
         feat_declaration._remove_features(
             ["TRACK_X_LOCATION", "TRACK_Y_LOCATION", "TRACK_Z_LOCATION"],
-            ["lineage"] * 3,
         )  # Replaced by the following `location` feature, a triplet of floats.
         feat_location = Feature(
-            "location",
+            "lineage_location",
             "Location of the lineage (i.e. mean location of its nodes)",
+            "lineage",
             "CellLineage",
-            "TrackMate",
             "float",
+            "TrackMate",
             units["spatialunits"],
         )
-        feat_declaration._add_feature(feat_location, "lineage")
+        feat_declaration._add_feature(feat_location)
 
 
 def _update_node_feature_key(
@@ -838,7 +847,7 @@ def _update_location_related_features(
             lineage.nodes[node].pop("POSITION_Y"),
             lineage.nodes[node].pop("POSITION_Z"),
         )
-        lineage.nodes[node]["location"] = location
+        lineage.nodes[node]["cell_location"] = location
 
     # Edges
     for edge in lineage.edges:
@@ -847,7 +856,7 @@ def _update_location_related_features(
             lineage.edges[edge].pop("EDGE_Y_LOCATION"),
             lineage.edges[edge].pop("EDGE_Z_LOCATION"),
         )
-        lineage.edges[edge]["location"] = location
+        lineage.edges[edge]["link_location"] = location
 
     # Lineage
     if "TRACK_X_LOCATION" in lineage.graph:
@@ -856,7 +865,7 @@ def _update_location_related_features(
             lineage.graph.pop("TRACK_Y_LOCATION"),
             lineage.graph.pop("TRACK_Z_LOCATION"),
         )
-        lineage.graph["location"] = location
+        lineage.graph["lineage_location"] = location
     else:
         # One-node graph don't have the TRACK_X_LOCATION, TRACK_Y_LOCATION
         # and TRACK_Z_LOCATION features in the graph, so we have to create it.
@@ -864,7 +873,7 @@ def _update_location_related_features(
             len(lineage) == 1
         ), "TRACK_X_LOCATION not found and not a one-node lineage."
         node = [n for n in lineage.nodes][0]
-        lineage.graph["location"] = lineage.nodes[node]["location"]
+        lineage.graph["lineage_location"] = lineage.nodes[node]["cell_location"]
 
 
 def _parse_model_tag(
