@@ -198,11 +198,6 @@ class FeaturesDeclaration:
         -------
         bool
             True if the feature has been declared, False otherwise.
-
-        Raises
-        ------
-        ValueError
-            If the feature type is invalid.
         """
         if feature_name in self.feats_dict:
             return True
