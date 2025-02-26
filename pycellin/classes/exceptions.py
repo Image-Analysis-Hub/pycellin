@@ -102,3 +102,6 @@ class TimeFlowError(LineageStructureError):
                 f"node {source_noi}{txt_source_lin}."
             )
         super().__init__(message)
+
+
+# TODO: maybe add a FeatureTypeValueError and a LineageTypeValueError
