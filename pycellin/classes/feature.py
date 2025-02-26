@@ -186,7 +186,6 @@ class FeaturesDeclaration:
     def _has_feature(
         self,
         feature_name: str,
-        feature_type: Literal["node", "edge", "lineage"] | None = None,
     ) -> bool:
         """
         Check if the FeaturesDeclaration contains the specified feature.
@@ -195,9 +194,6 @@ class FeaturesDeclaration:
         ----------
         feature_name : str
             The name of the feature to check.
-        feature_type : Literal["node", "edge", "lineage"], optional
-            The type of the feature to check (node, edge, or lineage).
-            If not specified, the method will check all types.
 
         Returns
         -------
@@ -209,23 +205,10 @@ class FeaturesDeclaration:
         ValueError
             If the feature type is invalid.
         """
-        if not check_literal_type(feature_type, FeatureType):
-            raise ValueError(
-                f"Feature type must be one of {', '.join(FeatureType.__args__)}."
-            )
-        match feature_type:
-            case "node":
-                return feature_name in self.node_feats
-            case "edge":
-                return feature_name in self.edge_feats
-            case "lineage":
-                return feature_name in self.lin_feats
-            case None:
-                return (
-                    feature_name in self.node_feats
-                    or feature_name in self.edge_feats
-                    or feature_name in self.lin_feats
-                )
+        if feature_name in self.feats_dict:
+            return True
+        else:
+            return False
 
     def _get_feat_dict_from_feat_type(
         self, feature_type: Literal["node", "edge", "lineage"]
