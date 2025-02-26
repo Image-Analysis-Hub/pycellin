@@ -285,9 +285,10 @@ class FeaturesDeclaration:
         Add the basic features of cell cycle lineages.
         """
         common_fields = {
+            "feat_type": "cycle",
             "lineage_type": "CycleLineage",
-            "provenance": "Pycellin",
             "data_type": "int",
+            "provenance": "Pycellin",
         }
 
         # Node features.
@@ -320,10 +321,11 @@ class FeaturesDeclaration:
             ),
             **common_fields,
         )
-        self._add_features([feat_ID, feat_cells, feat_length, feat_level], ["node"] * 4)
+        self._add_features([feat_ID, feat_cells, feat_length, feat_level])
 
         # We don't need to add the lineage_ID feature to the lineage features
         # since it is already present in the cell lineage features.
+        # TODO: Lineage should be a valid choice of lin_type.
 
     def _remove_feature(
         self, feature_name: str, feature_type: Literal["node", "edge", "lineage"]
