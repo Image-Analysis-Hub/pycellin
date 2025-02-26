@@ -424,7 +424,6 @@ class FeaturesDeclaration:
         self,
         feature_name: str,
         new_description: str,
-        feature_type: Literal["node", "edge", "lineage"],
     ) -> None:
         """
         Modify the description of a specified feature.
@@ -435,28 +434,18 @@ class FeaturesDeclaration:
             The name of the feature whose description is to be modified.
         new_description : str
             The new description for the feature.
-        feature_type : Literal["node", "edge", "lineage"]
-            The type of the feature to be modified. Valid values are "node",
-            "edge", or "lineage".
 
         Raises
         ------
-        ValueError
-            If the feature type is invalid.
         KeyError
-            If the feature does not exist within the specified type.
+            If the feature does not exist in the declared features.
         """
-        try:
-            dict_feats = self._get_feat_dict_from_feat_type(feature_type)
-        except ValueError as e:
-            raise ValueError(e)
-
-        if feature_name not in dict_feats:
+        if feature_name not in self.feats_dict:
             raise KeyError(
-                f"Feature {feature_name} does not exist in {feature_type} features."
+                f"Feature {feature_name} does not exist in the declared features."
             )
 
-        dict_feats[feature_name]._modify_description(new_description)
+        self.feats_dict[feature_name]._modify_description(new_description)
 
     def _get_units_per_features(self) -> dict[str, list[str]]:
         """
@@ -532,3 +521,7 @@ if __name__ == "__main__":
     # Rename feature
     fd._rename_feature("cell_ID", "cell_ID_new")
     print(fd.feats_dict.keys(), fd.feats_dict["cell_ID_new"].name)
+
+    # Modify description
+    fd._modify_feature_description("cell_ID_new", "New description")
+    print(fd.feats_dict["cell_ID_new"])
