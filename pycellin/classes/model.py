@@ -14,8 +14,7 @@ import pycellin.graph.features.tracking as tracking
 import pycellin.graph.features.motion as motion
 import pycellin.graph.features.morphology as morpho
 import pycellin.graph.features.utils as futils
-from pycellin.custom_types import Cell, Link, FeatureType
-from pycellin.utils import check_literal_type
+from pycellin.custom_types import Cell, Link
 
 
 class Model:
@@ -204,19 +203,11 @@ class Model:
         list[str]
             List of the names of the cell lineages features present in the model.
         """
-        cell_lineage_feats = []
-        for feat_dict in [
-            self.feat_declaration.node_feats,
-            self.feat_declaration.edge_feats,
-            self.feat_declaration.lin_feats,
-        ]:
-            cell_lineage_feats.extend(
-                [
-                    feat.name
-                    for feat in feat_dict.values()
-                    if feat.lineage_type == "CellLineage"
-                ]
-            )
+        cell_lineage_feats = [
+            feat.name
+            for feat in self.feat_declaration.feats_dict.values()
+            if feat.lin_type == "CellLineage"
+        ]
         return cell_lineage_feats
 
     def get_cycle_lineage_features(self):
@@ -228,19 +219,11 @@ class Model:
         list[str]
             List of the names of the cycle lineages features present in the model.
         """
-        cycle_lineage_feats = []
-        for feat_dict in [
-            self.feat_declaration.node_feats,
-            self.feat_declaration.edge_feats,
-            self.feat_declaration.lin_feats,
-        ]:
-            cycle_lineage_feats.extend(
-                [
-                    feat.name
-                    for feat in feat_dict.values()
-                    if feat.lineage_type == "CycleLineage"
-                ]
-            )
+        cycle_lineage_feats = [
+            feat.name
+            for feat in self.feat_declaration.feats_dict.values()
+            if feat.lin_type == "CycleLineage"
+        ]
         return cycle_lineage_feats
 
     def get_next_available_lineage_ID(self) -> int:
@@ -257,7 +240,6 @@ class Model:
     def has_feature(
         self,
         feature_name: str,
-        feature_type: Literal["node", "edge", "lineage"] | None = None,
     ) -> bool:
         """
         Check if the model contains the specified feature.
@@ -266,16 +248,13 @@ class Model:
         ----------
         feature_name : str
             The name of the feature to check.
-        feature_type : Literal["node", "edge", "lineage"], optional
-            The type of the feature to check (node, edge, or lineage).
-            If not specified, the method will check all types.
 
         Returns
         -------
         bool
             True if the feature is in the model, False otherwise.
         """
-        return self.feat_declaration._has_feature(feature_name, feature_type)
+        return self.feat_declaration._has_feature(feature_name)
 
     def is_update_required(self) -> bool:
         """
@@ -338,7 +317,7 @@ class Model:
 
         if with_CycleLineage:
             cycle_lineage = self.data._compute_cycle_lineage(lin_ID)
-            self.data.cycle_data["cycle_lineage_ID"] = cycle_lineage
+            self.data.cycle_data["lineage_ID"] = cycle_lineage
 
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
@@ -477,7 +456,7 @@ class Model:
 
         if cell_attributes is not None:
             for feat in cell_attributes:
-                if feat not in self.feat_declaration.node_feats:
+                if not self.feat_declaration._has_feature(feat):
                     raise KeyError(f"The feature {feat} has not been declared.")
         else:
             cell_attributes = dict()
@@ -577,7 +556,7 @@ class Model:
 
         if link_attributes is not None:
             for feat in link_attributes:
-                if feat not in self.feat_declaration.edge_feats:
+                if not self.feat_declaration._has_feature(feat):
                     raise KeyError(f"The feature '{feat}' has not been declared.")
         else:
             link_attributes = dict()
@@ -708,10 +687,7 @@ class Model:
             If the feature is a cycle lineage feature and cycle lineages
             have not been computed yet.
         """
-        if (
-            calculator.feature.lineage_type == "CycleLineage"
-            and not self.data.cycle_data
-        ):
+        if calculator.feature.lin_type == "CycleLineage" and not self.data.cycle_data:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with `model.add_cycle_data()`."
@@ -736,9 +712,10 @@ class Model:
         feat = Feature(
             rename if rename else "cell_width",
             "Width of the cell",
+            "node",
             "CellLineage",
-            "Pycellin",
             "float",
+            "Pycellin",
             self.metadata["space_unit"],
         )
         calc = morpho.CellWidth(
@@ -762,9 +739,10 @@ class Model:
         feat = Feature(
             rename if rename else "cell_length",
             "Length of the cell",
+            "node",
             "CellLineage",
-            "Pycellin",
             "float",
+            "Pycellin",
             self.metadata["space_unit"],
         )
         calc = morpho.CellLength(
@@ -801,9 +779,10 @@ class Model:
         feat = Feature(
             rename if rename else "absolute_age",
             "Age of the cell since the beginning of the lineage",
+            "node",
             "CellLineage",
-            "Pycellin",
             "float" if in_time_unit else "int",
+            "Pycellin",
             self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
@@ -834,9 +813,10 @@ class Model:
         feat = Feature(
             rename if rename else "relative_age",
             "Age of the cell since the beginning of the current cell cycle",
+            "node",
             "CellLineage",
-            "Pycellin",
             "float" if in_time_unit else "int",
+            "Pycellin",
             self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
@@ -864,9 +844,10 @@ class Model:
         feat = Feature(
             rename if rename else "cell_cycle_completeness",
             "Completeness of the cell cycle",
+            "node",
             "CycleLineage",
-            "Pycellin",
             "bool",
+            "Pycellin",
             "none",
         )
         self.add_custom_feature(tracking.CellCycleCompleteness(feat))
@@ -895,9 +876,10 @@ class Model:
         feat = Feature(
             rename if rename else "division_time",
             "Time elapsed between the birth of a cell and its division",
+            "node",
             "CycleLineage",
-            "Pycellin",
             "float" if in_time_unit else "int",
+            "Pycellin",
             self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
@@ -927,9 +909,10 @@ class Model:
         feat = Feature(
             rename if rename else "division_rate",
             "Number of divisions per time unit",
+            "node",
             "CycleLineage",
-            "Pycellin",
             "float",
+            "Pycellin",
             f'1/{self.metadata["time_unit"]}' if in_time_unit else "1/frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
@@ -956,9 +939,10 @@ class Model:
         feat = Feature(
             rename if rename else "angle",
             "Angle of the cell trajectory between two consecutive detections",
+            "edge",
             "CellLineage",
-            "Pycellin",
             "float",
+            "Pycellin",
             unit,
         )
         self.add_custom_feature(motion.Angle(feat, unit))
@@ -981,9 +965,10 @@ class Model:
         feat = Feature(
             rename if rename else "cell_displacement",
             "Displacement of the cell between two consecutive detections",
+            "edge",
             "CellLineage",
-            "Pycellin",
             "float",
+            "Pycellin",
             self.metadata["space_unit"],
         )
         self.add_custom_feature(motion.CellDisplacement(feat))
@@ -1006,9 +991,10 @@ class Model:
         feat = Feature(
             rename if rename else "branch_total_displacement",
             "Displacement of the cell during the cell cycle",
+            "node",
             "CycleLineage",
-            "Pycellin",
             "float",
+            "Pycellin",
             self.metadata["space_unit"],
         )
         self.add_custom_feature(motion.BranchTotalDisplacement(feat))
@@ -1031,9 +1017,10 @@ class Model:
         feat = Feature(
             rename if rename else "branch_mean_displacement",
             "Mean displacement of the cell during the cell cycle",
+            "node",
             "CycleLineage",
-            "Pycellin",
             "float",
+            "Pycellin",
             self.metadata["space_unit"],
         )
         self.add_custom_feature(motion.BranchMeanDisplacement(feat))
@@ -1062,9 +1049,10 @@ class Model:
         feat = Feature(
             rename if rename else "cell_speed",
             "Speed of the cell between two consecutive detections",
+            "edge",
             "CellLineage",
-            "Pycellin",
             "float",
+            "Pycellin",
             (
                 f"{self.metadata['space_unit']}/{self.metadata['time_unit']}"
                 if in_time_unit
@@ -1096,9 +1084,10 @@ class Model:
         feat = Feature(
             rename if rename else "branch_mean_speed",
             "Mean speed of the cell during the cell cycle",
+            "node",
             "CycleLineage",
-            "Pycellin",
             "float",
+            "Pycellin",
             f"{self.metadata['space_unit']} / {self.metadata['time_unit']}",
         )
         self.add_custom_feature(motion.BranchMeanSpeed(feat, include_incoming_edge))
@@ -1128,9 +1117,10 @@ class Model:
         feat = Feature(
             rename if rename else "straightness",
             "Straightness of the cell displacement",
+            "node",
             "CycleLineage",
-            "Pycellin",
             "float",
+            "Pycellin",
         )
         self.add_custom_feature(motion.Straightness(feat, include_incoming_edge))
 
@@ -1264,7 +1254,6 @@ class Model:
     def remove_feature(
         self,
         feature_name: str,
-        feature_type: Literal["node", "edge", "lineage"],
     ) -> None:
         """
         Remove the specified feature from the model.
@@ -1276,13 +1265,10 @@ class Model:
         ----------
         feature_name : str
             Name of the feature to remove.
-        feature_type : Literal["node", "edge", "lineage"]
-            The type of the feature to check (node, edge, or lineage).
 
         Raises
         ------
         ValueError
-            If the feature type is not recognized.
             If the feature does not exist.
         """
         # TODO: stop the user from removing mandatory features? With a force argument
@@ -1291,19 +1277,15 @@ class Model:
         # their own features to it?
 
         # Preliminary checks.
-        if not check_literal_type(feature_type, FeatureType):
+        if not self.feat_declaration._has_feature(feature_name):
             raise ValueError(
-                f"Feature type must be one of {', '.join(FeatureType.__args__)}."
-            )
-        if not self.feat_declaration._has_feature(feature_name, feature_type):
-            raise ValueError(
-                f"There is no feature {feature_name} in {feature_type} features."
+                f"There is no feature {feature_name} in the declared features."
             )
 
         # First we update the FeaturesDeclaration...
-        feat_dict = self.feat_declaration._get_feat_dict_from_feat_type(feature_type)
-        lineage_type = feat_dict[feature_name].lineage_type
-        feat_dict.pop(feature_name)
+        feature_type = self.feat_declaration.feats_dict[feature_name].feat_type
+        lineage_type = self.feat_declaration.feats_dict[feature_name].lin_type
+        self.feat_declaration.feats_dict.pop(feature_name)
 
         # ... we remove the feature values...
         if lineage_type == "CellLineage":
