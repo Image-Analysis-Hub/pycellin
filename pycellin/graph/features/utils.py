@@ -97,7 +97,7 @@ def define_lineage_ID_Feature(provenance: str = "Pycellin") -> Feature:
 # on the feature type (node, edge, lineage), something like cell_x, edge_y...
 def define_cell_location_Feature(unit: str, provenance: str = "Pycellin") -> Feature:
     feat = Feature(
-        name="location",
+        name="cell_location",
         description="Location of the cell",
         feat_type="node",
         lin_type="CellLineage",
