@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from __future__ import annotations
 
 import warnings
 from typing import Literal
@@ -124,7 +125,7 @@ class Feature:
         """
         self.description = new_description
 
-    def is_equal(self, other: "Feature", ignore_feat_type: bool = False) -> bool:
+    def is_equal(self, other: Feature, ignore_feat_type: bool = False) -> bool:
         """
         Check if the feature is equal to another feature.
 
@@ -624,3 +625,6 @@ if __name__ == "__main__":
     # Modify description
     fd._modify_feature_description("cell_ID_new", "New description")
     # print(fd.feats_dict["cell_ID_new"])
+
+    print(gfu.define_cell_ID_Feature().is_equal(gfu.define_cell_ID_Feature()))
+    print(gfu.define_cell_ID_Feature().is_equal(gfu.define_lineage_ID_Feature()))
