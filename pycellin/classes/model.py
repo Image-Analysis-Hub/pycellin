@@ -692,9 +692,7 @@ class Model:
                 "Cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with `model.add_cycle_data()`."
             )
-        self.feat_declaration._add_feature(
-            calculator.feature, calculator.get_feature_type()
-        )
+        self.feat_declaration._add_feature(calculator.feature)
         self._updater.register_calculator(calculator)
         self.prepare_full_data_update()
 
