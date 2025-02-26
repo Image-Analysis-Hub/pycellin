@@ -8,9 +8,6 @@ from pycellin.classes.data import Data
 from pycellin.classes.feature import Feature
 from pycellin.classes.lineage import Lineage
 
-# In FeaturesDeclaration, maybe all the features should be stored in the same
-# dictionary, with getters to access the features of a specific type?
-
 
 def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Lineage]:
     """
