@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from itertools import chain
 from typing import Literal
 
 from pycellin.custom_types import FeatureType, LineageType
