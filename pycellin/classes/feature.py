@@ -328,7 +328,9 @@ class FeaturesDeclaration:
         # TODO: Lineage should be a valid choice of lin_type.
 
     def _remove_feature(
-        self, feature_name: str, feature_type: Literal["node", "edge", "lineage"]
+        self,
+        feature_name: str,
+        feature_type: Literal["node", "edge", "lineage"] | None = None,
     ) -> None:
         """
         Remove the specified feature from the FeaturesDeclaration.
@@ -337,8 +339,10 @@ class FeaturesDeclaration:
         ----------
         feature_name : str
             The name of the feature to remove.
-        feature_type : Literal["node", "edge", "lineage"]
-            The type of the feature to add (node, edge, or lineage).
+        feature_type : Literal["node", "edge", "lineage"], optional
+            The type of the feature to remove (node, edge, or lineage).
+            If not specified, the method will try to remove the feature from
+            all types.
 
         Raises
         ------
@@ -347,22 +351,35 @@ class FeaturesDeclaration:
         KeyError
             If the feature does not exist within the specified type.
         """
-        try:
-            dict_feats = self._get_feat_dict_from_feat_type(feature_type)
-        except ValueError as e:
-            raise ValueError(e)
-
-        if feature_name not in dict_feats:
+        if feature_name not in self.feats_dict:
             raise KeyError(
-                f"Feature {feature_name} does not exist in {feature_type} features."
+                f"Feature {feature_name} does not exist in the declared features."
             )
 
-        del dict_feats[feature_name]
+        if feature_type:
+            # Check that the feature_type is valid.
+            if not check_literal_type(feature_type, FeatureType):
+                raise ValueError(
+                    f"Feature type must be one of {', '.join(FeatureType.__args__)}, "
+                    f"or a combination of them separated by a +."
+                )
+
+            current_feat_type = self.feats_dict[feature_name].feat_type
+            # In case of multiple feat types, current_feat_type is a string
+            # of the different feat_types separated with a +.
+            current_feat_type = current_feat_type.split("+")
+            if feature_type in current_feat_type:
+                current_feat_type.remove(feature_type)
+                self.feats_dict[feature_name].feat_type = "+".join(current_feat_type)
+                # If the feat_type is now empty, remove the feature from the dict.
+                if not current_feat_type:
+                    del self.feats_dict[feature_name]
+        else:
+            del self.feats_dict[feature_name]
 
     def _remove_features(
         self,
         feature_names: list[str],
-        feature_types: list[Literal["node", "edge", "lineage"]],
     ) -> None:
         """
         Remove the specified features from the FeaturesDeclaration.
@@ -371,11 +388,9 @@ class FeaturesDeclaration:
         ----------
         feature_names : list[str]
             The names of the features to remove.
-        feature_types : list[Literal["node", "edge", "lineage"]]
-            The types of the features to remove (node, edge, or lineage).
         """
-        for feature_name, feature_type in zip(feature_names, feature_types):
-            self._remove_feature(feature_name, feature_type)
+        for feature_name in feature_names:
+            self._remove_feature(feature_name)
 
     def _rename_feature(
         self,
@@ -483,3 +498,42 @@ class FeaturesDeclaration:
             else:
                 units[feat.unit] = [feat.name]
         return units
+
+
+if __name__ == "__main__":
+
+    # Basic testing of the Feature and FeaturesDeclaration classes.
+    # TODO: do this properly in test_feature.py.
+
+    import pycellin.graph.features.utils as gfu
+
+    fd = FeaturesDeclaration()
+    fd._add_feature(gfu.define_cell_ID_Feature())
+    fd._add_features(
+        [
+            gfu.define_frame_Feature(),
+            gfu.define_lineage_ID_Feature(),
+        ]
+    )
+    for k, v in fd.feats_dict.items():
+        print(k, v)
+
+    fd._remove_feature("frame")
+    print(fd.feats_dict.keys())
+
+    fd._remove_feature("lineage_ID", "node")
+    for k, v in fd.feats_dict.items():
+        print(k, v)
+
+    fd._remove_feature("lineage_ID", "lineage")
+    print(fd.feats_dict.keys())
+
+    fd._add_feature(gfu.define_lineage_ID_Feature())
+    fd._remove_feature("lineage_ID")
+    print(fd.feats_dict.keys())
+
+    # Invalid feat name
+    # fd._remove_feature("cel_ID")
+
+    # Invalid feat type
+    fd._remove_feature("cell_ID", "nod")
