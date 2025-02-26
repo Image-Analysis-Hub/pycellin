@@ -240,9 +240,7 @@ class FeaturesDeclaration:
         }
         return feats_dict
 
-    def _add_feature(
-        self, feature: Feature, feature_type: Literal["node", "edge", "lineage"]
-    ) -> None:
+    def _add_feature(self, feature: Feature) -> None:
         """
         Add the specified feature to the FeaturesDeclaration.
 
@@ -250,33 +248,26 @@ class FeaturesDeclaration:
         ----------
         feature : Feature
             The feature to add.
-        feature_type : Literal["node", "edge", "lineage"]
-            The type of the feature to add (node, edge, or lineage).
 
         Raises
         ------
         ValueError
             If the feature type is invalid.
         ValueError
-            If a feature with the same name already exists in the specified type.
+            If a feature with the same name already exists.
         """
-        try:
-            dict_feats = self._get_feat_dict_from_feat_type(feature_type)
-        except ValueError as e:
-            raise ValueError(e)
-
-        if dict_feats:
-            if feature.name in dict_feats:
-                raise ValueError(
-                    f"A Feature called {feature.name} already exists in "
-                    f"{feature_type} features."
-                )
-        dict_feats[feature.name] = feature
+        if feature.name in self.feats_dict:
+            # TODO: a warning would be more appropriate here so it doesn't
+            # block execution.
+            raise ValueError(
+                f"A Feature called {feature.name} already exists in "
+                f"the declared features."
+            )
+        self.feats_dict[feature.name] = feature
 
     def _add_features(
         self,
         features: list[Feature],
-        feature_types: list[Literal["node", "edge", "lineage"]],
     ) -> None:
         """
         Add the specified features to the FeaturesDeclaration.
@@ -285,11 +276,9 @@ class FeaturesDeclaration:
         ----------
         features : list[Feature]
             The features to add.
-        feature_types : list[Literal["node", "edge", "lineage"]]
-            The types of the features to add (node, edge, or lineage).
         """
-        for feature, feature_type in zip(features, feature_types):
-            self._add_feature(feature, feature_type)
+        for feature in features:
+            self._add_feature(feature)
 
     def _add_cycle_lineage_features(self) -> None:
         """
