@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import warnings
 from typing import Literal
 
 from pycellin.custom_types import FeatureType, LineageType
@@ -122,6 +123,34 @@ class Feature:
             The new description of the feature.
         """
         self.description = new_description
+
+    def is_equal(self, other: "Feature", ignore_feat_type: bool = False) -> bool:
+        """
+        Check if the feature is equal to another feature.
+
+        Parameters
+        ----------
+        other : Feature
+            The other feature to compare with.
+        ignore_feat_type : bool, optional
+            Whether to ignore the feature type when comparing the features.
+
+        Returns
+        -------
+        bool
+            True if the features are equal, False otherwise.
+        """
+        if ignore_feat_type:
+            return (
+                self.name == other.name
+                and self.description == other.description
+                and self.lin_type == other.lin_type
+                and self.data_type == other.data_type
+                and self.provenance == other.provenance
+                and self.unit == other.unit
+            )
+        else:
+            return self == other
 
 
 class FeaturesDeclaration:
@@ -278,19 +307,43 @@ class FeaturesDeclaration:
 
         Raises
         ------
-        ValueError
-            If the feature type is invalid.
-        ValueError
-            If a feature with the same name already exists.
+        UserWarning
+            If an identical feature has already been declared.
+        UserWarning
+            If a feature with the same name has already been declared
+            with a different definition.
+        UserWarning
+            If a feature with the same name has already been declared
+            with a different type and definition.
         """
         if feature.name in self.feats_dict:
-            # TODO: a warning would be more appropriate here so it doesn't
-            # block execution.
-            raise ValueError(
-                f"A Feature called {feature.name} already exists in "
-                f"the declared features."
-            )
-        self.feats_dict[feature.name] = feature
+            old_feat = self.feats_dict[feature.name]
+
+            if feature.is_equal(old_feat, ignore_feat_type=True):
+                if feature.feat_type in old_feat.feat_type:
+                    warnings.warn(
+                        f"An identical Feature '{feature.name}' "
+                        f"has already been declared."
+                    )
+                else:
+                    old_feat.feat_type += "+" + feature.feat_type
+            else:
+                if feature.feat_type in old_feat.feat_type:
+                    warnings.warn(
+                        f"A Feature called '{feature.name}' has already been declared "
+                        f"with a different definition. "
+                        f"The feature will be overwritten."
+                    )
+                    self.feats_dict[feature.name] = feature
+                else:
+                    warnings.warn(
+                        f"A Feature called '{feature.name}' has already been declared "
+                        f"with a different type and definition. "
+                        f"The feature will be overwritten."
+                    )
+                    self.feats_dict[feature.name] = feature
+        else:
+            self.feats_dict[feature.name] = feature
 
     def _add_features(
         self,
@@ -380,7 +433,7 @@ class FeaturesDeclaration:
         """
         if feature_name not in self.feats_dict:
             raise KeyError(
-                f"Feature {feature_name} does not exist in the declared features."
+                f"Feature '{feature_name}' does not exist in the declared features."
             )
 
         if feature_type:
@@ -441,7 +494,7 @@ class FeaturesDeclaration:
         """
         if feature_name not in self.feats_dict:
             raise KeyError(
-                f"Feature {feature_name} does not exist in the declared features."
+                f"Feature '{feature_name}' does not exist in the declared features."
             )
 
         self.feats_dict[new_name] = self.feats_dict.pop(feature_name)
@@ -469,7 +522,7 @@ class FeaturesDeclaration:
         """
         if feature_name not in self.feats_dict:
             raise KeyError(
-                f"Feature {feature_name} does not exist in the declared features."
+                f"Feature '{feature_name}' does not exist in the declared features."
             )
 
         self.feats_dict[feature_name]._modify_description(new_description)
@@ -513,31 +566,47 @@ if __name__ == "__main__":
             gfu.define_lineage_ID_Feature(),
         ]
     )
-    for k, v in fd.feats_dict.items():
-        print(k, v)
+    # for k, v in fd.feats_dict.items():
+    #     print(k, v)
+
+    # Add identical feature
+    fd._add_feature(gfu.define_cell_ID_Feature())
+    print()
+
+    # Add different type feature
+    tmp_feat = gfu.define_cell_ID_Feature()
+    tmp_feat.feat_type = "edge"
+    fd._add_feature(tmp_feat)
+    print(fd.feats_dict["cell_ID"])
+
+    # Add different definition feature
+    tmp_feat = gfu.define_cell_ID_Feature()
+    tmp_feat.description = "new description"
+    fd._add_feature(tmp_feat)
+    print(fd.feats_dict["cell_ID"])
 
     # Get feats dict
-    print(fd.get_node_feats().keys())
-    print(fd.get_edge_feats().keys())
-    print(fd.get_lin_feats().keys())
+    # print(fd.get_node_feats().keys())
+    # print(fd.get_edge_feats().keys())
+    # print(fd.get_lin_feats().keys())
 
     # Remove feat
     fd._remove_feature("frame")
-    print(fd.feats_dict.keys())
+    # print(fd.feats_dict.keys())
 
     # Remove feat with type
     fd._remove_feature("lineage_ID", "node")
-    for k, v in fd.feats_dict.items():
-        print(k, v)
+    # for k, v in fd.feats_dict.items():
+    #     print(k, v)
 
     # Remove feat with type, but last type so in fact remove feat
     fd._remove_feature("lineage_ID", "lineage")
-    print(fd.feats_dict.keys())
+    # print(fd.feats_dict.keys())
 
     # Remove feat with multi type
     fd._add_feature(gfu.define_lineage_ID_Feature())
     fd._remove_feature("lineage_ID")
-    print(fd.feats_dict.keys())
+    # print(fd.feats_dict.keys())
 
     # Invalid feat name
     # fd._remove_feature("cel_ID")
@@ -547,8 +616,8 @@ if __name__ == "__main__":
 
     # Rename feature
     fd._rename_feature("cell_ID", "cell_ID_new")
-    print(fd.feats_dict.keys(), fd.feats_dict["cell_ID_new"].name)
+    # print(fd.feats_dict.keys(), fd.feats_dict["cell_ID_new"].name)
 
     # Modify description
     fd._modify_feature_description("cell_ID_new", "New description")
-    print(fd.feats_dict["cell_ID_new"])
+    # print(fd.feats_dict["cell_ID_new"])
