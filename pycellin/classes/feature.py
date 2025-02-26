@@ -462,12 +462,7 @@ class FeaturesDeclaration:
             {'unit1': ['feature1', 'feature2'], 'unit2': ['feature3']}.
         """
         units = {}
-        features_values = [
-            self.node_feats.values(),
-            self.edge_feats.values(),
-            self.lin_feats.values(),
-        ]
-        for feat in chain.from_iterable(features_values):
+        for feat in self.feats_dict.values():
             if feat.unit in units:
                 units[feat.unit].append(feat.name)
             else:
