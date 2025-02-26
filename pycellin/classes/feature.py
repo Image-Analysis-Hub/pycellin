@@ -396,7 +396,6 @@ class FeaturesDeclaration:
         self,
         feature_name: str,
         new_name: str,
-        feature_type: Literal["node", "edge", "lineage"],
     ) -> None:
         """
         Rename a specified feature.
@@ -404,35 +403,22 @@ class FeaturesDeclaration:
         Parameters
         ----------
         feature_name : str
-            The name of the feature to rename.
+            The current name of the feature to rename.
         new_name : str
             The new name for the feature.
-        feature_type : Literal["node", "edge", "lineage"]
-            The type of the feature to rename. Valid values are "node",
-            "edge", or "lineage".
 
         Raises
         ------
-        ValueError
-            If the feature type is invalid.
         KeyError
-            If the feature does not exist within the specified type.
+            If the feature does not exist in the declared features.
         """
-        # TODO: make the feature type optional, but raise an error
-        # if several features with the same name exist.
-        # + do the same for the other relevant method
-        try:
-            dict_feats = self._get_feat_dict_from_feat_type(feature_type)
-        except ValueError as e:
-            raise ValueError(e)
-
-        if feature_name not in dict_feats:
+        if feature_name not in self.feats_dict:
             raise KeyError(
-                f"Feature {feature_name} does not exist in {feature_type} features."
+                f"Feature {feature_name} does not exist in the declared features."
             )
 
-        dict_feats[new_name] = dict_feats.pop(feature_name)
-        dict_feats[new_name]._rename(new_name)
+        self.feats_dict[new_name] = self.feats_dict.pop(feature_name)
+        self.feats_dict[new_name]._rename(new_name)
 
     def _modify_feature_description(
         self,
@@ -507,6 +493,7 @@ if __name__ == "__main__":
 
     import pycellin.graph.features.utils as gfu
 
+    # Add features
     fd = FeaturesDeclaration()
     fd._add_feature(gfu.define_cell_ID_Feature())
     fd._add_features(
@@ -518,16 +505,20 @@ if __name__ == "__main__":
     for k, v in fd.feats_dict.items():
         print(k, v)
 
+    # Remove feat
     fd._remove_feature("frame")
     print(fd.feats_dict.keys())
 
+    # Remove feat with type
     fd._remove_feature("lineage_ID", "node")
     for k, v in fd.feats_dict.items():
         print(k, v)
 
+    # Remove feat with type, but last type so in fact remove feat
     fd._remove_feature("lineage_ID", "lineage")
     print(fd.feats_dict.keys())
 
+    # Remove feat with multi type
     fd._add_feature(gfu.define_lineage_ID_Feature())
     fd._remove_feature("lineage_ID")
     print(fd.feats_dict.keys())
@@ -536,4 +527,8 @@ if __name__ == "__main__":
     # fd._remove_feature("cel_ID")
 
     # Invalid feat type
-    fd._remove_feature("cell_ID", "nod")
+    # fd._remove_feature("cell_ID", "nod")
+
+    # Rename feature
+    fd._rename_feature("cell_ID", "cell_ID_new")
+    print(fd.feats_dict.keys(), fd.feats_dict["cell_ID_new"].name)
