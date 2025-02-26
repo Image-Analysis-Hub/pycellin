@@ -94,11 +94,11 @@ def define_lineage_ID_Feature(provenance: str = "Pycellin") -> Feature:
 
 
 def define_cell_coord_Feature(
-    unit: str, dimension: str, provenance: str = "Pycellin"
+    unit: str, axis: str, provenance: str = "Pycellin"
 ) -> Feature:
     feat = Feature(
-        name=f"cell_{dimension}",
-        description=f"{dimension.upper()} coordinate of the cell",
+        name=f"cell_{axis}",
+        description=f"{axis.upper()} coordinate of the cell",
         provenance=provenance,
         feat_type="node",
         lin_type="CellLineage",
@@ -109,12 +109,12 @@ def define_cell_coord_Feature(
 
 
 def define_link_coord_Feature(
-    unit: str, dimension: str, provenance: str = "Pycellin"
+    unit: str, axis: str, provenance: str = "Pycellin"
 ) -> Feature:
     feat = Feature(
-        name=f"link_{dimension}",
+        name=f"link_{axis}",
         description=(
-            f"{dimension.upper()} coordinate of the link, "
+            f"{axis.upper()} coordinate of the link, "
             f"i.e. mean coordinate of its two cells"
         ),
         provenance=provenance,
@@ -127,12 +127,12 @@ def define_link_coord_Feature(
 
 
 def define_lineage_coord_Feature(
-    unit: str, dimension: str, provenance: str = "Pycellin"
+    unit: str, axis: str, provenance: str = "Pycellin"
 ) -> Feature:
     feat = Feature(
-        name=f"lineage_{dimension}",
+        name=f"lineage_{axis}",
         description=(
-            f"{dimension.upper()} coordinate of the lineage, "
+            f"{axis.upper()} coordinate of the lineage, "
             f"i.e. mean coordinate of its cells"
         ),
         provenance=provenance,

@@ -99,8 +99,19 @@ class CellDisplacement(EdgeLocalFeatureCalculator):
         float
             The cell displacement.
         """
-        pos1 = lineage.nodes[edge[0]]["cell_location"]
-        pos2 = lineage.nodes[edge[1]]["cell_location"]
+        pos1 = []
+        pos2 = []
+        for axis in ["x", "y", "z"]:
+            pos1.append(lineage.nodes[edge[0]][f"cell_{axis}"])
+            pos2.append(lineage.nodes[edge[1]][f"cell_{axis}"])
+            # pos1 = lineage.nodes[edge[0]][f"link_{axis}"]
+            # pos2 = lineage.nodes[edge[1]][f"link_{axis}"]
+        #     if i == 0:
+        #         displacement = (pos1 - pos2) ** 2
+        #     else:
+        #         displacement += (pos1 - pos2) ** 2
+        # pos1 = lineage.nodes[edge[0]]["cell_location"]
+        # pos2 = lineage.nodes[edge[1]]["cell_location"]
         return math.dist(pos1, pos2)
 
 
@@ -235,8 +246,13 @@ class CellSpeed(EdgeLocalFeatureCalculator):
         if "cell_displacement" in lineage.edges[edge]:
             return lineage.edges[edge]["cell_displacement"] / (time2 - time1)
         else:
-            pos1 = lineage.nodes[edge[0]]["location"]
-            pos2 = lineage.nodes[edge[1]]["location"]
+            pos1 = []
+            pos2 = []
+            for axis in ["x", "y", "z"]:
+                pos1.append(lineage.nodes[edge[0]][f"cell_{axis}"])
+                pos2.append(lineage.nodes[edge[1]][f"cell_{axis}"])
+            # pos1 = lineage.nodes[edge[0]]["location"]
+            # pos2 = lineage.nodes[edge[1]]["location"]
             return math.dist(pos1, pos2) / (time2 - time1)
 
 
@@ -326,26 +342,53 @@ class Straightness(NodeGlobalFeatureCalculator):
         float
             Straightness of the displacement.
         """
-        lin_ID = cycle_lin.graph["cycle_lineage_ID"]
+        lin_ID = cycle_lin.graph["lineage_ID"]
         cell_lin = data.cell_data[lin_ID]
         cells = cycle_lin.nodes[noi]["cells"]
         distances = [
-            math.dist(cell_lin.nodes[n1]["location"], cell_lin.nodes[n2]["location"])
+            math.dist(
+                (
+                    cell_lin.nodes[n1]["cell_x"],
+                    cell_lin.nodes[n1]["cell_y"],
+                    cell_lin.nodes[n1]["cell_z"],
+                ),
+                (
+                    cell_lin.nodes[n2]["cell_x"],
+                    cell_lin.nodes[n2]["cell_y"],
+                    cell_lin.nodes[n2]["cell_z"],
+                ),
+            )
             for (n1, n2) in pairwise(cells)
         ]
         if self.include_incoming_edge:
             first_cell = cells[0]
-            predecessors = list(cell_lin.predecessors(first_cell))
-            if len(predecessors) == 1:
+            preds = list(cell_lin.predecessors(first_cell))
+            if len(preds) == 1:
                 dist = math.dist(
-                    cell_lin.nodes[predecessors[0]]["location"],
-                    cell_lin.nodes[first_cell]["location"],
+                    (
+                        cell_lin.nodes[preds[0]]["cell_x"],
+                        cell_lin.nodes[preds[0]]["cell_y"],
+                        cell_lin.nodes[preds[0]]["cell_z"],
+                    ),
+                    (
+                        cell_lin.nodes[first_cell]["cell_x"],
+                        cell_lin.nodes[first_cell]["cell_y"],
+                        cell_lin.nodes[first_cell]["cell_z"],
+                    ),
                 )
                 distances.append(dist)
-            elif len(predecessors) > 1:
+            elif len(preds) > 1:
                 raise FusionError(first_cell, lin_ID)
-        first_cell_loc = cell_lin.nodes[cells[0]]["location"]
-        last_cell_loc = cell_lin.nodes[cells[-1]]["location"]
+        first_cell_loc = (
+            cell_lin.nodes[cells[0]]["cell_x"],
+            cell_lin.nodes[cells[0]]["cell_y"],
+            cell_lin.nodes[cells[0]]["cell_z"],
+        )
+        last_cell_loc = (
+            cell_lin.nodes[cells[-1]]["cell_x"],
+            cell_lin.nodes[cells[-1]]["cell_y"],
+            cell_lin.nodes[cells[-1]]["cell_z"],
+        )
         return math.dist(first_cell_loc, last_cell_loc) / sum(distances)
 
 
@@ -400,9 +443,21 @@ class Angle(NodeGlobalFeatureCalculator):
             raise FusionError(noi, lineage.graph["lineage_ID"])
 
         # Compute the angle between the incoming and outgoing edges.
-        in_coords = lineage.nodes[predecessors[0]]["location"]
-        noi_coords = lineage.nodes[noi]["location"]
-        out_coords = lineage.nodes[successors[0]]["location"]
+        in_coords = (
+            lineage.nodes[predecessors[0]]["cell_x"],
+            lineage.nodes[predecessors[0]]["cell_y"],
+            lineage.nodes[predecessors[0]]["cell_z"],
+        )
+        noi_coords = (
+            lineage.nodes[noi]["cell_x"],
+            lineage.nodes[noi]["cell_y"],
+            lineage.nodes[noi]["cell_z"],
+        )
+        out_coords = (
+            lineage.nodes[successors[0]]["cell_x"],
+            lineage.nodes[successors[0]]["cell_y"],
+            lineage.nodes[successors[0]]["cell_z"],
+        )
         vector_in = np.array(noi_coords) - np.array(in_coords)
         vector_out = np.array(out_coords) - np.array(noi_coords)
         cross_prod = np.cross(vector_in, vector_out)
