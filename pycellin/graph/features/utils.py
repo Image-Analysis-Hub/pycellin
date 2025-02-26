@@ -58,10 +58,10 @@ def define_frame_Feature(provenance: str = "Pycellin") -> Feature:
     feat = Feature(
         name="frame",
         description="Frame number of the cell ",
+        provenance=provenance,
         feat_type="node",
         lin_type="CellLineage",
         data_type="int",
-        provenance=provenance,
         unit="frame",
     )
     return feat
@@ -71,10 +71,10 @@ def define_cell_ID_Feature(provenance: str = "Pycellin") -> Feature:
     feat = Feature(
         name="cell_ID",
         description="Unique identifier of the cell",
+        provenance=provenance,
         feat_type="node",
         lin_type="CellLineage",
         data_type="int",
-        provenance=provenance,
         unit="none",
     )
     return feat
@@ -84,25 +84,61 @@ def define_lineage_ID_Feature(provenance: str = "Pycellin") -> Feature:
     feat = Feature(
         name="lineage_ID",
         description="Unique identifier of the lineage",
-        feat_type="lineage",
-        lin_type="CellLineage",  # TODO: should be Lineage? or CellLineage+CycleLineage
-        data_type="int",
         provenance=provenance,
+        feat_type="lineage",
+        lin_type="Lineage",
+        data_type="int",
         unit="none",
     )
     return feat
 
 
-# FIXME:  location should be splitted into x, y and z, with a different name depending
-# on the feature type (node, edge, lineage), something like cell_x, edge_y...
-def define_cell_location_Feature(unit: str, provenance: str = "Pycellin") -> Feature:
+def define_cell_coord_Feature(
+    unit: str, dimension: str, provenance: str = "Pycellin"
+) -> Feature:
     feat = Feature(
-        name="cell_location",
-        description="Location of the cell",
+        name=f"cell_{dimension}",
+        description=f"{dimension.upper()} coordinate of the cell",
+        provenance=provenance,
         feat_type="node",
         lin_type="CellLineage",
         data_type="float",
+        unit=unit,
+    )
+    return feat
+
+
+def define_link_coord_Feature(
+    unit: str, dimension: str, provenance: str = "Pycellin"
+) -> Feature:
+    feat = Feature(
+        name=f"link_{dimension}",
+        description=(
+            f"{dimension.upper()} coordinate of the link, "
+            f"i.e. mean coordinate of its two cells"
+        ),
         provenance=provenance,
+        feat_type="edge",
+        lin_type="CellLineage",
+        data_type="float",
+        unit=unit,
+    )
+    return feat
+
+
+def define_lineage_coord_Feature(
+    unit: str, dimension: str, provenance: str = "Pycellin"
+) -> Feature:
+    feat = Feature(
+        name=f"lineage_{dimension}",
+        description=(
+            f"{dimension.upper()} coordinate of the lineage, "
+            f"i.e. mean coordinate of its cells"
+        ),
+        provenance=provenance,
+        feat_type="lineage",
+        lin_type="CellLineage",
+        data_type="float",
         unit=unit,
     )
     return feat

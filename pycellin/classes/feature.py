@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import warnings
-from typing import Literal
 
 from pycellin.custom_types import FeatureType, LineageType
 from pycellin.utils import check_literal_type
@@ -17,7 +16,7 @@ class Feature:
         name: str,
         description: str,
         feat_type: str,
-        lin_type: Literal["CellLineage", "CycleLineage"],
+        lin_type: LineageType,
         data_type: str,
         provenance: str,
         unit: str | None = None,
@@ -33,9 +32,9 @@ class Feature:
             A description of the feature.
         feat_type : str
             The type of the feature (node, edge, lineage, or a combination of the 3).
-        lin_type : Literal["CellLineage", "CycleLineage"]
-            The type of lineage the feature is associated with: cell lineage
-            or cell cycle lineage.
+        lin_type : LineageType
+            The type of lineage the feature is associated with: cell lineage,
+            cell cycle lineage or both.
         data_type : str
             The data type of the feature (int, float, string).
         provenance : str
@@ -56,10 +55,10 @@ class Feature:
             raise ValueError(
                 f"Feature type must be one of {', '.join(LineageType.__args__)}."
             )
+        self.provenance = provenance
         self.feat_type = feat_type
         self.lin_type = lin_type
         self.data_type = data_type
-        self.provenance = provenance
         self.unit = unit
 
     def __eq__(self, other: object) -> bool:
@@ -68,10 +67,10 @@ class Feature:
         return (
             self.name == other.name
             and self.description == other.description
+            and self.provenance == other.provenance
             and self.feat_type == other.feat_type
             and self.lin_type == other.lin_type
             and self.data_type == other.data_type
-            and self.provenance == other.provenance
             and self.unit == other.unit
         )
 
@@ -145,9 +144,9 @@ class Feature:
             return (
                 self.name == other.name
                 and self.description == other.description
+                and self.provenance == other.provenance
                 and self.lin_type == other.lin_type
                 and self.data_type == other.data_type
-                and self.provenance == other.provenance
                 and self.unit == other.unit
             )
         else:
@@ -234,15 +233,13 @@ class FeaturesDeclaration:
         else:
             return False
 
-    def _get_feat_dict_from_feat_type(
-        self, feat_type: Literal["node", "edge", "lineage"]
-    ) -> dict:
+    def _get_feat_dict_from_feat_type(self, feat_type: FeatureType) -> dict:
         """
         Return the dictionary of features corresponding to the specified type.
 
         Parameters
         ----------
-        feat_type : Literal["node", "edge", "lineage"]
+        feat_type : FeatureType
             The type of the features to return (node, edge, or lineage).
 
         Returns
@@ -369,10 +366,10 @@ class FeaturesDeclaration:
         Add the basic features of cell cycle lineages.
         """
         common_fields = {
-            "feat_type": "cycle",
+            "provenance": "Pycellin",
+            "feat_type": "node",
             "lin_type": "CycleLineage",
             "data_type": "int",
-            "provenance": "Pycellin",
         }
 
         # Node features.
@@ -414,7 +411,7 @@ class FeaturesDeclaration:
     def _remove_feature(
         self,
         feature_name: str,
-        feature_type: Literal["node", "edge", "lineage"] | None = None,
+        feature_type: FeatureType | None = None,
     ) -> None:
         """
         Remove the specified feature from the FeaturesDeclaration.
@@ -423,7 +420,7 @@ class FeaturesDeclaration:
         ----------
         feature_name : str
             The name of the feature to remove.
-        feature_type : Literal["node", "edge", "lineage"], optional
+        feature_type : FeatureType, optional
             The type of the feature to remove (node, edge, or lineage).
             If not specified, the method will try to remove the feature from
             all types.
