@@ -15,9 +15,10 @@ class Feature:
         self,
         name: str,
         description: str,
-        lineage_type: Literal["CellLineage", "CycleLineage"],
-        provenance: str,
+        feat_type: str,
+        lin_type: Literal["CellLineage", "CycleLineage"],
         data_type: str,
+        provenance: str,
         unit: str | None = None,
     ) -> None:
         """
@@ -29,13 +30,15 @@ class Feature:
             The name of the feature.
         description : str
             A description of the feature.
-        lineage_type : Literal["CellLineage", "CycleLineage"]
+        feat_type : str
+            The type of the feature (node, edge, lineage, or a combination of the 3).
+        lin_type : Literal["CellLineage", "CycleLineage"]
             The type of lineage the feature is associated with: cell lineage
             or cell cycle lineage.
-        provenance : str
-            The provenance of the feature (TrackMate, CTC, Pycellin, custom...).
         data_type : str
             The data type of the feature (int, float, string).
+        provenance : str
+            The provenance of the feature (TrackMate, CTC, Pycellin, custom...).
         unit : str, optional
             The unit of the feature (e.g. µm, min, cell).
 
@@ -46,16 +49,16 @@ class Feature:
         """
         # TODO: add a protect argument to prevent the modification of the feature
         # and create the related methods to protect / unprotect the feature, and getters
-        # TODO: should the feature type be stored as an attribute?
         self.name = name
         self.description = description
-        if not check_literal_type(lineage_type, LineageType):
+        if not check_literal_type(lin_type, LineageType):
             raise ValueError(
                 f"Feature type must be one of {', '.join(LineageType.__args__)}."
             )
-        self.lineage_type = lineage_type
-        self.provenance = provenance
+        self.feat_type = feat_type
+        self.lin_type = lin_type
         self.data_type = data_type
+        self.provenance = provenance
         self.unit = unit
 
     def __eq__(self, other: object) -> bool:
@@ -64,9 +67,10 @@ class Feature:
         return (
             self.name == other.name
             and self.description == other.description
-            and self.lineage_type == other.lineage_type
-            and self.provenance == other.provenance
+            and self.feat_type == other.feat_type
+            and self.lin_type == other.lin_type
             and self.data_type == other.data_type
+            and self.provenance == other.provenance
             and self.unit == other.unit
         )
 
@@ -81,8 +85,9 @@ class Feature:
         """
         return (
             f"Feature(name={self.name!r}, description={self.description!r}, "
-            f"lineage_type={self.lineage_type!r}, provenance={self.provenance!r}, "
-            f"data_type={self.data_type!r}, unit={self.unit!r})"
+            f"feat_type={self.feat_type!r}, lin_type={self.lin_type!r}, "
+            f"provenance={self.provenance!r}, data_type={self.data_type!r}, "
+            f"unit={self.unit!r})"
         )
 
     def __str__(self) -> str:
