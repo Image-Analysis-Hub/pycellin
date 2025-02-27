@@ -1527,7 +1527,7 @@ Computation done in 6 ms.</Log>
     </FilteredTracks>
   </Model>
   <Settings>
-    <ImageData filename="230413_Stage10_Frame1-23_merge_FINAL.tif" folder="D:\Laura_DATA\AgarPad_Ec\230413\" width="660" height="960" nslices="1" nframes="23" pixelwidth="0.06587000409777295" pixelheight="0.06587000409777295" voxeldepth="0.06587" timeinterval="5.0" />
+    <ImageData filename="230413_Stage10_Frame1-23_merge_FINAL.tif" folder="D:\Laura_DATA\AgarPad_Ec\230413\" width="660" height="960" nslices="1" nframes="23" pixelwidth="0.06587" pixelheight="0.06587" voxeldepth="0.06587" timeinterval="5.0" />
     <BasicSettings xstart="0" xend="659" ystart="0" yend="959" zstart="0" zend="0" tstart="0" tend="22" />
     <DetectorSettings DETECTOR_NAME="LABEL_IMAGE_DETECTOR" TARGET_CHANNEL="1" SIMPLIFY_CONTOURS="true" />
     <InitialSpotFilter feature="QUALITY" value="0.44648147070849387" isabove="true" />
