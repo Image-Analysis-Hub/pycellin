@@ -256,6 +256,24 @@ class Model:
         """
         return self.feat_declaration._has_feature(feature_name)
 
+    def prepare_full_data_update(self) -> None:
+        """
+        Prepare the updater for a full data update.
+
+        All cells, links and lineages in the model data will see
+        their feature values recomputed during the next update.
+        """
+        if self._updater._full_data_update:
+            return
+        self._updater._full_data_update = True
+        self._updater._update_required = True
+        for lin_ID, lin in self.data.cell_data.items():
+            for noi in lin.nodes:
+                self._updater._added_cells.add(Cell(noi, lin_ID))
+            for edge in lin.edges:
+                self._updater._added_links.add(Link(edge[0], edge[1], lin_ID))
+        self._updater._added_lineages = set(self.data.cell_data.keys())
+
     def is_update_required(self) -> bool:
         """
         Check if the model requires an update.
@@ -646,24 +664,6 @@ class Model:
                 fusions.extend([Cell(cell_ID, lin_ID) for cell_ID in tmp])
         return fusions
 
-    def prepare_full_data_update(self) -> None:
-        """
-        Prepare the updater for a full data update.
-
-        All cells, links and lineages in the model data will see
-        their feature values recomputed during the next update.
-        """
-        if self._updater._full_data_update:
-            return
-        self._updater._full_data_update = True
-        self._updater._update_required = True
-        for lin_ID, lin in self.data.cell_data.items():
-            for noi in lin.nodes:
-                self._updater._added_cells.add(Cell(noi, lin_ID))
-            for edge in lin.edges:
-                self._updater._added_links.add(Link(edge[0], edge[1], lin_ID))
-        self._updater._added_lineages = set(self.data.cell_data.keys())
-
     def add_custom_feature(
         self,
         calculator: FeatureCalculator,
@@ -699,60 +699,6 @@ class Model:
     # TODO: in case of data coming from a loader, there is no calculator associated
     # with the declared features.
 
-    def add_cell_width(
-        self,
-        skel_algo: str = "zhang",
-        tolerance: float = 0.5,
-        method_width: str = "mean",
-        width_ignore_tips: bool = False,
-        rename: str | None = None,
-    ) -> None:
-        feat = Feature(
-            name=rename if rename else "cell_width",
-            description="Width of the cell",
-            feat_type="node",
-            lin_type="CellLineage",
-            data_type="float",
-            provenance="Pycellin",
-            unit=self.metadata["space_unit"],
-        )
-        calc = morpho.CellWidth(
-            feat,
-            self.metadata["pixel_size"]["width"],
-            skel_algo=skel_algo,
-            tolerance=tolerance,
-            method_width=method_width,
-            width_ignore_tips=width_ignore_tips,
-        )
-        self.add_custom_feature(calc)
-
-    def add_cell_length(
-        self,
-        skel_algo: str = "zhang",
-        tolerance: float = 0.5,
-        method_width: str = "mean",
-        width_ignore_tips: bool = False,
-        rename: str | None = None,
-    ) -> None:
-        feat = Feature(
-            name=rename if rename else "cell_length",
-            description="Length of the cell",
-            provenance="Pycellin",
-            feat_type="node",
-            lin_type="CellLineage",
-            data_type="float",
-            unit=self.metadata["space_unit"],
-        )
-        calc = morpho.CellLength(
-            feat,
-            self.metadata["pixel_size"]["width"],
-            skel_algo=skel_algo,
-            tolerance=tolerance,
-            method_width=method_width,
-            width_ignore_tips=width_ignore_tips,
-        )
-        self.add_custom_feature(calc)
-
     def add_absolute_age(
         self,
         in_time_unit: bool = False,
@@ -786,136 +732,6 @@ class Model:
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(tracking.AbsoluteAge(feat, time_step))
 
-    def add_relative_age(
-        self,
-        in_time_unit: bool = False,
-        rename: str | None = None,
-    ) -> None:
-        """
-        Add the cell relative age feature to the model.
-
-        The relative age of a cell is defined as the number of nodes since
-        the start of the cell cycle (i.e. previous division, or beginning
-        of the lineage).
-        It is given in frames by default, but can be converted
-        to the time unit of the model if specified.
-
-        Parameters
-        ----------
-        in_time_unit : bool, optional
-            True to give the relative age in the time unit of the model,
-            False to give it in frames (default is False).
-        rename : str, optional
-            New name for the feature (default is None).
-        """
-        feat = Feature(
-            name=rename if rename else "relative_age",
-            description="Age of the cell since the beginning of the current cell cycle",
-            provenance="Pycellin",
-            feat_type="node",
-            lin_type="CellLineage",
-            data_type="float" if in_time_unit else "int",
-            unit=self.metadata["time_step"] if in_time_unit else "frame",
-        )
-        time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(tracking.RelativeAge(feat, time_step))
-
-    def add_cell_cycle_completeness(
-        self,
-        rename: str | None = None,
-    ) -> None:
-        """
-        Add the cell cycle completeness feature to the model.
-
-        A cell cycle is defined as complete when it starts by a division
-        AND ends by a division. Cell cycles that start at the root
-        or end with a leaf are thus incomplete.
-        This can be useful when analyzing features like division time. It avoids
-        the introduction of a bias since we have no information on what happened
-        before the root or after the leaves.
-
-        Parameters
-        ----------
-        rename : str, optional
-            New name for the feature (default is None).
-        """
-        feat = Feature(
-            name=rename if rename else "cell_cycle_completeness",
-            description="Completeness of the cell cycle",
-            provenance="Pycellin",
-            feat_type="node",
-            lin_type="CycleLineage",
-            data_type="bool",
-            unit="none",
-        )
-        self.add_custom_feature(tracking.CellCycleCompleteness(feat))
-
-    def add_division_time(
-        self,
-        in_time_unit: bool = False,
-        rename: str | None = None,
-    ) -> None:
-        """
-        Add the division time feature to the model.
-
-        Division time is defined as the time between 2 divisions.
-        It is also the length of the cell cycle of the cell of interest.
-        It is given in frames by default, but can be converted
-        to the time unit of the model if specified.
-
-        Parameters
-        ----------
-        in_time_unit : bool, optional
-            True to give the division time in the time unit of the model,
-            False to give it in frames (default is False).
-        rename : str, optional
-            New name for the feature (default is None).
-        """
-        feat = Feature(
-            name=rename if rename else "division_time",
-            description="Time elapsed between the birth of a cell and its division",
-            provenance="Pycellin",
-            feat_type="node",
-            lin_type="CycleLineage",
-            data_type="float" if in_time_unit else "int",
-            unit=self.metadata["time_step"] if in_time_unit else "frame",
-        )
-        time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(tracking.DivisionTime(feat, time_step))
-
-    def add_division_rate(
-        self,
-        in_time_unit: bool = False,
-        rename: str | None = None,
-    ) -> None:
-        """
-        Add the division rate feature to the model.
-
-        Division rate is defined as the number of divisions per time unit.
-        It is the inverse of the division time.
-        It is given in divisions per frame by default, but can be converted
-        to divisions per time unit of the model if specified.
-
-        Parameters
-        ----------
-        in_time_unit : bool, optional
-            True to give the division rate in the time unit of the model,
-            False to give it in frames (default is False).
-        rename : str, optional
-            New name for the feature (default is None).
-        """
-        feat = Feature(
-            name=rename if rename else "division_rate",
-            description="Number of divisions per time unit",
-            provenance="Pycellin",
-            feat_type="node",
-            lin_type="CycleLineage",
-            data_type="float",
-            unit=f'1/{self.metadata["time_unit"]}' if in_time_unit else "1/frame",
-        )
-        time_step = self.metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(tracking.DivisionRate(feat, time_step))
-
     def add_angle(
         self,
         unit: Literal["radian", "degree"] = "radian",
@@ -947,15 +763,15 @@ class Model:
         )
         self.add_custom_feature(motion.Angle(feat, unit))
 
-    def add_cell_displacement(
+    def add_branch_mean_displacement(
         self,
         rename: str | None = None,
     ) -> None:
         """
-        Add the displacement feature to the model.
+        Add the branch mean displacement feature to the model.
 
-        The displacement is defined as the Euclidean distance between the positions
-        of the cell at two consecutive detections.
+        The branch mean displacement is defined as the mean displacement of the cell
+        during the cell cycle.
 
         Parameters
         ----------
@@ -963,15 +779,45 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            name=rename if rename else "cell_displacement",
-            description="Displacement of the cell between two consecutive detections",
+            name=rename if rename else "branch_mean_displacement",
+            description="Mean displacement of the cell during the cell cycle",
             provenance="Pycellin",
-            feat_type="edge",
-            lin_type="CellLineage",
+            feat_type="node",
+            lin_type="CycleLineage",
             data_type="float",
             unit=self.metadata["space_unit"],
         )
-        self.add_custom_feature(motion.CellDisplacement(feat))
+        self.add_custom_feature(motion.BranchMeanDisplacement(feat))
+
+    def add_branch_mean_speed(
+        self,
+        include_incoming_edge: bool = False,
+        rename: str | None = None,
+    ) -> None:
+        """
+        Add the branch mean speed feature to the model.
+
+        The branch mean speed is defined as the mean speed of the cell
+        during the cell cycle.
+
+        Parameters
+        ----------
+        include_incoming_edge : bool, optional
+            Whether to include the distance between the first cell and its predecessor.
+            Default is False.
+        rename : str, optional
+            New name for the feature (default is None).
+        """
+        feat = Feature(
+            name=rename if rename else "branch_mean_speed",
+            description="Mean speed of the cell during the cell cycle",
+            provenance="Pycellin",
+            feat_type="node",
+            lin_type="CycleLineage",
+            data_type="float",
+            unit=f"{self.metadata['space_unit']} / {self.metadata['time_unit']}",
+        )
+        self.add_custom_feature(motion.BranchMeanSpeed(feat, include_incoming_edge))
 
     def add_branch_total_displacement(
         self,
@@ -999,15 +845,19 @@ class Model:
         )
         self.add_custom_feature(motion.BranchTotalDisplacement(feat))
 
-    def add_branch_mean_displacement(
+    def add_cell_cycle_completeness(
         self,
         rename: str | None = None,
     ) -> None:
         """
-        Add the branch mean displacement feature to the model.
+        Add the cell cycle completeness feature to the model.
 
-        The branch mean displacement is defined as the mean displacement of the cell
-        during the cell cycle.
+        A cell cycle is defined as complete when it starts by a division
+        AND ends by a division. Cell cycles that start at the root
+        or end with a leaf are thus incomplete.
+        This can be useful when analyzing features like division time. It avoids
+        the introduction of a bias since we have no information on what happened
+        before the root or after the leaves.
 
         Parameters
         ----------
@@ -1015,15 +865,68 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            name=rename if rename else "branch_mean_displacement",
-            description="Mean displacement of the cell during the cell cycle",
+            name=rename if rename else "cell_cycle_completeness",
+            description="Completeness of the cell cycle",
             provenance="Pycellin",
             feat_type="node",
             lin_type="CycleLineage",
+            data_type="bool",
+            unit="none",
+        )
+        self.add_custom_feature(tracking.CellCycleCompleteness(feat))
+
+    def add_cell_displacement(
+        self,
+        rename: str | None = None,
+    ) -> None:
+        """
+        Add the displacement feature to the model.
+
+        The displacement is defined as the Euclidean distance between the positions
+        of the cell at two consecutive detections.
+
+        Parameters
+        ----------
+        rename : str, optional
+            New name for the feature (default is None).
+        """
+        feat = Feature(
+            name=rename if rename else "cell_displacement",
+            description="Displacement of the cell between two consecutive detections",
+            provenance="Pycellin",
+            feat_type="edge",
+            lin_type="CellLineage",
             data_type="float",
             unit=self.metadata["space_unit"],
         )
-        self.add_custom_feature(motion.BranchMeanDisplacement(feat))
+        self.add_custom_feature(motion.CellDisplacement(feat))
+
+    def add_cell_length(
+        self,
+        skel_algo: str = "zhang",
+        tolerance: float = 0.5,
+        method_width: str = "mean",
+        width_ignore_tips: bool = False,
+        rename: str | None = None,
+    ) -> None:
+        feat = Feature(
+            name=rename if rename else "cell_length",
+            description="Length of the cell",
+            provenance="Pycellin",
+            feat_type="node",
+            lin_type="CellLineage",
+            data_type="float",
+            unit=self.metadata["space_unit"],
+        )
+        calc = morpho.CellLength(
+            feat,
+            self.metadata["pixel_size"]["width"],
+            skel_algo=skel_algo,
+            tolerance=tolerance,
+            method_width=method_width,
+            width_ignore_tips=width_ignore_tips,
+        )
+        self.add_custom_feature(calc)
 
     def add_cell_speed(
         self,
@@ -1062,35 +965,132 @@ class Model:
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(motion.CellSpeed(feat, time_step))
 
-    def add_branch_mean_speed(
+    def add_cell_width(
         self,
-        include_incoming_edge: bool = False,
+        skel_algo: str = "zhang",
+        tolerance: float = 0.5,
+        method_width: str = "mean",
+        width_ignore_tips: bool = False,
+        rename: str | None = None,
+    ) -> None:
+        feat = Feature(
+            name=rename if rename else "cell_width",
+            description="Width of the cell",
+            feat_type="node",
+            lin_type="CellLineage",
+            data_type="float",
+            provenance="Pycellin",
+            unit=self.metadata["space_unit"],
+        )
+        calc = morpho.CellWidth(
+            feat,
+            self.metadata["pixel_size"]["width"],
+            skel_algo=skel_algo,
+            tolerance=tolerance,
+            method_width=method_width,
+            width_ignore_tips=width_ignore_tips,
+        )
+        self.add_custom_feature(calc)
+
+    def add_division_rate(
+        self,
+        in_time_unit: bool = False,
         rename: str | None = None,
     ) -> None:
         """
-        Add the branch mean speed feature to the model.
+        Add the division rate feature to the model.
 
-        The branch mean speed is defined as the mean speed of the cell
-        during the cell cycle.
+        Division rate is defined as the number of divisions per time unit.
+        It is the inverse of the division time.
+        It is given in divisions per frame by default, but can be converted
+        to divisions per time unit of the model if specified.
 
         Parameters
         ----------
-        include_incoming_edge : bool, optional
-            Whether to include the distance between the first cell and its predecessor.
-            Default is False.
+        in_time_unit : bool, optional
+            True to give the division rate in the time unit of the model,
+            False to give it in frames (default is False).
         rename : str, optional
             New name for the feature (default is None).
         """
         feat = Feature(
-            name=rename if rename else "branch_mean_speed",
-            description="Mean speed of the cell during the cell cycle",
+            name=rename if rename else "division_rate",
+            description="Number of divisions per time unit",
             provenance="Pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="float",
-            unit=f"{self.metadata['space_unit']} / {self.metadata['time_unit']}",
+            unit=f'1/{self.metadata["time_unit"]}' if in_time_unit else "1/frame",
         )
-        self.add_custom_feature(motion.BranchMeanSpeed(feat, include_incoming_edge))
+        time_step = self.metadata["time_step"] if in_time_unit else 1
+        self.add_custom_feature(tracking.DivisionRate(feat, time_step))
+
+    def add_division_time(
+        self,
+        in_time_unit: bool = False,
+        rename: str | None = None,
+    ) -> None:
+        """
+        Add the division time feature to the model.
+
+        Division time is defined as the time between 2 divisions.
+        It is also the length of the cell cycle of the cell of interest.
+        It is given in frames by default, but can be converted
+        to the time unit of the model if specified.
+
+        Parameters
+        ----------
+        in_time_unit : bool, optional
+            True to give the division time in the time unit of the model,
+            False to give it in frames (default is False).
+        rename : str, optional
+            New name for the feature (default is None).
+        """
+        feat = Feature(
+            name=rename if rename else "division_time",
+            description="Time elapsed between the birth of a cell and its division",
+            provenance="Pycellin",
+            feat_type="node",
+            lin_type="CycleLineage",
+            data_type="float" if in_time_unit else "int",
+            unit=self.metadata["time_step"] if in_time_unit else "frame",
+        )
+        time_step = self.metadata["time_step"] if in_time_unit else 1
+        self.add_custom_feature(tracking.DivisionTime(feat, time_step))
+
+    def add_relative_age(
+        self,
+        in_time_unit: bool = False,
+        rename: str | None = None,
+    ) -> None:
+        """
+        Add the cell relative age feature to the model.
+
+        The relative age of a cell is defined as the number of nodes since
+        the start of the cell cycle (i.e. previous division, or beginning
+        of the lineage).
+        It is given in frames by default, but can be converted
+        to the time unit of the model if specified.
+
+        Parameters
+        ----------
+        in_time_unit : bool, optional
+            True to give the relative age in the time unit of the model,
+            False to give it in frames (default is False).
+        rename : str, optional
+            New name for the feature (default is None).
+        """
+        feat = Feature(
+            name=rename if rename else "relative_age",
+            description="Age of the cell since the beginning of the current cell cycle",
+            provenance="Pycellin",
+            feat_type="node",
+            lin_type="CellLineage",
+            data_type="float" if in_time_unit else "int",
+            unit=self.metadata["time_step"] if in_time_unit else "frame",
+        )
+        time_step = self.metadata["time_step"] if in_time_unit else 1
+        self.add_custom_feature(tracking.RelativeAge(feat, time_step))
 
     def add_straightness(
         self,
