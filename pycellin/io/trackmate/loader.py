@@ -107,7 +107,7 @@ def _dimension_to_unit(trackmate_feature, units) -> str:
     dimension = trackmate_feature["dimension"]
     match dimension:
         case "NONE" | "QUALITY" | "VISIBILITY" | "RATIO" | "INTENSITY" | "COST":
-            return "none"
+            return None
         case "LENGTH" | "POSITION":
             return units["spatialunits"]
         case "VELOCITY":
@@ -224,7 +224,6 @@ def _add_all_features(
                 feat_type="node",
                 lin_type="CellLineage",
                 data_type="string",
-                unit="none",
             )
             fdec._add_feature(name_feat)
 
@@ -237,7 +236,6 @@ def _add_all_features(
                 feat_type="lineage",
                 lin_type="CellLineage",
                 data_type="string",
-                unit="none",
             )
             fdec._add_feature(name_feat)
         element.clear()
@@ -749,7 +747,6 @@ def _update_features_declaration(
         feat_type="lineage",
         lin_type="CellLineage",
         data_type="int",
-        unit="none",
     )
     fdec._add_feature(feat_filtered_track)
     if "TRACK_X_LOCATION" in fdec.feats_dict:
