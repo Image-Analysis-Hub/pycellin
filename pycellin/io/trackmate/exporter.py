@@ -216,11 +216,11 @@ def _write_FeatureDeclarations(
                 xf.write(f"\n{' '*8}")
                 match f_type:
                     case "SpotFeatures":
-                        features = model.feat_declaration.get_node_feats()
+                        features = model.get_node_features()
                     case "EdgeFeatures":
-                        features = model.feat_declaration.get_edge_feats()
+                        features = model.get_edge_features()
                     case "TrackFeatures":
-                        features = model.feat_declaration.get_lin_feats()
+                        features = model.get_lineage_features()
                 first_feat_written = False
                 for feat in features.values():
                     trackmate_feat = _convert_feature(feat)
