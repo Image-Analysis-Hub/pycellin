@@ -308,29 +308,38 @@ class FeaturesDeclaration:
         UserWarning
             If an identical feature has already been declared.
         UserWarning
-            If a feature with the same name has already been declared
-            with a different definition.
+            If an identical feature has already been declared
+            but with a different type.
         UserWarning
             If a feature with the same name has already been declared
-            with a different type and definition.
+            but with a different definition.
+        UserWarning
+            If a feature with the same name has already been declared
+            but with a different type and definition.
         """
         if feature.name in self.feats_dict:
             old_feat = self.feats_dict[feature.name]
 
             if feature.is_equal(old_feat, ignore_feat_type=True):
-                if feature.feat_type in old_feat.feat_type:
+                if feature.feat_type == old_feat.feat_type:
                     msg = (
                         f"An identical Feature '{feature.name}' "
                         f"has already been declared."
                     )
                     warnings.warn(msg)
                 else:
-                    old_feat.feat_type += "+" + feature.feat_type
+                    msg = (
+                        f"An identical Feature '{feature.name}' has already been "
+                        f"declared but with a different type ({old_feat.feat_type}). "
+                        f"The feature will be overwritten."
+                    )
+                    warnings.warn(msg)
+                    self.feats_dict[feature.name] = feature
             else:
-                if feature.feat_type in old_feat.feat_type:
+                if feature.feat_type == old_feat.feat_type:
                     msg = (
                         f"A Feature called '{feature.name}' has already been declared "
-                        f"with a different definition. "
+                        f"but with a different definition. "
                         f"The feature will be overwritten."
                     )
                     warnings.warn(msg)
@@ -338,8 +347,8 @@ class FeaturesDeclaration:
                 else:
                     msg = (
                         f"A Feature called '{feature.name}' has already been declared "
-                        f"with a different type and definition. "
-                        f"The feature will be overwritten."
+                        f"but with a different type ({old_feat.feat_type}) "
+                        f"and definition. The feature will be overwritten."
                     )
                     warnings.warn(msg)
                     self.feats_dict[feature.name] = feature
@@ -577,6 +586,7 @@ if __name__ == "__main__":
     # Add different type feature
     tmp_feat = gfu.define_cell_ID_Feature()
     tmp_feat.feat_type = "edge"
+    print(tmp_feat)
     fd._add_feature(tmp_feat)
     print(fd.feats_dict["cell_ID"])
 
