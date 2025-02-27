@@ -708,13 +708,13 @@ class Model:
         rename: str | None = None,
     ) -> None:
         feat = Feature(
-            rename if rename else "cell_width",
-            "Width of the cell",
-            "node",
-            "CellLineage",
-            "float",
-            "Pycellin",
-            self.metadata["space_unit"],
+            name=rename if rename else "cell_width",
+            description="Width of the cell",
+            feat_type="node",
+            lin_type="CellLineage",
+            data_type="float",
+            provenance="Pycellin",
+            unit=self.metadata["space_unit"],
         )
         calc = morpho.CellWidth(
             feat,
@@ -735,13 +735,13 @@ class Model:
         rename: str | None = None,
     ) -> None:
         feat = Feature(
-            rename if rename else "cell_length",
-            "Length of the cell",
-            "node",
-            "CellLineage",
-            "float",
-            "Pycellin",
-            self.metadata["space_unit"],
+            name=rename if rename else "cell_length",
+            description="Length of the cell",
+            provenance="Pycellin",
+            feat_type="node",
+            lin_type="CellLineage",
+            data_type="float",
+            unit=self.metadata["space_unit"],
         )
         calc = morpho.CellLength(
             feat,
@@ -775,13 +775,13 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            rename if rename else "absolute_age",
-            "Age of the cell since the beginning of the lineage",
-            "node",
-            "CellLineage",
-            "float" if in_time_unit else "int",
-            "Pycellin",
-            self.metadata["time_step"] if in_time_unit else "frame",
+            name=rename if rename else "absolute_age",
+            description="Age of the cell since the beginning of the lineage",
+            provenance="Pycellin",
+            feat_type="node",
+            lin_type="CellLineage",
+            data_type="float" if in_time_unit else "int",
+            unit=self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(tracking.AbsoluteAge(feat, time_step))
@@ -809,13 +809,13 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            rename if rename else "relative_age",
-            "Age of the cell since the beginning of the current cell cycle",
-            "node",
-            "CellLineage",
-            "float" if in_time_unit else "int",
-            "Pycellin",
-            self.metadata["time_step"] if in_time_unit else "frame",
+            name=rename if rename else "relative_age",
+            description="Age of the cell since the beginning of the current cell cycle",
+            provenance="Pycellin",
+            feat_type="node",
+            lin_type="CellLineage",
+            data_type="float" if in_time_unit else "int",
+            unit=self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(tracking.RelativeAge(feat, time_step))
@@ -840,13 +840,13 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            rename if rename else "cell_cycle_completeness",
-            "Completeness of the cell cycle",
-            "node",
-            "CycleLineage",
-            "bool",
-            "Pycellin",
-            "none",
+            name=rename if rename else "cell_cycle_completeness",
+            description="Completeness of the cell cycle",
+            provenance="Pycellin",
+            feat_type="node",
+            lin_type="CycleLineage",
+            data_type="bool",
+            unit="none",
         )
         self.add_custom_feature(tracking.CellCycleCompleteness(feat))
 
@@ -872,13 +872,13 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            rename if rename else "division_time",
-            "Time elapsed between the birth of a cell and its division",
-            "node",
-            "CycleLineage",
-            "float" if in_time_unit else "int",
-            "Pycellin",
-            self.metadata["time_step"] if in_time_unit else "frame",
+            name=rename if rename else "division_time",
+            description="Time elapsed between the birth of a cell and its division",
+            provenance="Pycellin",
+            feat_type="node",
+            lin_type="CycleLineage",
+            data_type="float" if in_time_unit else "int",
+            unit=self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(tracking.DivisionTime(feat, time_step))
@@ -905,13 +905,13 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            rename if rename else "division_rate",
-            "Number of divisions per time unit",
-            "node",
-            "CycleLineage",
-            "float",
-            "Pycellin",
-            f'1/{self.metadata["time_unit"]}' if in_time_unit else "1/frame",
+            name=rename if rename else "division_rate",
+            description="Number of divisions per time unit",
+            provenance="Pycellin",
+            feat_type="node",
+            lin_type="CycleLineage",
+            data_type="float",
+            unit=f'1/{self.metadata["time_unit"]}' if in_time_unit else "1/frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(tracking.DivisionRate(feat, time_step))
@@ -935,13 +935,15 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            rename if rename else "angle",
-            "Angle of the cell trajectory between two consecutive detections",
-            "edge",
-            "CellLineage",
-            "float",
-            "Pycellin",
-            unit,
+            name=rename if rename else "angle",
+            description=(
+                "Angle of the cell trajectory between two consecutive detections"
+            ),
+            provenance="Pycellin",
+            feat_type="edge",
+            lin_type="CellLineage",
+            data_type="float",
+            unit=unit,
         )
         self.add_custom_feature(motion.Angle(feat, unit))
 
@@ -961,13 +963,13 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            rename if rename else "cell_displacement",
-            "Displacement of the cell between two consecutive detections",
-            "edge",
-            "CellLineage",
-            "float",
-            "Pycellin",
-            self.metadata["space_unit"],
+            name=rename if rename else "cell_displacement",
+            description="Displacement of the cell between two consecutive detections",
+            provenance="Pycellin",
+            feat_type="edge",
+            lin_type="CellLineage",
+            data_type="float",
+            unit=self.metadata["space_unit"],
         )
         self.add_custom_feature(motion.CellDisplacement(feat))
 
@@ -987,13 +989,13 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            rename if rename else "branch_total_displacement",
-            "Displacement of the cell during the cell cycle",
-            "node",
-            "CycleLineage",
-            "float",
-            "Pycellin",
-            self.metadata["space_unit"],
+            name=rename if rename else "branch_total_displacement",
+            description="Displacement of the cell during the cell cycle",
+            provenance="Pycellin",
+            feat_type="node",
+            lin_type="CycleLineage",
+            data_type="float",
+            unit=self.metadata["space_unit"],
         )
         self.add_custom_feature(motion.BranchTotalDisplacement(feat))
 
@@ -1013,13 +1015,13 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            rename if rename else "branch_mean_displacement",
-            "Mean displacement of the cell during the cell cycle",
-            "node",
-            "CycleLineage",
-            "float",
-            "Pycellin",
-            self.metadata["space_unit"],
+            name=rename if rename else "branch_mean_displacement",
+            description="Mean displacement of the cell during the cell cycle",
+            provenance="Pycellin",
+            feat_type="node",
+            lin_type="CycleLineage",
+            data_type="float",
+            unit=self.metadata["space_unit"],
         )
         self.add_custom_feature(motion.BranchMeanDisplacement(feat))
 
@@ -1045,13 +1047,13 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            rename if rename else "cell_speed",
-            "Speed of the cell between two consecutive detections",
-            "edge",
-            "CellLineage",
-            "float",
-            "Pycellin",
-            (
+            name=rename if rename else "cell_speed",
+            description="Speed of the cell between two consecutive detections",
+            provenance="Pycellin",
+            feat_type="edge",
+            lin_type="CellLineage",
+            data_type="float",
+            unit=(
                 f"{self.metadata['space_unit']}/{self.metadata['time_unit']}"
                 if in_time_unit
                 else f"{self.metadata['space_unit']}/frame"
@@ -1080,13 +1082,13 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            rename if rename else "branch_mean_speed",
-            "Mean speed of the cell during the cell cycle",
-            "node",
-            "CycleLineage",
-            "float",
-            "Pycellin",
-            f"{self.metadata['space_unit']} / {self.metadata['time_unit']}",
+            name=rename if rename else "branch_mean_speed",
+            description="Mean speed of the cell during the cell cycle",
+            provenance="Pycellin",
+            feat_type="node",
+            lin_type="CycleLineage",
+            data_type="float",
+            unit=f"{self.metadata['space_unit']} / {self.metadata['time_unit']}",
         )
         self.add_custom_feature(motion.BranchMeanSpeed(feat, include_incoming_edge))
 
@@ -1113,12 +1115,12 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            rename if rename else "straightness",
-            "Straightness of the cell displacement",
-            "node",
-            "CycleLineage",
-            "float",
-            "Pycellin",
+            name=rename if rename else "straightness",
+            description="Straightness of the cell displacement",
+            provenance="Pycellin",
+            feat_type="node",
+            lin_type="CycleLineage",
+            data_type="float",
         )
         self.add_custom_feature(motion.Straightness(feat, include_incoming_edge))
 

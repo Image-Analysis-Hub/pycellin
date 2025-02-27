@@ -15,10 +15,10 @@ class Feature:
         self,
         name: str,
         description: str,
+        provenance: str,
         feat_type: str,
         lin_type: LineageType,
         data_type: str,
-        provenance: str,
         unit: str | None = None,
     ) -> None:
         """
@@ -85,8 +85,8 @@ class Feature:
         """
         return (
             f"Feature(name={self.name!r}, description={self.description!r}, "
-            f"feat_type={self.feat_type!r}, lin_type={self.lin_type!r}, "
-            f"provenance={self.provenance!r}, data_type={self.data_type!r}, "
+            f"provenance={self.provenance!r}, feat_type={self.feat_type!r}, "
+            f"lin_type={self.lin_type!r}, data_type={self.data_type!r}, "
             f"unit={self.unit!r})"
         )
 

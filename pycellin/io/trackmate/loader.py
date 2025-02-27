@@ -152,12 +152,12 @@ def _convert_and_add_feature(
     """
     feat_name = trackmate_feature["feature"]
     feat_description = trackmate_feature["name"]
+    feat_provenance = "TrackMate"
     feat_lineage_type = "CellLineage"
     if trackmate_feature["isint"] == "true":
         feat_data_type = "int"
     else:
         feat_data_type = "float"
-    feat_provenance = "TrackMate"
     feat_unit = _dimension_to_unit(trackmate_feature, units)
 
     match feature_type:
@@ -172,10 +172,10 @@ def _convert_and_add_feature(
     feature = Feature(
         feat_name,
         feat_description,
+        feat_provenance,
         feat_type,
         feat_lineage_type,
         feat_data_type,
-        feat_provenance,
         feat_unit,
     )
 
@@ -218,26 +218,26 @@ def _add_all_features(
         # Features used in Spot tags but not declared in the FeatureDeclarations tag.
         if element.tag == "SpotFeatures":
             name_feat = Feature(
-                "cell_name",
-                "Name of the spot",
-                "node",
-                "CellLineage",
-                "string",
-                "TrackMate",
-                "none",
+                name="cell_name",
+                description="Name of the spot",
+                provenance="TrackMate",
+                feat_type="node",
+                lin_type="CellLineage",
+                data_type="string",
+                unit="none",
             )
             fdec._add_feature(name_feat)
 
         # Feature used in Track tags but not declared in the FeatureDeclarations tag.
         if element.tag == "TrackFeatures":
             name_feat = Feature(
-                "lineage_name",
-                "Name of the track",
-                "lineage",
-                "CellLineage",
-                "string",
-                "TrackMate",
-                "none",
+                name="lineage_name",
+                description="Name of the track",
+                provenance="TrackMate",
+                feat_type="lineage",
+                lin_type="CellLineage",
+                data_type="string",
+                unit="none",
             )
             fdec._add_feature(name_feat)
         element.clear()
@@ -719,13 +719,13 @@ def _update_features_declaration(
     fdec._rename_feature("FRAME", "frame")
     if segmentation:
         roi_coord_feat = Feature(
-            "ROI_coords",
-            "List of coordinates of the region of interest",
-            "node",
-            "CellLineage",
-            "float",
-            "TrackMate",
-            units["spatialunits"],
+            name="ROI_coords",
+            description="List of coordinates of the region of interest",
+            provenance="TrackMate",
+            feat_type="node",
+            lin_type="CellLineage",
+            data_type="float",
+            unit=units["spatialunits"],
         )
         fdec._add_feature(roi_coord_feat)
 
@@ -743,13 +743,13 @@ def _update_features_declaration(
     fdec._rename_feature("TRACK_ID", "lineage_ID")
     fdec._modify_feature_description("lineage_ID", "Unique identifier of the lineage")
     feat_filtered_track = Feature(
-        "FilteredTrack",
-        "True if the track was not filtered out in TrackMate",
-        "lineage",
-        "CellLineage",
-        "int",
-        "TrackMate",
-        "none",
+        name="FilteredTrack",
+        description="True if the track was not filtered out in TrackMate",
+        provenance="TrackMate",
+        feat_type="lineage",
+        lin_type="CellLineage",
+        data_type="int",
+        unit="none",
     )
     fdec._add_feature(feat_filtered_track)
     if "TRACK_X_LOCATION" in fdec.feats_dict:
