@@ -194,37 +194,82 @@ class Model:
         """
         return self.feat_declaration._get_units_per_features()
 
-    def get_cell_lineage_features(self):
+    def get_cell_lineage_features(
+        self,
+        include_Lineage_feats: bool = True,
+    ) -> dict[str, Feature]:
         """
         Return the cell lineages features present in the model.
 
+        Parameters
+        ----------
+        include_Lineage_feats : bool, optional
+            True to include the Lineage features, False otherwise (default is True).
+
         Returns
         -------
-        list[str]
-            List of the names of the cell lineages features present in the model.
+        dict[str, Feature]
+            Dictionary of the cell lineages features present in the model.
         """
-        cell_lineage_feats = [
-            feat.name
-            for feat in self.feat_declaration.feats_dict.values()
-            if feat.lin_type == "CellLineage"
-        ]
-        return cell_lineage_feats
+        feats = self.feat_declaration._get_feat_dict_from_lin_type("CellLineage")
+        if include_Lineage_feats:
+            feats.update(self.feat_declaration._get_feat_dict_from_lin_type("Lineage"))
+        return feats
 
-    def get_cycle_lineage_features(self):
+    def get_cycle_lineage_features(
+        self,
+        include_Lineage_feats: bool = True,
+    ) -> dict[str, Feature]:
         """
         Return the cycle lineages features present in the model.
 
+        Parameters
+        ----------
+        include_Lineage_feats : bool, optional
+            True to include the Lineage features, False otherwise (default is True).
+
         Returns
         -------
-        list[str]
-            List of the names of the cycle lineages features present in the model.
+        dict[str, Feature]
+            Dictionary of the cycle lineages features present in the model.
         """
-        cycle_lineage_feats = [
-            feat.name
-            for feat in self.feat_declaration.feats_dict.values()
-            if feat.lin_type == "CycleLineage"
-        ]
-        return cycle_lineage_feats
+        feats = self.feat_declaration._get_feat_dict_from_lin_type("CycleLineage")
+        if include_Lineage_feats:
+            feats.update(self.feat_declaration._get_feat_dict_from_lin_type("Lineage"))
+        return feats
+
+    def get_node_features(self) -> dict[str, Feature]:
+        """
+        Return the node features present in the model.
+
+        Returns
+        -------
+        dict[str, Feature]
+            Dictionary of the node features present in the model.
+        """
+        return self.feat_declaration._get_feat_dict_from_feat_type("node")
+
+    def get_edge_features(self) -> dict[str, Feature]:
+        """
+        Return the edge features present in the model.
+
+        Returns
+        -------
+        dict[str, Feature]
+            Dictionary of the edge features present in the model.
+        """
+        return self.feat_declaration._get_feat_dict_from_feat_type("edge")
+
+    def get_lineage_features(self) -> dict[str, Feature]:
+        """
+        Return the lineage features present in the model.
+
+        Returns
+        -------
+        dict[str, Feature]
+            Dictionary of the lineage features present in the model.
+        """
+        return self.feat_declaration._get_feat_dict_from_feat_type("lineage")
 
     def get_next_available_lineage_ID(self) -> int:
         """

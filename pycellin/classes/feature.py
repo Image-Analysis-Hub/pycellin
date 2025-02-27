@@ -431,39 +431,6 @@ class FeaturesDeclaration:
         }
         return feats_dict
 
-    def get_node_feats(self) -> dict[str, Feature]:
-        """
-        Return the dictionary of node features.
-
-        Returns
-        -------
-        dict[str, Feature]
-            The dictionary of node features.
-        """
-        return self._get_feat_dict_from_feat_type("node")
-
-    def get_edge_feats(self) -> dict[str, Feature]:
-        """
-        Return the dictionary of edge features.
-
-        Returns
-        -------
-        dict[str, Feature]
-            The dictionary of edge features.
-        """
-        return self._get_feat_dict_from_feat_type("edge")
-
-    def get_lin_feats(self) -> dict[str, Feature]:
-        """
-        Return the dictionary of lineage features.
-
-        Returns
-        -------
-        dict[str, Feature]
-            The dictionary of lineage features.
-        """
-        return self._get_feat_dict_from_feat_type("lineage")
-
     def _add_feature(self, feature: Feature) -> None:
         """
         Add the specified feature to the FeaturesDeclaration.
