@@ -87,36 +87,36 @@ def units():
 @pytest.fixture(scope="module")
 def feat_QUALITY():
     return Feature(
-        "QUALITY",
-        "Quality",
-        "CellLineage",
-        "TrackMate",
+        name="QUALITY",
+        description="Quality",
+        provenance="TrackMate",
+        feat_type="node",
+        lin_type="CellLineage",
         data_type="float",
-        unit="none",
     )
 
 
 @pytest.fixture(scope="module")
 def feat_FRAME():
     return Feature(
-        "FRAME",
-        "Frame",
-        "CellLineage",
-        "TrackMate",
+        name="FRAME",
+        description="Frame",
+        provenance="TrackMate",
+        feat_type="node",
+        lin_type="CellLineage",
         data_type="int",
-        unit="none",
     )
 
 
 @pytest.fixture(scope="module")
 def feat_spot_name():
     return Feature(
-        "name",
-        "Name of the spot",
-        "CellLineage",
-        "TrackMate",
+        name="cell_name",
+        description="Name of the spot",
+        provenance="TrackMate",
+        feat_type="node",
+        lin_type="CellLineage",
         data_type="string",
-        unit="none",
     )
 
 
@@ -125,31 +125,31 @@ def spot_feats(feat_QUALITY: Feature, feat_FRAME: Feature, feat_spot_name: Featu
     return {
         "QUALITY": feat_QUALITY,
         "FRAME": feat_FRAME,
-        "name": feat_spot_name,
+        "cell_name": feat_spot_name,
     }
 
 
 @pytest.fixture(scope="module")
 def feat_SPOT_SOURCE_ID():
     return Feature(
-        "SPOT_SOURCE_ID",
-        "Source spot ID",
-        "CellLineage",
-        "TrackMate",
+        name="SPOT_SOURCE_ID",
+        description="Source spot ID",
+        provenance="TrackMate",
+        feat_type="edge",
+        lin_type="CellLineage",
         data_type="int",
-        unit="none",
     )
 
 
 @pytest.fixture(scope="module")
 def feat_SPOT_TARGET_ID():
     return Feature(
-        "SPOT_TARGET_ID",
-        "Target spot ID",
-        "CellLineage",
-        "TrackMate",
+        name="SPOT_TARGET_ID",
+        description="Target spot ID",
+        provenance="TrackMate",
+        feat_type="edge",
+        lin_type="CellLineage",
         data_type="int",
-        unit="none",
     )
 
 
@@ -164,36 +164,36 @@ def edge_feats(feat_SPOT_SOURCE_ID: Feature, feat_SPOT_TARGET_ID: Feature):
 @pytest.fixture(scope="module")
 def feat_TRACK_INDEX():
     return Feature(
-        "TRACK_INDEX",
-        "Track index",
-        "CellLineage",
-        "TrackMate",
+        name="TRACK_INDEX",
+        description="Track index",
+        provenance="TrackMate",
+        feat_type="lineage",
+        lin_type="CellLineage",
         data_type="int",
-        unit="none",
     )
 
 
 @pytest.fixture(scope="module")
 def feat_NUMBER_SPOTS():
     return Feature(
-        "NUMBER_SPOTS",
-        "Number of spots",
-        "CellLineage",
-        "TrackMate",
+        name="NUMBER_SPOTS",
+        description="Number of spots",
+        provenance="TrackMate",
+        feat_type="lineage",
+        lin_type="CellLineage",
         data_type="int",
-        unit="none",
     )
 
 
 @pytest.fixture(scope="module")
 def feat_track_name():
     return Feature(
-        "name",
-        "Name of the track",
-        "CellLineage",
-        "TrackMate",
+        name="lineage_name",
+        description="Name of the track",
+        provenance="TrackMate",
+        feat_type="lineage",
+        lin_type="CellLineage",
         data_type="string",
-        unit="none",
     )
 
 
@@ -204,7 +204,7 @@ def track_feats(
     return {
         "TRACK_INDEX": feat_TRACK_INDEX,
         "NUMBER_SPOTS": feat_NUMBER_SPOTS,
-        "name": feat_track_name,
+        "lineage_name": feat_track_name,
     }
 
 
@@ -313,7 +313,7 @@ def test_convert_and_add_feature_spot_feature(
     obtained = FeaturesDeclaration()
     tml._convert_and_add_feature(trackmate_feature, feature_type, obtained, units)
 
-    expected = FeaturesDeclaration(node_features={"QUALITY": feat_QUALITY})
+    expected = FeaturesDeclaration({"QUALITY": feat_QUALITY})
 
     assert obtained == expected
 
@@ -331,9 +331,7 @@ def test_convert_and_add_feature_edge_feature(
     obtained = FeaturesDeclaration()
     tml._convert_and_add_feature(trackmate_feature, feature_type, obtained, units)
 
-    expected = FeaturesDeclaration(
-        edge_features={"SPOT_SOURCE_ID": feat_SPOT_SOURCE_ID}
-    )
+    expected = FeaturesDeclaration({"SPOT_SOURCE_ID": feat_SPOT_SOURCE_ID})
 
     assert obtained == expected
 
@@ -351,7 +349,7 @@ def test_convert_and_add_feature_track_feature(
     obtained = FeaturesDeclaration()
     tml._convert_and_add_feature(trackmate_feature, feature_type, obtained, units)
 
-    expected = FeaturesDeclaration(lineage_features={"TRACK_INDEX": feat_TRACK_INDEX})
+    expected = FeaturesDeclaration({"TRACK_INDEX": feat_TRACK_INDEX})
 
     assert obtained == expected
 
@@ -405,11 +403,7 @@ def test_add_all_features(
     obtained = FeaturesDeclaration()
     tml._add_all_features(it, element, obtained, {})
 
-    expected = FeaturesDeclaration(
-        node_features=spot_feats,
-        edge_features=edge_feats,
-        lineage_features=track_feats,
-    )
+    expected = FeaturesDeclaration({**spot_feats, **edge_feats, **track_feats})
 
     assert obtained == expected
 
@@ -451,9 +445,7 @@ def test_add_all_features_tag_with_no_feature_tag(
     obtained = FeaturesDeclaration()
     tml._add_all_features(it, element, obtained, {})
 
-    expected = FeaturesDeclaration(
-        node_features=spot_feats, lineage_features=track_feats
-    )
+    expected = FeaturesDeclaration({**spot_feats, **track_feats})
 
     assert obtained == expected
 
@@ -463,10 +455,10 @@ def test_add_all_features_tag_with_no_feature_tag(
 
 def test_convert_attributes():
     features = {
-        "feat_float": Feature("", "", "CellLineage", "", data_type="float"),
-        "feat_int": Feature("", "", "CellLineage", "", data_type="int"),
-        "feat_neg": Feature("", "", "CellLineage", "", data_type="int"),
-        "feat_string": Feature("", "", "CellLineage", "", data_type="string"),
+        "feat_float": Feature("", "", "", "node", "CellLineage", data_type="float"),
+        "feat_int": Feature("", "", "", "node", "CellLineage", data_type="int"),
+        "feat_neg": Feature("", "", "", "node", "CellLineage", data_type="int"),
+        "feat_string": Feature("", "", "", "node", "CellLineage", data_type="string"),
     }
 
     obtained_attr = {
@@ -500,7 +492,7 @@ def test_convert_attributes_specific_keys():
 
 def test_convert_attributes_KeyError():
     features = {
-        "feat_float": Feature("", "", "CellLineage", "", data_type="float"),
+        "feat_float": Feature("", "", "", "node", "CellLineage", data_type="float"),
     }
     attributes = {"feat_float": "30", "feat_int": "20"}
 
@@ -509,7 +501,9 @@ def test_convert_attributes_KeyError():
 
 
 def test_convert_attributes_ValueError():
-    features = {"feat_int": Feature("", "", "CellLineage", "", data_type="integer")}
+    features = {
+        "feat_int": Feature("", "", "", "node", "CellLineage", data_type="integer")
+    }
     attributes = {"feat_int": "20"}
 
     with pytest.raises(ValueError):
@@ -585,10 +579,10 @@ def test_add_all_nodes_several_attributes():
     _, element = next(it)
 
     spot_features = {
-        "x": Feature("", "", "CellLineage", "", data_type="float"),
-        "y": Feature("", "", "CellLineage", "", data_type="int"),
+        "x": Feature("", "", "", "node", "CellLineage", data_type="float"),
+        "y": Feature("", "", "", "node", "CellLineage", data_type="int"),
     }
-    feat_decl = FeaturesDeclaration(node_features=spot_features)
+    feat_decl = FeaturesDeclaration(spot_features)
     obtained = nx.DiGraph()
     tml._add_all_nodes(it, element, feat_decl, obtained)
 
@@ -666,13 +660,13 @@ def test_add_edge():
     track_id = 0
 
     edge_feats = {
-        "x": Feature("", "", "CellLineage", "", data_type="float"),
-        "y": Feature("", "", "CellLineage", "", data_type="int"),
-        "SPOT_SOURCE_ID": Feature("", "", "CellLineage", "", data_type="int"),
-        "SPOT_TARGET_ID": Feature("", "", "CellLineage", "", data_type="int"),
+        "x": Feature("", "", "", "edge", "CellLineage", data_type="float"),
+        "y": Feature("", "", "", "edge", "CellLineage", data_type="int"),
+        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
+        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
     }
     obtained = nx.DiGraph()
-    feat_decl = FeaturesDeclaration(edge_features=edge_feats)
+    feat_decl = FeaturesDeclaration(edge_feats)
     tml._add_edge(element, feat_decl, obtained, track_id)
 
     expected = nx.DiGraph()
@@ -690,12 +684,12 @@ def test_add_edge_no_node_ID():
     track_id = 0
 
     edge_feats = {
-        "x": Feature("", "", "CellLineage", "", data_type="float"),
-        "y": Feature("", "", "CellLineage", "", data_type="int"),
-        "SPOT_SOURCE_ID": Feature("", "", "CellLineage", "", data_type="int"),
+        "x": Feature("", "", "", "edge", "CellLineage", data_type="float"),
+        "y": Feature("", "", "", "edge", "CellLineage", data_type="int"),
+        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
     }
     obtained = nx.DiGraph()
-    feat_decl = FeaturesDeclaration(edge_features=edge_feats)
+    feat_decl = FeaturesDeclaration(edge_feats)
     tml._add_edge(element, feat_decl, obtained, track_id)
 
     expected = nx.DiGraph()
@@ -710,11 +704,11 @@ def test_add_edge_no_edge_attributes():
     track_id = 0
 
     edge_feats = {
-        "SPOT_SOURCE_ID": Feature("", "", "CellLineage", "", data_type="int"),
-        "SPOT_TARGET_ID": Feature("", "", "CellLineage", "", data_type="int"),
+        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
+        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
     }
     obtained = nx.DiGraph()
-    feat_decl = FeaturesDeclaration(edge_features=edge_feats)
+    feat_decl = FeaturesDeclaration(edge_feats)
     tml._add_edge(element, feat_decl, obtained, track_id)
 
     expected = nx.DiGraph()
@@ -746,17 +740,17 @@ def test_build_tracks_several_attributes():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     edge_feats = {
-        "x": Feature("", "", "CellLineage", "", data_type="float"),
-        "y": Feature("", "", "CellLineage", "", data_type="int"),
-        "SPOT_SOURCE_ID": Feature("", "", "CellLineage", "", data_type="int"),
-        "SPOT_TARGET_ID": Feature("", "", "CellLineage", "", data_type="int"),
+        "x": Feature("", "", "", "edge", "CellLineage", data_type="float"),
+        "y": Feature("", "", "", "edge", "CellLineage", data_type="int"),
+        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
+        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
     }
-    track_feats = {"TRACK_ID": Feature("", "", "CellLineage", "", data_type="int")}
+    track_feats = {
+        "TRACK_ID": Feature("", "", "", "lineage", "CellLineage", data_type="int")
+    }
 
     obtained = nx.DiGraph()
-    feat_decl = FeaturesDeclaration(
-        edge_features=edge_feats, lineage_features=track_feats
-    )
+    feat_decl = FeaturesDeclaration({**edge_feats, **track_feats})
     obtained_tracks_attrib = tml._build_tracks(it, element, feat_decl, obtained)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
 
@@ -798,15 +792,15 @@ def test_build_tracks_no_nodes_ID():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     edge_feats = {
-        "x": Feature("", "", "CellLineage", "", data_type="float"),
-        "y": Feature("", "", "CellLineage", "", data_type="int"),
+        "x": Feature("", "", "", "edge", "CellLineage", data_type="float"),
+        "y": Feature("", "", "", "edge", "CellLineage", data_type="int"),
     }
-    track_feats = {"TRACK_ID": Feature("", "", "CellLineage", "", data_type="int")}
+    track_feats = {
+        "TRACK_ID": Feature("", "", "", "lineage", "CellLineage", data_type="int")
+    }
 
     obtained = nx.DiGraph()
-    feat_decl = FeaturesDeclaration(
-        edge_features=edge_feats, lineage_features=track_feats
-    )
+    feat_decl = FeaturesDeclaration({**edge_feats, **track_feats})
     obtained_tracks_attrib = tml._build_tracks(it, element, feat_decl, obtained)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
 
@@ -830,10 +824,12 @@ def test_build_tracks_no_edges():
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    track_feats = {"TRACK_ID": Feature("", "", "CellLineage", "", data_type="int")}
+    track_feats = {
+        "TRACK_ID": Feature("", "", "", "lineage", "CellLineage", data_type="int")
+    }
 
     obtained = nx.DiGraph()
-    feat_decl = FeaturesDeclaration(lineage_features=track_feats)
+    feat_decl = FeaturesDeclaration(track_feats)
     obtained_tracks_attrib = tml._build_tracks(it, element, feat_decl, obtained)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
 
@@ -866,14 +862,14 @@ def test_build_tracks_no_track_ID():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     edge_feats = {
-        "x": Feature("", "", "CellLineage", "", data_type="float"),
-        "y": Feature("", "", "CellLineage", "", data_type="int"),
-        "SPOT_SOURCE_ID": Feature("", "", "CellLineage", "", data_type="int"),
-        "SPOT_TARGET_ID": Feature("", "", "CellLineage", "", data_type="int"),
+        "x": Feature("", "", "", "edge", "CellLineage", data_type="float"),
+        "y": Feature("", "", "", "edge", "CellLineage", data_type="int"),
+        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
+        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
     }
 
     obtained = nx.DiGraph()
-    feat_decl = FeaturesDeclaration(edge_features=edge_feats)
+    feat_decl = FeaturesDeclaration(edge_feats)
 
     with pytest.raises(KeyError):
         tml._build_tracks(it, element, feat_decl, obtained)
@@ -1065,33 +1061,6 @@ def test_split_graph_into_lineages_different_ID():
         tml._split_graph_into_lineages(g, [g1_attr, g2_attr])
 
 
-# _check_for_fusions ##########################################################
-
-
-def test_check_for_fusions():
-    g = nx.DiGraph()
-    g.graph["lineage_ID"] = 0
-    g.add_nodes_from([1, 2, 3, 4])
-    g.add_edges_from([(1, 2), (1, 3), (2, 4), (3, 4)])
-
-    obtained = tml._check_for_fusions([CellLineage(g)])
-
-    expected = {0: [4]}
-
-    assert obtained == expected
-
-
-def test_check_for_fusions_no_fusion():
-    g = nx.DiGraph()
-    g.graph["lineage_ID"] = 0
-    g.add_nodes_from([1, 2, 3, 4])
-    g.add_edges_from([(1, 2), (1, 3), (2, 4)])
-
-    obtained = tml._check_for_fusions([CellLineage(g)])
-
-    assert obtained == {}
-
-
 # _update_node_feature_key ####################################################
 
 
@@ -1129,8 +1098,6 @@ def test_update_TRACK_ID_no_TRACK_ID():
     tml._update_TRACK_ID(lineage)
     assert "lineage_ID" in lineage.graph
     assert lineage.graph["lineage_ID"] == -1
-    assert "lineage_ID" in lineage.nodes[1]
-    assert lineage.nodes[1]["lineage_ID"] == -1
 
 
 def test_update_TRACK_ID_several_subgraphs():
@@ -1156,10 +1123,18 @@ def test_update_location_related_features():
 
     tml._update_location_related_features(lineage)
 
-    assert lineage.nodes[1]["location"] == (1, 2, 3)
-    assert lineage.nodes[2]["location"] == (4, 5, 6)
-    assert lineage.edges[(1, 2)]["location"] == (7, 8, 9)
-    assert lineage.graph["location"] == (10, 11, 12)
+    assert lineage.nodes[1]["cell_x"] == 1
+    assert lineage.nodes[1]["cell_y"] == 2
+    assert lineage.nodes[1]["cell_z"] == 3
+    assert lineage.nodes[2]["cell_x"] == 4
+    assert lineage.nodes[2]["cell_y"] == 5
+    assert lineage.nodes[2]["cell_z"] == 6
+    assert lineage.edges[(1, 2)]["link_x"] == 7
+    assert lineage.edges[(1, 2)]["link_y"] == 8
+    assert lineage.edges[(1, 2)]["link_z"] == 9
+    assert lineage.graph["lineage_x"] == 10
+    assert lineage.graph["lineage_y"] == 11
+    assert lineage.graph["lineage_z"] == 12
 
 
 def test_update_location_related_features_one_node():
@@ -1168,7 +1143,9 @@ def test_update_location_related_features_one_node():
 
     tml._update_location_related_features(lineage)
 
-    assert lineage.graph["location"] == (1, 2, 3)
+    assert lineage.nodes[1]["cell_x"] == 1
+    assert lineage.nodes[1]["cell_y"] == 2
+    assert lineage.nodes[1]["cell_z"] == 3
 
 
 # _get_specific_tags ##########################################################

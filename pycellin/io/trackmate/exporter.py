@@ -216,11 +216,11 @@ def _write_FeatureDeclarations(
                 xf.write(f"\n{' '*8}")
                 match f_type:
                     case "SpotFeatures":
-                        features = model.feat_declaration.node_feats
+                        features = model.feat_declaration.get_node_feats()
                     case "EdgeFeatures":
-                        features = model.feat_declaration.edge_feats
+                        features = model.feat_declaration.get_edge_feats()
                     case "TrackFeatures":
-                        features = model.feat_declaration.lin_feats
+                        features = model.feat_declaration.get_lin_feats()
                 first_feat_written = False
                 for feat in features.values():
                     trackmate_feat = _convert_feature(feat)
@@ -418,8 +418,8 @@ def _prepare_model_for_export(
     Prepare a Pycellin model for export to TrackMate format.
 
     Some Pycellin features are a bit different from TrackMate features
-    and need to be modified or deleted.
-    For example, "lineage_ID" in Pycellin is "TRACK_ID" in TrackMate.
+    and need to be modified or deleted. For example, "lineage_ID" in Pycellin
+    is "TRACK_ID" in TrackMate.
 
     Parameters
     ----------
@@ -427,68 +427,37 @@ def _prepare_model_for_export(
         Model to prepare for export.
     """
     # Update of the features declaration.
-    model.feat_declaration._rename_feature("lineage_ID", "TRACK_ID", "lineage")
-    model.feat_declaration._modify_feature_description(
-        "TRACK_ID", "Track ID", "lineage"
-    )
-    model.feat_declaration._remove_features(["FilteredTrack", "name"], ["lineage"] * 2)
-    model.feat_declaration._rename_feature("frame", "FRAME", "node")
-    model.feat_declaration._remove_features(["cell_ID", "name"], ["node"] * 2)
-    if "ROI_coords" in model.feat_declaration.node_feats:
-        model.feat_declaration._remove_feature("ROI_coords", "node")
-
+    fd = model.feat_declaration
+    fd._rename_feature("lineage_ID", "TRACK_ID")
+    fd._modify_feature_description("TRACK_ID", "Track ID")
+    fd._remove_features(["FilteredTrack", "lineage_name"])
+    fd._rename_feature("frame", "FRAME")
+    fd._remove_features(["cell_ID", "cell_name"])
+    if "ROI_coords" in fd.feats_dict:
+        fd._remove_feature("ROI_coords")
     # Location related features.
-    # TrackMate is expecting one feature per dimension instead of a triplet.
-    model.feat_declaration._remove_features(
-        ["location"] * 3, ["lineage", "node", "edge"]
-    )
-    for dim in ["X", "Y", "Z"]:
-        feat_lineage = Feature(
-            f"TRACK_{dim}_LOCATION",
-            f"Track mean {dim}",
-            "CellLineage",
-            "TrackMate",
-            "float",
-            "pixel",
-        )
-        feat_node = Feature(
-            f"POSITION_{dim}",
-            f"{dim}",
-            "CellLineage",
-            "TrackMate",
-            "float",
-            "pixel",
-        )
-        feat_edge = Feature(
-            f"EDGE_{dim}_LOCATION",
-            f"Edge {dim}",
-            "CellLineage",
-            "TrackMate",
-            "float",
-            "pixel",
-        )
-        model.feat_declaration._add_features(
-            [feat_lineage, feat_node, feat_edge], ["lineage", "node", "edge"]
-        )
+    for axis in ["x", "y", "z"]:
+        fd._rename_feature(f"cell_{axis}", f"POSITION_{axis.upper()}")
+        fd._rename_feature(f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION")
+        fd._rename_feature(f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION")
 
     # Update of the data.
     for lin in model.data.cell_data.values():
+        for _, data in lin.nodes(data=True):
+            data["ID"] = data.pop("cell_ID")
+            data["FRAME"] = data.pop("frame")
+            for axis in ["X", "Y", "Z"]:
+                data[f"POSITION_{axis}"] = data.pop(f"cell_{axis.lower()}")
+
+        for _, _, data in lin.edges(data=True):
+            for axis in ["X", "Y", "Z"]:
+                data[f"EDGE_{axis}_LOCATION"] = data.pop(f"link_{axis.lower()}")
+
         lin.graph["TRACK_ID"] = lin.graph.pop("lineage_ID")
-        if "location" in lin.graph:  # One-node lineage don't have a location for now.
-            xyz = lin.graph.pop("location")
-            for feat, val in zip(["X", "Y", "Z"], xyz):
-                lin.graph[f"TRACK_{feat}_LOCATION"] = val
-        for node in lin.nodes:
-            lin.nodes[node].pop("lineage_ID")
-            lin.nodes[node]["ID"] = lin.nodes[node].pop("cell_ID")
-            lin.nodes[node]["FRAME"] = lin.nodes[node].pop("frame")
-            xyz = lin.nodes[node].pop("location")
-            for feat, val in zip(["X", "Y", "Z"], xyz):
-                lin.nodes[node][f"POSITION_{feat}"] = val
-        for edge in lin.edges:
-            xyz = lin.edges[edge].pop("location")
-            for feat, val in zip(["X", "Y", "Z"], xyz):
-                lin.edges[edge][f"EDGE_{feat}_LOCATION"] = val
+        for axis in ["X", "Y", "Z"]:
+            lin.graph[f"TRACK_{axis}_LOCATION"] = lin.graph.pop(
+                f"lineage_{axis.lower()}"
+            )
 
 
 def _write_metadata_tag(
@@ -604,7 +573,12 @@ if __name__ == "__main__":
     xml_out = "sample_data/FakeTracks_exported_TM.xml"
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
+    # print(model.feat_declaration)
     lin0 = model.data.cell_data[0]
+    # lin0.plot(
+    #     node_hover_features=["cell_ID", "cell_x", "cell_y", "cell_z"],
+    #     edge_hover_features=["link_x", "link_y", "link_z"],
+    # )
     export_TrackMate_XML(
         model, xml_out, {"spatialunits": "pixel", "temporalunits": "sec"}
     )

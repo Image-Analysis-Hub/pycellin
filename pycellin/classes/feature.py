@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from __future__ import annotations
 
-from itertools import chain
-from typing import Literal
+import warnings
 
 from pycellin.custom_types import FeatureType, LineageType
 from pycellin.utils import check_literal_type
@@ -15,8 +15,9 @@ class Feature:
         self,
         name: str,
         description: str,
-        lineage_type: Literal["CellLineage", "CycleLineage"],
         provenance: str,
+        feat_type: str,
+        lin_type: LineageType,
         data_type: str,
         unit: str | None = None,
     ) -> None:
@@ -29,13 +30,15 @@ class Feature:
             The name of the feature.
         description : str
             A description of the feature.
-        lineage_type : Literal["CellLineage", "CycleLineage"]
-            The type of lineage the feature is associated with: cell lineage
-            or cell cycle lineage.
-        provenance : str
-            The provenance of the feature (TrackMate, CTC, Pycellin, custom...).
+        feat_type : str
+            The type of the feature (node, edge, lineage, or a combination of the 3).
+        lin_type : LineageType
+            The type of lineage the feature is associated with: cell lineage,
+            cell cycle lineage or both.
         data_type : str
             The data type of the feature (int, float, string).
+        provenance : str
+            The provenance of the feature (TrackMate, CTC, Pycellin, custom...).
         unit : str, optional
             The unit of the feature (e.g. µm, min, cell).
 
@@ -46,15 +49,15 @@ class Feature:
         """
         # TODO: add a protect argument to prevent the modification of the feature
         # and create the related methods to protect / unprotect the feature, and getters
-        # TODO: should the feature type be stored as an attribute?
         self.name = name
         self.description = description
-        if not check_literal_type(lineage_type, LineageType):
+        if not check_literal_type(lin_type, LineageType):
             raise ValueError(
                 f"Feature type must be one of {', '.join(LineageType.__args__)}."
             )
-        self.lineage_type = lineage_type
         self.provenance = provenance
+        self.feat_type = feat_type
+        self.lin_type = lin_type
         self.data_type = data_type
         self.unit = unit
 
@@ -64,8 +67,9 @@ class Feature:
         return (
             self.name == other.name
             and self.description == other.description
-            and self.lineage_type == other.lineage_type
             and self.provenance == other.provenance
+            and self.feat_type == other.feat_type
+            and self.lin_type == other.lin_type
             and self.data_type == other.data_type
             and self.unit == other.unit
         )
@@ -81,8 +85,9 @@ class Feature:
         """
         return (
             f"Feature(name={self.name!r}, description={self.description!r}, "
-            f"lineage_type={self.lineage_type!r}, provenance={self.provenance!r}, "
-            f"data_type={self.data_type!r}, unit={self.unit!r})"
+            f"provenance={self.provenance!r}, feat_type={self.feat_type!r}, "
+            f"lin_type={self.lin_type!r}, data_type={self.data_type!r}, "
+            f"unit={self.unit!r})"
         )
 
     def __str__(self) -> str:
@@ -119,58 +124,63 @@ class Feature:
         """
         self.description = new_description
 
+    def is_equal(self, other: Feature, ignore_feat_type: bool = False) -> bool:
+        """
+        Check if the feature is equal to another feature.
+
+        Parameters
+        ----------
+        other : Feature
+            The other feature to compare with.
+        ignore_feat_type : bool, optional
+            Whether to ignore the feature type when comparing the features.
+
+        Returns
+        -------
+        bool
+            True if the features are equal, False otherwise.
+        """
+        if ignore_feat_type:
+            return (
+                self.name == other.name
+                and self.description == other.description
+                and self.provenance == other.provenance
+                and self.lin_type == other.lin_type
+                and self.data_type == other.data_type
+                and self.unit == other.unit
+            )
+        else:
+            return self == other
+
 
 class FeaturesDeclaration:
     """
+    The FeaturesDeclaration class is used to store the features that are
+    associated with the nodes, edges, and lineages of a cell lineage graph.
+
+    Attributes
+    ----------
+    feats_dict : dict[str, Feature]
+        A dictionary of features where the keys are the feature names and
+        the values are the Feature objects.
+
+    Notes
+    -----
     Spatial and temporal units are not part of the FeaturesDeclaration but of the
     features themselves to allow different units for a same dimension (e.g. time
     in seconds or minutes).
-    - dict of node features: {feature_name: Feature}
-    - dict of edge features: {feature_name: Feature}
-    - dict of lineage features: {feature_name: Feature}
-    How to differentiate between cell features and cycle features?
     """
 
     def __init__(
         self,
-        node_features: dict[str, Feature] | None = None,
-        edge_features: dict[str, Feature] | None = None,
-        lineage_features: dict[str, Feature] | None = None,
+        feats_dict: dict[str, Feature] | None = None,
     ) -> None:
-        self.node_feats = node_features if node_features else {}
-        self.edge_feats = edge_features if edge_features else {}
-        self.lin_feats = lineage_features if lineage_features else {}
-
-        # TODO: are the versions below a better way?
-
-        # if node_features is None:
-        #     node_features = {}
-        # else:
-        #     self.node_feats = node_features
-        # if edge_features is None:
-        #     edge_features = {}
-        # else:
-        #     self.edge_feats = edge_features
-        # if lineage_features is None:
-        #     lineage_features = {}
-        # else:
-        #     self.lin_feats = lineage_features
-
-        # if node_features is not None:
-        #     self.node_feats = node_features
-        # if edge_features is not None:
-        #     self.edge_feats = edge_features
-        # if lineage_features is not None:
-        #     self.lin_feats = lineage_features
+        self.feats_dict = feats_dict if feats_dict else {}
 
     def __eq__(self, other):
         if not isinstance(other, FeaturesDeclaration):
             return False
-        return (
-            self.node_feats == other.node_feats
-            and self.edge_feats == other.edge_feats
-            and self.lin_feats == other.lin_feats
-        )
+        return self.feats_dict == other.feats_dict
 
     def __repr__(self) -> str:
         """
@@ -181,11 +191,7 @@ class FeaturesDeclaration:
         str
             A string representation of the FeaturesDeclaration object.
         """
-        return (
-            f"FeaturesDeclaration(node_features={self.node_feats!r}, "
-            f"edge_features={self.edge_feats!r}, "
-            f"lineage_features={self.lin_feats!r})"
-        )
+        return f"FeaturesDeclaration(feats_dict={self.feats_dict!r}"
 
     def __str__(self) -> str:
         """
@@ -196,19 +202,18 @@ class FeaturesDeclaration:
         str
             A human-readable string representation of the FeaturesDeclaration object.
         """
-        node_features = ", ".join(self.node_feats.keys())
-        edge_features = ", ".join(self.edge_feats.keys())
-        lineage_features = ", ".join(self.lin_feats.keys())
+        node_feats = ", ".join(self.get_node_feats().keys())
+        edge_feats = ", ".join(self.get_edge_feats().keys())
+        lin_feats = ", ".join(self.get_lin_feats().keys())
         return (
-            f"Node features: {node_features}\n"
-            f"Edge features: {edge_features}\n"
-            f"Lineage features: {lineage_features}"
+            f"Node features: {node_feats}\n"
+            f"Edge features: {edge_feats}\n"
+            f"Lineage features: {lin_feats}"
         )
 
     def _has_feature(
         self,
         feature_name: str,
-        feature_type: Literal["node", "edge", "lineage"] | None = None,
     ) -> bool:
         """
         Check if the FeaturesDeclaration contains the specified feature.
@@ -217,47 +222,24 @@ class FeaturesDeclaration:
         ----------
         feature_name : str
             The name of the feature to check.
-        feature_type : Literal["node", "edge", "lineage"], optional
-            The type of the feature to check (node, edge, or lineage).
-            If not specified, the method will check all types.
 
         Returns
         -------
         bool
             True if the feature has been declared, False otherwise.
-
-        Raises
-        ------
-        ValueError
-            If the feature type is invalid.
         """
-        if not check_literal_type(feature_type, FeatureType):
-            raise ValueError(
-                f"Feature type must be one of {', '.join(FeatureType.__args__)}."
-            )
-        match feature_type:
-            case "node":
-                return feature_name in self.node_feats
-            case "edge":
-                return feature_name in self.edge_feats
-            case "lineage":
-                return feature_name in self.lin_feats
-            case None:
-                return (
-                    feature_name in self.node_feats
-                    or feature_name in self.edge_feats
-                    or feature_name in self.lin_feats
-                )
+        if feature_name in self.feats_dict:
+            return True
+        else:
+            return False
 
-    def _get_feat_dict_from_feat_type(
-        self, feature_type: Literal["node", "edge", "lineage"]
-    ) -> dict:
+    def _get_feat_dict_from_feat_type(self, feat_type: FeatureType) -> dict:
         """
         Return the dictionary of features corresponding to the specified type.
 
         Parameters
         ----------
-        feature_type : Literal["node", "edge", "lineage"]
+        feat_type : FeatureType
             The type of the features to return (node, edge, or lineage).
 
         Returns
@@ -270,21 +252,49 @@ class FeaturesDeclaration:
         ValueError
             If the feature type is invalid.
         """
-        if not check_literal_type(feature_type, FeatureType):
+        if not check_literal_type(feat_type, FeatureType):
             raise ValueError(
                 f"Feature type must be one of {', '.join(FeatureType.__args__)}."
             )
-        match feature_type:
-            case "node":
-                return self.node_feats
-            case "edge":
-                return self.edge_feats
-            case "lineage":
-                return self.lin_feats
+        feats_dict = {
+            k: v for k, v in self.feats_dict.items() if feat_type in v.feat_type
+        }
+        return feats_dict
 
-    def _add_feature(
-        self, feature: Feature, feature_type: Literal["node", "edge", "lineage"]
-    ) -> None:
+    def get_node_feats(self) -> dict[str, Feature]:
+        """
+        Return the dictionary of node features.
+
+        Returns
+        -------
+        dict[str, Feature]
+            The dictionary of node features.
+        """
+        return self._get_feat_dict_from_feat_type("node")
+
+    def get_edge_feats(self) -> dict[str, Feature]:
+        """
+        Return the dictionary of edge features.
+
+        Returns
+        -------
+        dict[str, Feature]
+            The dictionary of edge features.
+        """
+        return self._get_feat_dict_from_feat_type("edge")
+
+    def get_lin_feats(self) -> dict[str, Feature]:
+        """
+        Return the dictionary of lineage features.
+
+        Returns
+        -------
+        dict[str, Feature]
+            The dictionary of lineage features.
+        """
+        return self._get_feat_dict_from_feat_type("lineage")
+
+    def _add_feature(self, feature: Feature) -> None:
         """
         Add the specified feature to the FeaturesDeclaration.
 
@@ -292,33 +302,62 @@ class FeaturesDeclaration:
         ----------
         feature : Feature
             The feature to add.
-        feature_type : Literal["node", "edge", "lineage"]
-            The type of the feature to add (node, edge, or lineage).
 
         Raises
         ------
-        ValueError
-            If the feature type is invalid.
-        ValueError
-            If a feature with the same name already exists in the specified type.
+        UserWarning
+            If an identical feature has already been declared.
+        UserWarning
+            If an identical feature has already been declared
+            but with a different type.
+        UserWarning
+            If a feature with the same name has already been declared
+            but with a different definition.
+        UserWarning
+            If a feature with the same name has already been declared
+            but with a different type and definition.
         """
-        try:
-            dict_feats = self._get_feat_dict_from_feat_type(feature_type)
-        except ValueError as e:
-            raise ValueError(e)
+        if feature.name in self.feats_dict:
+            old_feat = self.feats_dict[feature.name]
 
-        if dict_feats:
-            if feature.name in dict_feats:
-                raise ValueError(
-                    f"A Feature called {feature.name} already exists in "
-                    f"{feature_type} features."
-                )
-        dict_feats[feature.name] = feature
+            if feature.is_equal(old_feat, ignore_feat_type=True):
+                if feature.feat_type == old_feat.feat_type:
+                    msg = (
+                        f"An identical Feature '{feature.name}' "
+                        f"has already been declared."
+                    )
+                    warnings.warn(msg)
+                else:
+                    msg = (
+                        f"An identical Feature '{feature.name}' has already been "
+                        f"declared but with a different type ({old_feat.feat_type}). "
+                        f"The feature will be overwritten."
+                    )
+                    warnings.warn(msg)
+                    self.feats_dict[feature.name] = feature
+            else:
+                if feature.feat_type == old_feat.feat_type:
+                    msg = (
+                        f"A Feature called '{feature.name}' has already been declared "
+                        f"but with a different definition. "
+                        f"The feature will be overwritten."
+                    )
+                    warnings.warn(msg)
+                    self.feats_dict[feature.name] = feature
+                else:
+                    msg = (
+                        f"A Feature called '{feature.name}' has already been declared "
+                        f"but with a different type ({old_feat.feat_type}) "
+                        f"and definition. The feature will be overwritten."
+                    )
+                    warnings.warn(msg)
+                    self.feats_dict[feature.name] = feature
+        else:
+            self.feats_dict[feature.name] = feature
 
     def _add_features(
         self,
         features: list[Feature],
-        feature_types: list[Literal["node", "edge", "lineage"]],
     ) -> None:
         """
         Add the specified features to the FeaturesDeclaration.
@@ -327,19 +366,18 @@ class FeaturesDeclaration:
         ----------
         features : list[Feature]
             The features to add.
-        feature_types : list[Literal["node", "edge", "lineage"]]
-            The types of the features to add (node, edge, or lineage).
         """
-        for feature, feature_type in zip(features, feature_types):
-            self._add_feature(feature, feature_type)
+        for feature in features:
+            self._add_feature(feature)
 
     def _add_cycle_lineage_features(self) -> None:
         """
         Add the basic features of cell cycle lineages.
         """
         common_fields = {
-            "lineage_type": "CycleLineage",
             "provenance": "Pycellin",
+            "feat_type": "node",
+            "lin_type": "CycleLineage",
             "data_type": "int",
         }
 
@@ -373,13 +411,16 @@ class FeaturesDeclaration:
             ),
             **common_fields,
         )
-        self._add_features([feat_ID, feat_cells, feat_length, feat_level], ["node"] * 4)
+        self._add_features([feat_ID, feat_cells, feat_length, feat_level])
 
         # We don't need to add the lineage_ID feature to the lineage features
         # since it is already present in the cell lineage features.
+        # TODO: Lineage should be a valid choice of lin_type.
 
     def _remove_feature(
-        self, feature_name: str, feature_type: Literal["node", "edge", "lineage"]
+        self,
+        feature_name: str,
+        feature_type: FeatureType | None = None,
     ) -> None:
         """
         Remove the specified feature from the FeaturesDeclaration.
@@ -388,8 +429,10 @@ class FeaturesDeclaration:
         ----------
         feature_name : str
             The name of the feature to remove.
-        feature_type : Literal["node", "edge", "lineage"]
-            The type of the feature to add (node, edge, or lineage).
+        feature_type : FeatureType, optional
+            The type of the feature to remove (node, edge, or lineage).
+            If not specified, the method will try to remove the feature from
+            all types.
 
         Raises
         ------
@@ -398,22 +441,35 @@ class FeaturesDeclaration:
         KeyError
             If the feature does not exist within the specified type.
         """
-        try:
-            dict_feats = self._get_feat_dict_from_feat_type(feature_type)
-        except ValueError as e:
-            raise ValueError(e)
-
-        if feature_name not in dict_feats:
+        if feature_name not in self.feats_dict:
             raise KeyError(
-                f"Feature {feature_name} does not exist in {feature_type} features."
+                f"Feature '{feature_name}' does not exist in the declared features."
             )
 
-        del dict_feats[feature_name]
+        if feature_type:
+            # Check that the feature_type is valid.
+            if not check_literal_type(feature_type, FeatureType):
+                raise ValueError(
+                    f"Feature type must be one of {', '.join(FeatureType.__args__)}, "
+                    f"or a combination of them separated by a +."
+                )
+
+            current_feat_type = self.feats_dict[feature_name].feat_type
+            # In case of multiple feat types, current_feat_type is a string
+            # of the different feat_types separated with a +.
+            current_feat_type = current_feat_type.split("+")
+            if feature_type in current_feat_type:
+                current_feat_type.remove(feature_type)
+                self.feats_dict[feature_name].feat_type = "+".join(current_feat_type)
+                # If the feat_type is now empty, remove the feature from the dict.
+                if not current_feat_type:
+                    del self.feats_dict[feature_name]
+        else:
+            del self.feats_dict[feature_name]
 
     def _remove_features(
         self,
         feature_names: list[str],
-        feature_types: list[Literal["node", "edge", "lineage"]],
     ) -> None:
         """
         Remove the specified features from the FeaturesDeclaration.
@@ -422,17 +478,14 @@ class FeaturesDeclaration:
         ----------
         feature_names : list[str]
             The names of the features to remove.
-        feature_types : list[Literal["node", "edge", "lineage"]]
-            The types of the features to remove (node, edge, or lineage).
         """
-        for feature_name, feature_type in zip(feature_names, feature_types):
-            self._remove_feature(feature_name, feature_type)
+        for feature_name in feature_names:
+            self._remove_feature(feature_name)
 
     def _rename_feature(
         self,
         feature_name: str,
         new_name: str,
-        feature_type: Literal["node", "edge", "lineage"],
     ) -> None:
         """
         Rename a specified feature.
@@ -440,41 +493,27 @@ class FeaturesDeclaration:
         Parameters
         ----------
         feature_name : str
-            The name of the feature to rename.
+            The current name of the feature to rename.
         new_name : str
             The new name for the feature.
-        feature_type : Literal["node", "edge", "lineage"]
-            The type of the feature to rename. Valid values are "node",
-            "edge", or "lineage".
 
         Raises
         ------
-        ValueError
-            If the feature type is invalid.
         KeyError
-            If the feature does not exist within the specified type.
+            If the feature does not exist in the declared features.
         """
-        # TODO: make the feature type optional, but raise an error
-        # if several features with the same name exist.
-        # + do the same for the other relevant method
-        try:
-            dict_feats = self._get_feat_dict_from_feat_type(feature_type)
-        except ValueError as e:
-            raise ValueError(e)
-
-        if feature_name not in dict_feats:
+        if feature_name not in self.feats_dict:
             raise KeyError(
-                f"Feature {feature_name} does not exist in {feature_type} features."
+                f"Feature '{feature_name}' does not exist in the declared features."
             )
 
-        dict_feats[new_name] = dict_feats.pop(feature_name)
-        dict_feats[new_name]._rename(new_name)
+        self.feats_dict[new_name] = self.feats_dict.pop(feature_name)
+        self.feats_dict[new_name]._rename(new_name)
 
     def _modify_feature_description(
         self,
         feature_name: str,
         new_description: str,
-        feature_type: Literal["node", "edge", "lineage"],
     ) -> None:
         """
         Modify the description of a specified feature.
@@ -485,28 +524,18 @@ class FeaturesDeclaration:
             The name of the feature whose description is to be modified.
         new_description : str
             The new description for the feature.
-        feature_type : Literal["node", "edge", "lineage"]
-            The type of the feature to be modified. Valid values are "node",
-            "edge", or "lineage".
 
         Raises
         ------
-        ValueError
-            If the feature type is invalid.
         KeyError
-            If the feature does not exist within the specified type.
+            If the feature does not exist in the declared features.
         """
-        try:
-            dict_feats = self._get_feat_dict_from_feat_type(feature_type)
-        except ValueError as e:
-            raise ValueError(e)
-
-        if feature_name not in dict_feats:
+        if feature_name not in self.feats_dict:
             raise KeyError(
-                f"Feature {feature_name} does not exist in {feature_type} features."
+                f"Feature '{feature_name}' does not exist in the declared features."
             )
 
-        dict_feats[feature_name]._modify_description(new_description)
+        self.feats_dict[feature_name]._modify_description(new_description)
 
     def _get_units_per_features(self) -> dict[str, list[str]]:
         """
@@ -523,14 +552,86 @@ class FeaturesDeclaration:
             {'unit1': ['feature1', 'feature2'], 'unit2': ['feature3']}.
         """
         units = {}
-        features_values = [
-            self.node_feats.values(),
-            self.edge_feats.values(),
-            self.lin_feats.values(),
-        ]
-        for feat in chain.from_iterable(features_values):
+        for feat in self.feats_dict.values():
             if feat.unit in units:
                 units[feat.unit].append(feat.name)
             else:
                 units[feat.unit] = [feat.name]
         return units
+
+
+if __name__ == "__main__":
+
+    # Basic testing of the Feature and FeaturesDeclaration classes.
+    # TODO: do this properly in test_feature.py.
+
+    import pycellin.graph.features.utils as gfu
+
+    # Add features
+    fd = FeaturesDeclaration()
+    fd._add_feature(gfu.define_cell_ID_Feature())
+    fd._add_features(
+        [
+            gfu.define_frame_Feature(),
+            gfu.define_lineage_ID_Feature(),
+        ]
+    )
+    # for k, v in fd.feats_dict.items():
+    #     print(k, v)
+
+    # Add identical feature
+    fd._add_feature(gfu.define_cell_ID_Feature())
+    print()
+
+    # Add different type feature
+    tmp_feat = gfu.define_cell_ID_Feature()
+    tmp_feat.feat_type = "edge"
+    print(tmp_feat)
+    fd._add_feature(tmp_feat)
+    print(fd.feats_dict["cell_ID"])
+
+    # Add different definition feature
+    tmp_feat = gfu.define_cell_ID_Feature()
+    tmp_feat.description = "new description"
+    fd._add_feature(tmp_feat)
+    print(fd.feats_dict["cell_ID"])
+
+    # Get feats dict
+    # print(fd.get_node_feats().keys())
+    # print(fd.get_edge_feats().keys())
+    # print(fd.get_lin_feats().keys())
+
+    # Remove feat
+    fd._remove_feature("frame")
+    # print(fd.feats_dict.keys())
+
+    # Remove feat with type
+    fd._remove_feature("lineage_ID", "node")
+    # for k, v in fd.feats_dict.items():
+    #     print(k, v)
+
+    # Remove feat with type, but last type so in fact remove feat
+    fd._remove_feature("lineage_ID", "lineage")
+    # print(fd.feats_dict.keys())
+
+    # Remove feat with multi type
+    fd._add_feature(gfu.define_lineage_ID_Feature())
+    fd._remove_feature("lineage_ID")
+    # print(fd.feats_dict.keys())
+
+    # Invalid feat name
+    # fd._remove_feature("cel_ID")
+
+    # Invalid feat type
+    # fd._remove_feature("cell_ID", "nod")
+
+    # Rename feature
+    fd._rename_feature("cell_ID", "cell_ID_new")
+    # print(fd.feats_dict.keys(), fd.feats_dict["cell_ID_new"].name)
+
+    # Modify description
+    fd._modify_feature_description("cell_ID_new", "New description")
+    # print(fd.feats_dict["cell_ID_new"])
+
+    print(gfu.define_cell_ID_Feature().is_equal(gfu.define_cell_ID_Feature()))
+    print(gfu.define_cell_ID_Feature().is_equal(gfu.define_lineage_ID_Feature()))

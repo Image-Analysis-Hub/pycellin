@@ -8,9 +8,6 @@ from pycellin.classes.data import Data
 from pycellin.classes.feature import Feature
 from pycellin.classes.lineage import Lineage
 
-# In FeaturesDeclaration, maybe all the features should be stored in the same
-# dictionary, with getters to access the features of a specific type?
-
 
 def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Lineage]:
     """
@@ -181,7 +178,7 @@ class NodeLocalFeatureCalculator(LocalFeatureCalculator):
             List of tuples containing the node ID and the lineage ID of the nodes
             to enrich with the feature value.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.feature.lineage_type)
+        lineages = _get_lin_data_from_lin_type(data, self.feature.lin_type)
         for noi, lin_ID in nodes_to_enrich:
             lin = lineages[lin_ID]
             lin.nodes[noi][self.feature.name] = self.compute(lin, noi)
@@ -225,7 +222,7 @@ class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
             List of tuples containing the source node ID, the target node ID and
             the lineage ID of the edges to enrich with the feature value.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.feature.lineage_type)
+        lineages = _get_lin_data_from_lin_type(data, self.feature.lin_type)
         for source, target, lin_ID in edges_to_enrich:
             link = (source, target)
             lin = lineages[lin_ID]
@@ -263,7 +260,7 @@ class LineageLocalFeatureCalculator(LocalFeatureCalculator):
         data : Data
             Data object containing the lineages.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.feature.lineage_type)
+        lineages = _get_lin_data_from_lin_type(data, self.feature.lin_type)
         for lin_ID in lineages_to_enrich:
             lin = lineages[lin_ID]
             lin.graph[self.feature.name] = self.compute(lin)
@@ -348,7 +345,7 @@ class NodeGlobalFeatureCalculator(GlobalFeatureCalculator):
         data : Data
             Data object containing the lineages to enrich.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.feature.lineage_type)
+        lineages = _get_lin_data_from_lin_type(data, self.feature.lin_type)
         for lin in lineages.values():
             for noi in lin.nodes:
                 lin.nodes[noi][self.feature.name] = self.compute(data, lin, noi)
@@ -389,7 +386,7 @@ class EdgeGlobalFeatureCalculator(GlobalFeatureCalculator):
         data : Data
             Data object containing the lineages to enrich.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.feature.lineage_type)
+        lineages = _get_lin_data_from_lin_type(data, self.feature.lin_type)
         for lin in lineages.values():
             for edge in lin.edges:
                 lin.edges[edge][self.feature.name] = self.compute(data, lin, edge)
@@ -429,6 +426,6 @@ class LineageGlobalFeatureCalculator(GlobalFeatureCalculator):
         data : Data
             Data object containing the lineages to enrich.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.feature.lineage_type)
+        lineages = _get_lin_data_from_lin_type(data, self.feature.lin_type)
         for lin in lineages.values():
             lin.graph[self.feature.name] = self.compute(data, lin)
