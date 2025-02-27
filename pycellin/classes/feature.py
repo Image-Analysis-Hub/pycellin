@@ -153,6 +153,147 @@ class Feature:
             return self == other
 
 
+def frame_Feature(provenance: str = "Pycellin") -> Feature:
+    feat = Feature(
+        name="frame",
+        description="Frame number of the cell ",
+        provenance=provenance,
+        feat_type="node",
+        lin_type="CellLineage",
+        data_type="int",
+        unit="frame",
+    )
+    return feat
+
+
+def cell_ID_Feature(provenance: str = "Pycellin") -> Feature:
+    feat = Feature(
+        name="cell_ID",
+        description="Unique identifier of the cell",
+        provenance=provenance,
+        feat_type="node",
+        lin_type="CellLineage",
+        data_type="int",
+    )
+    return feat
+
+
+def lineage_ID_Feature(provenance: str = "Pycellin") -> Feature:
+    feat = Feature(
+        name="lineage_ID",
+        description="Unique identifier of the lineage",
+        provenance=provenance,
+        feat_type="lineage",
+        lin_type="Lineage",
+        data_type="int",
+    )
+    return feat
+
+
+def cell_coord_Feature(unit: str, axis: str, provenance: str = "Pycellin") -> Feature:
+    feat = Feature(
+        name=f"cell_{axis}",
+        description=f"{axis.upper()} coordinate of the cell",
+        provenance=provenance,
+        feat_type="node",
+        lin_type="CellLineage",
+        data_type="float",
+        unit=unit,
+    )
+    return feat
+
+
+def link_coord_Feature(unit: str, axis: str, provenance: str = "Pycellin") -> Feature:
+    feat = Feature(
+        name=f"link_{axis}",
+        description=(
+            f"{axis.upper()} coordinate of the link, "
+            f"i.e. mean coordinate of its two cells"
+        ),
+        provenance=provenance,
+        feat_type="edge",
+        lin_type="CellLineage",
+        data_type="float",
+        unit=unit,
+    )
+    return feat
+
+
+def lineage_coord_Feature(
+    unit: str, axis: str, provenance: str = "Pycellin"
+) -> Feature:
+    feat = Feature(
+        name=f"lineage_{axis}",
+        description=(
+            f"{axis.upper()} coordinate of the lineage, "
+            f"i.e. mean coordinate of its cells"
+        ),
+        provenance=provenance,
+        feat_type="lineage",
+        lin_type="CellLineage",
+        data_type="float",
+        unit=unit,
+    )
+    return feat
+
+
+def cycle_ID_Feature(provenance: str = "Pycellin") -> Feature:
+    feat = Feature(
+        name="cycle_ID",
+        description=(
+            "Unique identifier of the cell cycle, "
+            "i.e. cell_ID of the last cell in the cell cycle"
+        ),
+        provenance=provenance,
+        feat_type="node",
+        lin_type="CycleLineage",
+        data_type="int",
+    )
+    return feat
+
+
+def cells_Feature(provenance: str = "Pycellin") -> Feature:
+    feat = Feature(
+        name="cells",
+        description="cell_IDs of the cells in the cell cycle, in chronological order",
+        provenance=provenance,
+        feat_type="node",
+        lin_type="CycleLineage",
+        data_type="int",
+    )
+    return feat
+
+
+def cycle_length_Feature(provenance: str = "Pycellin") -> Feature:
+    feat = Feature(
+        name="cycle_length",
+        description="Number of cells in the cell cycle",
+        provenance=provenance,
+        feat_type="node",
+        lin_type="CycleLineage",
+        data_type="int",
+    )
+    return feat
+
+
+# TODO: define_cycle_duration_Feature
+
+
+def level_Feature(provenance: str = "Pycellin") -> Feature:
+    feat = Feature(
+        name="level",
+        description=(
+            "Level of the cell cycle in the lineage, "
+            "i.e. number of cell cycles upstream of the current one."
+        ),
+        provenance=provenance,
+        feat_type="node",
+        lin_type="CycleLineage",
+        data_type="int",
+    )
+    return feat
+
+
 class FeaturesDeclaration:
     """
     The FeaturesDeclaration class is used to store the features that are
@@ -374,48 +515,11 @@ class FeaturesDeclaration:
         """
         Add the basic features of cell cycle lineages.
         """
-        common_fields = {
-            "provenance": "Pycellin",
-            "feat_type": "node",
-            "lin_type": "CycleLineage",
-            "data_type": "int",
-        }
-
-        # Node features.
-        # TODO: should add these features to features.utils
-        feat_ID = Feature(
-            name="cycle_ID",
-            description=(
-                "Node ID of the cell cycle, "
-                "i.e. node ID of the last cell in the cell cycle."
-            ),
-            **common_fields,
-        )
-        feat_cells = Feature(
-            name="cells",
-            description=(
-                "Node IDs of the cells in the cell cycle, in chronological order."
-            ),
-            **common_fields,
-        )
-        feat_length = Feature(
-            name="cycle_length",
-            description="Number of cells in the cell cycle.",
-            **common_fields,
-        )
-        feat_level = Feature(
-            name="level",
-            description=(
-                "Level of the cell cycle in the lineage, "
-                "i.e. number of cell cycles upstream of the current one."
-            ),
-            **common_fields,
-        )
+        feat_ID = cycle_ID_Feature()
+        feat_cells = cells_Feature()
+        feat_length = cycle_length_Feature()
+        feat_level = level_Feature()
         self._add_features([feat_ID, feat_cells, feat_length, feat_level])
-
-        # We don't need to add the lineage_ID feature to the lineage features
-        # since it is already present in the cell lineage features.
-        # TODO: Lineage should be a valid choice of lin_type.
 
     def _remove_feature(
         self,
@@ -565,33 +669,31 @@ if __name__ == "__main__":
     # Basic testing of the Feature and FeaturesDeclaration classes.
     # TODO: do this properly in test_feature.py.
 
-    import pycellin.graph.features.utils as gfu
-
     # Add features
     fd = FeaturesDeclaration()
-    fd._add_feature(gfu.define_cell_ID_Feature())
+    fd._add_feature(cell_ID_Feature())
     fd._add_features(
         [
-            gfu.define_frame_Feature(),
-            gfu.define_lineage_ID_Feature(),
+            frame_Feature(),
+            lineage_ID_Feature(),
         ]
     )
     # for k, v in fd.feats_dict.items():
     #     print(k, v)
 
     # Add identical feature
-    fd._add_feature(gfu.define_cell_ID_Feature())
+    fd._add_feature(cell_ID_Feature())
     print()
 
     # Add different type feature
-    tmp_feat = gfu.define_cell_ID_Feature()
+    tmp_feat = cell_ID_Feature()
     tmp_feat.feat_type = "edge"
     print(tmp_feat)
     fd._add_feature(tmp_feat)
     print(fd.feats_dict["cell_ID"])
 
     # Add different definition feature
-    tmp_feat = gfu.define_cell_ID_Feature()
+    tmp_feat = cell_ID_Feature()
     tmp_feat.description = "new description"
     fd._add_feature(tmp_feat)
     print(fd.feats_dict["cell_ID"])
@@ -615,7 +717,7 @@ if __name__ == "__main__":
     # print(fd.feats_dict.keys())
 
     # Remove feat with multi type
-    fd._add_feature(gfu.define_lineage_ID_Feature())
+    fd._add_feature(lineage_ID_Feature())
     fd._remove_feature("lineage_ID")
     # print(fd.feats_dict.keys())
 
@@ -633,5 +735,5 @@ if __name__ == "__main__":
     fd._modify_feature_description("cell_ID_new", "New description")
     # print(fd.feats_dict["cell_ID_new"])
 
-    print(gfu.define_cell_ID_Feature().is_equal(gfu.define_cell_ID_Feature()))
-    print(gfu.define_cell_ID_Feature().is_equal(gfu.define_lineage_ID_Feature()))
+    print(cell_ID_Feature().is_equal(cell_ID_Feature()))
+    print(cell_ID_Feature().is_equal(lineage_ID_Feature()))

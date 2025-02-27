@@ -14,10 +14,9 @@ from lxml import etree as ET
 import networkx as nx
 
 from pycellin.classes import Model
-from pycellin.classes import FeaturesDeclaration, Feature
+from pycellin.classes import FeaturesDeclaration, Feature, cell_ID_Feature
 from pycellin.classes import Data
 from pycellin.classes import CellLineage
-import pycellin.graph.features.utils as gfu
 
 
 def _get_units(
@@ -707,7 +706,7 @@ def _update_features_declaration(
         True if the model has segmentation data, False otherwise.
     """
     # Node features.
-    feat_cell_ID = gfu.define_cell_ID_Feature("TrackMate")
+    feat_cell_ID = cell_ID_Feature("TrackMate")
     fdec._add_feature(feat_cell_ID)
     for axis in ["x", "y", "z"]:
         fdec._rename_feature(f"POSITION_{axis.upper()}", f"cell_{axis}")
@@ -1222,6 +1221,7 @@ if __name__ == "__main__":
 
     model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
     print(model)
+    print(model.feat_declaration)
     # print(model.metadata)
     # print(model.fdec.node_feats.keys())
     # print(model.data)

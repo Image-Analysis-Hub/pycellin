@@ -25,10 +25,14 @@ from typing import Any, Tuple
 import networkx as nx
 
 from pycellin.classes.model import Model
-from pycellin.classes.feature import FeaturesDeclaration
+from pycellin.classes.feature import (
+    FeaturesDeclaration,
+    cell_ID_Feature,
+    frame_Feature,
+    lineage_ID_Feature,
+)
 from pycellin.classes.data import Data
 from pycellin.classes.lineage import CellLineage
-import pycellin.graph.features.utils as gfu
 
 # FIXME: get_distribution("pycellin").version is not working
 
@@ -74,9 +78,9 @@ def _create_FeaturesDeclaration() -> FeaturesDeclaration:
         identification features.
     """
     feat_declaration = FeaturesDeclaration()
-    cell_ID_feat = gfu.define_cell_ID_Feature()
-    frame_feat = gfu.define_frame_Feature()
-    lin_ID_feat = gfu.define_lineage_ID_Feature()
+    cell_ID_feat = cell_ID_Feature()
+    frame_feat = frame_Feature()
+    lin_ID_feat = lineage_ID_Feature()
     feat_declaration._add_features([cell_ID_feat, frame_feat, lin_ID_feat])
     return feat_declaration
 
