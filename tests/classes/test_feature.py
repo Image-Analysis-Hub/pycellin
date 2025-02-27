@@ -14,22 +14,22 @@ from pycellin.classes import Feature, FeaturesDeclaration
 
 @pytest.fixture(scope="module")
 def feat1():
-    return Feature("name1", "desc1", "CellLineage", "prov1", "type1", "unit1")
+    return Feature("name1", "desc1", "prov1", "node", "CellLineage", "type1", "unit1")
 
 
 @pytest.fixture(scope="module")
 def feat1_bis():
-    return Feature("name1", "desc1", "CellLineage", "prov1", "type1", "unit1")
+    return Feature("name1", "desc1", "prov1", "node", "CellLineage", "type1", "unit1")
 
 
 @pytest.fixture(scope="module")
 def feat2():
-    return Feature("name2", "desc2", "CellLineage", "prov2", "type2", "unit2")
+    return Feature("name2", "desc2", "prov2", "node", "CellLineage", "type2", "unit2")
 
 
 @pytest.fixture(scope="module")
 def feat3():
-    return Feature("name1", "desc1", "CellLineage", "prov1", "type1")
+    return Feature("name1", "desc1", "prov1", "node", "CellLineage", "type1")
 
 
 def test_feature_equality(feat1, feat1_bis):
@@ -44,7 +44,7 @@ def test_feature_unequality(feat1, feat2, feat3):
 
 def test_feature_invalid_Literal():
     with pytest.raises(ValueError):
-        Feature("name1", "desc1", "not a valid Literal", "prov1", "type1")
+        Feature("name1", "desc1", "prov1", "node", "not a valid Literal", "type1")
 
 
 # Class FeaturesDeclaration ###################################################
@@ -52,37 +52,43 @@ def test_feature_invalid_Literal():
 
 @pytest.fixture(scope="module")
 def fd1():
-    return FeaturesDeclaration(node_features=1, edge_features=2, lineage_features=3)
+    return FeaturesDeclaration(1)
 
 
 @pytest.fixture(scope="module")
 def fd1_bis():
-    return FeaturesDeclaration(node_features=1, edge_features=2, lineage_features=3)
+    return FeaturesDeclaration(1)
 
 
 @pytest.fixture(scope="module")
 def fd2():
-    return FeaturesDeclaration(node_features=4, edge_features=2, lineage_features=3)
+    return FeaturesDeclaration({})
+
+
+@pytest.fixture(scope="module")
+def fd2_bis():
+    return FeaturesDeclaration({})
 
 
 @pytest.fixture(scope="module")
 def fd3():
-    return FeaturesDeclaration(node_features=1, edge_features=5, lineage_features=3)
+    return FeaturesDeclaration(2)
 
 
 @pytest.fixture(scope="module")
 def fd4():
-    return FeaturesDeclaration(node_features=1, edge_features=2, lineage_features=6)
+    return FeaturesDeclaration({"a": "a"})
 
 
-def test_features_declaration_equality(feat1, feat1_bis, fd1, fd1_bis):
-    fd = FeaturesDeclaration(node_features={"feat1": feat1})
-    fd_bis = FeaturesDeclaration(node_features={"feat1": feat1_bis})
+def test_features_declaration_equality(feat1, feat1_bis, fd1, fd1_bis, fd2, fd2_bis):
+    fd = FeaturesDeclaration({"feat1": feat1})
+    fd_bis = FeaturesDeclaration({"feat1": feat1_bis})
     assert fd == fd_bis
     assert fd1 == fd1_bis
+    assert fd2 == fd2_bis
 
 
-def test_features_declaration_inequality_node_feats(fd1, fd2, fd3, fd4):
+def test_features_declaration_inequality(fd1, fd2, fd3, fd4):
     assert fd1 != fd2
     assert fd1 != fd3
     assert fd1 != fd4
