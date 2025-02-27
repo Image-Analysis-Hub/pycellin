@@ -194,6 +194,17 @@ class Model:
         """
         return self.feat_declaration._get_units_per_features()
 
+    def get_features(self) -> dict[str, Feature]:
+        """
+        Return the features present in the model.
+
+        Returns
+        -------
+        dict[str, Feature]
+            Dictionary of the features present in the model.
+        """
+        return self.feat_declaration.feats_dict
+
     def get_cell_lineage_features(
         self,
         include_Lineage_feats: bool = True,
