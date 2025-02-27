@@ -402,6 +402,35 @@ class FeaturesDeclaration:
         }
         return feats_dict
 
+    def _get_feat_dict_from_lin_type(self, lin_type: LineageType) -> dict:
+        """
+        Return the dictionary of features corresponding to the specified lineage type.
+
+        Parameters
+        ----------
+        lin_type : LineageType
+            The type of the lineage features to return (CellLineage,
+            CycleLineage or Lineage).
+
+        Returns
+        -------
+        dict
+            The dictionary of features corresponding to the specified lineage type.
+
+        Raises
+        ------
+        ValueError
+            If the lineage type is invalid.
+        """
+        if not check_literal_type(lin_type, LineageType):
+            raise ValueError(
+                f"Lineage type must be one of {', '.join(LineageType.__args__)}."
+            )
+        feats_dict = {
+            k: v for k, v in self.feats_dict.items() if lin_type in v.lin_type
+        }
+        return feats_dict
+
     def get_node_feats(self) -> dict[str, Feature]:
         """
         Return the dictionary of node features.
