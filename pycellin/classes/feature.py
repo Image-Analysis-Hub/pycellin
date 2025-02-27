@@ -405,10 +405,8 @@ class FeaturesDeclaration:
             raise ValueError(
                 f"Feature type must be one of {', '.join(FeatureType.__args__)}."
             )
-        feats_dict = {
-            k: v for k, v in self.feats_dict.items() if feat_type in v.feat_type
-        }
-        return feats_dict
+        feats = {k: v for k, v in self.feats_dict.items() if feat_type == v.feat_type}
+        return feats
 
     def _get_feat_dict_from_lin_type(self, lin_type: LineageType) -> dict:
         """
@@ -434,10 +432,8 @@ class FeaturesDeclaration:
             raise ValueError(
                 f"Lineage type must be one of {', '.join(LineageType.__args__)}."
             )
-        feats_dict = {
-            k: v for k, v in self.feats_dict.items() if lin_type in v.lin_type
-        }
-        return feats_dict
+        feats = {k: v for k, v in self.feats_dict.items() if lin_type == v.lin_type}
+        return feats
 
     def _add_feature(self, feature: Feature) -> None:
         """
