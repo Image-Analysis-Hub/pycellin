@@ -99,8 +99,16 @@ class Feature:
         str
             A human-readable string representation of the Feature object.
         """
-        # TODO: see if and how to simplify the string representation
-        return self.__repr__()
+        string = (
+            f"Feature '{self.name}'\n"
+            f"  Description: {self.description}\n"
+            f"  Provenance: {self.provenance}\n"
+            f"  Type: {self.feat_type}\n"
+            f"  Lineage type: {self.lin_type}\n"
+            f"  Data type: {self.data_type}\n"
+            f"  Unit: {self.unit}"
+        )
+        return string
 
     def _rename(self, new_name: str) -> None:
         """
@@ -343,9 +351,9 @@ class FeaturesDeclaration:
         str
             A human-readable string representation of the FeaturesDeclaration object.
         """
-        node_feats = ", ".join(self.get_node_feats().keys())
-        edge_feats = ", ".join(self.get_edge_feats().keys())
-        lin_feats = ", ".join(self.get_lin_feats().keys())
+        node_feats = ", ".join(self._get_feat_dict_from_feat_type("node").keys())
+        edge_feats = ", ".join(self._get_feat_dict_from_feat_type("edge").keys())
+        lin_feats = ", ".join(self._get_feat_dict_from_feat_type("lineage").keys())
         return (
             f"Node features: {node_feats}\n"
             f"Edge features: {edge_feats}\n"
