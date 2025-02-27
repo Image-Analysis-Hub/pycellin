@@ -292,7 +292,7 @@ def level_Feature(provenance: str = "Pycellin") -> Feature:
         name="level",
         description=(
             "Level of the cell cycle in the lineage, "
-            "i.e. number of cell cycles upstream of the current one."
+            "i.e. number of cell cycles upstream of the current one"
         ),
         provenance=provenance,
         feat_type="node",
