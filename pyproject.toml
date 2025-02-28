@@ -3,8 +3,10 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
-test = ["pytest>=6.2.4"]
-viz = ["pygraphviz>=1.8"]
+test = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+]
 
 [project]
 name = "pycellin"
@@ -22,7 +24,7 @@ dependencies = [
     "pandas>=1.5",
     "plotly>=5.24",
     "scikit-image>=0.19",
-    "scipy>=1.7",
+    "scipy>=1.15",
     "shapely>=2.0",
 ]
 classifiers = [
