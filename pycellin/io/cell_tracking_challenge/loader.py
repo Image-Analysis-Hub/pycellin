@@ -19,7 +19,8 @@ https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content
 from datetime import datetime
 from itertools import pairwise
 from pathlib import Path
-from pkg_resources import get_distribution
+
+# from pkg_resources import get_distribution
 from typing import Any, Tuple
 
 import networkx as nx
