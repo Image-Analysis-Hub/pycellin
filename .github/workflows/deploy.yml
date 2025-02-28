@@ -25,9 +25,9 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install --upgrade build
 
-    - name: Pip build pycellin
+    - name: Build wheel
       run: |
-        python -m pip install build
+        python -m build --wheel
         
     - uses: actions/upload-artifact@v4
       with:
