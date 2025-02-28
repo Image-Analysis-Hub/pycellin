@@ -278,8 +278,8 @@ def load_CTC_file(
 
 if __name__ == "__main__":
 
-    ctc_file = "sample_data/FakeTracks_TMtoCTC_res.txt"
-    ctc_file = "sample_data/Ecoli_growth_on_agar_pad_TMtoCTC_res.txt"
+    ctc_file = "sample_data/FakeTracks_TMtoCTC.txt"
+    ctc_file = "sample_data/Ecoli_growth_on_agar_pad_TMtoCTC.txt"
     # ctc_file = "/mnt/data/Films_Laure/Benchmarks/CTC/EvaluationSoftware/testing_dataset/03_RES/res_track.txt"
     model = load_CTC_file(ctc_file)
     print(model)

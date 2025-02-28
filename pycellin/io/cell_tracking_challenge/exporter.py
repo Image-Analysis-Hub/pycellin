@@ -276,8 +276,8 @@ if __name__ == "__main__":
 
     xml_in = "sample_data/FakeTracks.xml"
     # xml_in = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
-    ctc_in = "sample_data/FakeTracks_TMtoCTC_res.txt"
-    ctc_out = "sample_data/FakeTracks_exported_CTC_from_CTC.txt"
+    ctc_in = "sample_data/FakeTracks_TMtoCTC.txt"
+    ctc_out = "sample_data/results/FakeTracks_exported_CTC_from_CTC.txt"
 
     model = load_TrackMate_XML(xml_in)
     # model = load_CTC_file(ctc_in)
