@@ -33,9 +33,9 @@ jobs:
         python -m pip install build
         
     - uses: actions/upload-artifact@v4
-        with:
-          path: dist/*.whl
-          name: artifacts-wheel
+      with:
+        path: dist/*.whl
+        name: artifacts-wheel
 
   build_sdist:
     name: Build Source Distribution
