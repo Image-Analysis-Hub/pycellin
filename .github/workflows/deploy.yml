@@ -64,28 +64,28 @@ jobs:
           path: dist/*.tar.gz
           name: artifacts-sdist
 
-    upload_all:
-      name: Publish to PyPI
-      needs: [build_wheel, build_sdist]
-      runs-on: ubuntu-latest
-      if: github.event_name == 'release' && success()
+  upload_all:
+    name: Publish to PyPI
+    needs: [build_wheel, build_sdist]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && success()
 
-      steps:
-        - name: Set up Python
-          uses: actions/setup-python@v5
-          with:
-            python-version: '3.10'
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-        - name: Download artifacts
-          uses: actions/download-artifact@v4
-          with: 
-            name: artifacts-*
-            path: dist
-            merge: true
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with: 
+          name: artifacts-*
+          path: dist
+          merge: true
 
-        - name: Publish to PyPI
-          uses: pypa/gh-action-pypi-publish@v1.12.4
-          with:
-            password: ${{ secrets.PYPI_API_TOKEN }}
-            skip-existing: true
-            verbose: true
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.12.4
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
+          verbose: true
