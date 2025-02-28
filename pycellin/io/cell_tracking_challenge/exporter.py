@@ -271,15 +271,16 @@ def export_CTC_file(
 
 if __name__ == "__main__":
 
-    from pycellin.io.cell_tracking_challenge.loader import load_CTC_file
-    from pycellin.io.trackmate.loader import load_TrackMate_XML
-
     xml_in = "sample_data/FakeTracks.xml"
     # xml_in = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
     ctc_in = "sample_data/FakeTracks_TMtoCTC.txt"
     ctc_out = "sample_data/results/FakeTracks_exported_CTC_from_CTC.txt"
 
+    from pycellin.io.trackmate.loader import load_TrackMate_XML
+
     model = load_TrackMate_XML(xml_in)
+
+    # from pycellin.io.cell_tracking_challenge.loader import load_CTC_file
     # model = load_CTC_file(ctc_in)
 
     export_CTC_file(model, ctc_out)
