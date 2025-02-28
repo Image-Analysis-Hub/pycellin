@@ -1,10 +1,21 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
-.pytest_cache/
+
+# Distribution / packaging
+build/
 *.egg-info/
+
+# mypy
+.mypy_cache/
+
+# IDE
 .vscode/
+
+# Unit test / coverage reports
+.pytest_cache/
 .coverage
 cov.xml
 
-*.gz
+# Data
 sample_data/FakeTracks.tif
 sample_data/*.csv
