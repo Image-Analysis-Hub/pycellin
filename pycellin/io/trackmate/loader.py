@@ -708,12 +708,14 @@ def _update_features_declaration(
     # Node features.
     feat_cell_ID = cell_ID_Feature("TrackMate")
     fdec._add_feature(feat_cell_ID)
+    fdec._protect_feature("cell_ID")
     for axis in ["x", "y", "z"]:
         fdec._rename_feature(f"POSITION_{axis.upper()}", f"cell_{axis}")
         fdec._modify_feature_description(
             f"cell_{axis}", f"{axis.upper()} coordinate of the cell"
         )
     fdec._rename_feature("FRAME", "frame")
+    fdec._protect_feature("frame")
     if segmentation:
         roi_coord_feat = Feature(
             name="ROI_coords",
@@ -739,6 +741,7 @@ def _update_features_declaration(
     # Lineage features.
     fdec._rename_feature("TRACK_ID", "lineage_ID")
     fdec._modify_feature_description("lineage_ID", "Unique identifier of the lineage")
+    fdec._protect_feature("lineage_ID")
     feat_filtered_track = Feature(
         name="FilteredTrack",
         description="True if the track was not filtered out in TrackMate",

@@ -82,7 +82,10 @@ def _create_FeaturesDeclaration() -> FeaturesDeclaration:
     cell_ID_feat = cell_ID_Feature()
     frame_feat = frame_Feature()
     lin_ID_feat = lineage_ID_Feature()
-    feat_declaration._add_features([cell_ID_feat, frame_feat, lin_ID_feat])
+    for feat in [cell_ID_feat, frame_feat, lin_ID_feat]:
+        feat_declaration._add_feature(feat)
+        feat_declaration._protect_feature(feat)
+
     return feat_declaration
 
 

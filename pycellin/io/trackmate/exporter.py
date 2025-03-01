@@ -428,10 +428,13 @@ def _prepare_model_for_export(
     """
     # Update of the features declaration.
     fd = model.feat_declaration
+    fd._unprotect_feature("lineage_ID")
     fd._rename_feature("lineage_ID", "TRACK_ID")
     fd._modify_feature_description("TRACK_ID", "Track ID")
     fd._remove_features(["FilteredTrack", "lineage_name"])
+    fd._unprotect_feature("frame")
     fd._rename_feature("frame", "FRAME")
+    fd._unprotect_feature("cell_ID")
     fd._remove_features(["cell_ID", "cell_name"])
     if "ROI_coords" in fd.feats_dict:
         fd._remove_feature("ROI_coords")
