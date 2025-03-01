@@ -549,7 +549,6 @@ class FeaturesDeclaration:
     def _remove_feature(
         self,
         feature_name: str,
-        feature_type: FeatureType | None = None,
     ) -> None:
         """
         Remove the specified feature from the FeaturesDeclaration.
@@ -558,17 +557,11 @@ class FeaturesDeclaration:
         ----------
         feature_name : str
             The name of the feature to remove.
-        feature_type : FeatureType, optional
-            The type of the feature to remove (node, edge, or lineage).
-            If not specified, the method will try to remove the feature from
-            all types.
 
         Raises
         ------
         ValueError
             If the feature type is invalid.
-        KeyError
-            If the feature does not exist within the specified type.
         UserWarning
             If the feature is protected and cannot be removed.
         """
@@ -583,28 +576,7 @@ class FeaturesDeclaration:
             )
             warnings.warn(msg)
         else:
-            if feature_type:
-                # Check that the feature_type is valid.
-                if not check_literal_type(feature_type, FeatureType):
-                    raise ValueError(
-                        f"Feature type must be one of {', '.join(FeatureType.__args__)}, "
-                        f"or a combination of them separated by a +."
-                    )
-
-                current_feat_type = self.feats_dict[feature_name].feat_type
-                # In case of multiple feat types, current_feat_type is a string
-                # of the different feat_types separated with a +.
-                current_feat_type = current_feat_type.split("+")
-                if feature_type in current_feat_type:
-                    current_feat_type.remove(feature_type)
-                    self.feats_dict[feature_name].feat_type = "+".join(
-                        current_feat_type
-                    )
-                    # If the feat_type is now empty, remove the feature from the dict.
-                    if not current_feat_type:
-                        del self.feats_dict[feature_name]
-            else:
-                del self.feats_dict[feature_name]
+            del self.feats_dict[feature_name]
 
     def _remove_features(
         self,
