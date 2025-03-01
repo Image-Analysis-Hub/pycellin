@@ -456,7 +456,7 @@ class FeaturesDeclaration:
         list[str]
             The list of protected features.
         """
-        return self.protected_feats
+        return self._protected_feats
 
     def _add_feature(self, feature: Feature) -> None:
         """
@@ -576,7 +576,7 @@ class FeaturesDeclaration:
             raise KeyError(
                 f"Feature '{feature_name}' does not exist in the declared features."
             )
-        if feature_name in self.protected_feats:
+        if feature_name in self._protected_feats:
             msg = (
                 f"Feature '{feature_name}' is protected and cannot be removed. "
                 "Unprotect the feature before modifying it."
@@ -647,7 +647,7 @@ class FeaturesDeclaration:
             raise KeyError(
                 f"Feature '{feature_name}' does not exist in the declared features."
             )
-        if feature_name in self.protected_feats:
+        if feature_name in self._protected_feats:
             msg = (
                 f"Feature '{feature_name}' is protected and cannot be modified. "
                 "Unprotect the feature before modifying it."
@@ -684,7 +684,7 @@ class FeaturesDeclaration:
             raise KeyError(
                 f"Feature '{feature_name}' does not exist in the declared features."
             )
-        if feature_name in self.protected_feats:
+        if feature_name in self._protected_feats:
             msg = (
                 f"Feature '{feature_name}' is protected and cannot be modified. "
                 "Unprotect the feature before modifying it."
@@ -714,8 +714,8 @@ class FeaturesDeclaration:
             )
             warnings.warn(msg)
 
-        if feature_name not in self.protected_feats:
-            self.protected_feats.append(feature_name)
+        if feature_name not in self._protected_feats:
+            self._protected_feats.append(feature_name)
 
     def _unprotect_feature(self, feature_name: str) -> None:
         """
@@ -738,8 +738,8 @@ class FeaturesDeclaration:
             )
             warnings.warn(msg)
 
-        if feature_name in self.protected_feats:
-            self.protected_feats.remove(feature_name)
+        if feature_name in self._protected_feats:
+            self._protected_feats.remove(feature_name)
 
     def _get_units_per_features(self) -> dict[str, list[str]]:
         """
