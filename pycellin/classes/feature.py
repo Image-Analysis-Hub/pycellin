@@ -305,13 +305,15 @@ def level_Feature(provenance: str = "Pycellin") -> Feature:
 class FeaturesDeclaration:
     """
     The FeaturesDeclaration class is used to store the features that are
-    associated with the nodes, edges, and lineages of a cell lineage graph.
+    associated with the nodes, edges, and lineages of cell lineage graphs.
 
     Attributes
     ----------
     feats_dict : dict[str, Feature]
         A dictionary of features where the keys are the feature names and
         the values are the Feature objects.
+    protected_feats : list[str]
+        A list of feature names that are protected from being modified or removed.
 
     Notes
     -----
@@ -323,8 +325,18 @@ class FeaturesDeclaration:
     def __init__(
         self,
         feats_dict: dict[str, Feature] | None = None,
+        protected_feats: list[str] | None = None,
     ) -> None:
         self.feats_dict = feats_dict if feats_dict else {}
+        self._protected_feats = protected_feats if protected_feats else []
+        for feat in self._protected_feats:
+            if feat not in self.feats_dict:
+                msg = (
+                    f"Protected feature '{feat}' does not exist in the declared "
+                    "features. Removing it from the list of protected features."
+                )
+                warnings.warn(msg)
+                self._protected_feats.remove(feat)
 
     def __eq__(self, other):
         if not isinstance(other, FeaturesDeclaration):
@@ -435,6 +447,17 @@ class FeaturesDeclaration:
         feats = {k: v for k, v in self.feats_dict.items() if lin_type == v.lin_type}
         return feats
 
+    def _get_protected_features(self) -> list[str]:
+        """
+        Return the list of protected features.
+
+        Returns
+        -------
+        list[str]
+            The list of protected features.
+        """
+        return self.protected_feats
+
     def _add_feature(self, feature: Feature) -> None:
         """
         Add the specified feature to the FeaturesDeclaration.
@@ -519,7 +542,9 @@ class FeaturesDeclaration:
         feat_cells = cells_Feature()
         feat_length = cycle_length_Feature()
         feat_level = level_Feature()
-        self._add_features([feat_ID, feat_cells, feat_length, feat_level])
+        for feat in [feat_ID, feat_cells, feat_length, feat_level]:
+            self._add_feature(feat)
+            self._protect_feature(feat.name)
 
     def _remove_feature(
         self,
@@ -544,32 +569,42 @@ class FeaturesDeclaration:
             If the feature type is invalid.
         KeyError
             If the feature does not exist within the specified type.
+        UserWarning
+            If the feature is protected and cannot be removed.
         """
         if feature_name not in self.feats_dict:
             raise KeyError(
                 f"Feature '{feature_name}' does not exist in the declared features."
             )
-
-        if feature_type:
-            # Check that the feature_type is valid.
-            if not check_literal_type(feature_type, FeatureType):
-                raise ValueError(
-                    f"Feature type must be one of {', '.join(FeatureType.__args__)}, "
-                    f"or a combination of them separated by a +."
-                )
-
-            current_feat_type = self.feats_dict[feature_name].feat_type
-            # In case of multiple feat types, current_feat_type is a string
-            # of the different feat_types separated with a +.
-            current_feat_type = current_feat_type.split("+")
-            if feature_type in current_feat_type:
-                current_feat_type.remove(feature_type)
-                self.feats_dict[feature_name].feat_type = "+".join(current_feat_type)
-                # If the feat_type is now empty, remove the feature from the dict.
-                if not current_feat_type:
-                    del self.feats_dict[feature_name]
+        if feature_name in self.protected_feats:
+            msg = (
+                f"Feature '{feature_name}' is protected and cannot be removed. "
+                "Unprotect the feature before modifying it."
+            )
+            warnings.warn(msg)
         else:
-            del self.feats_dict[feature_name]
+            if feature_type:
+                # Check that the feature_type is valid.
+                if not check_literal_type(feature_type, FeatureType):
+                    raise ValueError(
+                        f"Feature type must be one of {', '.join(FeatureType.__args__)}, "
+                        f"or a combination of them separated by a +."
+                    )
+
+                current_feat_type = self.feats_dict[feature_name].feat_type
+                # In case of multiple feat types, current_feat_type is a string
+                # of the different feat_types separated with a +.
+                current_feat_type = current_feat_type.split("+")
+                if feature_type in current_feat_type:
+                    current_feat_type.remove(feature_type)
+                    self.feats_dict[feature_name].feat_type = "+".join(
+                        current_feat_type
+                    )
+                    # If the feat_type is now empty, remove the feature from the dict.
+                    if not current_feat_type:
+                        del self.feats_dict[feature_name]
+            else:
+                del self.feats_dict[feature_name]
 
     def _remove_features(
         self,
@@ -605,14 +640,22 @@ class FeaturesDeclaration:
         ------
         KeyError
             If the feature does not exist in the declared features.
+        UserWarning
+            If the feature is protected and cannot be modified.
         """
         if feature_name not in self.feats_dict:
             raise KeyError(
                 f"Feature '{feature_name}' does not exist in the declared features."
             )
-
-        self.feats_dict[new_name] = self.feats_dict.pop(feature_name)
-        self.feats_dict[new_name]._rename(new_name)
+        if feature_name in self.protected_feats:
+            msg = (
+                f"Feature '{feature_name}' is protected and cannot be modified. "
+                "Unprotect the feature before modifying it."
+            )
+            warnings.warn(msg)
+        else:
+            self.feats_dict[new_name] = self.feats_dict.pop(feature_name)
+            self.feats_dict[new_name]._rename(new_name)
 
     def _modify_feature_description(
         self,
@@ -633,13 +676,70 @@ class FeaturesDeclaration:
         ------
         KeyError
             If the feature does not exist in the declared features.
+        UserWarning
+            If the feature is protected and cannot be modified
+            (i.e. it is in the list of protected features).
         """
         if feature_name not in self.feats_dict:
             raise KeyError(
                 f"Feature '{feature_name}' does not exist in the declared features."
             )
+        if feature_name in self.protected_feats:
+            msg = (
+                f"Feature '{feature_name}' is protected and cannot be modified. "
+                "Unprotect the feature before modifying it."
+            )
+            warnings.warn(msg)
+        else:
+            self.feats_dict[feature_name]._modify_description(new_description)
 
-        self.feats_dict[feature_name]._modify_description(new_description)
+    def _protect_feature(self, feature_name: str) -> None:
+        """
+        Protect the specified feature from being modified or removed.
+
+        Parameters
+        ----------
+        feature_name : str
+            The name of the feature to protect.
+
+        Raises
+        ------
+        UserWarning
+            If the feature does not exist in the declared features.
+        """
+        if feature_name not in self.feats_dict:
+            msg = (
+                f"Feature '{feature_name}' does not exist in the declared features "
+                "and cannot be protected."
+            )
+            warnings.warn(msg)
+
+        if feature_name not in self.protected_feats:
+            self.protected_feats.append(feature_name)
+
+    def _unprotect_feature(self, feature_name: str) -> None:
+        """
+        Unprotect the specified feature.
+
+        Parameters
+        ----------
+        feature_name : str
+            The name of the feature to unprotect.
+
+        Raises
+        ------
+        UserWarning
+            If the feature does not exist in the declared features.
+        """
+        if feature_name not in self.feats_dict:
+            msg = (
+                f"Feature '{feature_name}' does not exist in the declared features "
+                "and cannot be unprotected."
+            )
+            warnings.warn(msg)
+
+        if feature_name in self.protected_feats:
+            self.protected_feats.remove(feature_name)
 
     def _get_units_per_features(self) -> dict[str, list[str]]:
         """
