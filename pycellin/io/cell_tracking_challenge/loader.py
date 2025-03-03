@@ -84,7 +84,7 @@ def _create_FeaturesDeclaration() -> FeaturesDeclaration:
     lin_ID_feat = lineage_ID_Feature()
     for feat in [cell_ID_feat, frame_feat, lin_ID_feat]:
         feat_declaration._add_feature(feat)
-        feat_declaration._protect_feature(feat)
+        feat_declaration._protect_feature(feat.name)
 
     return feat_declaration
 
@@ -293,9 +293,9 @@ if __name__ == "__main__":
     print(model.feat_declaration)
     print(model.data)
 
-    # for lin_id, lin in model.data.cell_data.items():
-    #     print(f"{lin_id} - {lin}")
-    #     lin.plot()
+    for lin_id, lin in model.data.cell_data.items():
+        print(f"{lin_id} - {lin}")
+        lin.plot()
 
     # model.add_cycle_data()
     # for lin_id, lin in model.data.cycle_data.items():
