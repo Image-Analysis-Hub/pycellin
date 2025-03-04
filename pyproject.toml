@@ -10,17 +10,17 @@ test = [
 
 [project]
 name = "pycellin"
-version = "0.3.3"
+version = "0.3.4"
 authors = [{ name = "Laura Xénard", email = "laura.xenard@pasteur.fr" }]
 description = "Graph-based framework to manipulate and analyze cell lineages from cell tracking data"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "igraph",
-    "lxml",
-    "matplotlib",
-    "networkx",
-    "pandas",
+    "igraph>=0.9",
+    "lxml>=5",
+    "matplotlib>=3",
+    "networkx>=3",
+    "pandas>=2",
     "plotly",
     "scikit-image",
     "scipy",
