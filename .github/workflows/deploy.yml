@@ -7,61 +7,6 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # build_wheel:
-  #   name: Build Wheel
-  #   runs-on: ubuntu-latest
-    
-  #   steps:
-  #   - name: Checkout
-  #     uses: actions/checkout@v4
-    
-  #   - name: Set up Python
-  #     uses: actions/setup-python@v5
-  #     with:
-  #       python-version: '3.10'
-        
-  #   - name: Install dependencies
-  #     run: |
-  #       python -m pip install --upgrade pip
-  #       python -m pip install --upgrade build
-
-  #   - name: Build wheel
-  #     run: |
-  #       python -m build --wheel
-        
-  #   - uses: actions/upload-artifact@v4
-  #     with:
-  #       name: artifacts-wheel
-  #       path: dist/*.whl
-  #       if-no-files-found: error
-
-  # build_sdist:
-  #   name: Build Source Distribution
-  #   runs-on: ubuntu-latest
-
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-
-  #     - name: Set up Python
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: '3.10'
-
-  #     - name: Install dependencies
-  #       run: |
-  #         python -m pip install --upgrade pip
-  #         python -m pip install --upgrade build
-
-  #     - name: Build sdist
-  #       run: |
-  #         python -m build --sdist
-
-  #     - uses: actions/upload-artifact@v4
-  #       with:
-  #         name: artifacts-sdist
-  #         path: dist/*.tar.gz
-  #         if-no-files-found: error
   build:
     name: Build distribution
     runs-on: ubuntu-latest
@@ -75,7 +20,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: "3.x"
         
     - name: Install pypa/build
       run: |
@@ -98,13 +43,11 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     # if: github.event_name == 'release' && success()
-
     environment:
       name: testpypi
       url: https://test.pypi.org/p/pycellin
-
     permissions:
-      id-token: write  # IMPORTANT: mandatory for trusted publishing
+      id-token: write  # mandatory for trusted publishing
 
     steps:
       - name: Download artifacts
@@ -118,42 +61,22 @@ jobs:
         with:
           repository-url: https://test.pypi.org/legacy/
 
-  # publish:
-  #   name: Publish to PyPI
-  #   needs: [build_wheel, build_sdist]
-  #   runs-on: ubuntu-latest
-  #   if: github.event_name == 'release' && success()
-
-  #   steps:
-  #     - name: Set up Python
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: '3.10'
-
-  #     - name: Download artifacts
-  #       uses: actions/download-artifact@v4
-  #       with: 
-  #         name: artifacts-*
-  #         path: dist
-  #         merge: true
-
-  #     - name: Test publish package
-  #       uses: pypa/gh-action-pypi-publish@release/v1
-  #       with:
-  #         user: __token__
-  #         password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-  #         repository-url: https://test.pypi.org/legacy/
-
-      # - name: Publish to PyPI
-      #   uses: pypa/gh-action-pypi-publish@v1.12.4
-      #   with:
-      #     user: __token__ 
-      #     password: ${{ secrets.PYPI_API_TOKEN }}
-      #     skip-existing: true
-      #     verbose: true
-
-      # - name: Create GitHub Release
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   run: |
-      #     gh release create ${{ github.ref_name }} ./dist/* --generate-notes
+  publish-to-pypi:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && success()
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pycellin
+    permissions:
+      id-token: write  # mandatory for trusted publishing
+    
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish distribution to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
