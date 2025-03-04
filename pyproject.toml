@@ -10,25 +10,24 @@ test = [
 
 [project]
 name = "pycellin"
-version = "0.3.0"
+version = "0.3.1"
 authors = [{ name = "Laura Xénard", email = "laura.xenard@pasteur.fr" }]
 description = "Graph-based framework to manipulate and analyze cell lineages from cell tracking data"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "python-igraph>=0.9",  # conda-forge
+    "igraph>=0.11",
     "lxml>=5.3",
-    "matplotlib >= 3.5",
-    "nbformat>=5.10",
-    "networkx>=3.2",
-    "pandas>=1.5",
-    "plotly>=5.24",
-    "scikit-image>=0.19",
+    "matplotlib >= 3.10",
+    "networkx>=3.4",
+    "pandas>=2.2",
+    "plotly>=6.0",
+    "scikit-image>=0.25",
     "scipy>=1.15",
     "shapely>=2.0",
 ]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
