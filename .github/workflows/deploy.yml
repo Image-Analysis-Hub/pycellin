@@ -95,7 +95,7 @@ jobs:
 
   publish-to-testpypi:
     name: Publish to TestPyPI
-    needs: [build_wheel, build_sdist]
+    needs: build
     runs-on: ubuntu-latest
     # if: github.event_name == 'release' && success()
 
