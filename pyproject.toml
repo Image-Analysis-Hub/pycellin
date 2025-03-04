@@ -4,27 +4,27 @@ build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
 test = [
-    "pytest",
-    "pytest-cov",
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
 ]
 
 [project]
 name = "pycellin"
-version = "0.3.5"
+version = "0.3.5b1"
 authors = [{ name = "Laura Xénard", email = "laura.xenard@pasteur.fr" }]
 description = "Graph-based framework to manipulate and analyze cell lineages from cell tracking data"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "igraph>=0.5",
-    "lxml>=5",
-    "matplotlib>=3",
-    "networkx>=3",
-    "pandas>=2",
-    "plotly",
-    "scikit-image",
-    "scipy",
-    "shapely",
+    "python-igraph>=0.9",
+    "lxml>=5.3",
+    "matplotlib >= 3.5",
+    "networkx>=3.2",
+    "pandas>=1.5",
+    "plotly>=5.24",
+    "scikit-image>=0.19",
+    "scipy>=1.7",
+    "shapely>=2.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
