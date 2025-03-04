@@ -81,7 +81,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: artifacts-*
-          path: dist/
+          path: dist
           merge: true
       
       - name: Publish distribution to TestPyPI
