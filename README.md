@@ -1,3 +1,6 @@
+![Build](https://github.com/Image-Analysis-Hub/pycellin/actions/workflows/build.yml/badge.svg)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 # Pycellin
 
 Pycellin is a graph-based Python framework to easily manipulate and extract information from cell tracking data, at the single-cell level. In Pycellin, cell lineages are modeled intuitively by directed acyclic graphs (DAG). Graph nodes represent cells at a specific point in time and space, and graph edges represent the time and space displacement of the cells. Please note that while Pycellin is built to support cell division events, **it does not authorize cell merging events**: a cell at a specific timepoint cannot have more than one parent.
