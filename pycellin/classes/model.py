@@ -7,7 +7,13 @@ from typing import Any, Literal
 import pandas as pd
 import networkx as nx
 
-from pycellin.classes import CellLineage, Data, Feature, FeaturesDeclaration
+from pycellin.classes import (
+    CellLineage,
+    CycleLineage,
+    Data,
+    Feature,
+    FeaturesDeclaration,
+)
 from pycellin.classes.feature_calculator import FeatureCalculator
 from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features.tracking as tracking
@@ -281,6 +287,66 @@ class Model:
             Dictionary of the lineage features present in the model.
         """
         return self.feat_declaration._get_feat_dict_from_feat_type("lineage")
+
+    def get_cell_lineages(self) -> list[CellLineage]:
+        """
+        Return the cell lineages present in the model.
+
+        Returns
+        -------
+        list[CellLineage]
+            List of the cell lineages present in the model.
+        """
+        return list(self.data.cell_data.values())
+
+    def get_cycle_lineages(self) -> list[CycleLineage]:
+        """
+        Return the cycle lineages present in the model.
+
+        Returns
+        -------
+        list[CellLineage]
+            List of the cycle lineages present in the model.
+        """
+        return list(self.data.cycle_data.values())
+
+    def get_cell_lineage_from_ID(self, lineage_ID: int) -> CellLineage | None:
+        """
+        Return the cell lineage with the specified ID.
+
+        Parameters
+        ----------
+        lineage_ID : int
+            ID of the lineage to return.
+
+        Returns
+        -------
+        CellLineage
+            The cell lineage with the specified ID.
+        """
+        if lineage_ID in self.data.cell_data:
+            return self.data.cell_data[lineage_ID]
+        else:
+            return None
+
+    def get_cycle_lineage_from_ID(self, lineage_ID: int) -> CycleLineage | None:
+        """
+        Return the cycle lineage with the specified ID.
+
+        Parameters
+        ----------
+        lineage_ID : int
+            ID of the lineage to return.
+
+        Returns
+        -------
+        CycleLineage
+            The cycle lineage with the specified ID.
+        """
+        if self.data.cycle_data and lineage_ID in self.data.cycle_data:
+            return self.data.cycle_data[lineage_ID]
+        else:
+            return None
 
     def get_next_available_lineage_ID(self) -> int:
         """
