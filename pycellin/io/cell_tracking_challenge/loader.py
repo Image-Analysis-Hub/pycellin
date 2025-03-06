@@ -17,10 +17,9 @@ https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content
 """
 
 from datetime import datetime
+import importlib
 from itertools import pairwise
 from pathlib import Path
-
-# from pkg_resources import get_distribution
 from typing import Any, Tuple
 
 import networkx as nx
@@ -34,8 +33,6 @@ from pycellin.classes.feature import (
 )
 from pycellin.classes.data import Data
 from pycellin.classes.lineage import CellLineage
-
-# FIXME: get_distribution("pycellin").version is not working
 
 
 def _create_metadata(
@@ -64,7 +61,11 @@ def _create_metadata(
     # TODO: is it possible to get space_unit with the labels data?
     # or a better time_unit with the images metadata?
     # or maybe ask the user...
-    # metadata["pycellin_version"] = get_distribution("pycellin").version
+    try:
+        version = importlib.metadata.version("pycellin")
+    except importlib.metadata.PackageNotFoundError:
+        version = "unknown"
+    metadata["pycellin_version"] = version
     return metadata
 
 

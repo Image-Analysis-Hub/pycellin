@@ -3,12 +3,10 @@
 
 from copy import deepcopy
 from datetime import datetime
+import importlib
 from pathlib import Path
-import warnings
-
-# from pkg_resources import get_distribution => deprecated
-# from importlib.metadata import version
 from typing import Any
+import warnings
 
 from lxml import etree as ET
 import networkx as nx
@@ -1169,11 +1167,11 @@ def load_TrackMate_XML(
     metadata["date"] = datetime.now()
     metadata["space_unit"] = units["spatialunits"]
     metadata["time_unit"] = units["timeunits"]
-    # metadata["pycellin_version"] = get_distribution("pycellin").version
-    # metadata["pycellin_version"] = version("pycellin")
-    metadata["pycellin_version"] = "0.2.0"
-    # TODO: see how to get the version of the package.
-    # Maybe by using the toml created by Stephane?
+    try:
+        version = importlib.metadata.version("pycellin")
+    except importlib.metadata.PackageNotFoundError:
+        version = "unknown"
+    metadata["pycellin_version"] = version
     metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
     dict_tags = _get_specific_tags(
         xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
@@ -1225,6 +1223,7 @@ if __name__ == "__main__":
     model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
     print(model)
     print(model.feat_declaration)
+    print(model.metadata["pycellin_version"])
     # print(model.metadata)
     # print(model.fdec.node_feats.keys())
     # print(model.data)
