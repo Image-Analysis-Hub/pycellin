@@ -955,22 +955,6 @@ def _parse_model_tag(
         else:
             lin.graph["FilteredTrack"] = False
 
-    # if fusion_dict:
-    #     cell_txt = f"{'s' if len(fusion_dict) > 1 else ''}"
-    #     fusion_txt = "\n".join(
-    #         f"  Lineage {lin_id} => cell IDs: {fusions}"
-    #         for lin_id, fusions in fusion_dict.items()
-    #     )
-    #     warnings.warn(
-    #         f"WARNING: Cell fusion{cell_txt} detected!! "
-    #         f"Since Pycellin does not support fusions, it is advised to "
-    #         f"deal with them before any other processing. Be especially "
-    #         f"careful with tracking related features. Crashes and incorrect "
-    #         f"results can occur.\n"
-    #         f"Fusion{cell_txt} location:\n"
-    #         f"{fusion_txt}"
-    #     )
-
     return units, fd, Data({lin.graph["lineage_ID"]: lin for lin in lineages})
 
 
@@ -1189,7 +1173,7 @@ def load_TrackMate_XML(
     if all_fusions:
         # TODO: link toward correct documentation when it is written.
         fusion_warning = (
-            f"unsupported data, {len(all_fusions)} cell fusions detected. "
+            f"Unsupported data, {len(all_fusions)} cell fusions detected. "
             "It is advised to deal with them before any other processing, "
             "especially for tracking related features. Crashes and incorrect "
             "results can occur. See documentation for more details."
