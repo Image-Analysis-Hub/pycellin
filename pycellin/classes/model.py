@@ -561,7 +561,7 @@ class Model:
         lineage_ID: int,
         cell_ID: int | None = None,
         frame: int | None = 0,
-        cell_attributes: dict[str, Any] | None = None,
+        feat_values: dict[str, Any] | None = None,
     ) -> int:
         """
         Add a cell to the lineage.
@@ -574,8 +574,8 @@ class Model:
             The ID of the cell to add (default is None).
         frame : int, optional
             The frame of the cell (default is 0).
-        cell_attributes : dict, optional
-            A dictionary containing the features value of the cell to add.
+        feat_values : dict, optional
+            A dictionary containing the features values of the cell to add.
 
         Returns
         -------
@@ -587,21 +587,21 @@ class Model:
         KeyError
             If the lineage with the specified ID does not exist in the model.
         KeyError
-            If a feature in the cell_attributes is not declared.
+            If a feature in the feat_values is not declared.
         """
         try:
             lineage = self.data.cell_data[lineage_ID]
         except KeyError as err:
             raise KeyError(f"Lineage with ID {lineage_ID} does not exist.") from err
 
-        if cell_attributes is not None:
-            for feat in cell_attributes:
+        if feat_values is not None:
+            for feat in feat_values:
                 if not self.feat_declaration._has_feature(feat):
                     raise KeyError(f"The feature {feat} has not been declared.")
         else:
-            cell_attributes = dict()
+            feat_values = dict()
 
-        cell_ID = lineage._add_cell(cell_ID, frame, **cell_attributes)
+        cell_ID = lineage._add_cell(cell_ID, frame, **feat_values)
 
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
@@ -645,7 +645,7 @@ class Model:
 
         return cell_attrs
 
-    def link_cells(
+    def add_link(
         self,
         source_cell_ID: int,
         source_lineage_ID: int,
@@ -712,7 +712,7 @@ class Model:
         )
         self._updater._modified_lineages.add(source_lineage_ID)
 
-    def unlink_cells(
+    def remove_link(
         self, source_cell_ID: int, target_cell_ID: int, lineage_ID: int
     ) -> dict[str, Any]:
         """
