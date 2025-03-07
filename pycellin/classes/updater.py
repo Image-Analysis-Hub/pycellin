@@ -126,6 +126,10 @@ class ModelUpdater:
                 lineages_to_enrich=self._added_lineages | self._modified_lineages,
             )
 
+        # TODO: when updating:
+        # - empty lineages (no nodes nor links) should be removed
+        # - lineages with several connected components should be split
+
         # In case of modifications in the structure of some cell lineages,
         # we need to recompute the cycle lineages and their features.
         # TODO: optimize so we don't have to recompute EVERYTHING for cycle lineages?
