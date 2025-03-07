@@ -3,6 +3,7 @@
 
 import math
 from typing import Literal
+import warnings
 
 import networkx as nx
 
@@ -87,15 +88,25 @@ class Data:
     def number_of_lineages(self) -> int:
         """
         Return the number of lineages in the data.
+
+        Returns
+        -------
+        int
+            The number of cell lineages in the data.
+
+        Raises
+        ------
+        Warning
+            If the number of cell lineages and cycle lineages do not match.
         """
-        # TODO: replace the assertion by a warning or an exception
-        # so that the user can handle the case however they want.
         if self.cycle_data:
-            assert len(self.cell_data) == len(self.cycle_data), (
-                f"Impossible state:"
-                f"number of cell lineages ({len(self.cell_data)}) "
-                f"and cycle lineages ({len(self.cycle_data)}) do not match."
-            )
+            if len(self.cell_data) != len(self.cycle_data):
+                msg = (
+                    f"Number of cell lineages ({len(self.cell_data)}) "
+                    f"and cycle lineages ({len(self.cycle_data)}) do not match. "
+                    "An update of the model is required. "
+                )
+                warnings.warn(msg)
         return len(self.cell_data)
 
     def get_closest_cell(
