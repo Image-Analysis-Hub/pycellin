@@ -20,8 +20,24 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     Abstract class for a lineage graph.
     """
 
-    def __init__(self, nx_digraph: nx.DiGraph | None = None) -> None:
+    def __init__(
+        self, nx_digraph: nx.DiGraph | None = None, lineage_ID: int | None = None
+    ) -> None:
+        """
+        Initialize a lineage graph.
+
+        Parameters
+        ----------
+        nx_digraph : nx.DiGraph, optional
+            A NetworkX directed graph to initialize the lineage with,
+            by default None.
+        lineage_ID : int, optional
+            The ID of the lineage, by default None.
+        """
         super().__init__(incoming_graph_data=nx_digraph)
+        if lineage_ID is not None:
+            assert isinstance(lineage_ID, int), "The lineage ID must be an integer."
+            self.graph["lineage_ID"] = lineage_ID
 
     def get_root(self) -> int:
         """
