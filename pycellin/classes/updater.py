@@ -132,7 +132,8 @@ class ModelUpdater:
         for lin_ID in (
             self._modified_lineages | self._added_lineages - self._removed_lineages
         ):
-            data.cycle_data[lin_ID] = data._compute_cycle_lineage(lin_ID)
+            if data.cycle_data is not None:
+                data.cycle_data[lin_ID] = data._compute_cycle_lineage(lin_ID)
         for lin_ID in self._removed_lineages:
             if lin_ID in data.cycle_data:
                 del data.cycle_data[lin_ID]
