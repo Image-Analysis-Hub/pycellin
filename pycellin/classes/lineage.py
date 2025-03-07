@@ -61,14 +61,14 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         if len(self) == 1:
             root = [n for n in self.nodes()]
-            assert len(root) == 1
+            assert len(root) == 1, f"{len(root)} root nodes found, should be 1."
         else:
             root = [
                 n
                 for n in self.nodes()
                 if self.in_degree(n) == 0 and self.out_degree(n) != 0
             ]
-            assert len(root) == 1
+            assert len(root) == 1, f"{len(root)} root nodes found, should be 1."
         return root[0]
 
     def get_leaves(self) -> list[int]:
@@ -498,7 +498,10 @@ class CellLineage(Lineage):
         int
             The next available node ID.
         """
-        return max(self.nodes()) + 1
+        if len(self.nodes()) == 0:
+            return 0
+        else:
+            return max(self.nodes()) + 1
 
     def _add_cell(
         self, noi: int | None = None, frame: int | None = 0, **cell_attrs
