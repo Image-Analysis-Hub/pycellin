@@ -430,38 +430,47 @@ class Model:
         # self.data._unfreeze_lineage_data()
 
     def add_lineage(
-        self, lineage: CellLineage, with_CycleLineage: bool = False
-    ) -> None:
+        self,
+        lineage: CellLineage | None = None,
+        lineage_ID: int | None = None,
+        with_CycleLineage: bool = False,
+    ) -> int:
         """
         Add a lineage to the model.
 
         Parameters
         ----------
-        lineage : CellLineage
-            Lineage to add.
+        lineage : CellLineage, optional
+            Lineage to add (default is None). If None, a new lineage
+            will be created.
+        lineage_ID : int, optional
+            ID of the lineage to add (default is None). If None, a new ID
+            will be generated.
         with_CycleLineage : bool, optional
             True to compute the cycle lineage, False otherwise (default is False).
 
-        Raises
-        ------
-        KeyError
-            If the lineage does not have a lineage_ID.
+        Returns
+        -------
+        int
+            The ID of the added lineage.
         """
-        # FIXME: need to handle the case where we add an empty lineage, i.e. no
-        # lineage_ID
-        try:
-            lin_ID = lineage.graph["lineage_ID"]
-        except KeyError:
-            raise KeyError("Lineage does not have a lineage_ID.")
-        self.data.cell_data["lineage_ID"] = lineage
+        if lineage is None:
+            if lineage_ID is None:
+                lineage_ID = self.get_next_available_lineage_ID()
+            lineage = CellLineage(lineage_ID=lineage_ID)
+        else:
+            lineage_ID = lineage.graph["lineage_ID"]
+        self.data.cell_data[lineage_ID] = lineage
 
         if with_CycleLineage:
-            cycle_lineage = self.data._compute_cycle_lineage(lin_ID)
-            self.data.cycle_data["lineage_ID"] = cycle_lineage
+            cycle_lineage = self.data._compute_cycle_lineage(lineage_ID)
+            self.data.cycle_data[lineage_ID] = cycle_lineage
 
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
-        self._updater._added_lineages.add(lin_ID)
+        self._updater._added_lineages.add(lineage_ID)
+
+        return lineage_ID
 
     def remove_lineage(self, lineage_ID: int) -> CellLineage:
         """
