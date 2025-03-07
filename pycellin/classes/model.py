@@ -542,6 +542,9 @@ class Model:
         KeyError
             If the lineage with the specified ID does not exist in the model.
         """
+        # TODO: unclear method... and the case where the cell is a division
+        # and split is downstream is not handled correctly (we end up with
+        # a lineage with several disconnected components.
         try:
             lineage = self.data.cell_data[lineage_ID]
         except KeyError as err:
