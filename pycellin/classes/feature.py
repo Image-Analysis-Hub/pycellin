@@ -543,8 +543,9 @@ class FeaturesDeclaration:
         feat_length = cycle_length_Feature()
         feat_level = level_Feature()
         for feat in [feat_ID, feat_cells, feat_length, feat_level]:
-            self._add_feature(feat)
-            self._protect_feature(feat.name)
+            if feat.name not in self.feats_dict:
+                self._add_feature(feat)
+                self._protect_feature(feat.name)
 
     def _remove_feature(
         self,
