@@ -531,19 +531,15 @@ class CellLineage(Lineage):
         ValueError
             If the cell already exists in the lineage.
         """
-        try:
-            lineage_ID = self.graph["lineage_ID"]
-        except KeyError as err:
-            raise KeyError("The lineage does not have a lineage ID.") from err
         if noi is None:
             noi = self._get_next_available_node_ID()
         elif noi in self.nodes():
             raise ValueError(
-                f"Cell {noi} already exists in the lineage with ID {lineage_ID}."
+                f"Cell {noi} already exists in the lineage "
+                f"with ID {self.graph['lineage_ID']}."
             )
         self.add_node(noi, **cell_attrs)
         self.nodes[noi]["cell_ID"] = noi
-        self.nodes[noi]["lineage_ID"] = lineage_ID
         self.nodes[noi]["frame"] = frame
         return noi
 
