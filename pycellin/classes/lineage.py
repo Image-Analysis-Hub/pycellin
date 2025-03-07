@@ -678,7 +678,9 @@ class CellLineage(Lineage):
                 assert tmp_lineage.get_root() == target_noi
 
             # Merge all the elements of the target lineage into the source lineage.
-            self.update(tmp_lineage)
+            self.update(
+                edges=tmp_lineage.edges(data=True), nodes=tmp_lineage.nodes(data=True)
+            )
             del tmp_lineage
 
         self.add_edge(source_noi, target_noi, **link_attrs)
