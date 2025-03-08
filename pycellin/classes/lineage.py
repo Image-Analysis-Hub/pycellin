@@ -39,37 +39,36 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             assert isinstance(lineage_ID, int), "The lineage ID must be an integer."
             self.graph["lineage_ID"] = lineage_ID
 
-    def get_root(self) -> int:
+    def get_root(self) -> int | list[int]:
         """
         Return the root of the lineage.
 
         The root is defined as the first node of the lineage temporally speaking,
         i.e. the node with no incoming edges and at least one outgoing edge.
-        A lineage has one and exactly one root node.
-        In the case where the lineage has only one node,
-        that node is considered the root.
+        A lineage normally has one and exactly one root node. However, when in the
+        process of modifying the lineage topology, a lineage can temporarily have
+        more than one root node.
+        In the case where the lineage has only one node, that node is considered
+        the root.
 
         Returns
         -------
-        int
-            The root node of the lineage.
-
-        Raises
-        ------
-        AssertionError
-            If there is more or less than one root node.
+        int or list[int]
+            The root node of the lineage. If the lineage has more than one root,
+            a list of root nodes is returned
         """
         if len(self) == 1:
-            root = [n for n in self.nodes()]
-            assert len(root) == 1, f"{len(root)} root nodes found, should be 1."
+            roots = [n for n in self.nodes()]
         else:
-            root = [
+            roots = [
                 n
                 for n in self.nodes()
                 if self.in_degree(n) == 0 and self.out_degree(n) != 0
             ]
-            assert len(root) == 1, f"{len(root)} root nodes found, should be 1."
-        return root[0]
+        if len(roots) == 1:
+            return roots[0]
+        else:
+            return roots
 
     def get_leaves(self) -> list[int]:
         """
