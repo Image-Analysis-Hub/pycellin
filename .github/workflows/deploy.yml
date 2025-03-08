@@ -65,7 +65,7 @@ jobs:
     name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
-    # if: github.event_name == 'release' && success()
+    if: github.event_name == 'release' && success()
     environment:
       name: pypi
       url: https://pypi.org/p/pycellin
@@ -78,6 +78,6 @@ jobs:
       with:
         name: python-package-distributions
         path: dist/
-        
+
     - name: Publish distribution to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
