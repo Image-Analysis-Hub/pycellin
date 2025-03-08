@@ -110,24 +110,6 @@ class ModelUpdater:
         features_to_update : list of str, optional
             List of features to update. If None, all features are updated.
         """
-        # TODO: Deal with feature dependencies. See comments in __init__.
-
-        if features_to_update is None:
-            calculators = self._calculators.values()
-        else:
-            calculators = [self._calculators[feat] for feat in features_to_update]
-
-        # Recompute the features as needed.
-        for calc in calculators:
-            # Depending on the class of the calculator, a different version of
-            # the enrich() method is called.
-            calc.enrich(
-                data,
-                nodes_to_enrich=self._added_cells,
-                edges_to_enrich=self._added_links,
-                lineages_to_enrich=self._added_lineages | self._modified_lineages,
-            )
-
         # Cleaning up the model.
         # Remove empty lineages.
         for lin_ID in (
@@ -188,6 +170,23 @@ class ModelUpdater:
         for lin_ID in self._removed_lineages:
             if lin_ID in data.cycle_data:
                 del data.cycle_data[lin_ID]
+
+        # Update the features.
+        # TODO: Deal with feature dependencies. See comments in __init__.
+        if features_to_update is None:
+            calculators = self._calculators.values()
+        else:
+            calculators = [self._calculators[feat] for feat in features_to_update]
+        # Recompute the features as needed.
+        for calc in calculators:
+            # Depending on the class of the calculator, a different version of
+            # the enrich() method is called.
+            calc.enrich(
+                data,
+                nodes_to_enrich=self._added_cells,
+                edges_to_enrich=self._added_links,
+                lineages_to_enrich=self._added_lineages | self._modified_lineages,
+            )
 
         # Update is done, we can clean up.
         self._reinit()
