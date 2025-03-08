@@ -134,7 +134,7 @@ class ModelUpdater:
         # we need to recompute the cycle lineages and their features.
         # TODO: optimize so we don't have to recompute EVERYTHING for cycle lineages?
         for lin_ID in (
-            self._modified_lineages | self._added_lineages - self._removed_lineages
+            (self._modified_lineages | self._added_lineages) - self._removed_lineages
         ):
             if data.cycle_data is not None:
                 data.cycle_data[lin_ID] = data._compute_cycle_lineage(lin_ID)
