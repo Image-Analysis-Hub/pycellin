@@ -663,7 +663,7 @@ class Model:
         source_lineage_ID: int,
         target_cell_ID: int,
         target_lineage_ID: int | None = None,
-        link_attributes: dict[str, Any] | None = None,
+        feat_values: dict[str, Any] | None = None,
     ) -> None:
         """
         Add a link between two cells.
@@ -678,7 +678,7 @@ class Model:
             The ID of the target cell.
         target_lineage_ID : int, optional
             The ID of the target lineage (default is None).
-        link_attributes : dict, optional
+        feat_values : dict, optional
             A dictionary containing the features value of
             the link between the two cells.
 
@@ -706,15 +706,15 @@ class Model:
             target_lineage_ID = source_lineage_ID
             target_lineage = self.data.cell_data[source_lineage_ID]
 
-        if link_attributes is not None:
-            for feat in link_attributes:
+        if feat_values is not None:
+            for feat in feat_values:
                 if not self.feat_declaration._has_feature(feat):
                     raise KeyError(f"The feature '{feat}' has not been declared.")
         else:
-            link_attributes = dict()
+            feat_values = dict()
 
         source_lineage._add_link(
-            source_cell_ID, target_cell_ID, target_lineage, **link_attributes
+            source_cell_ID, target_cell_ID, target_lineage, **feat_values
         )
 
         # Notify that an update of the feature values may be required.
