@@ -1,4 +1,8 @@
-![Build](https://github.com/Image-Analysis-Hub/pycellin/actions/workflows/build.yml/badge.svg)
+[![PyPI](https://img.shields.io/pypi/v/pycellin.svg)](https://pypi.org/project/pycellin)
+[![Development Status](https://img.shields.io/pypi/status/pycellin.svg)](https://en.wikipedia.org/wiki/Software_release_life_cycle#Beta)
+[![Python Version](https://img.shields.io/pypi/pyversions/pycellin.svg)](https://python.org)
+[![License](https://img.shields.io/pypi/l/pycellin.svg)](https://github.com/Image-Analysis-Hub/pycellin/blob/main/LICENSE)
+[![Actions Status](https://github.com/Image-Analysis-Hub/pycellin/workflows/Test/badge.svg)](https://github.com/Image-Analysis-Hub/pycellin/actions)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 # Pycellin
