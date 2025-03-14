@@ -39,17 +39,21 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             assert isinstance(lineage_ID, int), "The lineage ID must be an integer."
             self.graph["lineage_ID"] = lineage_ID
 
-    def get_root(self) -> int | list[int]:
+    def get_root(self, ignore_lone_nodes: bool = False) -> int | list[int]:
         """
         Return the root of the lineage.
 
-        The root is defined as the first node of the lineage temporally speaking,
-        i.e. the node with no incoming edges and at least one outgoing edge.
+        The root is defined as the node with no incoming edges and usually at
+        least one outgoing edge.
         A lineage normally has one and exactly one root node. However, when in the
         process of modifying the lineage topology, a lineage can temporarily have
-        more than one root node.
-        In the case where the lineage has only one node, that node is considered
-        the root.
+        more than one.
+
+        Parameters
+        ----------
+        ignore_lone_nodes : bool, optional
+            True to ignore nodes with no incoming and outgoing edges, False otherwise.
+            False by default.
 
         Returns
         -------
@@ -57,14 +61,14 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The root node of the lineage. If the lineage has more than one root,
             a list of root nodes is returned
         """
-        if len(self) == 1:
-            roots = [n for n in self.nodes()]
-        else:
-            roots = [
-                n
-                for n in self.nodes()
-                if self.in_degree(n) == 0 and self.out_degree(n) != 0
-            ]
+        roots = []
+        for wcc in nx.weakly_connected_components(self):
+            if ignore_lone_nodes:
+                roots += [
+                    n for n in wcc if self.in_degree(n) == 0 and self.out_degree(n) > 0
+                ]
+            else:
+                roots += [n for n in wcc if self.in_degree(n) == 0]
         if len(roots) == 1:
             return roots[0]
         else:
