@@ -61,36 +61,44 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The root node of the lineage. If the lineage has more than one root,
             a list of root nodes is returned
         """
-        roots = []
-        for wcc in nx.weakly_connected_components(self):
-            if ignore_lone_nodes:
-                roots += [
-                    n for n in wcc if self.in_degree(n) == 0 and self.out_degree(n) > 0
-                ]
-            else:
-                roots += [n for n in wcc if self.in_degree(n) == 0]
+        if ignore_lone_nodes:
+            roots = [
+                n
+                for n in self.nodes()
+                if self.in_degree(n) == 0 and self.out_degree(n) > 0
+            ]
+        else:
+            roots = [n for n in self.nodes() if self.in_degree(n) == 0]
         if len(roots) == 1:
             return roots[0]
         else:
             return roots
 
-    def get_leaves(self) -> list[int]:
+    def get_leaves(self, ignore_lone_nodes: bool = False) -> list[int]:
         """
         Return the leaves of the lineage.
 
-        The leaves are defined as the nodes with at least one incoming edge
-        and no outgoing edges.
+        A leaf is a node with no outgoing edges and one or less incoming edge.
+
+        Parameters
+        ----------
+        ignore_lone_nodes : bool, optional
+            True to ignore nodes with no incoming and outgoing edges, False otherwise.
+            False by default.
 
         Returns
         -------
         list[int]
             The list of leaf nodes in the lineage.
         """
-        leaves = [
-            n
-            for n in self.nodes()
-            if self.in_degree(n) != 0 and self.out_degree(n) == 0
-        ]
+        if ignore_lone_nodes:
+            leaves = [
+                n
+                for n in self.nodes()
+                if self.in_degree(n) != 0 and self.out_degree(n) == 0
+            ]
+        else:
+            leaves = [n for n in self.nodes() if self.out_degree(n) == 0]
         return leaves
 
     def get_ancestors(self, node: int) -> list[int]:
@@ -507,7 +515,7 @@ class CellLineage(Lineage):
             return max(self.nodes()) + 1
 
     def _add_cell(
-        self, noi: int | None = None, frame: int | None = 0, **cell_attrs
+        self, noi: int | None = None, frame: int | None = 0, **cell_feats
     ) -> int:
         """
         Add a cell to the lineage graph.
@@ -519,7 +527,7 @@ class CellLineage(Lineage):
             available node ID is used.
         frame : int, optional
             The frame of the cell. If None, the frame is set to 0.
-        **cell_attrs
+        **cell_feats
             Feature values to set for the node.
 
         Returns
@@ -541,7 +549,7 @@ class CellLineage(Lineage):
                 f"Cell {noi} already exists in the lineage "
                 f"with ID {self.graph['lineage_ID']}."
             )
-        self.add_node(noi, **cell_attrs)
+        self.add_node(noi, **cell_feats)
         self.nodes[noi]["cell_ID"] = noi
         self.nodes[noi]["frame"] = frame
         return noi
@@ -581,7 +589,7 @@ class CellLineage(Lineage):
         source_noi: int,
         target_noi: int,
         target_lineage: CellLineage | None = None,
-        **link_attrs,
+        **link_feats,
     ) -> None:
         """
         Create a link beween 2 cells.
@@ -599,7 +607,7 @@ class CellLineage(Lineage):
         target_lineage : CellLineage, optional
             The lineage of the target cell. If None, the target cell is
             assumed to be in the same lineage as the source cell.
-        **link_attrs
+        **link_feats
             Feature values to set for the edge.
 
         Raises
@@ -686,7 +694,7 @@ class CellLineage(Lineage):
             )
             del tmp_lineage
 
-        self.add_edge(source_noi, target_noi, **link_attrs)
+        self.add_edge(source_noi, target_noi, **link_feats)
 
     def _remove_link(self, source_noi: int, target_noi: int) -> dict[str, Any]:
         """
