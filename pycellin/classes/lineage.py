@@ -6,6 +6,7 @@ from abc import ABCMeta, abstractmethod
 from itertools import pairwise
 import types
 from typing import Any, Generator, Literal, Tuple
+import warnings
 
 from igraph import Graph
 import networkx as nx
@@ -101,9 +102,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             leaves = [n for n in self.nodes() if self.out_degree(n) == 0]
         return leaves
 
-    def get_ancestors(self, node: int) -> list[int]:
+    def get_ancestors(self, node: int, sorted: bool = True) -> list[int]:
         """
-        Return all the ancestors of a given node, in chronological order.
+        Return all the ancestors of a given node.
 
         Chronological order means from the root node to the target node.
         In terms of graph theory, it is the shortest path from the root node
@@ -113,14 +114,20 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ----------
         node : int
             A node of the lineage.
+        sorted : bool, optional
+            True to return the ancestors in chronological order, False otherwise.
 
         Returns
         -------
         list[int]
-            A list of all the ancestor nodes, from root node to target node.
+            A list of all the ancestor nodes.
         """
-        root = self.get_root()
-        ancestors = nx.shortest_path(self, source=root, target=node)[:-1]
+        ancestors = list(nx.ancestors(self, node))
+        if sorted:
+            try:
+                ancestors.sort(key=lambda n: self.nodes[n]["frame"])
+            except KeyError:
+                warnings.warn("No 'frame' feature to order the cells.")
         return ancestors
 
     def get_descendants(self, node: int) -> list[int]:
