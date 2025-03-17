@@ -5,6 +5,8 @@
 
 import pytest
 
+import networkx as nx
+
 from pycellin.classes import CellLineage, CycleLineage
 
 
@@ -19,7 +21,7 @@ def empty_cell_lin():
 @pytest.fixture
 def one_node_cell_lin():
     lineage = CellLineage()
-    lineage.add_node(1)
+    lineage.add_node(1, frame=0)
     return lineage
 
 
@@ -27,7 +29,6 @@ def one_node_cell_lin():
 def cell_lin():
     # Nothing special, just a lineage.
     lineage = CellLineage()
-    lineage.add_nodes_from(range(1, 13))
     lineage.add_edges_from(
         [
             (1, 2),
@@ -41,16 +42,22 @@ def cell_lin():
             (8, 10),
             (2, 11),
             (11, 12),
+            (12, 13),
+            (13, 14),
+            (14, 15),
+            (14, 16),
         ]
     )
+    for n in lineage.nodes:
+        lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 1, n)
     return lineage
 
 
 @pytest.fixture
 def cell_lin_div_root(cell_lin):
     # The root is a division.
-    cell_lin.add_node(13)
-    cell_lin.add_edge(1, 13)
+    cell_lin.add_node(17, frame=1)
+    cell_lin.add_edge(1, 17)
     return cell_lin
 
 
@@ -58,7 +65,6 @@ def cell_lin_div_root(cell_lin):
 def cell_lin_successive_divs_and_root():
     # Successive divisions and root division.
     lineage = CellLineage()
-    lineage.add_nodes_from(range(2, 12))
     lineage.add_edges_from(
         [
             (2, 3),
@@ -72,27 +78,31 @@ def cell_lin_successive_divs_and_root():
             (2, 11),
         ]
     )
+    for n in lineage.nodes:
+        lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 2, n)
     return lineage
 
 
 @pytest.fixture
 def cell_lin_triple_div(cell_lin):
     # Triple division.
-    cell_lin.add_nodes_from([13, 14])
-    cell_lin.add_edges_from([(4, 13), (13, 14)])
+    cell_lin.add_node(17, frame=4)
+    cell_lin.add_node(18, frame=5)
+    cell_lin.add_edges_from([(4, 17), (17, 18)])
     return cell_lin
 
 
 @pytest.fixture
 def cell_lin_unconnected_node(cell_lin):
-    cell_lin.add_node(13)
+    cell_lin.add_node(17, frame=0)
     return cell_lin
 
 
 @pytest.fixture
 def cell_lin_unconnected_component(cell_lin):
-    cell_lin.add_nodes_from([13, 14])
-    cell_lin.add_edges_from([(13, 14)])
+    cell_lin.add_node(17, frame=0)
+    cell_lin.add_node(18, frame=1)
+    cell_lin.add_edges_from([(17, 18)])
     return cell_lin
 
 
@@ -120,21 +130,21 @@ def test_get_root_div_root(cell_lin_div_root):
 
 
 def test_get_root_unconnected_node(cell_lin_unconnected_node):
-    assert cell_lin_unconnected_node.get_root() == [1, 13]
+    assert cell_lin_unconnected_node.get_root() == [1, 17]
     assert cell_lin_unconnected_node.get_root(ignore_lone_nodes=True) == 1
 
 
 def test_get_root_unconnected_component(cell_lin_unconnected_component):
-    assert cell_lin_unconnected_component.get_root() == [1, 13]
-    assert cell_lin_unconnected_component.get_root(ignore_lone_nodes=True) == [1, 13]
+    assert cell_lin_unconnected_component.get_root() == [1, 17]
+    assert cell_lin_unconnected_component.get_root(ignore_lone_nodes=True) == [1, 17]
 
 
 # get_leaves() ################################################################
 
 
 def test_get_leaves_normal_lin(cell_lin):
-    assert cell_lin.get_leaves() == [6, 9, 10, 12]
-    assert cell_lin.get_leaves(ignore_lone_nodes=True) == [6, 9, 10, 12]
+    assert cell_lin.get_leaves() == [6, 9, 10, 15, 16]
+    assert cell_lin.get_leaves(ignore_lone_nodes=True) == [6, 9, 10, 15, 16]
 
 
 def test_get_leaves_empty_lin(empty_cell_lin):
@@ -149,13 +159,179 @@ def test_get_leaves_single_node(one_node_cell_lin):
 
 def test_get_leaves_unconnected_node(cell_lin_unconnected_node):
     res = cell_lin_unconnected_node.get_leaves()
-    assert res == [6, 9, 10, 12, 13]
+    assert res == [6, 9, 10, 15, 16, 17]
     res = cell_lin_unconnected_node.get_leaves(ignore_lone_nodes=True)
-    assert res == [6, 9, 10, 12]
+    assert res == [6, 9, 10, 15, 16]
 
 
 def test_get_leaves_unconnected_component(cell_lin_unconnected_component):
     res = cell_lin_unconnected_component.get_leaves()
-    assert res == [6, 9, 10, 12, 14]
+    assert res == [6, 9, 10, 15, 16, 18]
     res = cell_lin_unconnected_component.get_leaves(ignore_lone_nodes=True)
-    assert res == [6, 9, 10, 12, 14]
+    assert res == [6, 9, 10, 15, 16, 18]
+
+
+# get_ancestors() #############################################################
+
+
+def test_get_ancestors_normal_lin(cell_lin):
+    # Root.
+    expected = []
+    assert cell_lin.get_ancestors(1) == expected
+    assert cell_lin.get_ancestors(1, sorted=False) == expected
+    # Division.
+    expected = [1]
+    assert cell_lin.get_ancestors(2) == expected
+    assert cell_lin.get_ancestors(2, sorted=False) == expected
+    expected = [1, 2, 3]
+    assert cell_lin.get_ancestors(4) == expected
+    assert sorted(cell_lin.get_ancestors(4, sorted=False)) == expected
+    expected = [1, 2, 3, 4, 7]
+    assert cell_lin.get_ancestors(8) == expected
+    assert sorted(cell_lin.get_ancestors(8, sorted=False)) == expected
+    expected = [1, 2, 11, 12, 13]
+    assert cell_lin.get_ancestors(14) == expected
+    assert sorted(cell_lin.get_ancestors(14, sorted=False)) == expected
+    # Just after division.
+    expected = [1, 2]
+    assert cell_lin.get_ancestors(3) == expected
+    assert sorted(cell_lin.get_ancestors(3, sorted=False)) == expected
+    assert cell_lin.get_ancestors(11) == expected
+    assert sorted(cell_lin.get_ancestors(11, sorted=False)) == expected
+    expected = [1, 2, 3, 4]
+    assert cell_lin.get_ancestors(5) == expected
+    assert sorted(cell_lin.get_ancestors(5, sorted=False)) == expected
+    assert cell_lin.get_ancestors(7) == expected
+    assert sorted(cell_lin.get_ancestors(7, sorted=False)) == expected
+    expected = [1, 2, 3, 4, 7, 8]
+    assert cell_lin.get_ancestors(9) == expected
+    assert sorted(cell_lin.get_ancestors(9, sorted=False)) == expected
+    assert cell_lin.get_ancestors(10) == expected
+    assert sorted(cell_lin.get_ancestors(10, sorted=False)) == expected
+    # Leaves.
+    expected = [1, 2, 3, 4, 5]
+    assert cell_lin.get_ancestors(6) == expected
+    assert sorted(cell_lin.get_ancestors(6, sorted=False)) == expected
+    expected = [1, 2, 3, 4, 7, 8]
+    assert cell_lin.get_ancestors(9) == expected
+    assert sorted(cell_lin.get_ancestors(9, sorted=False)) == expected
+    assert cell_lin.get_ancestors(10) == expected
+    assert sorted(cell_lin.get_ancestors(10, sorted=False)) == expected
+    expected = [1, 2, 11, 12, 13, 14]
+    assert cell_lin.get_ancestors(15) == expected
+    assert sorted(cell_lin.get_ancestors(15, sorted=False)) == expected
+    assert cell_lin.get_ancestors(16) == expected
+    assert sorted(cell_lin.get_ancestors(16, sorted=False)) == expected
+    # Other.
+    expected = [1, 2, 11]
+    assert cell_lin.get_ancestors(12) == expected
+    assert sorted(cell_lin.get_ancestors(12, sorted=False)) == expected
+    expected = [1, 2, 11, 12]
+    assert cell_lin.get_ancestors(13) == expected
+    assert sorted(cell_lin.get_ancestors(13, sorted=False)) == expected
+    expected = [1, 2, 11, 12, 13]
+    assert cell_lin.get_ancestors(14) == expected
+    assert sorted(cell_lin.get_ancestors(14, sorted=False)) == expected
+
+
+def test_get_ancestors_single_node(one_node_cell_lin):
+    assert one_node_cell_lin.get_ancestors(1) == []
+    assert one_node_cell_lin.get_ancestors(1, sorted=False) == []
+
+
+def test_get_ancestors_div_root(cell_lin_div_root):
+    assert cell_lin_div_root.get_ancestors(1) == []
+    assert sorted(cell_lin_div_root.get_ancestors(1, sorted=False)) == []
+    expected = [1]
+    assert cell_lin_div_root.get_ancestors(2) == expected
+    assert sorted(cell_lin_div_root.get_ancestors(2, sorted=False)) == expected
+    assert cell_lin_div_root.get_ancestors(17) == expected
+    assert sorted(cell_lin_div_root.get_ancestors(17, sorted=False)) == expected
+
+
+def test_get_ancestors_successive_divs_and_root(cell_lin_successive_divs_and_root):
+    # Root.
+    assert cell_lin_successive_divs_and_root.get_ancestors(2) == []
+    assert cell_lin_successive_divs_and_root.get_ancestors(2, sorted=False) == []
+    # Divisions.
+    expected = [2]
+    assert cell_lin_successive_divs_and_root.get_ancestors(3) == expected
+    assert cell_lin_successive_divs_and_root.get_ancestors(3, sorted=False) == expected
+    expected = [2, 3, 4]
+    assert cell_lin_successive_divs_and_root.get_ancestors(5) == expected
+    assert (
+        sorted(cell_lin_successive_divs_and_root.get_ancestors(5, sorted=False))
+        == expected
+    )
+    expected = [2, 3]
+    assert cell_lin_successive_divs_and_root.get_ancestors(8) == expected
+    assert (
+        sorted(cell_lin_successive_divs_and_root.get_ancestors(8, sorted=False))
+        == expected
+    )
+    # Leaves.
+    expected = [2, 3, 4, 5]
+    assert cell_lin_successive_divs_and_root.get_ancestors(6) == expected
+    assert (
+        sorted(cell_lin_successive_divs_and_root.get_ancestors(6, sorted=False))
+        == expected
+    )
+    assert cell_lin_successive_divs_and_root.get_ancestors(7) == expected
+    assert (
+        sorted(cell_lin_successive_divs_and_root.get_ancestors(7, sorted=False))
+        == expected
+    )
+    expected = [2, 3, 8]
+    assert cell_lin_successive_divs_and_root.get_ancestors(9) == expected
+    assert (
+        sorted(cell_lin_successive_divs_and_root.get_ancestors(9, sorted=False))
+        == expected
+    )
+    assert cell_lin_successive_divs_and_root.get_ancestors(10) == expected
+    assert (
+        sorted(cell_lin_successive_divs_and_root.get_ancestors(10, sorted=False))
+        == expected
+    )
+    expected = [2]
+    assert cell_lin_successive_divs_and_root.get_ancestors(11) == expected
+    assert cell_lin_successive_divs_and_root.get_ancestors(11, sorted=False) == expected
+
+
+def test_get_ancestors_triple_div(cell_lin_triple_div):
+    expected = [1, 2, 3]
+    assert cell_lin_triple_div.get_ancestors(4) == expected
+    assert sorted(cell_lin_triple_div.get_ancestors(4, sorted=False)) == expected
+    expected = [1, 2, 3, 4]
+    assert cell_lin_triple_div.get_ancestors(5) == expected
+    assert sorted(cell_lin_triple_div.get_ancestors(5, sorted=False)) == expected
+    assert cell_lin_triple_div.get_ancestors(7) == expected
+    assert sorted(cell_lin_triple_div.get_ancestors(7, sorted=False)) == expected
+    expected = [1, 2, 3, 4, 17]
+    assert cell_lin_triple_div.get_ancestors(18) == expected
+    assert sorted(cell_lin_triple_div.get_ancestors(18, sorted=False)) == expected
+
+
+def test_get_ancestors_unconnected_node(cell_lin_unconnected_node):
+    assert cell_lin_unconnected_node.get_ancestors(17) == []
+    assert cell_lin_unconnected_node.get_ancestors(17, sorted=False) == []
+
+
+def test_get_ancestors_unconnected_component(cell_lin_unconnected_component):
+    assert cell_lin_unconnected_component.get_ancestors(17) == []
+    assert cell_lin_unconnected_component.get_ancestors(17, sorted=False) == []
+    assert cell_lin_unconnected_component.get_ancestors(18) == [17]
+    assert cell_lin_unconnected_component.get_ancestors(18, sorted=False) == [17]
+
+
+def test_get_ancestors_node_ID_error(cell_lin):
+    with pytest.raises(KeyError):
+        cell_lin.get_ancestors(0)
+
+
+# get_descendants() ###########################################################
+
+# is_root() ###################################################################
+
+# is_leaf() ###################################################################
+
+# get_fusions() ###############################################################
