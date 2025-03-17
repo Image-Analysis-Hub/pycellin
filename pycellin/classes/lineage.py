@@ -102,7 +102,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             leaves = [n for n in self.nodes() if self.out_degree(n) == 0]
         return leaves
 
-    def get_ancestors(self, node: int, sorted: bool = True) -> list[int]:
+    def get_ancestors(self, node: int) -> list[int]:
         """
         Return all the ancestors of a given node.
 
@@ -114,8 +114,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ----------
         node : int
             A node of the lineage.
-        sorted : bool, optional
-            True to return the ancestors in chronological order, False otherwise.
 
         Returns
         -------
@@ -123,11 +121,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             A list of all the ancestor nodes.
         """
         ancestors = list(nx.ancestors(self, node))
-        if sorted:
-            try:
-                ancestors.sort(key=lambda n: self.nodes[n]["frame"])
-            except KeyError:
-                warnings.warn("No 'frame' feature to order the cells.")
         return ancestors
 
     def get_descendants(self, node: int) -> list[int]:
@@ -790,6 +783,48 @@ class CellLineage(Lineage):
         self.remove_nodes_from(nodes)
         return new_lineage
 
+    def get_ancestors(self, noi: int, sorted=True) -> list[int]:
+        """
+        Return all the ancestors of a given cell.
+
+        Chronological order means from the root cell to the target cell.
+        In terms of graph theory, it is the shortest path from the root cell
+        to the target cell.
+
+        Parameters
+        ----------
+        noi : int
+            A cell of the lineage.
+        sorted : bool, optional
+            True to return the ancestors in chronological order, False otherwise.
+            True by default.
+
+        Returns
+        -------
+        list[int]
+            A list of all the ancestor cells.
+
+        Raises
+        ------
+        KeyError
+            If the cell does not exist in the lineage.
+
+        Warns
+        -----
+        UserWarning
+            If the cells have no 'frame' feature to order them.
+        """
+        try:
+            ancestors = super().get_ancestors(noi)
+        except nx.NetworkXError as err:
+            raise KeyError(f"Cell {noi} is not in the lineage.") from err
+        if sorted:
+            try:
+                ancestors.sort(key=lambda n: self.nodes[n]["frame"])
+            except KeyError:
+                warnings.warn("No 'frame' feature to order the cells.")
+        return ancestors
+
     def get_divisions(self, nodes: list[int] | None = None) -> list[int]:
         """
         Return the division nodes of the lineage.
@@ -1202,6 +1237,48 @@ class CycleLineage(Lineage):
         return txt
 
     # Methods to freeze / unfreeze?
+
+    def get_ancestors(self, noi: int, sorted=True) -> list[int]:
+        """
+        Return all the ancestors of a given cell cycle.
+
+        Chronological order means from the root cell cycle to the target cell cycle.
+        In terms of graph theory, it is the shortest path from the root cell cycle
+        to the target cell cycle.
+
+        Parameters
+        ----------
+        noi : int
+            A cell cycle of the lineage.
+        sorted : bool, optional
+            True to return the ancestors in chronological order, False otherwise.
+            True by default.
+
+        Returns
+        -------
+        list[int]
+            A list of all the ancestor cell cycles.
+
+        Raises
+        ------
+        KeyError
+            If the cell cycle does not exist in the lineage.
+
+        Warns
+        -----
+        UserWarning
+            If there is no 'level' feature to order the cell cycles.
+        """
+        try:
+            ancestors = super().get_ancestors(noi)
+        except nx.NetworkXError as err:
+            raise KeyError(f"Cell cycle {noi} is not in the lineage.") from err
+        if sorted:
+            try:
+                ancestors.sort(key=lambda n: self.nodes[n]["level"])
+            except KeyError:
+                warnings.warn("No 'level' feature to order the cell cycles.")
+        return ancestors
 
     def get_edges_within_cycle(self, noi: int) -> list[tuple[int, int]]:
         """
