@@ -102,8 +102,48 @@ def cell_lin_unconnected_node(cell_lin):
 def cell_lin_unconnected_component(cell_lin):
     cell_lin.add_node(17, frame=0)
     cell_lin.add_node(18, frame=1)
-    cell_lin.add_edges_from([(17, 18)])
+    cell_lin.add_edge(17, 18)
     return cell_lin
+
+
+# CycleLineage fixtures #######################################################
+
+
+@pytest.fixture
+def empty_cycle_lin():
+    return CycleLineage()
+
+
+@pytest.fixture
+def one_node_cycle_lin():
+    lineage = CycleLineage()
+    lineage.add_node(1, level=0)
+    return lineage
+
+
+@pytest.fixture
+def cycle_lin():
+    # Nothing special, just a lineage.
+    lineage = CycleLineage()
+    lineage.add_edges_from(
+        [
+            (1, 2),
+            (1, 3),
+            (2, 4),
+            (2, 5),
+        ]
+    )
+    for n in lineage.nodes:
+        lineage.nodes[n]["level"] = nx.shortest_path_length(lineage, 1, n)
+    return lineage
+
+
+@pytest.fixture
+def cycle_lin_triple_div(cycle_lin):
+    # Triple division.
+    cycle_lin.add_node(6, level=0)
+    cycle_lin.add_edge(1, 6)
+    return cycle_lin
 
 
 # get_root() ##################################################################
