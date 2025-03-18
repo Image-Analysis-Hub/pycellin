@@ -646,3 +646,57 @@ def test_get_fusions_unconnected_component(cell_lin_unconnected_component):
     # Fusion.
     cell_lin_unconnected_component.add_edges_from([(17, 19), (18, 20), (19, 20)])
     assert cell_lin_unconnected_component.get_fusions() == [20]
+
+
+# _get_next_available_node_ID() ###############################################
+
+
+def test_get_next_available_node_ID_normal_lin(cell_lin):
+    assert cell_lin._get_next_available_node_ID() == 17
+
+
+def test_get_next_available_node_ID_empty_lin(empty_cell_lin):
+    assert empty_cell_lin._get_next_available_node_ID() == 0
+
+
+def test_get_next_available_node_ID_single_node(one_node_cell_lin):
+    assert one_node_cell_lin._get_next_available_node_ID() == 2
+
+
+def test_get_next_available_node_ID_gap(cell_lin_gap):
+    assert cell_lin_gap._get_next_available_node_ID() == 17
+
+
+def test_get_next_available_node_ID__unconnected_node(cell_lin_unconnected_node):
+    assert cell_lin_unconnected_node._get_next_available_node_ID() == 18
+
+
+def test_get_next_available_node_ID_unconnected_component(
+    cell_lin_unconnected_component,
+):
+    assert cell_lin_unconnected_component._get_next_available_node_ID() == 19
+
+
+# _add_cell() #################################################################
+
+# _remove_cell() ##############################################################
+
+# _add_link() #################################################################
+
+# _remove_link() ##############################################################
+
+# _split_from_cell() ##########################################################
+
+# get_divisions() #############################################################
+
+# get_cell_cycle() ############################################################
+
+# get_cell_cycles() ###########################################################
+
+# get_sister_cells() ##########################################################
+
+# is_division() ###############################################################
+
+# get_edges_within_cycle() ###################################################
+
+# yield_edges_within_cycle() #################################################
