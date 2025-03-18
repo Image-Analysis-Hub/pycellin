@@ -574,4 +574,75 @@ def test_is_leaf_unconnected_component(cell_lin_unconnected_component):
 # get_fusions() ###############################################################
 
 
+def test_get_fusions_normal_lin(cell_lin):
+    # No fusions.
+    assert cell_lin.get_fusions() == []
+    # Fusion.
+    cell_lin.add_edge(3, 12)
+    assert cell_lin.get_fusions() == [12]
+    # Multiple fusions.
+    cell_lin.add_edge(5, 8)
+    cell_lin.add_edge(4, 14)
+    assert sorted(cell_lin.get_fusions()) == [8, 12, 14]
 
+
+def test_get_fusions_empty_lin(empty_cell_lin):
+    # No fusions.
+    assert empty_cell_lin.get_fusions() == []
+
+
+def test_get_fusions_single_node(one_node_cell_lin):
+    # No fusions.
+    assert one_node_cell_lin.get_fusions() == []
+
+
+def test_get_fusions_gap(cell_lin_gap):
+    # No fusions.
+    assert cell_lin_gap.get_fusions() == []
+    # Fusion.
+    cell_lin_gap.add_edge(3, 14)
+    assert cell_lin_gap.get_fusions() == [14]
+    # Multiple fusions.
+    cell_lin_gap.add_edge(8, 15)
+    assert sorted(cell_lin_gap.get_fusions()) == [14, 15]
+
+
+def test_get_fusions_div_root(cell_lin_div_root):
+    # No fusions.
+    assert cell_lin_div_root.get_fusions() == []
+    # Fusion.
+    cell_lin_div_root.add_edge(17, 11)
+    assert cell_lin_div_root.get_fusions() == [11]
+
+
+def test_get_fusions_successive_divs_and_root(cell_lin_successive_divs_and_root):
+    # No fusions.
+    assert cell_lin_successive_divs_and_root.get_fusions() == []
+    # Fusion.
+    cell_lin_successive_divs_and_root.add_edge(4, 9)
+    assert cell_lin_successive_divs_and_root.get_fusions() == [9]
+
+
+def test_get_fusions_triple_fusion(cell_lin_triple_div):
+    # No fusions.
+    assert cell_lin_triple_div.get_fusions() == []
+    # Fusion.
+    cell_lin_triple_div.add_edges_from([(6, 9), (18, 9)])
+    assert cell_lin_triple_div.get_fusions() == [9]
+
+
+def test_get_fusions_unconnected_node(cell_lin_unconnected_node):
+    # No fusions.
+    assert cell_lin_unconnected_node.get_fusions() == []
+    # Multiple fusions.
+    cell_lin_unconnected_node.add_edge(5, 8)
+    cell_lin_unconnected_node.add_edge(4, 14)
+    assert sorted(cell_lin_unconnected_node.get_fusions()) == [8, 14]
+
+
+def test_get_fusions_unconnected_component(cell_lin_unconnected_component):
+    # No fusions.
+    assert cell_lin_unconnected_component.get_fusions() == []
+    # Fusion.
+    cell_lin_unconnected_component.add_edges_from([(17, 19), (18, 20), (19, 20)])
+    assert cell_lin_unconnected_component.get_fusions() == [20]
