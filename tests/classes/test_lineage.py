@@ -679,6 +679,56 @@ def test_get_next_available_node_ID_unconnected_component(
 
 # _add_cell() #################################################################
 
+
+def test_add_cell_no_no_arg(cell_lin):
+    next_id = cell_lin._get_next_available_node_ID()
+    assert cell_lin._add_cell() == next_id
+    assert cell_lin.nodes[next_id]["cell_ID"] == next_id
+    assert cell_lin.nodes[next_id]["frame"] == 0
+
+
+def test_add_cell_with_id(cell_lin):
+    assert cell_lin._add_cell(noi=20) == 20
+    assert cell_lin.nodes[20]["cell_ID"] == 20
+    assert cell_lin.nodes[20]["frame"] == 0
+
+
+def test_add_cell_with_frame(cell_lin):
+    next_id = cell_lin._get_next_available_node_ID()
+    assert cell_lin._add_cell(frame=5) == next_id
+    assert cell_lin.nodes[next_id]["cell_ID"] == next_id
+    assert cell_lin.nodes[next_id]["frame"] == 5
+
+
+def test_add_cell_with_features(cell_lin):
+    cell_id = 20
+    assert cell_lin._add_cell(20, color="red", size=10) == cell_id
+    assert cell_lin.nodes[cell_id]["cell_ID"] == cell_id
+    assert cell_lin.nodes[cell_id]["frame"] == 0
+    assert cell_lin.nodes[cell_id]["color"] == "red"
+    assert cell_lin.nodes[cell_id]["size"] == 10
+
+
+def test_add_cell_existing_id(cell_lin):
+    with pytest.raises(ValueError):
+        cell_lin._add_cell(1)
+    cell_lin.graph["lineage_ID"] = 1
+    with pytest.raises(ValueError):
+        cell_lin._add_cell(1)
+
+
+def test_add_cell_empty_lin(empty_cell_lin):
+    assert empty_cell_lin._add_cell() == 0
+    assert empty_cell_lin.nodes[0]["cell_ID"] == 0
+    assert empty_cell_lin.nodes[0]["frame"] == 0
+
+
+def test_add_cell_single_node(one_node_cell_lin):
+    assert one_node_cell_lin._add_cell() == 2
+    assert one_node_cell_lin.nodes[2]["cell_ID"] == 2
+    assert one_node_cell_lin.nodes[2]["frame"] == 0
+
+
 # _remove_cell() ##############################################################
 
 # _add_link() #################################################################

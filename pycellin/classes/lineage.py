@@ -545,10 +545,9 @@ class CellLineage(Lineage):
         if noi is None:
             noi = self._get_next_available_node_ID()
         elif noi in self.nodes():
-            raise ValueError(
-                f"Cell {noi} already exists in the lineage "
-                f"with ID {self.graph['lineage_ID']}."
-            )
+            _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
+            msg = f"Cell {noi} already exists{txt}."
+            raise ValueError(msg)
         self.add_node(noi, **cell_feats)
         self.nodes[noi]["cell_ID"] = noi
         self.nodes[noi]["frame"] = frame
