@@ -400,7 +400,89 @@ def test_get_ancestors_node_ID_error(cell_lin, cycle_lin):
 
 # get_descendants() ###########################################################
 
+
+def test_get_descendants_normal_cell_lin(cell_lin):
+    # Root.
+    assert sorted(cell_lin.get_descendants(1)) == list(range(2, 17))
+    # Division.
+    assert sorted(cell_lin.get_descendants(2)) == list(range(3, 17))
+    assert sorted(cell_lin.get_descendants(4)) == list(range(5, 11))
+    assert sorted(cell_lin.get_descendants(8)) == [9, 10]
+    assert sorted(cell_lin.get_descendants(14)) == [15, 16]
+    # Just after division.
+    assert sorted(cell_lin.get_descendants(3)) == list(range(4, 11))
+    assert sorted(cell_lin.get_descendants(5)) == [6]
+    assert sorted(cell_lin.get_descendants(7)) == [8, 9, 10]
+    assert sorted(cell_lin.get_descendants(11)) == list(range(12, 17))
+    # Leaves.
+    assert cell_lin.get_descendants(6) == []
+    assert cell_lin.get_descendants(9) == []
+    assert cell_lin.get_descendants(15) == []
+    # Other.
+    assert sorted(cell_lin.get_descendants(12)) == list(range(13, 17))
+
+
+def test_get_descendants_normal_cycle_lin(cycle_lin):
+    # Root.
+    assert sorted(cycle_lin.get_descendants(1)) == [2, 3, 4, 5]
+    # Leaves.
+    assert cycle_lin.get_descendants(3) == []
+    assert cycle_lin.get_descendants(5) == []
+    # Other.
+    assert cycle_lin.get_descendants(2) == [4, 5]
+
+
+def test_get_descendants_single_node(one_node_cell_lin, one_node_cycle_lin):
+    # CellLineage
+    assert one_node_cell_lin.get_descendants(1) == []
+    # CycleLineage
+    assert one_node_cycle_lin.get_descendants(1) == []
+
+
+def test_get_descendants_div_root(cell_lin_div_root):
+    assert sorted(cell_lin_div_root.get_descendants(1)) == list(range(2, 18))
+
+
+def test_get_descendants_successive_divs_and_root(cell_lin_successive_divs_and_root):
+    # Root.
+    expected = list(range(3, 12))
+    assert sorted(cell_lin_successive_divs_and_root.get_descendants(2)) == expected
+    # Divisions.
+    expected = list(range(4, 11))
+    assert sorted(cell_lin_successive_divs_and_root.get_descendants(3)) == expected
+    assert sorted(cell_lin_successive_divs_and_root.get_descendants(5)) == [6, 7]
+    assert sorted(cell_lin_successive_divs_and_root.get_descendants(8)) == [9, 10]
+    # Leaves.
+    assert cell_lin_successive_divs_and_root.get_descendants(6) == []
+    assert cell_lin_successive_divs_and_root.get_descendants(9) == []
+    assert cell_lin_successive_divs_and_root.get_descendants(11) == []
+    # Other.
+    assert sorted(cell_lin_successive_divs_and_root.get_descendants(4)) == [5, 6, 7]
+
+
+def test_get_descendants_triple_div(cell_lin_triple_div, cycle_lin_triple_div):
+    # CellLineage
+    expected = list(range(5, 11)) + [17, 18]
+    assert sorted(cell_lin_triple_div.get_descendants(4)) == expected
+    assert cell_lin_triple_div.get_descendants(17) == [18]
+    assert cell_lin_triple_div.get_descendants(18) == []
+    # CycleLineage
+    assert sorted(cycle_lin_triple_div.get_descendants(2)) == [4, 5, 6]
+    assert cycle_lin_triple_div.get_descendants(6) == []
+
+
+def test_get_descendants_unconnected_node(cell_lin_unconnected_node):
+    assert cell_lin_unconnected_node.get_descendants(17) == []
+
+
+def test_get_descendants_unconnected_component(cell_lin_unconnected_component):
+    assert cell_lin_unconnected_component.get_descendants(17) == [18]
+    assert cell_lin_unconnected_component.get_descendants(18) == []
+
+
 # is_root() ###################################################################
+
+# TODO: when keyerror on noi
 
 
 def test_is_root_normal_lin(cell_lin, cycle_lin):
