@@ -402,6 +402,72 @@ def test_get_ancestors_node_ID_error(cell_lin, cycle_lin):
 
 # is_root() ###################################################################
 
+
+def test_is_root_normal_lin(cell_lin, cycle_lin):
+    # CellLineage
+    assert cell_lin.is_root(1)
+    assert not cell_lin.is_root(2)
+    assert not cell_lin.is_root(6)
+    # CycleLineage
+    assert cycle_lin.is_root(1)
+    assert not cycle_lin.is_root(2)
+    assert not cycle_lin.is_root(4)
+
+
+def test_is_root_single_node(one_node_cell_lin, one_node_cycle_lin):
+    # CellLineage
+    assert one_node_cell_lin.is_root(1)
+    # CycleLineage
+    assert one_node_cycle_lin.is_root(1)
+
+
+def test_is_root_div_root(cell_lin_div_root):
+    assert cell_lin_div_root.is_root(1)
+    assert not cell_lin_div_root.is_root(2)
+    assert not cell_lin_div_root.is_root(17)
+
+
+def test_is_root_unconnected_node(cell_lin_unconnected_node):
+    assert cell_lin_unconnected_node.is_root(17)
+
+
+def test_is_root_unconnected_component(cell_lin_unconnected_component):
+    assert cell_lin_unconnected_component.is_root(17)
+    assert not cell_lin_unconnected_component.is_root(18)
+
+
 # is_leaf() ###################################################################
+
+
+def test_is_leaf_normal_lin(cell_lin, cycle_lin):
+    # CellLineage
+    assert not cell_lin.is_leaf(1)
+    assert not cell_lin.is_leaf(2)
+    assert not cell_lin.is_leaf(4)
+    assert cell_lin.is_leaf(9)
+    assert cell_lin.is_leaf(10)
+    assert cell_lin.is_leaf(16)
+    # CycleLineage
+    assert not cycle_lin.is_leaf(1)
+    assert not cycle_lin.is_leaf(2)
+    assert cycle_lin.is_leaf(3)
+    assert cycle_lin.is_leaf(4)
+
+
+def test_is_leaf_single_node(one_node_cell_lin, one_node_cycle_lin):
+    # CellLineage
+    assert one_node_cell_lin.is_leaf(1)
+    # CycleLineage
+    assert one_node_cycle_lin.is_leaf(1)
+
+
+def test_is_leaf_unconnected_node(cell_lin_unconnected_node):
+    assert cell_lin_unconnected_node.is_leaf(17)
+
+
+def test_is_leaf_unconnected_component(cell_lin_unconnected_component):
+    assert not cell_lin_unconnected_component.is_leaf(17)
+    assert cell_lin_unconnected_component.is_leaf(18)
+
 
 # get_fusions() ###############################################################
