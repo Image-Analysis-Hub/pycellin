@@ -141,8 +141,8 @@ def cycle_lin():
 @pytest.fixture
 def cycle_lin_triple_div(cycle_lin):
     # Triple division.
-    cycle_lin.add_node(6, level=0)
-    cycle_lin.add_edge(1, 6)
+    cycle_lin.add_node(6, level=2)
+    cycle_lin.add_edge(2, 6)
     return cycle_lin
 
 
@@ -214,7 +214,7 @@ def test_get_leaves_unconnected_component(cell_lin_unconnected_component):
 # get_ancestors() #############################################################
 
 
-def test_get_ancestors_normal_lin(cell_lin):
+def test_get_ancestors_normal_cell_lin(cell_lin):
     # Root.
     expected = []
     assert cell_lin.get_ancestors(1) == expected
@@ -274,9 +274,30 @@ def test_get_ancestors_normal_lin(cell_lin):
     assert sorted(cell_lin.get_ancestors(14, sorted=False)) == expected
 
 
-def test_get_ancestors_single_node(one_node_cell_lin):
+def test_get_ancestors_normal_cycle_lin(cycle_lin):
+    # Root.
+    expected = []
+    assert cycle_lin.get_ancestors(1) == expected
+    assert cycle_lin.get_ancestors(1, sorted=False) == expected
+    # Leaves.
+    expected = [1, 2]
+    assert cycle_lin.get_ancestors(4) == expected
+    assert sorted(cycle_lin.get_ancestors(4, sorted=False)) == expected
+    assert cycle_lin.get_ancestors(5) == expected
+    assert sorted(cycle_lin.get_ancestors(5, sorted=False)) == expected
+    # Other.
+    expected = [1]
+    assert cycle_lin.get_ancestors(2) == expected
+    assert cycle_lin.get_ancestors(2, sorted=False) == expected
+
+
+def test_get_ancestors_single_node(one_node_cell_lin, one_node_cycle_lin):
+    # CellLineage
     assert one_node_cell_lin.get_ancestors(1) == []
     assert one_node_cell_lin.get_ancestors(1, sorted=False) == []
+    # CycleLineage
+    assert one_node_cycle_lin.get_ancestors(1) == []
+    assert one_node_cycle_lin.get_ancestors(1, sorted=False) == []
 
 
 def test_get_ancestors_div_root(cell_lin_div_root):
@@ -337,7 +358,8 @@ def test_get_ancestors_successive_divs_and_root(cell_lin_successive_divs_and_roo
     assert cell_lin_successive_divs_and_root.get_ancestors(11, sorted=False) == expected
 
 
-def test_get_ancestors_triple_div(cell_lin_triple_div):
+def test_get_ancestors_triple_div(cell_lin_triple_div, cycle_lin_triple_div):
+    # CellLineage
     expected = [1, 2, 3]
     assert cell_lin_triple_div.get_ancestors(4) == expected
     assert sorted(cell_lin_triple_div.get_ancestors(4, sorted=False)) == expected
@@ -349,6 +371,12 @@ def test_get_ancestors_triple_div(cell_lin_triple_div):
     expected = [1, 2, 3, 4, 17]
     assert cell_lin_triple_div.get_ancestors(18) == expected
     assert sorted(cell_lin_triple_div.get_ancestors(18, sorted=False)) == expected
+    # CycleLineage
+    expected = [1, 2]
+    assert cycle_lin_triple_div.get_ancestors(4) == expected
+    assert cycle_lin_triple_div.get_ancestors(4, sorted=False) == expected
+    assert cycle_lin_triple_div.get_ancestors(6) == expected
+    assert cycle_lin_triple_div.get_ancestors(6, sorted=False) == expected
 
 
 def test_get_ancestors_unconnected_node(cell_lin_unconnected_node):
@@ -363,9 +391,11 @@ def test_get_ancestors_unconnected_component(cell_lin_unconnected_component):
     assert cell_lin_unconnected_component.get_ancestors(18, sorted=False) == [17]
 
 
-def test_get_ancestors_node_ID_error(cell_lin):
+def test_get_ancestors_node_ID_error(cell_lin, cycle_lin):
     with pytest.raises(KeyError):
         cell_lin.get_ancestors(0)
+    with pytest.raises(KeyError):
+        cycle_lin.get_ancestors(0)
 
 
 # get_descendants() ###########################################################
