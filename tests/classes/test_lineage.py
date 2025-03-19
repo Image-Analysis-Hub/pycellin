@@ -8,6 +8,7 @@ import pytest
 import networkx as nx
 
 from pycellin.classes import CellLineage, CycleLineage
+from pycellin.classes.exceptions import FusionError
 
 
 # CellLineage fixtures ########################################################
@@ -740,6 +741,90 @@ def test_add_cell_single_node(one_node_cell_lin):
 # get_divisions() #############################################################
 
 # get_cell_cycle() ############################################################
+
+
+def test_get_cell_cycle_normal_lin(cell_lin):
+    # From root.
+    assert cell_lin.get_cell_cycle(1) == [1, 2]
+    # From division.
+    assert cell_lin.get_cell_cycle(2) == [1, 2]
+    assert cell_lin.get_cell_cycle(4) == [3, 4]
+    assert cell_lin.get_cell_cycle(8) == [7, 8]
+    assert cell_lin.get_cell_cycle(14) == [11, 12, 13, 14]
+    # From leaf.
+    assert cell_lin.get_cell_cycle(6) == [5, 6]
+    assert cell_lin.get_cell_cycle(9) == [9]
+    assert cell_lin.get_cell_cycle(16) == [16]
+    # From intermediate node.
+    assert cell_lin.get_cell_cycle(3) == [3, 4]
+    assert cell_lin.get_cell_cycle(5) == [5, 6]
+    assert cell_lin.get_cell_cycle(7) == [7, 8]
+    assert cell_lin.get_cell_cycle(11) == [11, 12, 13, 14]
+    assert cell_lin.get_cell_cycle(12) == [11, 12, 13, 14]
+    assert cell_lin.get_cell_cycle(13) == [11, 12, 13, 14]
+
+
+def test_get_cell_cycle_single_node(one_node_cell_lin):
+    assert one_node_cell_lin.get_cell_cycle(1) == [1]
+
+
+def test_get_cell_cycle_gap(cell_lin_gap):
+    # From root.
+    assert cell_lin_gap.get_cell_cycle(1) == [1, 2]
+    # From division.
+    assert cell_lin_gap.get_cell_cycle(2) == [1, 2]
+    assert cell_lin_gap.get_cell_cycle(4) == [3, 4]
+    assert cell_lin_gap.get_cell_cycle(8) == [8]
+    assert cell_lin_gap.get_cell_cycle(14) == [11, 14]
+    # From leaf.
+    assert cell_lin_gap.get_cell_cycle(6) == [6]
+    assert cell_lin_gap.get_cell_cycle(9) == [9]
+    assert cell_lin_gap.get_cell_cycle(16) == [16]
+    # From intermediate node.
+    assert cell_lin_gap.get_cell_cycle(3) == [3, 4]
+    assert cell_lin_gap.get_cell_cycle(11) == [11, 14]
+
+
+def test_get_cell_cycle_div_root(cell_lin_div_root):
+    assert cell_lin_div_root.get_cell_cycle(1) == [1]
+    assert cell_lin_div_root.get_cell_cycle(2) == [2]
+    assert cell_lin_div_root.get_cell_cycle(17) == [17]
+
+
+def test_get_cell_cycle_successive_divs_and_root(cell_lin_successive_divs_and_root):
+    assert cell_lin_successive_divs_and_root.get_cell_cycle(2) == [2]
+    assert cell_lin_successive_divs_and_root.get_cell_cycle(3) == [3]
+    assert cell_lin_successive_divs_and_root.get_cell_cycle(4) == [4, 5]
+    assert cell_lin_successive_divs_and_root.get_cell_cycle(5) == [4, 5]
+    assert cell_lin_successive_divs_and_root.get_cell_cycle(6) == [6]
+    assert cell_lin_successive_divs_and_root.get_cell_cycle(8) == [8]
+    assert cell_lin_successive_divs_and_root.get_cell_cycle(9) == [9]
+    assert cell_lin_successive_divs_and_root.get_cell_cycle(11) == [11]
+
+
+def test_get_cell_cycle_triple_div(cell_lin_triple_div):
+    assert cell_lin_triple_div.get_cell_cycle(1) == [1, 2]
+    assert cell_lin_triple_div.get_cell_cycle(4) == [3, 4]
+    assert cell_lin_triple_div.get_cell_cycle(5) == [5, 6]
+    assert cell_lin_triple_div.get_cell_cycle(8) == [7, 8]
+    assert cell_lin_triple_div.get_cell_cycle(17) == [17, 18]
+    assert cell_lin_triple_div.get_cell_cycle(18) == [17, 18]
+
+
+def test_get_cell_cycle_unconnected_node(cell_lin_unconnected_node):
+    assert cell_lin_unconnected_node.get_cell_cycle(17) == [17]
+
+
+def test_get_cell_cycle_unconnected_component(cell_lin_unconnected_component):
+    assert cell_lin_unconnected_component.get_cell_cycle(17) == [17, 18]
+    assert cell_lin_unconnected_component.get_cell_cycle(18) == [17, 18]
+
+
+def test_get_cell_cycle_fusion_error(cell_lin):
+    cell_lin.add_edge(3, 12)
+    with pytest.raises(FusionError):
+        cell_lin.get_cell_cycle(12)
+
 
 # get_cell_cycles() ###########################################################
 
