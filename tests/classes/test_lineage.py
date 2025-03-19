@@ -1059,6 +1059,97 @@ def test_get_cell_cycles_fusion_error(cell_lin):
 
 # get_sister_cells() ##########################################################
 
+
+def test_get_sister_cells_normal_lin(cell_lin):
+    # Root.
+    assert cell_lin.get_sister_cells(1) == []
+    # Divisions.
+    assert cell_lin.get_sister_cells(2) == []
+    assert cell_lin.get_sister_cells(4) == [12]
+    assert cell_lin.get_sister_cells(8) == [6]
+    assert cell_lin.get_sister_cells(14) == []
+    # Just after division.
+    assert cell_lin.get_sister_cells(3) == [11]
+    assert cell_lin.get_sister_cells(5) == [7]
+    assert cell_lin.get_sister_cells(12) == [4]
+    assert cell_lin.get_sister_cells(13) == []
+    # Leaves.
+    assert cell_lin.get_sister_cells(6) == [8]
+    assert cell_lin.get_sister_cells(9) == [10]
+    assert cell_lin.get_sister_cells(10) == [9]
+    assert cell_lin.get_sister_cells(15) == [16]
+
+
+def test_get_sister_cells_single_node(one_node_cell_lin):
+    assert one_node_cell_lin.get_sister_cells(1) == []
+
+
+def test_get_sister_cells_gap(cell_lin_gap):
+    # Root.
+    assert cell_lin_gap.get_sister_cells(1) == []
+    # Divisions.
+    assert cell_lin_gap.get_sister_cells(2) == []
+    assert cell_lin_gap.get_sister_cells(4) == []
+    assert cell_lin_gap.get_sister_cells(8) == [6]
+    assert cell_lin_gap.get_sister_cells(14) == []
+    # Just after division.
+    assert cell_lin_gap.get_sister_cells(3) == [11]
+    # Leaves.
+    assert cell_lin_gap.get_sister_cells(6) == [8]
+    assert cell_lin_gap.get_sister_cells(9) == [10]
+    assert cell_lin_gap.get_sister_cells(10) == [9]
+    assert cell_lin_gap.get_sister_cells(15) == [16]
+
+
+def test_get_sister_cells_div_root(cell_lin_div_root):
+    assert cell_lin_div_root.get_sister_cells(1) == []
+    assert cell_lin_div_root.get_sister_cells(2) == [17]
+    assert cell_lin_div_root.get_sister_cells(17) == [2]
+
+
+def test_get_sister_cells_successive_divs_and_root(cell_lin_successive_divs_and_root):
+    assert cell_lin_successive_divs_and_root.get_sister_cells(2) == []
+    assert cell_lin_successive_divs_and_root.get_sister_cells(3) == [11]
+    assert cell_lin_successive_divs_and_root.get_sister_cells(4) == [8]
+    assert cell_lin_successive_divs_and_root.get_sister_cells(5) == []
+    assert cell_lin_successive_divs_and_root.get_sister_cells(6) == [7]
+    assert cell_lin_successive_divs_and_root.get_sister_cells(7) == [6]
+    assert cell_lin_successive_divs_and_root.get_sister_cells(8) == [4]
+    assert cell_lin_successive_divs_and_root.get_sister_cells(9) == [10]
+    assert cell_lin_successive_divs_and_root.get_sister_cells(10) == [9]
+    assert cell_lin_successive_divs_and_root.get_sister_cells(11) == [3]
+
+
+def test_get_sister_cells_triple_div(cell_lin_triple_div):
+    assert cell_lin_triple_div.get_sister_cells(1) == []
+    assert cell_lin_triple_div.get_sister_cells(2) == []
+    assert cell_lin_triple_div.get_sister_cells(4) == [12]
+    assert cell_lin_triple_div.get_sister_cells(5) == [7, 17]
+    assert cell_lin_triple_div.get_sister_cells(6) == [8, 18]
+    assert cell_lin_triple_div.get_sister_cells(7) == [5, 17]
+    assert cell_lin_triple_div.get_sister_cells(8) == [6, 18]
+    assert cell_lin_triple_div.get_sister_cells(13) == []
+    assert cell_lin_triple_div.get_sister_cells(14) == []
+
+
+def test_get_sister_cells_unconnected_node(cell_lin_unconnected_node):
+    assert cell_lin_unconnected_node.get_sister_cells(1) == []
+    assert cell_lin_unconnected_node.get_sister_cells(17) == []
+
+
+def test_get_sister_cells_unconnected_component(cell_lin_unconnected_component):
+    assert cell_lin_unconnected_component.get_sister_cells(1) == []
+    assert cell_lin_unconnected_component.get_sister_cells(2) == []
+    assert cell_lin_unconnected_component.get_sister_cells(17) == []
+    assert cell_lin_unconnected_component.get_sister_cells(18) == []
+
+
+def test_get_sister_cells_fusion_error(cell_lin):
+    cell_lin.add_edge(3, 12)
+    with pytest.raises(FusionError):
+        cell_lin.get_sister_cells(12)
+
+
 # is_division() ###############################################################
 
 # get_edges_within_cycle() ###################################################
