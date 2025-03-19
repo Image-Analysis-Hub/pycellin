@@ -115,6 +115,18 @@ def cell_lin_unconnected_component(cell_lin):
     return cell_lin
 
 
+@pytest.fixture
+def cell_lin_unconnected_component_div(cell_lin_unconnected_component):
+    cell_lin_unconnected_component.add_node(19, frame=1)
+    cell_lin_unconnected_component.add_node(20, frame=2)
+    cell_lin_unconnected_component.add_node(21, frame=3)
+    cell_lin_unconnected_component.add_node(22, frame=2)
+    cell_lin_unconnected_component.add_edges_from(
+        [(17, 19), (19, 20), (20, 21), (19, 22)]
+    )
+    return cell_lin_unconnected_component
+
+
 # CycleLineage fixtures #######################################################
 
 
@@ -801,12 +813,20 @@ def test_get_divisions_unconnected_node(cell_lin_unconnected_node):
 
 def test_get_divisions_unconnected_component(cell_lin_unconnected_component):
     lin = cell_lin_unconnected_component
-    lin.add_edge(17, 19)
-    assert sorted(lin.get_divisions()) == [2, 4, 8, 14, 17]
-    assert sorted(lin.get_divisions(list(range(1, 19)))) == [2, 4, 8, 14, 17]
-    assert sorted(lin.get_divisions([1, 2, 3, 4, 17, 18, 19])) == [2, 4, 17]
+    assert sorted(lin.get_divisions()) == [2, 4, 8, 14]
+    assert sorted(lin.get_divisions(list(range(1, 18)))) == [2, 4, 8, 14]
+    assert sorted(lin.get_divisions([1, 2, 3, 4, 17, 18])) == [2, 4]
+    assert sorted(lin.get_divisions([17])) == []
+
+
+def test_get_divisions_unconnected_component_div(cell_lin_unconnected_component_div):
+    lin = cell_lin_unconnected_component_div
+    assert sorted(lin.get_divisions()) == [2, 4, 8, 14, 17, 19]
+    assert sorted(lin.get_divisions(list(range(1, 23)))) == [2, 4, 8, 14, 17, 19]
+    assert sorted(lin.get_divisions([1, 2, 3, 4, 17, 18, 19, 20])) == [2, 4, 17, 19]
     assert sorted(lin.get_divisions([17])) == [17]
-    assert sorted(lin.get_divisions([19])) == []
+    assert sorted(lin.get_divisions([19])) == [19]
+    assert sorted(lin.get_divisions([20, 21, 22])) == []
 
 
 # get_cell_cycle() ############################################################
@@ -887,6 +907,15 @@ def test_get_cell_cycle_unconnected_node(cell_lin_unconnected_node):
 def test_get_cell_cycle_unconnected_component(cell_lin_unconnected_component):
     assert cell_lin_unconnected_component.get_cell_cycle(17) == [17, 18]
     assert cell_lin_unconnected_component.get_cell_cycle(18) == [17, 18]
+
+
+def test_get_cell_cycle_unconnected_component_div(cell_lin_unconnected_component_div):
+    assert cell_lin_unconnected_component_div.get_cell_cycle(17) == [17]
+    assert cell_lin_unconnected_component_div.get_cell_cycle(18) == [18]
+    assert cell_lin_unconnected_component_div.get_cell_cycle(19) == [19]
+    assert cell_lin_unconnected_component_div.get_cell_cycle(20) == [20, 21]
+    assert cell_lin_unconnected_component_div.get_cell_cycle(21) == [20, 21]
+    assert cell_lin_unconnected_component_div.get_cell_cycle(22) == [22]
 
 
 def test_get_cell_cycle_fusion_error(cell_lin):
@@ -1051,6 +1080,31 @@ def test_get_cell_cycles_unconnected_component(cell_lin_unconnected_component):
     assert lin.get_cell_cycles(ignore_incomplete_cycles=True) == expected
 
 
+def test_get_cell_cycles_unconnected_component_div(cell_lin_unconnected_component_div):
+    lin = cell_lin_unconnected_component_div
+    expected = [
+        [1, 2],
+        [3, 4],
+        [5, 6],
+        [7, 8],
+        [9],
+        [10],
+        [11, 12, 13, 14],
+        [15],
+        [16],
+        [17],
+        [18],
+        [19],
+        [20, 21],
+        [22],
+    ]
+    assert sorted(lin.get_cell_cycles()) == expected
+    # Remove incomplete cycles.
+    incomplete = [[1, 2], [5, 6], [9], [10], [15], [16], [17], [18], [20, 21], [22]]
+    expected = [cycle for cycle in expected if cycle not in incomplete]
+    assert lin.get_cell_cycles(ignore_incomplete_cycles=True) == expected
+
+
 def test_get_cell_cycles_fusion_error(cell_lin):
     cell_lin.add_edge(3, 12)
     with pytest.raises(FusionError):
@@ -1142,6 +1196,17 @@ def test_get_sister_cells_unconnected_component(cell_lin_unconnected_component):
     assert cell_lin_unconnected_component.get_sister_cells(2) == []
     assert cell_lin_unconnected_component.get_sister_cells(17) == []
     assert cell_lin_unconnected_component.get_sister_cells(18) == []
+
+
+def test_get_sister_cells_unconnected_component_div(cell_lin_unconnected_component_div):
+    assert cell_lin_unconnected_component_div.get_sister_cells(1) == []
+    assert cell_lin_unconnected_component_div.get_sister_cells(2) == []
+    assert cell_lin_unconnected_component_div.get_sister_cells(17) == []
+    assert cell_lin_unconnected_component_div.get_sister_cells(18) == [19]
+    assert cell_lin_unconnected_component_div.get_sister_cells(19) == [18]
+    assert cell_lin_unconnected_component_div.get_sister_cells(20) == [22]
+    assert cell_lin_unconnected_component_div.get_sister_cells(22) == [20]
+    assert cell_lin_unconnected_component_div.get_sister_cells(21) == []
 
 
 def test_get_sister_cells_fusion_error(cell_lin):
