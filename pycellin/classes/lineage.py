@@ -648,15 +648,7 @@ class CellLineage(Lineage):
 
         # Check that the link will not create a fusion event.
         if target_lineage.in_degree(target_noi) != 0:
-            try:
-                raise FusionError(target_noi, source_lineage_ID)
-            except Exception as err:
-                note = (
-                    f"Remove any incoming edge to node {target_noi} "
-                    f"before adding a new incoming edge."
-                )
-                err.add_note(note)
-                raise err
+            raise FusionError(target_noi, source_lineage_ID)
 
         # Check that the link respects the flow of time.
         if self.nodes[source_noi]["frame"] >= target_lineage.nodes[target_noi]["frame"]:
@@ -882,12 +874,7 @@ class CellLineage(Lineage):
         if not start:
             predecessors = list(self.predecessors(node))
             if len(predecessors) != 1:
-                try:
-                    raise FusionError(node, lineage_ID)
-                except Exception as err:
-                    note = f"This node has {len(predecessors)} predecessors."
-                    err.add_note(note)
-                    raise err
+                raise FusionError(node, lineage_ID)
             while not self.is_division(*predecessors) and not self.is_root(
                 *predecessors
             ):
@@ -895,12 +882,7 @@ class CellLineage(Lineage):
                 cell_cycle.append(*predecessors)
                 predecessors = list(self.predecessors(*predecessors))
                 if len(predecessors) != 1:
-                    try:
-                        raise FusionError(node, lineage_ID)
-                    except Exception as err:
-                        note = f"This node has {len(predecessors)} predecessors."
-                        err.add_note(note)
-                        raise err
+                    raise FusionError(node, lineage_ID)
             if self.is_root(*predecessors) and not self.is_division(*predecessors):
                 cell_cycle.append(*predecessors)
             cell_cycle.reverse()  # We built it from the end.
