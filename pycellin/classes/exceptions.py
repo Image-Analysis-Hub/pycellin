@@ -44,11 +44,11 @@ class FusionError(LineageStructureError):
         self.lineage_ID = lineage_ID
         if message is None:
             if lineage_ID is None:
-                message = f"Node {node_ID} already has a parent node."
+                message = f"Node {node_ID} has more than one parent node."
             else:
                 message = (
-                    f"Node {node_ID} in lineage {lineage_ID} already has "
-                    f"a parent node."
+                    f"Node {node_ID} in lineage {lineage_ID} has "
+                    f"more than one parent node."
                 )
         super().__init__(message)
 
