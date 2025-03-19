@@ -738,7 +738,76 @@ def test_add_cell_single_node(one_node_cell_lin):
 
 # _split_from_cell() ##########################################################
 
+
 # get_divisions() #############################################################
+
+
+def test_get_divisions_normal_lin(cell_lin):
+    assert sorted(cell_lin.get_divisions()) == [2, 4, 8, 14]
+    assert sorted(cell_lin.get_divisions(list(range(1, 17)))) == [2, 4, 8, 14]
+    assert sorted(cell_lin.get_divisions([1, 2, 3, 4])) == [2, 4]
+    assert sorted(cell_lin.get_divisions([4])) == [4]
+    assert sorted(cell_lin.get_divisions([1, 3, 11, 12, 13, 15, 16])) == []
+
+
+def test_get_divisions_empty_lin(empty_cell_lin):
+    assert empty_cell_lin.get_divisions() == []
+
+
+def test_get_divisions_single_node(one_node_cell_lin):
+    assert one_node_cell_lin.get_divisions() == []
+    assert one_node_cell_lin.get_divisions([1]) == []
+
+
+def test_get_divisions_gap(cell_lin_gap):
+    assert sorted(cell_lin_gap.get_divisions()) == [2, 4, 8, 14]
+    assert sorted(cell_lin_gap.get_divisions([1, 2, 3, 4, 6, 8, 9, 10])) == [2, 4, 8]
+    assert sorted(cell_lin_gap.get_divisions([1, 2, 3, 4])) == [2, 4]
+    assert sorted(cell_lin_gap.get_divisions([4])) == [4]
+    assert sorted(cell_lin_gap.get_divisions([1, 3, 11, 15, 16])) == []
+
+
+def test_get_divisions_div_root(cell_lin_div_root):
+    lin = cell_lin_div_root
+    assert sorted(lin.get_divisions()) == [1, 2, 4, 8, 14]
+    assert sorted(lin.get_divisions([1, 2, 3, 4, 6, 8, 9, 10])) == [1, 2, 4, 8]
+    assert sorted(lin.get_divisions([1])) == [1]
+    assert sorted(lin.get_divisions([3, 5, 7, 9])) == []
+
+
+def test_get_divisions_successive_divs_and_root(cell_lin_successive_divs_and_root):
+    lin = cell_lin_successive_divs_and_root
+    assert sorted(lin.get_divisions()) == [2, 3, 5, 8]
+    assert sorted(lin.get_divisions(list(range(2, 12)))) == [2, 3, 5, 8]
+    assert sorted(lin.get_divisions([2, 3, 4, 5, 6, 7])) == [2, 3, 5]
+    assert sorted(lin.get_divisions([3])) == [3]
+    assert sorted(lin.get_divisions([4, 6, 7, 11])) == []
+
+
+def test_get_divisions_triple_div(cell_lin_triple_div):
+    assert sorted(cell_lin_triple_div.get_divisions()) == [2, 4, 8, 14]
+    assert sorted(cell_lin_triple_div.get_divisions([1, 2, 3, 4, 5, 6])) == [2, 4]
+    assert sorted(cell_lin_triple_div.get_divisions([4])) == [4]
+    assert sorted(cell_lin_triple_div.get_divisions([17, 18])) == []
+
+
+def test_get_divisions_unconnected_node(cell_lin_unconnected_node):
+    lin = cell_lin_unconnected_node
+    assert sorted(lin.get_divisions()) == [2, 4, 8, 14]
+    assert sorted(lin.get_divisions(list(range(1, 18)))) == [2, 4, 8, 14]
+    assert sorted(lin.get_divisions([1, 2, 3, 4, 17])) == [2, 4]
+    assert sorted(lin.get_divisions([17])) == []
+
+
+def test_get_divisions_unconnected_component(cell_lin_unconnected_component):
+    lin = cell_lin_unconnected_component
+    lin.add_edge(17, 19)
+    assert sorted(lin.get_divisions()) == [2, 4, 8, 14, 17]
+    assert sorted(lin.get_divisions(list(range(1, 19)))) == [2, 4, 8, 14, 17]
+    assert sorted(lin.get_divisions([1, 2, 3, 4, 17, 18, 19])) == [2, 4, 17]
+    assert sorted(lin.get_divisions([17])) == [17]
+    assert sorted(lin.get_divisions([19])) == []
+
 
 # get_cell_cycle() ############################################################
 
@@ -825,7 +894,7 @@ def test_get_cell_cycle_fusion_error(cell_lin):
     with pytest.raises(FusionError):
         cell_lin.get_cell_cycle(12)
 
-
+        
 # get_cell_cycles() ###########################################################
 
 # get_sister_cells() ##########################################################
