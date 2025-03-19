@@ -925,39 +925,38 @@ class CellLineage(Lineage):
         return cell_cycle
 
     def get_cell_cycles(
-        self, keep_incomplete_cell_cycles: bool = False, debug: bool = False
+        self, ignore_incomplete_cycles: bool = False, debug: bool = False
     ) -> list[list[int]]:
         """
         Identify all the nodes of each cell cycle in a lineage.
 
-        A cell cycle is a tree segment that starts at the root or at a
-        division node, ends at a division node or at a leaf, and doesn't
+        A cell cycle is a lineage segment that starts at the root or at a
+        division cell, ends at a division cell or at a leaf, and doesn't
         include any other division.
 
         Parameters
         ----------
-        keep_incomplete_cell_cycles : bool, optional
-            True to keep the first and last cell cycles, False otherwise.
-            False by default.
+        ignore_incomplete_cycles : bool, optional
+            True to ignore incomplete cell cycles, False otherwise. False by default.
         debug : bool, optional
             True to display debug messages, False otherwise. False by default.
 
         Returns
         -------
         list(list(int))
-            List of nodes ID for each cell cycle, in chronological order.
+            List of cell IDs for each cell cycle, in chronological order.
         """
-        if keep_incomplete_cell_cycles:
-            end_nodes = self.get_divisions() + self.get_leaves()
-        else:
+        if ignore_incomplete_cycles:
             end_nodes = self.get_divisions()  # Includes the root if it's a div.
+        else:
+            end_nodes = self.get_divisions() + self.get_leaves()
         if debug:
             print("End nodes:", end_nodes)
 
         cell_cycles = []
         for node in end_nodes:
             cc_nodes = self.get_cell_cycle(node)
-            if not keep_incomplete_cell_cycles and self.get_root() in cc_nodes:
+            if ignore_incomplete_cycles and self.is_root(cc_nodes[0]):
                 continue
             cell_cycles.append(cc_nodes)
             if debug:

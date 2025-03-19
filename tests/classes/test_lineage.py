@@ -894,8 +894,168 @@ def test_get_cell_cycle_fusion_error(cell_lin):
     with pytest.raises(FusionError):
         cell_lin.get_cell_cycle(12)
 
-        
+
 # get_cell_cycles() ###########################################################
+
+
+def test_get_cell_cycles_normal_lin(cell_lin):
+    expected = [
+        [1, 2],
+        [3, 4],
+        [5, 6],
+        [7, 8],
+        [9],
+        [10],
+        [11, 12, 13, 14],
+        [15],
+        [16],
+    ]
+    assert sorted(cell_lin.get_cell_cycles()) == expected
+    # Remove incomplete cycles.
+    incomplete = [[1, 2], [5, 6], [9], [10], [15], [16]]
+    expected = [cycle for cycle in expected if cycle not in incomplete]
+    assert cell_lin.get_cell_cycles(ignore_incomplete_cycles=True) == expected
+
+
+def test_get_cell_cycles_empty_lin(empty_cell_lin):
+    assert empty_cell_lin.get_cell_cycles() == []
+    assert empty_cell_lin.get_cell_cycles(ignore_incomplete_cycles=True) == []
+
+
+def test_get_cell_cycles_single_node(one_node_cell_lin):
+    assert one_node_cell_lin.get_cell_cycles() == [[1]]
+    assert one_node_cell_lin.get_cell_cycles(ignore_incomplete_cycles=True) == []
+
+
+def test_get_cell_cycles_gap(cell_lin_gap):
+    expected = [
+        [1, 2],
+        [3, 4],
+        [6],
+        [8],
+        [9],
+        [10],
+        [11, 14],
+        [15],
+        [16],
+    ]
+    assert sorted(cell_lin_gap.get_cell_cycles()) == expected
+    # Remove incomplete cycles.
+    incomplete = [[1, 2], [6], [9], [10], [15], [16]]
+    expected = [cycle for cycle in expected if cycle not in incomplete]
+    assert cell_lin_gap.get_cell_cycles(ignore_incomplete_cycles=True) == expected
+
+
+def test_get_cell_cycles_div_root(cell_lin_div_root):
+    expected = [
+        [1],
+        [2],
+        [3, 4],
+        [5, 6],
+        [7, 8],
+        [9],
+        [10],
+        [11, 12, 13, 14],
+        [15],
+        [16],
+        [17],
+    ]
+    assert sorted(cell_lin_div_root.get_cell_cycles()) == expected
+    # Remove incomplete cycles.
+    incomplete = [[1], [5, 6], [9], [10], [15], [16], [17]]
+    expected = [cycle for cycle in expected if cycle not in incomplete]
+    assert cell_lin_div_root.get_cell_cycles(ignore_incomplete_cycles=True) == expected
+
+
+def test_get_cell_cycles_successive_divs_and_root(cell_lin_successive_divs_and_root):
+    lin = cell_lin_successive_divs_and_root
+    expected = [
+        [2],
+        [3],
+        [4, 5],
+        [6],
+        [7],
+        [8],
+        [9],
+        [10],
+        [11],
+    ]
+    assert sorted(lin.get_cell_cycles()) == expected
+    # Remove incomplete cycles.
+    incomplete = [[2], [6], [7], [9], [10], [11]]
+    expected = [cycle for cycle in expected if cycle not in incomplete]
+    assert lin.get_cell_cycles(ignore_incomplete_cycles=True) == expected
+
+
+def test_get_cell_cycles_triple_div(cell_lin_triple_div):
+    lin = cell_lin_triple_div
+    expected = [
+        [1, 2],
+        [3, 4],
+        [5, 6],
+        [7, 8],
+        [9],
+        [10],
+        [11, 12, 13, 14],
+        [15],
+        [16],
+        [17, 18],
+    ]
+    assert sorted(lin.get_cell_cycles()) == expected
+    # Remove incomplete cycles.
+    incomplete = [[1, 2], [5, 6], [9], [10], [15], [16], [17, 18]]
+    expected = [cycle for cycle in expected if cycle not in incomplete]
+    assert lin.get_cell_cycles(ignore_incomplete_cycles=True) == expected
+
+
+def test_get_cell_cycles_unconnected_node(cell_lin_unconnected_node):
+    lin = cell_lin_unconnected_node
+    expected = [
+        [1, 2],
+        [3, 4],
+        [5, 6],
+        [7, 8],
+        [9],
+        [10],
+        [11, 12, 13, 14],
+        [15],
+        [16],
+        [17],
+    ]
+    assert sorted(lin.get_cell_cycles()) == expected
+    # Remove incomplete cycles.
+    incomplete = [[1, 2], [5, 6], [9], [10], [15], [16], [17]]
+    expected = [cycle for cycle in expected if cycle not in incomplete]
+    assert len(lin.get_cell_cycles(ignore_incomplete_cycles=True)) == len(expected)
+    # assert lin.get_cell_cycles(ignore_incomplete_cycles=True) == expected
+
+
+def test_get_cell_cycles_unconnected_component(cell_lin_unconnected_component):
+    lin = cell_lin_unconnected_component
+    expected = [
+        [1, 2],
+        [3, 4],
+        [5, 6],
+        [7, 8],
+        [9],
+        [10],
+        [11, 12, 13, 14],
+        [15],
+        [16],
+        [17, 18],
+    ]
+    assert sorted(lin.get_cell_cycles()) == expected
+    # Remove incomplete cycles.
+    incomplete = [[1, 2], [5, 6], [9], [10], [15], [16], [17, 18]]
+    expected = [cycle for cycle in expected if cycle not in incomplete]
+    assert lin.get_cell_cycles(ignore_incomplete_cycles=True) == expected
+
+
+def test_get_cell_cycles_fusion_error(cell_lin):
+    cell_lin.add_edge(3, 12)
+    with pytest.raises(FusionError):
+        cell_lin.get_cell_cycles()
+
 
 # get_sister_cells() ##########################################################
 
