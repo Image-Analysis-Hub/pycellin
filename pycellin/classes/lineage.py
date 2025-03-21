@@ -593,7 +593,7 @@ class CellLineage(Lineage):
         target_noi: int,
         target_lineage: CellLineage | None = None,
         **link_feats,
-    ) -> None:
+    ) -> dict[int, int] | None:
         """
         Create a link beween 2 cells.
 
@@ -612,6 +612,13 @@ class CellLineage(Lineage):
             assumed to be in the same lineage as the source cell.
         **link_feats
             Feature values to set for the edge.
+
+        Returns
+        -------
+        dict[int, int] or None
+            A dictionary of renamed cells {old_ID : new_ID} from
+            the target lineage when it had conflicting cell IDs with the
+            source lineage. None otherwise.
 
         Raises
         ------
@@ -663,13 +670,16 @@ class CellLineage(Lineage):
                 target_lineage_ID,
             )
 
+        conflicting_ids = None
         if target_lineage != self:
             # Identify cell ID conflict between lineages.
-            target_descendants = nx.descendants(target_lineage, target_noi)
+            target_descendants = nx.descendants(target_lineage, target_noi) | {
+                target_noi
+            }
             conflicting_ids = set(self.nodes()) & set(target_descendants)
             if conflicting_ids:
                 next_id = self._get_next_available_node_ID()
-                ids_mapping = {}
+                ids_mapping = {}  # a dict of {old_ID : new_ID}
                 for id in conflicting_ids:
                     ids_mapping[id] = next_id
                     next_id += 1
@@ -679,6 +689,8 @@ class CellLineage(Lineage):
             tmp_lineage = target_lineage._split_from_cell(target_noi)
             if conflicting_ids:
                 nx.relabel_nodes(tmp_lineage, ids_mapping, copy=False)
+                for id, new_id in ids_mapping.items():
+                    tmp_lineage.nodes[new_id]["cell_ID"] = new_id
                 if target_noi in ids_mapping:
                     target_noi = ids_mapping[target_noi]
                 assert tmp_lineage.get_root() == target_noi
@@ -690,6 +702,7 @@ class CellLineage(Lineage):
             del tmp_lineage
 
         self.add_edge(source_noi, target_noi, **link_feats)
+        return ids_mapping if conflicting_ids else None
 
     def _remove_link(self, source_noi: int, target_noi: int) -> dict[str, Any]:
         """
@@ -749,8 +762,9 @@ class CellLineage(Lineage):
             The node ID of the cell from which to split the lineage.
         split : {"upstream", "downstream"}, optional
             Where to split the lineage relative to the given cell.
-            If upstream, the given cell is included in the second lineage.
-            If downstream, the given cell is included in the first lineage.
+            If upstream, the given cell becomes the root of the newly
+            created lineage. If downstream, the given cell stays in the initial
+            lineage but its descendants all go in the newly created lineage.
             "upstream" by default.
 
         Returns

@@ -56,6 +56,7 @@ def cell_lin():
     )
     for n in lineage.nodes:
         lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 1, n)
+        lineage.nodes[n]["cell_ID"] = n
     lineage.graph["lineage_ID"] = 1
     return lineage
 
@@ -63,17 +64,19 @@ def cell_lin():
 @pytest.fixture
 def cell_lin_gap(cell_lin):
     # Gap in the lineage.
-    cell_lin.remove_nodes_from([5, 7, 12, 13])
-    cell_lin.add_edges_from([(4, 6), (4, 8), (11, 14)])
-    return cell_lin
+    new_lin = cell_lin.copy()
+    new_lin.remove_nodes_from([5, 7, 12, 13])
+    new_lin.add_edges_from([(4, 6), (4, 8), (11, 14)])
+    return new_lin
 
 
 @pytest.fixture
 def cell_lin_div_root(cell_lin):
     # The root is a division.
-    cell_lin.add_node(17, frame=1)
-    cell_lin.add_edge(1, 17)
-    return cell_lin
+    new_lin = cell_lin.copy()
+    new_lin.add_node(17, frame=1)
+    new_lin.add_edge(1, 17)
+    return new_lin
 
 
 @pytest.fixture
@@ -94,44 +97,49 @@ def cell_lin_successive_divs_and_root():
         ]
     )
     for n in lineage.nodes:
-        lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 2, n)
-    lineage.graph["lineage_ID"] = 1
+        lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 2, n) + 1
+        lineage.nodes[n]["cell_ID"] = n
+    lineage.graph["lineage_ID"] = 2
     return lineage
 
 
 @pytest.fixture
 def cell_lin_triple_div(cell_lin):
     # Triple division.
-    cell_lin.add_node(17, frame=4)
-    cell_lin.add_node(18, frame=5)
-    cell_lin.add_edges_from([(4, 17), (17, 18)])
-    return cell_lin
+    new_lin = cell_lin.copy()
+    new_lin.add_node(17, frame=4)
+    new_lin.add_node(18, frame=5)
+    new_lin.add_edges_from([(4, 17), (17, 18)])
+    return new_lin
 
 
 @pytest.fixture
 def cell_lin_unconnected_node(cell_lin):
-    cell_lin.add_node(17, frame=0)
-    return cell_lin
+    new_lin = cell_lin.copy()
+    new_lin.add_node(17, frame=1, cell_ID=17)
+    new_lin.graph["lineage_ID"] = 2
+    return new_lin
 
 
 @pytest.fixture
 def cell_lin_unconnected_component(cell_lin):
-    cell_lin.add_node(17, frame=1)
-    cell_lin.add_node(18, frame=2)
-    cell_lin.add_edge(17, 18)
-    return cell_lin
+    new_lin = cell_lin.copy()
+    new_lin.add_node(17, frame=1, cell_ID=17)
+    new_lin.add_node(18, frame=2, cell_ID=18)
+    new_lin.add_edge(17, 18)
+    new_lin.graph["lineage_ID"] = 2
+    return new_lin
 
 
 @pytest.fixture
 def cell_lin_unconnected_component_div(cell_lin_unconnected_component):
-    cell_lin_unconnected_component.add_node(19, frame=2)
-    cell_lin_unconnected_component.add_node(20, frame=3)
-    cell_lin_unconnected_component.add_node(21, frame=4)
-    cell_lin_unconnected_component.add_node(22, frame=3)
-    cell_lin_unconnected_component.add_edges_from(
-        [(17, 19), (19, 20), (20, 21), (19, 22)]
-    )
-    return cell_lin_unconnected_component
+    new_lin = cell_lin_unconnected_component.copy()
+    new_lin.add_node(19, frame=2)
+    new_lin.add_node(20, frame=3)
+    new_lin.add_node(21, frame=4)
+    new_lin.add_node(22, frame=3)
+    new_lin.add_edges_from([(17, 19), (19, 20), (20, 21), (19, 22)])
+    return new_lin
 
 
 # CycleLineage fixtures #######################################################
@@ -867,9 +875,9 @@ def test_add_link_time_flow_error(cell_lin):
         cell_lin._add_link(1, 18)
 
 
-def test_add_link_different_lineages(cell_lin, cell_lin_unconnected_component):
+def test_add_link_different_lineages(cell_lin):
     # Add a link between different lineages.
-    new_lin = CellLineage()
+    new_lin = CellLineage(lineage_ID=2)
     new_lin.add_node(19, frame=1, cell_ID=19)
     cell_lin._add_link(1, 19, target_lineage=new_lin)
     assert cell_lin.has_node(19)
@@ -877,27 +885,103 @@ def test_add_link_different_lineages(cell_lin, cell_lin_unconnected_component):
     assert cell_lin.nodes[19]["frame"] == 1
     assert cell_lin.has_edge(1, 19)
     assert not new_lin.has_node(19)
-    # Add a link between a lineage and a component of another lineage.
-    # FIXME: seems like the nodes are not removed from the target lineage...
-    # cell_lin._add_link(1, 17, target_lineage=cell_lin_unconnected_component)
-    # assert cell_lin.has_node(17)
-    # assert cell_lin.has_node(18)
-    # assert cell_lin.has_edge(1, 17)
-    # assert cell_lin.has_edge(17, 18)
-    # assert cell_lin_unconnected_component.nodes == cell_lin.nodes
-    # assert list(cell_lin.nodes) == [17, 18]
-    # assert list(cell_lin_unconnected_component.nodes) == [17, 18]
-    # assert not cell_lin_unconnected_component.has_node(17)
 
 
-# FIXME
-# def test_add_link_conflicting_ids(cell_lin, cell_lin_unconnected_component):
-#     # Add a link between different lineages with conflicting IDs.
-#     cell_lin_unconnected_component.add_node(6, frame=5)
-#     cell_lin._add_link(4, 6, target_lineage=cell_lin_unconnected_component)
-#     assert cell_lin.has_edge(4, 6)
-#     assert cell_lin.nodes[6]["cell_ID"] == 6
-#     assert cell_lin.nodes[6]["frame"] == 5
+def test_add_link_different_lineages_unconnected_node(
+    cell_lin, cell_lin_unconnected_node
+):
+    # Add a link between a lineage and an unconnected node of another lineage.
+    cell_lin._add_link(1, 17, target_lineage=cell_lin_unconnected_node)
+    assert cell_lin.has_node(17)
+    assert cell_lin.has_edge(1, 17)
+    assert cell_lin.nodes[17]["cell_ID"] == 17
+    assert cell_lin.nodes[17]["frame"] == 1
+    assert not cell_lin_unconnected_node.has_node(17)
+
+
+def test_add_link_different_lineages_unconnected_component(
+    cell_lin, cell_lin_unconnected_component
+):
+    # Add a link between a lineage and an unconnected component of another lineage.
+    cell_lin._add_link(1, 17, target_lineage=cell_lin_unconnected_component)
+    assert cell_lin.has_node(17)
+    assert cell_lin.has_node(18)
+    assert cell_lin.has_edge(1, 17)
+    assert cell_lin.has_edge(17, 18)
+    assert cell_lin.nodes[17]["cell_ID"] == 17
+    assert cell_lin.nodes[17]["frame"] == 1
+    assert cell_lin.nodes[18]["cell_ID"] == 18
+    assert cell_lin.nodes[18]["frame"] == 2
+    assert not cell_lin_unconnected_component.has_node(17)
+    assert not cell_lin_unconnected_component.has_node(18)
+
+
+def test_add_link_conflicting_ID(cell_lin):
+    # Add a link between different lineages with a conflicting ID.
+    new_lin = CellLineage(lineage_ID=2)
+    new_lin.add_node(5, frame=1, cell_ID=5)
+    IDs_mapping = cell_lin._add_link(1, 5, target_lineage=new_lin)
+    assert IDs_mapping == {5: 17}
+    # Cell 5 is removed from the target lineage.
+    assert not new_lin.has_node(5)
+    assert not new_lin.has_node(17)
+    # Cell 17 is added with the new edge.
+    assert cell_lin.has_node(17)
+    assert cell_lin.has_edge(1, 17)
+    assert cell_lin.nodes[17]["cell_ID"] == 17
+    assert cell_lin.nodes[17]["frame"] == 1
+    # Cell 5 is untouched.
+    assert cell_lin.has_node(5)
+    assert cell_lin.nodes[5]["cell_ID"] == 5
+    assert cell_lin.nodes[5]["frame"] == 4
+
+
+def test_add_link_conflicting_IDs(cell_lin, cell_lin_successive_divs_and_root):
+    IDs_mapping = cell_lin._add_link(1, 2, cell_lin_successive_divs_and_root)
+    assert IDs_mapping == {
+        2: 17,
+        3: 18,
+        4: 19,
+        5: 20,
+        6: 21,
+        7: 22,
+        8: 23,
+        9: 24,
+        10: 25,
+        11: 26,
+    }
+    # Cells are removed from the target lineage.
+    assert len(cell_lin_successive_divs_and_root.nodes) == 0
+    # Cells are added with the new edges.
+    assert cell_lin.has_edge(1, 17)
+    assert cell_lin.nodes[17]["cell_ID"] == 17
+    assert cell_lin.nodes[17]["frame"] == 1
+    assert cell_lin.has_edge(17, 18)
+    assert cell_lin.nodes[18]["cell_ID"] == 18
+    assert cell_lin.nodes[18]["frame"] == 2
+    # Cells are untouched.
+    assert cell_lin.has_node(2)
+    assert cell_lin.nodes[2]["cell_ID"] == 2
+    assert cell_lin.nodes[2]["frame"] == 1
+
+
+def test_add_link_same_IDs(cell_lin):
+    new_lin = CellLineage(lineage_ID=2)
+    new_lin.add_node(1, frame=1, cell_ID=1)
+    IDs_mapping = cell_lin._add_link(1, 1, new_lin)
+    assert IDs_mapping == {1: 17}
+    # Cell 1 is removed from the target lineage.
+    assert not new_lin.has_node(1)
+    assert not new_lin.has_node(17)
+    # Cell 17 is added with the new edge.
+    assert cell_lin.has_node(17)
+    assert cell_lin.has_edge(1, 17)
+    assert cell_lin.nodes[17]["cell_ID"] == 17
+    assert cell_lin.nodes[17]["frame"] == 1
+    # Cell 1 is untouched.
+    assert cell_lin.has_node(1)
+    assert cell_lin.nodes[1]["cell_ID"] == 1
+    assert cell_lin.nodes[1]["frame"] == 0
 
 
 # _remove_link() ##############################################################
