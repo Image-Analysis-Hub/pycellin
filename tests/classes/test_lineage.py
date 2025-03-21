@@ -1061,21 +1061,62 @@ def test_remove_link_unconnected_component_div(cell_lin_unconnected_component_di
 
 
 # _split_from_cell() ##########################################################
-# TODO: to check
 
 
-def test_split_from_cell_upstream(cell_lin):
-    # Split upstream from a node.
+def test_split_from_cell_division_upstream(cell_lin):
+    # Split upstream from a division node.
     new_lin = cell_lin._split_from_cell(4, split="upstream")
     assert sorted(new_lin.nodes()) == [4, 5, 6, 7, 8, 9, 10]
     assert sorted(cell_lin.nodes()) == [1, 2, 3, 11, 12, 13, 14, 15, 16]
 
 
-def test_split_from_cell_downstream(cell_lin):
-    # Split downstream from a node.
+def test_split_from_cell_division_downstream(cell_lin):
+    # Split downstream from a division node.
     new_lin = cell_lin._split_from_cell(4, split="downstream")
     assert sorted(new_lin.nodes()) == [5, 6, 7, 8, 9, 10]
     assert sorted(cell_lin.nodes()) == [1, 2, 3, 4, 11, 12, 13, 14, 15, 16]
+
+
+def test_split_from_cell_root_upstream(cell_lin):
+    # Split upstream from a root node.
+    new_lin = cell_lin._split_from_cell(1, split="upstream")
+    assert sorted(new_lin.nodes()) == list(range(1, 17))
+    assert sorted(cell_lin.nodes()) == []
+
+
+def test_split_from_cell_root_downstream(cell_lin):
+    # Split downstream from a root node.
+    new_lin = cell_lin._split_from_cell(1, split="downstream")
+    assert sorted(new_lin.nodes()) == list(range(2, 17))
+    assert sorted(cell_lin.nodes()) == [1]
+
+
+def test_split_from_cell_leaf_upstream(cell_lin):
+    # Split upstream from a leaf node.
+    new_lin = cell_lin._split_from_cell(9, split="upstream")
+    assert sorted(new_lin.nodes()) == [9]
+    assert sorted(cell_lin.nodes()) == list(range(1, 9)) + list(range(10, 17))
+
+
+def test_split_from_cell_leaf_downstream(cell_lin):
+    # Split downstream from a leaf node.
+    new_lin = cell_lin._split_from_cell(9, split="downstream")
+    assert sorted(new_lin.nodes()) == []
+    assert sorted(cell_lin.nodes()) == list(range(1, 17))
+
+
+def test_split_from_cell_middle_upstream(cell_lin):
+    # Split upstream from a middle node.
+    new_lin = cell_lin._split_from_cell(12, split="upstream")
+    assert sorted(new_lin.nodes()) == list(range(12, 17))
+    assert sorted(cell_lin.nodes()) == list(range(1, 12))
+
+
+def test_split_from_cell_middle_downstream(cell_lin):
+    # Split downstream from a middle node.
+    new_lin = cell_lin._split_from_cell(12, split="downstream")
+    assert sorted(new_lin.nodes()) == list(range(13, 17))
+    assert sorted(cell_lin.nodes()) == list(range(1, 13))
 
 
 def test_split_from_cell_upstream_single_node(one_node_cell_lin):
@@ -1103,94 +1144,43 @@ def test_split_from_cell_downstream_gap(cell_lin_gap):
     # Split downstream from a node in a lineage with gaps.
     new_lin = cell_lin_gap._split_from_cell(4, split="downstream")
     assert sorted(new_lin.nodes()) == [6, 8, 9, 10]
+    assert new_lin.in_degree(6) == 0
     assert sorted(cell_lin_gap.nodes()) == [1, 2, 3, 4, 11, 14, 15, 16]
 
 
 def test_split_from_cell_upstream_div_root(cell_lin_div_root):
     # Split upstream from a node in a lineage with a division root.
-    new_lin = cell_lin_div_root._split_from_cell(4, split="upstream")
-    assert sorted(new_lin.nodes()) == [4, 5, 6, 7, 8, 9, 10]
-    assert sorted(cell_lin_div_root.nodes()) == [1, 2, 3, 11, 12, 13, 14, 15, 16, 17]
+    new_lin = cell_lin_div_root._split_from_cell(1, split="upstream")
+    assert sorted(new_lin.nodes()) == list(range(1, 18))
+    assert sorted(cell_lin_div_root.nodes()) == []
 
 
 def test_split_from_cell_downstream_div_root(cell_lin_div_root):
     # Split downstream from a node in a lineage with a division root.
-    new_lin = cell_lin_div_root._split_from_cell(4, split="downstream")
-    assert sorted(new_lin.nodes()) == [5, 6, 7, 8, 9, 10]
-    assert sorted(cell_lin_div_root.nodes()) == [1, 2, 3, 4, 11, 12, 13, 14, 15, 16, 17]
+    new_lin = cell_lin_div_root._split_from_cell(1, split="downstream")
+    assert sorted(new_lin.nodes()) == list(range(2, 18))
+    assert sorted(cell_lin_div_root.nodes()) == [1]
 
 
 def test_split_from_cell_upstream_unconnected_node(cell_lin_unconnected_node):
     # Split upstream from an unconnected node.
     new_lin = cell_lin_unconnected_node._split_from_cell(17, split="upstream")
     assert sorted(new_lin.nodes()) == [17]
-    assert sorted(cell_lin_unconnected_node.nodes()) == [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15,
-        16,
-    ]
+    assert sorted(cell_lin_unconnected_node.nodes()) == list(range(1, 17))
 
 
 def test_split_from_cell_downstream_unconnected_node(cell_lin_unconnected_node):
     # Split downstream from an unconnected node.
     new_lin = cell_lin_unconnected_node._split_from_cell(17, split="downstream")
     assert sorted(new_lin.nodes()) == []
-    assert sorted(cell_lin_unconnected_node.nodes()) == [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15,
-        16,
-        17,
-    ]
+    assert sorted(cell_lin_unconnected_node.nodes()) == list(range(1, 18))
 
 
 def test_split_from_cell_upstream_unconnected_component(cell_lin_unconnected_component):
     # Split upstream from a node in an unconnected component.
     new_lin = cell_lin_unconnected_component._split_from_cell(17, split="upstream")
     assert sorted(new_lin.nodes()) == [17, 18]
-    assert sorted(cell_lin_unconnected_component.nodes()) == [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15,
-        16,
-    ]
+    assert sorted(cell_lin_unconnected_component.nodes()) == list(range(1, 17))
 
 
 def test_split_from_cell_downstream_unconnected_component(
@@ -1199,25 +1189,7 @@ def test_split_from_cell_downstream_unconnected_component(
     # Split downstream from a node in an unconnected component.
     new_lin = cell_lin_unconnected_component._split_from_cell(17, split="downstream")
     assert sorted(new_lin.nodes()) == [18]
-    assert sorted(cell_lin_unconnected_component.nodes()) == [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15,
-        16,
-        17,
-    ]
+    assert sorted(cell_lin_unconnected_component.nodes()) == list(range(1, 18))
 
 
 def test_split_from_cell_invalid_node(cell_lin):
