@@ -1050,6 +1050,9 @@ class CellLineage(Lineage):
 
     def plot(
         self,
+        ID_feature: str = "cell_ID",
+        y_feature: str = "frame",
+        y_legend: str = "Time (frames)",
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -1070,6 +1073,12 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
+        ID_feature : str, optional
+            The feature of the nodes to use as the node ID. "cell_ID" by default.
+        y_feature : str, optional
+            The feature of the nodes to use as the y-axis. "frame" by default.
+        y_legend : str, optional
+            The label of the y-axis. "Time (frames)" by default.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -1133,9 +1142,9 @@ class CellLineage(Lineage):
         """
         # TODO: and if we want to plot in time units instead of frames?
         super().plot(
-            ID_feature="cell_ID",
-            y_feature="frame",
-            y_legend="Time (frames)",
+            ID_feature=ID_feature,
+            y_feature=y_feature,
+            y_legend=y_legend,
             title=title,
             node_text=node_text,
             node_text_font=node_text_font,
@@ -1308,6 +1317,9 @@ class CycleLineage(Lineage):
 
     def plot(
         self,
+        ID_feature: str = "cycle_ID",
+        y_feature: str = "level",
+        y_legend: str = "Cell cycle level",
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -1328,6 +1340,12 @@ class CycleLineage(Lineage):
 
         Parameters
         ----------
+        ID_feature : str, optional
+            The feature of the nodes to use as the node ID. "cycle_ID" by default.
+        y_feature : str, optional
+            The feature of the nodes to use as the y-axis. "level" by default.
+        y_legend : str, optional
+            The label of the y-axis. "Cell cycle level" by default.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -1390,9 +1408,9 @@ class CycleLineage(Lineage):
         )
         """
         super().plot(
-            ID_feature="cycle_ID",
-            y_feature="level",
-            y_legend="Cell cycle level",
+            ID_feature=ID_feature,
+            y_feature=y_feature,
+            y_legend=y_legend,
             title=title,
             node_text=node_text,
             node_text_font=node_text_font,
