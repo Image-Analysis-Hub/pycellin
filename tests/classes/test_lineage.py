@@ -20,7 +20,9 @@ from pycellin.classes.exceptions import (
 
 @pytest.fixture
 def empty_cell_lin():
-    return CellLineage()
+    lineage = CellLineage()
+    lineage.graph["lineage_ID"] = 1
+    return lineage
 
 
 @pytest.fixture
@@ -1766,49 +1768,113 @@ def test_is_division_unconnected_component_div(cell_lin_unconnected_component_di
 
 
 # CycleLineage __init__() #####################################################
-# TODO: test what is inside the cycle lineages
 
 
 def test_cycle_lineage_normal_lin(cell_lin):
     cycle_lin = CycleLineage(cell_lin)
+    assert sorted(list(cycle_lin.nodes())) == [2, 4, 6, 8, 9, 10, 14, 15, 16]
+    assert cycle_lin.graph["lineage_ID"] == 1
+    assert cycle_lin.nodes[2]["cycle_ID"] == 2
+    assert cycle_lin.nodes[2]["cells"] == [1, 2]
+    assert cycle_lin.nodes[2]["cycle_length"] == 2
+    assert cycle_lin.nodes[2]["level"] == 0
+    assert cycle_lin.nodes[9]["cycle_ID"] == 9
+    assert cycle_lin.nodes[9]["cells"] == [9]
+    assert cycle_lin.nodes[9]["cycle_length"] == 1
+    assert cycle_lin.nodes[9]["level"] == 3
+    assert cycle_lin.nodes[14]["cycle_ID"] == 14
+    assert cycle_lin.nodes[14]["cells"] == [11, 12, 13, 14]
+    assert cycle_lin.nodes[14]["cycle_length"] == 4
+    assert cycle_lin.nodes[14]["level"] == 1
 
 
 def test_cycle_lineage_empty_lin(empty_cell_lin):
     cycle_lin = CycleLineage(empty_cell_lin)
+    assert len(cycle_lin) == 0
+    assert cycle_lin.graph["lineage_ID"] == 1
 
 
 def test_cycle_lineage_single_node(one_node_cell_lin):
     cycle_lin = CycleLineage(one_node_cell_lin)
+    assert len(cycle_lin) == 1
+    assert cycle_lin.graph["lineage_ID"] == 1
+    assert cycle_lin.nodes[1]["cycle_ID"] == 1
+    assert cycle_lin.nodes[1]["cells"] == [1]
+    assert cycle_lin.nodes[1]["cycle_length"] == 1
+    assert cycle_lin.nodes[1]["level"] == 0
 
 
 def test_cycle_lineage_gap(cell_lin_gap):
     cycle_lin = CycleLineage(cell_lin_gap)
+    assert sorted(list(cycle_lin.nodes())) == [2, 4, 6, 8, 9, 10, 14, 15, 16]
+    assert cycle_lin.graph["lineage_ID"] == 1
+    assert cycle_lin.nodes[2]["cycle_ID"] == 2
+    assert cycle_lin.nodes[2]["cells"] == [1, 2]
+    assert cycle_lin.nodes[2]["cycle_length"] == 2
+    assert cycle_lin.nodes[2]["level"] == 0
+    assert cycle_lin.nodes[9]["cycle_ID"] == 9
+    assert cycle_lin.nodes[9]["cells"] == [9]
+    assert cycle_lin.nodes[9]["cycle_length"] == 1
+    assert cycle_lin.nodes[9]["level"] == 3
+    assert cycle_lin.nodes[14]["cycle_ID"] == 14
+    assert cycle_lin.nodes[14]["cells"] == [11, 14]
+    assert cycle_lin.nodes[14]["cycle_length"] == 2
+    assert cycle_lin.nodes[14]["level"] == 1
 
 
 def test_cycle_lineage_div_root(cell_lin_div_root):
     cycle_lin = CycleLineage(cell_lin_div_root)
+    assert sorted(list(cycle_lin.nodes())) == [1, 2, 4, 6, 8, 9, 10, 14, 15, 16, 17]
+    assert cycle_lin.graph["lineage_ID"] == 1
+    assert cycle_lin.nodes[1]["cycle_ID"] == 1
+    assert cycle_lin.nodes[1]["cells"] == [1]
+    assert cycle_lin.nodes[1]["cycle_length"] == 1
+    assert cycle_lin.nodes[1]["level"] == 0
+    assert cycle_lin.nodes[17]["cycle_ID"] == 17
+    assert cycle_lin.nodes[17]["cells"] == [17]
+    assert cycle_lin.nodes[17]["cycle_length"] == 1
+    assert cycle_lin.nodes[17]["level"] == 1
 
 
 def test_cycle_lineage_successive_divs_and_root(cell_lin_successive_divs_and_root):
     cycle_lin = CycleLineage(cell_lin_successive_divs_and_root)
+    assert sorted(list(cycle_lin.nodes())) == [2, 3, 5, 6, 7, 8, 9, 10, 11]
+    assert cycle_lin.graph["lineage_ID"] == 2
+    assert cycle_lin.nodes[3]["cycle_ID"] == 3
+    assert cycle_lin.nodes[3]["cells"] == [3]
+    assert cycle_lin.nodes[3]["cycle_length"] == 1
+    assert cycle_lin.nodes[3]["level"] == 1
+    assert cycle_lin.nodes[5]["cycle_ID"] == 5
+    assert cycle_lin.nodes[5]["cells"] == [4, 5]
+    assert cycle_lin.nodes[5]["cycle_length"] == 2
+    assert cycle_lin.nodes[5]["level"] == 2
 
 
 def test_cycle_lineage_triple_div(cell_lin_triple_div):
     cycle_lin = CycleLineage(cell_lin_triple_div)
+    assert sorted(list(cycle_lin.nodes())) == [2, 4, 6, 8, 9, 10, 14, 15, 16, 18]
+    assert cycle_lin.graph["lineage_ID"] == 1
+    assert cycle_lin.nodes[4]["cycle_ID"] == 4
+    assert cycle_lin.nodes[4]["cells"] == [3, 4]
+    assert cycle_lin.nodes[4]["cycle_length"] == 2
+    assert cycle_lin.nodes[4]["level"] == 1
+    assert cycle_lin.nodes[18]["cycle_ID"] == 18
+    assert cycle_lin.nodes[18]["cells"] == [17, 18]
+    assert cycle_lin.nodes[18]["cycle_length"] == 2
+    assert cycle_lin.nodes[18]["level"] == 2
 
 
 def test_cycle_lineage_unconnected_node(cell_lin_unconnected_node):
     with pytest.raises(LineageStructureError):
-        cycle_lin = CycleLineage(cell_lin_unconnected_node)
+        CycleLineage(cell_lin_unconnected_node)
 
 
 def test_cycle_lineage_unconnected_component(cell_lin_unconnected_component):
     with pytest.raises(LineageStructureError):
-        cycle_lin = CycleLineage(cell_lin_unconnected_component)
+        CycleLineage(cell_lin_unconnected_component)
 
 
 # get_edges_within_cycle() ###################################################
-# TODO
 
 
 def test_get_edges_within_cycle_normal_lin(cell_lin):
