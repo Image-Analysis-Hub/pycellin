@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-A collection of diverse morphology features that can be added to 
+A collection of diverse morphology features that can be added to
 lineage graphs.
 """
 
@@ -114,7 +114,7 @@ def get_width_and_length(
     width_ignore_tips: bool = False,
     debug: bool = False,
     debug_folder: str | None = None,
-) -> tuple[int, int]:
+) -> tuple[float, float]:
     """
     Compute the width and length of the ROI associated with a node.
 
@@ -144,7 +144,7 @@ def get_width_and_length(
 
     Returns
     -------
-    tuple[int, int]
+    tuple[float, float]
         Width and length of the ROI.
     """
     if debug:
@@ -257,8 +257,8 @@ def get_width_and_length(
                 f" is a better metric in that case. Setting the length and "
                 f"width to NaN."
             )
-        length = np.NaN
-        width = np.NaN
+        length = np.nan
+        width = np.nan
     elif len(adjacency_dict) == 0 or len(tip_px) == 0:
         # The skeleton is a loop!! The object being processed is
         # probably roundish. The method for mesuring length is not adapted to
@@ -279,8 +279,8 @@ def get_width_and_length(
                 f"is a better metric in that case. Setting the length and "
                 f"width to NaN."
             )
-        length = np.NaN
-        width = np.NaN
+        length = np.nan
+        width = np.nan
     else:
         # Ordering the skeleton pixels by following along the skeleton,
         # from one tip to another.
@@ -370,13 +370,13 @@ def get_width_and_length(
             # Width: max distance transform along skeleton.
             # TODO: see how to deal with this case, maybe put it in the ignore_tips?
             if len(dist_on_skel) == 0:
-                width = np.NaN
+                width = np.nan
             else:
                 width = np.max(dist_on_skel) * 2 - 1
         elif method_width == "min":
             # Width: min distance transform along skeleton.
             if len(dist_on_skel) == 0:
-                width = np.NaN
+                width = np.nan
             else:
                 width = np.min(dist_on_skel) * 2 - 1
         else:
@@ -528,7 +528,7 @@ class CellLength(NodeLocalFeatureCalculator):
 #     # Area of node at t minus area at t-1.
 #     predecessors = list(lineage.predecessors(noi))
 #     if len(predecessors) == 0:
-#         return np.NaN
+#         return np.nan
 #     else:
 #         err_mes = (
 #             f'Node {noi} in track {lineage.graph["name"]} has multiple predecessors.'
