@@ -417,6 +417,13 @@ def test_get_ancestors_node_ID_error(cell_lin, cycle_lin):
         cycle_lin.get_ancestors(0)
 
 
+def test_get_ancestors_cannot_order(cell_lin):
+    for n in cell_lin.nodes:
+        del cell_lin.nodes[n]["frame"]
+    with pytest.warns(UserWarning, match="No 'frame' feature to order the cells."):
+        cell_lin.get_ancestors(16)
+
+
 # get_descendants() ###########################################################
 
 
@@ -1872,6 +1879,22 @@ def test_cycle_lineage_unconnected_node(cell_lin_unconnected_node):
 def test_cycle_lineage_unconnected_component(cell_lin_unconnected_component):
     with pytest.raises(LineageStructureError):
         CycleLineage(cell_lin_unconnected_component)
+
+
+# get_ancestors() #############################################################
+
+
+def test_get_ancestors_key_error(cycle_lin):
+    with pytest.raises(KeyError):
+        cycle_lin.get_ancestors(0)
+
+
+def test_get_ancestors_cannot_order_cycle(cycle_lin):
+    for n in cycle_lin.nodes:
+        del cycle_lin.nodes[n]["level"]
+    msg = "No 'level' feature to order the cell cycles."
+    with pytest.warns(UserWarning, match=msg):
+        cycle_lin.get_ancestors(5)
 
 
 # get_edges_within_cycle() ###################################################
