@@ -1207,7 +1207,7 @@ class CycleLineage(Lineage):
     def __init__(self, cell_lineage: CellLineage | None = None) -> None:
         super().__init__()
 
-        if cell_lineage:
+        if cell_lineage is not None:
             # Creating nodes.
             divs = cell_lineage.get_divisions()
             leaves = cell_lineage.get_leaves()
@@ -1224,7 +1224,6 @@ class CycleLineage(Lineage):
             # Adding node and graph features.
             self.graph["lineage_ID"] = cell_lineage.graph["lineage_ID"]
             for n in divs + leaves:
-                self.nodes[n]["lineage_ID"] = cell_lineage.graph["lineage_ID"]
                 self.nodes[n]["cycle_ID"] = n
                 self.nodes[n]["cells"] = cell_lineage.get_cell_cycle(n)
                 self.nodes[n]["cycle_length"] = len(self.nodes[n]["cells"])
@@ -1236,6 +1235,7 @@ class CycleLineage(Lineage):
                 self.nodes[n]["level"] = nx.shortest_path_length(self, root, n)
             # cell_cycle completeness?
             # div_time?
+            # cell cycle duration?
             # Or I add it later with add_custom_feature()?
 
     def __str__(self) -> str:
