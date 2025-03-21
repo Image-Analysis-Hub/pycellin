@@ -37,9 +37,7 @@ class Data:
         """
         self.cell_data = data
         if add_cycle_data:
-            self.cycle_data = {
-                lin_ID: self._compute_cycle_lineage(lin_ID) for lin_ID in self.cell_data
-            }
+            self._add_cycle_lineages()
         else:
             self.cycle_data = None
 
