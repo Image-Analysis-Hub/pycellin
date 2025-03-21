@@ -923,7 +923,7 @@ class CellLineage(Lineage):
         return cell_cycle
 
     def get_cell_cycles(
-        self, ignore_incomplete_cycles: bool = False, debug: bool = False
+        self, ignore_incomplete_cycles: bool = False
     ) -> list[list[int]]:
         """
         Identify all the nodes of each cell cycle in a lineage.
@@ -936,8 +936,6 @@ class CellLineage(Lineage):
         ----------
         ignore_incomplete_cycles : bool, optional
             True to ignore incomplete cell cycles, False otherwise. False by default.
-        debug : bool, optional
-            True to display debug messages, False otherwise. False by default.
 
         Returns
         -------
@@ -948,8 +946,6 @@ class CellLineage(Lineage):
             end_nodes = self.get_divisions()  # Includes the root if it's a div.
         else:
             end_nodes = self.get_divisions() + self.get_leaves()
-        if debug:
-            print("End nodes:", end_nodes)
 
         cell_cycles = []
         for node in end_nodes:
@@ -957,8 +953,6 @@ class CellLineage(Lineage):
             if ignore_incomplete_cycles and self.is_root(cc_nodes[0]):
                 continue
             cell_cycles.append(cc_nodes)
-            if debug:
-                print("Cell cycle nodes:", cc_nodes)
 
         return cell_cycles
 
