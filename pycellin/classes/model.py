@@ -29,8 +29,8 @@ class Model:
     def __init__(
         self,
         metadata: dict[str, Any] | None = None,
-        feat_declaration: FeaturesDeclaration = None,
-        data: Data = None,
+        feat_declaration: FeaturesDeclaration | None = None,
+        data: Data | None = None,
     ) -> None:
         """
         Constructs all the necessary attributes for the Model object.
