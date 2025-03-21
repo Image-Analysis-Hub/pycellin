@@ -78,12 +78,12 @@ class Data:
             if not nx.is_frozen(lineage):
                 nx.freeze(lineage)
 
-    def _unfreeze_lineage_data(self):
-        """
-        Unfreeze all cell lineages.
-        """
-        for lineage in self.cell_data.values():
-            Lineage.unfreeze(lineage)
+    # def _unfreeze_lineage_data(self):
+    #     """
+    #     Unfreeze all cell lineages.
+    #     """
+    #     for lineage in self.cell_data.values():
+    #         Lineage.unfreeze(lineage)
 
     def number_of_lineages(self) -> int:
         """
