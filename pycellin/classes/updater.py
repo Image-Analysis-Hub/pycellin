@@ -172,6 +172,12 @@ class ModelUpdater:
             self._modified_lineages | self._added_lineages
         ) - self._removed_lineages:
             if data.cycle_data is not None:
+                # To preserve references, but cannot work on frozen lineages...:
+                # new_cycle_data = data._compute_cycle_lineage(lin_ID)
+                # if lin_ID in data.cycle_data:
+                #     data.cycle_data.update({lin_ID: new_cycle_data})
+                # else:
+                #     data.cycle_data[lin_ID] = new_cycle_data
                 data.cycle_data[lin_ID] = data._compute_cycle_lineage(lin_ID)
         for lin_ID in self._removed_lineages:
             if lin_ID in data.cycle_data:
