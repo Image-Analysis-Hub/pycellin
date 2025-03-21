@@ -4,6 +4,8 @@
 # TODO: add a Warning when a feature is not present across all cells,
 # links, or lineages?
 
+# TODO: create an exception when unknown cell, cell cycle, link, lineage...
+
 
 class LineageStructureError(Exception):
     """
