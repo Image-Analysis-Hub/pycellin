@@ -4,13 +4,11 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from itertools import pairwise
-import types
 from typing import Any, Generator, Literal, Tuple
 import warnings
 
 from igraph import Graph
 import networkx as nx
-from networkx.classes.digraph import DiGraph
 import plotly.graph_objects as go
 
 from pycellin.classes.exceptions import (

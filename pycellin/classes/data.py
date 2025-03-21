@@ -7,20 +7,39 @@ import warnings
 
 import networkx as nx
 
-from pycellin.classes.lineage import Lineage, CellLineage, CycleLineage
+from pycellin.classes.lineage import CellLineage, CycleLineage
 
 
 class Data:
     """
     Class to store and manipulate cell lineages and cell cycle lineages.
+
+    Attributes
+    ----------
+    cell_data : dict[int, CellLineage]
+        The cell lineages stored.
+    cycle_data : dict[int, CycleLineage] | None
+        The cycle lineages stored, if any.
     """
 
     def __init__(
-        self, data: dict[str, CellLineage], add_cycle_data: bool = False
+        self, data: dict[int, CellLineage], add_cycle_data: bool = False
     ) -> None:
+        """
+        Initialize a Data object.
+
+        Parameters
+        ----------
+        data : dict[int, CellLineage]
+            The cell lineages to store.
+        add_cycle_data : bool, optional
+            Whether to compute and store the cycle lineages, by default False.
+        """
         self.cell_data = data
         if add_cycle_data:
-            self._compute_cycle_lineages()
+            self.cycle_data = {
+                lin_ID: self._compute_cycle_lineage(lin_ID) for lin_ID in self.cell_data
+            }
         else:
             self.cycle_data = None
 
@@ -116,9 +135,9 @@ class Data:
         radius: float = 0,
         time_window: int = 0,
         time_window_type: Literal["before", "after", "symetric"] = "symetric",
-        lineages_to_search: list[CellLineage] = None,
+        lineages_to_search: list[CellLineage] | None = None,
         reference: Literal["center", "border"] = "center",
-    ) -> tuple[CellLineage, int]:
+    ) -> tuple[int, CellLineage]:
         """
         Find the closest cell to a given cell of a lineage.
 
@@ -163,7 +182,7 @@ class Data:
         radius: float = 0,
         time_window: int = 0,
         time_window_type: Literal["before", "after", "symetric"] = "symetric",
-        lineages_to_search: list[CellLineage] = None,
+        lineages_to_search: list[CellLineage] | None = None,
         reference: Literal["center", "border"] = "center",
     ) -> list[tuple[int, CellLineage]]:
         """
