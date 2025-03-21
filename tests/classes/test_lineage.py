@@ -202,6 +202,7 @@ def test_get_root_single_node(one_node_cell_lin):
 
 def test_get_root_gap(cell_lin_gap):
     assert cell_lin_gap.get_root() == 1
+    assert cell_lin_gap.get_root(ignore_lone_nodes=True) == 1
 
 
 def test_get_root_div_root(cell_lin_div_root):
