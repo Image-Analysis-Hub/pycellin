@@ -13,7 +13,11 @@ import networkx as nx
 from networkx.classes.digraph import DiGraph
 import plotly.graph_objects as go
 
-from pycellin.classes.exceptions import FusionError, TimeFlowError
+from pycellin.classes.exceptions import (
+    FusionError,
+    TimeFlowError,
+    LineageStructureError,
+)
 
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
@@ -575,13 +579,13 @@ class CellLineage(Lineage):
             If the cell does not exist in the lineage.
         """
         try:
-            cell_attrs = self.nodes[noi]
+            cell_feats = self.nodes[noi]
         except KeyError as err:
             _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
             msg = f"Cell {noi} does not exist{txt}."
             raise KeyError(msg) from err
         self.remove_node(noi)
-        return cell_attrs
+        return cell_feats
 
     def _add_link(
         self,
@@ -723,13 +727,13 @@ class CellLineage(Lineage):
             raise ValueError(f"Target cell (ID {target_noi}) does not exist{txt}.")
 
         try:
-            link_attrs = self[source_noi][target_noi]
+            link_feats = self[source_noi][target_noi]
         except KeyError as err:
             raise KeyError(
                 f"Link 'Cell {source_noi} -> Cell {target_noi}' does not exist{txt}."
             ) from err
         self.remove_edge(source_noi, target_noi)
-        return link_attrs
+        return link_feats
 
     def _split_from_cell(
         self,
@@ -1201,9 +1205,12 @@ class CycleLineage(Lineage):
                 self.nodes[n]["cycle_ID"] = n
                 self.nodes[n]["cells"] = cell_lineage.get_cell_cycle(n)
                 self.nodes[n]["cycle_length"] = len(self.nodes[n]["cells"])
-                self.nodes[n]["level"] = nx.shortest_path_length(
-                    self, self.get_root(), n
-                )
+                root = self.get_root()
+                if isinstance(root, list):
+                    raise LineageStructureError(
+                        "A cycle lineage cannot have multiple roots."
+                    )
+                self.nodes[n]["level"] = nx.shortest_path_length(self, root, n)
             # cell_cycle completeness?
             # div_time?
             # Or I add it later with add_custom_feature()?
@@ -1264,6 +1271,8 @@ class CycleLineage(Lineage):
         """
         Return the edges within a cell cycle.
 
+        This doesn't include the edge from the previous cell cycle to the current one.
+
         Parameters
         ----------
         noi : int
@@ -1281,6 +1290,8 @@ class CycleLineage(Lineage):
     ) -> Generator[Tuple[int, int], None, None]:
         """
         Yield the edges within a cell cycle.
+
+        This doesn't include the edge from the previous cell cycle to the current one.
 
         Parameters
         ----------

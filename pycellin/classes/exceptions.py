@@ -38,7 +38,7 @@ class FusionError(LineageStructureError):
         self,
         node_ID: int,
         lineage_ID: int | None = None,
-        message: str = None,
+        message: str | None = None,
     ):
         self.node_ID = node_ID
         self.lineage_ID = lineage_ID
@@ -83,7 +83,7 @@ class TimeFlowError(LineageStructureError):
         target_noi: int,
         source_lineage_ID: int | None = None,
         target_lineage_ID: int | None = None,
-        message: str = None,
+        message: str | None = None,
     ):
         self.source_noi = source_noi
         self.source_lineage_ID = source_lineage_ID

@@ -8,7 +8,11 @@ import pytest
 import networkx as nx
 
 from pycellin.classes import CellLineage, CycleLineage
-from pycellin.classes.exceptions import FusionError
+from pycellin.classes.exceptions import (
+    FusionError,
+    TimeFlowError,
+    LineageStructureError,
+)
 
 
 # CellLineage fixtures ########################################################
@@ -23,6 +27,7 @@ def empty_cell_lin():
 def one_node_cell_lin():
     lineage = CellLineage()
     lineage.add_node(1, frame=0)
+    lineage.graph["lineage_ID"] = 1
     return lineage
 
 
@@ -51,6 +56,7 @@ def cell_lin():
     )
     for n in lineage.nodes:
         lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 1, n)
+    lineage.graph["lineage_ID"] = 1
     return lineage
 
 
@@ -89,6 +95,7 @@ def cell_lin_successive_divs_and_root():
     )
     for n in lineage.nodes:
         lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 2, n)
+    lineage.graph["lineage_ID"] = 1
     return lineage
 
 
@@ -109,18 +116,18 @@ def cell_lin_unconnected_node(cell_lin):
 
 @pytest.fixture
 def cell_lin_unconnected_component(cell_lin):
-    cell_lin.add_node(17, frame=0)
-    cell_lin.add_node(18, frame=1)
+    cell_lin.add_node(17, frame=1)
+    cell_lin.add_node(18, frame=2)
     cell_lin.add_edge(17, 18)
     return cell_lin
 
 
 @pytest.fixture
 def cell_lin_unconnected_component_div(cell_lin_unconnected_component):
-    cell_lin_unconnected_component.add_node(19, frame=1)
-    cell_lin_unconnected_component.add_node(20, frame=2)
-    cell_lin_unconnected_component.add_node(21, frame=3)
-    cell_lin_unconnected_component.add_node(22, frame=2)
+    cell_lin_unconnected_component.add_node(19, frame=2)
+    cell_lin_unconnected_component.add_node(20, frame=3)
+    cell_lin_unconnected_component.add_node(21, frame=4)
+    cell_lin_unconnected_component.add_node(22, frame=3)
     cell_lin_unconnected_component.add_edges_from(
         [(17, 19), (19, 20), (20, 21), (19, 22)]
     )
@@ -500,8 +507,6 @@ def test_get_descendants_unconnected_component(cell_lin_unconnected_component):
 
 # is_root() ###################################################################
 
-# TODO: when keyerror on noi
-
 
 def test_is_root_normal_lin(cell_lin, cycle_lin):
     # CellLineage
@@ -744,11 +749,402 @@ def test_add_cell_single_node(one_node_cell_lin):
 
 # _remove_cell() ##############################################################
 
+
+def check_correct_cell_removal(cell_lin, node_id):
+    cell_feats = cell_lin.nodes[node_id]
+    assert cell_lin._remove_cell(node_id) == cell_feats
+    assert node_id not in cell_lin.nodes
+    assert not any(node_id in edge for edge in cell_lin.edges)
+
+
+def test_remove_cell_normal_lin(cell_lin):
+    # Root.
+    check_correct_cell_removal(cell_lin, 1)
+    # Division.
+    check_correct_cell_removal(cell_lin, 4)
+    # Just after division.
+    check_correct_cell_removal(cell_lin, 11)
+    # Leaves.
+    check_correct_cell_removal(cell_lin, 10)
+    check_correct_cell_removal(cell_lin, 16)
+    # Intermediate node.
+    check_correct_cell_removal(cell_lin, 12)
+
+
+def test_remove_cell_empty_lin(empty_cell_lin):
+    with pytest.raises(KeyError):
+        empty_cell_lin._remove_cell(0)
+
+
+def test_remove_cell_single_node(one_node_cell_lin):
+    check_correct_cell_removal(one_node_cell_lin, 1)
+
+
+def test_remove_cell_gap(cell_lin_gap):
+    # Root.
+    check_correct_cell_removal(cell_lin_gap, 1)
+    # Division.
+    check_correct_cell_removal(cell_lin_gap, 4)
+    check_correct_cell_removal(cell_lin_gap, 8)
+    check_correct_cell_removal(cell_lin_gap, 14)
+    # Just after division.
+    check_correct_cell_removal(cell_lin_gap, 11)
+    # Leaves.
+    check_correct_cell_removal(cell_lin_gap, 6)
+    check_correct_cell_removal(cell_lin_gap, 15)
+
+
+def test_remove_cell_div_root(cell_lin_div_root):
+    check_correct_cell_removal(cell_lin_div_root, 17)
+
+
+def test_remove_cell_unconnected_node(cell_lin_unconnected_node):
+    check_correct_cell_removal(cell_lin_unconnected_node, 17)
+
+
+def test_remove_cell_unconnected_component(cell_lin_unconnected_component):
+    check_correct_cell_removal(cell_lin_unconnected_component, 17)
+    check_correct_cell_removal(cell_lin_unconnected_component, 18)
+
+
+def test_remove_cell_unconnected_component_div(cell_lin_unconnected_component_div):
+    check_correct_cell_removal(cell_lin_unconnected_component_div, 18)
+    check_correct_cell_removal(cell_lin_unconnected_component_div, 19)
+    check_correct_cell_removal(cell_lin_unconnected_component_div, 20)
+    check_correct_cell_removal(cell_lin_unconnected_component_div, 22)
+
+
 # _add_link() #################################################################
+
+
+def test_add_link_normal_lin(cell_lin):
+    # Add a valid link.
+    cell_lin.add_node(17, frame=6, cell_ID=17)
+    cell_lin._add_link(6, 17)
+    assert cell_lin.has_edge(6, 17)
+    assert cell_lin.nodes[17]["cell_ID"] == 17
+    assert cell_lin.nodes[17]["frame"] == 6
+    # Add a link that creates a division.
+    cell_lin.add_node(18, frame=1, cell_ID=18)
+    cell_lin._add_link(1, 18)
+    assert cell_lin.has_edge(1, 18)
+    assert cell_lin.nodes[18]["cell_ID"] == 18
+    assert cell_lin.nodes[18]["frame"] == 1
+
+
+def test_add_link_existing_edge(cell_lin):
+    # Add an existing link.
+    with pytest.raises(ValueError):
+        cell_lin._add_link(1, 2)
+
+
+def test_add_link_nonexistent_source(cell_lin):
+    # Add a link with a nonexistent source.
+    with pytest.raises(ValueError):
+        cell_lin._add_link(99, 2)
+
+
+def test_add_link_nonexistent_target(cell_lin):
+    # Add a link with a nonexistent target.
+    with pytest.raises(ValueError):
+        cell_lin._add_link(1, 99)
+
+
+def test_add_link_fusion_error(cell_lin):
+    # Add a link that creates a fusion event.
+    cell_lin.add_edge(3, 12)
+    with pytest.raises(FusionError):
+        cell_lin._add_link(5, 12)
+
+
+def test_add_link_time_flow_error(cell_lin):
+    # Add a link that violates the flow of time.
+    cell_lin.add_node(17, frame=1, cell_ID=17)
+    with pytest.raises(TimeFlowError):
+        cell_lin._add_link(6, 17)
+    cell_lin.add_node(18, frame=0, cell_ID=18)
+    with pytest.raises(TimeFlowError):
+        cell_lin._add_link(1, 18)
+
+
+def test_add_link_different_lineages(cell_lin, cell_lin_unconnected_component):
+    # Add a link between different lineages.
+    new_lin = CellLineage()
+    new_lin.add_node(19, frame=1, cell_ID=19)
+    cell_lin._add_link(1, 19, target_lineage=new_lin)
+    assert cell_lin.has_node(19)
+    assert cell_lin.nodes[19]["cell_ID"] == 19
+    assert cell_lin.nodes[19]["frame"] == 1
+    assert cell_lin.has_edge(1, 19)
+    assert not new_lin.has_node(19)
+    # Add a link between a lineage and a component of another lineage.
+    # FIXME: seems like the nodes are not removed from the target lineage...
+    # cell_lin._add_link(1, 17, target_lineage=cell_lin_unconnected_component)
+    # assert cell_lin.has_node(17)
+    # assert cell_lin.has_node(18)
+    # assert cell_lin.has_edge(1, 17)
+    # assert cell_lin.has_edge(17, 18)
+    # assert cell_lin_unconnected_component.nodes == cell_lin.nodes
+    # assert list(cell_lin.nodes) == [17, 18]
+    # assert list(cell_lin_unconnected_component.nodes) == [17, 18]
+    # assert not cell_lin_unconnected_component.has_node(17)
+
+
+# FIXME
+# def test_add_link_conflicting_ids(cell_lin, cell_lin_unconnected_component):
+#     # Add a link between different lineages with conflicting IDs.
+#     cell_lin_unconnected_component.add_node(6, frame=5)
+#     cell_lin._add_link(4, 6, target_lineage=cell_lin_unconnected_component)
+#     assert cell_lin.has_edge(4, 6)
+#     assert cell_lin.nodes[6]["cell_ID"] == 6
+#     assert cell_lin.nodes[6]["frame"] == 5
+
 
 # _remove_link() ##############################################################
 
+
+def check_correct_link_removal(cell_lin, source_noi, target_noi):
+    link_feats = cell_lin[source_noi][target_noi]
+    assert cell_lin._remove_link(source_noi, target_noi) == link_feats
+    assert not cell_lin.has_edge(source_noi, target_noi)
+
+
+def test_remove_link_normal_lin(cell_lin):
+    # Remove a valid link with root.
+    check_correct_link_removal(cell_lin, 1, 2)
+    # Remove a valid link with division.
+    check_correct_link_removal(cell_lin, 4, 5)
+    # Remove a valid link with leaf.
+    check_correct_link_removal(cell_lin, 8, 9)
+    # Remove a valid link with intermediate node.
+    check_correct_link_removal(cell_lin, 12, 13)
+
+
+def test_remove_link_nonexistent_source(cell_lin):
+    # Remove a link with a nonexistent source.
+    with pytest.raises(ValueError):
+        cell_lin._remove_link(99, 2)
+
+
+def test_remove_link_nonexistent_target(cell_lin):
+    # Remove a link with a nonexistent target.
+    with pytest.raises(ValueError):
+        cell_lin._remove_link(1, 99)
+
+
+def test_remove_link_nonexistent_link(cell_lin):
+    # Remove a nonexistent link.
+    with pytest.raises(KeyError):
+        cell_lin._remove_link(1, 3)
+
+
+def test_remove_link_empty_lin(empty_cell_lin):
+    # Remove a link from an empty lineage.
+    with pytest.raises(ValueError):
+        empty_cell_lin._remove_link(0, 1)
+
+
+def test_remove_link_single_node(one_node_cell_lin):
+    # Remove a link from a single node lineage.
+    with pytest.raises(ValueError):
+        one_node_cell_lin._remove_link(1, 2)
+
+
+def test_remove_link_gap(cell_lin_gap):
+    # Remove a valid link in a lineage with gaps.
+    check_correct_link_removal(cell_lin_gap, 1, 2)
+    check_correct_link_removal(cell_lin_gap, 4, 6)
+    check_correct_link_removal(cell_lin_gap, 8, 9)
+    check_correct_link_removal(cell_lin_gap, 11, 14)
+
+
+def test_remove_link_div_root(cell_lin_div_root):
+    # Remove a valid link in a lineage with a division root.
+    check_correct_link_removal(cell_lin_div_root, 1, 17)
+
+
+def test_remove_link_unconnected_component(cell_lin_unconnected_component):
+    # Remove a valid link in a lineage with an unconnected component.
+    check_correct_link_removal(cell_lin_unconnected_component, 17, 18)
+
+
+def test_remove_link_unconnected_component_div(cell_lin_unconnected_component_div):
+    # Remove a valid link in a lineage with an unconnected component and division.
+    check_correct_link_removal(cell_lin_unconnected_component_div, 17, 18)
+    check_correct_link_removal(cell_lin_unconnected_component_div, 19, 20)
+    check_correct_link_removal(cell_lin_unconnected_component_div, 19, 22)
+
+
 # _split_from_cell() ##########################################################
+# TODO: to check
+
+
+def test_split_from_cell_upstream(cell_lin):
+    # Split upstream from a node.
+    new_lin = cell_lin._split_from_cell(4, split="upstream")
+    assert sorted(new_lin.nodes()) == [4, 5, 6, 7, 8, 9, 10]
+    assert sorted(cell_lin.nodes()) == [1, 2, 3, 11, 12, 13, 14, 15, 16]
+
+
+def test_split_from_cell_downstream(cell_lin):
+    # Split downstream from a node.
+    new_lin = cell_lin._split_from_cell(4, split="downstream")
+    assert sorted(new_lin.nodes()) == [5, 6, 7, 8, 9, 10]
+    assert sorted(cell_lin.nodes()) == [1, 2, 3, 4, 11, 12, 13, 14, 15, 16]
+
+
+def test_split_from_cell_upstream_single_node(one_node_cell_lin):
+    # Split upstream from a single node.
+    new_lin = one_node_cell_lin._split_from_cell(1, split="upstream")
+    assert sorted(new_lin.nodes()) == [1]
+    assert sorted(one_node_cell_lin.nodes()) == []
+
+
+def test_split_from_cell_downstream_single_node(one_node_cell_lin):
+    # Split downstream from a single node.
+    new_lin = one_node_cell_lin._split_from_cell(1, split="downstream")
+    assert sorted(new_lin.nodes()) == []
+    assert sorted(one_node_cell_lin.nodes()) == [1]
+
+
+def test_split_from_cell_upstream_gap(cell_lin_gap):
+    # Split upstream from a node in a lineage with gaps.
+    new_lin = cell_lin_gap._split_from_cell(4, split="upstream")
+    assert sorted(new_lin.nodes()) == [4, 6, 8, 9, 10]
+    assert sorted(cell_lin_gap.nodes()) == [1, 2, 3, 11, 14, 15, 16]
+
+
+def test_split_from_cell_downstream_gap(cell_lin_gap):
+    # Split downstream from a node in a lineage with gaps.
+    new_lin = cell_lin_gap._split_from_cell(4, split="downstream")
+    assert sorted(new_lin.nodes()) == [6, 8, 9, 10]
+    assert sorted(cell_lin_gap.nodes()) == [1, 2, 3, 4, 11, 14, 15, 16]
+
+
+def test_split_from_cell_upstream_div_root(cell_lin_div_root):
+    # Split upstream from a node in a lineage with a division root.
+    new_lin = cell_lin_div_root._split_from_cell(4, split="upstream")
+    assert sorted(new_lin.nodes()) == [4, 5, 6, 7, 8, 9, 10]
+    assert sorted(cell_lin_div_root.nodes()) == [1, 2, 3, 11, 12, 13, 14, 15, 16, 17]
+
+
+def test_split_from_cell_downstream_div_root(cell_lin_div_root):
+    # Split downstream from a node in a lineage with a division root.
+    new_lin = cell_lin_div_root._split_from_cell(4, split="downstream")
+    assert sorted(new_lin.nodes()) == [5, 6, 7, 8, 9, 10]
+    assert sorted(cell_lin_div_root.nodes()) == [1, 2, 3, 4, 11, 12, 13, 14, 15, 16, 17]
+
+
+def test_split_from_cell_upstream_unconnected_node(cell_lin_unconnected_node):
+    # Split upstream from an unconnected node.
+    new_lin = cell_lin_unconnected_node._split_from_cell(17, split="upstream")
+    assert sorted(new_lin.nodes()) == [17]
+    assert sorted(cell_lin_unconnected_node.nodes()) == [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+    ]
+
+
+def test_split_from_cell_downstream_unconnected_node(cell_lin_unconnected_node):
+    # Split downstream from an unconnected node.
+    new_lin = cell_lin_unconnected_node._split_from_cell(17, split="downstream")
+    assert sorted(new_lin.nodes()) == []
+    assert sorted(cell_lin_unconnected_node.nodes()) == [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+    ]
+
+
+def test_split_from_cell_upstream_unconnected_component(cell_lin_unconnected_component):
+    # Split upstream from a node in an unconnected component.
+    new_lin = cell_lin_unconnected_component._split_from_cell(17, split="upstream")
+    assert sorted(new_lin.nodes()) == [17, 18]
+    assert sorted(cell_lin_unconnected_component.nodes()) == [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+    ]
+
+
+def test_split_from_cell_downstream_unconnected_component(
+    cell_lin_unconnected_component,
+):
+    # Split downstream from a node in an unconnected component.
+    new_lin = cell_lin_unconnected_component._split_from_cell(17, split="downstream")
+    assert sorted(new_lin.nodes()) == [18]
+    assert sorted(cell_lin_unconnected_component.nodes()) == [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+    ]
+
+
+def test_split_from_cell_invalid_node(cell_lin):
+    # Split from an invalid node.
+    with pytest.raises(ValueError):
+        cell_lin._split_from_cell(99)
+
+
+def test_split_from_cell_invalid_split(cell_lin):
+    # Split with an invalid split parameter.
+    with pytest.raises(ValueError):
+        cell_lin._split_from_cell(4, split="invalid")
 
 
 # get_divisions() #############################################################
@@ -1217,6 +1613,201 @@ def test_get_sister_cells_fusion_error(cell_lin):
 
 # is_division() ###############################################################
 
-# get_edges_within_cycle() ###################################################
 
-# yield_edges_within_cycle() #################################################
+def test_is_division_normal_lin(cell_lin):
+    # Root.
+    assert not cell_lin.is_division(1)
+    # Divisions.
+    assert cell_lin.is_division(2)
+    assert cell_lin.is_division(4)
+    assert cell_lin.is_division(8)
+    assert cell_lin.is_division(14)
+    # Leaves.
+    assert not cell_lin.is_division(6)
+    assert not cell_lin.is_division(9)
+    assert not cell_lin.is_division(10)
+    assert not cell_lin.is_division(15)
+    assert not cell_lin.is_division(16)
+    # Intermediate nodes.
+    assert not cell_lin.is_division(3)
+    assert not cell_lin.is_division(5)
+    assert not cell_lin.is_division(7)
+    assert not cell_lin.is_division(11)
+    assert not cell_lin.is_division(12)
+    assert not cell_lin.is_division(13)
+
+
+def test_is_division_single_node(one_node_cell_lin):
+    assert not one_node_cell_lin.is_division(1)
+
+
+def test_is_division_gap(cell_lin_gap):
+    # Root.
+    assert not cell_lin_gap.is_division(1)
+    # Divisions.
+    assert cell_lin_gap.is_division(2)
+    assert cell_lin_gap.is_division(4)
+    assert cell_lin_gap.is_division(8)
+    assert cell_lin_gap.is_division(14)
+    # Leaves.
+    assert not cell_lin_gap.is_division(6)
+    assert not cell_lin_gap.is_division(10)
+    assert not cell_lin_gap.is_division(16)
+    # Intermediate nodes.
+    assert not cell_lin_gap.is_division(3)
+    assert not cell_lin_gap.is_division(11)
+
+
+def test_is_division_div_root(cell_lin_div_root):
+    # Root.
+    assert cell_lin_div_root.is_division(1)
+    # Divisions.
+    assert cell_lin_div_root.is_division(2)
+    assert cell_lin_div_root.is_division(4)
+    assert cell_lin_div_root.is_division(8)
+    assert cell_lin_div_root.is_division(14)
+    # Leaves.
+    assert not cell_lin_div_root.is_division(6)
+    assert not cell_lin_div_root.is_division(9)
+    assert not cell_lin_div_root.is_division(15)
+    assert not cell_lin_div_root.is_division(17)
+    # Intermediate nodes.
+    assert not cell_lin_div_root.is_division(3)
+    assert not cell_lin_div_root.is_division(7)
+
+
+def test_is_division_successive_divs_and_root(cell_lin_successive_divs_and_root):
+    # Root.
+    assert cell_lin_successive_divs_and_root.is_division(2)
+    # Divisions.
+    assert cell_lin_successive_divs_and_root.is_division(3)
+    assert cell_lin_successive_divs_and_root.is_division(5)
+    assert cell_lin_successive_divs_and_root.is_division(8)
+    # Leaves.
+    assert not cell_lin_successive_divs_and_root.is_division(6)
+    assert not cell_lin_successive_divs_and_root.is_division(9)
+    assert not cell_lin_successive_divs_and_root.is_division(11)
+    # Intermediate nodes.
+    assert not cell_lin_successive_divs_and_root.is_division(4)
+
+
+def test_is_division_unconnected_node(cell_lin_unconnected_node):
+    assert not cell_lin_unconnected_node.is_division(17)
+
+
+def test_is_division_unconnected_component(cell_lin_unconnected_component):
+    assert not cell_lin_unconnected_component.is_division(17)
+    assert not cell_lin_unconnected_component.is_division(18)
+
+
+def test_is_division_unconnected_component_div(cell_lin_unconnected_component_div):
+    assert cell_lin_unconnected_component_div.is_division(17)
+    assert cell_lin_unconnected_component_div.is_division(19)
+    assert not cell_lin_unconnected_component_div.is_division(20)
+    assert not cell_lin_unconnected_component_div.is_division(21)
+    assert not cell_lin_unconnected_component_div.is_division(22)
+
+
+# CycleLineage __init__() #####################################################
+# TODO: test what is inside the cycle lineages
+
+
+def test_cycle_lineage_normal_lin(cell_lin):
+    cycle_lin = CycleLineage(cell_lin)
+
+
+def test_cycle_lineage_empty_lin(empty_cell_lin):
+    cycle_lin = CycleLineage(empty_cell_lin)
+
+
+def test_cycle_lineage_single_node(one_node_cell_lin):
+    cycle_lin = CycleLineage(one_node_cell_lin)
+
+
+def test_cycle_lineage_gap(cell_lin_gap):
+    cycle_lin = CycleLineage(cell_lin_gap)
+
+
+def test_cycle_lineage_div_root(cell_lin_div_root):
+    cycle_lin = CycleLineage(cell_lin_div_root)
+
+
+def test_cycle_lineage_successive_divs_and_root(cell_lin_successive_divs_and_root):
+    cycle_lin = CycleLineage(cell_lin_successive_divs_and_root)
+
+
+def test_cycle_lineage_triple_div(cell_lin_triple_div):
+    cycle_lin = CycleLineage(cell_lin_triple_div)
+
+
+def test_cycle_lineage_unconnected_node(cell_lin_unconnected_node):
+    with pytest.raises(LineageStructureError):
+        cycle_lin = CycleLineage(cell_lin_unconnected_node)
+
+
+def test_cycle_lineage_unconnected_component(cell_lin_unconnected_component):
+    with pytest.raises(LineageStructureError):
+        cycle_lin = CycleLineage(cell_lin_unconnected_component)
+
+
+# get_edges_within_cycle() ###################################################
+# TODO
+
+
+def test_get_edges_within_cycle_normal_lin(cell_lin):
+    cycle_lin = CycleLineage(cell_lin)
+    # From division.
+    assert cycle_lin.get_edges_within_cycle(2) == [(1, 2)]
+    assert cycle_lin.get_edges_within_cycle(4) == [(3, 4)]
+    assert cycle_lin.get_edges_within_cycle(8) == [(7, 8)]
+    assert cycle_lin.get_edges_within_cycle(14) == [(11, 12), (12, 13), (13, 14)]
+    # From leaf.
+    assert cycle_lin.get_edges_within_cycle(6) == [(5, 6)]
+    assert cycle_lin.get_edges_within_cycle(9) == []
+    assert cycle_lin.get_edges_within_cycle(16) == []
+
+
+def test_get_edges_within_cycle_single_node(one_node_cell_lin):
+    cycle_lin = CycleLineage(one_node_cell_lin)
+    assert cycle_lin.get_edges_within_cycle(1) == []
+
+
+def test_get_edges_within_cycle_gap(cell_lin_gap):
+    cycle_lin = CycleLineage(cell_lin_gap)
+    # From division.
+    assert cycle_lin.get_edges_within_cycle(2) == [(1, 2)]
+    assert cycle_lin.get_edges_within_cycle(4) == [(3, 4)]
+    assert cycle_lin.get_edges_within_cycle(8) == []
+    assert cycle_lin.get_edges_within_cycle(14) == [(11, 14)]
+    # From leaf.
+    assert cycle_lin.get_edges_within_cycle(6) == []
+    assert cycle_lin.get_edges_within_cycle(9) == []
+    assert cycle_lin.get_edges_within_cycle(16) == []
+
+
+def test_get_edges_within_cycle_div_root(cell_lin_div_root):
+    cycle_lin = CycleLineage(cell_lin_div_root)
+    assert cycle_lin.get_edges_within_cycle(1) == []
+    assert cycle_lin.get_edges_within_cycle(2) == []
+    assert cycle_lin.get_edges_within_cycle(17) == []
+
+
+def test_get_edges_within_cycle_successive_divs_and_root(
+    cell_lin_successive_divs_and_root,
+):
+    cycle_lin = CycleLineage(cell_lin_successive_divs_and_root)
+    assert cycle_lin.get_edges_within_cycle(2) == []
+    assert cycle_lin.get_edges_within_cycle(3) == []
+    assert cycle_lin.get_edges_within_cycle(5) == [(4, 5)]
+    assert cycle_lin.get_edges_within_cycle(6) == []
+    assert cycle_lin.get_edges_within_cycle(8) == []
+    assert cycle_lin.get_edges_within_cycle(9) == []
+    assert cycle_lin.get_edges_within_cycle(11) == []
+
+
+def test_get_edges_within_cycle_triple_div(cell_lin_triple_div):
+    cycle_lin = CycleLineage(cell_lin_triple_div)
+    assert cycle_lin.get_edges_within_cycle(4) == [(3, 4)]
+    assert cycle_lin.get_edges_within_cycle(6) == [(5, 6)]
+    assert cycle_lin.get_edges_within_cycle(8) == [(7, 8)]
+    assert cycle_lin.get_edges_within_cycle(18) == [(17, 18)]

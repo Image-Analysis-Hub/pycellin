@@ -159,7 +159,7 @@ def _build_CTC_tracks(
         )
     else:
         try:
-            cell_cycles = lineage.get_cell_cycles(keep_incomplete_cell_cycles=True)
+            cell_cycles = lineage.get_cell_cycles()
         except FusionError as err:
             raise FusionError(
                 err.node_ID,
