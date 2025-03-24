@@ -6,6 +6,8 @@
 
 # TODO: create an exception when unknown cell, cell cycle, link, lineage...
 
+# TODO: maybe add a FeatureTypeValueError and a LineageTypeValueError
+
 
 class LineageStructureError(Exception):
     """
@@ -106,4 +108,21 @@ class TimeFlowError(LineageStructureError):
         super().__init__(message)
 
 
-# TODO: maybe add a FeatureTypeValueError and a LineageTypeValueError
+class UpdateRequiredError(Exception):
+    """
+    Raised when an update is required before performing an operation.
+
+    Parameters
+    ----------
+    message : str, optional
+        The error message to display.
+        If not provided, a default message is displayed.
+    """
+
+    def __init__(
+        self,
+        message: str | None = None,
+    ):
+        if message is None:
+            message = "An update is required before performing this operation."
+        super().__init__(message)
