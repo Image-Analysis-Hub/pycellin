@@ -68,7 +68,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             roots = [
                 n
                 for n in self.nodes()
-                if self.in_degree(n) == 0 and self.out_degree(n) > 0
+                if self.in_degree(n) == 0 and self.out_degree(n) > 0  # type: ignore
             ]
         else:
             roots = [n for n in self.nodes() if self.in_degree(n) == 0]
@@ -194,7 +194,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         list[int]
             The list of fusion nodes in the lineage.
         """
-        return [node for node in self.nodes() if self.in_degree(node) > 1]
+        return [n for n in self.nodes() if self.in_degree(n) > 1]  # type: ignore
 
     @abstractmethod
     def plot(
@@ -342,6 +342,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         def node_feature_color_mapping():
             # TODO: add colorbar units, but the info is stored in the model
             # FIXME: the colorbar is partially hiding the traces names
+            assert node_marker_style is not None
             node_marker_style["color"] = G.vs[node_colormap_feature]
             node_marker_style["colorscale"] = node_color_scale
             node_marker_style["colorbar"] = dict(title=node_colormap_feature)
@@ -498,7 +499,7 @@ class CellLineage(Lineage):
         name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
         txt = (
             f"CellLineage of ID {self.graph['lineage_ID']}{name_txt}"
-            f" with {len(self.nodes())} cells and {len(self.edges())} links."
+            f" with {len(self)} cells and {len(self.edges())} links."
         )
         return txt
 
@@ -511,7 +512,7 @@ class CellLineage(Lineage):
         int
             The next available node ID.
         """
-        if len(self.nodes()) == 0:
+        if len(self) == 0:
             return 0
         else:
             return max(self.nodes()) + 1
@@ -786,9 +787,9 @@ class CellLineage(Lineage):
             nodes = nx.descendants(self, noi)
         else:
             raise ValueError("The split parameter must be 'upstream' or 'downstream'.")
-        new_lineage = self.subgraph(nodes).copy()
+        new_lineage = self.subgraph(nodes).copy()  # new_lineage has self type
         self.remove_nodes_from(nodes)
-        return new_lineage
+        return new_lineage  # type: ignore
 
     def get_ancestors(self, noi: int, sorted=True) -> list[int]:
         """
@@ -850,8 +851,8 @@ class CellLineage(Lineage):
             The list of division nodes in the lineage.
         """
         if nodes is None:
-            nodes = self.nodes()
-        return [n for n in nodes if self.out_degree(n) > 1]
+            nodes = list(self.nodes())
+        return [n for n in nodes if self.out_degree(n) > 1]  # type: ignore
 
     def get_cell_cycle(self, node: int) -> list[int]:
         """
@@ -1018,7 +1019,7 @@ class CellLineage(Lineage):
         bool
             True if the node is a division node, False otherwise.
         """
-        if self.in_degree(node) <= 1 and self.out_degree(node) > 1:
+        if self.in_degree(node) <= 1 and self.out_degree(node) > 1:  # type: ignore
             return True
         else:
             return False
@@ -1234,7 +1235,7 @@ class CycleLineage(Lineage):
         name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
         txt = (
             f"CycleLineage of ID {self.graph['lineage_ID']}{name_txt}"
-            f" with {len(self.nodes())} cell cycles and {len(self.edges())} links."
+            f" with {len(self)} cell cycles and {len(self.edges())} links."
         )
         return txt
 

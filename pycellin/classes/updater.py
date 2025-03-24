@@ -180,7 +180,7 @@ class ModelUpdater:
                 #     data.cycle_data[lin_ID] = new_cycle_data
                 data.cycle_data[lin_ID] = data._compute_cycle_lineage(lin_ID)
         for lin_ID in self._removed_lineages:
-            if lin_ID in data.cycle_data:
+            if data.cycle_data is not None and lin_ID in data.cycle_data:
                 del data.cycle_data[lin_ID]
 
         # Update the features.

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+from typing import get_args
 import warnings
 
 from pycellin.custom_types import FeatureType, LineageType
@@ -47,13 +48,11 @@ class Feature:
         ValueError
             If the lineage type is not a valid value.
         """
-        # TODO: add a protect argument to prevent the modification of the feature
-        # and create the related methods to protect / unprotect the feature, and getters
         self.name = name
         self.description = description
         if not check_literal_type(lin_type, LineageType):
             raise ValueError(
-                f"Feature type must be one of {', '.join(LineageType.__args__)}."
+                f"Feature type must be one of {', '.join(get_args(LineageType))}."
             )
         self.provenance = provenance
         self.feat_type = feat_type
@@ -327,8 +326,8 @@ class FeaturesDeclaration:
         feats_dict: dict[str, Feature] | None = None,
         protected_feats: list[str] | None = None,
     ) -> None:
-        self.feats_dict = feats_dict if feats_dict else {}
-        self._protected_feats = protected_feats if protected_feats else []
+        self.feats_dict = feats_dict if feats_dict is not None else {}
+        self._protected_feats = protected_feats if protected_feats is not None else []
         for feat in self._protected_feats:
             if feat not in self.feats_dict:
                 msg = (
@@ -415,7 +414,7 @@ class FeaturesDeclaration:
         """
         if not check_literal_type(feat_type, FeatureType):
             raise ValueError(
-                f"Feature type must be one of {', '.join(FeatureType.__args__)}."
+                f"Feature type must be one of {', '.join(get_args(FeatureType))}."
             )
         feats = {k: v for k, v in self.feats_dict.items() if feat_type == v.feat_type}
         return feats
@@ -442,7 +441,7 @@ class FeaturesDeclaration:
         """
         if not check_literal_type(lin_type, LineageType):
             raise ValueError(
-                f"Lineage type must be one of {', '.join(LineageType.__args__)}."
+                f"Lineage type must be one of {', '.join(get_args(LineageType))}."
             )
         feats = {k: v for k, v in self.feats_dict.items() if lin_type == v.lin_type}
         return feats
@@ -728,8 +727,9 @@ class FeaturesDeclaration:
             of feature names. For example:
             {'unit1': ['feature1', 'feature2'], 'unit2': ['feature3']}.
         """
-        units = {}
+        units = {}  # type: dict[str, list[str]]
         for feat in self.feats_dict.values():
+            assert feat.unit is not None
             if feat.unit in units:
                 units[feat.unit].append(feat.name)
             else:
@@ -781,12 +781,12 @@ if __name__ == "__main__":
     # print(fd.feats_dict.keys())
 
     # Remove feat with type
-    fd._remove_feature("lineage_ID", "node")
+    fd._remove_feature("lineage_ID")
     # for k, v in fd.feats_dict.items():
     #     print(k, v)
 
     # Remove feat with type, but last type so in fact remove feat
-    fd._remove_feature("lineage_ID", "lineage")
+    fd._remove_feature("lineage_ID")
     # print(fd.feats_dict.keys())
 
     # Remove feat with multi type

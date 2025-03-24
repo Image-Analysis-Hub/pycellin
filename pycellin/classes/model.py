@@ -3,6 +3,7 @@
 
 import pickle
 from typing import Any, Literal
+import warnings
 
 import pandas as pd
 import networkx as nx
@@ -14,6 +15,7 @@ from pycellin.classes import (
     Feature,
     FeaturesDeclaration,
 )
+from pycellin.classes.exceptions import UpdateRequiredError
 from pycellin.classes.feature_calculator import FeatureCalculator
 from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features.tracking as tracking
@@ -29,7 +31,7 @@ class Model:
     def __init__(
         self,
         metadata: dict[str, Any] | None = None,
-        feat_declaration: FeaturesDeclaration | None = None,
+        fd: FeaturesDeclaration | None = None,
         data: Data | None = None,
     ) -> None:
         """
@@ -39,14 +41,14 @@ class Model:
         ----------
         metadata : dict[str, Any] | None, optional
             Metadata of the model (default is None).
-        feat_declaration : FeaturesDeclaration, optional
+        fd : FeaturesDeclaration, optional
             The declaration of the features present in the model (default is None).
         data : Data, optional
             The lineages data of the model (default is None).
         """
-        self.metadata = metadata
-        self.feat_declaration = feat_declaration
-        self.data = data
+        self.metadata = metadata if metadata is not None else dict()
+        self.feat_declaration = fd if fd is not None else FeaturesDeclaration()
+        self.data = data if data is not None else Data(dict())
 
         self._updater = ModelUpdater()
 
@@ -106,41 +108,7 @@ class Model:
             txt = "Empty model."
         return txt
 
-    # TODO: do I need these methods?
-    # def get_cell_lineages(self) -> list[CellLineage]:
-    #     return self.data.cell_data
-
-    # def get_cycle_lineages(self) -> list[CycleLineage]:
-    #     return self.data.cycle_data
-
-    # def get_cell_lineage_from_ID(self, lineage_id: int) -> CellLineage:
-    #     return self.data.cell_data[lineage_id]
-
-    # def get_cycle_lineage_from_ID(self, lineage_id: int) -> CycleLineage:
-    #     return self.data.cycle_data[lineage_id]
-
-    # def get_lineage_from_name(self, name: str,
-    #    lineage_type: Literal["cell", "cycle", "both"] = "both") -> CellLineage:
-    #     """
-    #     Return the cell lineage with the specified name.
-
-    #     Parameters
-    #     ----------
-    #     name : str
-    #         Name of the cell lineage to return.
-    #     lineage_type : Literal["cell", "cycle", "both"], optional
-    #         Type of lineage to return (default is "both").
-
-    #     Returns
-    #     -------
-    #     CellLineage
-    #         The cell lineage with the specified name.
-    #     """
-    #     # FIXME: bad design? In some cases it will return a Lineage
-    #     # and in others a dict of Lineages...
-    #     pass
-
-    def get_space_unit(self) -> str:
+    def get_space_unit(self) -> str | None:
         """
         Return the spatial unit of the model.
 
@@ -148,10 +116,15 @@ class Model:
         -------
         str
             The spatial unit of the model.
+
+        Raises
+        ------
+        KeyError
+            If the metadata does not contain the spatial unit.
         """
         return self.metadata["space_unit"]
 
-    def get_pixel_size(self) -> dict[str, float]:
+    def get_pixel_size(self) -> dict[str, float] | None:
         """
         Return the pixel size of the model.
 
@@ -159,10 +132,15 @@ class Model:
         -------
         dict[str, float]
             The pixel size of the model.
+
+        Raises
+        ------
+        KeyError
+            If the metadata does not contain the pixel size.
         """
         return self.metadata["pixel_size"]
 
-    def get_time_unit(self) -> str:
+    def get_time_unit(self) -> str | None:
         """
         Return the temporal unit of the model.
 
@@ -170,10 +148,15 @@ class Model:
         -------
         str
             The temporal unit of the model.
+
+        Raises
+        ------
+        KeyError
+            If the metadata does not contain the temporal unit.
         """
         return self.metadata["time_unit"]
 
-    def get_time_step(self) -> float:
+    def get_time_step(self) -> float | None:
         """
         Return the time step of the model.
 
@@ -181,6 +164,11 @@ class Model:
         -------
         int
             The time step of the model.
+
+        Raises
+        ------
+        KeyError
+            If the metadata does not contain the time step.
         """
         return self.metadata["time_step"]
 
@@ -308,7 +296,10 @@ class Model:
         list[CellLineage]
             List of the cycle lineages present in the model.
         """
-        return list(self.data.cycle_data.values())
+        if self.data.cycle_data is None:
+            return []
+        else:
+            return list(self.data.cycle_data.values())
 
     def get_cell_lineage_from_ID(self, lineage_ID: int) -> CellLineage | None:
         """
@@ -416,7 +407,7 @@ class Model:
         Bring the model up to date by recomputing features.
         """
         if not self._updater._update_required:
-            print("Model is already up to date.")
+            warnings.warn("Model is already up to date.")
             return
 
         # self.data._freeze_lineage_data()
@@ -460,11 +451,19 @@ class Model:
             lineage = CellLineage(lineage_ID=lineage_ID)
         else:
             lineage_ID = lineage.graph["lineage_ID"]
+        assert lineage_ID is not None
         self.data.cell_data[lineage_ID] = lineage
 
         if with_CycleLineage:
             cycle_lineage = self.data._compute_cycle_lineage(lineage_ID)
-            self.data.cycle_data[lineage_ID] = cycle_lineage
+            if self.data.cycle_data is None:
+                msg = (
+                    f"Cannot add cycle lineage {lineage_ID} when "
+                    "cycle data has not been added yet."
+                )
+                warnings.warn(msg)
+            else:
+                self.data.cycle_data[lineage_ID] = cycle_lineage
 
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
@@ -787,12 +786,13 @@ class Model:
         """
         fusions = []
         if lineage_IDs is None:
-            lineage_IDs = self.data.cell_data.keys()
+            lineage_IDs = list(self.data.cell_data.keys())
         for lin_ID in lineage_IDs:
             try:
                 lineage = self.data.cell_data[lin_ID]
             except KeyError as err:
-                raise KeyError(f"Lineage with ID {lin_ID} does not exist.") from err
+                msg = f"Lineage with ID {lin_ID} does not exist."
+                raise KeyError(msg) from err
             tmp = lineage.get_fusions()
             if tmp:
                 fusions.extend([Cell(cell_ID, lin_ID) for cell_ID in tmp])
@@ -1424,7 +1424,7 @@ class Model:
         # ... we remove the feature values...
         if lineage_type == "CellLineage":
             lineage_data = self.data.cell_data
-        elif lineage_type == "CycleLineage":
+        elif lineage_type == "CycleLineage" and self.data.cycle_data:
             lineage_data = self.data.cycle_data
         else:
             raise ValueError(
@@ -1475,6 +1475,15 @@ class Model:
         """
         Compute and add the cycle lineages of the model.
         """
+        # if self._updater._update_required:
+        #     txt = (
+        #         "The structure of the cell lineages has been modified. "
+        #         "Please update the model before attempting to add "
+        #         "the cycle lineages."
+        #     )
+        #     raise UpdateRequiredError(txt)
+        # TODO: I have nothing to check if the structure was modified since
+        # _update_required becomes true when features are added...
         self.data._add_cycle_lineages()
         self.feat_declaration._add_cycle_lineage_features()
 
@@ -1632,7 +1641,7 @@ class Model:
             If the `lineage_ID`, `level` or `cycle_ID` feature is not found
             in the model.
         """
-        list_df = []
+        list_df = []  # type: list[pd.DataFrame]
         nb_nodes = 0
         if not self.data.cycle_data:
             raise ValueError(

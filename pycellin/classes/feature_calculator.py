@@ -40,31 +40,31 @@ class FeatureCalculator(ABC):
     Abstract class to compute and enrich data from a model with the values of a feature.
     """
 
-    _LOCAL_FEATURE = None
-    _FEATURE_TYPE = None
+    _LOCAL_FEATURE = None  # type: bool | None
+    _FEATURE_TYPE = None  # type: str | None
 
     def __init__(self, feature: Feature):
         self.feature = feature
 
     @classmethod
-    def is_for_local_feature(self) -> bool | None:
+    def is_for_local_feature(cls) -> bool | None:
         """
         Accessor to the _LOCAL_FEATURE attribute.
 
         Return True if the calculator is for a local feature,
         False if it is for a global feature.
         """
-        return self._LOCAL_FEATURE
+        return cls._LOCAL_FEATURE
 
     @classmethod
-    def get_feature_type(self) -> str | None:
+    def get_feature_type(cls) -> str | None:
         """
         Accessor to the _FEATURE_TYPE attribute.
 
         Return the type of object to which the feature applies
         (node, edge, lineage).
         """
-        return self._FEATURE_TYPE
+        return cls._FEATURE_TYPE
 
     @abstractmethod
     def compute(self, *args, **kwargs) -> Any:

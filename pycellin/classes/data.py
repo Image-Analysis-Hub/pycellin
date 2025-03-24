@@ -39,7 +39,7 @@ class Data:
         if add_cycle_data:
             self._add_cycle_lineages()
         else:
-            self.cycle_data = None
+            self.cycle_data = None  # type: dict[int, CycleLineage] | None
 
     def __repr__(self) -> str:
         return f"Data(cell_data={self.cell_data!r}, cycle_data={self.cycle_data!r})"
