@@ -5,6 +5,8 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  release:
+    types: [ "created" ]
 
 jobs:
   build:
@@ -65,7 +67,7 @@ jobs:
     name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && success()
+    # if: github.event_name == 'release' && success()
     environment:
       name: pypi
       url: https://pypi.org/p/pycellin
