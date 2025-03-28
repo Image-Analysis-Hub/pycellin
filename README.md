@@ -7,14 +7,14 @@
 
 # Pycellin
 
-Pycellin is a graph-based Python framework to easily manipulate and extract information from cell tracking data, at the single-cell level. In Pycellin, cell lineages are modeled intuitively by directed acyclic graphs (DAG). Graph nodes represent cells at a specific point in time and space, and graph edges represent the time and space displacement of the cells. Please note that while Pycellin is built to support cell division events, **it does not authorize cell merging events**: a cell at a specific timepoint cannot have more than one parent.
+Pycellin is a graph-based Python framework to easily manipulate and extract information from cell tracking data, at the single-cell level. In Pycellin, cell lineages are modeled intuitively by directed rooted trees. Graph nodes represent cells at a specific point in time and space, and graph edges represent the time and space displacement of the cells. Please note that while Pycellin is built to support cell division events, **it does not authorize cell merging events**: a cell at a specific timepoint cannot have more than one parent.
 
 Pycellin provides predefined features related to cell morphology, cell motion and tracking that can be automatically added to enrich lineages. More predefined features will be implemented in the future. The framework also facilitates the creation of new features defined by the user to accommodate the wide variety of experiments and biological questions.
 
 Pycellin can read from and write to TrackMate XML and Cell Tracking Challenge text file formats. More tracking formats will progressively be supported.
 
 While Pycellin has been designed with bacteria / cell lineages in mind, it could be used with more diverse tracking data provided the few conditions below are enforced:
-- the tracking data can be modeled by a DAG, meaning no merging event
+- the tracking data can be modeled by directed rooted trees, meaning no merging event
 - time must flow homogeneously, i.e. all the edges of a lineage graph must represent the same elapsed time.
 
 
