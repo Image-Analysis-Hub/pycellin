@@ -61,7 +61,9 @@ class AbsoluteAge(NodeGlobalFeatureCalculator):
         super().__init__(feature)
         self.time_step = time_step
 
-    def compute(self, data: Data, lineage: CellLineage, noi: int) -> int | float:
+    def compute(  # type: ignore[override]
+        self, data: Data, lineage: CellLineage, noi: int
+    ) -> int | float:
         """
         Compute the absolute age of a given cell.
 
@@ -107,7 +109,9 @@ class RelativeAge(NodeGlobalFeatureCalculator):
         super().__init__(feature)
         self.time_step = time_step
 
-    def compute(self, data: Data, lineage: CellLineage, noi: int) -> int | float:
+    def compute(  # type: ignore[override]
+        self, data: Data, lineage: CellLineage, noi: int
+    ) -> int | float:
         """
         Compute the relative age of a given cell.
 
@@ -142,7 +146,7 @@ class CellCycleCompleteness(NodeGlobalFeatureCalculator):
     before the root or after the leaves.
     """
 
-    def compute(
+    def compute(  # type: ignore[override]
         self, data: Data, lineage: CellLineage | CycleLineage, noi: int
     ) -> bool:
         """
@@ -197,7 +201,7 @@ class DivisionTime(NodeGlobalFeatureCalculator):
         super().__init__(feature)
         self.time_step = time_step
 
-    def compute(
+    def compute(  # type: ignore[override]
         self, data: Data, lineage: CellLineage | CycleLineage, noi: int
     ) -> int | float:
         """
@@ -246,7 +250,7 @@ class DivisionRate(NodeGlobalFeatureCalculator):
         super().__init__(feature)
         self.time_step = time_step
 
-    def compute(
+    def compute(  # type: ignore[override]
         self, data: Data, lineage: CellLineage | CycleLineage, noi: int
     ) -> int | float:
         """

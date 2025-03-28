@@ -83,7 +83,9 @@ class CellDisplacement(EdgeLocalFeatureCalculator):
     of the cell at the two consecutive detections.
     """
 
-    def compute(self, lineage: CellLineage, edge: tuple[int, int]) -> float:
+    def compute(  # type: ignore[override]
+        self, lineage: CellLineage, edge: tuple[int, int]
+    ) -> float:
         """
         Compute the displacement of a cell between two consecutive detections.
 
@@ -136,7 +138,9 @@ class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
         super().__init__(feature)
         self.include_incoming_edge = include_incoming_edge
 
-    def compute(self, data: Data, lineage: CycleLineage, noi: int) -> float:
+    def compute(  # type: ignore[override]
+        self, data: Data, lineage: CycleLineage, noi: int
+    ) -> float:
         """
         Compute the total displacement of a cell during the cell cycle.
 
@@ -181,7 +185,9 @@ class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
         super().__init__(feature)
         self.include_incoming_edge = include_incoming_edge
 
-    def compute(self, data: Data, lineage: CycleLineage, noi: int) -> float:
+    def compute(  # type: ignore[override]
+        self, data: Data, lineage: CycleLineage, noi: int
+    ) -> float:
         """
         Compute the mean displacement of a cell during the cell cycle.
 
@@ -202,7 +208,7 @@ class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
         disps = _get_branch_edge_feature_values(
             "cell_displacement", data, lineage, noi, self.include_incoming_edge
         )
-        return np.nanmean(disps)
+        return np.nanmean(disps).item()
 
 
 class CellSpeed(EdgeLocalFeatureCalculator):
@@ -225,7 +231,9 @@ class CellSpeed(EdgeLocalFeatureCalculator):
         super().__init__(feature)
         self.time_step = time_step
 
-    def compute(self, lineage: CellLineage, edge: tuple[int, int]) -> float:
+    def compute(  # type: ignore[override]
+        self, lineage: CellLineage, edge: tuple[int, int]
+    ) -> float:
         """
         Compute the speed of a cell between two consecutive detections.
 
@@ -277,7 +285,9 @@ class BranchMeanSpeed(NodeGlobalFeatureCalculator):
         super().__init__(feature)
         self.include_incoming_edge = include_incoming_edge
 
-    def compute(self, data: Data, lineage: CycleLineage, noi: int) -> float:
+    def compute(  # type: ignore[override]
+        self, data: Data, lineage: CycleLineage, noi: int
+    ) -> float:
         """
         Compute the mean speed of a cell during the cell cycle.
 
@@ -298,7 +308,7 @@ class BranchMeanSpeed(NodeGlobalFeatureCalculator):
         speeds = _get_branch_edge_feature_values(
             "cell_speed", data, lineage, noi, self.include_incoming_edge
         )
-        return np.nanmean(speeds)
+        return np.nanmean(speeds).item()
 
 
 class Straightness(NodeGlobalFeatureCalculator):
@@ -324,7 +334,9 @@ class Straightness(NodeGlobalFeatureCalculator):
         super().__init__(feature)
         self.include_incoming_edge = include_incoming_edge
 
-    def compute(self, data: Data, cycle_lin: CycleLineage, noi: int) -> float:
+    def compute(  # type: ignore[override]
+        self, data: Data, cycle_lin: CycleLineage, noi: int
+    ) -> float:
         """
         Compute the straightness of the cell displacement within a cell cycle.
 
@@ -412,7 +424,9 @@ class Angle(NodeGlobalFeatureCalculator):
         super().__init__(feature)
         self.unit = unit
 
-    def compute(self, data: Data, lineage: CellLineage, noi: int) -> float:
+    def compute(  # type: ignore[override]
+        self, data: Data, lineage: CellLineage, noi: int
+    ) -> float:
         """
         Compute the angle between two consecutive detections of a cell.
 

@@ -452,7 +452,9 @@ class CellWidth(NodeLocalFeatureCalculator):
         self.debug = debug
         self.debug_folder = debug_folder
 
-    def compute(self, lineage: CellLineage, noi: int) -> float:
+    def compute(  # type: ignore[override]
+        self, lineage: CellLineage, noi: int
+    ) -> float:
         return get_width_and_length(
             noi,
             lineage,
@@ -487,7 +489,9 @@ class CellLength(NodeLocalFeatureCalculator):
         self.debug = debug
         self.debug_folder = debug_folder
 
-    def compute(self, lineage: CellLineage, noi: int) -> float:
+    def compute(  # type: ignore[override]
+        self, lineage: CellLineage, noi: int
+    ) -> float:
         return get_width_and_length(
             noi,
             lineage,
