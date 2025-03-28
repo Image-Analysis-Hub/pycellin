@@ -16,20 +16,19 @@ Vocabulary:
         0           we have the following generation:
         |             [0, 1]
         1             [2, 4, 6]
-       / \            [3, 5, 7]
+       / \\            [3, 5, 7]
       2   3           [8]
       |   |           [9]
-      4   5  
-      |   |    
+      4   5
+      |   |
       6   7
-     / \ 
+     / \\
     8   9
 
 - Complete generation: It is a generation that do not include a root nor a leaf.
   If we take the previous example, the only complete generation is [2, 4, 6].
 """
 
-import networkx as nx
 
 from pycellin.classes import CellLineage, CycleLineage
 from pycellin.classes import Feature

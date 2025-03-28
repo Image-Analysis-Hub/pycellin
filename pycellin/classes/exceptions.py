@@ -4,6 +4,10 @@
 # TODO: add a Warning when a feature is not present across all cells,
 # links, or lineages?
 
+# TODO: create an exception when unknown cell, cell cycle, link, lineage...
+
+# TODO: maybe add a FeatureTypeValueError and a LineageTypeValueError
+
 
 class LineageStructureError(Exception):
     """
@@ -38,17 +42,17 @@ class FusionError(LineageStructureError):
         self,
         node_ID: int,
         lineage_ID: int | None = None,
-        message: str = None,
+        message: str | None = None,
     ):
         self.node_ID = node_ID
         self.lineage_ID = lineage_ID
         if message is None:
             if lineage_ID is None:
-                message = f"Node {node_ID} already has a parent node."
+                message = f"Node {node_ID} has more than one parent node."
             else:
                 message = (
-                    f"Node {node_ID} in lineage {lineage_ID} already has "
-                    f"a parent node."
+                    f"Node {node_ID} in lineage {lineage_ID} has "
+                    f"more than one parent node."
                 )
         super().__init__(message)
 
@@ -83,7 +87,7 @@ class TimeFlowError(LineageStructureError):
         target_noi: int,
         source_lineage_ID: int | None = None,
         target_lineage_ID: int | None = None,
-        message: str = None,
+        message: str | None = None,
     ):
         self.source_noi = source_noi
         self.source_lineage_ID = source_lineage_ID
@@ -101,4 +105,24 @@ class TimeFlowError(LineageStructureError):
                 f"has a time value lower than its parent node, "
                 f"node {source_noi}{txt_source_lin}."
             )
+        super().__init__(message)
+
+
+class UpdateRequiredError(Exception):
+    """
+    Raised when an update is required before performing an operation.
+
+    Parameters
+    ----------
+    message : str, optional
+        The error message to display.
+        If not provided, a default message is displayed.
+    """
+
+    def __init__(
+        self,
+        message: str | None = None,
+    ):
+        if message is None:
+            message = "An update is required before performing this operation."
         super().__init__(message)

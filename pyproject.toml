@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+]
+
+[project]
+name = "pycellin"
+version = "0.3.6b"
+authors = [{ name = "Laura Xénard", email = "laura.xenard@pasteur.fr" }]
+description = "Graph-based framework to manipulate and analyze cell lineages from cell tracking data"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "igraph>=0.9",
+    "lxml>=5",
+    "matplotlib>=3",
+    "networkx>=3",
+    "pandas>=2",
+    "plotly>=5",
+    "scikit-image>=0.19",
+    "scipy>=1.15",
+    "shapely>=2",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+
+[project.urls]
+Documentation = "https://Image-Analysis-Hub.github.io/pycellin/"
+Examples = "https://Image-Analysis-Hub.github.io/pycellin/notebooks/"
+Issues = "https://github.com/Image-Analysis-Hub/pycellin/issues"
+Source = "https://github.com/Image-Analysis-Hub/pycellin/"
+
+[tool.setuptools]
+packages = [
+    "pycellin",
+    "pycellin.classes",
+    "pycellin.graph",
+    "pycellin.graph.features",
+    "pycellin.io",
+    "pycellin.io.cell_tracking_challenge",
+    "pycellin.io.trackmate",
+]

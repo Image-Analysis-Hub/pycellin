@@ -1,6 +1,18 @@
 from .classes.data import Data
 from .classes.lineage import CellLineage, CycleLineage
 from .classes.feature import FeaturesDeclaration, Feature
+from .classes.feature import (
+    frame_Feature,
+    cell_ID_Feature,
+    lineage_ID_Feature,
+    cell_coord_Feature,
+    link_coord_Feature,
+    lineage_coord_Feature,
+    cycle_ID_Feature,
+    cells_Feature,
+    cycle_length_Feature,
+    level_Feature,
+)
 from .classes.model import Model
 from .classes.feature_calculator import (
     NodeLocalFeatureCalculator,
@@ -28,6 +40,16 @@ __all__ = [
     "CycleLineage",
     "FeaturesDeclaration",
     "Feature",
+    "frame_Feature",
+    "cell_ID_Feature",
+    "lineage_ID_Feature",
+    "cell_coord_Feature",
+    "link_coord_Feature",
+    "lineage_coord_Feature",
+    "cycle_ID_Feature",
+    "cells_Feature",
+    "cycle_length_Feature",
+    "level_Feature",
     "Model",
     "NodeLocalFeatureCalculator",
     "EdgeLocalFeatureCalculator",

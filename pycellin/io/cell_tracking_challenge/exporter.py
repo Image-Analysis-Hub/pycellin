@@ -1,12 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+exporter.py
+
+This module is part of the Pycellin package.
+
+This module provides functions to export Pycellin models to Cell Tracking Challenge
+(CTC) tracking files. It includes a function to export a Pycellin model to a CTC file
+and helper functions to build CTC tracks from a lineage.
+
+References:
+- CTC website: https://celltrackingchallenge.net/
+- CTC tracking annotations conventions:
+https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content%20conventions.pdf
+"""
+
+from pycellin.classes.exceptions import FusionError
 from pycellin.classes.model import Model
 from pycellin.classes.lineage import CellLineage
-from pycellin.io.cell_tracking_challenge.loader import load_CTC_file
-from pycellin.io.trackmate.loader import load_TrackMate_XML
+
 
 # TODO: need to extensively test this.
+# TODO: check beforehand for fusions and gap just after division. No need to start
+# the CTC file creation if we know it will fail.
 
 
 def _sort_nodes_by_frame(
@@ -21,12 +38,12 @@ def _sort_nodes_by_frame(
     lineage : CellLineage
         The lineage object to which the nodes belongs.
     nodes : list[int]
-        A list of nodes to order by ascending frame.
+        A list of nodes ID to order by ascending frame.
 
     Returns
     -------
     list[int]
-        A list of nodes ordered by ascending frame.
+        A list of nodes ID, ordered by ascending frame.
     """
     sorted_list = [(node, lineage.nodes[node]["frame"]) for node in nodes]
     sorted_list.sort(key=lambda x: x[1])
@@ -44,9 +61,8 @@ def _find_gaps(
     ----------
     lineage : CellLineage
         The lineage object to which the nodes belongs.
-    sorted_nodes : list[tuple[int, int]]
-        A list of tuples, where each tuple contains the frame of the node and
-        the ID of the node, ordered by ascending frame.
+    sorted_nodes : list[int]
+        A list of nodes ID, ordered by ascending frame.
 
     Returns
     -------
@@ -79,7 +95,7 @@ def _add_track(
     lineage : CellLineage
         The lineage object to which the nodes belongs.
     sorted_nodes : list[int]
-        A list of nodes ordered by ascending frame.
+        A list of nodes ID, ordered by ascending frame.
     ctc_tracks : dict[int, dict[str, int]]
         A dictionary containing the CTC tracks of the lineage.
     node_to_parent_track : dict[int, int]
@@ -127,6 +143,11 @@ def _build_CTC_tracks(
     -------
     int
         The updated current track label.
+
+    Raises
+    ------
+    FusionError
+        If a fusion event is detected in the lineage.
     """
     if len(lineage) == 1:
         current_track_label = _add_track(
@@ -137,7 +158,15 @@ def _build_CTC_tracks(
             current_track_label,
         )
     else:
-        for cc in lineage.get_cell_cycles(keep_incomplete_cell_cycles=True):
+        try:
+            cell_cycles = lineage.get_cell_cycles()
+        except FusionError as err:
+            raise FusionError(
+                err.node_ID,
+                lineage.graph["lineage_ID"],
+                f"CTC do not support fusion events. {err.message}",
+            ) from err
+        for cc in cell_cycles:
             sorted_nodes = _sort_nodes_by_frame(lineage, cc)
             gaps = _find_gaps(lineage, sorted_nodes)
             if gaps:
@@ -192,7 +221,7 @@ def _add_parent_track(
         f"Node {track_info['B_node']} has more than 1 parent node "
         f"({len(parent_nodes)} nodes) in lineage of ID "
         f"{lineage.graph['lineage_ID']}. Incorrect lineage topology: "
-        f"Pycellin and CTC do not support merge events."
+        f"Pycellin and CTC do not support fusion events."
     )
     assert len(parent_nodes) <= 1, assert_msg
     if parent_nodes:
@@ -201,9 +230,15 @@ def _add_parent_track(
         track_info["P"] = 0
 
 
-def export_CTC_file(model: Model, ctc_file_out) -> None:
+def export_CTC_file(
+    model: Model,
+    ctc_file_out: str,
+) -> None:
     """
-    Export lineage data from a Model to CTC file format.
+    Export lineage data from a Model to CTC tracking file format.
+
+    The CTC tracking format does not support fusion events and does not allow
+    gaps right after division events.
 
     Parameters
     ----------
@@ -211,6 +246,7 @@ def export_CTC_file(model: Model, ctc_file_out) -> None:
         The model from which we want to export the CTC file.
     ctc_file_out : str
         The path to the CTC file to write.
+    -----
     """
     lineages = [lineage for lineage in model.data.cell_data.values()]
     current_track_label = 1  # 0 is kept for no parent track
@@ -236,10 +272,15 @@ def export_CTC_file(model: Model, ctc_file_out) -> None:
 if __name__ == "__main__":
 
     xml_in = "sample_data/FakeTracks.xml"
-    ctc_in = "C:/Users/haiba/Documents/01_RES/res_track.txt"
-    ctc_out = "sample_data/FakeTracks_exported_CTC.txt"
+    # xml_in = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
+    ctc_in = "sample_data/FakeTracks_TMtoCTC.txt"
+    ctc_out = "sample_data/results/FakeTracks_exported_CTC_from_CTC.txt"
 
-    # model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
-    model = load_CTC_file(ctc_in)  # => FIXME
+    from pycellin.io.trackmate.loader import load_TrackMate_XML
+
+    model = load_TrackMate_XML(xml_in)
+
+    # from pycellin.io.cell_tracking_challenge.loader import load_CTC_file
+    # model = load_CTC_file(ctc_in)
 
     export_CTC_file(model, ctc_out)

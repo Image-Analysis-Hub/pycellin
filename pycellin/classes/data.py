@@ -3,25 +3,53 @@
 
 import math
 from typing import Literal
+import warnings
 
 import networkx as nx
 
-from pycellin.classes.lineage import Lineage, CellLineage, CycleLineage
+from pycellin.classes.lineage import CellLineage, CycleLineage
 
 
 class Data:
     """
     Class to store and manipulate cell lineages and cell cycle lineages.
+
+    Attributes
+    ----------
+    cell_data : dict[int, CellLineage]
+        The cell lineages stored.
+    cycle_data : dict[int, CycleLineage] | None
+        The cycle lineages stored, if any.
     """
 
     def __init__(
-        self, data: dict[str, CellLineage], add_cycle_data: bool = False
+        self, data: dict[int, CellLineage], add_cycle_data: bool = False
     ) -> None:
+        """
+        Initialize a Data object.
+
+        Parameters
+        ----------
+        data : dict[int, CellLineage]
+            The cell lineages to store.
+        add_cycle_data : bool, optional
+            Whether to compute and store the cycle lineages, by default False.
+        """
         self.cell_data = data
         if add_cycle_data:
-            self._compute_cycle_lineages()
+            self._add_cycle_lineages()
         else:
-            self.cycle_data = None
+            self.cycle_data = None  # type: dict[int, CycleLineage] | None
+
+    def __repr__(self) -> str:
+        return f"Data(cell_data={self.cell_data!r}, cycle_data={self.cycle_data!r})"
+
+    def __str__(self) -> str:
+        if self.cycle_data:
+            txt = f" and {self.number_of_lineages()} cycle lineages"
+        else:
+            txt = ""
+        return f"Data object with {self.number_of_lineages()} cell lineages{txt}."
 
     def _add_cycle_lineages(self, lineage_IDs: list[int] | None = None) -> None:
         """
@@ -67,25 +95,35 @@ class Data:
             if not nx.is_frozen(lineage):
                 nx.freeze(lineage)
 
-    def _unfreeze_lineage_data(self):
-        """
-        Unfreeze all cell lineages.
-        """
-        for lineage in self.cell_data.values():
-            Lineage.unfreeze(lineage)
+    # def _unfreeze_lineage_data(self):
+    #     """
+    #     Unfreeze all cell lineages.
+    #     """
+    #     for lineage in self.cell_data.values():
+    #         Lineage.unfreeze(lineage)
 
     def number_of_lineages(self) -> int:
         """
         Return the number of lineages in the data.
+
+        Returns
+        -------
+        int
+            The number of cell lineages in the data.
+
+        Raises
+        ------
+        Warning
+            If the number of cell lineages and cycle lineages do not match.
         """
-        # TODO: replace the assertion by a warning or an exception
-        # so that the user can handle the case however they want.
         if self.cycle_data:
-            assert len(self.cell_data) == len(self.cycle_data), (
-                f"Impossible state:"
-                f"number of cell lineages ({len(self.cell_data)}) "
-                f"and cycle lineages ({len(self.cycle_data)}) do not match."
-            )
+            if len(self.cell_data) != len(self.cycle_data):
+                msg = (
+                    f"Number of cell lineages ({len(self.cell_data)}) "
+                    f"and cycle lineages ({len(self.cycle_data)}) do not match. "
+                    "An update of the model is required. "
+                )
+                warnings.warn(msg)
         return len(self.cell_data)
 
     def get_closest_cell(
@@ -95,9 +133,9 @@ class Data:
         radius: float = 0,
         time_window: int = 0,
         time_window_type: Literal["before", "after", "symetric"] = "symetric",
-        lineages_to_search: list[CellLineage] = None,
+        lineages_to_search: list[CellLineage] | None = None,
         reference: Literal["center", "border"] = "center",
-    ) -> tuple[CellLineage, int]:
+    ) -> tuple[int, CellLineage]:
         """
         Find the closest cell to a given cell of a lineage.
 
@@ -142,7 +180,7 @@ class Data:
         radius: float = 0,
         time_window: int = 0,
         time_window_type: Literal["before", "after", "symetric"] = "symetric",
-        lineages_to_search: list[CellLineage] = None,
+        lineages_to_search: list[CellLineage] | None = None,
         reference: Literal["center", "border"] = "center",
     ) -> list[tuple[int, CellLineage]]:
         """

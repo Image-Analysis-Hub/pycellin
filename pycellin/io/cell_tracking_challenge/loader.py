@@ -1,20 +1,38 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+loader.py
+
+This module is part of the Pycellin package.
+
+This module provides functions to load and process Cell Tracking Challenge (CTC) files
+into Pycellin models. It includes a function to load a CTC file into Pycellin model
+and helper functions to create metadata, features, and lineage graphs.
+
+References:
+- CTC website: https://celltrackingchallenge.net/
+- CTC tracking annotations conventions:
+https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content%20conventions.pdf
+"""
+
 from datetime import datetime
+import importlib
 from itertools import pairwise
 from pathlib import Path
-from pkg_resources import get_distribution
 from typing import Any, Tuple
 
 import networkx as nx
 
 from pycellin.classes.model import Model
-from pycellin.classes.feature import FeaturesDeclaration, Feature
+from pycellin.classes.feature import (
+    FeaturesDeclaration,
+    cell_ID_Feature,
+    frame_Feature,
+    lineage_ID_Feature,
+)
 from pycellin.classes.data import Data
 from pycellin.classes.lineage import CellLineage
-
-# TODO: check for fusions once the model is built and deal with the fusions
 
 
 def _create_metadata(
@@ -43,7 +61,11 @@ def _create_metadata(
     # TODO: is it possible to get space_unit with the labels data?
     # or a better time_unit with the images metadata?
     # or maybe ask the user...
-    metadata["pycellin_version"] = get_distribution("pycellin").version
+    try:
+        version = importlib.metadata.version("pycellin")
+    except importlib.metadata.PackageNotFoundError:
+        version = "unknown"
+    metadata["pycellin_version"] = version
     return metadata
 
 
@@ -58,24 +80,13 @@ def _create_FeaturesDeclaration() -> FeaturesDeclaration:
         identification features.
     """
     feat_declaration = FeaturesDeclaration()
-    node_id_feat = Feature(
-        "cell_ID",
-        "Unique identifier of the cell",
-        "CellLineage",
-        "Pycellin",
-        "int",
-        "none",
-    )
-    lin_id_feat = Feature(
-        "lineage_ID",
-        "Unique identifier of the lineage",
-        "CellLineage",
-        "Pycellin",
-        "int",
-        "none",
-    )
-    feat_declaration._add_features([node_id_feat, lin_id_feat], ["node"] * 2)
-    feat_declaration._add_feature(lin_id_feat, "lineage")
+    cell_ID_feat = cell_ID_Feature()
+    frame_feat = frame_Feature()
+    lin_ID_feat = lineage_ID_Feature()
+    for feat in [cell_ID_feat, frame_feat, lin_ID_feat]:
+        feat_declaration._add_feature(feat)
+        feat_declaration._protect_feature(feat.name)
+
     return feat_declaration
 
 
@@ -195,7 +206,6 @@ def _update_node_attributes(
     """
     lineage.graph["lineage_ID"] = lineage_id
     for _, data in lineage.nodes(data=True):
-        data["lineage_ID"] = lineage_id
         # Removing obsolete attributes.
         if "TRACK" in data:
             del data["TRACK"]
@@ -211,6 +221,8 @@ def load_CTC_file(
 
     Only track topology is read: no cell segmentations are extracted
     from associated label images.
+    The CTC tracking format does not support fusion events and does not allow
+    gaps right after division events.
 
     Parameters
     ----------
@@ -225,11 +237,20 @@ def load_CTC_file(
     graph = nx.DiGraph()
     current_node_id = 0
     with open(file_path) as file:
+        nodes_from_tracks = []
+        # The lines in the file are read sequentially to create the nodes.
+        # However, nothing ensures that parent nodes are created before
+        # being referenced by their children.
+        # nodes_from_tracks keeps track of the nodes created for each track
+        # so that they can be merged later.
         for line in file:
             nodes, current_node_id = _read_track_line(line, current_node_id)
+            nodes_from_tracks.append(nodes)
             _add_nodes_and_edges(graph, nodes)
-            _merge_tracks(graph, nodes)
 
+    # Merging tracks that are part of the same lineage.
+    for nodes in nodes_from_tracks:
+        _merge_tracks(graph, nodes)
     # We want one lineage per connected component of the graph.
     lineages = [
         CellLineage(graph.subgraph(c).copy())
@@ -237,10 +258,10 @@ def load_CTC_file(
     ]
 
     # Adding a unique lineage_ID to each lineage and their nodes.
-    lin_id = 0  # lineage ID
+    lin_ID = 0
     for lin in lineages:
-        _update_node_attributes(lin, lin_id)
-        lin_id += 1
+        _update_node_attributes(lin, lin_ID)
+        lin_ID += 1
 
     data = {}
     for lin in lineages:
@@ -249,8 +270,10 @@ def load_CTC_file(
         else:
             assert len(lin) == 1, "Lineage ID not found and not a one-node lineage."
             node = [n for n in lin.nodes][0]
-            lin_id = f"Node_{node}"
-            data[lin_id] = lin
+            # We set the ID of a one-node lineage to the negative of the node ID.
+            lin_ID = -node
+            lin.graph["lineage_ID"] = lin_ID
+            data[lin_ID] = lin
 
     model = Model(
         _create_metadata(file_path), _create_FeaturesDeclaration(), Data(data)
@@ -260,17 +283,23 @@ def load_CTC_file(
 
 if __name__ == "__main__":
 
-    ctc_file = "C:/Users/haiba/Documents/01_RES/res_track.txt"
+    ctc_file = "sample_data/FakeTracks_TMtoCTC.txt"
+    ctc_file = "sample_data/Ecoli_growth_on_agar_pad_TMtoCTC.txt"
+    ctc_file = (
+        "/mnt/data/Films_Laure/Benchmarks/CTC/"
+        "EvaluationSoftware/testing_dataset/03_RES/res_track.txt"
+    )
     model = load_CTC_file(ctc_file)
     print(model)
     print(model.feat_declaration)
+    print(model.data)
 
     for lin_id, lin in model.data.cell_data.items():
         print(f"{lin_id} - {lin}")
         lin.plot()
 
-    model.add_cycle_data()
-    for lin_id, lin in model.data.cycle_data.items():
-        lin.plot()
+    # model.add_cycle_data()
+    # for lin_id, lin in model.data.cycle_data.items():
+    #     lin.plot()
 
-    print(model.data.cell_data[1].nodes(data=True))
+    # print(model.data.cell_data[1].nodes(data=True))

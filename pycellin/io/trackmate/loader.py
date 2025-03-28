@@ -3,25 +3,18 @@
 
 from copy import deepcopy
 from datetime import datetime
+import importlib
 from pathlib import Path
-
-# from pkg_resources import get_distribution => deprecated
-# from importlib.metadata import version
 from typing import Any
+import warnings
 
 from lxml import etree as ET
 import networkx as nx
 
 from pycellin.classes import Model
-from pycellin.classes import FeaturesDeclaration, Feature
+from pycellin.classes import FeaturesDeclaration, Feature, cell_ID_Feature
 from pycellin.classes import Data
 from pycellin.classes import CellLineage
-
-# TODO: maybe TRACK_ID / lineage_ID should not be added as a node feature,
-# and a fonction get_lineage_ID() should be implemented instead?
-# Another issue is that we currently have 2 features called lineage_ID,
-# one on nodes and one on lineages. However only the one in the lineage
-# is in the features declaration.
 
 
 def _get_units(
@@ -44,7 +37,16 @@ def _get_units(
         A dictionary where the keys are the attribute names and the values are the
         corresponding attribute values (units information).
     """
-    units = deepcopy(element.attrib)
+    if element.attrib:
+        units = deepcopy(element.attrib)
+    else:
+        units = {}
+    if "spatialunits" not in units:
+        units["spatialunits"] = "pixel"  # TrackMate default value.
+        print("WARNING: No spatial units found in the XML file. Setting to 'pixel'.")
+    if "timeunits" not in units:
+        units["timeunits"] = "frame"  # TrackMate default value.
+        print("WARNING: No time units found in the XML file. Setting to 'frame'.")
     element.clear()  # We won't need it anymore so we free up some memory.
     # .clear() does not delete the element: it only removes all subelements
     # and clears or sets to `None` all attributes.
@@ -54,7 +56,7 @@ def _get_units(
 def _get_features_dict(
     iterator: ET.iterparse,
     ancestor: ET._Element,
-) -> dict[str, str]:
+) -> list[dict[str, str]]:
     """
     Get all the features of ancestor and return them as a list.
 
@@ -69,8 +71,8 @@ def _get_features_dict(
 
     Returns
     -------
-    list
-        List of features contained in the ancestor element.
+    list[dict[str, str]]
+        A list of dictionaries, each representing a feature.
     """
     features = []
     event, element = next(iterator)  # Feature.
@@ -102,7 +104,7 @@ def _dimension_to_unit(trackmate_feature, units) -> str:
     dimension = trackmate_feature["dimension"]
     match dimension:
         case "NONE" | "QUALITY" | "VISIBILITY" | "RATIO" | "INTENSITY" | "COST":
-            return "none"
+            return None
         case "LENGTH" | "POSITION":
             return units["spatialunits"]
         case "VELOCITY":
@@ -122,7 +124,7 @@ def _dimension_to_unit(trackmate_feature, units) -> str:
 def _convert_and_add_feature(
     trackmate_feature: dict[str, str],
     feature_type: str,
-    feat_declaration: FeaturesDeclaration,
+    fdec: FeaturesDeclaration,
     units: dict[str, str],
 ) -> None:
     """
@@ -134,7 +136,7 @@ def _convert_and_add_feature(
         The feature to add.
     feature_type : str
         The type of the feature to add (node, edge, or lineage).
-    feat_declaration : FeaturesDeclaration
+    fdec : FeaturesDeclaration
         The FeaturesDeclaration object to add the feature to.
     units : dict[str, str]
         The temporal and spatial units of the TrackMate model
@@ -147,22 +149,13 @@ def _convert_and_add_feature(
     """
     feat_name = trackmate_feature["feature"]
     feat_description = trackmate_feature["name"]
+    feat_provenance = "TrackMate"
     feat_lineage_type = "CellLineage"
     if trackmate_feature["isint"] == "true":
         feat_data_type = "int"
     else:
         feat_data_type = "float"
-    feat_provenance = "TrackMate"
     feat_unit = _dimension_to_unit(trackmate_feature, units)
-
-    feature = Feature(
-        feat_name,
-        feat_description,
-        feat_lineage_type,
-        feat_provenance,
-        feat_data_type,
-        feat_unit,
-    )
 
     match feature_type:
         case "SpotFeatures":
@@ -173,13 +166,23 @@ def _convert_and_add_feature(
             feat_type = "lineage"
         case _:
             raise ValueError(f"Invalid feature type: {feature_type}")
-    feat_declaration._add_feature(feature, feat_type)
+    feature = Feature(
+        feat_name,
+        feat_description,
+        feat_provenance,
+        feat_type,
+        feat_lineage_type,
+        feat_data_type,
+        feat_unit,
+    )
+
+    fdec._add_feature(feature)
 
 
 def _add_all_features(
     iterator: ET.iterparse,
     ancestor: ET._Element,
-    feat_declaration: FeaturesDeclaration,
+    fdec: FeaturesDeclaration,
     units: dict[str, str],
 ) -> None:
     """
@@ -196,7 +199,7 @@ def _add_all_features(
         An iterator over XML elements.
     ancestor : ET._Element
         The XML element that encompasses the information to be added.
-    feat_declaration : FeaturesDeclaration
+    fdec : FeaturesDeclaration
         The FeaturesDeclaration object to add the features to.
     units : dict[str, str]
         The temporal and spatial units of the TrackMate model
@@ -207,36 +210,41 @@ def _add_all_features(
         # Features stored in the FeatureDeclarations tag.
         features = _get_features_dict(iterator, element)
         for feat in features:
-            _convert_and_add_feature(feat, element.tag, feat_declaration, units)
+            _convert_and_add_feature(feat, element.tag, fdec, units)
 
         # Features used in Spot tags but not declared in the FeatureDeclarations tag.
         if element.tag == "SpotFeatures":
             name_feat = Feature(
-                "name", "Name of the spot", "CellLineage", "TrackMate", "string", "none"
+                name="cell_name",
+                description="Name of the spot",
+                provenance="TrackMate",
+                feat_type="node",
+                lin_type="CellLineage",
+                data_type="string",
             )
-            feat_declaration._add_feature(name_feat, "node")
+            fdec._add_feature(name_feat)
 
         # Feature used in Track tags but not declared in the FeatureDeclarations tag.
         if element.tag == "TrackFeatures":
             name_feat = Feature(
-                "name",
-                "Name of the track",
-                "CellLineage",
-                "TrackMate",
-                "string",
-                "none",
+                name="lineage_name",
+                description="Name of the track",
+                provenance="TrackMate",
+                feat_type="lineage",
+                lin_type="CellLineage",
+                data_type="string",
             )
-            feat_declaration._add_feature(name_feat, "lineage")
+            fdec._add_feature(name_feat)
         element.clear()
         event, element = next(iterator)
 
 
 def _convert_attributes(
     attributes: dict[str, str],
-    features: dict[str, CellLineage],
+    features: dict[str, Feature],
 ) -> None:
     """
-    Convert the values of `attributes` from string to int or float.
+    Convert the values of `attributes` from string to the correct data type.
 
     The type to convert to is given by the features declaration that stores all
     the features info.
@@ -245,7 +253,7 @@ def _convert_attributes(
     ----------
     attributes : dict[str, str]
         The dictionary whose values we want to convert.
-    features : dict[str, CellLineage]
+    features : dict[str, Feature]
         The dictionary of features that contains the information on how to convert
         the values of `attributes`.
 
@@ -268,7 +276,7 @@ def _convert_attributes(
                 case "string":
                     pass  # Nothing to do.
                 case _:
-                    raise ValueError(f"Invalid data type: {features[key]['data_type']}")
+                    raise ValueError(f"Invalid data type: {features[key].data_type}")
         elif key == "ID":
             attributes[key] = int(attributes[key])  # IDs are always integers.
         elif key == "name":
@@ -321,7 +329,7 @@ def _convert_ROI_coordinates(
 def _add_all_nodes(
     iterator: ET.iterparse,
     ancestor: ET._Element,
-    feat_declaration: FeaturesDeclaration,
+    fdec: FeaturesDeclaration,
     graph: nx.DiGraph,
 ) -> bool:
     """
@@ -335,7 +343,7 @@ def _add_all_nodes(
         An iterator over XML elements.
     ancestor : ET._Element
         The XML element that encompasses the information to be added.
-    feat_declaration : FeaturesDeclaration
+    fdec : FeaturesDeclaration
         An object holding the features declaration information used to convert the
         node attributes.
     graph : nx.DiGraph
@@ -364,7 +372,7 @@ def _add_all_nodes(
             # as defined in the features declaration.
             attribs = deepcopy(element.attrib)
             try:
-                _convert_attributes(attribs, feat_declaration.node_feats)
+                _convert_attributes(attribs, fdec.feats_dict)
             except ValueError as err:
                 print(f"ERROR: {err} Please check the XML file.")
                 raise
@@ -404,7 +412,7 @@ def _add_all_nodes(
 
 def _add_edge(
     element: ET._Element,
-    feat_declaration: FeaturesDeclaration,
+    fdec: FeaturesDeclaration,
     graph: nx.DiGraph,
     current_track_id: int,
 ) -> None:
@@ -421,7 +429,7 @@ def _add_edge(
     ----------
     element : ET._Element
         The XML element containing edge information.
-    feat_declaration : FeaturesDeclaration
+    fdec : FeaturesDeclaration
         An object holding the features declaration information used
         to convert the edge attributes.
     graph : nx.DiGraph
@@ -437,7 +445,7 @@ def _add_edge(
         in track assignment.
     """
     attribs = deepcopy(element.attrib)
-    _convert_attributes(attribs, feat_declaration.edge_feats)
+    _convert_attributes(attribs, fdec.feats_dict)
     try:
         entry_node_id = attribs["SPOT_SOURCE_ID"]
         exit_node_id = attribs["SPOT_TARGET_ID"]
@@ -471,7 +479,7 @@ def _add_edge(
 def _build_tracks(
     iterator: ET.iterparse,
     ancestor: ET._Element,
-    feat_declaration: FeaturesDeclaration,
+    fdec: FeaturesDeclaration,
     graph: nx.DiGraph,
 ) -> list[dict[str, Any]]:
     """
@@ -489,7 +497,7 @@ def _build_tracks(
         An iterator over XML elements.
     ancestor : ET._Element
         The XML element that encompasses the information to be added.
-    feat_declaration : FeaturesDeclaration
+    fdec : FeaturesDeclaration
         An object holding the features declaration information used
         to convert the edge and tracks attributes.
     graph: nx.DiGraph
@@ -509,13 +517,20 @@ def _build_tracks(
         # Saving the current track information.
         if element.tag == "Track" and event == "start":
             attribs = deepcopy(element.attrib)
-            _convert_attributes(attribs, feat_declaration.lin_feats)
+            _convert_attributes(attribs, fdec.feats_dict)
             tracks_attributes.append(attribs)
-            current_track_id = attribs["TRACK_ID"]
+            try:
+                current_track_id = attribs["TRACK_ID"]
+            except KeyError as err:
+                message = (
+                    f"No key {err} in the attributes of current element "
+                    f"'{element.tag}'. Please check the XML file."
+                )
+                raise KeyError(message)
 
         # Edge creation.
         if element.tag == "Edge" and event == "start":
-            _add_edge(element, feat_declaration, graph, current_track_id)
+            _add_edge(element, fdec, graph, current_track_id)
 
         event, element = next(iterator)
 
@@ -670,41 +685,8 @@ def _split_graph_into_lineages(
     return lineages
 
 
-def _check_for_fusions(
-    lineages: list[CellLineage],
-) -> None:
-    """
-    Check if there are fusions in the lineages and notify the user.
-
-    Parameters
-    ----------
-    lineages : list[CellLineage]
-        The lineages to check for fusions.
-    """
-    fusion_dict = {}
-    for lin in lineages:
-        fusions = lin.check_for_fusions()
-        if len(fusions) > 0:
-            fusion_dict[lin.graph["lineage_ID"]] = lin.check_for_fusions()
-    if fusion_dict:
-        cell_txt = f"{'s' if len(fusion_dict) > 1 else ''}"
-        fusion_txt = "\n".join(
-            f"  Lineage {lin_id} => cell IDs: {fusions}"
-            for lin_id, fusions in fusion_dict.items()
-        )
-        print(
-            f"WARNING: Cell fusion{cell_txt} detected!! "
-            f"Since Pycellin does not support fusions, it is advised to "
-            f"deal with them before any other processing. Be especially "
-            f"careful with tracking related features. Crashes and incorrect "
-            f"results can occur.\n"
-            f"Fusion{cell_txt} location:\n"
-            f"{fusion_txt}"
-        )
-
-
 def _update_features_declaration(
-    feat_declaration: FeaturesDeclaration,
+    fdec: FeaturesDeclaration,
     units: dict[str, str],
     segmentation: bool,
 ) -> None:
@@ -713,7 +695,7 @@ def _update_features_declaration(
 
     Parameters
     ----------
-    feat_declaration : FeaturesDeclaration
+    fdec : FeaturesDeclaration
         The features declaration to update.
     units : dict[str, str]
         The temporal and spatial units of the TrackMate model
@@ -722,84 +704,59 @@ def _update_features_declaration(
         True if the model has segmentation data, False otherwise.
     """
     # Node features.
-    feat_cell_id = Feature(
-        "cell_ID",
-        "Unique identifier of the cell",
-        "CellLineage",
-        "TrackMate",
-        "int",
-        "none",
-    )
-    feat_declaration._remove_features(
-        ["POSITION_X", "POSITION_Y", "POSITION_Z"], ["node"] * 3
-    )  # Replaced by the following `location` feature, a triplet of floats.
-    feat_location = Feature(
-        "location",
-        "Location of the cell",
-        "CellLineage",
-        "TrackMate",
-        "float",
-        units["spatialunits"],
-    )
-    feat_declaration._add_features([feat_cell_id, feat_location], ["node"] * 2)
-    feat_declaration._modify_feature_description(
-        "cell_ID", "Unique identifier of the cell", "node"
-    )
-    feat_declaration._rename_feature("FRAME", "frame", "node")
+    feat_cell_ID = cell_ID_Feature("TrackMate")
+    fdec._add_feature(feat_cell_ID)
+    fdec._protect_feature("cell_ID")
+    for axis in ["x", "y", "z"]:
+        fdec._rename_feature(f"POSITION_{axis.upper()}", f"cell_{axis}")
+        fdec._modify_feature_description(
+            f"cell_{axis}", f"{axis.upper()} coordinate of the cell"
+        )
+    fdec._rename_feature("FRAME", "frame")
+    fdec._protect_feature("frame")
     if segmentation:
         roi_coord_feat = Feature(
-            "ROI_coords",
-            "List of coordinates of the region of interest",
-            "CellLineage",
-            "TrackMate",
-            "float",
-            units["spatialunits"],
+            name="ROI_coords",
+            description="List of coordinates of the region of interest",
+            provenance="TrackMate",
+            feat_type="node",
+            lin_type="CellLineage",
+            data_type="float",
+            unit=units["spatialunits"],
         )
-        feat_declaration._add_feature(roi_coord_feat, "node")
+        fdec._add_feature(roi_coord_feat)
 
     # Edge features.
-    if "EDGE_X_LOCATION" in feat_declaration.edge_feats:
-        feat_declaration._remove_features(
-            ["EDGE_X_LOCATION", "EDGE_Y_LOCATION", "EDGE_Z_LOCATION"], ["edge"] * 3
-        )  # Replaced by the following `location` feature, a triplet of floats.
-        feat_location = Feature(
-            "location",
-            "Location of the edge (i.e. mean location of its nodes)",
-            "CellLineage",
-            "TrackMate",
-            "float",
-            units["spatialunits"],
-        )
-        feat_declaration._add_feature(feat_location, "edge")
+    if "EDGE_X_LOCATION" in fdec.feats_dict:
+        for axis in ["x", "y", "z"]:
+            fdec._rename_feature(f"EDGE_{axis.upper()}_LOCATION", f"link_{axis}")
+            desc = (
+                f"{axis.upper()} coordinate of the link, "
+                "i.e. mean coordinate of its two cells"
+            )
+            fdec._modify_feature_description(f"link_{axis}", desc)
 
     # Lineage features.
-    feat_declaration._rename_feature("TRACK_ID", "lineage_ID", "lineage")
-    feat_declaration._modify_feature_description(
-        "lineage_ID", "Unique identifier of the lineage", "lineage"
-    )
+    fdec._rename_feature("TRACK_ID", "lineage_ID")
+    fdec._modify_feature_description("lineage_ID", "Unique identifier of the lineage")
+    fdec._protect_feature("lineage_ID")
     feat_filtered_track = Feature(
-        "FilteredTrack",
-        "True if the track was not filtered out in TrackMate",
-        "CellLineage",
-        "TrackMate",
-        "int",
-        "none",
+        name="FilteredTrack",
+        description="True if the track was not filtered out in TrackMate",
+        provenance="TrackMate",
+        feat_type="lineage",
+        lin_type="CellLineage",
+        data_type="int",
     )
-    feat_declaration._add_feature(feat_filtered_track, "lineage")
-    if "TRACK_X_LOCATION" in feat_declaration.lin_feats:
-        feat_declaration._remove_features(
-            ["TRACK_X_LOCATION", "TRACK_Y_LOCATION", "TRACK_Z_LOCATION"],
-            ["lineage"] * 3,
-        )  # Replaced by the following `location` feature, a triplet of floats.
-        feat_location = Feature(
-            "location",
-            "Location of the lineage (i.e. mean location of its nodes)",
-            "CellLineage",
-            "TrackMate",
-            "float",
-            units["spatialunits"],
-        )
-        feat_declaration._add_feature(feat_location, "lineage")
+    fdec._add_feature(feat_filtered_track)
+    if "TRACK_X_LOCATION" in fdec.feats_dict:
+        for axis in ["x", "y", "z"]:
+            fdec._rename_feature(f"TRACK_{axis.upper()}_LOCATION", f"lineage_{axis}")
+            desc = (
+                f"{axis.upper()} coordinate of the lineage, "
+                "i.e. mean coordinate of its cells"
+            )
+            fdec._modify_feature_description(f"lineage_{axis}", desc)
 
 
 def _update_node_feature_key(
@@ -840,18 +797,15 @@ def _update_TRACK_ID(
     lineage : CellLineage
         The lineage to update.
     """
-    # If TRACK_ID is a node feature, we need to update it in the nodes.
-    _update_node_feature_key(lineage, "TRACK_ID", "lineage_ID")
-    # And in the graph.
     if "TRACK_ID" in lineage.graph:
         lineage.graph["lineage_ID"] = lineage.graph.pop("TRACK_ID")
     else:
         # One-node graph don't have the TRACK_ID feature in the graph
         # or in the nodes, so we have to create it.
+        # We set the ID of a one-node lineage to the negative of the node ID.
         assert len(lineage) == 1, "TRACK_ID not found and not a one-node lineage."
         node = [n for n in lineage.nodes][0]
         lineage.graph["lineage_ID"] = -node
-        lineage.nodes[node]["lineage_ID"] = -node
 
 
 def _update_location_related_features(
@@ -866,31 +820,21 @@ def _update_location_related_features(
         The lineage to update.
     """
     # Nodes
-    for node in lineage.nodes:
-        location = (
-            lineage.nodes[node].pop("POSITION_X"),
-            lineage.nodes[node].pop("POSITION_Y"),
-            lineage.nodes[node].pop("POSITION_Z"),
-        )
-        lineage.nodes[node]["location"] = location
+    for _, data in lineage.nodes(data=True):
+        for axis in ["x", "y", "z"]:
+            data[f"cell_{axis}"] = data.pop(f"POSITION_{axis.upper()}")
 
     # Edges
-    for edge in lineage.edges:
-        location = (
-            lineage.edges[edge].pop("EDGE_X_LOCATION"),
-            lineage.edges[edge].pop("EDGE_Y_LOCATION"),
-            lineage.edges[edge].pop("EDGE_Z_LOCATION"),
-        )
-        lineage.edges[edge]["location"] = location
+    for _, _, data in lineage.edges(data=True):
+        for axis in ["x", "y", "z"]:
+            data[f"link_{axis}"] = data.pop(f"EDGE_{axis.upper()}_LOCATION")
 
     # Lineage
     if "TRACK_X_LOCATION" in lineage.graph:
-        location = (
-            lineage.graph.pop("TRACK_X_LOCATION"),
-            lineage.graph.pop("TRACK_Y_LOCATION"),
-            lineage.graph.pop("TRACK_Z_LOCATION"),
-        )
-        lineage.graph["location"] = location
+        for axis in ["x", "y", "z"]:
+            lineage.graph[f"lineage_{axis}"] = lineage.graph.pop(
+                f"TRACK_{axis.upper()}_LOCATION"
+            )
     else:
         # One-node graph don't have the TRACK_X_LOCATION, TRACK_Y_LOCATION
         # and TRACK_Z_LOCATION features in the graph, so we have to create it.
@@ -898,7 +842,8 @@ def _update_location_related_features(
             len(lineage) == 1
         ), "TRACK_X_LOCATION not found and not a one-node lineage."
         node = [n for n in lineage.nodes][0]
-        lineage.graph["location"] = lineage.nodes[node]["location"]
+        for axis in ["x", "y", "z"]:
+            lineage.graph[f"lineage_{axis}"] = lineage.nodes[node][f"cell_{axis}"]
 
 
 def _parse_model_tag(
@@ -1009,9 +954,6 @@ def _parse_model_tag(
             lin.graph["FilteredTrack"] = True
         else:
             lin.graph["FilteredTrack"] = False
-
-    # Pycellin DOES NOT support fusion events.
-    _check_for_fusions(lineages)
 
     return units, fd, Data({lin.graph["lineage_ID"]: lin for lin in lineages})
 
@@ -1159,7 +1101,7 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
                     )
                 except ValueError:
                     raise ValueError(
-                        "The {key_TM} attribute cannot be converted to float."
+                        f"The {key_TM} attribute cannot be converted to float."
                     )
             return pixel_size
 
@@ -1198,9 +1140,7 @@ def load_TrackMate_XML(
     Model
         A Pycellin Model that contains all the data from the TrackMate XML file.
     """
-    units, feat_declaration, data = _parse_model_tag(
-        xml_path, keep_all_spots, keep_all_tracks
-    )
+    units, fdec, data = _parse_model_tag(xml_path, keep_all_spots, keep_all_tracks)
 
     # Add in the metadata all the TrackMate info that was not in the
     # TrackMate XML `Model` tag.
@@ -1211,22 +1151,35 @@ def load_TrackMate_XML(
     metadata["date"] = datetime.now()
     metadata["space_unit"] = units["spatialunits"]
     metadata["time_unit"] = units["timeunits"]
-    # metadata["pycellin_version"] = get_distribution("pycellin").version
-    # metadata["pycellin_version"] = version("pycellin")
-    metadata["pycellin_version"] = "0.2.0"
-    # TODO: see how to get the version of the package.
-    # Maybe by using the toml created by Stephane?
+    try:
+        version = importlib.metadata.version("pycellin")
+    except importlib.metadata.PackageNotFoundError:
+        version = "unknown"
+    metadata["pycellin_version"] = version
     metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
     dict_tags = _get_specific_tags(
         xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
     )
+    metadata["time_step"] = _get_time_step(dict_tags["Settings"])
+    metadata["pixel_size"] = _get_pixel_size(dict_tags["Settings"])
     for tag_name, tag in dict_tags.items():
         element_string = ET.tostring(tag, encoding="utf-8").decode()
         metadata[tag_name] = element_string
-    metadata["time_step"] = _get_time_step(dict_tags["Settings"])
-    metadata["pixel_size"] = _get_pixel_size(dict_tags["Settings"])
 
-    model = Model(metadata, feat_declaration, data)
+    model = Model(metadata, fdec, data)
+
+    # Pycellin DOES NOT support fusion events.
+    all_fusions = model.get_fusions()
+    if all_fusions:
+        # TODO: link toward correct documentation when it is written.
+        fusion_warning = (
+            f"Unsupported data, {len(all_fusions)} cell fusions detected. "
+            "It is advised to deal with them before any other processing, "
+            "especially for tracking related features. Crashes and incorrect "
+            "results can occur. See documentation for more details."
+        )
+        warnings.warn(fusion_warning)
+
     return model
 
 
@@ -1234,10 +1187,10 @@ if __name__ == "__main__":
 
     # import math
 
-    xml = "E:/Pasteur/Code/pycellin/pycellin/sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
     # xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
-    # xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    # xml = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
     # xml = "E:/Pasteur/LS_data/LStoLX/230328GreffeGakaYFPMyogTdtmdxFDBTryplen1-movie01-01-Scene-15-TR37-A01.xml"
 
     # trackmate_version = _get_trackmate_version(xml)
@@ -1253,8 +1206,10 @@ if __name__ == "__main__":
 
     model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
     print(model)
+    print(model.feat_declaration)
+    print(model.metadata["pycellin_version"])
     # print(model.metadata)
-    # print(model.feat_declaration.node_feats.keys())
+    # print(model.fdec.node_feats.keys())
     # print(model.data)
 
     # lineage = model.data.cell_data[0]

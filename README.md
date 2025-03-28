@@ -1,41 +1,95 @@
-# pycellin
+[![PyPI](https://img.shields.io/pypi/v/pycellin.svg)](https://pypi.org/project/pycellin)
+[![Development Status](https://img.shields.io/pypi/status/pycellin.svg)](https://en.wikipedia.org/wiki/Software_release_life_cycle#Beta)
+[![Python Version](https://img.shields.io/pypi/pyversions/pycellin.svg)](https://python.org)
+[![License](https://img.shields.io/pypi/l/pycellin.svg)](https://github.com/Image-Analysis-Hub/pycellin/blob/main/LICENSE)
+[![Actions Status](https://github.com/Image-Analysis-Hub/pycellin/workflows/Test/badge.svg)](https://github.com/Image-Analysis-Hub/pycellin/actions)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-`pycellin` is a python library to help analyze tracking data obtained by the Fiji plugin [TrackMate](https://imagej.net/plugins/trackmate/). It focuses on bacteria or cell lineages analysis but might prove useful to other applications.
+# Pycellin
 
-From TrackMate XML output, `pycellin` builds [NetworkX](https://networkx.org/) directed graphs, thus providing an intuitive way of representing cell lineages.
-No tracking information is lost in the process. Each TrackMate track gives birth to a directed graph while TrackMate spots become graph nodes and TrackMate links become graph edges. TrackMate features are stored as either node, edge or graph attributes.
+Pycellin is a graph-based Python framework to easily manipulate and extract information from cell tracking data, at the single-cell level. In Pycellin, cell lineages are modeled intuitively by directed rooted trees. Graph nodes represent cells at a specific point in time and space, and graph edges represent the time and space displacement of the cells. Please note that while Pycellin is built to support cell division events, **it does not authorize cell merging events**: a cell at a specific timepoint cannot have more than one parent.
 
-Since the tracks topology is kept intact, it is quite easy to compute new features like division rate, or to do an analysis on individual cells over time. To this end, `pycellin` provides a few tracking and morphological features that can be added automatically to a graph/lineage. It is also possible to add your own features on nodes, edges or graphs.
+Pycellin provides predefined features related to cell morphology, cell motion and tracking that can be automatically added to enrich lineages. More predefined features will be implemented in the future. The framework also facilitates the creation of new features defined by the user to accommodate the wide variety of experiments and biological questions.
 
-Finally,  `pycellin` can save these updated graphs into a TrackMate compatible XML. In most cases, the newly added features are carried along and can be used in TrackMate for visualization or filtering purposes.
+Pycellin can read from and write to TrackMate XML and Cell Tracking Challenge text file formats. More tracking formats will progressively be supported.
+
+While Pycellin has been designed with bacteria / cell lineages in mind, it could be used with more diverse tracking data provided the few conditions below are enforced:
+- the tracking data can be modeled by directed rooted trees, meaning no merging event
+- time must flow homogeneously, i.e. all the edges of a lineage graph must represent the same elapsed time.
+
 
 ## Installation
 
-`pycellin` is compatible with at least Python 3.10 and 3.11, and has been tested on Windows and Linux.
+Pycellin supports Python 3.10 and above. It is tested with Python 3.10 and 3.13 on the latest versions of Ubuntu, Windows and MacOS. Please let me know if you encounter any compatibility issue with a different combination.
 
-Use pip to install the latest development version:
+You can install Pycellin from [PyPI](https://pypi.org/):
 
 ```
-pip install git+https://github.com/Image-Analysis-Hub/pycellin.git
+pip install pycellin
 ```
 
-### Dependencies
+To install Pycellin with the optional test related dependencies:
 
-`pycellin` itself requires the following dependencies:
-- `lxml`
-- `matplotlib`
-- `networkx`
-- `pygraphviz`
-- `scikit-image`
-- `scipy`
-- `shapely`
+```
+pip install pycellin[test]
+```
 
-On top of that, running the tests requires `pytest` and running the notebooks requires `tifffile`.
 
-All these packages are available through conda default channel, except for `pygraphviz` which is available through the conda-forge channel.
+## Code Example
 
-See `requirements.txt` for more information.
+```python
+import pycellin
+
+# Import data from an external tool, here TrackMate.
+xml_path = "sample_data/Ecoli_growth_on_agar_pad.xml"
+model = pycellin.load_TrackMate_XML(xml_path)
+
+# Plot the cell lineages.
+for lin in model.get_cell_lineages():
+    plot(lin)
+
+# Compute and plot the cell cycle lineages.
+model.add_cycle_data()
+for clin in model.get_cycle_lineages():
+    plot(clin)
+
+# Enrich your lineages with additional predefined features.
+model.add_pycellin_features([
+    "cell_length", 
+    "cell_width",
+    "cell_displacement", 
+    "cell_speed", 
+    "branch_mean_speed",
+    "relative_age",
+    "division_time", 
+    "division_rate",
+    "cell_cycle_completeness",
+    ])
+model.update()
+
+# Export the enriched data as dataframes.
+cell_df = model.to_cell_dataframe()
+link_df = model.to_link_dataframe()
+cycle_df = model.to_cycle_dataframe()
+lineage_df = model.to_lineage_dataframe()
+```
+
 
 ## Usage
 
-See the `Getting_started` notebook located in the `notebooks` folder.
+Please note that the following notebooks are still a work in progress. There may be some mistakes in the code and some sections might move from one notebook to another.
+
+| Notebook                                                                                 | Description                                                       | Level    | State |
+|------------------------------------------------------------------------------------------|-------------------------------------------------------------------|----------|-------|
+| [Getting started](./notebooks/Getting%20started.ipynb)                                   | The basics of Pycellin, through examples                          | Beginner | WIP   |
+| [Managing features](./notebooks/Managing%20features.ipynb)                               | How to add, compute and remove features from a model              | Beginner | WIP   |
+| [Working with TrackMate data](./notebooks/Working%20with%20TrackMate%20data.ipynb)       | How Pycellin can work with TrackMate, through an example          | Beginner | WIP   |
+| [Creating a model from scratch](./notebooks/Creating%20a%20model%20from%20scratch.ipynb) | How to manually create a Pycellin model, including its lineages   | Advanced | Stub  |
+| [Custom features](./notebooks/Custom%20features.ipynb)                                   | How to create user-defined features and augment a model with them | Advanced | WIP   |
+
+
+## Credits
+
+- [NetworkX](https://networkx.org/) for lineages modeling ([Hagberg, Schult and Swart, 2008](http://conference.scipy.org.s3-website-us-east-1.amazonaws.com/proceedings/scipy2008/paper_2/))
+- [TrackMate](https://imagej.net/plugins/trackmate/) for the TrackMate data loader and exporter ([Tinevez et al., 2017](https://doi.org/10.1016/j.ymeth.2016.09.016), [Ershov et al., 2022](https://doi:10.1038/s41592-022-01507-1))
+- The [Cell Tracking Challenge](https://celltrackingchallenge.net/) for the CTC data loader and exporter ([Maška et al., 2023](https://doi.org/10.1038/s41592-023-01879-y))

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from typing import Any
+import networkx as nx
 
 from pycellin.classes import Data
-from pycellin.classes import Feature
 from pycellin.classes.feature_calculator import FeatureCalculator
+from pycellin.classes.lineage import CellLineage
 
 
 class ModelUpdater:
@@ -68,33 +68,17 @@ class ModelUpdater:
 
     def register_calculator(
         self,
-        feature: Feature,
         calculator: FeatureCalculator,
-        *args: Any,
-        **kwargs: Any,
     ) -> None:
         """
         Register a calculator for a feature.
 
         Parameters
         ----------
-        feature : Feature
-            The feature of interest.
         calculator : FeatureCalculator
             The calculator to use to compute the feature.
-        args : tuple
-            Positional arguments to pass to the calculator.
-        kwargs : dict
-            Keyword arguments to pass to the calculator.
         """
-        self._calculators[feature.name] = calculator(feature, *args, **kwargs)
-        # TODO: isn't it better to pass an instance of the calculator
-        # instead of a class?
-        # I feel like maybe it is easier / more intuitive for the user...?
-        # Discuss with Marie.
-        # Also, since the feature is already passed to the calculator,
-        # maybe we don't need it for register_calculator()?
-        # Could get it from the calculator instance.
+        self._calculators[calculator.feature.name] = calculator
 
     def delete_calculator(self, feature_name: str) -> None:
         """
@@ -126,13 +110,85 @@ class ModelUpdater:
         features_to_update : list of str, optional
             List of features to update. If None, all features are updated.
         """
-        # TODO: Deal with feature dependencies. See comments in __init__.
+        # Cleaning up the model.
+        # Remove empty lineages.
+        for lin_ID in (
+            self._added_lineages | self._modified_lineages
+        ) - self._removed_lineages:
+            if len(data.cell_data[lin_ID]) == 0:
+                del data.cell_data[lin_ID]
+                self._removed_lineages.add(lin_ID)
 
+        # Split lineages with several unconnected components.
+        lineages = list(data.cell_data.values())
+        for lin in lineages:
+            splitted_lins = [
+                CellLineage(lin.subgraph(c).copy())
+                for c in nx.weakly_connected_components(lin)
+            ]
+            if len(splitted_lins) == 1:
+                continue
+            # The largest lineage is considered to be the original one
+            # and will keep its lineage ID.
+            largest_lin = CellLineage()
+            for lin in splitted_lins:
+                if len(lin) > len(largest_lin):
+                    largest_lin = lin
+            # We replace it in the data, otherwise the unsplitted lineage
+            # will be kept.
+            data.cell_data[largest_lin.graph["lineage_ID"]] = largest_lin
+            self._modified_lineages.add(largest_lin.graph["lineage_ID"])
+            splitted_lins.remove(largest_lin)
+            # The other lineages are considered as new lineages.
+            for lin in splitted_lins:
+                if len(lin) == 1:
+                    # ID of a one-node lineage is minus the ID of the node.
+                    new_lin_ID = -list(lin.nodes())[0]
+                    if new_lin_ID in data.cell_data:
+                        # ID is already taken, so we change the ID of the node.
+                        new_cell_ID = max(data.cell_data.keys()) + 1
+                        cell_feats = lin._remove_cell(-new_lin_ID)
+                        frame = cell_feats.pop("frame")
+                        assert len(lin) == 0
+                        lin._add_cell(new_cell_ID, frame, **cell_feats)
+                        self._added_cells.add(new_cell_ID)
+                        lin.graph["lineage_ID"] = -new_cell_ID
+                        data.cell_data[-new_cell_ID] = lin
+                        self._added_lineages.add(-new_cell_ID)
+                    else:
+                        lin.graph["lineage_ID"] = new_lin_ID
+                        data.cell_data[new_lin_ID] = lin
+                        self._added_lineages.add(new_lin_ID)
+                else:
+                    new_lin_ID = max(data.cell_data.keys()) + 1
+                    lin.graph["lineage_ID"] = new_lin_ID
+                    data.cell_data[new_lin_ID] = lin
+                    self._added_lineages.add(new_lin_ID)
+
+        # In case of modifications in the structure of some cell lineages,
+        # we need to recompute the cycle lineages and their features.
+        # TODO: optimize so we don't have to recompute EVERYTHING for cycle lineages?
+        for lin_ID in (
+            self._modified_lineages | self._added_lineages
+        ) - self._removed_lineages:
+            if data.cycle_data is not None:
+                # To preserve references, but cannot work on frozen lineages...:
+                # new_cycle_data = data._compute_cycle_lineage(lin_ID)
+                # if lin_ID in data.cycle_data:
+                #     data.cycle_data.update({lin_ID: new_cycle_data})
+                # else:
+                #     data.cycle_data[lin_ID] = new_cycle_data
+                data.cycle_data[lin_ID] = data._compute_cycle_lineage(lin_ID)
+        for lin_ID in self._removed_lineages:
+            if data.cycle_data is not None and lin_ID in data.cycle_data:
+                del data.cycle_data[lin_ID]
+
+        # Update the features.
+        # TODO: Deal with feature dependencies. See comments in __init__.
         if features_to_update is None:
             calculators = self._calculators.values()
         else:
             calculators = [self._calculators[feat] for feat in features_to_update]
-
         # Recompute the features as needed.
         for calc in calculators:
             # Depending on the class of the calculator, a different version of
@@ -140,15 +196,9 @@ class ModelUpdater:
             calc.enrich(
                 data,
                 nodes_to_enrich=self._added_cells,
-                links_to_enrich=self._added_links,
+                edges_to_enrich=self._added_links,
                 lineages_to_enrich=self._added_lineages | self._modified_lineages,
             )
-
-        # In case of modifications in the structure of some cell lineages,
-        # we need to recompute the cycle lineages and their features.
-        # TODO: optimize so we don't have to recompute EVERYTHING for cycle lineages?
-        for lin_ID in self._modified_lineages:
-            data.cycle_data[lin_ID] = data._compute_cycle_lineage(lin_ID)
 
         # Update is done, we can clean up.
         self._reinit()

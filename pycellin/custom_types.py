@@ -5,7 +5,7 @@ from collections import namedtuple
 from typing import Literal
 
 
-LineageType = Literal["CellLineage", "CycleLineage"]
+LineageType = Literal["CellLineage", "CycleLineage", "Lineage"]
 FeatureType = Literal["node", "edge", "lineage"]
 
 # TODO: should I force the user to use the Cell and Link named tuples?
