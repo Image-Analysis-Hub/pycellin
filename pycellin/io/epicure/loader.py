@@ -12,7 +12,7 @@ from skimage import measure
 import tifffile as tiff
 
 from pycellin.classes import CellLineage, Data, Feature, FeaturesDeclaration, Model
-import pycellin.graph.features.utils as pgfu
+import pycellin.classes.feature as pcf
 
 
 def _extract_labels(
@@ -325,10 +325,11 @@ def _check_for_fusions(
     """
     fusion_dict = {}
     for lin in lineages:
-        fusions = lin.check_for_fusions()
+        fusions = lin.get_fusions()
         if len(fusions) > 0:
-            fusion_dict[lin.graph["lineage_ID"]] = lin.check_for_fusions()
+            fusion_dict[lin.graph["lineage_ID"]] = lin.get_fusions()
     if fusion_dict:
+        # TODO: switch to a true warning for consistency with the rest of Pycellin.
         cell_txt = f"{'s' if len(fusion_dict) > 1 else ''}"
         fusion_txt = "\n".join(
             f"  Lineage {lin_id} => cell IDs: {fusions}"
@@ -438,30 +439,36 @@ def _build_features_declaration(unit: str) -> FeaturesDeclaration:
     FeaturesDeclaration
         The built features declaration.
     """
+    feat_declaration = FeaturesDeclaration()
+    # Common node features.
+    feat_declaration._add_feature(pcf.frame_Feature("EpiCure"))
+    feat_declaration._add_feature(pcf.cell_ID_Feature("Pycellin"))
+    feat_declaration._add_feature(pcf.cell_coord_Feature(unit, "x", "EpiCure"))
+    feat_declaration._add_feature(pcf.cell_coord_Feature(unit, "y", "EpiCure"))
+    feat_declaration._add_feature(pcf.lineage_ID_Feature("Pycellin"))
+
+    # EpiCure specific node features.
     label_feat = Feature(
         name="label",
         description="Identifier of the cell in EpiCure",
-        lineage_type="CellLineage",
         provenance="EpiCure",
+        feat_type="node",
+        lin_type="CellLineage",
         data_type="int",
-        unit="none",
+        unit=None,
     )
     group_feat = Feature(
         name="group",
         description="Name of the group to which the cell belongs",
-        lineage_type="CellLineage",
         provenance="EpiCure",
+        feat_type="node",
+        lin_type="CellLineage",
         data_type="str",
-        unit="none",
+        unit=None,
     )
+    feat_declaration._add_feature(label_feat)
+    feat_declaration._add_feature(group_feat)
 
-    feat_declaration = FeaturesDeclaration()
-    feat_declaration._add_feature(pgfu.define_frame_Feature(), "node")
-    feat_declaration._add_feature(pgfu.define_cell_ID_Feature(), "node")
-    feat_declaration._add_feature(label_feat, "node")
-    feat_declaration._add_feature(pgfu.define_cell_location_Feature(unit), "node")
-    feat_declaration._add_feature(group_feat, "node")
-    feat_declaration._add_feature(pgfu.define_lineage_ID_Feature(), "lineage")
     return feat_declaration
 
 
