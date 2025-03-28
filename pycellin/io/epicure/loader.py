@@ -6,6 +6,7 @@ from itertools import pairwise
 import numpy as np
 from pathlib import Path
 import pickle
+from typing import Any
 
 import networkx as nx
 from skimage import measure
@@ -220,7 +221,7 @@ def _add_division_edges(
         # So we need to find the corresponding cell IDs.
         candidate_daughter_cell = [
             (node, frame)
-            for node, frame in graph.nodes(data="frame")
+            for node, frame in graph.nodes(data="frame")  # type: ignore
             if graph.nodes[node]["label"] == daughter_cell
         ]
         # assert len(candidate_daughter_cell) > 0, print(candidate_daughter_cell)
@@ -236,7 +237,7 @@ def _add_division_edges(
                 # Same as above but with the mother cell.
                 candidate_mother_cell = [
                     (node, frame)
-                    for node, frame in graph.nodes(data="frame")
+                    for node, frame in graph.nodes(data="frame")  # type: ignore
                     if graph.nodes[node]["label"] == mother_cell
                 ]
                 # assert len(candidate_mother_cell) > 0, print(candidate_mother_cell)
@@ -298,7 +299,7 @@ def _split_graph_into_lineages(
     # One subgraph is created per lineage, so each subgraph is
     # a connected component of `graph`.
     lineages = [
-        CellLineage(graph.subgraph(c).copy())
+        CellLineage(graph.subgraph(c).copy())  # type: ignore
         for c in nx.weakly_connected_components(graph)
     ]
     del graph  # Redondant with the subgraphs.
@@ -371,7 +372,7 @@ def _build_lineages(
     coord_array = _extract_label_coord_array(stack_array)
 
     # Populating the graph with nodes and edges.
-    graph = nx.DiGraph()
+    graph = nx.DiGraph()  # type: nx.DiGraph
     # _add_all_nodes(graph, labels_dict)
     _add_all_nodes_from_coord_array(graph, coord_array)
     # Adding edges between identical labels in consecutive frames.
@@ -396,7 +397,7 @@ def _build_metadata(
     pickle_path: str,
     label_img_path: str,
     epimetadata: dict,
-) -> dict:
+) -> dict[str, Any]:
     """
     Build the Pycellin metadata dictionary.
 
@@ -411,10 +412,10 @@ def _build_metadata(
 
     Returns
     -------
-    dict
+    dict[str, Any]
         The built metadata dictionary.
     """
-    metadata = {}
+    metadata = {}  # type: dict[str, Any]
     metadata["name"] = Path(pickle_path).stem
     metadata["pickle_location"] = pickle_path
     metadata["label_img_location"] = label_img_path
@@ -493,7 +494,7 @@ def _load_from_napari(
         A Pycellin model of the data.
     """
     # Populating the graph with nodes and edges.
-    graph = nx.DiGraph()
+    graph = nx.DiGraph()  # type: nx.DiGraph
     _add_all_nodes_from_coord_array(graph, coord_array)
     # Adding edges between identical labels in consecutive frames.
     _add_same_label_edges_from_coord_array(graph, coord_array[:, 0:2])
@@ -508,7 +509,7 @@ def _load_from_napari(
     # No metadata nor units for now.
     # TODO: need to add an argument to get the data from EpiMetaData
     # metadata = _build_metadata(pickle_path, label_img_path, epidata["EpiMetaData"])
-    metadata = {}
+    metadata = {}  # type: dict[str, str]
     # feat_declaration = _build_features_declaration(epidata["EpiMetaData"]["UnitXY"])
     feat_declaration = FeaturesDeclaration()
     model = Model(metadata, feat_declaration, data)
