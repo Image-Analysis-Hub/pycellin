@@ -80,8 +80,15 @@ class AbsoluteAge(NodeGlobalFeatureCalculator):
         -------
         int | float
             Absolute age of the node.
+
+        Raises
+        ------
+        KeyError
+            If the cell is not in the lineage.
         """
         root = lineage.get_root()
+        if noi not in lineage.nodes:
+            raise KeyError(f"Cell {noi} not in the lineage.")
         age_in_frame = lineage.nodes[noi]["frame"] - lineage.nodes[root]["frame"]
         return age_in_frame * self.time_step
 
@@ -128,7 +135,14 @@ class RelativeAge(NodeGlobalFeatureCalculator):
         -------
         int | float
             Relative age of the node.
+
+        Raises
+        ------
+        KeyError
+            If the cell is not in the lineage.
         """
+        if noi not in lineage.nodes:
+            raise KeyError(f"Cell {noi} not in the lineage.")
         first_cell = lineage.get_cell_cycle(noi)[0]
         age_in_frame = lineage.nodes[noi]["frame"] - lineage.nodes[first_cell]["frame"]
         return age_in_frame * self.time_step
@@ -165,14 +179,23 @@ class CellCycleCompleteness(NodeGlobalFeatureCalculator):
         -------
         bool
             True if the cell cycle is complete, False otherwise.
+
+        Raises
+        ------
+        KeyError
+            If the cell or cycle is not in the lineage.
         """
         if isinstance(lineage, CellLineage):
+            if noi not in lineage.nodes:
+                raise KeyError(f"Cell {noi} not in the lineage.")
             cell_cycle = lineage.get_cell_cycle(noi)
             if lineage.is_root(cell_cycle[0]) or lineage.is_leaf(cell_cycle[-1]):
                 return False
             else:
                 return True
         elif isinstance(lineage, CycleLineage):
+            if noi not in lineage.nodes:
+                raise KeyError(f"Cycle {noi} not in the lineage.")
             if lineage.is_root(noi) or lineage.is_leaf(noi):
                 return False
             else:
@@ -220,11 +243,20 @@ class DivisionTime(NodeGlobalFeatureCalculator):
         -------
         int | float
             Division time.
+
+        Raises
+        ------
+        KeyError
+            If the cell or cycle is not in the lineage.
         """
         if isinstance(lineage, CellLineage):
+            if noi not in lineage.nodes:
+                raise KeyError(f"Cell {noi} not in the lineage.")
             cell_cycle = lineage.get_cell_cycle(noi)
             return len(cell_cycle) * self.time_step
         elif isinstance(lineage, CycleLineage):
+            if noi not in lineage.nodes:
+                raise KeyError(f"Cycle {noi} not in the lineage.")
             return lineage.nodes[noi]["cycle_length"] * self.time_step
 
 
@@ -269,11 +301,20 @@ class DivisionRate(NodeGlobalFeatureCalculator):
         -------
         int | float
             Division rate.
+
+        Raises
+        ------
+        KeyError
+            If the cell or cycle is not in the lineage.
         """
         if isinstance(lineage, CellLineage):
+            if noi not in lineage.nodes:
+                raise KeyError(f"Cell {noi} not in the lineage.")
             cell_cycle = lineage.get_cell_cycle(noi)
             return 1 / (len(cell_cycle) * self.time_step)
         elif isinstance(lineage, CycleLineage):
+            if noi not in lineage.nodes:
+                raise KeyError(f"Cycle {noi} not in the lineage.")
             return 1 / (lineage.nodes[noi]["cycle_length"] * self.time_step)
 
 
