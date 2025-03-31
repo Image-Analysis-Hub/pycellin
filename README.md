@@ -90,6 +90,7 @@ Please note that the following notebooks are still a work in progress. There may
 
 ## Credits
 
+- Laure Le Blanc for _Escherichia coli_ growth on agar pad data (in sample_data directory)
 - [NetworkX](https://networkx.org/) for lineages modeling ([Hagberg, Schult and Swart, 2008](http://conference.scipy.org.s3-website-us-east-1.amazonaws.com/proceedings/scipy2008/paper_2/))
 - [TrackMate](https://imagej.net/plugins/trackmate/) for the TrackMate data loader and exporter ([Tinevez et al., 2017](https://doi.org/10.1016/j.ymeth.2016.09.016), [Ershov et al., 2022](https://doi:10.1038/s41592-022-01507-1))
 - The [Cell Tracking Challenge](https://celltrackingchallenge.net/) for the CTC data loader and exporter ([Maška et al., 2023](https://doi.org/10.1038/s41592-023-01879-y))
