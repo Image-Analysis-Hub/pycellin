@@ -37,10 +37,12 @@ def _get_units(
         A dictionary where the keys are the attribute names and the values are the
         corresponding attribute values (units information).
     """
+    units = {}  # type: dict[str, str]
     if element.attrib:
         units = deepcopy(element.attrib)
-    else:
-        units = {}
+        # Check that units is a dictionary.
+        assert isinstance(units, dict)
+        print(units)
     if "spatialunits" not in units:
         units["spatialunits"] = "pixel"  # TrackMate default value.
         print("WARNING: No spatial units found in the XML file. Setting to 'pixel'.")
@@ -85,7 +87,7 @@ def _get_features_dict(
     return features
 
 
-def _dimension_to_unit(trackmate_feature, units) -> str:
+def _dimension_to_unit(trackmate_feature, units) -> str | None:
     """
     Convert the dimension of a feature to its unit.
 
@@ -98,7 +100,7 @@ def _dimension_to_unit(trackmate_feature, units) -> str:
 
     Returns
     -------
-    str
+    str | None
         The unit of the feature.
     """
     dimension = trackmate_feature["dimension"]
@@ -147,15 +149,10 @@ def _convert_and_add_feature(
     ValueError
         If the feature type is invalid.
     """
-    feat_name = trackmate_feature["feature"]
-    feat_description = trackmate_feature["name"]
-    feat_provenance = "TrackMate"
-    feat_lineage_type = "CellLineage"
     if trackmate_feature["isint"] == "true":
         feat_data_type = "int"
     else:
         feat_data_type = "float"
-    feat_unit = _dimension_to_unit(trackmate_feature, units)
 
     match feature_type:
         case "SpotFeatures":
@@ -167,13 +164,13 @@ def _convert_and_add_feature(
         case _:
             raise ValueError(f"Invalid feature type: {feature_type}")
     feature = Feature(
-        feat_name,
-        feat_description,
-        feat_provenance,
-        feat_type,
-        feat_lineage_type,
-        feat_data_type,
-        feat_unit,
+        name=trackmate_feature["feature"],
+        description=trackmate_feature["name"],
+        provenance="TrackMate",
+        feat_type=feat_type,
+        lin_type="CellLineage",
+        data_type=feat_data_type,
+        unit=_dimension_to_unit(trackmate_feature, units),
     )
 
     fdec._add_feature(feature)
@@ -270,15 +267,16 @@ def _convert_attributes(
         if key in features:
             match features[key].data_type:
                 case "int":
-                    attributes[key] = int(attributes[key])
+                    attributes[key] = int(attributes[key])  # type: ignore
                 case "float":
-                    attributes[key] = float(attributes[key])
+                    attributes[key] = float(attributes[key])  # type: ignore
                 case "string":
                     pass  # Nothing to do.
                 case _:
                     raise ValueError(f"Invalid data type: {features[key].data_type}")
         elif key == "ID":
-            attributes[key] = int(attributes[key])  # IDs are always integers.
+            # IDs are always integers.
+            attributes[key] = int(attributes[key])  # type: ignore
         elif key == "name":
             # "name" is a string so we don't need to convert it.
             pass
@@ -317,10 +315,10 @@ def _convert_ROI_coordinates(
     n_points = int(attribs["ROI_N_POINTS"])
     if element.text:
         points_coordinates = element.text.split()
-        points_coordinates = [float(x) for x in points_coordinates]
+        points_coordinates = [float(x) for x in points_coordinates]  # type: ignore
         points_dimension = len(points_coordinates) // n_points
         it = [iter(points_coordinates)] * points_dimension
-        points_coordinates = list(zip(*it))
+        points_coordinates = list(zip(*it))  # type: ignore
         attribs["ROI_coords"] = points_coordinates
     else:
         attribs["ROI_coords"] = None
@@ -447,8 +445,8 @@ def _add_edge(
     attribs = deepcopy(element.attrib)
     _convert_attributes(attribs, fdec.feats_dict)
     try:
-        entry_node_id = attribs["SPOT_SOURCE_ID"]
-        exit_node_id = attribs["SPOT_TARGET_ID"]
+        entry_node_id = int(attribs["SPOT_SOURCE_ID"])
+        exit_node_id = int(attribs["SPOT_TARGET_ID"])
     except KeyError as err:
         print(
             f"No key {err} in the attributes of "
@@ -461,17 +459,17 @@ def _add_edge(
         # Adding the current track ID to the nodes of the newly created
         # edge. This will be useful later to filter nodes by track and
         # add the saved tracks attributes (as returned by this method).
-        error_msg = f"Incoherent track ID for nodes {entry_node_id} and {exit_node_id}."
+        err_msg = f"Incoherent track ID for nodes {entry_node_id} and {exit_node_id}."
         entry_node = graph.nodes[entry_node_id]
         if "TRACK_ID" not in entry_node:
             entry_node["TRACK_ID"] = current_track_id
         else:
-            assert entry_node["TRACK_ID"] == current_track_id, error_msg
+            assert entry_node["TRACK_ID"] == current_track_id, err_msg
         exit_node = graph.nodes[exit_node_id]
         if "TRACK_ID" not in exit_node:
             exit_node["TRACK_ID"] = current_track_id
         else:
-            assert exit_node["TRACK_ID"] == current_track_id, error_msg
+            assert exit_node["TRACK_ID"] == current_track_id, err_msg
     finally:
         element.clear()
 
@@ -530,6 +528,7 @@ def _build_tracks(
 
         # Edge creation.
         if element.tag == "Edge" and event == "start":
+            assert current_track_id is not None, "No current track ID."
             _add_edge(element, fdec, graph, current_track_id)
 
         event, element = next(iterator)
@@ -879,7 +878,7 @@ def _parse_model_tag(
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
     # the resulting graph will be disconnected.
-    graph = nx.DiGraph()
+    graph = nx.DiGraph()  # type: nx.DiGraph
 
     # So as not to load the entire XML file into memory at once, we're
     # using an iterator to browse over the tags one by one.
@@ -1015,13 +1014,15 @@ def _get_trackmate_version(
     Returns
     -------
     str
-        The version of TrackMate used to generate the XML file.
+        The version of TrackMate used to generate the XML file. If the
+        version cannot be found, "unknown" is returned.
     """
     it = ET.iterparse(xml_path, events=["start", "end"])
     for event, element in it:
         if event == "start" and element.tag == "TrackMate":
             version = str(element.attrib["version"])
             return version
+    return "unknown"
 
 
 def _get_time_step(settings: ET._Element) -> float:
@@ -1144,7 +1145,7 @@ def load_TrackMate_XML(
 
     # Add in the metadata all the TrackMate info that was not in the
     # TrackMate XML `Model` tag.
-    metadata = {}
+    metadata = {}  # type: dict[str, Any]
     metadata["name"] = Path(xml_path).stem
     metadata["file_location"] = xml_path
     metadata["provenance"] = "TrackMate"
