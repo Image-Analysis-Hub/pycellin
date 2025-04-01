@@ -22,17 +22,30 @@ While Pycellin has been designed with bacteria / cell lineages in mind, it could
 
 Pycellin supports Python 3.10 and above. It is tested with Python 3.10 and 3.13 on the latest versions of Ubuntu, Windows and MacOS. Please let me know if you encounter any compatibility issue with a different combination.
 
-You can install Pycellin from [PyPI](https://pypi.org/):
+It is recommended to install Pycellin in a conda or mamba environment. 
 
-```
-pip install pycellin
-```
+1. Check that conda/mamba is already installed by typing either `conda` or `mamba` in a terminal. If not, follow the installation instructions on [Miniforge](https://conda-forge.org/download/).
 
-To install Pycellin with the optional test related dependencies:
+2. Create a Python environment dedicated to Pycellin:
+    ```
+    conda create -n my_env_pycellin
+    ```
 
-```
-pip install pycellin[test]
-```
+3. Activate the environment:
+    ```
+    conda activate my_env_pycellin
+    ```
+
+4. Install Pycellin via [PyPI](https://pypi.org/):
+    ```
+    pip install pycellin
+    ```
+    or if you want to install the optional test related dependencies use instead:
+    ```
+    pip install pycellin[test]
+    ```
+
+5. You're good to go!
 
 
 ## Code Example
@@ -88,7 +101,7 @@ Please note that the following notebooks are still a work in progress. There may
 | [Custom features](./notebooks/Custom%20features.ipynb)                                   | How to create user-defined features and augment a model with them | Advanced | WIP   |
 
 
-## Credits
+## Credits and references
 
 - Laure Le Blanc for _Escherichia coli_ growth on agar pad data (in sample_data directory)
 - [NetworkX](https://networkx.org/) for lineages modeling ([Hagberg, Schult and Swart, 2008](http://conference.scipy.org.s3-website-us-east-1.amazonaws.com/proceedings/scipy2008/paper_2/))
