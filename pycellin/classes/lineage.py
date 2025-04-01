@@ -787,7 +787,7 @@ class CellLineage(Lineage):
             nodes = nx.descendants(self, noi)
         else:
             raise ValueError("The split parameter must be 'upstream' or 'downstream'.")
-        new_lineage = self.subgraph(nodes).copy()  # new_lineage has self type
+        new_lineage = self.subgraph(nodes).copy()  # new_lineage has same type as self
         self.remove_nodes_from(nodes)
         return new_lineage  # type: ignore
 
