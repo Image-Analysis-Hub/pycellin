@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import pickle
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 import warnings
 
 import pandas as pd
@@ -15,6 +15,7 @@ from pycellin.classes import (
     Feature,
     FeaturesDeclaration,
 )
+from pycellin.classes.lineage import Lineage
 from pycellin.classes.exceptions import UpdateRequiredError
 from pycellin.classes.feature_calculator import FeatureCalculator
 from pycellin.classes.updater import ModelUpdater
@@ -23,6 +24,8 @@ import pycellin.graph.features.motion as motion
 import pycellin.graph.features.morphology as morpho
 import pycellin.graph.features.utils as futils
 from pycellin.custom_types import Cell, Link
+
+L = TypeVar("L", bound="Lineage")
 
 
 class Model:
@@ -338,6 +341,85 @@ class Model:
             return self.data.cycle_data[lineage_ID]
         else:
             return None
+
+    @staticmethod
+    def _get_lineages_from_lin_feat(
+        lineages: list[L],
+        lineage_feature: str,
+        lineage_feature_value: Any,
+    ) -> list[L]:
+        """
+        Return the lineages with the specified feature value.
+
+        Parameters
+        ----------
+        lineages : list[T]
+            The lineages.
+        lineage_feature : str
+            The name of the feature to check.
+        lineage_feature_value : Any
+            The value of the feature to check.
+
+        Returns
+        -------
+        list[T]
+            The lineages with the specified feature value.
+        """
+        return [
+            lin
+            for lin in lineages
+            if lin.graph[lineage_feature] == lineage_feature_value
+        ]
+
+    def get_cell_lineages_from_lin_feat(
+        self,
+        lineage_feature: str,
+        lineage_feature_value: Any,
+    ) -> list[CellLineage]:
+        """
+        Return the cell lineages with the specified feature value.
+
+        Parameters
+        ----------
+        lineage_feature : str
+            The name of the feature to check.
+        lineage_feature_value : Any
+            The value of the feature to check.
+
+        Returns
+        -------
+        list[CellLineage]
+            The cell lineage(s) with the specified feature value.
+        """
+        return self._get_lineages_from_lin_feat(
+            list(self.data.cell_data.values()), lineage_feature, lineage_feature_value
+        )
+
+    def get_cycle_lineages_from_lin_feat(
+        self,
+        lineage_feature: str,
+        lineage_feature_value: Any,
+    ) -> list[CycleLineage]:
+        """
+        Return the cycle lineages with the specified feature value.
+
+        Parameters
+        ----------
+        lineage_feature : str
+            The name of the feature to check.
+        lineage_feature_value : Any
+            The value of the feature to check.
+
+        Returns
+        -------
+        list[CycleLineage]
+            The cycle lineages with the specified feature value.
+        """
+        if self.data.cycle_data is None:
+            return []
+        return self._get_lineages_from_lin_feat(
+            list(self.data.cycle_data.values()), lineage_feature, lineage_feature_value
+        )
 
     def get_next_available_lineage_ID(self) -> int:
         """
