@@ -509,7 +509,7 @@ def test_convert_attributes_missing_feat():
         tml._convert_attributes(attributes, features, "node")
     assert features["feat_int"].name == "feat_int"
     assert features["feat_int"].description == "unknown"
-    assert features["feat_int"].provenance == "TrackMate"
+    assert features["feat_int"].provenance == "unknown"
     assert features["feat_int"].feat_type == "node"
     assert features["feat_int"].lin_type == "CellLineage"
     assert features["feat_int"].data_type == "unknown"

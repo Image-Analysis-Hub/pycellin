@@ -299,7 +299,7 @@ def _convert_attributes(
             missing_feat = Feature(
                 name=key,
                 description="unknown",
-                provenance="TrackMate",
+                provenance="unknown",
                 feat_type=feature_type,
                 lin_type="CellLineage",
                 data_type="unknown",
