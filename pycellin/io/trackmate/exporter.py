@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Features in the XML file are not in the same order as a file that was exported 
+Features in the XML file are not in the same order as a file that was exported
 directly from TrackMate.
 I've tested quickly and it doesn't seem to be a problem for TrackMate.
 """
@@ -10,6 +10,7 @@ I've tested quickly and it doesn't seem to be a problem for TrackMate.
 
 import math
 from typing import Any, Union
+import warnings
 
 from lxml import etree as ET
 import networkx as nx
@@ -130,11 +131,12 @@ def _unit_to_dimension(
                     dimension = dim
                     break
             if dimension is None:
-                print(
-                    f"WARNING: {name} is a feature listed as coming from TrackMate"
+                msg = (
+                    f"{name} is a feature listed as coming from TrackMate"
                     f" but it is not a known feature of TrackMate. Dimension is set"
                     f" to NONE."
                 )
+                warnings.warn(msg)
                 # I'm using NONE here, which is already used in TM, for example
                 # with the FRAME or VISIBILITY features. I tried to use UNKNOWN
                 # but it's a dimension not recognized by TM and it crashes.
@@ -574,6 +576,9 @@ if __name__ == "__main__":
 
     xml_in = "sample_data/FakeTracks.xml"
     xml_out = "sample_data/results/FakeTracks_exported_TM.xml"
+
+    xml_in = "sample_data/Celegans-5pc-17timepoints.xml"
+    xml_out = "sample_data/Celegans-5pc-17timepoints_exported_TM.xml"
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # print(model.feat_declaration)
