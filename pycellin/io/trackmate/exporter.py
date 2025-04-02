@@ -8,6 +8,7 @@ I've tested quickly and it doesn't seem to be a problem for TrackMate.
 """
 
 
+import copy
 import math
 from typing import Any, Union
 import warnings
@@ -544,34 +545,36 @@ def export_TrackMate_XML(
         Dictionary containing the spatial and temporal units of the model.
         If not specified, the user will be asked to provide them.
     """
-    # FIXME: Copy the model to avoid modifying the original one.
+    # We don't want to modify the original model.
+    model_copy = copy.deepcopy(model)
 
     if not units:
-        units = _ask_units(model.feat_declaration)
-    if "TrackMate_version" in model.metadata:
-        tm_version = model.metadata["TrackMate_version"]
+        units = _ask_units(model_copy.feat_declaration)
+    if "TrackMate_version" in model_copy.metadata:
+        tm_version = model_copy.metadata["TrackMate_version"]
     else:
         tm_version = "unknown"
-    _prepare_model_for_export(model)
+    _prepare_model_for_export(model_copy)
 
     with ET.xmlfile(xml_path, encoding="utf-8", close=True) as xf:
         xf.write_declaration()
         with xf.element("TrackMate", {"version": tm_version}):
             xf.write("\n  ")
-            _write_metadata_tag(xf, model.metadata, "Log")
+            _write_metadata_tag(xf, model_copy.metadata, "Log")
             xf.write("\n  ")
             with xf.element("Model", units):
-                _write_FeatureDeclarations(xf, model)
-                _write_AllSpots(xf, model.data.cell_data)
-                _write_AllTracks(xf, model.data.cell_data)
-                _write_FilteredTracks(xf, model.data.cell_data)
+                _write_FeatureDeclarations(xf, model_copy)
+                _write_AllSpots(xf, model_copy.data.cell_data)
+                _write_AllTracks(xf, model_copy.data.cell_data)
+                _write_FilteredTracks(xf, model_copy.data.cell_data)
             xf.write("\n  ")
             for tag in ["Settings", "GUIState", "DisplaySettings"]:
-                _write_metadata_tag(xf, model.metadata, tag)
+                _write_metadata_tag(xf, model_copy.metadata, tag)
                 if tag == "DisplaySettings":
                     xf.write("\n")
                 else:
                     xf.write("\n  ")
+    del model_copy
 
 
 if __name__ == "__main__":
@@ -579,8 +582,8 @@ if __name__ == "__main__":
     xml_in = "sample_data/FakeTracks.xml"
     xml_out = "sample_data/results/FakeTracks_exported_TM.xml"
 
-    xml_in = "sample_data/Celegans-5pc-17timepoints.xml"
-    xml_out = "sample_data/Celegans-5pc-17timepoints_exported_TM.xml"
+    # xml_in = "sample_data/Celegans-5pc-17timepoints.xml"
+    # xml_out = "sample_data/Celegans-5pc-17timepoints_exported_TM.xml"
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # print(model.feat_declaration)
@@ -589,6 +592,9 @@ if __name__ == "__main__":
     #     node_hover_features=["cell_ID", "cell_x", "cell_y", "cell_z"],
     #     edge_hover_features=["link_x", "link_y", "link_z"],
     # )
+    print(model.feat_declaration)
     export_TrackMate_XML(
         model, xml_out, {"spatialunits": "pixel", "temporalunits": "sec"}
     )
+    print()
+    print(model.feat_declaration)
