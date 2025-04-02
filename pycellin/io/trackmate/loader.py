@@ -394,9 +394,6 @@ def _add_all_nodes(
             except ValueError as err:
                 print(f"ERROR: {err} Please check the XML file.")
                 raise
-            except KeyError as err:
-                print(f"ERROR: {err} Please check the XML file.")
-                raise
 
             # The ROI coordinates are not stored in a tag attribute but in
             # the tag text. So we need to extract then format them.
@@ -463,7 +460,11 @@ def _add_edge(
         in track assignment.
     """
     attribs = deepcopy(element.attrib)
-    _convert_attributes(attribs, fdec.feats_dict, "edge")
+    try:
+        _convert_attributes(attribs, fdec.feats_dict, "edge")
+    except ValueError as err:
+        print(f"ERROR: {err} Please check the XML file.")
+        raise
     try:
         entry_node_id = int(attribs["SPOT_SOURCE_ID"])
         exit_node_id = int(attribs["SPOT_TARGET_ID"])
@@ -535,7 +536,11 @@ def _build_tracks(
         # Saving the current track information.
         if element.tag == "Track" and event == "start":
             attribs = deepcopy(element.attrib)
-            _convert_attributes(attribs, fdec.feats_dict, "lineage")
+            try:
+                _convert_attributes(attribs, fdec.feats_dict, "lineage")
+            except ValueError as err:
+                print(f"ERROR: {err} Please check the XML file.")
+                raise
             tracks_attributes.append(attribs)
             try:
                 current_track_id = attribs["TRACK_ID"]
