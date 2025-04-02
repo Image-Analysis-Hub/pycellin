@@ -290,7 +290,7 @@ def _convert_attributes(
             pass
         else:
             msg = (
-                f"{feature_type.capitalize} feature {key} not found in "
+                f"{feature_type.capitalize()} feature {key} not found in "
                 "the features declaration."
             )
             warnings.warn(msg)
