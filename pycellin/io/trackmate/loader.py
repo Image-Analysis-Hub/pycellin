@@ -239,6 +239,7 @@ def _add_all_features(
 def _convert_attributes(
     attributes: dict[str, str],
     features: dict[str, Feature],
+    feature_type: str,
 ) -> None:
     """
     Convert the values of `attributes` from string to the correct data type.
@@ -253,6 +254,8 @@ def _convert_attributes(
     features : dict[str, Feature]
         The dictionary of features that contains the information on how to convert
         the values of `attributes`.
+    feature_type : str
+        The type of the feature to convert (node, edge, or lineage).
 
     Raises
     ------
@@ -292,6 +295,18 @@ def _convert_attributes(
                 "the features declaration."
             )
             warnings.warn(msg)
+            # In that case we add a stub version of the feature to the features
+            # declaration. The user will need to manually update the feature later on.
+            missing_feat = Feature(
+                name=key,
+                description="unknown",
+                provenance="TrackMate",
+                feat_type=feature_type,
+                lin_type="CellLineage",
+                data_type="unknown",
+                unit="unknown",
+            )
+            features[key] = missing_feat
 
 
 def _convert_ROI_coordinates(
@@ -376,7 +391,7 @@ def _add_all_nodes(
             # as defined in the features declaration.
             attribs = deepcopy(element.attrib)
             try:
-                _convert_attributes(attribs, fdec.feats_dict)
+                _convert_attributes(attribs, fdec.feats_dict, "node")
             except ValueError as err:
                 print(f"ERROR: {err} Please check the XML file.")
                 raise
@@ -449,7 +464,7 @@ def _add_edge(
         in track assignment.
     """
     attribs = deepcopy(element.attrib)
-    _convert_attributes(attribs, fdec.feats_dict)
+    _convert_attributes(attribs, fdec.feats_dict, "edge")
     try:
         entry_node_id = int(attribs["SPOT_SOURCE_ID"])
         exit_node_id = int(attribs["SPOT_TARGET_ID"])
@@ -521,7 +536,7 @@ def _build_tracks(
         # Saving the current track information.
         if element.tag == "Track" and event == "start":
             attribs = deepcopy(element.attrib)
-            _convert_attributes(attribs, fdec.feats_dict)
+            _convert_attributes(attribs, fdec.feats_dict, "lineage")
             tracks_attributes.append(attribs)
             try:
                 current_track_id = attribs["TRACK_ID"]
