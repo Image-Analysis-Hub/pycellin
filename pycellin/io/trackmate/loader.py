@@ -258,9 +258,11 @@ def _convert_attributes(
     ------
     ValueError
         If a feature has an invalid data_type (not "int", "float" nor "string").
-    KeyError
-        If a feature is not found in the features declaration nor treated as a
-        special case.
+
+    Warns
+    -----
+    UserWarning
+        If a feature is not found in the features declaration.
     """
     # TODO: Rewrite this.
     for key in attributes:
@@ -285,7 +287,11 @@ def _convert_attributes(
             # attribute) and will be converted later, in _add_ROI_coordinates().
             pass
         else:
-            raise KeyError(f"Feature {key} not found in the features declaration.")
+            msg = (
+                f"{feature_type.capitalize} feature {key} not found in "
+                "the features declaration."
+            )
+            warnings.warn(msg)
 
 
 def _convert_ROI_coordinates(
@@ -1190,9 +1196,10 @@ if __name__ == "__main__":
 
     # xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
-    xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    # xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
     # xml = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
     # xml = "E:/Pasteur/LS_data/LStoLX/230328GreffeGakaYFPMyogTdtmdxFDBTryplen1-movie01-01-Scene-15-TR37-A01.xml"
+    xml = "sample_data/Celegans-5pc-17timepoints.xml"
 
     # trackmate_version = _get_trackmate_version(xml)
     # print(trackmate_version)
