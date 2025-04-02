@@ -11,29 +11,32 @@ from pycellin.classes import Feature, FeaturesDeclaration
 # Class Feature ###############################################################
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def feat1():
     return Feature("name1", "desc1", "prov1", "node", "CellLineage", "type1", "unit1")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def feat1_bis():
     return Feature("name1", "desc1", "prov1", "node", "CellLineage", "type1", "unit1")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def feat2():
     return Feature("name2", "desc2", "prov2", "node", "CellLineage", "type2", "unit2")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def feat3():
     return Feature("name1", "desc1", "prov1", "node", "CellLineage", "type1")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def feat4():
     return Feature("name1", "desc1", "prov1", "edge", "CellLineage", "type1", "unit1")
+
+
+# __eq__() ####################################################################
 
 
 def test_feature_equality(feat1, feat1_bis):
@@ -111,34 +114,37 @@ def test_feature_is_equal_ignore_feat_type(feat1, feat3, feat4):
 # Class FeaturesDeclaration ###################################################
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def fd1():
     return FeaturesDeclaration(1)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def fd1_bis():
     return FeaturesDeclaration(1)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def fd2():
     return FeaturesDeclaration({})
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def fd2_bis():
     return FeaturesDeclaration({})
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def fd3():
     return FeaturesDeclaration(2)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def fd4():
     return FeaturesDeclaration({"a": "a"})
+
+
+# __eq__() ####################################################################
 
 
 def test_features_declaration_equality(feat1, feat1_bis, fd1, fd1_bis, fd2, fd2_bis):
