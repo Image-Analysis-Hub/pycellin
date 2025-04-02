@@ -40,15 +40,14 @@ def _get_units(
     units = {}  # type: dict[str, str]
     if element.attrib:
         units = deepcopy(element.attrib)
-        # Check that units is a dictionary.
-        assert isinstance(units, dict)
-        print(units)
     if "spatialunits" not in units:
         units["spatialunits"] = "pixel"  # TrackMate default value.
-        print("WARNING: No spatial units found in the XML file. Setting to 'pixel'.")
+        msg = "WARNING: No spatial units found in the XML file. Setting to 'pixel'."
+        warnings.warn(msg)
     if "timeunits" not in units:
         units["timeunits"] = "frame"  # TrackMate default value.
-        print("WARNING: No time units found in the XML file. Setting to 'frame'.")
+        msg = "WARNING: No time units found in the XML file. Setting to 'frame'."
+        warnings.warn(msg)
     element.clear()  # We won't need it anymore so we free up some memory.
     # .clear() does not delete the element: it only removes all subelements
     # and clears or sets to `None` all attributes.
@@ -239,6 +238,7 @@ def _add_all_features(
 def _convert_attributes(
     attributes: dict[str, str],
     features: dict[str, Feature],
+    feature_type: str,
 ) -> None:
     """
     Convert the values of `attributes` from string to the correct data type.
@@ -253,14 +253,18 @@ def _convert_attributes(
     features : dict[str, Feature]
         The dictionary of features that contains the information on how to convert
         the values of `attributes`.
+    feature_type : str
+        The type of the feature to convert (node, edge, or lineage).
 
     Raises
     ------
     ValueError
         If a feature has an invalid data_type (not "int", "float" nor "string").
-    KeyError
-        If a feature is not found in the features declaration nor treated as a
-        special case.
+
+    Warns
+    -----
+    UserWarning
+        If a feature is not found in the features declaration.
     """
     # TODO: Rewrite this.
     for key in attributes:
@@ -285,7 +289,23 @@ def _convert_attributes(
             # attribute) and will be converted later, in _add_ROI_coordinates().
             pass
         else:
-            raise KeyError(f"Feature {key} not found in the features declaration.")
+            msg = (
+                f"{feature_type.capitalize} feature {key} not found in "
+                "the features declaration."
+            )
+            warnings.warn(msg)
+            # In that case we add a stub version of the feature to the features
+            # declaration. The user will need to manually update the feature later on.
+            missing_feat = Feature(
+                name=key,
+                description="unknown",
+                provenance="unknown",
+                feat_type=feature_type,
+                lin_type="CellLineage",
+                data_type="unknown",
+                unit="unknown",
+            )
+            features[key] = missing_feat
 
 
 def _convert_ROI_coordinates(
@@ -370,11 +390,8 @@ def _add_all_nodes(
             # as defined in the features declaration.
             attribs = deepcopy(element.attrib)
             try:
-                _convert_attributes(attribs, fdec.feats_dict)
+                _convert_attributes(attribs, fdec.feats_dict, "node")
             except ValueError as err:
-                print(f"ERROR: {err} Please check the XML file.")
-                raise
-            except KeyError as err:
                 print(f"ERROR: {err} Please check the XML file.")
                 raise
 
@@ -397,11 +414,11 @@ def _add_all_nodes(
             try:
                 graph.add_nodes_from([(int(attribs["ID"]), attribs)])
             except KeyError as err:
-                print(
-                    f"No key {err} in the attributes of "
-                    f"current element '{element.tag}'. "
-                    f"Not adding this node to the graph."
+                msg = (
+                    f"No key {err} in the attributes of current element "
+                    f"'{element.tag}'. Not adding this node to the graph."
                 )
+                warnings.warn(msg)
             finally:
                 element.clear()
 
@@ -443,16 +460,20 @@ def _add_edge(
         in track assignment.
     """
     attribs = deepcopy(element.attrib)
-    _convert_attributes(attribs, fdec.feats_dict)
+    try:
+        _convert_attributes(attribs, fdec.feats_dict, "edge")
+    except ValueError as err:
+        print(f"ERROR: {err} Please check the XML file.")
+        raise
     try:
         entry_node_id = int(attribs["SPOT_SOURCE_ID"])
         exit_node_id = int(attribs["SPOT_TARGET_ID"])
     except KeyError as err:
-        print(
-            f"No key {err} in the attributes of "
-            f"current element '{element.tag}'. "
+        msg = (
+            f"No key {err} in the attributes of current element '{element.tag}'. "
             f"Not adding this edge to the graph."
         )
+        warnings.warn(msg)
     else:
         graph.add_edge(entry_node_id, exit_node_id)
         nx.set_edge_attributes(graph, {(entry_node_id, exit_node_id): attribs})
@@ -515,7 +536,11 @@ def _build_tracks(
         # Saving the current track information.
         if element.tag == "Track" and event == "start":
             attribs = deepcopy(element.attrib)
-            _convert_attributes(attribs, fdec.feats_dict)
+            try:
+                _convert_attributes(attribs, fdec.feats_dict, "lineage")
+            except ValueError as err:
+                print(f"ERROR: {err} Please check the XML file.")
+                raise
             tracks_attributes.append(attribs)
             try:
                 current_track_id = attribs["TRACK_ID"]
@@ -567,10 +592,11 @@ def _get_filtered_tracks_ID(
     try:
         filtered_tracks_ID.append(int(attribs["TRACK_ID"]))
     except KeyError as err:
-        print(
+        msg = (
             f"No key {err} in the attributes of current element "
             f"'{element.tag}'. Ignoring this track."
         )
+        warnings.warn(msg)
 
     while (event, element) != ("end", ancestor):
         event, element = next(iterator)
@@ -579,10 +605,11 @@ def _get_filtered_tracks_ID(
             try:
                 filtered_tracks_ID.append(int(attribs["TRACK_ID"]))
             except KeyError as err:
-                print(
+                msg = (
                     f"No key {err} in the attributes of current element "
                     f"'{element.tag}'. Ignoring this track."
                 )
+                warnings.warn(msg)
 
     return filtered_tracks_ID
 
@@ -1186,24 +1213,11 @@ def load_TrackMate_XML(
 
 if __name__ == "__main__":
 
-    # import math
-
     # xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
-    xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    # xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
     # xml = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
-    # xml = "E:/Pasteur/LS_data/LStoLX/230328GreffeGakaYFPMyogTdtmdxFDBTryplen1-movie01-01-Scene-15-TR37-A01.xml"
-
-    # trackmate_version = _get_trackmate_version(xml)
-    # print(trackmate_version)
-
-    # elem = _get_specific_tags(xml, ["Settings", "Log"])
-    # print(elem)
-    # element_string = ET.tostring(elem["Settings"], encoding="utf-8").decode()
-    # print(element_string)
-    # elem_from_string = ET.fromstring(element_string)
-    # print(elem_from_string)
-    # print(elem_from_string.tag)
+    xml = "sample_data/Celegans-5pc-17timepoints.xml"
 
     model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
     print(model)
@@ -1213,23 +1227,5 @@ if __name__ == "__main__":
     # print(model.fdec.node_feats.keys())
     # print(model.data)
 
-    # lineage = model.data.cell_data[0]
-
-    # print(lineage, type(lineage))
-    # # print(lin.nodes)
-    # closest_cells = model.data.get_closest_cells(2046, lineage)
-    # for cell, lin in closest_cells:
-    #     print(math.dist(lineage.nodes[2046]["location"], lin.nodes[cell]["location"]))
-
-    # for id, lin in model.data.cell_data.items():
-    #     print(f"ID: {id} - {lin}")
-
-    # for lin in model.data.cell_data.values():
-    #     if len(lin) > 1:
-    #         lin.plot()
-
-    # print(model.data.cell_data[-2094].nodes[2094])
-    # model.data.cell_data[0].plot()
-
-    # TODO: for now one-node graph do not have track features like "real" lineages.
-    # Should I add these features even if the value is None for consistency?
+    lineage = model.data.cell_data[0]
+    lineage.plot()

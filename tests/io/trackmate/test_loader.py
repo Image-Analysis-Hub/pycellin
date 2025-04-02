@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Unit test for TrackMate XML file loader.
-"""
+"""Unit test for TrackMate XML file loader."""
 
 from copy import deepcopy
 import io
@@ -467,7 +466,7 @@ def test_convert_attributes():
         "feat_neg": "-10",
         "feat_string": "nope",
     }
-    tml._convert_attributes(obtained_attr, features)
+    tml._convert_attributes(obtained_attr, features, "node")
 
     expected_attr = {
         "feat_float": 30.0,
@@ -483,21 +482,11 @@ def test_convert_attributes_specific_keys():
     features = {}
 
     obtained_attr = {"ID": "42", "name": "ID42", "ROI_N_POINTS": "something here"}
-    tml._convert_attributes(obtained_attr, features)
+    tml._convert_attributes(obtained_attr, features, "node")
 
     expected_attr = {"ID": 42, "name": "ID42", "ROI_N_POINTS": "something here"}
 
     assert obtained_attr == expected_attr
-
-
-def test_convert_attributes_KeyError():
-    features = {
-        "feat_float": Feature("", "", "", "node", "CellLineage", data_type="float"),
-    }
-    attributes = {"feat_float": "30", "feat_int": "20"}
-
-    with pytest.raises(KeyError):
-        tml._convert_attributes(attributes, features)
 
 
 def test_convert_attributes_ValueError():
@@ -507,7 +496,24 @@ def test_convert_attributes_ValueError():
     attributes = {"feat_int": "20"}
 
     with pytest.raises(ValueError):
-        tml._convert_attributes(attributes, features)
+        tml._convert_attributes(attributes, features, "node")
+
+
+def test_convert_attributes_missing_feat():
+    features = {
+        "feat_float": Feature("", "", "", "node", "CellLineage", data_type="float"),
+    }
+    attributes = {"feat_float": "30", "feat_int": "20"}
+
+    with pytest.warns(UserWarning):
+        tml._convert_attributes(attributes, features, "node")
+    assert features["feat_int"].name == "feat_int"
+    assert features["feat_int"].description == "unknown"
+    assert features["feat_int"].provenance == "unknown"
+    assert features["feat_int"].feat_type == "node"
+    assert features["feat_int"].lin_type == "CellLineage"
+    assert features["feat_int"].data_type == "unknown"
+    assert features["feat_int"].unit == "unknown"
 
 
 # _convert_ROI_coordinates ####################################################
