@@ -65,7 +65,7 @@ def test_feature_rename_ValueError(feat1):
         feat1._rename(42)
 
 
-# _modify_description() ###############################################################
+# _modify_description() #######################################################
 
 
 def test_modify_description(feat1):
@@ -78,7 +78,20 @@ def test_modify_description_ValueError(feat1):
         feat1._modify_description(42)
 
 
-# is_equal() ###############################################################
+# _modify_provenance() ########################################################
+
+
+def test_modify_provenance(feat1):
+    feat1._modify_provenance("new_prov")
+    assert feat1.provenance == "new_prov"
+
+
+def test_modify_provenance_ValueError(feat1):
+    with pytest.raises(ValueError):
+        feat1._modify_provenance(42)
+
+
+# is_equal() ##################################################################
 
 
 def test_feature_is_equal(feat1, feat1_bis, feat2, feat3):

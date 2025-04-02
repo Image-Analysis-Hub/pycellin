@@ -145,6 +145,24 @@ class Feature:
             raise ValueError("Feature description must be a string.")
         self.description = new_description
 
+    def _modify_provenance(self, new_provenance: str) -> None:
+        """
+        Modify the provenance of the feature.
+
+        Parameters
+        ----------
+        new_provenance : str
+            The new provenance of the feature.
+
+        Raises
+        ------
+        ValueError
+            If the new provenance is not a string.
+        """
+        if not isinstance(new_provenance, str):
+            raise ValueError("Feature provenance must be a string.")
+        self.provenance = new_provenance
+
     def is_equal(self, other: Feature, ignore_feat_type: bool = False) -> bool:
         """
         Check if the feature is equal to another feature.
