@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Unit test for Feature and FeaturesDeclaration classes from feature.py module.
-"""
+"""Unit test for Feature and FeaturesDeclaration classes from feature.py module."""
 
 import pytest
 
@@ -32,6 +31,11 @@ def feat3():
     return Feature("name1", "desc1", "prov1", "node", "CellLineage", "type1")
 
 
+@pytest.fixture(scope="module")
+def feat4():
+    return Feature("name1", "desc1", "prov1", "edge", "CellLineage", "type1", "unit1")
+
+
 def test_feature_equality(feat1, feat1_bis):
     assert feat1 == feat1_bis
 
@@ -45,6 +49,50 @@ def test_feature_unequality(feat1, feat2, feat3):
 def test_feature_invalid_Literal():
     with pytest.raises(ValueError):
         Feature("name1", "desc1", "prov1", "node", "not a valid Literal", "type1")
+
+
+# _rename() ###################################################################
+
+
+def test_feature_rename(feat1):
+    feat1._rename("new_name")
+    assert feat1.name == "new_name"
+
+
+def test_feature_rename_ValueError(feat1):
+    feat1 = Feature("name1", "desc1", "prov1", "node", "CellLineage", "type1", "unit1")
+    with pytest.raises(ValueError):
+        feat1._rename(42)
+
+
+# _modify_description() ###############################################################
+
+
+def test_modify_description(feat1):
+    feat1._modify_description("new_desc")
+    assert feat1.description == "new_desc"
+
+
+def test_modify_description_ValueError(feat1):
+    with pytest.raises(ValueError):
+        feat1._modify_description(42)
+
+
+# is_equal() ###############################################################
+
+
+def test_feature_is_equal(feat1, feat1_bis, feat2, feat3):
+    assert feat1.is_equal(feat1_bis)
+    assert not feat1.is_equal(feat2)
+    assert not feat1.is_equal(feat3)
+    assert feat1.is_equal("not a feature") == NotImplemented
+
+
+def test_feature_is_equal_ignore_feat_type(feat1, feat3, feat4):
+    assert feat1.is_equal(feat4, ignore_feat_type=True)
+    assert not feat1.is_equal(feat4, ignore_feat_type=False)
+    assert not feat1.is_equal(feat3, ignore_feat_type=True)
+    assert feat1.is_equal("not a feature", ignore_feat_type=True) == NotImplemented
 
 
 # Class FeaturesDeclaration ###################################################

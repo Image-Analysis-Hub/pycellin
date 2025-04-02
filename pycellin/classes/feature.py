@@ -117,7 +117,14 @@ class Feature:
         ----------
         new_name : str
             The new name of the feature.
+
+        Raises
+        ------
+        ValueError
+            If the new name is not a string.
         """
+        if not isinstance(new_name, str):
+            raise ValueError("Feature name must be a string.")
         self.name = new_name
 
     def _modify_description(self, new_description: str) -> None:
@@ -128,7 +135,14 @@ class Feature:
         ----------
         new_description : str
             The new description of the feature.
+
+        Raises
+        ------
+        ValueError
+            If the new description is not a string.
         """
+        if not isinstance(new_description, str):
+            raise ValueError("Feature description must be a string.")
         self.description = new_description
 
     def is_equal(self, other: Feature, ignore_feat_type: bool = False) -> bool:
@@ -147,6 +161,8 @@ class Feature:
         bool
             True if the features are equal, False otherwise.
         """
+        if not isinstance(other, Feature):
+            return NotImplemented
         if ignore_feat_type:
             return (
                 self.name == other.name
