@@ -104,10 +104,12 @@ def _unit_to_dimension(
         "TRACK_MEAN_QUALITY": "QUALITY",
         "TOTAL_DISTANCE_TRAVELED": "LENGTH",
         "MAX_DISTANCE_TRAVELED": "LENGTH",
-        "CONFINEMENT_RATIO": "NONE",
         "MEAN_STRAIGHT_LINE_SPEED": "VELOCITY",
         "LINEARITY_OF_FORWARD_PROGRESSION": "NONE",
         "MEAN_DIRECTIONAL_CHANGE_RATE": "ANGLE_RATE",
+        "DIVISION_TIME_MEAN": "TIME",
+        "DIVISION_TIME_STD": "TIME",
+        "CONFINEMENT_RATIO": "NONE",
     }
     # Channel dependent features.
     channel_feats = {
