@@ -40,15 +40,14 @@ def _get_units(
     units = {}  # type: dict[str, str]
     if element.attrib:
         units = deepcopy(element.attrib)
-        # Check that units is a dictionary.
-        assert isinstance(units, dict)
-        print(units)
     if "spatialunits" not in units:
         units["spatialunits"] = "pixel"  # TrackMate default value.
-        print("WARNING: No spatial units found in the XML file. Setting to 'pixel'.")
+        msg = "WARNING: No spatial units found in the XML file. Setting to 'pixel'."
+        warnings.warn(msg)
     if "timeunits" not in units:
         units["timeunits"] = "frame"  # TrackMate default value.
-        print("WARNING: No time units found in the XML file. Setting to 'frame'.")
+        msg = "WARNING: No time units found in the XML file. Setting to 'frame'."
+        warnings.warn(msg)
     element.clear()  # We won't need it anymore so we free up some memory.
     # .clear() does not delete the element: it only removes all subelements
     # and clears or sets to `None` all attributes.
@@ -418,11 +417,11 @@ def _add_all_nodes(
             try:
                 graph.add_nodes_from([(int(attribs["ID"]), attribs)])
             except KeyError as err:
-                print(
-                    f"No key {err} in the attributes of "
-                    f"current element '{element.tag}'. "
-                    f"Not adding this node to the graph."
+                msg = (
+                    f"No key {err} in the attributes of current element "
+                    f"'{element.tag}'. Not adding this node to the graph."
                 )
+                warnings.warn(msg)
             finally:
                 element.clear()
 
@@ -469,11 +468,11 @@ def _add_edge(
         entry_node_id = int(attribs["SPOT_SOURCE_ID"])
         exit_node_id = int(attribs["SPOT_TARGET_ID"])
     except KeyError as err:
-        print(
-            f"No key {err} in the attributes of "
-            f"current element '{element.tag}'. "
+        msg = (
+            f"No key {err} in the attributes of current element '{element.tag}'. "
             f"Not adding this edge to the graph."
         )
+        warnings.warn(msg)
     else:
         graph.add_edge(entry_node_id, exit_node_id)
         nx.set_edge_attributes(graph, {(entry_node_id, exit_node_id): attribs})
@@ -588,10 +587,11 @@ def _get_filtered_tracks_ID(
     try:
         filtered_tracks_ID.append(int(attribs["TRACK_ID"]))
     except KeyError as err:
-        print(
+        msg = (
             f"No key {err} in the attributes of current element "
             f"'{element.tag}'. Ignoring this track."
         )
+        warnings.warn(msg)
 
     while (event, element) != ("end", ancestor):
         event, element = next(iterator)
@@ -600,10 +600,11 @@ def _get_filtered_tracks_ID(
             try:
                 filtered_tracks_ID.append(int(attribs["TRACK_ID"]))
             except KeyError as err:
-                print(
+                msg = (
                     f"No key {err} in the attributes of current element "
                     f"'{element.tag}'. Ignoring this track."
                 )
+                warnings.warn(msg)
 
     return filtered_tracks_ID
 
@@ -1221,4 +1222,5 @@ if __name__ == "__main__":
     # print(model.fdec.node_feats.keys())
     # print(model.data)
 
-    # lineage = model.data.cell_data[0]
+    lineage = model.data.cell_data[0]
+    lineage.plot()
