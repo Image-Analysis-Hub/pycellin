@@ -1207,25 +1207,11 @@ def load_TrackMate_XML(
 
 if __name__ == "__main__":
 
-    # import math
-
     # xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
     # xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
     # xml = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
-    # xml = "E:/Pasteur/LS_data/LStoLX/230328GreffeGakaYFPMyogTdtmdxFDBTryplen1-movie01-01-Scene-15-TR37-A01.xml"
     xml = "sample_data/Celegans-5pc-17timepoints.xml"
-
-    # trackmate_version = _get_trackmate_version(xml)
-    # print(trackmate_version)
-
-    # elem = _get_specific_tags(xml, ["Settings", "Log"])
-    # print(elem)
-    # element_string = ET.tostring(elem["Settings"], encoding="utf-8").decode()
-    # print(element_string)
-    # elem_from_string = ET.fromstring(element_string)
-    # print(elem_from_string)
-    # print(elem_from_string.tag)
 
     model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
     print(model)
@@ -1236,22 +1222,3 @@ if __name__ == "__main__":
     # print(model.data)
 
     # lineage = model.data.cell_data[0]
-
-    # print(lineage, type(lineage))
-    # # print(lin.nodes)
-    # closest_cells = model.data.get_closest_cells(2046, lineage)
-    # for cell, lin in closest_cells:
-    #     print(math.dist(lineage.nodes[2046]["location"], lin.nodes[cell]["location"]))
-
-    # for id, lin in model.data.cell_data.items():
-    #     print(f"ID: {id} - {lin}")
-
-    # for lin in model.data.cell_data.values():
-    #     if len(lin) > 1:
-    #         lin.plot()
-
-    # print(model.data.cell_data[-2094].nodes[2094])
-    # model.data.cell_data[0].plot()
-
-    # TODO: for now one-node graph do not have track features like "real" lineages.
-    # Should I add these features even if the value is None for consistency?
