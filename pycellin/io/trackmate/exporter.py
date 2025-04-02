@@ -123,6 +123,25 @@ def _unit_to_dimension(
         "SNR_CH": "NONE",
     }
 
+    # Pycellin features.
+    pycellin_feats = {
+        "angle": "ANGLE",
+        "cell_displacement": "LENGTH",
+        "cell_length": "LENGTH",
+        "cell_speed": "VELOCITY",
+        "cell_width": "LENGTH",
+    }
+    if name == "absolute_age":
+        if unit == "frame":
+            pycellin_feats["absolute_age"] = "NONE"
+        else:
+            pycellin_feats["absolute_age"] = "TIME"
+    elif name == "relative_age":
+        if unit == "frame":
+            pycellin_feats["relative_age"] = "NONE"
+        else:
+            pycellin_feats["relative_age"] = "TIME"
+
     if provenance == "TrackMate":
         if name in trackmate_feats:
             dimension = trackmate_feats[name]
@@ -145,7 +164,7 @@ def _unit_to_dimension(
                 dimension = "NONE"
 
     elif provenance == "Pycellin":
-        dimension = "TODO1"
+        dimension = pycellin_feats[name]
 
     else:
         match unit:
@@ -261,8 +280,8 @@ def _value_to_str(
     """
     # TODO: Should this function take care of converting non-numeric added
     # features to numeric ones (like GEN_ID)? Or should it be done in
-    # pycellin?
-    # I can also use the provenance field to ientify which features come
+    # Pycellin?
+    # I can also use the provenance field to identify which features come
     # from TrackMate.
     if isinstance(value, str):
         return value
@@ -587,6 +606,10 @@ if __name__ == "__main__":
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # print(model.feat_declaration)
+    model.add_absolute_age()
+    model.add_relative_age(in_time_unit=True)
+    model.add_cell_displacement()
+    model.update()
     lin0 = model.data.cell_data[0]
     # lin0.plot(
     #     node_hover_features=["cell_ID", "cell_x", "cell_y", "cell_z"],
