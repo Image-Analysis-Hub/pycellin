@@ -17,7 +17,6 @@ import networkx as nx
 
 from pycellin.classes.model import Model
 from pycellin.classes.feature import FeaturesDeclaration, Feature
-from pycellin.classes.data import Data
 from pycellin.classes.lineage import CellLineage
 from pycellin.io.trackmate.loader import load_TrackMate_XML
 
@@ -161,6 +160,7 @@ def _unit_to_dimension(
         # a feature-dimension mapping.
         dimension = "TODO2"
 
+    assert dimension is not None
     return dimension
 
 
@@ -314,7 +314,7 @@ def _create_Spot(
 
 def _write_AllSpots(
     xf: ET.xmlfile,
-    data: Data,
+    data: dict[int, CellLineage],
 ) -> None:
     """
     Write the nodes/spots data into an XML file.
@@ -323,8 +323,8 @@ def _write_AllSpots(
     ----------
     xf : ET.xmlfile
         Context manager for the XML file to write.
-    data : Data
-        Lineages containing the data to write.
+    data : dict[int, CellLineage]
+        Cell lineages containing the data to write.
     """
     xf.write(f"\n{' '*4}")
     lineages = data.values()
@@ -332,7 +332,7 @@ def _write_AllSpots(
     with xf.element("AllSpots", {"nspots": str(nb_nodes)}):
         # For each frame, nodes can be spread over several lineages
         # so we first need to identify all of the existing frames.
-        frames = set()
+        frames = set()  # type: set[int]
         for lin in lineages:
             frames.update(nx.get_node_attributes(lin, "FRAME").values())
 
@@ -351,7 +351,7 @@ def _write_AllSpots(
 
 def _write_AllTracks(
     xf: ET.xmlfile,
-    data: Data,
+    data: dict[int, CellLineage],
 ) -> None:
     """
     Write the tracks data into an XML file.
@@ -360,8 +360,8 @@ def _write_AllTracks(
     ----------
     xf : ET.xmlfile
         Context manager for the XML file to write.
-    data : Data
-        Lineages containing the data to write.
+    data : dict[int, CellLineage]
+        Cell lineages containing the data to write.
     """
     xf.write(f"\n{' '*4}")
     with xf.element("AllTracks"):
@@ -392,7 +392,7 @@ def _write_AllTracks(
 
 def _write_FilteredTracks(
     xf: ET.xmlfile,
-    data: Data,
+    data: dict[int, CellLineage],
 ) -> None:
     """
     Write the filtered tracks data into an XML file.
@@ -401,8 +401,8 @@ def _write_FilteredTracks(
     ----------
     xf : ET.xmlfile
         Context manager for the XML file to write.
-    data : Data
-        Lineages containing the data to write.z
+    data : dict[int, CellLineage]
+        Cell lineages containing the data to write.z
     """
     xf.write(f"\n{' '*4}")
     with xf.element("FilteredTracks"):
@@ -529,7 +529,7 @@ def _ask_units(
 def export_TrackMate_XML(
     model: Model,
     xml_path: str,
-    units: dict[str, str] = None,
+    units: dict[str, str] | None = None,
 ) -> None:
     """
     Write an XML file readable by TrackMate from a Pycellin model.
