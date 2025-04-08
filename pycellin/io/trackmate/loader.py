@@ -807,6 +807,27 @@ def _update_node_feature_key(
             lineage.nodes[node][new_key] = lineage.nodes[node].pop(old_key)
 
 
+def _update_lineage_feature_key(
+    lineage: CellLineage,
+    old_key: str,
+    new_key: str,
+) -> None:
+    """
+    Update the key of a feature in the graph of a lineage.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The lineage to update.
+    old_key : str
+        The old key of the feature.
+    new_key : str
+        The new key of the feature.
+    """
+    if old_key in lineage.graph:
+        lineage.graph[new_key] = lineage.graph.pop(old_key)
+
+
 def _update_TRACK_ID(
     lineage: CellLineage,
 ) -> None:
@@ -962,14 +983,17 @@ def _parse_model_tag(
     lineages = _split_graph_into_lineages(graph, tracks_attributes)
 
     # For Pycellin compatibility, some TrackMate features have to be renamed.
-    # We only rename features that are essential to the functioning of Pycellin.
+    # We only rename features that are either essential to the functioning of
+    # Pycellin or confusing (e.g. "name" is a spot and a track feature).
     _update_features_declaration(fd, units, segmentation)
     for lin in lineages:
         for key_name, new_key in [
-            ("ID", "cell_ID"),
-            ("FRAME", "frame"),
+            ("ID", "cell_ID"),  # mandatory
+            ("FRAME", "frame"),  # mandatory
+            ("name", "cell_name"),  # confusing
         ]:
             _update_node_feature_key(lin, key_name, new_key)
+        _update_lineage_feature_key(lin, "name", "lineage_name")
         _update_TRACK_ID(lin)
         _update_location_related_features(lin)
 
@@ -1228,4 +1252,4 @@ if __name__ == "__main__":
     # print(model.data)
 
     lineage = model.data.cell_data[0]
-    lineage.plot()
+    lineage.plot(node_hover_features=["cell_ID", "cell_name"])
