@@ -325,6 +325,9 @@ def _create_Spot(
         n_attr["ROI_N_POINTS"] = str(len(lineage.nodes[node]["ROI_coords"]))
         # The text of a Spot is the coordinates of its ROI points, in a flattened list.
         coords = [item for pt in lineage.nodes[node]["ROI_coords"] for item in pt]
+    else:
+        # No segmentation mask, so we set the ROI_N_POINTS to 0.
+        n_attr["ROI_N_POINTS"] = "0"
 
     el_node = ET.Element("Spot", n_attr)
     if "ROI_coords" in lineage.nodes[node]:
@@ -410,9 +413,37 @@ def _write_AllTracks(
         xf.write(f"\n{' '*4}")
 
 
+def _write_track_id(xf: ET.xmlfile, lineage: CellLineage) -> None:
+    """
+    Helper function to write a track ID to the XML file.
+
+    Parameters
+    ----------
+    xf : ET.xmlfile
+        Context manager for the XML file to write.
+    lineage : CellLineage
+        Cell lineage containing the data to write.
+
+    Raises
+    ------
+    KeyError
+        If the lineage does not have a TRACK_ID attribute.
+    """
+    try:
+        if lineage.graph["TRACK_ID"] < 0:
+            # We don't want to write the track ID for one-node lineages.
+            return
+    except KeyError as err:
+        raise KeyError("The lineage does not have a TRACK_ID attribute.") from err
+    xf.write(f"\n{' '*6}")
+    t_attr = {"TRACK_ID": str(lineage.graph["TRACK_ID"])}
+    xf.write(ET.Element("TrackID", t_attr))
+
+
 def _write_FilteredTracks(
     xf: ET.xmlfile,
     data: dict[int, CellLineage],
+    has_FilteredTracks: bool,
 ) -> None:
     """
     Write the filtered tracks data into an XML file.
@@ -422,15 +453,26 @@ def _write_FilteredTracks(
     xf : ET.xmlfile
         Context manager for the XML file to write.
     data : dict[int, CellLineage]
-        Cell lineages containing the data to write.z
+        Cell lineages containing the data to write.
+    has_FilteredTracks : bool
+        Flag indicating if the model contains filtered tracks.
+
+    Raises
+    ------
+    KeyError
+        If the lineage does not have a TRACK_IDif lineage.graph["TRACK_ID"] < 0: attribute.
     """
     xf.write(f"\n{' '*4}")
     with xf.element("FilteredTracks"):
-        for lineage in data.values():
-            if "TRACK_ID" in lineage.graph and lineage.graph["FilteredTrack"]:
-                xf.write(f"\n{' '*6}")
-                t_attr = {"TRACK_ID": str(lineage.graph["TRACK_ID"])}
-                xf.write(ET.Element("TrackID", t_attr))
+        if has_FilteredTracks:
+            for lineage in data.values():
+                if lineage.graph["FilteredTrack"]:
+                    _write_track_id(xf, lineage)
+        else:
+            # If there are no filtered tracks, we need to add all the tracks
+            # because TrackMate only displays tracks that are in this tag.
+            for lineage in data.values():
+                _write_track_id(xf, lineage)
         xf.write(f"\n{' '*4}")
     xf.write(f"\n{' '*2}")
 
@@ -455,13 +497,17 @@ def _prepare_model_for_export(
     fd._unprotect_feature("lineage_ID")
     fd._rename_feature("lineage_ID", "TRACK_ID")
     fd._modify_feature_description("TRACK_ID", "Track ID")
-    fd._remove_features(["FilteredTrack", "lineage_name"])
     fd._unprotect_feature("frame")
     fd._rename_feature("frame", "FRAME")
     fd._unprotect_feature("cell_ID")
-    fd._remove_features(["cell_ID", "cell_name"])
-    if "ROI_coords" in fd.feats_dict:
-        fd._remove_feature("ROI_coords")
+    fd._remove_feature("cell_ID")
+    for feature in ["cell_name", "lineage_name", "FilteredTrack", "ROI_coords"]:
+        try:
+            fd._remove_feature(feature)
+        except KeyError:
+            # This feature is a classic TrackMate feature but not mandatory.
+            pass
+
     # Location related features.
     for axis in ["x", "y", "z"]:
         fd._rename_feature(f"cell_{axis}", f"POSITION_{axis.upper()}")
@@ -473,6 +519,11 @@ def _prepare_model_for_export(
         for _, data in lin.nodes(data=True):
             data["ID"] = data.pop("cell_ID")
             data["FRAME"] = data.pop("frame")
+            try:
+                data["name"] = data.pop("cell_name")
+            except KeyError:
+                # Not a mandatory feature.
+                pass
             for axis in ["X", "Y", "Z"]:
                 data[f"POSITION_{axis}"] = data.pop(f"cell_{axis.lower()}")
 
@@ -481,6 +532,11 @@ def _prepare_model_for_export(
                 data[f"EDGE_{axis}_LOCATION"] = data.pop(f"link_{axis.lower()}")
 
         lin.graph["TRACK_ID"] = lin.graph.pop("lineage_ID")
+        try:
+            lin.graph["name"] = lin.graph.pop("lineage_name")
+        except KeyError:
+            # Not a mandatory feature.
+            pass
         for axis in ["X", "Y", "Z"]:
             lin.graph[f"TRACK_{axis}_LOCATION"] = lin.graph.pop(
                 f"lineage_{axis.lower()}"
@@ -573,6 +629,8 @@ def export_TrackMate_XML(
         tm_version = model_copy.metadata["TrackMate_version"]
     else:
         tm_version = "unknown"
+    has_FilteredTrack = model_copy.has_feature("FilteredTrack")
+    print(has_FilteredTrack)
     _prepare_model_for_export(model_copy)
 
     with ET.xmlfile(xml_path, encoding="utf-8", close=True) as xf:
@@ -585,7 +643,7 @@ def export_TrackMate_XML(
                 _write_FeatureDeclarations(xf, model_copy)
                 _write_AllSpots(xf, model_copy.data.cell_data)
                 _write_AllTracks(xf, model_copy.data.cell_data)
-                _write_FilteredTracks(xf, model_copy.data.cell_data)
+                _write_FilteredTracks(xf, model_copy.data.cell_data, has_FilteredTrack)
             xf.write("\n  ")
             for tag in ["Settings", "GUIState", "DisplaySettings"]:
                 _write_metadata_tag(xf, model_copy.metadata, tag)
@@ -606,6 +664,7 @@ if __name__ == "__main__":
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # print(model.feat_declaration)
+    # model.remove_feature("ROI_coords")
     model.add_absolute_age()
     model.add_relative_age(in_time_unit=True)
     model.add_cell_displacement()
