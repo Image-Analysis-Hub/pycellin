@@ -510,9 +510,35 @@ def _prepare_model_for_export(
 
     # Location related features.
     for axis in ["x", "y", "z"]:
-        fd._rename_feature(f"cell_{axis}", f"POSITION_{axis.upper()}")
-        fd._rename_feature(f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION")
-        fd._rename_feature(f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION")
+        try:
+            fd._rename_feature(f"cell_{axis}", f"POSITION_{axis.upper()}")
+        except KeyError:
+            # This feature is mandatory in TrackMate for x, y and z dimensions.
+            if axis in ["x", "y"]:
+                raise KeyError(
+                    f"Mandatory feature cell_{axis} is missing in the model."
+                )
+            else:
+                # We add the missing z dimension.
+                fd._add_feature(
+                    Feature(
+                        name=f"POSITION_{axis.upper()}",
+                        description=f"Cell {axis.upper()} coordinate",
+                        provenance="TrackMate",
+                        feat_type="node",
+                        lin_type="CellLineage",
+                        data_type="float",
+                        unit="pixel",
+                    )
+                )
+        try:
+            fd._rename_feature(f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION")
+        except KeyError:
+            pass  # Not a mandatory feature.
+        try:
+            fd._rename_feature(f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION")
+        except KeyError:
+            pass  # Not a mandatory feature.
 
     # Update of the data.
     for lin in model.data.cell_data.values():
@@ -522,25 +548,37 @@ def _prepare_model_for_export(
             try:
                 data["name"] = data.pop("cell_name")
             except KeyError:
-                # Not a mandatory feature.
-                pass
+                pass  # Not a mandatory feature.
             for axis in ["X", "Y", "Z"]:
-                data[f"POSITION_{axis}"] = data.pop(f"cell_{axis.lower()}")
+                try:
+                    data[f"POSITION_{axis}"] = data.pop(f"cell_{axis.lower()}")
+                except KeyError:
+                    # This feature is mandatory in TrackMate for x, y and z dimensions.
+                    if axis in ["X", "Y"]:
+                        raise KeyError(f"No POSITION_{axis} feature.")
+                    else:
+                        # We add the missing z dimension.
+                        data[f"POSITION_{axis}"] = 0.0
 
         for _, _, data in lin.edges(data=True):
             for axis in ["X", "Y", "Z"]:
-                data[f"EDGE_{axis}_LOCATION"] = data.pop(f"link_{axis.lower()}")
+                try:
+                    data[f"EDGE_{axis}_LOCATION"] = data.pop(f"link_{axis.lower()}")
+                except KeyError:
+                    pass  # Not a mandatory feature.
 
         lin.graph["TRACK_ID"] = lin.graph.pop("lineage_ID")
         try:
             lin.graph["name"] = lin.graph.pop("lineage_name")
         except KeyError:
-            # Not a mandatory feature.
-            pass
+            pass  # Not a mandatory feature.
         for axis in ["X", "Y", "Z"]:
-            lin.graph[f"TRACK_{axis}_LOCATION"] = lin.graph.pop(
-                f"lineage_{axis.lower()}"
-            )
+            try:
+                lin.graph[f"TRACK_{axis}_LOCATION"] = lin.graph.pop(
+                    f"lineage_{axis.lower()}"
+                )
+            except KeyError:
+                pass  # Not a mandatory feature.
 
 
 def _write_metadata_tag(
@@ -657,19 +695,20 @@ def export_TrackMate_XML(
 if __name__ == "__main__":
 
     xml_in = "sample_data/FakeTracks.xml"
-    xml_out = "sample_data/results/FakeTracks_exported_TM.xml"
+    xml_out = "sample_data/results/FakeTracks_TMtoTM.xml"
+    # xml_out = "/home/laura/FakeTracks_exported_TM.xml"
 
     # xml_in = "sample_data/Celegans-5pc-17timepoints.xml"
     # xml_out = "sample_data/Celegans-5pc-17timepoints_exported_TM.xml"
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # print(model.feat_declaration)
-    # model.remove_feature("ROI_coords")
-    model.add_absolute_age()
-    model.add_relative_age(in_time_unit=True)
-    model.add_cell_displacement()
-    model.update()
-    lin0 = model.data.cell_data[0]
+    # model.remove_feature("link_x")
+    # model.add_absolute_age()
+    # model.add_relative_age(in_time_unit=True)
+    # model.add_cell_displacement()
+    # model.update()
+    # lin0 = model.data.cell_data[0]
     # lin0.plot(
     #     node_hover_features=["cell_ID", "cell_x", "cell_y", "cell_z"],
     #     edge_hover_features=["link_x", "link_y", "link_z"],
