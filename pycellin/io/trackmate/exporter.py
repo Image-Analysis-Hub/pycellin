@@ -506,6 +506,11 @@ def _prepare_model_for_export(
     ----------
     model : Model
         Model to prepare for export.
+
+    Raises
+    ------
+    KeyError
+        If a mandatory feature is missing in the model.
     """
     # Update of the features declaration.
     fd = model.feat_declaration
@@ -531,7 +536,8 @@ def _prepare_model_for_export(
             # This feature is mandatory in TrackMate for x, y and z dimensions.
             if axis in ["x", "y"]:
                 raise KeyError(
-                    f"Mandatory feature cell_{axis} is missing in the model."
+                    f"A feature mandatory for TrackMate export is missing: "
+                    f"cell_{axis}."
                 )
             else:
                 # We add the missing z dimension.
@@ -570,7 +576,10 @@ def _prepare_model_for_export(
                 except KeyError:
                     # This feature is mandatory in TrackMate for x, y and z dimensions.
                     if axis in ["X", "Y"]:
-                        raise KeyError(f"No POSITION_{axis} feature.")
+                        raise KeyError(
+                            f"A mandatory TrackMate feature is missing: "
+                            f"POSITION_{axis}."
+                        )
                     else:
                         # We add the missing z dimension.
                         data[f"POSITION_{axis}"] = 0.0
@@ -717,7 +726,7 @@ if __name__ == "__main__":
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # print(model.feat_declaration)
-    # model.remove_feature("link_x")
+    # model.remove_feature("cell_x")
     # model.add_absolute_age()
     # model.add_relative_age(in_time_unit=True)
     # model.add_cell_displacement()
