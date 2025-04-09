@@ -527,6 +527,7 @@ def _prepare_model_for_export(
         except KeyError:
             # This feature is a classic TrackMate feature but not mandatory.
             pass
+    # TODO: add SPOT_SOURCE_ID and SPOT_TARGET_ID features to the edge fd
 
     # Location related features.
     for axis in ["x", "y", "z"]:
@@ -567,6 +568,8 @@ def _prepare_model_for_export(
         for _, data in lin.nodes(data=True):
             data["ID"] = data.pop("cell_ID")
             data["FRAME"] = data.pop("frame")
+            # TODO: check visibility in more details and add to fd if needed
+            data["VISIBILITY"] = 1
             try:
                 data["name"] = data.pop("cell_name")
             except KeyError:
@@ -729,8 +732,8 @@ def export_TrackMate_XML(
 if __name__ == "__main__":
 
     xml_in = "sample_data/FakeTracks.xml"
-    xml_out = "sample_data/results/FakeTracks_TMtoTM.xml"
-    # xml_out = "/home/laura/FakeTracks_exported_TM.xml"
+    # xml_out = "sample_data/results/FakeTracks_TMtoTM.xml"
+    xml_out = "/home/laura/FakeTracks_exported_TM.xml"
 
     # xml_in = "sample_data/Celegans-5pc-17timepoints.xml"
     # xml_out = "sample_data/Celegans-5pc-17timepoints_exported_TM.xml"
