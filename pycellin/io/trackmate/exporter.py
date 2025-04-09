@@ -22,7 +22,6 @@ from pycellin.classes.lineage import CellLineage
 from pycellin.io.trackmate.loader import load_TrackMate_XML
 
 
-# TODO: finish this function
 def _unit_to_dimension(
     feat: Feature,
 ) -> str:
@@ -39,6 +38,7 @@ def _unit_to_dimension(
     str
         Dimension corresponding to the unit.
     """
+    # TODO: finish this function and try to make it less nightmarish
     unit = feat.unit
     name = feat.name
     # desc = feat.description
@@ -142,7 +142,10 @@ def _unit_to_dimension(
         else:
             pycellin_feats["relative_age"] = "TIME"
 
-    if provenance == "TrackMate":
+    if name in trackmate_feats:
+        dimension = trackmate_feats[name]
+
+    elif provenance == "TrackMate":
         if name in trackmate_feats:
             dimension = trackmate_feats[name]
         else:
@@ -164,7 +167,19 @@ def _unit_to_dimension(
                 dimension = "NONE"
 
     elif provenance == "Pycellin":
-        dimension = pycellin_feats[name]
+        try:
+            dimension = pycellin_feats[name]
+        except KeyError:
+            try:
+                dimension = trackmate_feats[name]
+            except KeyError:
+                msg = (
+                    f"{name} is a feature listed as coming from Pycellin"
+                    f" but it is not a known feature of either Pycellin or TrackMate. "
+                    f" Dimension is set to NONE."
+                )
+                warnings.warn(msg)
+                dimension = "NONE"
 
     else:
         match unit:
@@ -668,7 +683,6 @@ def export_TrackMate_XML(
     else:
         tm_version = "unknown"
     has_FilteredTrack = model_copy.has_feature("FilteredTrack")
-    print(has_FilteredTrack)
     _prepare_model_for_export(model_copy)
 
     with ET.xmlfile(xml_path, encoding="utf-8", close=True) as xf:
