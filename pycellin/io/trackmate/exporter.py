@@ -563,6 +563,7 @@ def _prepare_model_for_export(
 
     # Update of the data.
     for lin in model.data.cell_data.values():
+        # Nodes.
         for _, data in lin.nodes(data=True):
             data["ID"] = data.pop("cell_ID")
             data["FRAME"] = data.pop("frame")
@@ -570,6 +571,7 @@ def _prepare_model_for_export(
                 data["name"] = data.pop("cell_name")
             except KeyError:
                 pass  # Not a mandatory feature.
+            # Position features.
             for axis in ["X", "Y", "Z"]:
                 try:
                     data[f"POSITION_{axis}"] = data.pop(f"cell_{axis.lower()}")
@@ -584,18 +586,27 @@ def _prepare_model_for_export(
                         # We add the missing z dimension.
                         data[f"POSITION_{axis}"] = 0.0
 
-        for _, _, data in lin.edges(data=True):
+        # Edges.
+        for source_node, target_node, data in lin.edges(data=True):
+            # Mandatory TrackMate features.
+            if "SPOT_SOURCE_ID" not in data:
+                data["SPOT_SOURCE_ID"] = source_node
+            if "SPOT_TARGET_ID" not in data:
+                data["SPOT_TARGET_ID"] = target_node
+            # Position features.
             for axis in ["X", "Y", "Z"]:
                 try:
                     data[f"EDGE_{axis}_LOCATION"] = data.pop(f"link_{axis.lower()}")
                 except KeyError:
                     pass  # Not a mandatory feature.
 
+        # Lineages.
         lin.graph["TRACK_ID"] = lin.graph.pop("lineage_ID")
         try:
             lin.graph["name"] = lin.graph.pop("lineage_name")
         except KeyError:
             pass  # Not a mandatory feature.
+        # Position features.
         for axis in ["X", "Y", "Z"]:
             try:
                 lin.graph[f"TRACK_{axis}_LOCATION"] = lin.graph.pop(
