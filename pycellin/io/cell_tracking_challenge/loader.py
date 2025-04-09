@@ -20,19 +20,24 @@ from datetime import datetime
 import importlib
 from itertools import pairwise
 from pathlib import Path
+import re
 from typing import Any, Tuple
 
 import networkx as nx
+from skimage.measure import regionprops, find_contours
+import tifffile
 
-from pycellin.classes.model import Model
 from pycellin.classes.feature import (
+    Feature,
     FeaturesDeclaration,
     cell_ID_Feature,
     frame_Feature,
     lineage_ID_Feature,
+    cell_coord_Feature,
 )
-from pycellin.classes.data import Data
-from pycellin.classes.lineage import CellLineage
+from pycellin.classes import CellLineage, Data, Model
+
+# TODO: what if the first frame is empty...?
 
 
 def _create_metadata(
@@ -69,9 +74,14 @@ def _create_metadata(
     return metadata
 
 
-def _create_FeaturesDeclaration() -> FeaturesDeclaration:
+def _create_FeaturesDeclaration(seg_data: bool) -> FeaturesDeclaration:
     """
     Return a FeaturesDeclaration object populated with Pycellin basic features.
+
+    Parameters
+    ----------
+    seg_data : bool
+        A boolean indicating whether segmentation data is available.
 
     Returns
     -------
@@ -86,6 +96,21 @@ def _create_FeaturesDeclaration() -> FeaturesDeclaration:
     for feat in [cell_ID_feat, frame_feat, lin_ID_feat]:
         feat_declaration._add_feature(feat)
         feat_declaration._protect_feature(feat.name)
+    if seg_data:
+        # TODO: deal with z dimension
+        # TODO: put the real unit, pixel is juste a placeholder for now
+        cell_x_feat = cell_coord_Feature(unit="pixel", axis="x", provenance="CTC")
+        cell_y_feat = cell_coord_Feature(unit="pixel", axis="y", provenance="CTC")
+        roi_coords_feat = Feature(
+            name="ROI_coords",
+            description="List of coordinates of the region of interest",
+            provenance="CTC",
+            feat_type="node",
+            lin_type="CellLineage",
+            data_type="float",
+            unit="pixel",
+        )
+        feat_declaration._add_features([cell_x_feat, cell_y_feat, roi_coords_feat])
 
     return feat_declaration
 
@@ -213,8 +238,111 @@ def _update_node_attributes(
             del data["PARENT"]
 
 
+def _extract_seg_data(
+    label_img_path: str,
+) -> Tuple[list[int], list[list[float]], list[list[Tuple[float, float]]]]:
+    """
+    Extract segmentation data from a label image.
+
+    This function reads a label image and extracts the labels, centroids,
+    and contours of the regions in the image.
+
+    Parameters
+    ----------
+    label_img_path : str
+        The path to the label image file.
+    Returns
+    -------
+    Tuple[List[int], List[List[float]], List[List[Tuple[float, float]]]]
+        A tuple containing three lists:
+        - labels: a list of unique labels in the image.
+        - centroids: a list of centroids for each label, where each centroid
+            is represented as a (x, y) tuple of coordinates.
+        - contours: a list of contours for each label, where each contour
+            is represented as a list of (x, y) coordinates relative to the centroid.
+    """
+    label_img = tifffile.imread(label_img_path)
+    regions = regionprops(label_img)
+    labels = []
+    centroids = []
+    contours = []
+    for props in regions:
+        # Label.
+        labels.append(props.label)
+        # Centroid.
+        y0, x0 = props.centroid  # skimage returns (row, column) format
+        centroids.append([x0, y0])
+        # Contours.
+        contour = find_contours(label_img == props.label, level=0.5)
+        assert len(contour) == 1, "Expected exactly one contour."
+        # The contours need to be given:
+        # - relatively to the label centroid
+        # - in the format (x, y) and not the default (row, column) yielded by skimage.
+        contour = [(float(x - x0), float(y - y0)) for y, x in contour[0]]
+        contours.append(contour)
+    return labels, centroids, contours
+
+
+def _integrate_seg_data(
+    graph: nx.DiGraph,
+    frame: int,
+    labels: list[int],
+    centroids: list[list[float]],
+    contours: list[list[Tuple[float, float]]],
+) -> None:
+    """
+    Integrate segmentation data into the Pycellin model.
+
+    This function updates the Pycellin model with segmentation data
+    for a specific frame. It identifies the graph nodes to update thanks to the
+    frame and labels and adds the following attributes to each node:
+    - the centroids as cell positions (cell_x, cell_y),
+    - the contours as cell ROIs (ROI_coords).
+
+    Parameters
+    ----------
+    graph: nx.DiGraph
+        The directed graph representing the lineage data.
+    frame : int
+        The frame number for which the segmentation data is being integrated.
+    labels : List[int]
+        A list of unique labels in the image.
+    centroids : List[List[float]]
+        A list of centroids for each label, where each centroid
+        is represented as a (x, y) tuple of coordinates.
+    contours : List[List[Tuple[float, float]]]
+        A list of contours for each label, where each contour
+        is represented as a list of (x, y) coordinates relative to the centroid.
+
+    Raises
+    ------
+    ValueError
+        If a label is not found in the graph for the specified frame,
+        or if multiple nodes are found for a label in the same frame.
+    """
+    for label, centroid, contour in zip(labels, centroids, contours):
+        # Finding the node in the graph that corresponds to the label.
+        node = [
+            n
+            for n in graph.nodes
+            if graph.nodes[n]["frame"] == frame and graph.nodes[n]["TRACK"] == label
+        ]
+        if len(node) < 1:
+            raise ValueError(f"Label {label} not found in the graph for frame {frame}.")
+        elif len(node) > 1:
+            raise ValueError(
+                f"Multiple nodes found for label {label} in frame {frame}."
+            )
+        node = node[0]
+        # Updating the nodes.
+        graph.nodes[node]["cell_x"] = centroid[0]
+        graph.nodes[node]["cell_y"] = centroid[1]
+        graph.nodes[label]["ROI_coords"] = contour
+
+
 def load_CTC_file(
-    file_path: str,
+    res_file_path: str,
+    labels_path: str = None,
 ) -> Model:
     """
     Create a Pycellin model out of a Cell Tracking Challenge (CTC) text file.
@@ -226,8 +354,10 @@ def load_CTC_file(
 
     Parameters
     ----------
-    file_path : str
-        The path to the CTC file that contains the tracking data.
+    res_file_path : str
+        The path to the CTC text file that contains the tracking data.
+    labels_path : str, optional
+        The path to the label images, if any.
 
     Returns
     -------
@@ -236,7 +366,7 @@ def load_CTC_file(
     """
     graph = nx.DiGraph()
     current_node_id = 0
-    with open(file_path) as file:
+    with open(res_file_path) as file:
         nodes_from_tracks = []
         # The lines in the file are read sequentially to create the nodes.
         # However, nothing ensures that parent nodes are created before
@@ -251,6 +381,28 @@ def load_CTC_file(
     # Merging tracks that are part of the same lineage.
     for nodes in nodes_from_tracks:
         _merge_tracks(graph, nodes)
+
+    # Adding the segmentation data, if any.
+    if labels_path:
+        if Path(labels_path).is_dir():
+            list_paths = sorted(Path(labels_path).glob("*.tif"))
+            if len(list_paths) == 0:
+                raise ValueError(
+                    f"No label images found in the directory: {labels_path}"
+                )
+            pattern = r"(\d+)\.tif"
+            for label_img_path in list_paths:
+                match = re.search(pattern, str(label_img_path))
+                try:
+                    frame = int(match.group(1))
+                except AttributeError:
+                    raise ValueError(
+                        f"Can't parse frame value: file name {label_img_path} "
+                        f"does not match the expected pattern."
+                    )
+                labels, centroids, contours = _extract_seg_data(str(label_img_path))
+                _integrate_seg_data(graph, frame, labels, centroids, contours)
+
     # We want one lineage per connected component of the graph.
     lineages = [
         CellLineage(graph.subgraph(c).copy())
@@ -262,7 +414,6 @@ def load_CTC_file(
     for lin in lineages:
         _update_node_attributes(lin, lin_ID)
         lin_ID += 1
-
     data = {}
     for lin in lineages:
         if "lineage_ID" in lin.graph:
@@ -275,9 +426,9 @@ def load_CTC_file(
             lin.graph["lineage_ID"] = lin_ID
             data[lin_ID] = lin
 
-    model = Model(
-        _create_metadata(file_path), _create_FeaturesDeclaration(), Data(data)
-    )
+    md = _create_metadata(res_file_path)
+    fd = _create_FeaturesDeclaration(labels_path is not None)
+    model = Model(md, fd, Data(data))
     return model
 
 
@@ -289,17 +440,26 @@ if __name__ == "__main__":
         "/mnt/data/Films_Laure/Benchmarks/CTC/"
         "EvaluationSoftware/testing_dataset/03_RES/res_track.txt"
     )
-    model = load_CTC_file(ctc_file)
+    ctc_file = "/mnt/data/Code/pycellin/TrackMate/01_RES/res_track.txt"
+    labels_path = "/mnt/data/Code/pycellin/TrackMate/01_RES"
+    model = load_CTC_file(ctc_file, labels_path=labels_path)
     print(model)
     print(model.feat_declaration)
     print(model.data)
 
-    for lin_id, lin in model.data.cell_data.items():
-        print(f"{lin_id} - {lin}")
-        lin.plot()
+    # for lin_id, lin in model.data.cell_data.items():
+    #     print(f"{lin_id} - {lin}")
+    #     lin.plot()
 
     # model.add_cycle_data()
     # for lin_id, lin in model.data.cycle_data.items():
     #     lin.plot()
 
     # print(model.data.cell_data[1].nodes(data=True))
+
+    from pycellin import export_TrackMate_XML
+
+    xml_out = "sample_data/results/FakeTracks_CTCtoTM.xml"
+    export_TrackMate_XML(
+        model, xml_out, units={"space_unit": "pixel", "time_unit": "frame"}
+    )
