@@ -550,6 +550,17 @@ def _prepare_model_for_export(
             unit="NONE",
         )
         fd._add_feature(target_feat)
+    if not fd._has_feature("VISIBILITY"):
+        visibility_feat = Feature(
+            name="VISIBILITY",
+            description="Visibility",
+            provenance="TrackMate",
+            feat_type="node",
+            lin_type="CellLineage",
+            data_type="int",
+            unit="NONE",
+        )
+        fd._add_feature(visibility_feat)
 
     # Location related features.
     for axis in ["x", "y", "z"]:
@@ -590,8 +601,7 @@ def _prepare_model_for_export(
         for _, data in lin.nodes(data=True):
             data["ID"] = data.pop("cell_ID")
             data["FRAME"] = data.pop("frame")
-            # TODO: check visibility in more details and add to fd if needed
-            # data["VISIBILITY"] = 1
+            data["VISIBILITY"] = 1
             try:
                 data["name"] = data.pop("cell_name")
             except KeyError:
@@ -762,7 +772,7 @@ if __name__ == "__main__":
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # print(model.feat_declaration)
-    model.remove_feature("SPOT_SOURCE_ID")
+    model.remove_feature("VISIBILITY")
     # model.add_absolute_age()
     # model.add_relative_age(in_time_unit=True)
     # model.add_cell_displacement()
