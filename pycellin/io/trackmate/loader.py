@@ -1200,14 +1200,14 @@ def load_TrackMate_XML(
     metadata["name"] = Path(xml_path).stem
     metadata["file_location"] = xml_path
     metadata["provenance"] = "TrackMate"
-    metadata["date"] = datetime.now()
+    metadata["date"] = str(datetime.now())
     metadata["space_unit"] = units["spatialunits"]
     metadata["time_unit"] = units["timeunits"]
     try:
         version = importlib.metadata.version("pycellin")
     except importlib.metadata.PackageNotFoundError:
         version = "unknown"
-    metadata["pycellin_version"] = version
+    metadata["Pycellin_version"] = version
     metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
     dict_tags = _get_specific_tags(
         xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
@@ -1246,7 +1246,7 @@ if __name__ == "__main__":
     model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
     print(model)
     print(model.feat_declaration)
-    print(model.metadata["pycellin_version"])
+    print(model.metadata["Pycellin_version"])
     # print(model.metadata)
     # print(model.fdec.node_feats.keys())
     # print(model.data)
