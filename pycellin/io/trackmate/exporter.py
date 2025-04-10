@@ -527,7 +527,29 @@ def _prepare_model_for_export(
         except KeyError:
             # This feature is a classic TrackMate feature but not mandatory.
             pass
-    # TODO: add SPOT_SOURCE_ID and SPOT_TARGET_ID features to the edge fd
+    # Some features don't necessarily exist in Pycellin but are mandatory in TrackMate.
+    if not fd._has_feature("SPOT_SOURCE_ID"):
+        source_feat = Feature(
+            name="SPOT_SOURCE_ID",
+            description="Source spot ID",
+            provenance="TrackMate",
+            feat_type="edge",
+            lin_type="CellLineage",
+            data_type="int",
+            unit="NONE",
+        )
+        fd._add_feature(source_feat)
+    if not fd._has_feature("SPOT_TARGET_ID"):
+        target_feat = Feature(
+            name="SPOT_TARGET_ID",
+            description="Target spot ID",
+            provenance="TrackMate",
+            feat_type="edge",
+            lin_type="CellLineage",
+            data_type="int",
+            unit="NONE",
+        )
+        fd._add_feature(target_feat)
 
     # Location related features.
     for axis in ["x", "y", "z"]:
@@ -569,7 +591,7 @@ def _prepare_model_for_export(
             data["ID"] = data.pop("cell_ID")
             data["FRAME"] = data.pop("frame")
             # TODO: check visibility in more details and add to fd if needed
-            data["VISIBILITY"] = 1
+            # data["VISIBILITY"] = 1
             try:
                 data["name"] = data.pop("cell_name")
             except KeyError:
@@ -740,7 +762,7 @@ if __name__ == "__main__":
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # print(model.feat_declaration)
-    # model.remove_feature("cell_x")
+    model.remove_feature("SPOT_SOURCE_ID")
     # model.add_absolute_age()
     # model.add_relative_age(in_time_unit=True)
     # model.add_cell_displacement()
