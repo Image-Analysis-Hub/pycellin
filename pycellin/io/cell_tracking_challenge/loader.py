@@ -40,8 +40,82 @@ from pycellin.classes import CellLineage, Data, Model
 # TODO: what if the first frame is empty...?
 
 
+def _integrate_label_imgs_metadata(metadata: dict[str, Any], labels_path: str) -> None:
+    """
+    Integrate metadata from label images into the Pycellin model metadata.
+
+    This function extracts metadata from label images and integrates it
+    into the provided metadata dictionary. Priority is given to the metadata
+    already present in the dictionary. If the metadata is not present,
+    it will be extracted from the label images.
+
+    Parameters
+    ----------
+    metadata : dict[str, Any]
+        The metadata dictionary of the model to which the label images metadata
+        will be added.
+    labels_path : str
+        The path to the label images directory.
+    """
+    list_paths = sorted(Path(labels_path).glob("*.tif"))
+    if len(list_paths) == 0:
+        raise ValueError(f"No label images found in the directory: {labels_path}")
+    metadata["label_imgs_location"] = labels_path
+    # Read metadata from the first label image. Hopefully all label images
+    # have the same metadata. I would be worried if they don't.
+    with tifffile.TiffFile(list_paths[0]) as tif:
+        # TODO: Look into a more robust way to deal with all the different
+        # metadata formats. I'm pretty sure I'm missing a lot here, like ImageJ tif.
+        tags = tif.pages[0].tags
+
+        # Check and set space_unit
+        if "space_unit" not in metadata:
+            if "ResolutionUnit" in tags and tags.get("ResolutionUnit") is not None:
+                resunit = tags.get("ResolutionUnit").value
+                match resunit:
+                    case 1:  # None
+                        metadata["space_unit"] = "pixel"
+                    case 2:  # inch
+                        metadata["space_unit"] = "inch"
+                    case 3:  # cm
+                        metadata["space_unit"] = "cm"
+            else:
+                metadata["space_unit"] = "pixel"
+
+        # Check and set pixel_width
+        if "pixel_size" not in metadata or "width" not in metadata["pixel_size"]:
+            if "XResolution" in tags and tags.get("XResolution") is not None:
+                xres = tags.get("XResolution").value
+                metadata["pixel_size"]["width"] = xres[1] / xres[0]
+            else:
+                metadata["pixel_size"]["width"] = 1.0
+
+        # Check and set pixel_height
+        if "pixel_size" not in metadata or "height" not in metadata["pixel_size"]:
+            if "YResolution" in tags and tags.get("YResolution") is not None:
+                yres = tags.get("YResolution").value
+                metadata["pixel_size"]["height"] = yres[1] / yres[0]
+            else:
+                metadata["pixel_size"]["height"] = 1.0
+
+        # Check and set pixel_depth
+        if "pixel_size" not in metadata or "depth" not in metadata["pixel_size"]:
+            if "ZResolution" in tags and tags.get("ZResolution") is not None:
+                zres = tags.get("ZResolution").value
+                metadata["pixel_size"]["depth"] = zres[1] / zres[0]
+            else:
+                metadata["pixel_size"]["depth"] = 1.0
+
+
 def _create_metadata(
     file_path: str,
+    labels_path: str | None = None,
+    space_unit: str | None = None,
+    pixel_width: float | None = None,
+    pixel_height: float | None = None,
+    pixel_depth: float | None = None,
+    time_unit: str | None = None,
+    time_step: float | None = None,
 ) -> dict[str, Any]:
     """
     Create a dictionary of basic Pycellin metadata for a given file.
@@ -50,27 +124,80 @@ def _create_metadata(
     ----------
     file_path : str
         The path to the file for which metadata is being created.
+    labels_path : str, optional
+        The path to the label images, if any.
+    space_unit : str, optional
+        The spatial unit of the data. If not provided, it will be set to 'pixel'
+        by default.
+    pixel_width : float, optional
+        The pixel width in the spatial unit. If not provided, it will be set to 1.0
+        by default.
+    pixel_height : float, optional
+        The pixel height in the spatial unit. If not provided, it will be set to 1.0
+        by default.
+    pixel_depth : float, optional
+        The pixel depth in the spatial unit. If not provided, it will be set to 1.0
+        by default.
+    time_unit : str, optional
+        The temporal unit of the data. If not provided, it will be set to 'frame'
+        by default.
+    time_step : float, optional
+        The time step in the temporal unit. If not provided, it will be set to 1.0
+        by default.
 
     Returns
     -------
     dict[str, Any]
         A dictionary containing the generated metadata.
     """
-    metadata = {}
+    metadata = {}  # type: dict[str, Any]
     metadata["name"] = Path(file_path).stem
     metadata["file_location"] = file_path
     metadata["provenance"] = "CTC"
-    metadata["date"] = datetime.now()
-    metadata["time_unit"] = "frame"
-    metadata["time_step"] = 1
-    # TODO: is it possible to get space_unit with the labels data?
-    # or a better time_unit with the images metadata?
-    # or maybe ask the user...
+    metadata["date"] = str(datetime.now())
     try:
         version = importlib.metadata.version("pycellin")
     except importlib.metadata.PackageNotFoundError:
         version = "unknown"
-    metadata["pycellin_version"] = version
+    metadata["Pycellin_version"] = version
+
+    if time_unit is not None:
+        metadata["time_unit"] = time_unit
+    else:
+        metadata["time_unit"] = "frame"
+    if time_step is not None:
+        metadata["time_step"] = time_step
+    else:
+        metadata["time_step"] = 1
+
+    complete_metadata_flag = [0, 0, 0, 0]
+    metadata["pixel_size"] = {}
+    if space_unit is not None:
+        metadata["space_unit"] = space_unit
+        complete_metadata_flag[0] = 1
+    if pixel_width is not None:
+        metadata["pixel_size"]["width"] = pixel_width
+        complete_metadata_flag[1] = 1
+    if pixel_height is not None:
+        metadata["pixel_size"]["height"] = pixel_height
+        complete_metadata_flag[2] = 1
+    if pixel_depth is not None:
+        metadata["pixel_size"]["depth"] = pixel_depth
+        complete_metadata_flag[3] = 1
+
+    if sum(complete_metadata_flag) < 4:
+        if labels_path is not None:
+            _integrate_label_imgs_metadata(metadata, labels_path)
+        else:
+            if complete_metadata_flag[0] == 0:
+                metadata["space_unit"] = "pixel"
+            if complete_metadata_flag[1] == 0:
+                metadata["pixel_size"]["width"] = 1.0
+            if complete_metadata_flag[2] == 0:
+                metadata["pixel_size"]["height"] = 1.0
+            if complete_metadata_flag[3] == 0:
+                metadata["pixel_size"]["depth"] = 1.0
+
     return metadata
 
 
@@ -342,22 +469,56 @@ def _integrate_seg_data(
 
 def load_CTC_file(
     res_file_path: str,
-    labels_path: str = None,
+    labels_path: str | None = None,
+    space_unit: str | None = None,
+    pixel_width: float | None = None,
+    pixel_height: float | None = None,
+    pixel_depth: float | None = None,
+    time_unit: str | None = None,
+    time_step: float | None = None,
 ) -> Model:
     """
     Create a Pycellin model out of a Cell Tracking Challenge (CTC) text file.
 
-    Only track topology is read: no cell segmentations are extracted
-    from associated label images.
     The CTC tracking format does not support fusion events and does not allow
     gaps right after division events.
+    If only 'res_file_path' is given, only track topology is read. To load
+    cell positions into the model, 'labels_path' must also be given.
+    The label images must be in the same format as the CTC format,
+    i.e. a single image per frame with a single label per cell.
+    The label images names must end in '<frame_number>.tif' (e.g. 000.tif,
+    02.tif, 0155.tif, etc.).
+    For image metadata, priority is given to the img_metadata given by the user.
+    If not provided, Pycellin will try to extract the metadata from the label images.
+    If it fails or if no label images are given, default values will be used.
 
     Parameters
     ----------
     res_file_path : str
         The path to the CTC text file that contains the tracking data.
     labels_path : str, optional
-        The path to the label images, if any.
+        The path to the label images, if any. If not provided, only the
+        track topology will be read. If image metadata is not directly provided
+        by the user, the metadata will be extracted from the label images.
+        If it fails default values will be used.
+    space_unit : str, optional
+        The spatial unit of the data. If not provided or not infered from the label
+        images, it will be set to 'pixel' by default.
+    pixel_width : float, optional
+        The pixel width in the spatial unit. If not provided or not infered from the
+        label images, it will be set to 1.0 by default.
+    pixel_height : float, optional
+        The pixel height in the spatial unit. If not provided or not infered from the
+        label images, it will be set to 1.0 by default.
+    pixel_depth : float, optional
+        The pixel depth in the spatial unit. If not provided or not infered from the
+        label images, it will be set to 1.0 by default.
+    time_unit : str, optional
+        The temporal unit of the data. If not provided, it will be set to 'frame'
+        by default.
+    time_step : float, optional
+        The time step in the temporal unit. If not provided, it will be set to 1.0
+        by default.
 
     Returns
     -------
@@ -426,7 +587,16 @@ def load_CTC_file(
             lin.graph["lineage_ID"] = lin_ID
             data[lin_ID] = lin
 
-    md = _create_metadata(res_file_path)
+    md = _create_metadata(
+        res_file_path,
+        labels_path=labels_path,
+        space_unit=space_unit,
+        pixel_width=pixel_width,
+        pixel_height=pixel_height,
+        pixel_depth=pixel_depth,
+        time_unit=time_unit,
+        time_step=time_step,
+    )
     fd = _create_FeaturesDeclaration(labels_path is not None)
     model = Model(md, fd, Data(data))
     return model
@@ -440,9 +610,12 @@ if __name__ == "__main__":
         "/mnt/data/Films_Laure/Benchmarks/CTC/"
         "EvaluationSoftware/testing_dataset/03_RES/res_track.txt"
     )
+
     ctc_file = "/mnt/data/Code/pycellin/TrackMate/01_RES/res_track.txt"
     labels_path = "/mnt/data/Code/pycellin/TrackMate/01_RES"
-    model = load_CTC_file(ctc_file, labels_path=labels_path)
+    # labels_path = "/mnt/data/Benchmarks/Segmentation/03_RES"
+
+    model = load_CTC_file(ctc_file, labels_path)
     print(model)
     print(model.feat_declaration)
     print(model.data)
@@ -456,10 +629,3 @@ if __name__ == "__main__":
     #     lin.plot()
 
     # print(model.data.cell_data[1].nodes(data=True))
-
-    from pycellin import export_TrackMate_XML
-
-    xml_out = "sample_data/results/FakeTracks_CTCtoTM.xml"
-    export_TrackMate_XML(
-        model, xml_out, units={"space_unit": "pixel", "time_unit": "frame"}
-    )
