@@ -32,6 +32,7 @@ from pycellin.classes import (
     cell_ID_Feature,
     frame_Feature,
     lineage_ID_Feature,
+    cell_coord_Feature,
 )
 
 
@@ -95,8 +96,7 @@ def _split_into_lineages(graph: nx.DiGraph) -> dict[int, CellLineage]:
     dict[int, CellLineage]
         A dictionary mapping lineage IDs to CellLineage objects.
     """
-    # One subgraph is created per lineage, so each subgraph is
-    # a connected component of `graph`.
+    # We want one lineage per connected component of the graph.
     lineages = [
         CellLineage(graph.subgraph(c).copy())
         for c in nx.weakly_connected_components(graph)
@@ -122,39 +122,56 @@ def _create_metadata() -> dict[str, Any]:
     metadata = {}  # type: dict[str, Any]
     metadata["provenance"] = "trackpy"
     metadata["date"] = str(datetime.now())
-    metadata["time_unit"] = "frame"
-    metadata["time_step"] = 1
-    # TODO: Maybe ask the user for the time unit and time step.
     try:
         version = importlib.metadata.version("pycellin")
     except importlib.metadata.PackageNotFoundError:
         version = "unknown"
     metadata["Pycellin_version"] = version
+
+    metadata["time_unit"] = "frame"
+    metadata["time_step"] = 1
+
     return metadata
 
 
-def _create_FeaturesDeclaration() -> FeaturesDeclaration:
+def _create_FeaturesDeclaration(features: list[str]) -> FeaturesDeclaration:
     """
-    Return a FeaturesDeclaration object populated with Pycellin basic features.
+    Return a FeaturesDeclaration object populated with the needed features.
+
+    Parameters
+    ----------
+    features : list[str]
+        List of features to be included in the FeaturesDeclaration.
 
     Returns
     -------
     FeaturesDeclaration
-        An instance of FeaturesDeclaration populated with cell and lineage
-        identification features.
+        An instance of FeaturesDeclaration populated with Pycellin and trackpy features.
     """
-    feat_declaration = FeaturesDeclaration()
+    fd = FeaturesDeclaration()
+
+    # Pycellin mandatory features.
     cell_ID_feat = cell_ID_Feature()
     frame_feat = frame_Feature()
     lin_ID_feat = lineage_ID_Feature()
     for feat in [cell_ID_feat, frame_feat, lin_ID_feat]:
-        feat_declaration._add_feature(feat)
-        feat_declaration._protect_feature(feat.name)
+        fd._add_feature(feat)
+        fd._protect_feature(feat.name)
 
-    return feat_declaration
+    # Trackpy features.
+    for axis in ["x", "y", "z"]:
+        if axis in features:
+            # TODO: change unit
+            feat = cell_coord_Feature(unit="pixel", axis=axis, provenance="trackpy")
+            fd._add_feature(feat)
+    # TODO: add fd for other trackpy features
+
+    return fd
 
 
-def load_trackpy_dataframe(df: pd.DataFrame) -> Model:
+def load_trackpy_dataframe(
+    df: pd.DataFrame,
+) -> Model:
     """
     Load a trackpy DataFrame into a Pycellin model.
 
@@ -171,6 +188,7 @@ def load_trackpy_dataframe(df: pd.DataFrame) -> Model:
     # Build the lineages.
     graph = nx.DiGraph()
     _add_nodes(graph, df)
+    features = df.columns.to_list()
     particles = df["particle"].unique()
     del df  # Free memory.
     _add_edges(graph, particles)
@@ -179,13 +197,9 @@ def load_trackpy_dataframe(df: pd.DataFrame) -> Model:
     del graph  # # Redondant with the subgraphs.
 
     # Create a Pycellin model.
-    metadata = _create_metadata()
-    feat_declaration = _create_FeaturesDeclaration()
-    model = Model(
-        metadata=metadata,
-        fd=feat_declaration,
-        data=Data(data),
-    )
+    md = _create_metadata()
+    fd = _create_FeaturesDeclaration(features)
+    model = Model(md, fd, Data(data))
 
     return model
 
@@ -201,5 +215,5 @@ if __name__ == "__main__":
 
     model = load_trackpy_dataframe(df)
     print(model)
-    for lin in model.get_cell_lineages():
-        lin.plot(node_hover_features=["cell_ID", "frame", "particle"])
+    # for lin in model.get_cell_lineages():
+    #     lin.plot(node_hover_features=["cell_ID", "frame", "particle"])
