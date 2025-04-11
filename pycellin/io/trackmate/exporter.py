@@ -22,7 +22,6 @@ from pycellin.classes.lineage import CellLineage
 from pycellin.io.trackmate.loader import load_TrackMate_XML
 
 
-# TODO: finish this function
 def _unit_to_dimension(
     feat: Feature,
 ) -> str:
@@ -39,6 +38,7 @@ def _unit_to_dimension(
     str
         Dimension corresponding to the unit.
     """
+    # TODO: finish this function and try to make it less nightmarish
     unit = feat.unit
     name = feat.name
     # desc = feat.description
@@ -142,7 +142,10 @@ def _unit_to_dimension(
         else:
             pycellin_feats["relative_age"] = "TIME"
 
-    if provenance == "TrackMate":
+    if name in trackmate_feats:
+        dimension = trackmate_feats[name]
+
+    elif provenance == "TrackMate":
         if name in trackmate_feats:
             dimension = trackmate_feats[name]
         else:
@@ -164,7 +167,19 @@ def _unit_to_dimension(
                 dimension = "NONE"
 
     elif provenance == "Pycellin":
-        dimension = pycellin_feats[name]
+        try:
+            dimension = pycellin_feats[name]
+        except KeyError:
+            try:
+                dimension = trackmate_feats[name]
+            except KeyError:
+                msg = (
+                    f"{name} is a feature listed as coming from Pycellin"
+                    f" but it is not a known feature of either Pycellin or TrackMate. "
+                    f" Dimension is set to NONE."
+                )
+                warnings.warn(msg)
+                dimension = "NONE"
 
     else:
         match unit:
@@ -491,6 +506,11 @@ def _prepare_model_for_export(
     ----------
     model : Model
         Model to prepare for export.
+
+    Raises
+    ------
+    KeyError
+        If a mandatory feature is missing in the model.
     """
     # Update of the features declaration.
     fd = model.feat_declaration
@@ -507,40 +527,128 @@ def _prepare_model_for_export(
         except KeyError:
             # This feature is a classic TrackMate feature but not mandatory.
             pass
+    # Some features don't necessarily exist in Pycellin but are mandatory in TrackMate.
+    if not fd._has_feature("SPOT_SOURCE_ID"):
+        source_feat = Feature(
+            name="SPOT_SOURCE_ID",
+            description="Source spot ID",
+            provenance="TrackMate",
+            feat_type="edge",
+            lin_type="CellLineage",
+            data_type="int",
+            unit="NONE",
+        )
+        fd._add_feature(source_feat)
+    if not fd._has_feature("SPOT_TARGET_ID"):
+        target_feat = Feature(
+            name="SPOT_TARGET_ID",
+            description="Target spot ID",
+            provenance="TrackMate",
+            feat_type="edge",
+            lin_type="CellLineage",
+            data_type="int",
+            unit="NONE",
+        )
+        fd._add_feature(target_feat)
+    if not fd._has_feature("VISIBILITY"):
+        visibility_feat = Feature(
+            name="VISIBILITY",
+            description="Visibility",
+            provenance="TrackMate",
+            feat_type="node",
+            lin_type="CellLineage",
+            data_type="int",
+            unit="NONE",
+        )
+        fd._add_feature(visibility_feat)
 
     # Location related features.
     for axis in ["x", "y", "z"]:
-        fd._rename_feature(f"cell_{axis}", f"POSITION_{axis.upper()}")
-        fd._rename_feature(f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION")
-        fd._rename_feature(f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION")
+        try:
+            fd._rename_feature(f"cell_{axis}", f"POSITION_{axis.upper()}")
+        except KeyError:
+            # This feature is mandatory in TrackMate for x, y and z dimensions.
+            if axis in ["x", "y"]:
+                raise KeyError(
+                    f"A feature mandatory for TrackMate export is missing: "
+                    f"cell_{axis}."
+                )
+            else:
+                # We add the missing z dimension.
+                fd._add_feature(
+                    Feature(
+                        name=f"POSITION_{axis.upper()}",
+                        description=f"Cell {axis.upper()} coordinate",
+                        provenance="TrackMate",
+                        feat_type="node",
+                        lin_type="CellLineage",
+                        data_type="float",
+                        unit="pixel",
+                    )
+                )
+        try:
+            fd._rename_feature(f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION")
+        except KeyError:
+            pass  # Not a mandatory feature.
+        try:
+            fd._rename_feature(f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION")
+        except KeyError:
+            pass  # Not a mandatory feature.
 
     # Update of the data.
     for lin in model.data.cell_data.values():
+        # Nodes.
         for _, data in lin.nodes(data=True):
             data["ID"] = data.pop("cell_ID")
             data["FRAME"] = data.pop("frame")
+            data["VISIBILITY"] = 1
             try:
                 data["name"] = data.pop("cell_name")
             except KeyError:
-                # Not a mandatory feature.
-                pass
+                pass  # Not a mandatory feature.
+            # Position features.
             for axis in ["X", "Y", "Z"]:
-                data[f"POSITION_{axis}"] = data.pop(f"cell_{axis.lower()}")
+                try:
+                    data[f"POSITION_{axis}"] = data.pop(f"cell_{axis.lower()}")
+                except KeyError:
+                    # This feature is mandatory in TrackMate for x, y and z dimensions.
+                    if axis in ["X", "Y"]:
+                        raise KeyError(
+                            f"A mandatory TrackMate feature is missing: "
+                            f"POSITION_{axis}."
+                        )
+                    else:
+                        # We add the missing z dimension.
+                        data[f"POSITION_{axis}"] = 0.0
 
-        for _, _, data in lin.edges(data=True):
+        # Edges.
+        for source_node, target_node, data in lin.edges(data=True):
+            # Mandatory TrackMate features.
+            if "SPOT_SOURCE_ID" not in data:
+                data["SPOT_SOURCE_ID"] = source_node
+            if "SPOT_TARGET_ID" not in data:
+                data["SPOT_TARGET_ID"] = target_node
+            # Position features.
             for axis in ["X", "Y", "Z"]:
-                data[f"EDGE_{axis}_LOCATION"] = data.pop(f"link_{axis.lower()}")
+                try:
+                    data[f"EDGE_{axis}_LOCATION"] = data.pop(f"link_{axis.lower()}")
+                except KeyError:
+                    pass  # Not a mandatory feature.
 
+        # Lineages.
         lin.graph["TRACK_ID"] = lin.graph.pop("lineage_ID")
         try:
             lin.graph["name"] = lin.graph.pop("lineage_name")
         except KeyError:
-            # Not a mandatory feature.
-            pass
+            pass  # Not a mandatory feature.
+        # Position features.
         for axis in ["X", "Y", "Z"]:
-            lin.graph[f"TRACK_{axis}_LOCATION"] = lin.graph.pop(
-                f"lineage_{axis.lower()}"
-            )
+            try:
+                lin.graph[f"TRACK_{axis}_LOCATION"] = lin.graph.pop(
+                    f"lineage_{axis.lower()}"
+                )
+            except KeyError:
+                pass  # Not a mandatory feature.
 
 
 def _write_metadata_tag(
@@ -630,7 +738,6 @@ def export_TrackMate_XML(
     else:
         tm_version = "unknown"
     has_FilteredTrack = model_copy.has_feature("FilteredTrack")
-    print(has_FilteredTrack)
     _prepare_model_for_export(model_copy)
 
     with ET.xmlfile(xml_path, encoding="utf-8", close=True) as xf:
@@ -657,19 +764,20 @@ def export_TrackMate_XML(
 if __name__ == "__main__":
 
     xml_in = "sample_data/FakeTracks.xml"
-    xml_out = "sample_data/results/FakeTracks_exported_TM.xml"
+    # xml_out = "sample_data/results/FakeTracks_TMtoTM.xml"
+    xml_out = "/home/laura/FakeTracks_exported_TM.xml"
 
     # xml_in = "sample_data/Celegans-5pc-17timepoints.xml"
     # xml_out = "sample_data/Celegans-5pc-17timepoints_exported_TM.xml"
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # print(model.feat_declaration)
-    # model.remove_feature("ROI_coords")
-    model.add_absolute_age()
-    model.add_relative_age(in_time_unit=True)
-    model.add_cell_displacement()
-    model.update()
-    lin0 = model.data.cell_data[0]
+    model.remove_feature("VISIBILITY")
+    # model.add_absolute_age()
+    # model.add_relative_age(in_time_unit=True)
+    # model.add_cell_displacement()
+    # model.update()
+    # lin0 = model.data.cell_data[0]
     # lin0.plot(
     #     node_hover_features=["cell_ID", "cell_x", "cell_y", "cell_z"],
     #     edge_hover_features=["link_x", "link_y", "link_z"],
