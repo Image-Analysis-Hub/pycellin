@@ -110,9 +110,37 @@ def _split_into_lineages(graph: nx.DiGraph) -> dict[int, CellLineage]:
     return data
 
 
-def _create_metadata() -> dict[str, Any]:
+def _create_metadata(
+    space_unit: str | None = None,
+    pixel_width: float | None = None,
+    pixel_height: float | None = None,
+    pixel_depth: float | None = None,
+    time_unit: str | None = None,
+    time_step: float | None = None,
+) -> dict[str, Any]:
     """
     Create a dictionary of basic Pycellin metadata for a given file.
+
+    Parameters
+    ----------
+    space_unit : str, optional
+        The spatial unit of the data. If not provided, it will be set to 'pixel'
+        by default.
+    pixel_width : float, optional
+        The pixel width in the spatial unit. If not provided, it will be set to 1.0
+        by default.
+    pixel_height : float, optional
+        The pixel height in the spatial unit. If not provided, it will be set to 1.0
+        by default.
+    pixel_depth : float, optional
+        The pixel depth in the spatial unit. If not provided, it will be set to 1.0
+        by default.
+    time_unit : str, optional
+        The temporal unit of the data. If not provided, it will be set to 'frame'
+        by default.
+    time_step : float, optional
+        The time step in the temporal unit. If not provided, it will be set to 1.0
+        by default.
 
     Returns
     -------
@@ -128,13 +156,39 @@ def _create_metadata() -> dict[str, Any]:
         version = "unknown"
     metadata["Pycellin_version"] = version
 
-    metadata["time_unit"] = "frame"
-    metadata["time_step"] = 1
+    # Units.
+    if space_unit is not None:
+        metadata["space_unit"] = space_unit
+    else:
+        metadata["space_unit"] = "pixel"
+    metadata["pixel_size"] = {}
+    if pixel_width is not None:
+        metadata["pixel_size"]["width"] = pixel_width
+    else:
+        metadata["pixel_size"]["width"] = 1.0
+    if pixel_height is not None:
+        metadata["pixel_size"]["height"] = pixel_height
+    else:
+        metadata["pixel_size"]["height"] = 1.0
+    if pixel_depth is not None:
+        metadata["pixel_size"]["depth"] = pixel_depth
+    else:
+        metadata["pixel_size"]["depth"] = 1.0
+    if time_unit is not None:
+        metadata["time_unit"] = time_unit
+    else:
+        metadata["time_unit"] = "frame"
+    if time_step is not None:
+        metadata["time_step"] = time_step
+    else:
+        metadata["time_step"] = 1.0
 
     return metadata
 
 
-def _create_FeaturesDeclaration(features: list[str]) -> FeaturesDeclaration:
+def _create_FeaturesDeclaration(
+    features: list[str], metadata: dict[str, Any]
+) -> FeaturesDeclaration:
     """
     Return a FeaturesDeclaration object populated with the needed features.
 
@@ -142,6 +196,8 @@ def _create_FeaturesDeclaration(features: list[str]) -> FeaturesDeclaration:
     ----------
     features : list[str]
         List of features to be included in the FeaturesDeclaration.
+    metadata : dict[str, Any]
+        Metadata dictionary containing information about the data.
 
     Returns
     -------
@@ -161,8 +217,9 @@ def _create_FeaturesDeclaration(features: list[str]) -> FeaturesDeclaration:
     # Trackpy features.
     for axis in ["x", "y", "z"]:
         if axis in features:
-            # TODO: change unit
-            feat = cell_coord_Feature(unit="pixel", axis=axis, provenance="trackpy")
+            feat = cell_coord_Feature(
+                unit=metadata["space_unit"], axis=axis, provenance="trackpy"
+            )
             fd._add_feature(feat)
     # TODO: add fd for other trackpy features
 
@@ -171,6 +228,12 @@ def _create_FeaturesDeclaration(features: list[str]) -> FeaturesDeclaration:
 
 def load_trackpy_dataframe(
     df: pd.DataFrame,
+    space_unit: str | None = None,
+    pixel_width: float | None = None,
+    pixel_height: float | None = None,
+    pixel_depth: float | None = None,
+    time_unit: str | None = None,
+    time_step: float | None = None,
 ) -> Model:
     """
     Load a trackpy DataFrame into a Pycellin model.
@@ -197,8 +260,10 @@ def load_trackpy_dataframe(
     del graph  # # Redondant with the subgraphs.
 
     # Create a Pycellin model.
-    md = _create_metadata()
-    fd = _create_FeaturesDeclaration(features)
+    md = _create_metadata(
+        space_unit, pixel_width, pixel_height, pixel_depth, time_unit, time_step
+    )
+    fd = _create_FeaturesDeclaration(features, md)
     model = Model(md, fd, Data(data))
 
     return model
@@ -214,6 +279,6 @@ if __name__ == "__main__":
     print(df.head())
 
     model = load_trackpy_dataframe(df)
-    print(model)
+    print(model.metadata)
     # for lin in model.get_cell_lineages():
     #     lin.plot(node_hover_features=["cell_ID", "frame", "particle"])
