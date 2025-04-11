@@ -18,14 +18,17 @@ References:
 
 from datetime import datetime
 import importlib
+from itertools import pairwise
 from typing import Any
 
 import networkx as nx
 import pandas as pd
 
-from pycellin.classes.model import Model
-from pycellin.classes.feature import (
+from pycellin.classes import (
+    CellLineage,
+    Data,
     FeaturesDeclaration,
+    Model,
     cell_ID_Feature,
     frame_Feature,
     lineage_ID_Feature,
@@ -43,7 +46,6 @@ def _create_metadata() -> dict[str, Any]:
     """
     metadata = {}  # type: dict[str, Any]
     metadata["provenance"] = "trackpy"
-    # TODO: switch the other loader to str
     metadata["date"] = str(datetime.now())
     metadata["time_unit"] = "frame"
     metadata["time_step"] = 1
@@ -52,7 +54,7 @@ def _create_metadata() -> dict[str, Any]:
         version = importlib.metadata.version("pycellin")
     except importlib.metadata.PackageNotFoundError:
         version = "unknown"
-    metadata["pycellin_version"] = version
+    metadata["Pycellin_version"] = version
     return metadata
 
 
@@ -96,21 +98,53 @@ def load_trackpy_dataframe(df: pd.DataFrame) -> Model:
 
     # Add nodes.
     for _, row in df.iterrows():
-        node_id = current_node_id
-        graph.add_node(node_id, **row.to_dict())
+        row_dict = row.to_dict()
+        # 'frame' and 'particle' needs to be converted back to int.
+        row_dict["frame"] = int(row_dict["frame"])
+        row_dict["particle"] = int(row_dict["particle"])
+        graph.add_node(current_node_id, **row_dict)
+        graph.nodes[current_node_id]["cell_ID"] = current_node_id
         current_node_id += 1
 
     # Add edges.
+    # We need to link cells that have the same 'particle' value and are in frames
+    # that follows each other. Since there can be gaps in trackpy trajectories,
+    # we can't rely on the fact that frames will be truly consecutive.
+    particles = df["particle"].unique()
+    del df  # Free memory.
+    for particle in particles:
+        candidates = [
+            (node, frame)
+            for node, frame in graph.nodes(data="frame")
+            if graph.nodes[node]["particle"] == particle
+        ]
+        candidates.sort(key=lambda x: x[1])
+        for (n1, _), (n2, _) in pairwise(candidates):
+            graph.add_edge(n1, n2)
 
     # Split into lineages.
-
-    metadata = _create_metadata()
-    feat_declaration = _create_FeaturesDeclaration()
+    # One subgraph is created per lineage, so each subgraph is
+    # a connected component of `graph`.
+    lineages = [
+        CellLineage(graph.subgraph(c).copy())
+        for c in nx.weakly_connected_components(graph)
+    ]
+    del graph  # Redondant with the subgraphs.
+    # Each lineage needs to be assigned a lineage ID.
+    data = {}  # type: dict[int, CellLineage]
+    current_node_id = 0
+    for lin in lineages:
+        lin.graph["lineage_ID"] = current_node_id
+        data[current_node_id] = lin
+        current_node_id += 1
 
     # Create a Pycellin model
+    metadata = _create_metadata()
+    feat_declaration = _create_FeaturesDeclaration()
     model = Model(
         metadata=metadata,
         fd=feat_declaration,
+        data=Data(data),
     )
 
     return model
@@ -118,10 +152,14 @@ def load_trackpy_dataframe(df: pd.DataFrame) -> Model:
 
 if __name__ == "__main__":
 
-    import pickle
-
-    folder = "/mnt/data/Code/trackpy-examples-master/sample_data/"
+    folder = "E:/Pasteur/Code/trackpy-examples-master/sample_data/"
     tracks = "FakeTracks_trackpy.pkl"
 
     df = pd.read_pickle(folder + tracks)
     print(df.shape)
+    print(df.head())
+
+    model = load_trackpy_dataframe(df)
+    print(model)
+    for lin in model.get_cell_lineages():
+        lin.plot(node_hover_features=["cell_ID", "frame", "particle"])
