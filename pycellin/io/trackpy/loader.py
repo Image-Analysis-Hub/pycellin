@@ -35,6 +35,81 @@ from pycellin.classes import (
 )
 
 
+def _add_nodes(graph: nx.DiGraph, df: pd.DataFrame) -> None:
+    """
+    Add nodes to the graph from the DataFrame.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The DataFrame containing trackpy data.
+    graph : nx.DiGraph
+        The graph to which nodes will be added.
+    """
+    current_node_id = 0
+    for _, row in df.iterrows():
+        row_dict = row.to_dict()
+        row_dict["frame"] = int(row_dict["frame"])
+        row_dict["particle"] = int(row_dict["particle"])
+        graph.add_node(current_node_id, **row_dict)
+        graph.nodes[current_node_id]["cell_ID"] = current_node_id
+        current_node_id += 1
+
+
+def _add_edges(graph: nx.DiGraph, particles: list) -> None:
+    """
+    Add edges to the graph based on particle trajectories.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        The graph to which edges will be added.
+    particles : list
+        List of unique particle identifiers.
+    """
+    for particle in particles:
+        # We need to link cells that have the same 'particle' value and are in frames
+        # that follows each other. Since there can be gaps in trackpy trajectories,
+        # we can't rely on the fact that frames will be truly consecutive.
+        candidates = [
+            (node, frame)
+            for node, frame in graph.nodes(data="frame")
+            if graph.nodes[node]["particle"] == particle
+        ]
+        candidates.sort(key=lambda x: x[1])
+        for (n1, _), (n2, _) in pairwise(candidates):
+            graph.add_edge(n1, n2)
+
+
+def _split_into_lineages(graph: nx.DiGraph) -> dict[int, CellLineage]:
+    """
+    Split the graph into cell lineages and assign lineage IDs.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        The graph to be split into cell lineages.
+
+    Returns
+    -------
+    dict[int, CellLineage]
+        A dictionary mapping lineage IDs to CellLineage objects.
+    """
+    # One subgraph is created per lineage, so each subgraph is
+    # a connected component of `graph`.
+    lineages = [
+        CellLineage(graph.subgraph(c).copy())
+        for c in nx.weakly_connected_components(graph)
+    ]
+    data = {}
+    current_node_id = 0
+    for lin in lineages:
+        lin.graph["lineage_ID"] = current_node_id
+        data[current_node_id] = lin
+        current_node_id += 1
+    return data
+
+
 def _create_metadata() -> dict[str, Any]:
     """
     Create a dictionary of basic Pycellin metadata for a given file.
@@ -93,52 +168,17 @@ def load_trackpy_dataframe(df: pd.DataFrame) -> Model:
     Model
         A Pycellin model populated with the trackpy data.
     """
+    # Build the lineages.
     graph = nx.DiGraph()
-    current_node_id = 0
-
-    # Add nodes.
-    for _, row in df.iterrows():
-        row_dict = row.to_dict()
-        # 'frame' and 'particle' needs to be converted back to int.
-        row_dict["frame"] = int(row_dict["frame"])
-        row_dict["particle"] = int(row_dict["particle"])
-        graph.add_node(current_node_id, **row_dict)
-        graph.nodes[current_node_id]["cell_ID"] = current_node_id
-        current_node_id += 1
-
-    # Add edges.
-    # We need to link cells that have the same 'particle' value and are in frames
-    # that follows each other. Since there can be gaps in trackpy trajectories,
-    # we can't rely on the fact that frames will be truly consecutive.
+    _add_nodes(graph, df)
     particles = df["particle"].unique()
     del df  # Free memory.
-    for particle in particles:
-        candidates = [
-            (node, frame)
-            for node, frame in graph.nodes(data="frame")
-            if graph.nodes[node]["particle"] == particle
-        ]
-        candidates.sort(key=lambda x: x[1])
-        for (n1, _), (n2, _) in pairwise(candidates):
-            graph.add_edge(n1, n2)
+    _add_edges(graph, particles)
+    # Split the graph into lineages.
+    data = _split_into_lineages(graph)
+    del graph  # # Redondant with the subgraphs.
 
-    # Split into lineages.
-    # One subgraph is created per lineage, so each subgraph is
-    # a connected component of `graph`.
-    lineages = [
-        CellLineage(graph.subgraph(c).copy())
-        for c in nx.weakly_connected_components(graph)
-    ]
-    del graph  # Redondant with the subgraphs.
-    # Each lineage needs to be assigned a lineage ID.
-    data = {}  # type: dict[int, CellLineage]
-    current_node_id = 0
-    for lin in lineages:
-        lin.graph["lineage_ID"] = current_node_id
-        data[current_node_id] = lin
-        current_node_id += 1
-
-    # Create a Pycellin model
+    # Create a Pycellin model.
     metadata = _create_metadata()
     feat_declaration = _create_FeaturesDeclaration()
     model = Model(
