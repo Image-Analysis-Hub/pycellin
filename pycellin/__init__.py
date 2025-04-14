@@ -27,6 +27,8 @@ from .io.cell_tracking_challenge.loader import load_CTC_file
 from .io.cell_tracking_challenge.exporter import export_CTC_file
 from .io.trackmate.loader import load_TrackMate_XML
 from .io.trackmate.exporter import export_TrackMate_XML
+from .io.trackpy.loader import load_trackpy_dataframe
+from .io.trackpy.exporter import export_trackpy_dataframe
 
 from .graph.features.utils import (
     get_pycellin_cell_lineage_features,
