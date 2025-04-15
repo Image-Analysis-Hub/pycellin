@@ -696,7 +696,8 @@ class CellLineage(Lineage):
 
             # Merge all the elements of the target lineage into the source lineage.
             self.update(
-                edges=tmp_lineage.edges(data=True), nodes=tmp_lineage.nodes(data=True)
+                edges=tmp_lineage.edges(data=True),
+                nodes=tmp_lineage.nodes(data=True),
             )
             del tmp_lineage
 

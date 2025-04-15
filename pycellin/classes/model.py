@@ -804,6 +804,8 @@ class Model:
             Link(source_cell_ID, target_cell_ID, source_lineage_ID)
         )
         self._updater._modified_lineages.add(source_lineage_ID)
+        if target_lineage_ID != source_lineage_ID:
+            self._updater._modified_lineages.add(target_lineage_ID)
 
     def remove_link(
         self, source_cell_ID: int, target_cell_ID: int, lineage_ID: int
