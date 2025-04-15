@@ -11,7 +11,12 @@ Pycellin is a graph-based Python framework to easily manipulate and extract info
 
 Pycellin provides predefined features related to cell morphology, cell motion and tracking that can be automatically added to enrich lineages. More predefined features will be implemented in the future. The framework also facilitates the creation of new features defined by the user to accommodate the wide variety of experiments and biological questions.
 
-Pycellin can read from and write to TrackMate XML and Cell Tracking Challenge text file formats. More tracking formats will progressively be supported.
+Pycellin can read from and write to:
+- [TrackMate](https://imagej.net/plugins/trackmate/) XMLs,
+- [Cell Tracking Challenge](https://celltrackingchallenge.net/) text files,
+- [trackpy](https://github.com/soft-matter/trackpy) DataFrames.
+
+More tracking formats will progressively be supported.
 
 While Pycellin has been designed with bacteria / cell lineages in mind, it could be used with more diverse tracking data provided the few conditions below are enforced:
 - the tracking data can be modeled by directed rooted trees, meaning no merging event
@@ -107,3 +112,4 @@ Please note that the following notebooks are still a work in progress. There may
 - [NetworkX](https://networkx.org/) for lineages modeling ([Hagberg, Schult and Swart, 2008](http://conference.scipy.org.s3-website-us-east-1.amazonaws.com/proceedings/scipy2008/paper_2/))
 - [TrackMate](https://imagej.net/plugins/trackmate/) for the TrackMate data loader and exporter ([Tinevez et al., 2017](https://doi.org/10.1016/j.ymeth.2016.09.016), [Ershov et al., 2022](https://doi:10.1038/s41592-022-01507-1))
 - The [Cell Tracking Challenge](https://celltrackingchallenge.net/) for the CTC data loader and exporter ([Maška et al., 2023](https://doi.org/10.1038/s41592-023-01879-y))
+- [trackpy](https://github.com/soft-matter/trackpy) for the trackpy data loader and exporter ([Allan et al., 2024](https://doi.org/10.5281/zenodo.12708864))
