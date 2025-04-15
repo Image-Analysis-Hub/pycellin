@@ -889,12 +889,17 @@ def test_add_link_different_lineages(cell_lin):
     # Add a link between different lineages.
     new_lin = CellLineage(lineage_ID=2)
     new_lin.add_node(19, frame=1, cell_ID=19)
+    new_lin.add_node(20, frame=2, cell_ID=20)
+    new_lin.add_node(21, frame=3, cell_ID=21)
+    new_lin.add_edges_from([(19, 20), (20, 21)])
     cell_lin._add_link(1, 19, target_lineage=new_lin)
     assert cell_lin.has_node(19)
     assert cell_lin.nodes[19]["cell_ID"] == 19
     assert cell_lin.nodes[19]["frame"] == 1
     assert cell_lin.has_edge(1, 19)
-    assert not new_lin.has_node(19)
+    assert cell_lin.has_node(20)
+    assert cell_lin.has_node(21)
+    assert len(new_lin.nodes) == 0
 
 
 def test_add_link_different_lineages_unconnected_node(
