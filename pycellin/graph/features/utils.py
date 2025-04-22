@@ -42,7 +42,7 @@ def get_pycellin_cycle_lineage_features() -> dict[str, str]:
             "Mean displacement of the cell during the cell cycle"
         ),
         "branch_mean_speed": "Mean speed of the cell during the cell cycle",
-        "cell_cycle_completeness": (
+        "cycle_completeness": (
             "Completeness of the cell cycle, i.e. does it start and end with a division"
         ),
         "division_time": "Time elapsed between the birth of a cell and its division",

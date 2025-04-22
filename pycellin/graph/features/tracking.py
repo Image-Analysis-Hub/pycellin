@@ -148,7 +148,7 @@ class RelativeAge(NodeGlobalFeatureCalculator):
         return age_in_frame * self.time_step
 
 
-class CellCycleCompleteness(NodeGlobalFeatureCalculator):
+class CycleCompleteness(NodeGlobalFeatureCalculator):
     """
     Calculator to compute the cell cycle completeness.
 
