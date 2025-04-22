@@ -1218,19 +1218,24 @@ class CycleLineage(Lineage):
             # Adding node and graph features.
             self.graph["lineage_ID"] = cell_lineage.graph["lineage_ID"]
             for n in divs + leaves:
+                cells_in_cycle = cell_lineage.get_cell_cycle(n)
+                first = cells_in_cycle[0]
+                last = cells_in_cycle[-1]
                 self.nodes[n]["cycle_ID"] = n
-                self.nodes[n]["cells"] = cell_lineage.get_cell_cycle(n)
-                self.nodes[n]["cycle_length"] = len(self.nodes[n]["cells"])
+                self.nodes[n]["cells"] = cells_in_cycle
+                # How many cells in the cycle?
+                self.nodes[n]["cycle_length"] = len(cells_in_cycle)
+                # How many frames in the cycle?
+                self.nodes[n]["cycle_duration"] = (
+                    cell_lineage.nodes[last]["frame"]
+                    - cell_lineage.nodes[first]["frame"]
+                ) + 1
                 root = self.get_root()
                 if isinstance(root, list):
                     raise LineageStructureError(
                         "A cycle lineage cannot have multiple roots."
                     )
                 self.nodes[n]["level"] = nx.shortest_path_length(self, root, n)
-            # cell_cycle completeness?
-            # div_time?
-            # cell cycle duration?
-            # Or I add it later with add_custom_feature()?
 
     def __str__(self) -> str:
         name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
