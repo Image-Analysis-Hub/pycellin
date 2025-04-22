@@ -10,7 +10,7 @@ import networkx as nx
 from pycellin.graph.features.tracking import (
     AbsoluteAge,
     RelativeAge,
-    CellCycleCompleteness,
+    CycleCompleteness,
     DivisionTime,
     DivisionRate,
 )
@@ -172,7 +172,7 @@ def test_relative_age_custom_time_step(cell_lin, feat_cell_lin):
 
 
 def test_cell_cycle_completeness_cell_lin(cell_lin, feat_cell_lin):
-    calculator = CellCycleCompleteness(feat_cell_lin)
+    calculator = CycleCompleteness(feat_cell_lin)
     # Complete cell cycles.
     assert calculator.compute(Data({}), cell_lin, noi=4) is True  # division
     assert calculator.compute(Data({}), cell_lin, noi=14) is True  # division
@@ -190,7 +190,7 @@ def test_cell_cycle_completeness_cell_lin(cell_lin, feat_cell_lin):
 
 
 def test_cell_cycle_completeness_cycle_lin(cycle_lin, feat_cycle_lin):
-    calculator = CellCycleCompleteness(feat_cycle_lin)
+    calculator = CycleCompleteness(feat_cycle_lin)
     # Complete cell cycles.
     assert calculator.compute(Data({}), cycle_lin, noi=4) is True  # division
     assert calculator.compute(Data({}), cycle_lin, noi=8) is True  # division
