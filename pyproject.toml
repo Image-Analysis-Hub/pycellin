@@ -52,4 +52,5 @@ packages = [
     "pycellin.io",
     "pycellin.io.cell_tracking_challenge",
     "pycellin.io.trackmate",
+    "pycellin.io.trackpy",
 ]
