@@ -63,6 +63,8 @@ __all__ = [
     "export_CTC_file",
     "load_TrackMate_XML",
     "export_TrackMate_XML",
+    "load_trackpy_dataframe",
+    "export_trackpy_dataframe",
     "get_pycellin_cell_lineage_features",
     "get_pycellin_cycle_lineage_features",
 ]
