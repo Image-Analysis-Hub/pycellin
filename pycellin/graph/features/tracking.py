@@ -276,6 +276,7 @@ class DivisionTime(NodeGlobalFeatureCalculator):
             else:
                 prev_cells = lineage.nodes[ancestors[0]]["cells"]
                 frame_prev_div = cell_lin.nodes[prev_cells[-1]]["frame"]
+
         else:
             raise TypeError(
                 f"Lineage must be of type CellLineage or CycleLineage, "
@@ -295,7 +296,9 @@ class DivisionRate(NodeGlobalFeatureCalculator):
     to divisions per time unit of the model if specified.
     """
 
-    def __init__(self, feature: Feature, time_step: int | float = 1):
+    def __init__(
+        self, feature: Feature, time_step: int | float = 1, use_div_time: bool = False
+    ):
         """
         Parameters
         ----------
@@ -303,9 +306,19 @@ class DivisionRate(NodeGlobalFeatureCalculator):
             Feature object to which the calculator is associated.
         time_step : int | float, optional
             Time step between 2 frames, in time unit. Default is 1.
+        use_div_time : bool, optional
+            If True, use the division time already computed in the lineage.
+            If False, compute the division time from the lineage. Default is False.
+            The first option is faster but you need to ensure that the division time
+            is computed and updated BEFORE division rate. This can be ensured
+            by adding to the model the division time feature before the division
+            rate feature. Moreover, if `use_div_time` is True, `time_step` will be
+            ignored: division rate will use the division time unit (e.g. if division
+            time is in frames, division rate will be in divisions per frame).
         """
         super().__init__(feature)
         self.time_step = time_step
+        self.use_div_time = use_div_time
 
     def compute(  # type: ignore[override]
         self, data: Data, lineage: CellLineage | CycleLineage, noi: int
@@ -332,15 +345,55 @@ class DivisionRate(NodeGlobalFeatureCalculator):
         KeyError
             If the cell or cycle is not in the lineage.
         """
+        if self.use_div_time:
+            try:
+                div_time = lineage.nodes[noi]["division_time"]
+            except KeyError:
+                raise KeyError(
+                    f"Division time not present for cell {noi} in lineage "
+                    f"{lineage.graph['lineage_ID']}."
+                )
+            return 1 / (div_time * self.use_div_time)
+
+        # Cell lineage.
         if isinstance(lineage, CellLineage):
             if noi not in lineage.nodes:
                 raise KeyError(f"Cell {noi} not in the lineage.")
-            cell_cycle = lineage.get_cell_cycle(noi)
-            return 1 / (len(cell_cycle) * self.time_step)
+            cells = lineage.get_cell_cycle(noi)
+            frame_current_div = lineage.nodes[cells[-1]]["frame"]
+            ancestors = list(lineage.predecessors(cells[0]))
+            if len(ancestors) > 1:
+                raise FusionError(noi, lineage.graph["lineage_ID"])
+            elif len(ancestors) == 0:
+                frame_prev_div = lineage.nodes[cells[0]]["frame"]
+            else:
+                frame_prev_div = lineage.nodes[ancestors[0]]["frame"]
+
+        # Cycle lineage.
         elif isinstance(lineage, CycleLineage):
             if noi not in lineage.nodes:
                 raise KeyError(f"Cycle {noi} not in the lineage.")
-            return 1 / (lineage.nodes[noi]["cycle_length"] * self.time_step)
+            cells = lineage.nodes[noi]["cells"]
+            cell_lin = data.cell_data[lineage.graph["lineage_ID"]]
+            frame_current_div = cell_lin.nodes[cells[-1]]["frame"]
+            ancestors = list(lineage.predecessors(noi))
+            if len(ancestors) > 1:
+                raise FusionError(noi, lineage.graph["lineage_ID"])
+            elif len(ancestors) == 0:
+                frame_prev_div = cell_lin.nodes[cells[0]]["frame"]
+            else:
+                prev_cells = lineage.nodes[ancestors[0]]["cells"]
+                frame_prev_div = cell_lin.nodes[prev_cells[-1]]["frame"]
+
+        else:
+            raise TypeError(
+                f"Lineage must be of type CellLineage or CycleLineage, "
+                f"not {type(lineage)}."
+            )
+
+        div_time = (frame_current_div - frame_prev_div) * self.time_step
+        div_rate = 1 / div_time
+        return div_rate
 
 
 # class CellPhase(NodeGlobalFeatureCalculator):
