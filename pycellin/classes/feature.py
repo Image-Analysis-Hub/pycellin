@@ -308,7 +308,7 @@ def cells_Feature(provenance: str = "Pycellin") -> Feature:
 def cycle_length_Feature(provenance: str = "Pycellin") -> Feature:
     feat = Feature(
         name="cycle_length",
-        description="Number of cells in the cell cycle",
+        description="Number of cells in the cell cycle, minding gaps",
         provenance=provenance,
         feat_type="node",
         lin_type="CycleLineage",
@@ -317,7 +317,17 @@ def cycle_length_Feature(provenance: str = "Pycellin") -> Feature:
     return feat
 
 
-# TODO: define_cycle_duration_Feature
+def cycle_duration_Feature(provenance: str = "Pycellin") -> Feature:
+    feat = Feature(
+        name="cycle_duration",
+        description="Number of frames in the cell cycle, regardless of gaps",
+        provenance=provenance,
+        feat_type="node",
+        lin_type="CycleLineage",
+        data_type="int",
+        unit="frame",
+    )
+    return feat
 
 
 def level_Feature(provenance: str = "Pycellin") -> Feature:
@@ -574,8 +584,9 @@ class FeaturesDeclaration:
         feat_ID = cycle_ID_Feature()
         feat_cells = cells_Feature()
         feat_length = cycle_length_Feature()
+        feat_duration = cycle_duration_Feature()
         feat_level = level_Feature()
-        for feat in [feat_ID, feat_cells, feat_length, feat_level]:
+        for feat in [feat_ID, feat_cells, feat_length, feat_duration, feat_level]:
             if feat.name not in self.feats_dict:
                 self._add_feature(feat)
                 self._protect_feature(feat.name)

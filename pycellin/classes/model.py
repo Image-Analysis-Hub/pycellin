@@ -1063,7 +1063,7 @@ class Model:
         )
         self.add_custom_feature(motion.BranchTotalDisplacement(feat))
 
-    def add_cell_cycle_completeness(
+    def add_cycle_completeness(
         self,
         rename: str | None = None,
     ) -> None:
@@ -1083,7 +1083,7 @@ class Model:
             New name for the feature (default is None).
         """
         feat = Feature(
-            name=rename if rename else "cell_cycle_completeness",
+            name=rename if rename else "cycle_completeness",
             description="Completeness of the cell cycle",
             provenance="Pycellin",
             feat_type="node",
@@ -1091,7 +1091,7 @@ class Model:
             data_type="bool",
             unit="none",
         )
-        self.add_custom_feature(tracking.CellCycleCompleteness(feat))
+        self.add_custom_feature(tracking.CycleCompleteness(feat))
 
     def add_cell_displacement(
         self,
