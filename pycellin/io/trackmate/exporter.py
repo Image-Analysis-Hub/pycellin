@@ -165,7 +165,7 @@ def _unit_to_dimension(
                     break
             if dimension is None:
                 msg = (
-                    f"{name} is a feature listed as coming from TrackMate"
+                    f"'{name}' is a feature listed as coming from TrackMate"
                     f" but it is not a known feature of TrackMate. Dimension is set"
                     f" to NONE."
                 )
@@ -183,7 +183,7 @@ def _unit_to_dimension(
                 dimension = trackmate_feats[name]
             except KeyError:
                 msg = (
-                    f"{name} is a feature listed as coming from Pycellin"
+                    f"'{name}' is a feature listed as coming from Pycellin"
                     f" but it is not a known feature of either Pycellin or TrackMate. "
                     f" Dimension is set to NONE."
                 )
@@ -199,10 +199,15 @@ def _unit_to_dimension(
                     dimension = "LENGTH"
             case "none" | "frame":
                 dimension = "NONE"
-        # It's going to be a nightmare to deal with all the possible cases.
-        # Is it even possible? I should ask the user for a file with
-        # a feature-dimension mapping.
-        dimension = "TODO2"
+        # TODO: It's going to be a nightmare to deal with all the possible cases.
+        # Is it even possible? Maybe I could ask the user for a file with
+        # a feature-dimension mapping. For now, I just set the dimension to NONE.
+        msg = (
+            f"Cannot infer dimension for feature '{name}'. "
+            f"Dimension is set to NONE."
+        )
+        warnings.warn(msg)
+        dimension = "NONE"
 
     assert dimension is not None
     return dimension
