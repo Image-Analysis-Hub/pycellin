@@ -368,6 +368,39 @@ def test_division_rate_gap(cell_lin, feat_cell_lin):
         calculator.compute(Data({}), cell_lin, noi=99)
 
 
+def test_division_rate_from_division_time(cell_lin, feat_cell_lin):
+    """Test DivisionRate from DivisionTime."""
+    calculator = DivisionRate(feat_cell_lin, use_div_time=True)
+    # Root.
+    noi = 1
+    cell_lin.nodes[noi]["division_time"] = 10
+    assert calculator.compute(Data({}), cell_lin, noi) == 1 / 10
+    # Divisions.
+    noi = 2
+    cell_lin.nodes[noi]["division_time"] = 20
+    assert calculator.compute(Data({}), cell_lin, noi) == 1 / 20
+    noi = 4
+    cell_lin.nodes[noi]["division_time"] = 40
+    assert calculator.compute(Data({}), cell_lin, noi) == 1 / 40
+    noi = 14
+    cell_lin.nodes[noi]["division_time"] = 140
+    assert calculator.compute(Data({}), cell_lin, noi) == 1 / 140
+    # Leaves.
+    noi = 6
+    cell_lin.nodes[noi]["division_time"] = 60
+    assert calculator.compute(Data({}), cell_lin, noi) == 1 / 60
+    noi = 10
+    cell_lin.nodes[noi]["division_time"] = 100
+    assert calculator.compute(Data({}), cell_lin, noi) == 1 / 100
+    # Intermediate nodes.
+    noi = 11
+    cell_lin.nodes[noi]["division_time"] = 110
+    assert calculator.compute(Data({}), cell_lin, noi) == 1 / 110
+    # Non-existent node.
+    with pytest.raises(KeyError, match="Cell 99 not in the lineage."):
+        calculator.compute(Data({}), cell_lin, noi=99)
+
+
 def test_division_rate_cycle_lin_default_time_step(cell_lin, feat_cycle_lin):
     """Test DivisionRate with CycleLineage and default time step."""
     calculator = DivisionRate(feat_cycle_lin)

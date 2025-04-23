@@ -404,6 +404,17 @@ class DivisionRate(NodeGlobalFeatureCalculator):
             If the cell or cycle is not in the lineage.
         """
         if self.use_div_time:
+            if noi not in lineage.nodes:
+                if isinstance(lineage, CellLineage):
+                    lin_txt = "Cell"
+                elif isinstance(lineage, CycleLineage):
+                    lin_txt = "Cycle"
+                else:
+                    raise TypeError(
+                        f"Lineage must be of type CellLineage or CycleLineage, "
+                        f"not {type(lineage)}."
+                    )
+                raise KeyError(f"{lin_txt} {noi} not in the lineage.")
             try:
                 div_time = lineage.nodes[noi]["division_time"]
             except KeyError:
