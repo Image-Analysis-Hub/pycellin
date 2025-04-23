@@ -125,11 +125,20 @@ def _unit_to_dimension(
 
     # Pycellin features.
     pycellin_feats = {
+        # Cell features.
         "angle": "ANGLE",
         "cell_displacement": "LENGTH",
         "cell_length": "LENGTH",
         "cell_speed": "VELOCITY",
         "cell_width": "LENGTH",
+        # Cycle features.
+        "cells": "NONE",
+        "cycle_duration": "NONE",
+        "cycle_ID": "NONE",
+        "cycle_length": "NONE",
+        "division_time": "TIME",
+        "division_rate": "TIME",  # TODO: check if this is correct
+        "level": "NONE",
     }
     if name == "absolute_age":
         if unit == "frame":
