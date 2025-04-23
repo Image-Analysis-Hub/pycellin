@@ -774,7 +774,6 @@ class FeaturesDeclaration:
         """
         units = {}  # type: dict[str, list[str]]
         for feat in self.feats_dict.values():
-            assert feat.unit is not None
             if feat.unit in units:
                 units[feat.unit].append(feat.name)
             else:
