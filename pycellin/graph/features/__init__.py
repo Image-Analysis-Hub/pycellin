@@ -6,7 +6,7 @@ from .morphology import CellWidth, CellLength
 from .tracking import (
     AbsoluteAge,
     RelativeAge,
-    CellCycleCompleteness,
+    CycleCompleteness,
     DivisionTime,
     DivisionRate,
 )

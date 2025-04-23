@@ -30,9 +30,8 @@ Vocabulary:
 """
 
 
-from pycellin.classes import CellLineage, CycleLineage
-from pycellin.classes import Feature
-from pycellin.classes import Data
+from pycellin.classes import CellLineage, CycleLineage, Data, Feature
+from pycellin.classes.exceptions import FusionError
 from pycellin.classes.feature_calculator import NodeGlobalFeatureCalculator
 
 # TODO: should I add the word Calc or Calculator to the class names?
@@ -148,7 +147,7 @@ class RelativeAge(NodeGlobalFeatureCalculator):
         return age_in_frame * self.time_step
 
 
-class CellCycleCompleteness(NodeGlobalFeatureCalculator):
+class CycleCompleteness(NodeGlobalFeatureCalculator):
     """
     Calculator to compute the cell cycle completeness.
 
@@ -202,14 +201,97 @@ class CellCycleCompleteness(NodeGlobalFeatureCalculator):
                 return True
 
 
+def _get_cell_lin_frames(lineage: CellLineage, noi: int) -> tuple[int, int]:
+    """
+    Get the frames of the divisions defining the cell cycle.
+
+    This function is used by the DivisionTime and DivisionRate calculators.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        Lineage graph containing the node of interest.
+    noi : int
+        Node ID (cell_ID) of the cell of interest.
+
+    Returns
+    -------
+    tuple[int, int]
+        Frames of the current and previous division.
+
+    Raises
+    ------
+    KeyError
+        If the cell is not in the lineage.
+    FusionError
+        If the cell has more than one ancestor.
+    """
+    if noi not in lineage.nodes:
+        raise KeyError(f"Cell {noi} not in the lineage.")
+    cells = lineage.get_cell_cycle(noi)
+    frame_current_div = lineage.nodes[cells[-1]]["frame"]
+    ancestors = list(lineage.predecessors(cells[0]))
+    if len(ancestors) > 1:
+        raise FusionError(noi, lineage.graph["lineage_ID"])
+    elif len(ancestors) == 0:
+        frame_prev_div = lineage.nodes[cells[0]]["frame"]
+    else:
+        frame_prev_div = lineage.nodes[ancestors[0]]["frame"]
+    return frame_current_div, frame_prev_div
+
+
+def _get_cycle_lin_frames(
+    data: Data, lineage: CycleLineage, noi: int
+) -> tuple[int, int]:
+    """
+    Get the frames of the divisions defining the cell cycle.
+
+    This function is used by the DivisionTime and DivisionRate calculators.
+
+    Parameters
+    ----------
+    data : Data
+        Data object containing the lineage.
+    lineage : CycleLineage
+        Lineage graph containing the node of interest.
+    noi : int
+        Node ID (cell_ID) of the cell of interest.
+
+    Returns
+    -------
+    tuple[int, int]
+        Frames of the current and previous division.
+
+    Raises
+    ------
+    KeyError
+        If the cycle is not in the lineage.
+    FusionError
+        If the cycle has more than one ancestor.
+    """
+    if noi not in lineage.nodes:
+        raise KeyError(f"Cycle {noi} not in the lineage.")
+    cells = lineage.nodes[noi]["cells"]
+    cell_lin = data.cell_data[lineage.graph["lineage_ID"]]
+    frame_current_div = cell_lin.nodes[cells[-1]]["frame"]
+    ancestors = list(lineage.predecessors(noi))
+    if len(ancestors) > 1:
+        raise FusionError(noi, lineage.graph["lineage_ID"])
+    elif len(ancestors) == 0:
+        frame_prev_div = cell_lin.nodes[cells[0]]["frame"]
+    else:
+        prev_cells = lineage.nodes[ancestors[0]]["cells"]
+        frame_prev_div = cell_lin.nodes[prev_cells[-1]]["frame"]
+    return frame_current_div, frame_prev_div
+
+
 class DivisionTime(NodeGlobalFeatureCalculator):
     """
     Calculator to compute the division time of cells.
 
-    Division time is defined as the time between 2 divisions.
-    It is also the length of the cell cycle of the cell of interest.
-    It is given in frames by default, but can be converted
-    to the time unit of the model if specified.
+    Division time is defined as the time elapsed between the 2 divisions
+    that define the cell cycle. It is given in frames by default, but can
+    be converted to the time unit of the model if specified.
     """
 
     def __init__(self, feature: Feature, time_step: int | float = 1):
@@ -250,14 +332,16 @@ class DivisionTime(NodeGlobalFeatureCalculator):
             If the cell or cycle is not in the lineage.
         """
         if isinstance(lineage, CellLineage):
-            if noi not in lineage.nodes:
-                raise KeyError(f"Cell {noi} not in the lineage.")
-            cell_cycle = lineage.get_cell_cycle(noi)
-            return len(cell_cycle) * self.time_step
+            frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, noi)
         elif isinstance(lineage, CycleLineage):
-            if noi not in lineage.nodes:
-                raise KeyError(f"Cycle {noi} not in the lineage.")
-            return lineage.nodes[noi]["cycle_length"] * self.time_step
+            frame_curr_div, frame_prev_div = _get_cycle_lin_frames(data, lineage, noi)
+        else:
+            raise TypeError(
+                f"Lineage must be of type CellLineage or CycleLineage, "
+                f"not {type(lineage)}."
+            )
+
+        return (frame_curr_div - frame_prev_div) * self.time_step
 
 
 class DivisionRate(NodeGlobalFeatureCalculator):
@@ -270,7 +354,9 @@ class DivisionRate(NodeGlobalFeatureCalculator):
     to divisions per time unit of the model if specified.
     """
 
-    def __init__(self, feature: Feature, time_step: int | float = 1):
+    def __init__(
+        self, feature: Feature, time_step: int | float = 1, use_div_time: bool = False
+    ):
         """
         Parameters
         ----------
@@ -278,9 +364,19 @@ class DivisionRate(NodeGlobalFeatureCalculator):
             Feature object to which the calculator is associated.
         time_step : int | float, optional
             Time step between 2 frames, in time unit. Default is 1.
+        use_div_time : bool, optional
+            If True, use the division time already computed in the lineage.
+            If False, compute the division time from the lineage. Default is False.
+            The first option is faster but you need to ensure that the division time
+            is computed and updated BEFORE division rate. This can be ensured
+            by adding to the model the division time feature before the division
+            rate feature. Moreover, if `use_div_time` is True, `time_step` will be
+            ignored: division rate will use the division time unit (e.g. if division
+            time is in frames, division rate will be in divisions per frame).
         """
         super().__init__(feature)
         self.time_step = time_step
+        self.use_div_time = use_div_time
 
     def compute(  # type: ignore[override]
         self, data: Data, lineage: CellLineage | CycleLineage, noi: int
@@ -307,15 +403,40 @@ class DivisionRate(NodeGlobalFeatureCalculator):
         KeyError
             If the cell or cycle is not in the lineage.
         """
+        if self.use_div_time:
+            if noi not in lineage.nodes:
+                if isinstance(lineage, CellLineage):
+                    lin_txt = "Cell"
+                elif isinstance(lineage, CycleLineage):
+                    lin_txt = "Cycle"
+                else:
+                    raise TypeError(
+                        f"Lineage must be of type CellLineage or CycleLineage, "
+                        f"not {type(lineage)}."
+                    )
+                raise KeyError(f"{lin_txt} {noi} not in the lineage.")
+            try:
+                div_time = lineage.nodes[noi]["division_time"]
+            except KeyError:
+                raise KeyError(
+                    f"Division time not present for cell {noi} in lineage "
+                    f"{lineage.graph['lineage_ID']}."
+                )
+            return 1 / div_time
+
         if isinstance(lineage, CellLineage):
-            if noi not in lineage.nodes:
-                raise KeyError(f"Cell {noi} not in the lineage.")
-            cell_cycle = lineage.get_cell_cycle(noi)
-            return 1 / (len(cell_cycle) * self.time_step)
+            frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, noi)
         elif isinstance(lineage, CycleLineage):
-            if noi not in lineage.nodes:
-                raise KeyError(f"Cycle {noi} not in the lineage.")
-            return 1 / (lineage.nodes[noi]["cycle_length"] * self.time_step)
+            frame_curr_div, frame_prev_div = _get_cycle_lin_frames(data, lineage, noi)
+        else:
+            raise TypeError(
+                f"Lineage must be of type CellLineage or CycleLineage, "
+                f"not {type(lineage)}."
+            )
+
+        div_time = (frame_curr_div - frame_prev_div) * self.time_step
+        div_rate = 1 / div_time
+        return div_rate
 
 
 # class CellPhase(NodeGlobalFeatureCalculator):
