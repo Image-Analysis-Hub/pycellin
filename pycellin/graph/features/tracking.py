@@ -30,9 +30,8 @@ Vocabulary:
 """
 
 
-from pycellin.classes import CellLineage, CycleLineage
-from pycellin.classes import Feature
-from pycellin.classes import Data
+from pycellin.classes import CellLineage, CycleLineage, Data, Feature
+from pycellin.classes.exceptions import FusionError
 from pycellin.classes.feature_calculator import NodeGlobalFeatureCalculator
 
 # TODO: should I add the word Calc or Calculator to the class names?
@@ -206,10 +205,9 @@ class DivisionTime(NodeGlobalFeatureCalculator):
     """
     Calculator to compute the division time of cells.
 
-    Division time is defined as the time between 2 divisions.
-    It is also the length of the cell cycle of the cell of interest.
-    It is given in frames by default, but can be converted
-    to the time unit of the model if specified.
+    Division time is defined as the time elapsed between the 2 divisions
+    that define the cell cycle. It is given in frames by default, but can
+    be converted to the time unit of the model if specified.
     """
 
     def __init__(self, feature: Feature, time_step: int | float = 1):
@@ -249,15 +247,42 @@ class DivisionTime(NodeGlobalFeatureCalculator):
         KeyError
             If the cell or cycle is not in the lineage.
         """
+        # Cell lineage.
         if isinstance(lineage, CellLineage):
             if noi not in lineage.nodes:
                 raise KeyError(f"Cell {noi} not in the lineage.")
-            cell_cycle = lineage.get_cell_cycle(noi)
-            return len(cell_cycle) * self.time_step
+            cells = lineage.get_cell_cycle(noi)
+            frame_current_div = lineage.nodes[cells[-1]]["frame"]
+            ancestors = list(lineage.predecessors(cells[0]))
+            if len(ancestors) > 1:
+                raise FusionError(noi, lineage.graph["lineage_ID"])
+            elif len(ancestors) == 0:
+                frame_prev_div = lineage.nodes[cells[0]]["frame"]
+            else:
+                frame_prev_div = lineage.nodes[ancestors[0]]["frame"]
+
+        # Cycle lineage.
         elif isinstance(lineage, CycleLineage):
             if noi not in lineage.nodes:
                 raise KeyError(f"Cycle {noi} not in the lineage.")
-            return lineage.nodes[noi]["cycle_length"] * self.time_step
+            cells = lineage.nodes[noi]["cells"]
+            cell_lin = data.cell_data[lineage.graph["lineage_ID"]]
+            frame_current_div = cell_lin.nodes[cells[-1]]["frame"]
+            ancestors = list(lineage.predecessors(noi))
+            if len(ancestors) > 1:
+                raise FusionError(noi, lineage.graph["lineage_ID"])
+            elif len(ancestors) == 0:
+                frame_prev_div = cell_lin.nodes[cells[0]]["frame"]
+            else:
+                prev_cells = lineage.nodes[ancestors[0]]["cells"]
+                frame_prev_div = cell_lin.nodes[prev_cells[-1]]["frame"]
+        else:
+            raise TypeError(
+                f"Lineage must be of type CellLineage or CycleLineage, "
+                f"not {type(lineage)}."
+            )
+
+        return (frame_current_div - frame_prev_div) * self.time_step
 
 
 class DivisionRate(NodeGlobalFeatureCalculator):
