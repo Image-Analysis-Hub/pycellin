@@ -201,6 +201,90 @@ class CycleCompleteness(NodeGlobalFeatureCalculator):
                 return True
 
 
+def _get_cell_lin_frames(lineage: CellLineage, noi: int) -> tuple[int, int]:
+    """
+    Get the frames of the divisions defining the cell cycle.
+
+    This function is used by the DivisionTime and DivisionRate calculators.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        Lineage graph containing the node of interest.
+    noi : int
+        Node ID (cell_ID) of the cell of interest.
+
+    Returns
+    -------
+    tuple[int, int]
+        Frames of the current and previous division.
+
+    Raises
+    ------
+    KeyError
+        If the cell is not in the lineage.
+    FusionError
+        If the cell has more than one ancestor.
+    """
+    if noi not in lineage.nodes:
+        raise KeyError(f"Cell {noi} not in the lineage.")
+    cells = lineage.get_cell_cycle(noi)
+    frame_current_div = lineage.nodes[cells[-1]]["frame"]
+    ancestors = list(lineage.predecessors(cells[0]))
+    if len(ancestors) > 1:
+        raise FusionError(noi, lineage.graph["lineage_ID"])
+    elif len(ancestors) == 0:
+        frame_prev_div = lineage.nodes[cells[0]]["frame"]
+    else:
+        frame_prev_div = lineage.nodes[ancestors[0]]["frame"]
+    return frame_current_div, frame_prev_div
+
+
+def _get_cycle_lin_frames(
+    data: Data, lineage: CycleLineage, noi: int
+) -> tuple[int, int]:
+    """
+    Get the frames of the divisions defining the cell cycle.
+
+    This function is used by the DivisionTime and DivisionRate calculators.
+
+    Parameters
+    ----------
+    data : Data
+        Data object containing the lineage.
+    lineage : CycleLineage
+        Lineage graph containing the node of interest.
+    noi : int
+        Node ID (cell_ID) of the cell of interest.
+
+    Returns
+    -------
+    tuple[int, int]
+        Frames of the current and previous division.
+
+    Raises
+    ------
+    KeyError
+        If the cycle is not in the lineage.
+    FusionError
+        If the cycle has more than one ancestor.
+    """
+    if noi not in lineage.nodes:
+        raise KeyError(f"Cycle {noi} not in the lineage.")
+    cells = lineage.nodes[noi]["cells"]
+    cell_lin = data.cell_data[lineage.graph["lineage_ID"]]
+    frame_current_div = cell_lin.nodes[cells[-1]]["frame"]
+    ancestors = list(lineage.predecessors(noi))
+    if len(ancestors) > 1:
+        raise FusionError(noi, lineage.graph["lineage_ID"])
+    elif len(ancestors) == 0:
+        frame_prev_div = cell_lin.nodes[cells[0]]["frame"]
+    else:
+        prev_cells = lineage.nodes[ancestors[0]]["cells"]
+        frame_prev_div = cell_lin.nodes[prev_cells[-1]]["frame"]
+    return frame_current_div, frame_prev_div
+
+
 class DivisionTime(NodeGlobalFeatureCalculator):
     """
     Calculator to compute the division time of cells.
@@ -247,43 +331,17 @@ class DivisionTime(NodeGlobalFeatureCalculator):
         KeyError
             If the cell or cycle is not in the lineage.
         """
-        # Cell lineage.
         if isinstance(lineage, CellLineage):
-            if noi not in lineage.nodes:
-                raise KeyError(f"Cell {noi} not in the lineage.")
-            cells = lineage.get_cell_cycle(noi)
-            frame_current_div = lineage.nodes[cells[-1]]["frame"]
-            ancestors = list(lineage.predecessors(cells[0]))
-            if len(ancestors) > 1:
-                raise FusionError(noi, lineage.graph["lineage_ID"])
-            elif len(ancestors) == 0:
-                frame_prev_div = lineage.nodes[cells[0]]["frame"]
-            else:
-                frame_prev_div = lineage.nodes[ancestors[0]]["frame"]
-
-        # Cycle lineage.
+            frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, noi)
         elif isinstance(lineage, CycleLineage):
-            if noi not in lineage.nodes:
-                raise KeyError(f"Cycle {noi} not in the lineage.")
-            cells = lineage.nodes[noi]["cells"]
-            cell_lin = data.cell_data[lineage.graph["lineage_ID"]]
-            frame_current_div = cell_lin.nodes[cells[-1]]["frame"]
-            ancestors = list(lineage.predecessors(noi))
-            if len(ancestors) > 1:
-                raise FusionError(noi, lineage.graph["lineage_ID"])
-            elif len(ancestors) == 0:
-                frame_prev_div = cell_lin.nodes[cells[0]]["frame"]
-            else:
-                prev_cells = lineage.nodes[ancestors[0]]["cells"]
-                frame_prev_div = cell_lin.nodes[prev_cells[-1]]["frame"]
-
+            frame_curr_div, frame_prev_div = _get_cycle_lin_frames(data, lineage, noi)
         else:
             raise TypeError(
                 f"Lineage must be of type CellLineage or CycleLineage, "
                 f"not {type(lineage)}."
             )
 
-        return (frame_current_div - frame_prev_div) * self.time_step
+        return (frame_curr_div - frame_prev_div) * self.time_step
 
 
 class DivisionRate(NodeGlobalFeatureCalculator):
@@ -353,45 +411,19 @@ class DivisionRate(NodeGlobalFeatureCalculator):
                     f"Division time not present for cell {noi} in lineage "
                     f"{lineage.graph['lineage_ID']}."
                 )
-            return 1 / (div_time * self.use_div_time)
+            return 1 / div_time
 
-        # Cell lineage.
         if isinstance(lineage, CellLineage):
-            if noi not in lineage.nodes:
-                raise KeyError(f"Cell {noi} not in the lineage.")
-            cells = lineage.get_cell_cycle(noi)
-            frame_current_div = lineage.nodes[cells[-1]]["frame"]
-            ancestors = list(lineage.predecessors(cells[0]))
-            if len(ancestors) > 1:
-                raise FusionError(noi, lineage.graph["lineage_ID"])
-            elif len(ancestors) == 0:
-                frame_prev_div = lineage.nodes[cells[0]]["frame"]
-            else:
-                frame_prev_div = lineage.nodes[ancestors[0]]["frame"]
-
-        # Cycle lineage.
+            frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, noi)
         elif isinstance(lineage, CycleLineage):
-            if noi not in lineage.nodes:
-                raise KeyError(f"Cycle {noi} not in the lineage.")
-            cells = lineage.nodes[noi]["cells"]
-            cell_lin = data.cell_data[lineage.graph["lineage_ID"]]
-            frame_current_div = cell_lin.nodes[cells[-1]]["frame"]
-            ancestors = list(lineage.predecessors(noi))
-            if len(ancestors) > 1:
-                raise FusionError(noi, lineage.graph["lineage_ID"])
-            elif len(ancestors) == 0:
-                frame_prev_div = cell_lin.nodes[cells[0]]["frame"]
-            else:
-                prev_cells = lineage.nodes[ancestors[0]]["cells"]
-                frame_prev_div = cell_lin.nodes[prev_cells[-1]]["frame"]
-
+            frame_curr_div, frame_prev_div = _get_cycle_lin_frames(data, lineage, noi)
         else:
             raise TypeError(
                 f"Lineage must be of type CellLineage or CycleLineage, "
                 f"not {type(lineage)}."
             )
 
-        div_time = (frame_current_div - frame_prev_div) * self.time_step
+        div_time = (frame_curr_div - frame_prev_div) * self.time_step
         div_rate = 1 / div_time
         return div_rate
 
