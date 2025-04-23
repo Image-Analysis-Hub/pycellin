@@ -32,7 +32,7 @@ jobs:
 
     - name: Pip install pycellin
       run: |
-        python -m pip install -e .[test] -v
+        python -m pip install .[test] -v
         
     - name: Test
       run: |
