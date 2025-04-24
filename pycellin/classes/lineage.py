@@ -197,7 +197,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         return [n for n in self.nodes() if self.in_degree(n) > 1]  # type: ignore
 
     @abstractmethod
-    def plot(
+    def plot_tree(
         self,
         ID_feature: str,
         y_feature: str,
@@ -1056,7 +1056,7 @@ class CellLineage(Lineage):
     #     # for div in ancestor_divs:
     #     #     pass
 
-    def plot(
+    def plot_tree(
         self,
         ID_feature: str = "cell_ID",
         y_feature: str = "frame",
@@ -1149,7 +1149,7 @@ class CellLineage(Lineage):
         )
         """
         # TODO: and if we want to plot in time units instead of frames?
-        super().plot(
+        super().plot_tree(
             ID_feature=ID_feature,
             y_feature=y_feature,
             y_legend=y_legend,
@@ -1168,6 +1168,29 @@ class CellLineage(Lineage):
             width=width,
             height=height,
         )
+
+    # def plot_cell_trajectory(
+    #     self,
+    #     feature: str,
+    #     start_noi: int | None = None,
+    #     end_noi: int | list[int] | None = None,
+    # ) -> None:
+    #     if start_noi is None:
+    #         start_noi = self.get_root()
+    #         # TODO: deal with the case where there are multiple roots.
+
+    #     if isinstance(end_noi, int):
+    #         nodes = set(nx.shortest_path(self, start_noi, end_noi))
+    #     elif isinstance(end_noi, list):
+    #         nodes = set()
+    #         for end in end_noi:
+    #             nodes.update(nx.shortest_path(self, start_noi, end))
+    #     # Sort by frame number for debugging.
+    #     nodes = sorted(nodes, key=lambda x: self.nodes[x]["frame"])
+    #     print(len(nodes), nodes)
+
+    #     # Get a view on the subgraph created by the nodes.
+    #     subgraph = self.subgraph(nodes)
 
     @staticmethod
     # TODO: I don't think this function is good design, even if it factorises code.
@@ -1328,7 +1351,7 @@ class CycleLineage(Lineage):
         for edge in pairwise(self.nodes[noi]["cells"]):
             yield edge
 
-    def plot(
+    def plot_tree(
         self,
         ID_feature: str = "cycle_ID",
         y_feature: str = "level",
@@ -1420,7 +1443,7 @@ class CycleLineage(Lineage):
             line=dict(color="black", width=1),
         )
         """
-        super().plot(
+        super().plot_tree(
             ID_feature=ID_feature,
             y_feature=y_feature,
             y_legend=y_legend,

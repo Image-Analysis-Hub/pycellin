@@ -1252,4 +1252,4 @@ if __name__ == "__main__":
     # print(model.data)
 
     lineage = model.data.cell_data[0]
-    lineage.plot(node_hover_features=["cell_ID", "cell_name"])
+    lineage.plot_tree(node_hover_features=["cell_ID", "cell_name"])
