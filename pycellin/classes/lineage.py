@@ -1169,28 +1169,29 @@ class CellLineage(Lineage):
             height=height,
         )
 
-    # def plot_cell_trajectory(
-    #     self,
-    #     feature: str,
-    #     start_noi: int | None = None,
-    #     end_noi: int | list[int] | None = None,
-    # ) -> None:
-    #     if start_noi is None:
-    #         start_noi = self.get_root()
-    #         # TODO: deal with the case where there are multiple roots.
+    def plot_cell_trajectory(
+        self,
+        feature: str,
+        start_noi: int | None = None,
+        end_noi: int | list[int] | None = None,
+    ) -> None:
+        # TODO: finish
+        if start_noi is None:
+            start_noi = self.get_root()
+            # TODO: deal with the case where there are multiple roots.
 
-    #     if isinstance(end_noi, int):
-    #         nodes = set(nx.shortest_path(self, start_noi, end_noi))
-    #     elif isinstance(end_noi, list):
-    #         nodes = set()
-    #         for end in end_noi:
-    #             nodes.update(nx.shortest_path(self, start_noi, end))
-    #     # Sort by frame number for debugging.
-    #     nodes = sorted(nodes, key=lambda x: self.nodes[x]["frame"])
-    #     print(len(nodes), nodes)
+        if isinstance(end_noi, int):
+            nodes = set(nx.shortest_path(self, start_noi, end_noi))
+        elif isinstance(end_noi, list):
+            nodes = set()
+            for end in end_noi:
+                nodes.update(nx.shortest_path(self, start_noi, end))
+        # Sort by frame number for debugging.
+        nodes = sorted(nodes, key=lambda x: self.nodes[x]["frame"])
+        print(len(nodes), nodes)
 
-    #     # Get a view on the subgraph created by the nodes.
-    #     subgraph = self.subgraph(nodes)
+        # Get a view on the subgraph created by the nodes.
+        subgraph = self.subgraph(nodes)
 
     @staticmethod
     # TODO: I don't think this function is good design, even if it factorises code.
