@@ -5,9 +5,15 @@
 [![Actions Status](https://github.com/Image-Analysis-Hub/pycellin/workflows/Test/badge.svg)](https://github.com/Image-Analysis-Hub/pycellin/actions)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
+</br>
+<p align="center">
+    <img src="https://github.com/Image-Analysis-Hub/pycellin/blob/main/pycellin_logo.png" height="150"/>
+</p>
+
+
 # Pycellin
 
-Pycellin is a graph-based Python framework to easily manipulate and extract information from cell tracking data, at the single-cell level. In Pycellin, cell lineages are modeled intuitively by directed rooted trees. Graph nodes represent cells at a specific point in time and space, and graph edges represent the time and space displacement of the cells. Please note that while Pycellin is built to support cell division events, **it does not authorize cell merging events**: a cell at a specific timepoint cannot have more than one parent.
+Pycellin is a graph-based Python framework to easily manipulate and extract information from cell tracking data, at the single-cell level. In pycellin, cell lineages are modeled intuitively by directed rooted trees. Graph nodes represent cells at a specific point in time and space, and graph edges represent the time and space displacement of the cells. Please note that while pycellin is built to support cell division events, **it does not authorize cell merging events**: a cell at a specific timepoint cannot have more than one parent.
 
 Pycellin provides predefined features related to cell morphology, cell motion and tracking that can be automatically added to enrich lineages. More predefined features will be implemented in the future. The framework also facilitates the creation of new features defined by the user to accommodate the wide variety of experiments and biological questions.
 
@@ -18,7 +24,7 @@ Pycellin can read from and write to:
 
 More tracking formats will progressively be supported.
 
-While Pycellin has been designed with bacteria / cell lineages in mind, it could be used with more diverse tracking data provided the few conditions below are enforced:
+While pycellin has been designed with bacteria / cell lineages in mind, it could be used with more diverse tracking data provided the few conditions below are enforced:
 - the tracking data can be modeled by directed rooted trees, meaning no merging event
 - time must flow homogeneously, i.e. all the edges of a lineage graph must represent the same elapsed time.
 
@@ -27,11 +33,11 @@ While Pycellin has been designed with bacteria / cell lineages in mind, it could
 
 Pycellin supports Python 3.10 and above. It is tested with Python 3.10 and 3.13 on the latest versions of Ubuntu, Windows and MacOS. Please let me know if you encounter any compatibility issue with a different combination.
 
-It is recommended to install Pycellin in a conda or mamba environment. 
+It is recommended to install pycellin in a conda or mamba environment. 
 
 1. Check that conda/mamba is already installed by typing either `conda` or `mamba` in a terminal. If not, follow the installation instructions on [Miniforge](https://conda-forge.org/download/).
 
-2. Create a Python environment dedicated to Pycellin:
+2. Create a Python environment dedicated to pycellin:
     ```
     conda create -n my_env_pycellin
     ```
@@ -41,7 +47,7 @@ It is recommended to install Pycellin in a conda or mamba environment.
     conda activate my_env_pycellin
     ```
 
-4. Install Pycellin via [PyPI](https://pypi.org/):
+4. Install pycellin via [PyPI](https://pypi.org/):
     ```
     pip install pycellin
     ```
@@ -99,10 +105,10 @@ Please note that the following notebooks are still a work in progress. There may
 
 | Notebook                                                                                 | Description                                                       | Level    | State |
 |------------------------------------------------------------------------------------------|-------------------------------------------------------------------|----------|-------|
-| [Getting started](./notebooks/Getting%20started.ipynb)                                   | The basics of Pycellin, through examples                          | Beginner | WIP   |
+| [Getting started](./notebooks/Getting%20started.ipynb)                                   | The basics of pycellin, through examples                          | Beginner | WIP   |
 | [Managing features](./notebooks/Managing%20features.ipynb)                               | How to add, compute and remove features from a model              | Beginner | WIP   |
-| [Working with TrackMate data](./notebooks/Working%20with%20TrackMate%20data.ipynb)       | How Pycellin can work with TrackMate, through an example          | Beginner | WIP   |
-| [Creating a model from scratch](./notebooks/Creating%20a%20model%20from%20scratch.ipynb) | How to manually create a Pycellin model, including its lineages   | Advanced | Stub  |
+| [Working with TrackMate data](./notebooks/Working%20with%20TrackMate%20data.ipynb)       | How pycellin can work with TrackMate, through an example          | Beginner | WIP   |
+| [Creating a model from scratch](./notebooks/Creating%20a%20model%20from%20scratch.ipynb) | How to manually create a pycellin model, including its lineages   | Advanced | Stub  |
 | [Custom features](./notebooks/Custom%20features.ipynb)                                   | How to create user-defined features and augment a model with them | Advanced | WIP   |
 
 
