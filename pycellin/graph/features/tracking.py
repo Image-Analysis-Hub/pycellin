@@ -29,6 +29,7 @@ Vocabulary:
   If we take the previous example, the only complete generation is [2, 4, 6].
 """
 
+import numpy as np
 
 from pycellin.classes import CellLineage, CycleLineage, Data, Feature
 from pycellin.classes.exceptions import FusionError
@@ -422,7 +423,10 @@ class DivisionRate(NodeGlobalFeatureCalculator):
                     f"Division time not present for cell {noi} in lineage "
                     f"{lineage.graph['lineage_ID']}."
                 )
-            return 1 / div_time
+            if div_time == 0:
+                return np.nan
+            else:
+                return 1 / div_time
 
         if isinstance(lineage, CellLineage):
             frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, noi)
@@ -435,8 +439,10 @@ class DivisionRate(NodeGlobalFeatureCalculator):
             )
 
         div_time = (frame_curr_div - frame_prev_div) * self.time_step
-        div_rate = 1 / div_time
-        return div_rate
+        if div_time == 0:
+            return np.nan
+        else:
+            return 1 / div_time
 
 
 # class CellPhase(NodeGlobalFeatureCalculator):
