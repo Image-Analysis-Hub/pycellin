@@ -10,7 +10,7 @@ test = [
 
 [project]
 name = "pycellin"
-version = "0.3.6b"
+version = "0.4.0"
 authors = [{ name = "Laura Xénard", email = "laura.xenard@pasteur.fr" }]
 description = "Graph-based framework to manipulate and analyze cell lineages from cell tracking data"
 readme = "README.md"
