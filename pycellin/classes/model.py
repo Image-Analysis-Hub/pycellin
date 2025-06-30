@@ -1571,6 +1571,50 @@ class Model:
         self.data._add_cycle_lineages()
         self.feat_declaration._add_cycle_lineage_features()
 
+    def propagate_cycle_features(self, features: list[str] | None = None) -> None:
+        """
+        Propagate the cycle features to the cell lineages.
+
+        Parameters
+        ----------
+        features : list[str], optional
+            List of the features to propagate. If None, all cycle features are
+            propagated. Default is None.
+
+        Raises
+        ------
+        ValueError
+            If the cycle lineages have not been computed yet.
+            If a feature in the list is not a cycle lineage feature or not declared
+            in the model.
+        """
+        if not self.data.cycle_data:
+            raise ValueError(
+                "Cycle lineages have not been computed yet. "
+                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+            )
+        # TODO: decide how to deal with link and lineage features.
+        if features is None:
+            features = self.get_cycle_lineage_features().keys()
+        else:
+            for feat in features:
+                if feat not in self.get_cycle_lineage_features():
+                    raise ValueError(
+                        f"Feature {feat} is either not a cycle lineage feature or not "
+                        f"declared in the model."
+                    )
+        for feat in features:
+            for lin_ID in self.data.cell_data:
+                lin = self.data.cell_data[lin_ID]
+                clin = self.data.cycle_data[lin_ID]
+                for cycle in clin.nodes:
+                    for cell in clin.nodes[cycle]["cells"]:
+                        try:
+                            lin.nodes[cell][feat] = clin.nodes[cycle][feat]
+                        except KeyError:
+                            # If the feature is not in the cycle lineage, we skip it.
+                            continue
+
     def to_cell_dataframe(self, lineages_ID: list[int] | None = None) -> pd.DataFrame:
         """
         Return the cell data of the model as a pandas DataFrame.
