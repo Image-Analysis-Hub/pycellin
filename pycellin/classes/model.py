@@ -1631,33 +1631,35 @@ class Model:
             lin = self.data.cell_data[lin_ID]
             clin = self.data.cycle_data[lin_ID]
             # Nodes.
-            for cycle, cells in clin.nodes(data="cells"):
-                for cell in cells:
-                    for feat in node_feats:
-                        try:
-                            lin.nodes[cell][feat] = clin.nodes[cycle][feat]
-                        except KeyError:
-                            # If the feature is not present, we skip it.
-                            continue
-            # Edges.
-            for cycle in clin.edges:
+            if node_feats:
                 for cycle, cells in clin.nodes(data="cells"):
-                    for link in pairwise(cells):
-                        for feat in edge_feats:
+                    for cell in cells:
+                        for feat in node_feats:
                             try:
-                                lin.edges[link][feat] = clin.edges[cycle][feat]
+                                lin.nodes[cell][feat] = clin.nodes[cycle][feat]
                             except KeyError:
+                                # If the feature is not present, we skip it.
                                 continue
-                    # Intercycle edge.
-                    incoming_edges = list(lin.in_edges(cells[0]))
-                    if len(incoming_edges) >= 1:
-                        raise FusionError(cells[0], lin_ID)
-                    try:
-                        lin.edges[incoming_edges[0]][feat] = clin.edges[cycle][feat]
-                    except KeyError:
-                        # Either the cell is a root or the feature is not present.
-                        # In both cases, we skip it.
-                        continue
+            # Edges.
+            if edge_feats:
+                for cycle in clin.edges:
+                    for cycle, cells in clin.nodes(data="cells"):
+                        for link in pairwise(cells):
+                            for feat in edge_feats:
+                                try:
+                                    lin.edges[link][feat] = clin.edges[cycle][feat]
+                                except KeyError:
+                                    continue
+                        # Intercycle edge.
+                        incoming_edges = list(lin.in_edges(cells[0]))
+                        if len(incoming_edges) >= 1:
+                            raise FusionError(cells[0], lin_ID)
+                        try:
+                            lin.edges[incoming_edges[0]][feat] = clin.edges[cycle][feat]
+                        except KeyError:
+                            # Either the cell is a root or the feature is not present.
+                            # In both cases, we skip it.
+                            continue
             # Lineages.
             for feat in lin_feats:
                 try:
