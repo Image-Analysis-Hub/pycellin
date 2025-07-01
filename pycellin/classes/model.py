@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from itertools import pairwise
 import pickle
 from typing import Any, Literal, TypeVar
 import warnings
@@ -16,7 +17,7 @@ from pycellin.classes import (
     FeaturesDeclaration,
 )
 from pycellin.classes.lineage import Lineage
-from pycellin.classes.exceptions import UpdateRequiredError
+from pycellin.classes.exceptions import FusionError, UpdateRequiredError
 from pycellin.classes.feature_calculator import FeatureCalculator
 from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features.tracking as tracking
@@ -1587,33 +1588,82 @@ class Model:
             If the cycle lineages have not been computed yet.
             If a feature in the list is not a cycle lineage feature or not declared
             in the model.
+        FusionError
+            If a cell has more than one incoming edge in the cycle lineage,
+            which indicates a fusion event.
         """
         if not self.data.cycle_data:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with `model.add_cycle_data()`."
             )
-        # TODO: decide how to deal with link and lineage features.
+
+        # Retrieve features by type.
         if features is None:
-            features = self.get_cycle_lineage_features().keys()
+            features = self.get_cycle_lineage_features()
+            node_feats = [
+                name for name, feat in features.items() if feat.feat_type == "node"
+            ]
+            edge_feats = [
+                name for name, feat in features.items() if feat.feat_type == "edge"
+            ]
+            lin_feats = [
+                name for name, feat in features.items() if feat.feat_type == "lineage"
+            ]
         else:
-            for feat in features:
-                if feat not in self.get_cycle_lineage_features():
-                    raise ValueError(
-                        f"Feature {feat} is either not a cycle lineage feature or not "
-                        f"declared in the model."
-                    )
-        for feat in features:
-            for lin_ID in self.data.cell_data:
-                lin = self.data.cell_data[lin_ID]
-                clin = self.data.cycle_data[lin_ID]
-                for cycle in clin.nodes:
-                    for cell in clin.nodes[cycle]["cells"]:
+            missing_feats = [
+                f for f in features if f not in self.get_cycle_lineage_features()
+            ]
+            if missing_feats:
+                missing_str = ", ".join(repr(f) for f in missing_feats)
+                plural = len(missing_feats) > 1
+                raise ValueError(
+                    f"Feature{'s' if plural else ''} {missing_str} "
+                    f"{'are' if plural else 'is'} either not cycle lineage "
+                    f"feature{'s' if plural else ''} or not declared in the model."
+                )
+            node_feats = [f for f in features if f in self.get_node_features()]
+            edge_feats = [f for f in features if f in self.get_edge_features()]
+            lin_feats = [f for f in features if f in self.get_lineage_features()]
+
+        # Propagate features to cell lineages.
+        for lin_ID in self.data.cell_data:
+            lin = self.data.cell_data[lin_ID]
+            clin = self.data.cycle_data[lin_ID]
+            # Nodes.
+            for cycle, cells in clin.nodes(data="cells"):
+                for cell in cells:
+                    for feat in node_feats:
                         try:
                             lin.nodes[cell][feat] = clin.nodes[cycle][feat]
                         except KeyError:
-                            # If the feature is not in the cycle lineage, we skip it.
+                            # If the feature is not present, we skip it.
                             continue
+            # Edges.
+            for cycle in clin.edges:
+                for cycle, cells in clin.nodes(data="cells"):
+                    for link in pairwise(cells):
+                        for feat in edge_feats:
+                            try:
+                                lin.edges[link][feat] = clin.edges[cycle][feat]
+                            except KeyError:
+                                continue
+                    # Intercycle edge.
+                    incoming_edges = list(lin.in_edges(cells[0]))
+                    if len(incoming_edges) >= 1:
+                        raise FusionError(cells[0], lin_ID)
+                    try:
+                        lin.edges[incoming_edges[0]][feat] = clin.edges[cycle][feat]
+                    except KeyError:
+                        # Either the cell is a root or the feature is not present.
+                        # In both cases, we skip it.
+                        continue
+            # Lineages.
+            for feat in lin_feats:
+                try:
+                    lin.graph[feat] = clin.graph[feat]
+                except KeyError:
+                    continue
 
     def to_cell_dataframe(self, lineages_ID: list[int] | None = None) -> pd.DataFrame:
         """
