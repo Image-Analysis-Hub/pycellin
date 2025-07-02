@@ -6,6 +6,7 @@ import networkx as nx
 from pycellin.classes import Data
 from pycellin.classes.feature_calculator import FeatureCalculator
 from pycellin.classes.lineage import CellLineage
+from pycellin.custom_types import Cell, Link
 
 
 class ModelUpdater:
@@ -110,7 +111,8 @@ class ModelUpdater:
         features_to_update : list of str, optional
             List of features to update. If None, all features are updated.
         """
-        # Cleaning up the model.
+        # TODO: refactor, this method is too long and does too many things.
+
         # Remove empty lineages.
         for lin_ID in (
             self._added_lineages | self._modified_lineages
@@ -179,18 +181,62 @@ class ModelUpdater:
                 # else:
                 #     data.cycle_data[lin_ID] = new_cycle_data
                 data.cycle_data[lin_ID] = data._compute_cycle_lineage(lin_ID)
+        # Remove cycle lineages whose cell lineage has been removed.
         for lin_ID in self._removed_lineages:
             if data.cycle_data is not None and lin_ID in data.cycle_data:
                 del data.cycle_data[lin_ID]
+        # Update cycle lineages with cycle features.
+        if data.cycle_data is not None:
+            if features_to_update is None:
+                cycle_calculators = [
+                    calc
+                    for calc in self._calculators.values()
+                    if calc.feature.lin_type == "CycleLineage"
+                ]
+            else:
+                cycle_calculators = [
+                    self._calculators[feat]
+                    for feat in features_to_update
+                    if self._calculators[feat].feature.lin_type == "CycleLineage"
+                ]
+            # Since cycle lineages are recreated at each update, every element
+            # of the lineages need to be updated with its features.
+            cycle_nodes = [
+                Cell(cycle_ID, lin_ID)
+                for lin_ID in data.cycle_data
+                for cycle_ID in data.cycle_data[lin_ID].nodes()
+            ]
+            cycle_edges = [
+                Link(source, target, lin_ID)
+                for lin_ID in data.cycle_data
+                for source, target in data.cycle_data[lin_ID].edges()
+            ]
+            for calc in cycle_calculators:
+                # Depending on the class of the calculator, a different version of
+                # the enrich() method is called.
+                calc.enrich(
+                    data,
+                    nodes_to_enrich=cycle_nodes,
+                    edges_to_enrich=cycle_edges,
+                    lineages_to_enrich=data.cycle_data.keys(),
+                )
 
-        # Update the features.
+        # Update cell lineage features.
         # TODO: Deal with feature dependencies. See comments in __init__.
         if features_to_update is None:
-            calculators = self._calculators.values()
+            cell_calculators = [
+                calc
+                for calc in self._calculators.values()
+                if calc.feature.lin_type == "CellLineage"
+            ]
         else:
-            calculators = [self._calculators[feat] for feat in features_to_update]
+            cell_calculators = [
+                self._calculators[feat]
+                for feat in features_to_update
+                if self._calculators[feat].feature.lin_type == "CellLineage"
+            ]
         # Recompute the features as needed.
-        for calc in calculators:
+        for calc in cell_calculators:
             # Depending on the class of the calculator, a different version of
             # the enrich() method is called.
             calc.enrich(
