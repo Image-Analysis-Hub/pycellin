@@ -1572,7 +1572,9 @@ class Model:
         self.data._add_cycle_lineages()
         self.feat_declaration._add_cycle_lineage_features()
 
-    def propagate_cycle_features(self, features: list[str] | None = None) -> None:
+    def propagate_cycle_features(
+        self, features: list[str] | None = None, update: bool = True
+    ) -> None:
         """
         Propagate the cycle features to the cell lineages.
 
@@ -1581,6 +1583,12 @@ class Model:
         features : list[str], optional
             List of the features to propagate. If None, all cycle features are
             propagated. Default is None.
+        update : bool, optional
+            Whether to update the model before propagating the features.
+            Default is True. For a correct propagation, the model must be updated
+            beforehand. If you are not sure about the state of the model, leave
+            this parameter to True. If you are sure that the model is up to date,
+            you can set it to False for better performances.
 
         Raises
         ------
@@ -1591,12 +1599,24 @@ class Model:
         FusionError
             If a cell has more than one incoming edge in the cycle lineage,
             which indicates a fusion event.
+
+        Warnings
+        --------
+        Quantitative analysis of cell cycle features should not be done on cell
+        lineages after propagation of cycle features, UNLESS you account for cell
+        cycle length. Otherwise you will introduce a bias in your quantification.
+        Indeed, after propagation, cycle features (like division time) become
+        overrepresented in long cell cycles since these features are propagated on each
+        node of the cell cycle in cell lineages, whereas they are stored only once
+        per cell cycle on the cycle node in cycle lineages.
         """
         if not self.data.cycle_data:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with `model.add_cycle_data()`."
             )
+        if self._updater._update_required and update:
+            self.update()
 
         # Retrieve features by type.
         if features is None:
@@ -1642,24 +1662,25 @@ class Model:
                                 continue
             # Edges.
             if edge_feats:
-                for cycle in clin.edges:
-                    for cycle, cells in clin.nodes(data="cells"):
-                        for link in pairwise(cells):
-                            for feat in edge_feats:
-                                try:
-                                    lin.edges[link][feat] = clin.edges[cycle][feat]
-                                except KeyError:
-                                    continue
-                        # Intercycle edge.
-                        incoming_edges = list(lin.in_edges(cells[0]))
-                        if len(incoming_edges) >= 1:
-                            raise FusionError(cells[0], lin_ID)
-                        try:
-                            lin.edges[incoming_edges[0]][feat] = clin.edges[cycle][feat]
-                        except KeyError:
-                            # Either the cell is a root or the feature is not present.
-                            # In both cases, we skip it.
-                            continue
+                for edge in clin.edges:
+                    cycle = clin.nodes[edge[1]]["cycle_ID"]
+                    cells = clin.nodes[cycle]["cells"]
+                    for link in pairwise(cells):
+                        for feat in edge_feats:
+                            try:
+                                lin.edges[link][feat] = clin.edges[edge][feat]
+                            except KeyError:
+                                continue
+                    # Intercycle edge.
+                    incoming_edges = list(lin.in_edges(cells[0]))
+                    if len(incoming_edges) > 1:
+                        raise FusionError(cells[0], lin_ID)
+                    try:
+                        lin.edges[incoming_edges[0]][feat] = clin.edges[edge][feat]
+                    except (IndexError, KeyError):
+                        # Either the cell is a root or the feature is not present.
+                        # In both cases, we skip it.
+                        continue
             # Lineages.
             for feat in lin_feats:
                 try:
