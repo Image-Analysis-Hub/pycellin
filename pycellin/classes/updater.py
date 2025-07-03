@@ -38,6 +38,10 @@ class ModelUpdater:
         # order for the other features that is the order of registration (order of keys
         # in the _calculators dictionary). Even better would be to have a solver.
         # => keep this for later
+        # On a related note, currently cell features are computed before cycle features.
+        # So if a cell feature depends on a cycle feature, it will not be computed
+        # correctly. In that case, the solution is to add the cycle features first,
+        # then update, then add the cell features and update again.
 
     def _reinit(self) -> None:
         """
@@ -167,6 +171,31 @@ class ModelUpdater:
                     data.cell_data[new_lin_ID] = lin
                     self._added_lineages.add(new_lin_ID)
 
+        # Update cell lineage features.
+        # TODO: Deal with feature dependencies. See comments in __init__.
+        if features_to_update is None:
+            cell_calculators = [
+                calc
+                for calc in self._calculators.values()
+                if calc.feature.lin_type == "CellLineage"
+            ]
+        else:
+            cell_calculators = [
+                self._calculators[feat]
+                for feat in features_to_update
+                if self._calculators[feat].feature.lin_type == "CellLineage"
+            ]
+        # Recompute the features as needed.
+        for calc in cell_calculators:
+            # Depending on the class of the calculator, a different version of
+            # the enrich() method is called.
+            calc.enrich(
+                data,
+                nodes_to_enrich=self._added_cells,
+                edges_to_enrich=self._added_links,
+                lineages_to_enrich=self._added_lineages | self._modified_lineages,
+            )
+
         # In case of modifications in the structure of some cell lineages,
         # we need to recompute the cycle lineages and their features.
         # TODO: optimize so we don't have to recompute EVERYTHING for cycle lineages?
@@ -220,31 +249,6 @@ class ModelUpdater:
                     edges_to_enrich=cycle_edges,
                     lineages_to_enrich=data.cycle_data.keys(),
                 )
-
-        # Update cell lineage features.
-        # TODO: Deal with feature dependencies. See comments in __init__.
-        if features_to_update is None:
-            cell_calculators = [
-                calc
-                for calc in self._calculators.values()
-                if calc.feature.lin_type == "CellLineage"
-            ]
-        else:
-            cell_calculators = [
-                self._calculators[feat]
-                for feat in features_to_update
-                if self._calculators[feat].feature.lin_type == "CellLineage"
-            ]
-        # Recompute the features as needed.
-        for calc in cell_calculators:
-            # Depending on the class of the calculator, a different version of
-            # the enrich() method is called.
-            calc.enrich(
-                data,
-                nodes_to_enrich=self._added_cells,
-                edges_to_enrich=self._added_links,
-                lineages_to_enrich=self._added_lineages | self._modified_lineages,
-            )
 
         # Update is done, we can clean up.
         self._reinit()
