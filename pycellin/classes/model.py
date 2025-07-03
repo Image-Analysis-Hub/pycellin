@@ -485,13 +485,51 @@ class Model:
         """
         return self._updater._update_required
 
-    def update(self) -> None:
+    def update(self, features_to_update: list[str] | None = None) -> None:
         """
         Bring the model up to date by recomputing features.
+
+        This method will recompute the features of the model
+        based on the current data and the features declaration.
+
+        Parameters
+        ----------
+        features_to_update : list[str], optional
+            List of features to update. If None, all features are updated.
+
+        Warns
+        -----
+        If the model is already up to date, a warning is raised and no update
+        is performed. If the user wants to force an update, they can call
+        `prepare_full_data_update()` before calling this method.
+        If a feature in the `features_to_update` list has not been declared,
+        a warning is raised and that feature is ignored during the update.
+        If no features are left to update after filtering, a warning is raised
+        and the model is not updated.
         """
         if not self._updater._update_required:
             warnings.warn("Model is already up to date.")
             return
+
+        if features_to_update is not None:
+            missing_feats = [
+                feat
+                for feat in features_to_update
+                if not self.feat_declaration._has_feature(feat)
+            ]
+            if missing_feats:
+                warnings.warn(
+                    f"The following features have not been declared "
+                    f"and will be ignored: {', '.join(missing_feats)}."
+                )
+                features_to_update = [
+                    feat for feat in features_to_update if feat not in missing_feats
+                ]
+                if not features_to_update:
+                    warnings.warn(
+                        "No features to update. The model will not be updated."
+                    )
+                    return
 
         # self.data._freeze_lineage_data()
 
@@ -499,7 +537,7 @@ class Model:
         # by the updater methods to avoid incoherent states.
         # => saving a copy of the model before the update so we can roll back?
 
-        self._updater._update(self.data)
+        self._updater._update(self.data, features_to_update)
 
         # self.data._unfreeze_lineage_data()
 
