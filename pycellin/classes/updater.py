@@ -114,6 +114,15 @@ class ModelUpdater:
             The data to update.
         features_to_update : list of str, optional
             List of features to update. If None, all features are updated.
+
+        Warnings
+        --------
+        This method does not resolve features dependencies. It is the responsibility
+        of the user to ensure that features are updated in the correct order, if needed.
+        For example, cell lineage features are computed before cycle lineage features,
+        so if a cell lineage feature depends on a cycle lineage feature, it will not be
+        computed correctly. In that case, the solution is to add the cycle features
+        first, then update, then add the cell features and update again.
         """
         # TODO: refactor, this method is too long and does too many things.
 
