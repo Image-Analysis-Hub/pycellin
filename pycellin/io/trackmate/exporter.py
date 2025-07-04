@@ -680,38 +680,41 @@ def _prepare_model_for_export(
                 pass  # Not a mandatory feature.
 
     # Removal of non numeric features since they are not supported by TrackMate.
-    for name, feat in model.get_features().items():
-        if feat.provenance != "TrackMate":
-            valid_dtype = [
-                "int",
-                "integer",
-                "float",
-                "complex",
-                "bool",
-                "boolean",
-                "fraction",
-                "decimal",
-                "number",
-                "numeric",
-                "real",
-                "rational",
-            ]
-            removed_feats = []
-            if feat.data_type.lower() not in valid_dtype:
-                try:
-                    model.remove_feature(name)
-                except ProtectedFeatureError:
-                    model.feat_declaration._unprotect_feature(name)
-                    model.remove_feature(name)
-                removed_feats.append(name)
-            if removed_feats:
-                plural = True if len(removed_feats) > 1 else False
-                msg = (
-                    f"Ignoring feature{'s' if plural else ''} "
-                    f"{', '.join(removed_feats)}. {'They are' if plural else 'It is'} "
-                    f"not numeric and won't be supported by TrackMate."
-                )
-                warnings.warn(msg)
+    valid_dtype = [
+        "int",
+        "integer",
+        "float",
+        "complex",
+        "bool",
+        "boolean",
+        "fraction",
+        "decimal",
+        "number",
+        "numeric",
+        "real",
+        "rational",
+    ]
+    to_remove = [
+        name
+        for name, feat in model.get_features().items()
+        if feat.provenance != "TrackMate" and feat.data_type.lower() not in valid_dtype
+    ]
+    if to_remove:
+        for name in to_remove:
+            try:
+                model.remove_feature(name)
+                print(name, "in try")
+            except ProtectedFeatureError:
+                model.feat_declaration._unprotect_feature(name)
+                model.remove_feature(name)
+                print(name, "in except")
+        plural = True if len(to_remove) > 1 else False
+        msg = (
+            f"Ignoring feature{'s' if plural else ''} "
+            f"{', '.join(to_remove)}. {'They are' if plural else 'It is'} "
+            f"not numeric and won't be supported by TrackMate."
+        )
+        warnings.warn(msg)
 
 
 def _write_metadata_tag(
