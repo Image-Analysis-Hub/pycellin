@@ -55,7 +55,7 @@ def feat_cell_lin():
     Feature(
         name="test_feature",
         description="test feature",
-        provenance="Pycellin",
+        provenance="pycellin",
         feat_type="node",
         lin_type="CellLineage",
         data_type="int",
@@ -76,7 +76,7 @@ def feat_cycle_lin():
     Feature(
         name="test_feature",
         description="test feature",
-        provenance="Pycellin",
+        provenance="pycellin",
         feat_type="node",
         lin_type="CycleLineage",
         data_type="int",

@@ -7,9 +7,10 @@ directly from TrackMate.
 I've tested quickly and it doesn't seem to be a problem for TrackMate.
 """
 
-
+from collections.abc import Iterable
 import copy
 import math
+import numbers
 from typing import Any, Union
 import warnings
 
@@ -175,7 +176,7 @@ def _unit_to_dimension(
                 # but it's a dimension not recognized by TM and it crashes.
                 dimension = "NONE"
 
-    elif provenance == "Pycellin":
+    elif provenance == "pycellin":
         try:
             dimension = pycellin_feats[name]
         except KeyError:
@@ -183,8 +184,8 @@ def _unit_to_dimension(
                 dimension = trackmate_feats[name]
             except KeyError:
                 msg = (
-                    f"'{name}' is a feature listed as coming from Pycellin"
-                    f" but it is not a known feature of either Pycellin or TrackMate. "
+                    f"'{name}' is a feature listed as coming from pycellin"
+                    f" but it is not a known feature of either pycellin or TrackMate. "
                     f" Dimension is set to NONE."
                 )
                 warnings.warn(msg)
@@ -217,7 +218,7 @@ def _convert_feature(
     feat: Feature,
 ) -> dict[str, str]:
     """
-    Convert a Pycellin feature to a TrackMate feature.
+    Convert a pycellin feature to a TrackMate feature.
 
     Parameters
     ----------
@@ -302,25 +303,38 @@ def _value_to_str(
     value : Union[int, float, str]
         Value to convert to string.
 
+    Warnings
+    --------
+    Appart from its classic features, TrackMate is only able to read features
+    with numeric values. So pycellin predefined features like the cycle feature
+    "cells", or custom features with string, list... values, will not be
+    exported to TrackMate format. If you want to export such features, you will
+    need to convert them to a string that can be parsed as a number by Java.
+
     Returns
     -------
     str
         The string equivalent of `value`.
     """
-    # TODO: Should this function take care of converting non-numeric added
-    # features to numeric ones (like GEN_ID)? Or should it be done in
-    # Pycellin?
-    # I can also use the provenance field to identify which features come
-    # from TrackMate.
-    if isinstance(value, str):
-        return value
-    elif math.isnan(value):
-        return "NaN"
-    elif math.isinf(value):
-        if value > 0:
-            return "Infinity"
+    # FIXME: TrackMate only supports numeric values.
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    elif isinstance(value, numbers.Number):
+        if math.isnan(value):
+            return "NaN"
+        elif math.isinf(value):
+            if value > 0:
+                return "Infinity"
+            else:
+                return "-Infinity"
         else:
-            return "-Infinity"
+            return str(value)
+    elif isinstance(value, str):
+        return value
+    elif isinstance(value, Iterable):
+        # If the value is an iterable, we convert it to a string
+        # by joining its elements with a space.
+        return " ".join(map(str, value))
     else:
         return str(value)
 
@@ -419,7 +433,7 @@ def _write_AllTracks(
     with xf.element("AllTracks"):
         for lineage in data.values():
             # We have track tags to add only for tracks with several spots,
-            # so one-node tracks are to be ignored. In Pycellin, a one-node
+            # so one-node tracks are to be ignored. In pycellin, a one-node
             # lineage is identified by a negative ID.
             if lineage.graph["TRACK_ID"] < 0:
                 continue
@@ -510,10 +524,10 @@ def _prepare_model_for_export(
     model: Model,
 ) -> None:
     """
-    Prepare a Pycellin model for export to TrackMate format.
+    Prepare a pycellin model for export to TrackMate format.
 
-    Some Pycellin features are a bit different from TrackMate features
-    and need to be modified or deleted. For example, "lineage_ID" in Pycellin
+    Some pycellin features are a bit different from TrackMate features
+    and need to be modified or deleted. For example, "lineage_ID" in pycellin
     is "TRACK_ID" in TrackMate.
 
     Parameters
@@ -541,7 +555,7 @@ def _prepare_model_for_export(
         except KeyError:
             # This feature is a classic TrackMate feature but not mandatory.
             pass
-    # Some features don't necessarily exist in Pycellin but are mandatory in TrackMate.
+    # Some features don't necessarily exist in pycellin but are mandatory in TrackMate.
     if not fd._has_feature("SPOT_SOURCE_ID"):
         source_feat = Feature(
             name="SPOT_SOURCE_ID",
@@ -664,6 +678,9 @@ def _prepare_model_for_export(
             except KeyError:
                 pass  # Not a mandatory feature.
 
+    # Removal of non numeric features, not supported by TrackMate.
+    for feat in model.feat_declaration.values():
+
 
 def _write_metadata_tag(
     xf: ET.xmlfile,
@@ -731,17 +748,19 @@ def export_TrackMate_XML(
     propagate_cycle_features: bool = False,
 ) -> None:
     """
-    Write an XML file readable by TrackMate from a Pycellin model.
+    Write an XML file readable by TrackMate from a pycellin model.
 
     Parameters
     ----------
     model : Model
-        Pycellin model containing the data to write.
+        pycellin model containing the data to write.
     xml_path : str
         Path of the XML file to write.
     units : dict[str, str], optional
         Dictionary containing the spatial and temporal units of the model.
-        If not specified, the user will be asked to provide them.
+        If not specified, the user will be asked to provide them. Format is:
+        {"spatialunits": "your_unit", "temporalunits": "your_unit"}, e.g.
+        {"spatialunits": "pixel", "temporalunits": "sec"}.
     propagate_cycle_features : bool, optional
         If True, cycle features will be propagated to cell lineages before export.
         This is useful if you want to export the cycle features to TrackMate
@@ -803,7 +822,12 @@ if __name__ == "__main__":
 
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # print(model.feat_declaration)
-    model.remove_feature("VISIBILITY")
+    # model.remove_feature("VISIBILITY")
+
+    model.add_cycle_data()
+    model.propagate_cycle_features(
+        features=["cells"],
+    )
     # model.add_absolute_age()
     # model.add_relative_age(in_time_unit=True)
     # model.add_cell_displacement()
@@ -813,9 +837,9 @@ if __name__ == "__main__":
     #     node_hover_features=["cell_ID", "cell_x", "cell_y", "cell_z"],
     #     edge_hover_features=["link_x", "link_y", "link_z"],
     # )
-    print(model.feat_declaration)
+    # print(model.feat_declaration)
     export_TrackMate_XML(
         model, xml_out, {"spatialunits": "pixel", "temporalunits": "sec"}
     )
-    print()
-    print(model.feat_declaration)
+    # print()
+    # print(model.feat_declaration)

@@ -4,7 +4,7 @@
 
 def get_pycellin_cell_lineage_features() -> dict[str, str]:
     """
-    Return the Pycellin features that can be computed on cell lineages.
+    Return the pycellin features that can be computed on cell lineages.
 
     Returns
     -------
@@ -28,7 +28,7 @@ def get_pycellin_cell_lineage_features() -> dict[str, str]:
 
 def get_pycellin_cycle_lineage_features() -> dict[str, str]:
     """
-    Return the Pycellin features that can be computed on cycle lineages.
+    Return the pycellin features that can be computed on cycle lineages.
 
     Returns
     -------

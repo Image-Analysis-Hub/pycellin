@@ -39,7 +39,7 @@ class Feature:
         data_type : str
             The data type of the feature (int, float, string).
         provenance : str
-            The provenance of the feature (TrackMate, CTC, Pycellin, custom...).
+            The provenance of the feature (TrackMate, CTC, pycellin, custom...).
         unit : str, optional
             The unit of the feature (e.g. µm, min, cell).
 
@@ -194,7 +194,7 @@ class Feature:
             return self == other
 
 
-def frame_Feature(provenance: str = "Pycellin") -> Feature:
+def frame_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="frame",
         description="Frame number of the cell ",
@@ -207,7 +207,7 @@ def frame_Feature(provenance: str = "Pycellin") -> Feature:
     return feat
 
 
-def cell_ID_Feature(provenance: str = "Pycellin") -> Feature:
+def cell_ID_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="cell_ID",
         description="Unique identifier of the cell",
@@ -219,7 +219,7 @@ def cell_ID_Feature(provenance: str = "Pycellin") -> Feature:
     return feat
 
 
-def lineage_ID_Feature(provenance: str = "Pycellin") -> Feature:
+def lineage_ID_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="lineage_ID",
         description="Unique identifier of the lineage",
@@ -231,7 +231,7 @@ def lineage_ID_Feature(provenance: str = "Pycellin") -> Feature:
     return feat
 
 
-def cell_coord_Feature(unit: str, axis: str, provenance: str = "Pycellin") -> Feature:
+def cell_coord_Feature(unit: str, axis: str, provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name=f"cell_{axis}",
         description=f"{axis.upper()} coordinate of the cell",
@@ -244,7 +244,7 @@ def cell_coord_Feature(unit: str, axis: str, provenance: str = "Pycellin") -> Fe
     return feat
 
 
-def link_coord_Feature(unit: str, axis: str, provenance: str = "Pycellin") -> Feature:
+def link_coord_Feature(unit: str, axis: str, provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name=f"link_{axis}",
         description=(
@@ -261,7 +261,7 @@ def link_coord_Feature(unit: str, axis: str, provenance: str = "Pycellin") -> Fe
 
 
 def lineage_coord_Feature(
-    unit: str, axis: str, provenance: str = "Pycellin"
+    unit: str, axis: str, provenance: str = "pycellin"
 ) -> Feature:
     feat = Feature(
         name=f"lineage_{axis}",
@@ -278,7 +278,7 @@ def lineage_coord_Feature(
     return feat
 
 
-def cycle_ID_Feature(provenance: str = "Pycellin") -> Feature:
+def cycle_ID_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="cycle_ID",
         description=(
@@ -293,7 +293,7 @@ def cycle_ID_Feature(provenance: str = "Pycellin") -> Feature:
     return feat
 
 
-def cells_Feature(provenance: str = "Pycellin") -> Feature:
+def cells_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="cells",
         description="cell_IDs of the cells in the cell cycle, in chronological order",
@@ -305,7 +305,7 @@ def cells_Feature(provenance: str = "Pycellin") -> Feature:
     return feat
 
 
-def cycle_length_Feature(provenance: str = "Pycellin") -> Feature:
+def cycle_length_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="cycle_length",
         description="Number of cells in the cell cycle, minding gaps",
@@ -317,7 +317,7 @@ def cycle_length_Feature(provenance: str = "Pycellin") -> Feature:
     return feat
 
 
-def cycle_duration_Feature(provenance: str = "Pycellin") -> Feature:
+def cycle_duration_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="cycle_duration",
         description="Number of frames in the cell cycle, regardless of gaps",
@@ -330,7 +330,7 @@ def cycle_duration_Feature(provenance: str = "Pycellin") -> Feature:
     return feat
 
 
-def level_Feature(provenance: str = "Pycellin") -> Feature:
+def level_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="level",
         description=(

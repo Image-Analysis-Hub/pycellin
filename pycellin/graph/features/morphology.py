@@ -505,7 +505,7 @@ class CellLength(NodeLocalFeatureCalculator):
         )[1]
 
 
-# TODO: this is a feature that should not be in Pycellin, too many ways to define
+# TODO: this is a feature that should not be in pycellin, too many ways to define
 # the area increment. Since it is user dependent, I should put it in a notebook
 # as an example of custom feature.
 

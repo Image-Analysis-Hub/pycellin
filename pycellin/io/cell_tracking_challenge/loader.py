@@ -4,10 +4,10 @@
 """
 loader.py
 
-This module is part of the Pycellin package.
+This module is part of the pycellin package.
 
 This module provides functions to load and process Cell Tracking Challenge (CTC) files
-into Pycellin models. It includes a function to load a CTC file into Pycellin model
+into pycellin models. It includes a function to load a CTC file into pycellin model
 and helper functions to create metadata, features, and lineage graphs.
 
 References:
@@ -42,7 +42,7 @@ from pycellin.classes import CellLineage, Data, Model
 
 def _integrate_label_imgs_metadata(metadata: dict[str, Any], labels_path: str) -> None:
     """
-    Integrate metadata from label images into the Pycellin model metadata.
+    Integrate metadata from label images into the pycellin model metadata.
 
     This function extracts metadata from label images and integrates it
     into the provided metadata dictionary. Priority is given to the metadata
@@ -118,7 +118,7 @@ def _create_metadata(
     time_step: float | None = None,
 ) -> dict[str, Any]:
     """
-    Create a dictionary of basic Pycellin metadata for a given file.
+    Create a dictionary of basic pycellin metadata for a given file.
 
     Parameters
     ----------
@@ -203,7 +203,7 @@ def _create_metadata(
 
 def _create_FeaturesDeclaration(seg_data: bool) -> FeaturesDeclaration:
     """
-    Return a FeaturesDeclaration object populated with Pycellin basic features.
+    Return a FeaturesDeclaration object populated with pycellin basic features.
 
     Parameters
     ----------
@@ -418,9 +418,9 @@ def _integrate_seg_data(
     contours: list[list[Tuple[float, float]]],
 ) -> None:
     """
-    Integrate segmentation data into the Pycellin model.
+    Integrate segmentation data into the pycellin model.
 
-    This function updates the Pycellin model with segmentation data
+    This function updates the pycellin model with segmentation data
     for a specific frame. It identifies the graph nodes to update thanks to the
     frame and labels and adds the following attributes to each node:
     - the centroids as cell positions (cell_x, cell_y),
@@ -478,7 +478,7 @@ def load_CTC_file(
     time_step: float | None = None,
 ) -> Model:
     """
-    Create a Pycellin model out of a Cell Tracking Challenge (CTC) text file.
+    Create a pycellin model out of a Cell Tracking Challenge (CTC) text file.
 
     The CTC tracking format does not support fusion events and does not allow
     gaps right after division events.
@@ -489,7 +489,7 @@ def load_CTC_file(
     The label images names must end in '<frame_number>.tif' (e.g. 000.tif,
     02.tif, 0155.tif, etc.).
     For image metadata, priority is given to the img_metadata given by the user.
-    If not provided, Pycellin will try to extract the metadata from the label images.
+    If not provided, pycellin will try to extract the metadata from the label images.
     If it fails or if no label images are given, default values will be used.
 
     Parameters
@@ -523,7 +523,7 @@ def load_CTC_file(
     Returns
     -------
     Model
-        The created Pycellin model.
+        The created pycellin model.
     """
     graph = nx.DiGraph()
     current_node_id = 0

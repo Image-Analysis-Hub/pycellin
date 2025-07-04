@@ -4,10 +4,10 @@
 """
 exporter.py
 
-This module is part of the Pycellin package.
+This module is part of the pycellin package.
 
-This module provides functions to export Pycellin models to Cell Tracking Challenge
-(CTC) tracking files. It includes a function to export a Pycellin model to a CTC file
+This module provides functions to export pycellin models to Cell Tracking Challenge
+(CTC) tracking files. It includes a function to export a pycellin model to a CTC file
 and helper functions to build CTC tracks from a lineage.
 
 References:
@@ -221,7 +221,7 @@ def _add_parent_track(
         f"Node {track_info['B_node']} has more than 1 parent node "
         f"({len(parent_nodes)} nodes) in lineage of ID "
         f"{lineage.graph['lineage_ID']}. Incorrect lineage topology: "
-        f"Pycellin and CTC do not support fusion events."
+        f"pycellin and CTC do not support fusion events."
     )
     assert len(parent_nodes) <= 1, assert_msg
     if parent_nodes:

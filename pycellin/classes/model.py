@@ -980,7 +980,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "absolute_age",
             description="Age of the cell since the beginning of the lineage",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CellLineage",
             data_type="float" if in_time_unit else "int",
@@ -1012,7 +1012,7 @@ class Model:
             description=(
                 "Angle of the cell trajectory between two consecutive detections"
             ),
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="edge",
             lin_type="CellLineage",
             data_type="float",
@@ -1038,7 +1038,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "branch_mean_displacement",
             description="Mean displacement of the cell during the cell cycle",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="float",
@@ -1068,7 +1068,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "branch_mean_speed",
             description="Mean speed of the cell during the cell cycle",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="float",
@@ -1094,7 +1094,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "branch_total_displacement",
             description="Displacement of the cell during the cell cycle",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="float",
@@ -1124,7 +1124,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "cycle_completeness",
             description="Completeness of the cell cycle",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="bool",
@@ -1150,7 +1150,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "cell_displacement",
             description="Displacement of the cell between two consecutive detections",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="edge",
             lin_type="CellLineage",
             data_type="float",
@@ -1169,7 +1169,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "cell_length",
             description="Length of the cell",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CellLineage",
             data_type="float",
@@ -1209,7 +1209,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "cell_speed",
             description="Speed of the cell between two consecutive detections",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="edge",
             lin_type="CellLineage",
             data_type="float",
@@ -1236,7 +1236,7 @@ class Model:
             feat_type="node",
             lin_type="CellLineage",
             data_type="float",
-            provenance="Pycellin",
+            provenance="pycellin",
             unit=self.metadata["space_unit"],
         )
         calc = morpho.CellWidth(
@@ -1273,7 +1273,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "division_rate",
             description="Number of divisions per time unit",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="float",
@@ -1306,7 +1306,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "division_time",
             description="Time elapsed between the birth of a cell and its division",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="float" if in_time_unit else "int",
@@ -1340,7 +1340,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "relative_age",
             description="Age of the cell since the beginning of the current cell cycle",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CellLineage",
             data_type="float" if in_time_unit else "int",
@@ -1374,7 +1374,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "straightness",
             description="Straightness of the cell displacement",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="float",
@@ -1414,7 +1414,7 @@ class Model:
 
     def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:
         """
-        Add a single predefined Pycellin feature to the model.
+        Add a single predefined pycellin feature to the model.
 
         Parameters
         ----------
@@ -1429,7 +1429,7 @@ class Model:
         Raises
         ------
         KeyError
-            If the feature is not a predefined feature of Pycellin.
+            If the feature is not a predefined feature of pycellin.
         ValueError
             If the feature is a feature of cycle lineages and the cycle lineages
             have not been computed yet.
@@ -1438,7 +1438,7 @@ class Model:
         cycle_lin_feats = list(futils.get_pycellin_cycle_lineage_features().keys())
         if feature_name not in cell_lin_feats + cycle_lin_feats:
             raise KeyError(
-                f"Feature {feature_name} is not a predefined feature of Pycellin."
+                f"Feature {feature_name} is not a predefined feature of pycellin."
             )
         elif feature_name in cycle_lin_feats and not self.data.cycle_data:
             raise ValueError(
@@ -1450,7 +1450,7 @@ class Model:
 
     def add_pycellin_features(self, features_info: list[str | dict[str, Any]]) -> None:
         """
-        Add the specified predefined Pycellin features to the model.
+        Add the specified predefined pycellin features to the model.
 
         Parameters
         ----------
@@ -1847,7 +1847,7 @@ class Model:
         df = pd.concat(list_df, ignore_index=True)
         assert nb_nodes == len(df)
 
-        # Reoder the columns to have Pycellin mandatory features first.
+        # Reoder the columns to have pycellin mandatory features first.
         columns = df.columns.tolist()
         try:
             columns.remove("lineage_ID")
@@ -1892,7 +1892,7 @@ class Model:
         df = pd.concat(list_df, ignore_index=True)
         assert nb_edges == len(df)
 
-        # Reoder the columns to have Pycellin mandatory features first.
+        # Reoder the columns to have pycellin mandatory features first.
         columns = df.columns.tolist()
         try:
             columns.remove("lineage_ID")
@@ -1934,7 +1934,7 @@ class Model:
             list_df.append(tmp_df)
         df = pd.concat(list_df, ignore_index=True)
 
-        # Reoder the columns to have Pycellin mandatory features first.
+        # Reoder the columns to have pycellin mandatory features first.
         columns = df.columns.tolist()
         try:
             columns.remove("lineage_ID")
@@ -1985,7 +1985,7 @@ class Model:
         df = pd.concat(list_df, ignore_index=True)
         assert nb_nodes == len(df)
 
-        # Reoder the columns to have Pycellin mandatory features first.
+        # Reoder the columns to have pycellin mandatory features first.
         columns = df.columns.tolist()
         try:
             columns.remove("lineage_ID")
@@ -2020,7 +2020,7 @@ class Model:
     @staticmethod
     def load_from_pickle(path: str) -> None:
         """
-        Load a model from a pickled Pycellin file.
+        Load a model from a pickled pycellin file.
 
         Parameters
         ----------

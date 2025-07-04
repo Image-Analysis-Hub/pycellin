@@ -4,10 +4,10 @@
 """
 loader.py
 
-This module is part of the Pycellin package.
+This module is part of the pycellin package.
 
-This module provides functions to load and process trackpy data into Pycellin models.
-It includes a function to load a trackpy file into Pycellin model and helper functions
+This module provides functions to load and process trackpy data into pycellin models.
+It includes a function to load a trackpy file into pycellin model and helper functions
 to create metadata, features, and lineage graphs.
 
 References:
@@ -119,7 +119,7 @@ def _create_metadata(
     time_step: float | None = None,
 ) -> dict[str, Any]:
     """
-    Create a dictionary of basic Pycellin metadata for a given file.
+    Create a dictionary of basic pycellin metadata for a given file.
 
     Parameters
     ----------
@@ -202,7 +202,7 @@ def _create_FeaturesDeclaration(
     Returns
     -------
     FeaturesDeclaration
-        An instance of FeaturesDeclaration populated with Pycellin and trackpy features.
+        An instance of FeaturesDeclaration populated with pycellin and trackpy features.
     """
     fd = FeaturesDeclaration()
 
@@ -236,7 +236,7 @@ def load_trackpy_dataframe(
     time_step: float | None = None,
 ) -> Model:
     """
-    Load a trackpy DataFrame into a Pycellin model.
+    Load a trackpy DataFrame into a pycellin model.
 
     Parameters
     ----------
@@ -246,7 +246,7 @@ def load_trackpy_dataframe(
     Returns
     -------
     Model
-        A Pycellin model populated with the trackpy data.
+        A pycellin model populated with the trackpy data.
     """
     # Build the lineages.
     graph = nx.DiGraph()
@@ -259,7 +259,7 @@ def load_trackpy_dataframe(
     data = _split_into_lineages(graph)
     del graph  # # Redondant with the subgraphs.
 
-    # Create a Pycellin model.
+    # Create a pycellin model.
     md = _create_metadata(
         space_unit, pixel_width, pixel_height, pixel_depth, time_unit, time_step
     )
