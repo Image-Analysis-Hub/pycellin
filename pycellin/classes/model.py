@@ -17,7 +17,7 @@ from pycellin.classes import (
     FeaturesDeclaration,
 )
 from pycellin.classes.lineage import Lineage
-from pycellin.classes.exceptions import FusionError, UpdateRequiredError
+from pycellin.classes.exceptions import FusionError
 from pycellin.classes.feature_calculator import FeatureCalculator
 from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features.tracking as tracking
