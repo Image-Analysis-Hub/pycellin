@@ -535,7 +535,7 @@ def _prepare_model_for_export(
     Warns
     -----
     UserWarning
-        If a feature is not numeric and will not be exported to TrackMate.
+        If some features are not numeric and will not be exported to TrackMate.
         This is the case for features with string, list, or other non-numeric
         values that TrackMate cannot handle.
     """
@@ -696,15 +696,20 @@ def _prepare_model_for_export(
                 "real",
                 "rational",
             ]
+            removed_feats = []
             if feat.data_type.lower() not in valid_dtype:
                 try:
                     model.remove_feature(name)
                 except ProtectedFeatureError:
                     model.feat_declaration._unprotect_feature(name)
                     model.remove_feature(name)
+                removed_feats.append(name)
+            if removed_feats:
+                plural = True if len(removed_feats) > 1 else False
                 msg = (
-                    f"Ignoring feature '{name}'. It is not numeric and won't be "
-                    f"supported by TrackMate."
+                    f"Ignoring feature{'s' if plural else ''} "
+                    f"{', '.join(removed_feats)}. {'They are' if plural else 'It is'} "
+                    f"not numeric and won't be supported by TrackMate."
                 )
                 warnings.warn(msg)
 
