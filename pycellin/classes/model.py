@@ -1544,6 +1544,7 @@ class Model:
         self.feat_declaration.feats_dict.pop(feature_name)
 
         # ... we remove the feature values...
+        # FIXME: does not remove features that were propagated from cycle lineages
         if lineage_type == "CellLineage":
             lineage_data = self.data.cell_data
         elif lineage_type == "CycleLineage" and self.data.cycle_data:
