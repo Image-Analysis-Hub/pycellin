@@ -728,6 +728,7 @@ def export_TrackMate_XML(
     model: Model,
     xml_path: str,
     units: dict[str, str] | None = None,
+    propagate_cycle_features: bool = False,
 ) -> None:
     """
     Write an XML file readable by TrackMate from a Pycellin model.
@@ -741,9 +742,25 @@ def export_TrackMate_XML(
     units : dict[str, str], optional
         Dictionary containing the spatial and temporal units of the model.
         If not specified, the user will be asked to provide them.
+    propagate_cycle_features : bool, optional
+        If True, cycle features will be propagated to cell lineages before export.
+        This is useful if you want to export the cycle features to TrackMate
+        and have them accessible in the tracks. Default is False.
+
+    Warnings
+    --------
+    Quantitative analysis of cell cycle features should not be done on cell
+    lineages after propagation of cycle features, UNLESS you account for cell
+    cycle length. Otherwise you will introduce a bias in your quantification.
+    Indeed, after propagation, cycle features (like division time) become
+    over-represented in long cell cycles since these features are propagated on each
+    node of the cell cycle in cell lineages, whereas they are stored only once
+    per cell cycle on the cycle node in cycle lineages.
     """
     # We don't want to modify the original model.
     model_copy = copy.deepcopy(model)
+    if propagate_cycle_features:
+        model_copy.propagate_cycle_features()
 
     if not units:
         units = _ask_units(model_copy.feat_declaration)
