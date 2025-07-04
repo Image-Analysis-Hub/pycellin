@@ -7,11 +7,10 @@ directly from TrackMate.
 I've tested quickly and it doesn't seem to be a problem for TrackMate.
 """
 
-from collections.abc import Iterable
 import copy
 import math
 import numbers
-from typing import Any, Union
+from typing import Any
 import warnings
 
 from lxml import etree as ET
@@ -295,7 +294,7 @@ def _write_FeatureDeclarations(
 
 
 def _value_to_str(
-    value: Union[int, float, str],
+    value: Any,
 ) -> str:
     """
     Convert a value to its associated string.
@@ -306,23 +305,14 @@ def _value_to_str(
 
     Parameters
     ----------
-    value : Union[int, float, str]
+    value : Any
         Value to convert to string.
-
-    Warnings
-    --------
-    Appart from its classic features, TrackMate is only able to read features
-    with numeric values. So pycellin predefined features like the cycle feature
-    "cells", or custom features with string, list... values, will not be
-    exported to TrackMate format. If you want to export such features, you will
-    need to convert them to a string that can be parsed as a number by Java.
 
     Returns
     -------
     str
         The string equivalent of `value`.
     """
-    # FIXME: TrackMate only supports numeric values.
     if isinstance(value, bool):
         return "1" if value else "0"
     elif isinstance(value, numbers.Number):
@@ -337,10 +327,6 @@ def _value_to_str(
             return str(value)
     elif isinstance(value, str):
         return value
-    elif isinstance(value, Iterable):
-        # If the value is an iterable, we convert it to a string
-        # by joining its elements with a space.
-        return " ".join(map(str, value))
     else:
         return str(value)
 
