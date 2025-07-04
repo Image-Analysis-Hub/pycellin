@@ -300,7 +300,7 @@ def cells_Feature(provenance: str = "pycellin") -> Feature:
         provenance=provenance,
         feat_type="node",
         lin_type="CycleLineage",
-        data_type="int",
+        data_type="list[int]",
     )
     return feat
 
