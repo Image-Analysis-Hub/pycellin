@@ -17,6 +17,7 @@ import warnings
 from lxml import etree as ET
 import networkx as nx
 
+from pycellin.classes.exceptions import ProtectedFeatureError
 from pycellin.classes.model import Model
 from pycellin.classes.feature import FeaturesDeclaration, Feature
 from pycellin.classes.lineage import CellLineage
@@ -38,6 +39,11 @@ def _unit_to_dimension(
     -------
     str
         Dimension corresponding to the unit.
+
+    Warns
+    -----
+    UserWarning
+        If the unit is not recognized or if the feature is not recognized.
     """
     # TODO: finish this function and try to make it less nightmarish
     unit = feat.unit
@@ -539,7 +545,16 @@ def _prepare_model_for_export(
     ------
     KeyError
         If a mandatory feature is missing in the model.
+
+    Warns
+    -----
+    UserWarning
+        If a feature is not numeric and will not be exported to TrackMate.
+        This is the case for features with string, list, or other non-numeric
+        values that TrackMate cannot handle.
     """
+    # TODO: refactor, this function is far too long and do too much stuff.
+
     # Update of the features declaration.
     fd = model.feat_declaration
     fd._unprotect_feature("lineage_ID")
@@ -678,8 +693,34 @@ def _prepare_model_for_export(
             except KeyError:
                 pass  # Not a mandatory feature.
 
-    # Removal of non numeric features, not supported by TrackMate.
-    for feat in model.feat_declaration.values():
+    # Removal of non numeric features since they are not supported by TrackMate.
+    for name, feat in model.get_features().items():
+        if feat.provenance != "TrackMate":
+            valid_dtype = [
+                "int",
+                "integer",
+                "float",
+                "complex",
+                "bool",
+                "boolean",
+                "fraction",
+                "decimal",
+                "number",
+                "numeric",
+                "real",
+                "rational",
+            ]
+            if feat.data_type.lower() not in valid_dtype:
+                try:
+                    model.remove_feature(name)
+                except ProtectedFeatureError:
+                    model.feat_declaration._unprotect_feature(name)
+                    model.remove_feature(name)
+                msg = (
+                    f"Ignoring feature '{name}'. It is not numeric and won't be "
+                    f"supported by TrackMate."
+                )
+                warnings.warn(msg)
 
 
 def _write_metadata_tag(
