@@ -17,7 +17,7 @@ from pycellin.classes import (
     FeaturesDeclaration,
 )
 from pycellin.classes.lineage import Lineage
-from pycellin.classes.exceptions import FusionError
+from pycellin.classes.exceptions import FusionError, ProtectedFeatureError
 from pycellin.classes.feature_calculator import FeatureCalculator
 from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features.tracking as tracking
@@ -1527,17 +1527,16 @@ class Model:
         ------
         ValueError
             If the feature does not exist.
+        ProtectedFeatureError
+            If the feature is a protected feature.
         """
-        # TODO: stop the user from removing mandatory features? With a force argument
-        # set to False to bypass the check?
-        # Or create a list of protected features so people can decide to add some of
-        # their own features to it?
-
         # Preliminary checks.
         if not self.feat_declaration._has_feature(feature_name):
             raise ValueError(
                 f"There is no feature {feature_name} in the declared features."
             )
+        if feature_name in self.feat_declaration._get_protected_features():
+            raise ProtectedFeatureError(feature_name)
 
         # First we update the FeaturesDeclaration...
         feature_type = self.feat_declaration.feats_dict[feature_name].feat_type
@@ -1792,7 +1791,7 @@ class Model:
         lineages after propagation of cycle features, UNLESS you account for cell
         cycle length. Otherwise you will introduce a bias in your quantification.
         Indeed, after propagation, cycle features (like division time) become
-        overrepresented in long cell cycles since these features are propagated on each
+        over-represented in long cell cycles since these features are propagated on each
         node of the cell cycle in cell lineages, whereas they are stored only once
         per cell cycle on the cycle node in cycle lineages.
         """

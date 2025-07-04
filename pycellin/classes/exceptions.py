@@ -126,3 +126,26 @@ class UpdateRequiredError(Exception):
         if message is None:
             message = "An update is required before performing this operation."
         super().__init__(message)
+
+
+class ProtectedFeatureError(Exception):
+    """
+    Raised when trying to modify or delete a protected feature.
+
+    Parameters
+    ----------
+    feature_name : str
+        The name of the feature that is protected.
+    message : str, optional
+        The error message to display.
+        If not provided, a default message is displayed.
+    """
+
+    def __init__(self, feat_name: str, message: str | None = None):
+        self.feature_name = feat_name
+        if message is None:
+            message = (
+                f"The feature '{feat_name}' is protected and cannot be modified "
+                f"nor removed."
+            )
+        super().__init__(message)
