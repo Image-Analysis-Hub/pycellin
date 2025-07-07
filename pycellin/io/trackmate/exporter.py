@@ -781,7 +781,7 @@ def export_TrackMate_XML(
     xml_path: str,
     units: dict[str, str] | None = None,
     propagate_cycle_features: bool = False,
-) -> None:
+) -> Model:
     """
     Write an XML file readable by TrackMate from a pycellin model.
 
@@ -798,8 +798,15 @@ def export_TrackMate_XML(
         {"spatialunits": "pixel", "temporalunits": "sec"}.
     propagate_cycle_features : bool, optional
         If True, cycle features will be propagated to cell lineages before export.
-        This is useful if you want to export the cycle features to TrackMate
+        Useful if you want to export the cycle features to TrackMate
         and have them accessible in the tracks. Default is False.
+
+    Returns
+    -------
+    model_copy : Model
+        The model as it was exported, including all the modifications done by the
+        exporter (removal of incompatible features, propagation of cycle features...).
+        This is a copy of the original model, so the original model is not modified.
 
     Warnings
     --------
@@ -843,7 +850,7 @@ def export_TrackMate_XML(
                     xf.write("\n")
                 else:
                     xf.write("\n  ")
-    del model_copy
+    return model_copy
 
 
 if __name__ == "__main__":
