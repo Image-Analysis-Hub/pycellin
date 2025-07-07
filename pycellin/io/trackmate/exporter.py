@@ -284,10 +284,15 @@ def _convert_feature(
     """
     trackmate_feat = {}
     trackmate_feat["feature"] = feat.name
-    # TrackMate uses the `name` attribute as the display name of the feature in the GUI.
-    # So we need to convert the name to a more user-friendly format.
-    trackmate_feat["name"] = _transform_name(feat.name)
-    trackmate_feat["shortname"] = feat.name.lower()
+    # TrackMate uses in the GUI the following attributes:
+    # - `name` as the display name of the feature for filtering and plotting
+    # - `shortname` as the display name of the feature in the nodes, edges and
+    # tracks tables
+    # So we need to convert the name to a more user-friendly format that is close
+    # to what TrackMate is using.
+    new_name = _transform_name(feat.name)
+    trackmate_feat["name"] = new_name
+    trackmate_feat["shortname"] = new_name
     trackmate_feat["dimension"] = _unit_to_dimension(feat)
     if feat.data_type == "int":
         trackmate_feat["isint"] = "true"
