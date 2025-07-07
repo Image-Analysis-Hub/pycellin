@@ -17,7 +17,7 @@ class Feature:
         name: str,
         description: str,
         provenance: str,
-        feat_type: str,
+        feat_type: FeatureType,
         lin_type: LineageType,
         data_type: str,
         unit: str | None = None,
@@ -31,31 +31,35 @@ class Feature:
             The name of the feature.
         description : str
             A description of the feature.
-        feat_type : str
-            The type of the feature (node, edge, lineage, or a combination of the 3).
-        lin_type : LineageType
-            The type of lineage the feature is associated with: cell lineage,
-            cell cycle lineage or both.
-        data_type : str
-            The data type of the feature (int, float, string).
         provenance : str
             The provenance of the feature (TrackMate, CTC, pycellin, custom...).
+        feat_type : FeatureType
+            The type of the feature: `node`, `edge` or `lineage.
+        lin_type : LineageType
+            The type of lineage the feature is associated with: `CellLineage`,
+            `CycleLineage`, or `Lineage` for both.
+        data_type : str
+            The data type of the feature (int, float, string).
         unit : str, optional
             The unit of the feature (e.g. µm, min, cell).
 
         Raises
         ------
         ValueError
-            If the lineage type is not a valid value.
+            If the feature type or the lineage type is not a valid value.
         """
         self.name = name
         self.description = description
+        self.provenance = provenance
+        if not check_literal_type(feat_type, FeatureType):
+            raise ValueError(
+                f"Feature type must be one of {', '.join(get_args(FeatureType))}."
+            )
+        self.feat_type = feat_type
         if not check_literal_type(lin_type, LineageType):
             raise ValueError(
-                f"Feature type must be one of {', '.join(get_args(LineageType))}."
+                f"Lineage type must be one of {', '.join(get_args(LineageType))}."
             )
-        self.provenance = provenance
-        self.feat_type = feat_type
         self.lin_type = lin_type
         self.data_type = data_type
         self.unit = unit
