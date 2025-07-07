@@ -1787,6 +1787,12 @@ class Model:
             self.update()
         node_feats, edge_feats, lin_feats = self._categorize_features(features)
 
+        # Update the features declaration: now the feature type is `Lineage`
+        # instead of just `CycleLineage` since the features are now present on cycle
+        # AND cell lineages.
+        for feat in node_feats + edge_feats + lin_feats:
+            self.feat_declaration.feats_dict[feat].lin_type = "Lineage"
+
         # Actual propagation.
         for lin_ID in self.data.cell_data:
             lin = self.data.cell_data[lin_ID]
