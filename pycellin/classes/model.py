@@ -1544,42 +1544,24 @@ class Model:
         self.feat_declaration.feats_dict.pop(feature_name)
 
         # ... we remove the feature values...
-        # FIXME: does not remove features that were propagated from cycle lineages
-        if lineage_type == "CellLineage":
-            lineage_data = self.data.cell_data
-        elif lineage_type == "CycleLineage" and self.data.cycle_data:
-            lineage_data = self.data.cycle_data
-        else:
-            raise ValueError(
-                "Lineage type not recognized. Must be 'CellLineage' or 'CycleLineage'."
-            )
-        match feature_type:
-            case "node":
-                for lin in lineage_data.values():
-                    for _, data in lin.nodes(data=True):
-                        try:
-                            del data[feature_name]
-                        except KeyError:
-                            # No feature doesn't mean there is something wrong,
-                            # maybe no update were done.
-                            pass
-            case "edge":
-                for lin in lineage_data.values():
-                    for _, _, data in lin.edges(data=True):
-                        try:
-                            del data[feature_name]
-                        except KeyError:
-                            # No feature doesn't mean there is something wrong,
-                            # maybe no update were done.
-                            pass
-            case "lineage":
-                for lin in lineage_data.values():
-                    try:
-                        del lin.graph[feature_name]
-                    except KeyError:
-                        # No feature doesn't mean there is something wrong,
-                        # maybe no update were done.
-                        pass
+        match lineage_type:
+            case "CellLineage":
+                for lin in self.data.cell_data.values():
+                    lin._remove_feature(feature_name, feature_type)
+            case "CycleLineage" if self.data.cycle_data:
+                for clin in self.data.cycle_data.values():
+                    clin._remove_feature(feature_name, feature_type)
+            case "Lineage":
+                for lin in self.data.cell_data.values():
+                    lin._remove_feature(feature_name, feature_type)
+                if self.data.cycle_data:
+                    for clin in self.data.cycle_data.values():
+                        clin._remove_feature(feature_name, feature_type)
+            case _:
+                raise ValueError(
+                    "Lineage type not recognized. Must be 'CellLineage', 'CycleLineage'"
+                    "or 'Lineage'."
+                )
 
         # ... and finally we update the updater.
         try:
