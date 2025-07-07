@@ -512,25 +512,110 @@ def _write_FilteredTracks(
     xf.write(f"\n{' '*2}")
 
 
-def _prepare_model_for_export(
-    model: Model,
-) -> None:
+def _update_nodes(lineage: CellLineage) -> None:
     """
-    Prepare a pycellin model for export to TrackMate format.
+    Update the node features in the lineage to match TrackMate requirements.
 
-    Some pycellin features are a bit different from TrackMate features
-    and need to be modified or deleted. For example, "lineage_ID" in pycellin
-    is "TRACK_ID" in TrackMate.
+    Parameters
+    ----------
+    lineage : CellLineage
+        Lineage whose nodes to update.
+    """
+    for _, data in lineage.nodes(data=True):
+        data["ID"] = data.pop("cell_ID")
+        data["FRAME"] = data.pop("frame")
+        data["VISIBILITY"] = 1
+        try:
+            data["name"] = data.pop("cell_name")
+        except KeyError:
+            pass  # Not a mandatory feature.
+        # Position features.
+        for axis in ["X", "Y", "Z"]:
+            try:
+                data[f"POSITION_{axis}"] = data.pop(f"cell_{axis.lower()}")
+            except KeyError:
+                # This feature is mandatory in TrackMate for x, y and z dimensions.
+                if axis in ["X", "Y"]:
+                    raise KeyError(
+                        f"A mandatory TrackMate feature is missing: "
+                        f"POSITION_{axis}."
+                    )
+                else:
+                    # We add the missing z dimension.
+                    data[f"POSITION_{axis}"] = 0.0
+
+
+def _update_edges(lineage: CellLineage) -> None:
+    """
+    Update the edge features in the lineage to match TrackMate requirements.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        Lineage whose edges to update.
+    """
+    for source_node, target_node, data in lineage.edges(data=True):
+        # Mandatory TrackMate features.
+        if "SPOT_SOURCE_ID" not in data:
+            data["SPOT_SOURCE_ID"] = source_node
+        if "SPOT_TARGET_ID" not in data:
+            data["SPOT_TARGET_ID"] = target_node
+        # Position features.
+        for axis in ["X", "Y", "Z"]:
+            try:
+                data[f"EDGE_{axis}_LOCATION"] = data.pop(f"link_{axis.lower()}")
+            except KeyError:
+                pass  # Not a mandatory feature.
+
+
+def _update_lineages(lineage: CellLineage) -> None:
+    """
+    Update the lineage features to match TrackMate requirements.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        Lineage whose graph to update.
+    """
+    # Mandatory TrackMate feature.
+    lineage.graph["TRACK_ID"] = lineage.graph.pop("lineage_ID")
+    try:
+        lineage.graph["name"] = lineage.graph.pop("lineage_name")
+    except KeyError:
+        pass  # Not a mandatory feature.
+    # Position features.
+    for axis in ["X", "Y", "Z"]:
+        try:
+            lineage.graph[f"TRACK_{axis}_LOCATION"] = lineage.graph.pop(
+                f"lineage_{axis.lower()}"
+            )
+        except KeyError:
+            pass  # Not a mandatory feature.
+
+
+def _update_model_data(model: Model) -> None:
+    """
+    Update the data in the model to match TrackMate requirements.
 
     Parameters
     ----------
     model : Model
-        Model to prepare for export.
+        Model whose data to update.
+    """
+    for lin in model.data.cell_data.values():
+        _update_nodes(lin)
+        _update_edges(lin)
+        _update_lineages(lin)
 
-    Raises
-    ------
-    KeyError
-        If a mandatory feature is missing in the model.
+
+def _remove_non_numeric_features(model: Model) -> None:
+    """
+    Completely remove non-numeric features from the model.
+
+    Parameters
+    ----------
+    model : Model
+        Model to modify.
 
     Warns
     -----
@@ -538,25 +623,101 @@ def _prepare_model_for_export(
         If some features are not numeric and will not be exported to TrackMate.
         This is the case for features with string, list, or other non-numeric
         values that TrackMate cannot handle.
-    """
-    # TODO: refactor, this function is far too long and do too much stuff.
 
-    # Update of the features declaration.
-    fd = model.feat_declaration
+    Notes
+    -----
+    This is necessary because TrackMate does not support non-numeric features.
+    Boolean features are considered numeric and are converted to integers
+    (1 for True, 0 for False).
+    """
+    valid_dtype = [
+        "int",
+        "integer",
+        "float",
+        "complex",
+        "bool",
+        "boolean",
+        "fraction",
+        "decimal",
+        "number",
+        "numeric",
+        "real",
+        "rational",
+    ]
+    to_remove = [
+        name
+        for name, feat in model.get_features().items()
+        if feat.provenance != "TrackMate" and feat.data_type.lower() not in valid_dtype
+    ]
+    if to_remove:
+        for name in to_remove:
+            try:
+                model.remove_feature(name)
+            except ProtectedFeatureError:
+                model.feat_declaration._unprotect_feature(name)
+                model.remove_feature(name)
+        plural = True if len(to_remove) > 1 else False
+        msg = (
+            f"Ignoring feature{'s' if plural else ''} "
+            f"{', '.join(to_remove)}. {'They are' if plural else 'It is'} "
+            f"not numeric and won't be supported by TrackMate."
+        )
+        warnings.warn(msg)
+
+
+def _rename_features(fd: FeaturesDeclaration) -> None:
+    """
+    Rename some features in the feature declaration to match TrackMate requirements.
+
+    Parameters
+    ----------
+    fd : FeaturesDeclaration
+        Feature declaration to modify.
+    """
     fd._unprotect_feature("lineage_ID")
     fd._rename_feature("lineage_ID", "TRACK_ID")
     fd._modify_feature_description("TRACK_ID", "Track ID")
     fd._unprotect_feature("frame")
     fd._rename_feature("frame", "FRAME")
+
+
+def _remove_features(fd: FeaturesDeclaration) -> None:
+    """
+    Remove some features from the feature declaration.
+
+    Parameters
+    ----------
+    fd : FeaturesDeclaration
+        Feature declaration to modify.
+
+    Notes
+    -----
+    While TrackMate has these features (maybe under a different name but in that
+    case renaming comes later), they are absent from the FeatureDeclarations tag
+    in the TrackMate XML file.
+    """
     fd._unprotect_feature("cell_ID")
     fd._remove_feature("cell_ID")
     for feature in ["cell_name", "lineage_name", "FilteredTrack", "ROI_coords"]:
         try:
             fd._remove_feature(feature)
         except KeyError:
-            # This feature is a classic TrackMate feature but not mandatory.
+            # Classic TrackMate feature but not mandatory.
             pass
-    # Some features don't necessarily exist in pycellin but are mandatory in TrackMate.
+
+
+def _add_mandatory_features(fd: FeaturesDeclaration) -> None:
+    """
+    Add mandatory features to the feature declaration.
+
+    This is necessary because TrackMate requires some features to be present
+    in the model, even if they are not used in pycellin.
+
+    Parameters
+    ----------
+    fd : FeaturesDeclaration
+        Feature declaration to modify.
+    """
     if not fd._has_feature("SPOT_SOURCE_ID"):
         source_feat = Feature(
             name="SPOT_SOURCE_ID",
@@ -591,7 +752,24 @@ def _prepare_model_for_export(
         )
         fd._add_feature(visibility_feat)
 
-    # Location related features.
+
+def _update_location_features(fd: FeaturesDeclaration) -> None:
+    """
+    Update location features in the feature declaration to match TrackMate requirements.
+
+    This function renames the cell_x, cell_y, cell_z, link_x, link_y, link_z,
+    lineage_x, lineage_y, and lineage_z features to their TrackMate equivalents.
+
+    Parameters
+    ----------
+    fd : FeaturesDeclaration
+        Feature declaration to modify.
+
+    Raises
+    ------
+    KeyError
+        If a mandatory feature is missing in the feature declaration.
+    """
     for axis in ["x", "y", "z"]:
         try:
             fd._rename_feature(f"cell_{axis}", f"POSITION_{axis.upper()}")
@@ -624,95 +802,41 @@ def _prepare_model_for_export(
         except KeyError:
             pass  # Not a mandatory feature.
 
-    # Update of the data.
-    for lin in model.data.cell_data.values():
-        # Nodes.
-        for _, data in lin.nodes(data=True):
-            data["ID"] = data.pop("cell_ID")
-            data["FRAME"] = data.pop("frame")
-            data["VISIBILITY"] = 1
-            try:
-                data["name"] = data.pop("cell_name")
-            except KeyError:
-                pass  # Not a mandatory feature.
-            # Position features.
-            for axis in ["X", "Y", "Z"]:
-                try:
-                    data[f"POSITION_{axis}"] = data.pop(f"cell_{axis.lower()}")
-                except KeyError:
-                    # This feature is mandatory in TrackMate for x, y and z dimensions.
-                    if axis in ["X", "Y"]:
-                        raise KeyError(
-                            f"A mandatory TrackMate feature is missing: "
-                            f"POSITION_{axis}."
-                        )
-                    else:
-                        # We add the missing z dimension.
-                        data[f"POSITION_{axis}"] = 0.0
 
-        # Edges.
-        for source_node, target_node, data in lin.edges(data=True):
-            # Mandatory TrackMate features.
-            if "SPOT_SOURCE_ID" not in data:
-                data["SPOT_SOURCE_ID"] = source_node
-            if "SPOT_TARGET_ID" not in data:
-                data["SPOT_TARGET_ID"] = target_node
-            # Position features.
-            for axis in ["X", "Y", "Z"]:
-                try:
-                    data[f"EDGE_{axis}_LOCATION"] = data.pop(f"link_{axis.lower()}")
-                except KeyError:
-                    pass  # Not a mandatory feature.
+def _update_feature_declarations(model: Model) -> None:
+    """
+    Update the feature declarations in the model to match TrackMate requirements.
 
-        # Lineages.
-        lin.graph["TRACK_ID"] = lin.graph.pop("lineage_ID")
-        try:
-            lin.graph["name"] = lin.graph.pop("lineage_name")
-        except KeyError:
-            pass  # Not a mandatory feature.
-        # Position features.
-        for axis in ["X", "Y", "Z"]:
-            try:
-                lin.graph[f"TRACK_{axis}_LOCATION"] = lin.graph.pop(
-                    f"lineage_{axis.lower()}"
-                )
-            except KeyError:
-                pass  # Not a mandatory feature.
 
-    # Removal of non numeric features since they are not supported by TrackMate.
-    valid_dtype = [
-        "int",
-        "integer",
-        "float",
-        "complex",
-        "bool",
-        "boolean",
-        "fraction",
-        "decimal",
-        "number",
-        "numeric",
-        "real",
-        "rational",
-    ]
-    to_remove = [
-        name
-        for name, feat in model.get_features().items()
-        if feat.provenance != "TrackMate" and feat.data_type.lower() not in valid_dtype
-    ]
-    if to_remove:
-        for name in to_remove:
-            try:
-                model.remove_feature(name)
-            except ProtectedFeatureError:
-                model.feat_declaration._unprotect_feature(name)
-                model.remove_feature(name)
-        plural = True if len(to_remove) > 1 else False
-        msg = (
-            f"Ignoring feature{'s' if plural else ''} "
-            f"{', '.join(to_remove)}. {'They are' if plural else 'It is'} "
-            f"not numeric and won't be supported by TrackMate."
-        )
-        warnings.warn(msg)
+    Parameters
+    ----------
+    model : Model
+        Model whose feature declarations to update.
+    """
+    fd = model.feat_declaration
+    _rename_features(fd)
+    _remove_features(fd)
+    _add_mandatory_features(fd)
+    _update_location_features(fd)
+
+
+def _prepare_model_for_export(
+    model: Model,
+) -> None:
+    """
+    Prepare a pycellin model for export to TrackMate format.
+
+    This function updates the model to match TrackMate requirements
+    and removes non-numeric features that TrackMate cannot handle.
+
+    Parameters
+    ----------
+    model : Model
+        Model to prepare for export.
+    """
+    _update_feature_declarations(model)
+    _update_model_data(model)
+    _remove_non_numeric_features(model)
 
 
 def _write_metadata_tag(
