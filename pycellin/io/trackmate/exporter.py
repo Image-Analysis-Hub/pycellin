@@ -10,6 +10,7 @@ I've tested quickly and it doesn't seem to be a problem for TrackMate.
 import copy
 import math
 import numbers
+import re
 from typing import Any
 import warnings
 
@@ -138,13 +139,18 @@ def _unit_to_dimension(
         "cell_speed": "VELOCITY",
         "cell_width": "LENGTH",
         # Cycle features.
+        "branch_total_displacement": "LENGTH",
+        "branch_mean_displacement": "LENGTH",
+        "branch_mean_speed": "VELOCITY",
         "cells": "NONE",
+        "cycle_completeness": "NONE",
         "cycle_duration": "NONE",
         "cycle_ID": "NONE",
         "cycle_length": "NONE",
         "division_time": "TIME",
         "division_rate": "TIME",  # TODO: check if this is correct
         "level": "NONE",
+        "straightness": "NONE",
     }
     if name == "absolute_age":
         if unit == "frame":
@@ -219,6 +225,47 @@ def _unit_to_dimension(
     return dimension
 
 
+def _transform_name(name: str) -> str:
+    """
+    Transform a feature name to a more user-friendly format, close to TrackMate's.
+
+    Parameters
+    ----------
+    name : str
+        Name of the feature to transform.
+
+    Returns
+    -------
+    str
+        The transformed name.
+
+    Notes
+    -----
+    The transformation consists in:
+    - replacing underscores by spaces,
+    - lowercasing the words, except for some exceptions,
+    - capitalizing the first letter of the name,
+    - handling specific cases for positions.
+    """
+    if name in ["POSITION_X", "POSITION_Y", "POSITION_Z", "POSITION_T"]:
+        new_name = name[-1]
+    elif name in ["EDGE_X_LOCATION", "EDGE_Y_LOCATION", "EDGE_Z_LOCATION"]:
+        new_name = "Edge " + name.split("_")[1]
+    elif name in ["TRACK_X_LOCATION", "TRACK_Y_LOCATION", "TRACK_Z_LOCATION"]:
+        new_name = "Track mean " + name.split("_")[1]
+    else:
+        exceptions = {"X", "Y", "Z", "T", "ID", "SNR"}
+        name = name.replace("_", " ")
+
+        def transform_word(match):
+            word = match.group(0)
+            return word if word in exceptions else word.lower()
+
+        new_name = re.sub(r"\b\w+\b", transform_word, name)
+        new_name = new_name[0].upper() + new_name[1:]
+    return new_name
+
+
 def _convert_feature(
     feat: Feature,
 ) -> dict[str, str]:
@@ -237,7 +284,9 @@ def _convert_feature(
     """
     trackmate_feat = {}
     trackmate_feat["feature"] = feat.name
-    trackmate_feat["name"] = feat.description
+    # TrackMate uses the `name` attribute as the display name of the feature in the GUI.
+    # So we need to convert the name to a more user-friendly format.
+    trackmate_feat["name"] = _transform_name(feat.name)
     trackmate_feat["shortname"] = feat.name.lower()
     trackmate_feat["dimension"] = _unit_to_dimension(feat)
     if feat.data_type == "int":
