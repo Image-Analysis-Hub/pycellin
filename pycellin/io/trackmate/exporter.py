@@ -703,11 +703,9 @@ def _prepare_model_for_export(
         for name in to_remove:
             try:
                 model.remove_feature(name)
-                print(name, "in try")
             except ProtectedFeatureError:
                 model.feat_declaration._unprotect_feature(name)
                 model.remove_feature(name)
-                print(name, "in except")
         plural = True if len(to_remove) > 1 else False
         msg = (
             f"Ignoring feature{'s' if plural else ''} "
