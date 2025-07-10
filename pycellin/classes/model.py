@@ -213,7 +213,8 @@ class Model:
         Parameters
         ----------
         include_Lineage_feats : bool, optional
-            True to include the Lineage features, False otherwise (default is True).
+            True to return Lineage features along with CellLineage ones,
+            False to only return CellLineage features (default is True).
 
         Returns
         -------
@@ -235,7 +236,8 @@ class Model:
         Parameters
         ----------
         include_Lineage_feats : bool, optional
-            True to include the Lineage features, False otherwise (default is True).
+            True to return Lineage features along with CycleLineage ones,
+            False to only return CycleLineage features (default is True).
 
         Returns
         -------
@@ -565,6 +567,12 @@ class Model:
         -------
         int
             The ID of the added lineage.
+
+        Warns
+        -----
+        UserWarning
+            If `with_CycleLineage` is True but the cycle data has not been added yet.
+            In this case, the cycle lineage cannot be computed.
         """
         if lineage is None:
             if lineage_ID is None:
@@ -576,7 +584,6 @@ class Model:
         self.data.cell_data[lineage_ID] = lineage
 
         if with_CycleLineage:
-            cycle_lineage = self.data._compute_cycle_lineage(lineage_ID)
             if self.data.cycle_data is None:
                 msg = (
                     f"Cannot add cycle lineage {lineage_ID} when "
@@ -584,6 +591,7 @@ class Model:
                 )
                 warnings.warn(msg)
             else:
+                cycle_lineage = self.data._compute_cycle_lineage(lineage_ID)
                 self.data.cycle_data[lineage_ID] = cycle_lineage
 
         # Notify that an update of the feature values may be required.
