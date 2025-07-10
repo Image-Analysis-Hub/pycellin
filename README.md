@@ -26,7 +26,7 @@ More tracking formats will progressively be supported.
 
 While pycellin has been designed with bacteria / cell lineages in mind, it could be used with more diverse tracking data provided the few conditions below are enforced:
 - the tracking data can be modeled by directed rooted trees, meaning no merging event
-- time must flow homogeneously, i.e. all the edges of a lineage graph must represent the same elapsed time.
+- gaps between detection are allowed but the time step must consistent.
 
 
 ## Installation
@@ -86,7 +86,6 @@ model.add_pycellin_features([
     "branch_mean_speed",
     "relative_age",
     "division_time", 
-    "division_rate",
     "cell_cycle_completeness",
     ])
 model.update()
