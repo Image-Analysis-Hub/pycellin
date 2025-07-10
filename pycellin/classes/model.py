@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from itertools import pairwise
 import pickle
 from typing import Any, Literal, TypeVar
 import warnings
@@ -16,7 +17,7 @@ from pycellin.classes import (
     FeaturesDeclaration,
 )
 from pycellin.classes.lineage import Lineage
-from pycellin.classes.exceptions import UpdateRequiredError
+from pycellin.classes.exceptions import FusionError, ProtectedFeatureError
 from pycellin.classes.feature_calculator import FeatureCalculator
 from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features.tracking as tracking
@@ -212,7 +213,8 @@ class Model:
         Parameters
         ----------
         include_Lineage_feats : bool, optional
-            True to include the Lineage features, False otherwise (default is True).
+            True to return Lineage features along with CellLineage ones,
+            False to only return CellLineage features (default is True).
 
         Returns
         -------
@@ -234,7 +236,8 @@ class Model:
         Parameters
         ----------
         include_Lineage_feats : bool, optional
-            True to include the Lineage features, False otherwise (default is True).
+            True to return Lineage features along with CycleLineage ones,
+            False to only return CycleLineage features (default is True).
 
         Returns
         -------
@@ -484,13 +487,51 @@ class Model:
         """
         return self._updater._update_required
 
-    def update(self) -> None:
+    def update(self, features_to_update: list[str] | None = None) -> None:
         """
         Bring the model up to date by recomputing features.
+
+        This method will recompute the features of the model
+        based on the current data and the features declaration.
+
+        Parameters
+        ----------
+        features_to_update : list[str], optional
+            List of features to update. If None, all features are updated.
+
+        Warns
+        -----
+        If the model is already up to date, a warning is raised and no update
+        is performed. If the user wants to force an update, they can call
+        `prepare_full_data_update()` before calling this method.
+        If a feature in the `features_to_update` list has not been declared,
+        a warning is raised and that feature is ignored during the update.
+        If no features are left to update after filtering, a warning is raised
+        and the model is not updated.
         """
         if not self._updater._update_required:
             warnings.warn("Model is already up to date.")
             return
+
+        if features_to_update is not None:
+            missing_feats = [
+                feat
+                for feat in features_to_update
+                if not self.feat_declaration._has_feature(feat)
+            ]
+            if missing_feats:
+                warnings.warn(
+                    f"The following features have not been declared "
+                    f"and will be ignored: {', '.join(missing_feats)}."
+                )
+                features_to_update = [
+                    feat for feat in features_to_update if feat not in missing_feats
+                ]
+                if not features_to_update:
+                    warnings.warn(
+                        "No features to update. The model will not be updated."
+                    )
+                    return
 
         # self.data._freeze_lineage_data()
 
@@ -498,7 +539,7 @@ class Model:
         # by the updater methods to avoid incoherent states.
         # => saving a copy of the model before the update so we can roll back?
 
-        self._updater._update(self.data)
+        self._updater._update(self.data, features_to_update)
 
         # self.data._unfreeze_lineage_data()
 
@@ -526,6 +567,12 @@ class Model:
         -------
         int
             The ID of the added lineage.
+
+        Warns
+        -----
+        UserWarning
+            If `with_CycleLineage` is True but the cycle data has not been added yet.
+            In this case, the cycle lineage cannot be computed.
         """
         if lineage is None:
             if lineage_ID is None:
@@ -537,7 +584,6 @@ class Model:
         self.data.cell_data[lineage_ID] = lineage
 
         if with_CycleLineage:
-            cycle_lineage = self.data._compute_cycle_lineage(lineage_ID)
             if self.data.cycle_data is None:
                 msg = (
                     f"Cannot add cycle lineage {lineage_ID} when "
@@ -545,6 +591,7 @@ class Model:
                 )
                 warnings.warn(msg)
             else:
+                cycle_lineage = self.data._compute_cycle_lineage(lineage_ID)
                 self.data.cycle_data[lineage_ID] = cycle_lineage
 
         # Notify that an update of the feature values may be required.
@@ -941,7 +988,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "absolute_age",
             description="Age of the cell since the beginning of the lineage",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CellLineage",
             data_type="float" if in_time_unit else "int",
@@ -973,7 +1020,7 @@ class Model:
             description=(
                 "Angle of the cell trajectory between two consecutive detections"
             ),
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="edge",
             lin_type="CellLineage",
             data_type="float",
@@ -999,7 +1046,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "branch_mean_displacement",
             description="Mean displacement of the cell during the cell cycle",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="float",
@@ -1029,7 +1076,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "branch_mean_speed",
             description="Mean speed of the cell during the cell cycle",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="float",
@@ -1055,7 +1102,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "branch_total_displacement",
             description="Displacement of the cell during the cell cycle",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="float",
@@ -1085,7 +1132,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "cycle_completeness",
             description="Completeness of the cell cycle",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="bool",
@@ -1111,7 +1158,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "cell_displacement",
             description="Displacement of the cell between two consecutive detections",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="edge",
             lin_type="CellLineage",
             data_type="float",
@@ -1130,7 +1177,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "cell_length",
             description="Length of the cell",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CellLineage",
             data_type="float",
@@ -1170,7 +1217,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "cell_speed",
             description="Speed of the cell between two consecutive detections",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="edge",
             lin_type="CellLineage",
             data_type="float",
@@ -1197,7 +1244,7 @@ class Model:
             feat_type="node",
             lin_type="CellLineage",
             data_type="float",
-            provenance="Pycellin",
+            provenance="pycellin",
             unit=self.metadata["space_unit"],
         )
         calc = morpho.CellWidth(
@@ -1234,7 +1281,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "division_rate",
             description="Number of divisions per time unit",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="float",
@@ -1267,7 +1314,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "division_time",
             description="Time elapsed between the birth of a cell and its division",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="float" if in_time_unit else "int",
@@ -1301,7 +1348,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "relative_age",
             description="Age of the cell since the beginning of the current cell cycle",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CellLineage",
             data_type="float" if in_time_unit else "int",
@@ -1335,7 +1382,7 @@ class Model:
         feat = Feature(
             name=rename if rename else "straightness",
             description="Straightness of the cell displacement",
-            provenance="Pycellin",
+            provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
             data_type="float",
@@ -1375,7 +1422,7 @@ class Model:
 
     def add_pycellin_feature(self, feature_name: str, **kwargs: bool) -> None:
         """
-        Add a single predefined Pycellin feature to the model.
+        Add a single predefined pycellin feature to the model.
 
         Parameters
         ----------
@@ -1390,7 +1437,7 @@ class Model:
         Raises
         ------
         KeyError
-            If the feature is not a predefined feature of Pycellin.
+            If the feature is not a predefined feature of pycellin.
         ValueError
             If the feature is a feature of cycle lineages and the cycle lineages
             have not been computed yet.
@@ -1399,7 +1446,7 @@ class Model:
         cycle_lin_feats = list(futils.get_pycellin_cycle_lineage_features().keys())
         if feature_name not in cell_lin_feats + cycle_lin_feats:
             raise KeyError(
-                f"Feature {feature_name} is not a predefined feature of Pycellin."
+                f"Feature {feature_name} is not a predefined feature of pycellin."
             )
         elif feature_name in cycle_lin_feats and not self.data.cycle_data:
             raise ValueError(
@@ -1411,7 +1458,7 @@ class Model:
 
     def add_pycellin_features(self, features_info: list[str | dict[str, Any]]) -> None:
         """
-        Add the specified predefined Pycellin features to the model.
+        Add the specified predefined pycellin features to the model.
 
         Parameters
         ----------
@@ -1488,17 +1535,16 @@ class Model:
         ------
         ValueError
             If the feature does not exist.
+        ProtectedFeatureError
+            If the feature is a protected feature.
         """
-        # TODO: stop the user from removing mandatory features? With a force argument
-        # set to False to bypass the check?
-        # Or create a list of protected features so people can decide to add some of
-        # their own features to it?
-
         # Preliminary checks.
         if not self.feat_declaration._has_feature(feature_name):
             raise ValueError(
                 f"There is no feature {feature_name} in the declared features."
             )
+        if feature_name in self.feat_declaration._get_protected_features():
+            raise ProtectedFeatureError(feature_name)
 
         # First we update the FeaturesDeclaration...
         feature_type = self.feat_declaration.feats_dict[feature_name].feat_type
@@ -1506,41 +1552,24 @@ class Model:
         self.feat_declaration.feats_dict.pop(feature_name)
 
         # ... we remove the feature values...
-        if lineage_type == "CellLineage":
-            lineage_data = self.data.cell_data
-        elif lineage_type == "CycleLineage" and self.data.cycle_data:
-            lineage_data = self.data.cycle_data
-        else:
-            raise ValueError(
-                "Lineage type not recognized. Must be 'CellLineage' or 'CycleLineage'."
-            )
-        match feature_type:
-            case "node":
-                for lin in lineage_data.values():
-                    for _, data in lin.nodes(data=True):
-                        try:
-                            del data[feature_name]
-                        except KeyError:
-                            # No feature doesn't mean there is something wrong,
-                            # maybe no update were done.
-                            pass
-            case "edge":
-                for lin in lineage_data.values():
-                    for _, _, data in lin.edges(data=True):
-                        try:
-                            del data[feature_name]
-                        except KeyError:
-                            # No feature doesn't mean there is something wrong,
-                            # maybe no update were done.
-                            pass
-            case "lineage":
-                for lin in lineage_data.values():
-                    try:
-                        del lin.graph[feature_name]
-                    except KeyError:
-                        # No feature doesn't mean there is something wrong,
-                        # maybe no update were done.
-                        pass
+        match lineage_type:
+            case "CellLineage":
+                for lin in self.data.cell_data.values():
+                    lin._remove_feature(feature_name, feature_type)
+            case "CycleLineage" if self.data.cycle_data:
+                for clin in self.data.cycle_data.values():
+                    clin._remove_feature(feature_name, feature_type)
+            case "Lineage":
+                for lin in self.data.cell_data.values():
+                    lin._remove_feature(feature_name, feature_type)
+                if self.data.cycle_data:
+                    for clin in self.data.cycle_data.values():
+                        clin._remove_feature(feature_name, feature_type)
+            case _:
+                raise ValueError(
+                    "Lineage type not recognized. Must be 'CellLineage', 'CycleLineage'"
+                    "or 'Lineage'."
+                )
 
         # ... and finally we update the updater.
         try:
@@ -1570,6 +1599,218 @@ class Model:
         # _update_required becomes true when features are added...
         self.data._add_cycle_lineages()
         self.feat_declaration._add_cycle_lineage_features()
+
+    def _categorize_features(
+        self, features: list[str] | None
+    ) -> tuple[list[str], list[str], list[str]]:
+        """
+        Categorize features by type (node, edge, lineage).
+
+        Parameters
+        ----------
+        features : list[str] | None
+            List of features to categorize. If None, all cycle features are used.
+
+        Returns
+        -------
+        tuple[list[str], list[str], list[str]]
+            Tuple containing a list of node features, a list of edge features,
+            and a list of lineage features.
+
+        Raises
+        ------
+        ValueError
+            If a feature is not a cycle lineage feature or not declared in the model.
+        """
+        feats = self.get_cycle_lineage_features()
+        if features is None:
+            node_feats = [
+                name for name, feat in feats.items() if feat.feat_type == "node"
+            ]
+            edge_feats = [
+                name for name, feat in feats.items() if feat.feat_type == "edge"
+            ]
+            lin_feats = [
+                name for name, feat in feats.items() if feat.feat_type == "lineage"
+            ]
+        else:
+            missing_feats = [feat for feat in features if feat not in feats]
+            if missing_feats:
+                missing_str = ", ".join(repr(f) for f in missing_feats)
+                plural = len(missing_feats) > 1
+                raise ValueError(
+                    f"Feature{'s' if plural else ''} {missing_str} "
+                    f"{'are' if plural else 'is'} either not{' ' if plural else 'a'}"
+                    f"cycle lineage feature{'s' if plural else ''} or not declared "
+                    f"in the model."
+                )
+            node_feats = [f for f in features if f in self.get_node_features()]
+            edge_feats = [f for f in features if f in self.get_edge_features()]
+            lin_feats = [f for f in features if f in self.get_lineage_features()]
+
+        return (node_feats, edge_feats, lin_feats)
+
+    @staticmethod
+    def _propagate_node_features(
+        node_feats: list[str],
+        clin: CycleLineage,
+        lin: CellLineage,
+    ) -> None:
+        """
+        Propagate node features from cycle lineage to cell lineage.
+
+        Parameters
+        ----------
+        node_feats : list[str]
+            List of node features to propagate.
+        clin : CycleLineage
+            Source cycle lineage.
+        lin : CellLineage
+            Target cell lineage.
+        """
+        for cycle, cells in clin.nodes(data="cells"):
+            for cell in cells:
+                for feat in node_feats:
+                    try:
+                        lin.nodes[cell][feat] = clin.nodes[cycle][feat]
+                    except KeyError:
+                        # If the feature is not present, we skip it.
+                        continue
+
+    @staticmethod
+    def _propagate_edge_features(
+        edge_feats: list[str],
+        clin: CycleLineage,
+        lin: CellLineage,
+    ) -> None:
+        """
+        Propagate edge features from cycle lineage to cell lineage.
+
+        Parameters
+        ----------
+        edge_feats : list[str]
+            List of edge features to propagate.
+        clin : CycleLineage
+            Source cycle lineage.
+        lin : CellLineage
+            Target cell lineage.
+
+        Raises
+        ------
+        FusionError
+            If a cell has more than one incoming edge, indicating fusion.
+        """
+        for edge in clin.edges:
+            cycle = clin.nodes[edge[1]]["cycle_ID"]
+            cells = clin.nodes[cycle]["cells"]
+
+            # Intracycle edges.
+            for link in pairwise(cells):
+                for feat in edge_feats:
+                    try:
+                        lin.edges[link][feat] = clin.edges[edge][feat]
+                    except KeyError:
+                        # If the feature is not present, we skip it.
+                        continue
+
+            # Intercycle edge.
+            incoming_edges = list(lin.in_edges(cells[0]))
+            if len(incoming_edges) > 1:
+                raise FusionError(cells[0], lin.graph["lineage_ID"])
+            try:
+                lin.edges[incoming_edges[0]][feat] = clin.edges[edge][feat]
+            except (IndexError, KeyError):
+                # Either the cell is a root or the feature is not present.
+                # In both cases, we skip it.
+                continue
+
+    @staticmethod
+    def _propagate_lineage_features(
+        lin_feats: list[str],
+        clin: CycleLineage,
+        lin: CellLineage,
+    ) -> None:
+        """
+        Propagate lineage features from cycle lineage to cell lineage.
+
+        Parameters
+        ----------
+        lin_feats : list[str]
+            List of lineage features to propagate.
+        clin : CycleLineage
+            Source cycle lineage.
+        lin : CellLineage
+            Target cell lineage.
+        """
+        for feat in lin_feats:
+            try:
+                lin.graph[feat] = clin.graph[feat]
+            except KeyError:
+                continue
+
+    def propagate_cycle_features(
+        self, features: list[str] | None = None, update: bool = True
+    ) -> None:
+        """
+        Propagate the cycle features to the cell lineages.
+
+        Parameters
+        ----------
+        features : list[str], optional
+            List of the features to propagate. If None, all cycle features are
+            propagated. Default is None.
+        update : bool, optional
+            Whether to update the model before propagating the features.
+            Default is True. For a correct propagation, the model must be updated
+            beforehand. If you are not sure about the state of the model, leave
+            this parameter to True. If you are sure that the model is up to date,
+            you can set it to False for better performances.
+
+        Raises
+        ------
+        ValueError
+            If the cycle lineages have not been computed yet.
+            If a feature in the list is not a cycle lineage feature or not declared
+            in the model.
+        FusionError
+            If a cell has more than one incoming edge in the cycle lineage,
+            which indicates a fusion event.
+
+        Warnings
+        --------
+        Quantitative analysis of cell cycle features should not be done on cell
+        lineages after propagation of cycle features, UNLESS you account for cell
+        cycle length. Otherwise you will introduce a bias in your quantification.
+        Indeed, after propagation, cycle features (like division time) become
+        over-represented in long cell cycles since these features are propagated on each
+        node of the cell cycle in cell lineages, whereas they are stored only once
+        per cell cycle on the cycle node in cycle lineages.
+        """
+        if not self.data.cycle_data:
+            raise ValueError(
+                "Cycle lineages have not been computed yet. "
+                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+            )
+        if self._updater._update_required and update:
+            self.update()
+        node_feats, edge_feats, lin_feats = self._categorize_features(features)
+
+        # Update the features declaration: now the feature type is `Lineage`
+        # instead of just `CycleLineage` since the features are now present on cycle
+        # AND cell lineages.
+        for feat in node_feats + edge_feats + lin_feats:
+            self.feat_declaration.feats_dict[feat].lin_type = "Lineage"
+
+        # Actual propagation.
+        for lin_ID in self.data.cell_data:
+            lin = self.data.cell_data[lin_ID]
+            clin = self.data.cycle_data[lin_ID]
+            if node_feats:
+                Model._propagate_node_features(node_feats, clin, lin)
+            if edge_feats:
+                Model._propagate_edge_features(edge_feats, clin, lin)
+            if lin_feats:
+                Model._propagate_lineage_features(lin_feats, clin, lin)
 
     def to_cell_dataframe(self, lineages_ID: list[int] | None = None) -> pd.DataFrame:
         """
@@ -1603,7 +1844,7 @@ class Model:
         df = pd.concat(list_df, ignore_index=True)
         assert nb_nodes == len(df)
 
-        # Reoder the columns to have Pycellin mandatory features first.
+        # Reoder the columns to have pycellin mandatory features first.
         columns = df.columns.tolist()
         try:
             columns.remove("lineage_ID")
@@ -1648,7 +1889,7 @@ class Model:
         df = pd.concat(list_df, ignore_index=True)
         assert nb_edges == len(df)
 
-        # Reoder the columns to have Pycellin mandatory features first.
+        # Reoder the columns to have pycellin mandatory features first.
         columns = df.columns.tolist()
         try:
             columns.remove("lineage_ID")
@@ -1690,7 +1931,7 @@ class Model:
             list_df.append(tmp_df)
         df = pd.concat(list_df, ignore_index=True)
 
-        # Reoder the columns to have Pycellin mandatory features first.
+        # Reoder the columns to have pycellin mandatory features first.
         columns = df.columns.tolist()
         try:
             columns.remove("lineage_ID")
@@ -1721,7 +1962,6 @@ class Model:
         ------
         ValueError
             If the cycle lineages have not been computed yet.
-        ValueError
             If the `lineage_ID`, `level` or `cycle_ID` feature is not found
             in the model.
         """
@@ -1742,7 +1982,7 @@ class Model:
         df = pd.concat(list_df, ignore_index=True)
         assert nb_nodes == len(df)
 
-        # Reoder the columns to have Pycellin mandatory features first.
+        # Reoder the columns to have pycellin mandatory features first.
         columns = df.columns.tolist()
         try:
             columns.remove("lineage_ID")
@@ -1777,7 +2017,7 @@ class Model:
     @staticmethod
     def load_from_pickle(path: str) -> None:
         """
-        Load a model from a pickled Pycellin file.
+        Load a model from a pickled pycellin file.
 
         Parameters
         ----------

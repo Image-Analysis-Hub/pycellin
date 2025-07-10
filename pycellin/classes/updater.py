@@ -6,6 +6,7 @@ import networkx as nx
 from pycellin.classes import Data
 from pycellin.classes.feature_calculator import FeatureCalculator
 from pycellin.classes.lineage import CellLineage
+from pycellin.custom_types import Cell, Link
 
 
 class ModelUpdater:
@@ -37,6 +38,10 @@ class ModelUpdater:
         # order for the other features that is the order of registration (order of keys
         # in the _calculators dictionary). Even better would be to have a solver.
         # => keep this for later
+        # On a related note, currently cell features are computed before cycle features.
+        # So if a cell feature depends on a cycle feature, it will not be computed
+        # correctly. In that case, the solution is to add the cycle features first,
+        # then update, then add the cell features and update again.
 
     def _reinit(self) -> None:
         """
@@ -109,8 +114,18 @@ class ModelUpdater:
             The data to update.
         features_to_update : list of str, optional
             List of features to update. If None, all features are updated.
+
+        Warnings
+        --------
+        This method does not resolve features dependencies. It is the responsibility
+        of the user to ensure that features are updated in the correct order, if needed.
+        For example, cell lineage features are computed before cycle lineage features,
+        so if a cell lineage feature depends on a cycle lineage feature, it will not be
+        computed correctly. In that case, the solution is to add the cycle features
+        first, then update, then add the cell features and update again.
         """
-        # Cleaning up the model.
+        # TODO: refactor, this method is too long and does too many things.
+
         # Remove empty lineages.
         for lin_ID in (
             self._added_lineages | self._modified_lineages
@@ -165,6 +180,31 @@ class ModelUpdater:
                     data.cell_data[new_lin_ID] = lin
                     self._added_lineages.add(new_lin_ID)
 
+        # Update cell lineage features.
+        # TODO: Deal with feature dependencies. See comments in __init__.
+        if features_to_update is None:
+            cell_calculators = [
+                calc
+                for calc in self._calculators.values()
+                if calc.feature.lin_type == "CellLineage"
+            ]
+        else:
+            cell_calculators = [
+                self._calculators[feat]
+                for feat in features_to_update
+                if self._calculators[feat].feature.lin_type == "CellLineage"
+            ]
+        # Recompute the features as needed.
+        for calc in cell_calculators:
+            # Depending on the class of the calculator, a different version of
+            # the enrich() method is called.
+            calc.enrich(
+                data,
+                nodes_to_enrich=self._added_cells,
+                edges_to_enrich=self._added_links,
+                lineages_to_enrich=self._added_lineages | self._modified_lineages,
+            )
+
         # In case of modifications in the structure of some cell lineages,
         # we need to recompute the cycle lineages and their features.
         # TODO: optimize so we don't have to recompute EVERYTHING for cycle lineages?
@@ -179,26 +219,45 @@ class ModelUpdater:
                 # else:
                 #     data.cycle_data[lin_ID] = new_cycle_data
                 data.cycle_data[lin_ID] = data._compute_cycle_lineage(lin_ID)
+        # Remove cycle lineages whose cell lineage has been removed.
         for lin_ID in self._removed_lineages:
             if data.cycle_data is not None and lin_ID in data.cycle_data:
                 del data.cycle_data[lin_ID]
-
-        # Update the features.
-        # TODO: Deal with feature dependencies. See comments in __init__.
-        if features_to_update is None:
-            calculators = self._calculators.values()
-        else:
-            calculators = [self._calculators[feat] for feat in features_to_update]
-        # Recompute the features as needed.
-        for calc in calculators:
-            # Depending on the class of the calculator, a different version of
-            # the enrich() method is called.
-            calc.enrich(
-                data,
-                nodes_to_enrich=self._added_cells,
-                edges_to_enrich=self._added_links,
-                lineages_to_enrich=self._added_lineages | self._modified_lineages,
-            )
+        # Update cycle lineages with cycle features.
+        if data.cycle_data is not None:
+            if features_to_update is None:
+                cycle_calculators = [
+                    calc
+                    for calc in self._calculators.values()
+                    if calc.feature.lin_type == "CycleLineage"
+                ]
+            else:
+                cycle_calculators = [
+                    self._calculators[feat]
+                    for feat in features_to_update
+                    if self._calculators[feat].feature.lin_type == "CycleLineage"
+                ]
+            # Since cycle lineages are recreated at each update, every element
+            # of the lineages need to be updated with its features.
+            cycle_nodes = [
+                Cell(cycle_ID, lin_ID)
+                for lin_ID in data.cycle_data
+                for cycle_ID in data.cycle_data[lin_ID].nodes()
+            ]
+            cycle_edges = [
+                Link(source, target, lin_ID)
+                for lin_ID in data.cycle_data
+                for source, target in data.cycle_data[lin_ID].edges()
+            ]
+            for calc in cycle_calculators:
+                # Depending on the class of the calculator, a different version of
+                # the enrich() method is called.
+                calc.enrich(
+                    data,
+                    nodes_to_enrich=cycle_nodes,
+                    edges_to_enrich=cycle_edges,
+                    lineages_to_enrich=data.cycle_data.keys(),
+                )
 
         # Update is done, we can clean up.
         self._reinit()

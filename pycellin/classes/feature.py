@@ -17,7 +17,7 @@ class Feature:
         name: str,
         description: str,
         provenance: str,
-        feat_type: str,
+        feat_type: FeatureType,
         lin_type: LineageType,
         data_type: str,
         unit: str | None = None,
@@ -31,31 +31,35 @@ class Feature:
             The name of the feature.
         description : str
             A description of the feature.
-        feat_type : str
-            The type of the feature (node, edge, lineage, or a combination of the 3).
+        provenance : str
+            The provenance of the feature (TrackMate, CTC, pycellin, custom...).
+        feat_type : FeatureType
+            The type of the feature: `node`, `edge` or `lineage.
         lin_type : LineageType
-            The type of lineage the feature is associated with: cell lineage,
-            cell cycle lineage or both.
+            The type of lineage the feature is associated with: `CellLineage`,
+            `CycleLineage`, or `Lineage` for both.
         data_type : str
             The data type of the feature (int, float, string).
-        provenance : str
-            The provenance of the feature (TrackMate, CTC, Pycellin, custom...).
         unit : str, optional
             The unit of the feature (e.g. µm, min, cell).
 
         Raises
         ------
         ValueError
-            If the lineage type is not a valid value.
+            If the feature type or the lineage type is not a valid value.
         """
         self.name = name
         self.description = description
+        self.provenance = provenance
+        if not check_literal_type(feat_type, FeatureType):
+            raise ValueError(
+                f"Feature type must be one of {', '.join(get_args(FeatureType))}."
+            )
+        self.feat_type = feat_type
         if not check_literal_type(lin_type, LineageType):
             raise ValueError(
-                f"Feature type must be one of {', '.join(get_args(LineageType))}."
+                f"Lineage type must be one of {', '.join(get_args(LineageType))}."
             )
-        self.provenance = provenance
-        self.feat_type = feat_type
         self.lin_type = lin_type
         self.data_type = data_type
         self.unit = unit
@@ -194,7 +198,7 @@ class Feature:
             return self == other
 
 
-def frame_Feature(provenance: str = "Pycellin") -> Feature:
+def frame_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="frame",
         description="Frame number of the cell ",
@@ -207,7 +211,7 @@ def frame_Feature(provenance: str = "Pycellin") -> Feature:
     return feat
 
 
-def cell_ID_Feature(provenance: str = "Pycellin") -> Feature:
+def cell_ID_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="cell_ID",
         description="Unique identifier of the cell",
@@ -219,7 +223,7 @@ def cell_ID_Feature(provenance: str = "Pycellin") -> Feature:
     return feat
 
 
-def lineage_ID_Feature(provenance: str = "Pycellin") -> Feature:
+def lineage_ID_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="lineage_ID",
         description="Unique identifier of the lineage",
@@ -231,7 +235,7 @@ def lineage_ID_Feature(provenance: str = "Pycellin") -> Feature:
     return feat
 
 
-def cell_coord_Feature(unit: str, axis: str, provenance: str = "Pycellin") -> Feature:
+def cell_coord_Feature(unit: str, axis: str, provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name=f"cell_{axis}",
         description=f"{axis.upper()} coordinate of the cell",
@@ -244,7 +248,7 @@ def cell_coord_Feature(unit: str, axis: str, provenance: str = "Pycellin") -> Fe
     return feat
 
 
-def link_coord_Feature(unit: str, axis: str, provenance: str = "Pycellin") -> Feature:
+def link_coord_Feature(unit: str, axis: str, provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name=f"link_{axis}",
         description=(
@@ -261,7 +265,7 @@ def link_coord_Feature(unit: str, axis: str, provenance: str = "Pycellin") -> Fe
 
 
 def lineage_coord_Feature(
-    unit: str, axis: str, provenance: str = "Pycellin"
+    unit: str, axis: str, provenance: str = "pycellin"
 ) -> Feature:
     feat = Feature(
         name=f"lineage_{axis}",
@@ -278,7 +282,7 @@ def lineage_coord_Feature(
     return feat
 
 
-def cycle_ID_Feature(provenance: str = "Pycellin") -> Feature:
+def cycle_ID_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="cycle_ID",
         description=(
@@ -293,19 +297,19 @@ def cycle_ID_Feature(provenance: str = "Pycellin") -> Feature:
     return feat
 
 
-def cells_Feature(provenance: str = "Pycellin") -> Feature:
+def cells_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="cells",
         description="cell_IDs of the cells in the cell cycle, in chronological order",
         provenance=provenance,
         feat_type="node",
         lin_type="CycleLineage",
-        data_type="int",
+        data_type="list[int]",
     )
     return feat
 
 
-def cycle_length_Feature(provenance: str = "Pycellin") -> Feature:
+def cycle_length_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="cycle_length",
         description="Number of cells in the cell cycle, minding gaps",
@@ -317,7 +321,7 @@ def cycle_length_Feature(provenance: str = "Pycellin") -> Feature:
     return feat
 
 
-def cycle_duration_Feature(provenance: str = "Pycellin") -> Feature:
+def cycle_duration_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="cycle_duration",
         description="Number of frames in the cell cycle, regardless of gaps",
@@ -330,7 +334,7 @@ def cycle_duration_Feature(provenance: str = "Pycellin") -> Feature:
     return feat
 
 
-def level_Feature(provenance: str = "Pycellin") -> Feature:
+def level_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="level",
         description=(

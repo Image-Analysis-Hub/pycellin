@@ -42,6 +42,36 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             assert isinstance(lineage_ID, int), "The lineage ID must be an integer."
             self.graph["lineage_ID"] = lineage_ID
 
+    def _remove_feature(self, feature_name: str, feature_type: str) -> None:
+        """
+        Remove a feature from the lineage graph based on the feature type.
+
+        Parameters
+        ----------
+        feature_name : str
+            The name of the feature to remove.
+        feature_type : str
+            The type of feature to remove. Must be one of `node`, `edge`, or `lineage`.
+
+        Raises
+        ------
+        ValueError
+            If the feature_type is not one of `node`, `edge`, or `lineage`.
+        """
+        match feature_type:
+            case "node":
+                for _, data in self.nodes(data=True):
+                    data.pop(feature_name, None)
+            case "edge":
+                for _, _, data in self.edges(data=True):
+                    data.pop(feature_name, None)
+            case "lineage":
+                self.graph.pop(feature_name, None)
+            case _:
+                raise ValueError(
+                    "Invalid feature_type. Must be one of 'node', 'edge', or 'lineage'."
+                )
+
     def get_root(self, ignore_lone_nodes: bool = False) -> int | list[int]:
         """
         Return the root of the lineage.

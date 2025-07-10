@@ -129,7 +129,7 @@ def _convert_and_add_feature(
     units: dict[str, str],
 ) -> None:
     """
-    Convert a TrackMate feature to a Pycellin one to add it to the features declaration.
+    Convert a TrackMate feature to a pycellin one to add it to the features declaration.
 
     Parameters
     ----------
@@ -717,7 +717,7 @@ def _update_features_declaration(
     segmentation: bool,
 ) -> None:
     """
-    Update the features declaration to match Pycellin conventions.
+    Update the features declaration to match pycellin conventions.
 
     Parameters
     ----------
@@ -982,9 +982,9 @@ def _parse_model_tag(
     # into its connected components.
     lineages = _split_graph_into_lineages(graph, tracks_attributes)
 
-    # For Pycellin compatibility, some TrackMate features have to be renamed.
+    # For pycellin compatibility, some TrackMate features have to be renamed.
     # We only rename features that are either essential to the functioning of
-    # Pycellin or confusing (e.g. "name" is a spot and a track feature).
+    # pycellin or confusing (e.g. "name" is a spot and a track feature).
     _update_features_declaration(fd, units, segmentation)
     for lin in lineages:
         for key_name, new_key in [
@@ -1190,7 +1190,7 @@ def load_TrackMate_XML(
     Returns
     -------
     Model
-        A Pycellin Model that contains all the data from the TrackMate XML file.
+        A pycellin Model that contains all the data from the TrackMate XML file.
     """
     units, fdec, data = _parse_model_tag(xml_path, keep_all_spots, keep_all_tracks)
 

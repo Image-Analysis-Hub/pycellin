@@ -4,10 +4,10 @@
 """
 exporter.py
 
-This module is part of the Pycellin package.
+This module is part of the pycellin package.
 
-This module provides functions to export Pycellin models to trackpy tracking files.
-It includes a function to export a Pycellin model to a trackpy file and helper functions
+This module provides functions to export pycellin models to trackpy tracking files.
+It includes a function to export a pycellin model to a trackpy file and helper functions
 to build trackpy tracks from a lineage.
 
 References:
@@ -34,7 +34,7 @@ def safekeep_original_lineage_IDs(model: Model) -> None:
     Parameters
     ----------
     model : Model
-        The Pycellin model to modify.
+        The pycellin model to modify.
     """
     for lin_ID, lin in model.data.cell_data.items():
         for node in lin.nodes():
@@ -48,7 +48,7 @@ def remove_division_events(model: Model) -> None:
     Parameters
     ----------
     model : Model
-        The Pycellin model to modify.
+        The pycellin model to modify.
     """
     for lin in model.get_cell_lineages():
         divs = lin.get_divisions()
@@ -68,7 +68,7 @@ def renumber_negative_lineage_IDs(model: Model) -> None:
     Parameters
     ----------
     model : Model
-        The Pycellin model to modify.
+        The pycellin model to modify.
     """
     one_node_lin_IDs = [
         lin.graph["lineage_ID"]
@@ -165,7 +165,7 @@ def format_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 def export_trackpy_dataframe(model: Model) -> pd.DataFrame:
     """
-    Export a Pycellin model to a trackpy DataFrame.
+    Export a pycellin model to a trackpy DataFrame.
 
     Trackpy does not support division events. They will be removed for
     the export so each cell cycle will be reprensented by a single
@@ -174,7 +174,7 @@ def export_trackpy_dataframe(model: Model) -> pd.DataFrame:
     Parameters
     ----------
     model : Model
-        The Pycellin model to export.
+        The pycellin model to export.
 
     Returns
     -------

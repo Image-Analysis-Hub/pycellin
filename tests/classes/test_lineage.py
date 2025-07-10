@@ -39,21 +39,21 @@ def cell_lin():
     lineage = CellLineage()
     lineage.add_edges_from(
         [
-            (1, 2),
-            (2, 3),
-            (3, 4),
-            (4, 5),
-            (5, 6),
-            (4, 7),
-            (7, 8),
-            (8, 9),
-            (8, 10),
-            (2, 11),
-            (11, 12),
-            (12, 13),
-            (13, 14),
-            (14, 15),
-            (14, 16),
+            (1, 2, {"name": "1 -> 2"}),
+            (2, 3, {"name": "2 -> 3"}),
+            (3, 4, {"name": "3 -> 4"}),
+            (4, 5, {"name": "4 -> 5"}),
+            (5, 6, {"name": "5 -> 6"}),
+            (4, 7, {"name": "4 -> 7"}),
+            (7, 8, {"name": "7 -> 8"}),
+            (8, 9, {"name": "8 -> 9"}),
+            (8, 10, {"name": "8 -> 10"}),
+            (2, 11, {"name": "2 -> 11"}),
+            (11, 12, {"name": "11 -> 12"}),
+            (12, 13, {"name": "12 -> 13"}),
+            (13, 14, {"name": "13 -> 14"}),
+            (14, 15, {"name": "14 -> 15"}),
+            (14, 16, {"name": "14 -> 16"}),
         ]
     )
     for n in lineage.nodes:
@@ -182,6 +182,49 @@ def cycle_lin_triple_div(cycle_lin):
     cycle_lin.add_node(6, level=2)
     cycle_lin.add_edge(2, 6)
     return cycle_lin
+
+
+# _remove_feature() ###########################################################
+
+
+def test_remove_feature_node(cell_lin):
+    cell_lin._remove_feature("frame", "node")
+    for node in cell_lin.nodes:
+        assert "frame" not in cell_lin.nodes[node]
+
+
+def test_remove_feature_edge(cell_lin):
+    cell_lin._remove_feature("name", "edge")
+    for edge in cell_lin.edges:
+        assert "name" not in cell_lin.edges[edge]
+
+
+def test_remove_feature_lineage(cell_lin):
+    cell_lin._remove_feature("lineage_ID", "lineage")
+    assert "lineage_ID" not in cell_lin.graph
+
+
+def test_remove_feature_unknown_feature(cell_lin):
+    # Attempting to remove a feature that does not exist should not raise an error.
+    cell_lin._remove_feature("unknown_feature", "node")
+    cell_lin._remove_feature("unknown_feature", "edge")
+    cell_lin._remove_feature("unknown_feature", "lineage")
+
+
+def test_remove_feature_missing_feature(cell_lin):
+    # Attempting to remove a feature not present in some elements should not raise
+    # an error.
+    cell_lin.add_edge(16, 17)
+    cell_lin._remove_feature("frame", "node")
+    cell_lin._remove_feature("name", "edge")
+
+
+def test_remove_feature_invalid_type(cell_lin):
+    with pytest.raises(
+        ValueError,
+        match="Invalid feature_type. Must be one of 'node', 'edge', or 'lineage'.",
+    ):
+        cell_lin._remove_feature("custom_feature", "invalid_type")
 
 
 # get_root() ##################################################################
