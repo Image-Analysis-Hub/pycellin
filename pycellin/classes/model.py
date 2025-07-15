@@ -2015,7 +2015,7 @@ class Model:
             pickle.dump(self, file, protocol=protocol)
 
     @staticmethod
-    def load_from_pickle(path: str) -> None:
+    def load_from_pickle(path: str) -> "Model":
         """
         Load a model from a pickled pycellin file.
 
@@ -2023,6 +2023,11 @@ class Model:
         ----------
         path : str
             Path to read the model.
+
+        Returns
+        -------
+        Model
+            The loaded model.
         """
         with open(path, "rb") as file:
             return pickle.load(file)
