@@ -15,6 +15,7 @@ from pycellin.classes import Model
 from pycellin.classes import FeaturesDeclaration, Feature, cell_ID_Feature
 from pycellin.classes import Data
 from pycellin.classes import CellLineage
+from pycellin.custom_types import FeatureType
 
 
 def _get_units(
@@ -238,7 +239,7 @@ def _add_all_features(
 def _convert_attributes(
     attributes: dict[str, str],
     features: dict[str, Feature],
-    feature_type: str,
+    feature_type: FeatureType,
 ) -> None:
     """
     Convert the values of `attributes` from string to the correct data type.
@@ -253,7 +254,7 @@ def _convert_attributes(
     features : dict[str, Feature]
         The dictionary of features that contains the information on how to convert
         the values of `attributes`.
-    feature_type : str
+    feature_type : FeatureType
         The type of the feature to convert (node, edge, or lineage).
 
     Raises
@@ -1194,7 +1195,7 @@ def load_TrackMate_XML(
         version = importlib.metadata.version("pycellin")
     except importlib.metadata.PackageNotFoundError:
         version = "unknown"
-    metadata["Pycellin_version"] = version
+    metadata["pycellin_version"] = version
     metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
     dict_tags = _get_specific_tags(
         xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
@@ -1233,7 +1234,7 @@ if __name__ == "__main__":
     model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
     print(model)
     print(model.feat_declaration)
-    print(model.metadata["Pycellin_version"])
+    print(model.metadata["pycellin_version"])
     # print(model.metadata)
     # print(model.fdec.node_feats.keys())
     # print(model.data)
