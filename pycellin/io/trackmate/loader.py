@@ -1035,19 +1035,11 @@ def _get_specific_tags(
         was found in the XML file, and the corresponding value is the
         deep copied `ET._Element` object for that tag.
     """
-    it = ET.iterparse(xml_path, events=["start", "end"])
     dict_tags = {}
-    for event, element in it:
-        if event == "start" and element.tag in tag_names:
+    for tag in tag_names:
+        it = ET.iterparse(xml_path, tag=tag)
+        for _, element in it:
             dict_tags[element.tag] = deepcopy(element)
-            tag_names.remove(element.tag)
-            if not tag_names:
-                # All the tags have been found.
-                break
-
-        if event == "end":
-            element.clear()
-
     return dict_tags
 
 
