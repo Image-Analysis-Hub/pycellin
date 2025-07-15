@@ -3,7 +3,7 @@
 
 from copy import deepcopy
 from datetime import datetime
-import importlib
+import importlib.metadata
 from pathlib import Path
 from typing import Any
 import warnings
