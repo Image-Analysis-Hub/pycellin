@@ -1060,11 +1060,10 @@ def _get_trackmate_version(
         The version of TrackMate used to generate the XML file. If the
         version cannot be found, "unknown" is returned.
     """
-    it = ET.iterparse(xml_path, events=["start", "end"])
-    for event, element in it:
-        if event == "start" and element.tag == "TrackMate":
-            version = str(element.attrib["version"])
-            return version
+    it = ET.iterparse(xml_path, tag="TrackMate")
+    for _, element in it:
+        version = str(element.attrib["version"])
+        return version
     return "unknown"
 
 
@@ -1089,19 +1088,17 @@ def _get_time_step(settings: ET._Element) -> float:
     KeyError
         If the 'ImageData' element is not found in the settings.
     """
-    for element in settings.iterchildren():
-        if element.tag == "ImageData":
-            try:
-                return float(element.attrib["timeinterval"])
-            except KeyError:
-                raise KeyError(
-                    "The 'timeinterval' attribute is missing "
-                    "in the 'ImageData' element."
-                )
-            except ValueError:
-                raise ValueError(
-                    "The 'timeinterval' attribute cannot be converted to float."
-                )
+    for element in settings.iterchildren("ImageData"):
+        try:
+            return float(element.attrib["timeinterval"])
+        except KeyError:
+            raise KeyError(
+                "The 'timeinterval' attribute is missing in the 'ImageData' element."
+            )
+        except ValueError:
+            raise ValueError(
+                "The 'timeinterval' attribute cannot be converted to float."
+            )
 
     raise KeyError("The 'ImageData' element is not found in the settings.")
 
@@ -1129,25 +1126,23 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
         If the 'pixelwidth', 'pixelheight' or 'voxeldepth' attribute is missing,
         or if the 'ImageData' element is not found in the settings.
     """
-    for element in settings.iterchildren():
-        if element.tag == "ImageData":
-            pixel_size = {}
-            for key_TM, key_pycellin in zip(
-                ["pixelwidth", "pixelheight", "voxeldepth"],
-                ["width", "height", "depth"],
-            ):
-                try:
-                    pixel_size[key_pycellin] = float(element.attrib[key_TM])
-                except KeyError:
-                    raise KeyError(
-                        f"The {key_TM} attribute is missing "
-                        "in the 'ImageData' element."
-                    )
-                except ValueError:
-                    raise ValueError(
-                        f"The {key_TM} attribute cannot be converted to float."
-                    )
-            return pixel_size
+    for element in settings.iterchildren("ImageData"):
+        pixel_size = {}
+        for key_TM, key_pycellin in zip(
+            ["pixelwidth", "pixelheight", "voxeldepth"],
+            ["width", "height", "depth"],
+        ):
+            try:
+                pixel_size[key_pycellin] = float(element.attrib[key_TM])
+            except KeyError:
+                raise KeyError(
+                    f"The {key_TM} attribute is missing " "in the 'ImageData' element."
+                )
+            except ValueError:
+                raise ValueError(
+                    f"The {key_TM} attribute cannot be converted to float."
+                )
+        return pixel_size
 
     raise KeyError("The 'ImageData' element is not found in the settings.")
 
