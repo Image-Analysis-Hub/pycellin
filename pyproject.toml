@@ -54,3 +54,7 @@ packages = [
     "pycellin.io.trackmate",
     "pycellin.io.trackpy",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
