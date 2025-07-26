@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
+import importlib
+import warnings
 from copy import deepcopy
 from datetime import datetime
-import importlib
 from pathlib import Path
 from typing import Any
-import warnings
 
-from lxml import etree as ET
 import networkx as nx
+from lxml import etree as ET
 
-from pycellin.classes import Model
-from pycellin.classes import FeaturesDeclaration, Feature, cell_ID_Feature
-from pycellin.classes import Data
-from pycellin.classes import CellLineage
+from pycellin.classes import (
+    CellLineage,
+    Data,
+    Feature,
+    FeaturesDeclaration,
+    Model,
+    cell_ID_Feature,
+)
+from pycellin.io.utils import _split_graph_into_lineages, check_fusions
 
 
 def _get_units(
@@ -532,7 +536,6 @@ def _build_tracks(
     current_track_id = None
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
-
         # Saving the current track information.
         if element.tag == "Track" and event == "start":
             attribs = deepcopy(element.attrib)
@@ -612,103 +615,6 @@ def _get_filtered_tracks_ID(
                 warnings.warn(msg)
 
     return filtered_tracks_ID
-
-
-def _add_tracks_info(
-    lineages: list[CellLineage],
-    tracks_attributes: list[dict[str, Any]],
-) -> None:
-    """
-    Update each CellLineage in the list with corresponding track attributes.
-
-    This function iterates over a list of CellLineage objects,
-    attempting to match each lineage with its corresponding track
-    attributes based on the 'TRACK_ID' attribute present in the
-    lineage nodes. It then updates the lineage graph with these
-    attributes.
-
-    Parameters
-    ----------
-    lineages : list[CellLineage]
-        A list of the lineages to update.
-    tracks_attributes : list[dict[str, Any]]
-        A list of dictionaries, where each dictionary contains
-        attributes for a specific track, identified by a 'TRACK_ID' key.
-
-    Raises
-    ------
-    ValueError
-        If a lineage is found to contain nodes with multiple distinct
-        'TRACK_ID' values, indicating an inconsistency in track ID
-        assignment.
-    """
-    for lin in lineages:
-        # Finding the dict of attributes matching the track.
-        tmp = set(t_id for _, t_id in lin.nodes(data="TRACK_ID"))
-
-        if not tmp:
-            # 'tmp' is empty because there's no nodes in the current graph.
-            # Even if it can't be updated, we still want to return this graph.
-            continue
-        elif tmp == {None}:
-            # Happens when all the nodes do not have a TRACK_ID attribute.
-            continue
-        elif None in tmp:
-            # Happens when at least one node does not have a TRACK_ID
-            # attribute, so we clean 'tmp' and carry on.
-            tmp.remove(None)
-        elif len(tmp) != 1:
-            raise ValueError("Impossible state: several IDs for one track.")
-
-        current_track_id = list(tmp)[0]
-        current_track_attr = [
-            d_attr
-            for d_attr in tracks_attributes
-            if d_attr["TRACK_ID"] == current_track_id
-        ][0]
-
-        # Adding the attributes to the lineage.
-        for k, v in current_track_attr.items():
-            lin.graph[k] = v
-
-
-def _split_graph_into_lineages(
-    graph: nx.DiGraph,
-    tracks_attributes: list[dict[str, Any]],
-) -> list[CellLineage]:
-    """
-    Split a graph into several subgraphs, each representing a lineage.
-
-    Parameters
-    ----------
-    lineage : nx.DiGraph
-        The graph to split.
-    tracks_attributes : list[dict[str, Any]]
-        A list of dictionaries, where each dictionary contains TrackMate
-        attributes for a specific track, identified by a 'TRACK_ID' key.
-
-    Returns
-    -------
-    list[CellLineage]
-        A list of subgraphs, each representing a lineage.
-    """
-    # One subgraph is created per lineage, so each subgraph is
-    # a connected component of `graph`.
-    lineages = [
-        CellLineage(graph.subgraph(c).copy())
-        for c in nx.weakly_connected_components(graph)
-    ]
-    del graph  # Redondant with the subgraphs.
-
-    # Adding TrackMate tracks attributes to each lineage.
-    try:
-        _add_tracks_info(lineages, tracks_attributes)
-    except ValueError as err:
-        print(err)
-        # The program is in an impossible state so we need to stop.
-        raise
-
-    return lineages
 
 
 def _update_features_declaration(
@@ -885,9 +791,9 @@ def _update_location_related_features(
     else:
         # One-node graph don't have the TRACK_X_LOCATION, TRACK_Y_LOCATION
         # and TRACK_Z_LOCATION features in the graph, so we have to create it.
-        assert (
-            len(lineage) == 1
-        ), "TRACK_X_LOCATION not found and not a one-node lineage."
+        assert len(lineage) == 1, (
+            "TRACK_X_LOCATION not found and not a one-node lineage."
+        )
         node = [n for n in lineage.nodes][0]
         for axis in ["x", "y", "z"]:
             lineage.graph[f"lineage_{axis}"] = lineage.nodes[node][f"cell_{axis}"]
@@ -980,7 +886,11 @@ def _parse_model_tag(
 
     # We want one lineage per track, so we need to split the graph
     # into its connected components.
-    lineages = _split_graph_into_lineages(graph, tracks_attributes)
+    lineages = _split_graph_into_lineages(
+        graph,
+        lin_features=tracks_attributes,
+        lineage_ID_key="TRACK_ID",
+    )
 
     # For pycellin compatibility, some TrackMate features have to be renamed.
     # We only rename features that are either essential to the functioning of
@@ -1148,8 +1058,7 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
                     pixel_size[key_pycellin] = float(element.attrib[key_TM])
                 except KeyError:
                     raise KeyError(
-                        f"The {key_TM} attribute is missing "
-                        "in the 'ImageData' element."
+                        f"The {key_TM} attribute is missing in the 'ImageData' element."
                     )
                 except ValueError:
                     raise ValueError(
@@ -1219,29 +1128,17 @@ def load_TrackMate_XML(
         metadata[tag_name] = element_string
 
     model = Model(metadata, fdec, data)
-
-    # Pycellin DOES NOT support fusion events.
-    all_fusions = model.get_fusions()
-    if all_fusions:
-        # TODO: link toward correct documentation when it is written.
-        fusion_warning = (
-            f"Unsupported data, {len(all_fusions)} cell fusions detected. "
-            "It is advised to deal with them before any other processing, "
-            "especially for tracking related features. Crashes and incorrect "
-            "results can occur. See documentation for more details."
-        )
-        warnings.warn(fusion_warning)
+    check_fusions(model)  # pycellin DOES NOT support fusion events
 
     return model
 
 
 if __name__ == "__main__":
-
     # xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
-    # xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
     # xml = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
-    xml = "sample_data/Celegans-5pc-17timepoints.xml"
+    # xml = "sample_data/Celegans-5pc-17timepoints.xml"
 
     model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
     print(model)
@@ -1251,5 +1148,5 @@ if __name__ == "__main__":
     # print(model.fdec.node_feats.keys())
     # print(model.data)
 
-    lineage = model.data.cell_data[0]
-    lineage.plot(node_hover_features=["cell_ID", "cell_name"])
+    # lineage = model.data.cell_data[0]
+    # lineage.plot(node_hover_features=["cell_ID", "cell_name"])

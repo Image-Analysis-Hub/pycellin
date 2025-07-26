@@ -1,79 +1,18 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """Unit test for TrackMate XML file loader."""
 
-from copy import deepcopy
 import io
+from copy import deepcopy
 from typing import Any
 
-from lxml import etree as ET
 import networkx as nx
-import networkx.algorithms.isomorphism as iso
 import pytest
+from lxml import etree as ET
 
-from pycellin.classes import CellLineage, Feature, FeaturesDeclaration
 import pycellin.io.trackmate.loader as tml
-
-
-def is_equal(obt, exp):
-    """Check if two graphs are perfectly identical.
-
-    It checks that the graphs are isomorphic, and that their graph,
-    nodes and edges attributes are all identical.
-
-    Args:
-        obt (nx.DiGraph): The obtained graph, built from XML_reader.py.
-        exp (nx.DiGraph): The expected graph, built from here.
-
-    Returns:
-        bool: True if the graphs are identical, False otherwise.
-    """
-    edges_attr = list(set([k for (n1, n2, d) in exp.edges.data() for k in d]))
-    edges_default = len(edges_attr) * [0]
-    em = iso.categorical_edge_match(edges_attr, edges_default)
-    nodes_attr = list(set([k for (n, d) in exp.nodes.data() for k in d]))
-    nodes_default = len(nodes_attr) * [0]
-    nm = iso.categorical_node_match(nodes_attr, nodes_default)
-
-    if not obt.nodes.data() and not exp.nodes.data():
-        same_nodes = True
-    elif len(obt.nodes.data()) != len(exp.nodes.data()):
-        same_nodes = False
-    else:
-        for data1, data2 in zip(sorted(obt.nodes.data()), sorted(exp.nodes.data())):
-            n1, attr1 = data1
-            n2, attr2 = data2
-            if sorted(attr1) == sorted(attr2) and n1 == n2:
-                same_nodes = True
-            else:
-                same_nodes = False
-
-    if not obt.edges.data() and not exp.edges.data():
-        same_edges = True
-    elif len(obt.edges.data()) != len(exp.edges.data()):
-        same_edges = False
-    else:
-        for data1, data2 in zip(sorted(obt.edges.data()), sorted(exp.edges.data())):
-            n11, n12, attr1 = data1
-            n21, n22, attr2 = data2
-            if sorted(attr1) == sorted(attr2) and sorted((n11, n12)) == sorted(
-                (n21, n22)
-            ):
-                same_edges = True
-            else:
-                same_edges = False
-
-    if (
-        nx.is_isomorphic(obt, exp, edge_match=em, node_match=nm)
-        and obt.graph == exp.graph
-        and same_nodes
-        and same_edges
-    ):
-        return True
-    else:
-        return False
-
+from pycellin.classes import CellLineage, Feature, FeaturesDeclaration
+from pycellin.utils import is_equal
 
 # Fixtures #####################################################################
 
@@ -211,7 +150,7 @@ def track_feats(
 
 
 def test_get_units():
-    xml_data = '<Model spatialunits="µm" timeunits="min">' "</Model>"
+    xml_data = '<Model spatialunits="µm" timeunits="min"></Model>'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     obtained = tml._get_units(element)
@@ -222,7 +161,7 @@ def test_get_units():
 
 
 def test_get_units_missing_spaceunits():
-    xml_data = '<Model timeunits="min">' "</Model>"
+    xml_data = '<Model timeunits="min"></Model>'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     obtained = tml._get_units(element)
@@ -233,7 +172,7 @@ def test_get_units_missing_spaceunits():
 
 
 def test_get_units_missing_timeunits():
-    xml_data = '<Model spatialunits="µm">' "</Model>"
+    xml_data = '<Model spatialunits="µm"></Model>'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     obtained = tml._get_units(element)
@@ -244,7 +183,7 @@ def test_get_units_missing_timeunits():
 
 
 def test_get_units_no_units():
-    xml_data = "<Model>" "</Model>"
+    xml_data = "<Model></Model>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     obtained = tml._get_units(element)
@@ -275,7 +214,7 @@ def test_get_features_dict():
 
 
 def test_get_features_dict_no_feature_tag():
-    xml_data = "<SpotFeatures>" "</SpotFeatures>"
+    xml_data = "<SpotFeatures></SpotFeatures>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     features = tml._get_features_dict(it, element)
@@ -408,7 +347,7 @@ def test_add_all_features(
 
 
 def test_add_all_features_empty():
-    xml_data = "<FeatureDeclarations>" "</FeatureDeclarations>"
+    xml_data = "<FeatureDeclarations></FeatureDeclarations>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
@@ -626,12 +565,7 @@ def test_add_all_nodes_only_ID_attribute():
 
 def test_add_all_nodes_no_node_attributes():
     xml_data = (
-        "<data>"
-        "   <frame>"
-        "       <Spot />"
-        '       <Spot ID="1001" />'
-        "   </frame>"
-        "</data>"
+        '<data>   <frame>       <Spot />       <Spot ID="1001" />   </frame></data>'
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
@@ -646,7 +580,7 @@ def test_add_all_nodes_no_node_attributes():
 
 
 def test_add_all_nodes_no_nodes():
-    xml_data = "<data>" "   <frame />" "</data>"
+    xml_data = "<data>   <frame /></data>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
@@ -885,9 +819,7 @@ def test_build_tracks_no_track_ID():
 
 
 def test_get_filtered_tracks_ID():
-    xml_data = (
-        "<data>" '   <TrackID TRACK_ID="0" />' '   <TrackID TRACK_ID="1" />' "</data>"
-    )
+    xml_data = '<data>   <TrackID TRACK_ID="0" />   <TrackID TRACK_ID="1" /></data>'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
@@ -897,7 +829,7 @@ def test_get_filtered_tracks_ID():
 
 
 def test_get_filtered_tracks_ID_no_ID():
-    xml_data = "<data>" "   <TrackID />" "   <TrackID />" "</data>"
+    xml_data = "<data>   <TrackID />   <TrackID /></data>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     obtained_ID = tml._get_filtered_tracks_ID(it, element)
@@ -905,166 +837,11 @@ def test_get_filtered_tracks_ID_no_ID():
 
 
 def test_get_filtered_tracks_ID_no_tracks():
-    xml_data = "<data>" "   <tag />" "   <tag />" "</data>"
+    xml_data = "<data>   <tag />   <tag /></data>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     obtained_ID = tml._get_filtered_tracks_ID(it, element)
     assert not obtained_ID
-
-
-# _add_tracks_info ############################################################
-
-
-def test_add_tracks_info():
-    g1_attr = {"name": "blob", "TRACK_ID": 0}
-    g2_attr = {"name": "blub", "TRACK_ID": 1}
-
-    g1_obt = nx.DiGraph()
-    g1_obt.add_node(1, TRACK_ID=0)
-    g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID=1)
-    tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
-
-    g1_exp = nx.DiGraph()
-    g1_exp.graph["name"] = "blob"
-    g1_exp.graph["TRACK_ID"] = 0
-    g1_exp.add_node(1, TRACK_ID=0)
-    g2_exp = nx.DiGraph()
-    g2_exp.graph["name"] = "blub"
-    g2_exp.graph["TRACK_ID"] = 1
-    g2_exp.add_node(2, TRACK_ID=1)
-
-    assert is_equal(g1_obt, g1_exp)
-    assert is_equal(g2_obt, g2_exp)
-
-
-def test_add_tracks_info_no_track_ID_on_all_nodes():
-    g1_attr = {"name": "blob", "TRACK_ID": 0}
-    g2_attr = {"name": "blub", "TRACK_ID": 1}
-
-    g1_obt = nx.DiGraph()
-    g1_obt.add_node(1)
-    g1_obt.add_node(3)
-    g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID=1)
-    tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
-
-    g1_exp = nx.DiGraph()
-    g1_exp.add_node(1)
-    g1_exp.add_node(3)
-    g2_exp = nx.DiGraph()
-    g2_exp.graph["name"] = "blub"
-    g2_exp.graph["TRACK_ID"] = 1
-    g2_exp.add_node(2, TRACK_ID=1)
-
-    assert is_equal(g1_obt, g1_exp)
-    assert is_equal(g2_obt, g2_exp)
-
-
-def test_add_tracks_info_no_track_ID_on_one_node():
-    g1_attr = {"name": "blob", "TRACK_ID": 0}
-    g2_attr = {"name": "blub", "TRACK_ID": 1}
-
-    g1_obt = nx.DiGraph()
-    g1_obt.add_node(1)
-    g1_obt.add_node(3)
-    g1_obt.add_node(4, TRACK_ID=0)
-
-    g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID=1)
-    tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
-
-    g1_exp = nx.DiGraph()
-    g1_exp.graph["name"] = "blob"
-    g1_exp.graph["TRACK_ID"] = 0
-    g1_exp.add_node(1)
-    g1_exp.add_node(3)
-    g1_exp.add_node(4, TRACK_ID=0)
-    g2_exp = nx.DiGraph()
-    g2_exp.graph["name"] = "blub"
-    g2_exp.graph["TRACK_ID"] = 1
-    g2_exp.add_node(2, TRACK_ID=1)
-
-    assert is_equal(g1_obt, g1_exp)
-    assert is_equal(g2_obt, g2_exp)
-
-
-def test_add_tracks_info_different_ID_for_one_track():
-    g1_attr = {"name": "blob", "TRACK_ID": 0}
-    g2_attr = {"name": "blub", "TRACK_ID": 1}
-
-    g1_obt = nx.DiGraph()
-    g1_obt.add_node(1, TRACK_ID=0)
-    g1_obt.add_node(3, TRACK_ID=2)
-    g1_obt.add_node(4, TRACK_ID=0)
-
-    g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID=1)
-    with pytest.raises(ValueError):
-        tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
-
-
-def test_add_tracks_info_no_nodes():
-    g1_attr = {"name": "blob", "TRACK_ID": 0}
-    g2_attr = {"name": "blub", "TRACK_ID": 1}
-
-    g1_obt = nx.DiGraph()
-    g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID=1)
-    tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
-
-    g1_exp = nx.DiGraph()
-    g2_exp = nx.DiGraph()
-    g2_exp.graph["name"] = "blub"
-    g2_exp.graph["TRACK_ID"] = 1
-    g2_exp.add_node(2, TRACK_ID=1)
-
-    assert is_equal(g1_obt, g1_exp)
-    assert is_equal(g2_obt, g2_exp)
-
-
-# _split_graph_into_lineages ##################################################
-
-
-def test_split_graph_into_lineages():
-    g1_attr = {"name": "blob", "TRACK_ID": 1}
-    g2_attr = {"name": "blub", "TRACK_ID": 2}
-
-    g = nx.DiGraph()
-    g.add_node(1, TRACK_ID=1)
-    g.add_node(2, TRACK_ID=1)
-    g.add_edge(1, 2)
-    g.add_node(3, TRACK_ID=2)
-    g.add_node(4, TRACK_ID=2)
-    g.add_edge(3, 4)
-    obtained = tml._split_graph_into_lineages(g, [g1_attr, g2_attr])
-
-    g1_exp = CellLineage(g.subgraph([1, 2]))
-    g1_exp.graph["name"] = "blob"
-    g1_exp.graph["TRACK_ID"] = 1
-    g2_exp = CellLineage(g.subgraph([3, 4]))
-    g2_exp.graph["name"] = "blub"
-    g2_exp.graph["TRACK_ID"] = 2
-
-    assert len(obtained) == 2
-    assert is_equal(obtained[0], g1_exp)
-    assert is_equal(obtained[1], g2_exp)
-
-
-def test_split_graph_into_lineages_different_ID():
-    g1_attr = {"name": "blob", "TRACK_ID": 1}
-    g2_attr = {"name": "blub", "TRACK_ID": 2}
-
-    g = nx.DiGraph()
-    g.add_node(1, TRACK_ID=0)
-    g.add_node(2, TRACK_ID=1)
-    g.add_edge(1, 2)
-    g.add_node(3, TRACK_ID=2)
-    g.add_node(4, TRACK_ID=2)
-    g.add_edge(3, 4)
-
-    with pytest.raises(ValueError):
-        tml._split_graph_into_lineages(g, [g1_attr, g2_attr])
 
 
 # _update_node_feature_key ####################################################
