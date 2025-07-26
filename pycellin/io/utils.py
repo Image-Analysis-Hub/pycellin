@@ -141,6 +141,9 @@ def _update_node_feature_key(
     lineage: CellLineage,
     old_key: str,
     new_key: str,
+    enforce_old_key_existence: bool = False,
+    set_default_if_missing: bool = False,
+    default_value: Any | None = None,
 ) -> None:
     """
     Update the key of a feature in all the nodes of a lineage.
@@ -153,10 +156,34 @@ def _update_node_feature_key(
         The old key of the feature.
     new_key : str
         The new key of the feature.
+    enforce_old_key_existence : bool, optional
+        If True, raises an error when the old key does not exist in a node.
+        If False, the function will skip nodes that do not have the old key.
+        Defaults to False.
+    set_default_if_missing : bool, optional
+        If True, set the new key to `default_value` when the old key does not exist.
+        If False, the new key will not be set when the old key does not exist.
+        Defaults to False.
+    default_value : Any | None, optional
+        The default value to set if the old key does not exist
+        and set_default_if_missing is True. Defaults to None.
+
+    Raises
+    ------
+    ValueError
+        If enforce_old_key_existence is True and the old key does not exist
+        in a node.
     """
     for node in lineage.nodes:
         if old_key in lineage.nodes[node]:
             lineage.nodes[node][new_key] = lineage.nodes[node].pop(old_key)
+        else:
+            if enforce_old_key_existence:
+                raise ValueError(
+                    f"Node {node} does not have the required key '{old_key}'."
+                )
+            if set_default_if_missing:
+                lineage.nodes[node][new_key] = default_value
 
 
 def _update_lineage_feature_key(

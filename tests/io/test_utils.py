@@ -19,7 +19,51 @@ from pycellin.utils import is_equal
 # _update_node_feature_key ####################################################
 
 
+# def _update_node_feature_key(
+#     lineage: CellLineage,
+#     old_key: str,
+#     new_key: str,
+#     enforce_old_key_existence: bool = False,
+#     set_default_if_missing: bool = False,
+#     default_value: Any | None = None,
+# ) -> None:
+#     """
+#     Update the key of a feature in all the nodes of a lineage.
+
+#     Parameters
+#     ----------
+#     lineage : CellLineage
+#         The lineage to update.
+#     old_key : str
+#         The old key of the feature.
+#     new_key : str
+#         The new key of the feature.
+#     enforce_old_key_existence : bool, optional
+#         If True, raises an error when the old key does not exist in a node.
+#         If False, the function will skip nodes that do not have the old key.
+#         Defaults to False.
+#     set_default_if_missing : bool, optional
+#         If True, set the new key to `default_value` when the old key does not exist.
+#         If False, the new key will not be set when the old key does not exist.
+#         Defaults to False.
+#     default_value : Any | None, optional
+#         The default value to set if the old key does not exist
+#         and set_default_if_missing is True. Defaults to None.
+#     """
+#     for node in lineage.nodes:
+#         if old_key in lineage.nodes[node]:
+#             lineage.nodes[node][new_key] = lineage.nodes[node].pop(old_key)
+#         else:
+#             if enforce_old_key_existence:
+#                 raise ValueError(
+#                     f"Node {node} does not have the required key '{old_key}'."
+#                 )
+#             if set_default_if_missing:
+#                 lineage.nodes[node][new_key] = default_value
+
+
 def test_update_node_feature_key():
+    """Test updating a node feature key."""
     lineage = CellLineage()
     old_key_values = ["value1", "value2", "value3"]
     lineage.add_node(1, old_key=old_key_values[0])
@@ -32,6 +76,92 @@ def test_update_node_feature_key():
         assert "new_key" in lineage.nodes[node]
         assert "old_key" not in lineage.nodes[node]
         assert lineage.nodes[node]["new_key"] == old_key_values[i]
+
+
+def test_update_node_feature_key_missing_old_key_skip():
+    """Test that nodes without old_key are skipped when enforce_old_key_existence=False."""
+    lineage = CellLineage()
+    lineage.add_node(1, old_key="value1")
+    lineage.add_node(2)  # No old_key
+    lineage.add_node(3, old_key="value3")
+
+    _update_node_feature_key(lineage, "old_key", "new_key")
+
+    assert lineage.nodes[1]["new_key"] == "value1"
+    assert "old_key" not in lineage.nodes[1]
+    assert "new_key" not in lineage.nodes[2]
+    assert "old_key" not in lineage.nodes[2]
+    assert lineage.nodes[3]["new_key"] == "value3"
+    assert "old_key" not in lineage.nodes[3]
+
+
+def test_update_node_feature_key_enforce_old_key_existence():
+    """Test that missing old_key raises error when enforce_old_key_existence=True."""
+    lineage = CellLineage()
+    lineage.add_node(1, old_key="value1")
+    lineage.add_node(2)  # No old_key
+
+    with pytest.raises(
+        ValueError, match="Node 2 does not have the required key 'old_key'"
+    ):
+        _update_node_feature_key(
+            lineage, "old_key", "new_key", enforce_old_key_existence=True
+        )
+
+
+def test_update_node_feature_key_set_default_if_missing():
+    """Test setting default value when old_key is missing and set_default_if_missing=True."""
+    lineage = CellLineage()
+    lineage.add_node(1, old_key="value1")
+    lineage.add_node(2)  # No old_key
+    lineage.add_node(3, old_key="value3")
+
+    _update_node_feature_key(
+        lineage,
+        "old_key",
+        "new_key",
+        set_default_if_missing=True,
+        default_value="default",
+    )
+
+    assert lineage.nodes[1]["new_key"] == "value1"
+    assert "old_key" not in lineage.nodes[1]
+    assert lineage.nodes[2]["new_key"] == "default"
+    assert "old_key" not in lineage.nodes[2]
+    assert lineage.nodes[3]["new_key"] == "value3"
+    assert "old_key" not in lineage.nodes[3]
+
+
+def test_update_node_feature_key_set_default_none():
+    """Test setting None as default value when old_key is missing."""
+    lineage = CellLineage()
+    lineage.add_node(1, old_key="value1")
+    lineage.add_node(2)  # No old_key
+
+    _update_node_feature_key(lineage, "old_key", "new_key", set_default_if_missing=True)
+
+    assert lineage.nodes[1]["new_key"] == "value1"
+    assert lineage.nodes[2]["new_key"] is None
+
+
+def test_update_node_feature_key_empty_lineage():
+    """Test function with empty lineage (no nodes)."""
+    lineage = CellLineage()
+    # Should not raise an error and do nothing
+    _update_node_feature_key(lineage, "old_key", "new_key")
+    assert len(lineage.nodes) == 0
+
+
+def test_update_node_feature_key_same_key_name():
+    """Test updating a key to itself (should work without issues)."""
+    lineage = CellLineage()
+    lineage.add_node(1, test_key="value1")
+    lineage.add_node(2, test_key="value2")
+
+    _update_node_feature_key(lineage, "test_key", "test_key")
+
+    assert lineage.nodes[1]["test_key"] == "value1"
+    assert lineage.nodes[2]["test_key"] == "value2"
 
 
 # _update_lineage_feature_key #################################################
