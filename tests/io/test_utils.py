@@ -11,7 +11,7 @@ from pycellin.io.utils import (
     _split_graph_into_lineages,
     _update_node_feature_key,
     _update_lineage_feature_key,
-    _update_lineage_ID_key,
+    _update_lineages_IDs_key,
 )
 from pycellin.utils import is_equal
 
@@ -177,48 +177,105 @@ def test_update_lineage_feature_key():
     assert "old_key" not in lineage.graph
 
 
-# _update_lineage_feature_key #################################################
+# _update_lineages_IDs_key #################################################
 
 
-def test_update_lineage_ID_key():
-    lineage = CellLineage()
-    lineage.add_nodes_from([1, 2, 3])
-    lineage.graph["TRACK_ID"] = 10
-    new_lin_ID = _update_lineage_ID_key(lineage, "TRACK_ID")
-    assert new_lin_ID is None
-    assert "lineage_ID" in lineage.graph
-    assert lineage.graph["lineage_ID"] == 10
-    assert "lineage_ID" not in lineage.nodes[1]
+def test_update_lineages_IDs_key():
+    """Test updating lineage IDs key."""
+    lin1 = CellLineage()
+    lin1.add_nodes_from([1, 2, 3])
+    lin1.graph["TRACK_ID"] = 10
+    lin2 = CellLineage()
+    lin2.add_nodes_from([4, 5])
+    lin2.graph["TRACK_ID"] = 20
+
+    _update_lineages_IDs_key([lin1, lin2], "TRACK_ID")
+    assert lin1.graph["lineage_ID"] == 10
+    assert lin2.graph["lineage_ID"] == 20
+    assert "TRACK_ID" not in lin1.graph
+    assert "TRACK_ID" not in lin2.graph
 
 
-def test_update_lineage_ID_key_no_key_multi_node():
-    lineage = CellLineage()
-    lineage.add_nodes_from([1, 2, 3])
-    new_lin_ID = _update_lineage_ID_key(lineage, "TRACK_ID", 0)
-    assert new_lin_ID == 0
-    assert "lineage_ID" in lineage.graph
-    assert lineage.graph["lineage_ID"] == 0
+def test_update_lineages_IDs_key_no_key_multi_node():
+    """Test updating lineage IDs key when no TRACK_ID key is present in a multi-node lineage."""
+    lin1 = CellLineage()
+    lin1.add_nodes_from([1, 2, 3])
+    lin2 = CellLineage()
+    lin2.add_nodes_from([4, 5])
+    lin2.graph["TRACK_ID"] = 20
+
+    _update_lineages_IDs_key([lin1, lin2], "TRACK_ID")
+    assert lin1.graph["lineage_ID"] == 21
+    assert lin2.graph["lineage_ID"] == 20
+    assert "TRACK_ID" not in lin1.graph
+    assert "TRACK_ID" not in lin2.graph
 
 
-def test_update_lineage_ID_key_no_key_one_node():
-    lineage = CellLineage()
-    lineage.add_node(1)
-    new_lin_ID = _update_lineage_ID_key(lineage, "TRACK_ID")
-    assert new_lin_ID == -1
-    assert "lineage_ID" in lineage.graph
-    assert lineage.graph["lineage_ID"] == -1
+def test_update_lineages_IDs_key_no_key_one_node():
+    """Test updating lineage IDs key when no TRACK_ID key is present in a one-node lineage."""
+    lin1 = CellLineage()
+    lin1.add_node(1)
+    lin2 = CellLineage()
+    lin2.add_nodes_from([4, 5])
+    lin2.graph["TRACK_ID"] = 20
+    _update_lineages_IDs_key([lin1, lin2], "TRACK_ID")
+    assert lin1.graph["lineage_ID"] == -1
+    assert lin2.graph["lineage_ID"] == 20
 
 
-def test_update_lineage_ID_key_no_key_no_new_ID():
-    lineage = CellLineage()
-    lineage.add_nodes_from([1, 2, 3])
-    with pytest.raises(
-        TypeError,
-        match=(
-            "Missing available_ID argument for multi-node lineage with no TRACK_ID key."
-        ),
-    ):
-        _update_lineage_ID_key(lineage, "TRACK_ID", None)
+def test_update_lineages_IDs_key_all_lineages_no_key():
+    """Test updating lineage IDs key when no lineages have the key."""
+    lin1 = CellLineage()
+    lin1.add_nodes_from([1, 2, 3])
+    lin2 = CellLineage()
+    lin2.add_nodes_from([4, 5])
+    lin3 = CellLineage()
+    lin3.add_node(6)
+
+    _update_lineages_IDs_key([lin1, lin2, lin3], "TRACK_ID")
+    assert lin1.graph["lineage_ID"] == 0
+    assert lin2.graph["lineage_ID"] == 1
+    assert lin3.graph["lineage_ID"] == -6
+    assert "TRACK_ID" not in lin1.graph
+    assert "TRACK_ID" not in lin2.graph
+    assert "TRACK_ID" not in lin3.graph
+
+
+def test_update_lineages_IDs_key_empty_list():
+    """Test updating lineage IDs key with empty lineages list."""
+    _update_lineages_IDs_key([], "TRACK_ID")
+
+
+def test_update_lineages_IDs_key_mixed_scenarios():
+    """Test with mix of single-node, multi-node, and lineages with existing keys."""
+    lin1 = CellLineage()  # single node, no key
+    lin1.add_node(1)
+    lin2 = CellLineage()  # multi-node, no key
+    lin2.add_nodes_from([2, 3])
+    lin3 = CellLineage()  # has key
+    lin3.add_node(4)
+    lin3.graph["TRACK_ID"] = 10
+    lin4 = CellLineage()  # single node, no key
+    lin4.add_node(5)
+
+    _update_lineages_IDs_key([lin1, lin2, lin3, lin4], "TRACK_ID")
+    assert lin1.graph["lineage_ID"] == -1
+    assert lin2.graph["lineage_ID"] == 11
+    assert lin3.graph["lineage_ID"] == 10
+    assert lin4.graph["lineage_ID"] == -5
+
+
+def test_update_lineages_IDs_key_preserves_other_graph_attributes():
+    """Test that other graph attributes are preserved."""
+    lin1 = CellLineage()
+    lin1.add_node(1)
+    lin1.graph["TRACK_ID"] = 10
+    lin1.graph["other_attr"] = "value"
+
+    _update_lineages_IDs_key([lin1], "TRACK_ID")
+    assert lin1.graph["lineage_ID"] == 10
+    assert lin1.graph["other_attr"] == "value"
+    assert "TRACK_ID" not in lin1.graph
 
 
 # _add_lineages_features ############################################################

@@ -207,57 +207,37 @@ def _update_lineage_feature_key(
         lineage.graph[new_key] = lineage.graph.pop(old_key)
 
 
-def _update_lineage_ID_key(
-    lineage: CellLineage,
+def _update_lineages_IDs_key(
+    lineages: list[CellLineage],
     lineage_ID_key: str,
-    available_ID: int | None = None,
 ) -> int | None:
     """
-    Update the lineage ID key in the lineage graph to match pycellin convention.
+    Update the lineage ID key of lineage graphs to match pycellin convention.
 
     In the case of a one-node lineage, it is possible that the lineage does not have
     a key to identify it. So we define the lineage_ID as minus the node ID.
     That way, it is easy to discriminate between one-node lineages
     (negative IDs) and multi-nodes lineages (positive IDs).
+    If the lineage_ID_key is not present in the lineage graph, a "lineage_ID" key
+    is created and set to the next available lineage ID.
 
     Parameters
     ----------
-    lineage : CellLineage
-        The lineage to update.
+    lineages : list[CellLineage]
+        The lineages to update.
     lineage_ID_key : str
-        The key that is the lineage identifier in the lineage graph.
-    available_ID : int | None, optional
-        The next available lineage ID to use if the lineage does not have one.
-
-    Returns
-    -------
-    int | None
-        The lineage ID if it was created, or None if it was already present.
-
-    Raises
-    ------
-    TypeError
-        If the lineage is a multi-node lineage and no available_ID is provided.
+        The key that is the lineage identifier in lineage graphs.
     """
-    try:
-        # If the lineage has a lineage_ID_key, we rename it to "lineage_ID".
-        # This is the key used by pycellin to identify lineages.
-        lineage.graph["lineage_ID"] = lineage.graph.pop(lineage_ID_key)
-        return None
-    except KeyError:
-        if len(lineage) == 1:
-            # If the lineage has only one node, we set the lineage ID to minus the node ID.
-            # This is a convention used by pycellin to identify one-node lineages.
-            node = list(lineage.nodes)[0]
-            lineage.graph["lineage_ID"] = -node
-            return -node
-        else:
-            # If the lineage does not have a lineage_ID_key, we create it.
-            # We set the ID of a multi-node lineage to the next available lineage ID.
-            if available_ID is None:
-                raise TypeError(
-                    "Missing available_ID argument for multi-node lineage "
-                    f"with no {lineage_ID_key} key."
-                )
-            lineage.graph["lineage_ID"] = available_ID
-            return available_ID
+    ids = [lin.graph[lineage_ID_key] for lin in lineages if lineage_ID_key in lin.graph]
+    next_id = max(ids) + 1 if ids else 0
+
+    for lin in lineages:
+        try:
+            lin.graph["lineage_ID"] = lin.graph.pop(lineage_ID_key)
+        except KeyError:
+            if len(lin) == 1:
+                node = list(lin.nodes)[0]
+                lin.graph["lineage_ID"] = -node
+            else:
+                lin.graph["lineage_ID"] = next_id
+                next_id += 1

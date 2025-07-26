@@ -23,7 +23,7 @@ from pycellin.io.utils import (
     check_fusions,
     _update_node_feature_key,
     _update_lineage_feature_key,
-    _update_lineage_ID_key,
+    _update_lineages_IDs_key,
 )
 
 
@@ -832,15 +832,16 @@ def _parse_model_tag(
     # We only rename features that are either essential to the functioning of
     # pycellin or confusing (e.g. "name" is a spot and a track feature).
     _update_features_declaration(fd, units, segmentation)
+    _update_lineages_IDs_key(lineages, "TRACK_ID")
     for lin in lineages:
         for key_name, new_key in [
+            ("TRACK_ID", "lineage_ID"),  # mandatory
             ("ID", "cell_ID"),  # mandatory
             ("FRAME", "frame"),  # mandatory
             ("name", "cell_name"),  # confusing
         ]:
             _update_node_feature_key(lin, key_name, new_key)
         _update_lineage_feature_key(lin, "name", "lineage_name")
-        _update_lineage_ID_key(lin, "TRACK_ID")
         _update_location_related_features(lin)
 
         # Adding if each track was present in the 'FilteredTracks' tag
@@ -1077,12 +1078,15 @@ if __name__ == "__main__":
     # xml = "sample_data/Celegans-5pc-17timepoints.xml"
 
     model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
-    print(model)
-    print(model.feat_declaration)
-    print(model.metadata["Pycellin_version"])
+    # print(model)
+    # print(model.feat_declaration)
+    # print(model.metadata["Pycellin_version"])
     # print(model.metadata)
     # print(model.fdec.node_feats.keys())
     # print(model.data)
+    # for lin in model.get_cell_lineages():
+    #     print(lin)
 
-    # lineage = model.data.cell_data[0]
-    # lineage.plot(node_hover_features=["cell_ID", "cell_name"])
+    lineage = model.data.cell_data[1]
+    # print(lineage.nodes(data="lineage_ID"))
+    lineage.plot(node_hover_features=["cell_ID", "cell_name", "lineage_ID"])
