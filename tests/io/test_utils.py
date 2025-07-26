@@ -6,8 +6,90 @@ import networkx as nx
 import pytest
 
 from pycellin.classes import CellLineage
-from pycellin.io.utils import _add_lineages_features, _split_graph_into_lineages
+from pycellin.io.utils import (
+    _add_lineages_features,
+    _split_graph_into_lineages,
+    _update_node_feature_key,
+    _update_lineage_feature_key,
+    _update_lineage_ID_key,
+)
 from pycellin.utils import is_equal
+
+
+# _update_node_feature_key ####################################################
+
+
+def test_update_node_feature_key():
+    lineage = CellLineage()
+    old_key_values = ["value1", "value2", "value3"]
+    lineage.add_node(1, old_key=old_key_values[0])
+    lineage.add_node(2, old_key=old_key_values[1])
+    lineage.add_node(3, old_key=old_key_values[2])
+
+    _update_node_feature_key(lineage, "old_key", "new_key")
+
+    for i, node in enumerate(lineage.nodes):
+        assert "new_key" in lineage.nodes[node]
+        assert "old_key" not in lineage.nodes[node]
+        assert lineage.nodes[node]["new_key"] == old_key_values[i]
+
+
+# _update_lineage_feature_key #################################################
+
+
+def test_update_lineage_feature_key():
+    lineage = CellLineage()
+    lineage.graph["old_key"] = "old_value"
+    _update_lineage_feature_key(lineage, "old_key", "new_key")
+
+    assert "new_key" in lineage.graph
+    assert lineage.graph["new_key"] == "old_value"
+    assert "old_key" not in lineage.graph
+
+
+# _update_lineage_feature_key #################################################
+
+
+def test_update_lineage_ID_key():
+    lineage = CellLineage()
+    lineage.add_nodes_from([1, 2, 3])
+    lineage.graph["TRACK_ID"] = 10
+    new_lin_ID = _update_lineage_ID_key(lineage, "TRACK_ID")
+    assert new_lin_ID is None
+    assert "lineage_ID" in lineage.graph
+    assert lineage.graph["lineage_ID"] == 10
+    assert "lineage_ID" not in lineage.nodes[1]
+
+
+def test_update_lineage_ID_key_no_key_multi_node():
+    lineage = CellLineage()
+    lineage.add_nodes_from([1, 2, 3])
+    new_lin_ID = _update_lineage_ID_key(lineage, "TRACK_ID", 0)
+    assert new_lin_ID == 0
+    assert "lineage_ID" in lineage.graph
+    assert lineage.graph["lineage_ID"] == 0
+
+
+def test_update_lineage_ID_key_no_key_one_node():
+    lineage = CellLineage()
+    lineage.add_node(1)
+    new_lin_ID = _update_lineage_ID_key(lineage, "TRACK_ID")
+    assert new_lin_ID == -1
+    assert "lineage_ID" in lineage.graph
+    assert lineage.graph["lineage_ID"] == -1
+
+
+def test_update_lineage_ID_key_no_key_no_new_ID():
+    lineage = CellLineage()
+    lineage.add_nodes_from([1, 2, 3])
+    with pytest.raises(
+        TypeError,
+        match=(
+            "Missing available_ID argument for multi-node lineage with no TRACK_ID key."
+        ),
+    ):
+        _update_lineage_ID_key(lineage, "TRACK_ID", None)
+
 
 # _add_lineages_features ############################################################
 

@@ -18,7 +18,13 @@ from pycellin.classes import (
     Model,
     cell_ID_Feature,
 )
-from pycellin.io.utils import _split_graph_into_lineages, check_fusions
+from pycellin.io.utils import (
+    _split_graph_into_lineages,
+    check_fusions,
+    _update_node_feature_key,
+    _update_lineage_feature_key,
+    _update_lineage_ID_key,
+)
 
 
 def _get_units(
@@ -691,76 +697,6 @@ def _update_features_declaration(
             fdec._modify_feature_description(f"lineage_{axis}", desc)
 
 
-def _update_node_feature_key(
-    lineage: CellLineage,
-    old_key: str,
-    new_key: str,
-) -> None:
-    """
-    Update the key of a feature in all the nodes of a lineage.
-
-    Parameters
-    ----------
-    lineage : CellLineage
-        The lineage to update.
-    old_key : str
-        The old key of the feature.
-    new_key : str
-        The new key of the feature.
-    """
-    for node in lineage.nodes:
-        if old_key in lineage.nodes[node]:
-            lineage.nodes[node][new_key] = lineage.nodes[node].pop(old_key)
-
-
-def _update_lineage_feature_key(
-    lineage: CellLineage,
-    old_key: str,
-    new_key: str,
-) -> None:
-    """
-    Update the key of a feature in the graph of a lineage.
-
-    Parameters
-    ----------
-    lineage : CellLineage
-        The lineage to update.
-    old_key : str
-        The old key of the feature.
-    new_key : str
-        The new key of the feature.
-    """
-    if old_key in lineage.graph:
-        lineage.graph[new_key] = lineage.graph.pop(old_key)
-
-
-def _update_TRACK_ID(
-    lineage: CellLineage,
-) -> None:
-    """
-    Update the TRACK_ID feature in the nodes and in the graph of a lineage.
-
-    In the case of a one-node lineage, TRACK_ID does not exist in the graph
-    nor in the nodes. So we define the lineage_ID as minus the node ID.
-    That way, it is easy to discriminate between one-node lineages
-    (negative IDs) and multi-nodes lineages (positive IDs).
-
-    Parameters
-    ----------
-    lineage : CellLineage
-        The lineage to update.
-    """
-    if "TRACK_ID" in lineage.graph:
-        lineage.graph["lineage_ID"] = lineage.graph.pop("TRACK_ID")
-    else:
-        # One-node graph don't have the TRACK_ID feature in the graph
-        # or in the nodes, so we have to create it.
-        # We set the ID of a one-node lineage to the negative of the node ID.
-        assert len(lineage) == 1, "TRACK_ID not found and not a one-node lineage."
-        node = [n for n in lineage.nodes][0]
-        lineage.graph["lineage_ID"] = -node
-
-
 def _update_location_related_features(
     lineage: CellLineage,
 ) -> None:
@@ -904,7 +840,7 @@ def _parse_model_tag(
         ]:
             _update_node_feature_key(lin, key_name, new_key)
         _update_lineage_feature_key(lin, "name", "lineage_name")
-        _update_TRACK_ID(lin)
+        _update_lineage_ID_key(lin, "TRACK_ID")
         _update_location_related_features(lin)
 
         # Adding if each track was present in the 'FilteredTracks' tag
