@@ -891,6 +891,8 @@ def _update_location_related_features(
         #             coord_u = lineage.nodes[u][f"cell_{axis}"]
         #             coord_v = lineage.nodes[v][f"cell_{axis}"]
         #             data[f"link_{axis}"] = (coord_u + coord_v) / 2
+    else:
+        has_edge_location = False
 
     # Lineage
     if "TRACK_X_LOCATION" in lineage.graph:
