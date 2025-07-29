@@ -3,7 +3,7 @@
 
 from copy import deepcopy
 from datetime import datetime
-import importlib
+import importlib.metadata
 from pathlib import Path
 from typing import Any
 import warnings
@@ -15,6 +15,7 @@ from pycellin.classes import Model
 from pycellin.classes import FeaturesDeclaration, Feature, cell_ID_Feature
 from pycellin.classes import Data
 from pycellin.classes import CellLineage
+from pycellin.custom_types import FeatureType
 
 
 def _get_units(
@@ -238,7 +239,7 @@ def _add_all_features(
 def _convert_attributes(
     attributes: dict[str, str],
     features: dict[str, Feature],
-    feature_type: str,
+    feature_type: FeatureType,
 ) -> None:
     """
     Convert the values of `attributes` from string to the correct data type.
@@ -253,7 +254,7 @@ def _convert_attributes(
     features : dict[str, Feature]
         The dictionary of features that contains the information on how to convert
         the values of `attributes`.
-    feature_type : str
+    feature_type : FeatureType
         The type of the feature to convert (node, edge, or lineage).
 
     Raises
@@ -1058,19 +1059,11 @@ def _get_specific_tags(
         was found in the XML file, and the corresponding value is the
         deep copied `ET._Element` object for that tag.
     """
-    it = ET.iterparse(xml_path, events=["start", "end"])
     dict_tags = {}
-    for event, element in it:
-        if event == "start" and element.tag in tag_names:
+    for tag in tag_names:
+        it = ET.iterparse(xml_path, tag=tag)
+        for _, element in it:
             dict_tags[element.tag] = deepcopy(element)
-            tag_names.remove(element.tag)
-            if not tag_names:
-                # All the tags have been found.
-                break
-
-        if event == "end":
-            element.clear()
-
     return dict_tags
 
 
@@ -1091,11 +1084,10 @@ def _get_trackmate_version(
         The version of TrackMate used to generate the XML file. If the
         version cannot be found, "unknown" is returned.
     """
-    it = ET.iterparse(xml_path, events=["start", "end"])
-    for event, element in it:
-        if event == "start" and element.tag == "TrackMate":
-            version = str(element.attrib["version"])
-            return version
+    it = ET.iterparse(xml_path, tag="TrackMate")
+    for _, element in it:
+        version = str(element.attrib["version"])
+        return version
     return "unknown"
 
 
@@ -1120,19 +1112,17 @@ def _get_time_step(settings: ET._Element) -> float:
     KeyError
         If the 'ImageData' element is not found in the settings.
     """
-    for element in settings.iterchildren():
-        if element.tag == "ImageData":
-            try:
-                return float(element.attrib["timeinterval"])
-            except KeyError:
-                raise KeyError(
-                    "The 'timeinterval' attribute is missing "
-                    "in the 'ImageData' element."
-                )
-            except ValueError:
-                raise ValueError(
-                    "The 'timeinterval' attribute cannot be converted to float."
-                )
+    for element in settings.iterchildren("ImageData"):
+        try:
+            return float(element.attrib["timeinterval"])
+        except KeyError:
+            raise KeyError(
+                "The 'timeinterval' attribute is missing in the 'ImageData' element."
+            )
+        except ValueError:
+            raise ValueError(
+                "The 'timeinterval' attribute cannot be converted to float."
+            )
 
     raise KeyError("The 'ImageData' element is not found in the settings.")
 
@@ -1160,24 +1150,23 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
         If the 'pixelwidth', 'pixelheight' or 'voxeldepth' attribute is missing,
         or if the 'ImageData' element is not found in the settings.
     """
-    for element in settings.iterchildren():
-        if element.tag == "ImageData":
-            pixel_size = {}
-            for key_TM, key_pycellin in zip(
-                ["pixelwidth", "pixelheight", "voxeldepth"],
-                ["width", "height", "depth"],
-            ):
-                try:
-                    pixel_size[key_pycellin] = float(element.attrib[key_TM])
-                except KeyError:
-                    raise KeyError(
-                        f"The {key_TM} attribute is missing in the 'ImageData' element."
-                    )
-                except ValueError:
-                    raise ValueError(
-                        f"The {key_TM} attribute cannot be converted to float."
-                    )
-            return pixel_size
+    for element in settings.iterchildren("ImageData"):
+        pixel_size = {}
+        for key_TM, key_pycellin in zip(
+            ["pixelwidth", "pixelheight", "voxeldepth"],
+            ["width", "height", "depth"],
+        ):
+            try:
+                pixel_size[key_pycellin] = float(element.attrib[key_TM])
+            except KeyError:
+                raise KeyError(
+                    f"The {key_TM} attribute is missing " "in the 'ImageData' element."
+                )
+            except ValueError:
+                raise ValueError(
+                    f"The {key_TM} attribute cannot be converted to float."
+                )
+        return pixel_size
 
     raise KeyError("The 'ImageData' element is not found in the settings.")
 
@@ -1229,7 +1218,7 @@ def load_TrackMate_XML(
         version = importlib.metadata.version("pycellin")
     except importlib.metadata.PackageNotFoundError:
         version = "unknown"
-    metadata["Pycellin_version"] = version
+    metadata["pycellin_version"] = version
     metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
     dict_tags = _get_specific_tags(
         xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
@@ -1264,19 +1253,17 @@ if __name__ == "__main__":
     # xml = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
     xml = "sample_data/Celegans-5pc-17timepoints.xml"
 
-    xml = "C:/Users/lxenard/Documents/Code/mastodon_data_bug_edge_pycellin/test-export2.xml"
-
     model = load_TrackMate_XML(xml)  # , keep_all_spots=True, keep_all_tracks=True)
     print(model)
-    print(model.get_fusions())
 
-    # model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
-    # print(model)
-    # print(model.feat_declaration)
-    # print(model.metadata["Pycellin_version"])
-    # # print(model.metadata)
-    # # print(model.fdec.node_feats.keys())
-    # # print(model.data)
+    print(model.feat_declaration)
+    print(model.metadata["pycellin_version"])
+    print(model.metadata)
+    # print(model.fdec.node_feats.keys())
+    # print(model.data)
+
+    # lineage = model.data.cell_data[0]
+    # lineage.plot(node_hover_features=["cell_ID", "cell_name"])
 
     # lineage = model.data.cell_data[0]
     # lineage.plot(node_hover_features=["cell_ID", "cell_name"])

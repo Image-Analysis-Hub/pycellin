@@ -1159,12 +1159,16 @@ def test_update_location_related_features_one_node():
 
 def test_get_specific_tags():
     xml_path = "sample_data/FakeTracks.xml"
-    tag_names = ["GUIState", "FeaturePenalties"]
+    tag_names = ["GUIState", "FeaturePenalties", "FilteredTracks"]
     obtained = tml._get_specific_tags(xml_path, tag_names)
 
+    nested_element = ET.Element("FilteredTracks")
+    nested_element.append(ET.Element("TrackID", attrib={"TRACK_ID": "0"}))
+    nested_element.append(ET.Element("TrackID", attrib={"TRACK_ID": "4"}))
     expected = {
         "GUIState": ET.Element("GUIState", attrib={"state": "ConfigureViews"}),
         "FeaturePenalties": ET.Element("FeaturePenalties"),  # empty tag
+        "FilteredTracks": nested_element,
     }
 
     assert obtained.keys() == expected.keys()
