@@ -532,7 +532,6 @@ def _build_tracks(
     current_track_id = None
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
-
         # Saving the current track information.
         if element.tag == "Track" and event == "start":
             attribs = deepcopy(element.attrib)
@@ -869,28 +868,50 @@ def _update_location_related_features(
     # Nodes
     for _, data in lineage.nodes(data=True):
         for axis in ["x", "y", "z"]:
-            data[f"cell_{axis}"] = data.pop(f"POSITION_{axis.upper()}")
+            data[f"cell_{axis}"] = data.pop(f"POSITION_{axis.upper()}", None)
 
     # Edges
-    for _, _, data in lineage.edges(data=True):
-        for axis in ["x", "y", "z"]:
-            data[f"link_{axis}"] = data.pop(f"EDGE_{axis.upper()}_LOCATION")
+    # Mastodon does not have the EDGE_{axis}_LOCATION so we have to check existence first
+    if lineage.edges():
+        first_edge = next(iter(lineage.edges(data=True)))
+        has_edge_location = any(
+            f"EDGE_{axis.upper()}_LOCATION" in first_edge[2] for axis in ["x", "y", "z"]
+        )
+        if has_edge_location:
+            for _, _, data in lineage.edges(data=True):
+                for axis in ["x", "y", "z"]:
+                    data[f"link_{axis}"] = data.pop(
+                        f"EDGE_{axis.upper()}_LOCATION", None
+                    )
+        # else:
+        #     # If the EDGE_{axis}_LOCATION features are not present, we compute the mean
+        #     # coordinate of the two nodes of the edge.
+        #     for u, v, data in lineage.edges(data=True):
+        #         for axis in ["x", "y", "z"]:
+        #             coord_u = lineage.nodes[u][f"cell_{axis}"]
+        #             coord_v = lineage.nodes[v][f"cell_{axis}"]
+        #             data[f"link_{axis}"] = (coord_u + coord_v) / 2
 
     # Lineage
     if "TRACK_X_LOCATION" in lineage.graph:
         for axis in ["x", "y", "z"]:
             lineage.graph[f"lineage_{axis}"] = lineage.graph.pop(
-                f"TRACK_{axis.upper()}_LOCATION"
+                f"TRACK_{axis.upper()}_LOCATION", None
             )
     else:
-        # One-node graph don't have the TRACK_X_LOCATION, TRACK_Y_LOCATION
-        # and TRACK_Z_LOCATION features in the graph, so we have to create it.
-        assert (
-            len(lineage) == 1
-        ), "TRACK_X_LOCATION not found and not a one-node lineage."
-        node = [n for n in lineage.nodes][0]
-        for axis in ["x", "y", "z"]:
-            lineage.graph[f"lineage_{axis}"] = lineage.nodes[node][f"cell_{axis}"]
+        if len(lineage) == 1 and has_edge_location:
+            # This is a one-node lineage from TrackMate.
+            # One-node graph don't have the TRACK_X_LOCATION, TRACK_Y_LOCATION
+            # and TRACK_Z_LOCATION features in the graph, so we have to create it.
+            node = [n for n in lineage.nodes][0]
+            for axis in ["x", "y", "z"]:
+                lineage.graph[f"lineage_{axis}"] = lineage.nodes[node][f"cell_{axis}"]
+        # else:
+        #     # Mastodon does not have the TRACK_{axis}_LOCATION, so we compute the mean
+        #     # coordinate of the lineage.
+        #     for axis in ["x", "y", "z"]:
+        #         coords = [data[f"cell_{axis}"] for _, data in lineage.nodes(data=True)]
+        #         lineage.graph[f"lineage_{axis}"] = sum(coords) / len(coords)
 
 
 def _parse_model_tag(
@@ -1148,8 +1169,7 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
                     pixel_size[key_pycellin] = float(element.attrib[key_TM])
                 except KeyError:
                     raise KeyError(
-                        f"The {key_TM} attribute is missing "
-                        "in the 'ImageData' element."
+                        f"The {key_TM} attribute is missing in the 'ImageData' element."
                     )
                 except ValueError:
                     raise ValueError(
@@ -1236,20 +1256,25 @@ def load_TrackMate_XML(
 
 
 if __name__ == "__main__":
-
     # xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
     # xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
     # xml = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
     xml = "sample_data/Celegans-5pc-17timepoints.xml"
 
-    model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
-    print(model)
-    print(model.feat_declaration)
-    print(model.metadata["Pycellin_version"])
-    # print(model.metadata)
-    # print(model.fdec.node_feats.keys())
-    # print(model.data)
+    xml = "C:/Users/lxenard/Documents/Code/mastodon_data_bug_edge_pycellin/test-export2.xml"
 
-    lineage = model.data.cell_data[0]
-    lineage.plot(node_hover_features=["cell_ID", "cell_name"])
+    model = load_TrackMate_XML(xml)  # , keep_all_spots=True, keep_all_tracks=True)
+    print(model)
+    print(model.get_fusions())
+
+    # model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
+    # print(model)
+    # print(model.feat_declaration)
+    # print(model.metadata["Pycellin_version"])
+    # # print(model.metadata)
+    # # print(model.fdec.node_feats.keys())
+    # # print(model.data)
+
+    # lineage = model.data.cell_data[0]
+    # lineage.plot(node_hover_features=["cell_ID", "cell_name"])
