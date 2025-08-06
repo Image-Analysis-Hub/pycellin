@@ -82,9 +82,7 @@ def _add_lineages_features(
 
         current_lineage_id = list(tmp)[0]
         current_lineage_attr = [
-            d_attr
-            for d_attr in lin_features
-            if d_attr[lineage_ID_key] == current_lineage_id
+            d_attr for d_attr in lin_features if d_attr[lineage_ID_key] == current_lineage_id
         ][0]
 
         # Adding the features to the lineage.
@@ -117,8 +115,7 @@ def _split_graph_into_lineages(
     # One subgraph is created per lineage, so each subgraph is
     # a connected component of `graph`.
     lineages = [
-        CellLineage(graph.subgraph(c).copy())
-        for c in nx.weakly_connected_components(graph)
+        CellLineage(graph.subgraph(c).copy()) for c in nx.weakly_connected_components(graph)
     ]
     del graph  # Redondant with the subgraphs.
     if not lin_features:
@@ -179,9 +176,7 @@ def _update_node_feature_key(
             lineage.nodes[node][new_key] = lineage.nodes[node].pop(old_key)
         else:
             if enforce_old_key_existence:
-                raise ValueError(
-                    f"Node {node} does not have the required key '{old_key}'."
-                )
+                raise ValueError(f"Node {node} does not have the required key '{old_key}'.")
             if set_default_if_missing:
                 lineage.nodes[node][new_key] = default_value
 
@@ -209,8 +204,8 @@ def _update_lineage_feature_key(
 
 def _update_lineages_IDs_key(
     lineages: list[CellLineage],
-    lineage_ID_key: str,
-) -> int | None:
+    lineage_ID_key: str | None,
+) -> None:
     """
     Update the lineage ID key of lineage graphs to match pycellin convention.
 
@@ -225,7 +220,7 @@ def _update_lineages_IDs_key(
     ----------
     lineages : list[CellLineage]
         The lineages to update.
-    lineage_ID_key : str
+    lineage_ID_key : str | None
         The key that is the lineage identifier in lineage graphs.
     """
     ids = [lin.graph[lineage_ID_key] for lin in lineages if lineage_ID_key in lin.graph]
