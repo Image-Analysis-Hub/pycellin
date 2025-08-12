@@ -22,9 +22,7 @@ class Data:
         The cycle lineages stored, if any.
     """
 
-    def __init__(
-        self, data: dict[int, CellLineage], add_cycle_data: bool = False
-    ) -> None:
+    def __init__(self, data: dict[int, CellLineage], add_cycle_data: bool = False) -> None:
         """
         Initialize a Data object.
 
@@ -63,9 +61,7 @@ class Data:
         """
         if lineage_IDs is None:
             lineage_IDs = list(self.cell_data.keys())
-        self.cycle_data = {
-            lin_id: self._compute_cycle_lineage(lin_id) for lin_id in lineage_IDs
-        }
+        self.cycle_data = {lin_id: self._compute_cycle_lineage(lin_id) for lin_id in lineage_IDs}
 
     def _compute_cycle_lineage(self, lineage_ID: int) -> CycleLineage:
         """
@@ -128,7 +124,7 @@ class Data:
 
     def get_closest_cell(
         self,
-        noi: int,
+        nid: int,
         lineage: CellLineage,
         radius: float = 0,
         time_window: int = 0,
@@ -141,8 +137,8 @@ class Data:
 
         Parameters
         ----------
-        noi : int
-            Node of interest, the one for which to find the closest cell.
+        nid : int
+            ID of the node for which to find the closest cell.
         lineage : CellLineage
             The lineage the node belongs to.
         radius : float, optional
@@ -163,7 +159,7 @@ class Data:
             The node ID of the closest cell and the lineage it belongs to.
         """
         distances = self.get_closest_cells(
-            noi=noi,
+            nid=nid,
             lineage=lineage,
             radius=radius,
             time_window=time_window,
@@ -175,7 +171,7 @@ class Data:
 
     def get_closest_cells(
         self,
-        noi: int,
+        nid: int,
         lineage: CellLineage,
         radius: float = 0,
         time_window: int = 0,
@@ -188,8 +184,8 @@ class Data:
 
         Parameters
         ----------
-        noi : int
-            Node of interest, the one for which to find the closest cell.
+        nid : int
+            ID of the node for which to find the closest cell.
         lineage : CellLineage
             The lineage the node belongs to.
         radius : float, optional
@@ -213,7 +209,7 @@ class Data:
         # TODO: implement the reference parameter
 
         # Identification of the frames to search in.
-        center_frame = lineage.nodes[noi]["frame"]
+        center_frame = lineage.nodes[nid]["frame"]
         if time_window == 0:
             frames_to_search = [center_frame]
         else:
@@ -222,13 +218,9 @@ class Data:
                     range(center_frame - time_window, center_frame + time_window + 1)
                 )
             elif time_window_type == "before":
-                frames_to_search = list(
-                    range(center_frame - time_window, center_frame + 1)
-                )
+                frames_to_search = list(range(center_frame - time_window, center_frame + 1))
             elif time_window_type == "after":
-                frames_to_search = list(
-                    range(center_frame, center_frame + time_window + 1)
-                )
+                frames_to_search = list(range(center_frame, center_frame + time_window + 1))
             else:
                 raise ValueError(
                     f"Unknown time window type: '{time_window_type}'."
@@ -243,23 +235,17 @@ class Data:
             lineages_to_search = list(self.cell_data.values())
         candidate_cells = {}
         for lin in lineages_to_search:
-            nodes = [
-                node
-                for node, frame in lin.nodes(data="frame")
-                if frame in frames_to_search
-            ]
+            nodes = [node for node, frame in lin.nodes(data="frame") if frame in frames_to_search]
             if nodes:
                 candidate_cells[lin] = nodes
         # Need to remove the node itself from the candidates.
-        candidate_cells[lineage].remove(noi)
+        candidate_cells[lineage].remove(nid)
 
         # Identification of the closest cell.
         distances = []
         for lin, nodes in candidate_cells.items():
             for node in nodes:
-                distance = math.dist(
-                    lineage.nodes[noi]["location"], lin.nodes[node]["location"]
-                )
+                distance = math.dist(lineage.nodes[nid]["location"], lin.nodes[node]["location"])
                 if radius == 0 or distance <= radius:
                     distances.append((node, lin, distance))
         distances.sort(key=lambda x: x[2])

@@ -22,7 +22,7 @@ def _get_branch_edge_feature_values(
     feat_name: str,
     data: Data,
     lineage: CycleLineage,
-    noi: int,
+    nid: int,
     include_incoming_edge: bool,
 ) -> list[Any]:
     """
@@ -36,7 +36,7 @@ def _get_branch_edge_feature_values(
         Data object containing the lineage.
     lineage : CycleLineage
         Lineage graph containing the node of interest.
-    noi : int
+    nid : int
         Node ID (cycle_ID) of the cell of interest.
     include_incoming_edge : bool
         Whether to include the incoming edge of the first cell of the cell cycle.
@@ -54,17 +54,12 @@ def _get_branch_edge_feature_values(
     lin_ID = lineage.graph["lineage_ID"]
     cell_lin = data.cell_data[lin_ID]
     try:
-        values = [
-            cell_lin.edges[edge][feat_name]
-            for edge in lineage.yield_edges_within_cycle(noi)
-        ]
+        values = [cell_lin.edges[edge][feat_name] for edge in lineage.yield_links_within_cycle(nid)]
     except KeyError:
-        raise KeyError(
-            f"Feature '{feat_name}' does not exist in the cell lineage '{lin_ID}'."
-        )
+        raise KeyError(f"Feature '{feat_name}' does not exist in the cell lineage '{lin_ID}'.")
 
     if include_incoming_edge:
-        first_cell = lineage.nodes[noi]["cells"][0]
+        first_cell = lineage.nodes[nid]["cells"][0]
         predecessors = list(cell_lin.predecessors(first_cell))
         if len(predecessors) == 1:
             edge = (predecessors[0], first_cell)
@@ -139,7 +134,7 @@ class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
         self.include_incoming_edge = include_incoming_edge
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, noi: int
+        self, data: Data, lineage: CycleLineage, nid: int
     ) -> float:
         """
         Compute the total displacement of a cell during the cell cycle.
@@ -150,7 +145,7 @@ class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        noi : int
+        nid : int
             Node ID (cycle_ID) of the cell cycle of interest.
 
         Returns
@@ -159,7 +154,7 @@ class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
             Total displacement of the cell during the cell cycle.
         """
         disps = _get_branch_edge_feature_values(
-            "cell_displacement", data, lineage, noi, self.include_incoming_edge
+            "cell_displacement", data, lineage, nid, self.include_incoming_edge
         )
         return np.nansum(disps)
 
@@ -186,7 +181,7 @@ class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
         self.include_incoming_edge = include_incoming_edge
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, noi: int
+        self, data: Data, lineage: CycleLineage, nid: int
     ) -> float:
         """
         Compute the mean displacement of a cell during the cell cycle.
@@ -197,7 +192,7 @@ class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        noi : int
+        nid : int
             Node ID (cycle_ID) of the cell cycle of interest.
 
         Returns
@@ -206,7 +201,7 @@ class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
             Mean displacement of the cell during the cell cycle.
         """
         disps = _get_branch_edge_feature_values(
-            "cell_displacement", data, lineage, noi, self.include_incoming_edge
+            "cell_displacement", data, lineage, nid, self.include_incoming_edge
         )
         return np.nanmean(disps).item()
 
@@ -286,7 +281,7 @@ class BranchMeanSpeed(NodeGlobalFeatureCalculator):
         self.include_incoming_edge = include_incoming_edge
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, noi: int
+        self, data: Data, lineage: CycleLineage, nid: int
     ) -> float:
         """
         Compute the mean speed of a cell during the cell cycle.
@@ -297,7 +292,7 @@ class BranchMeanSpeed(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        noi : int
+        nid : int
             Node ID (cycle_ID) of the cell cycle of interest.
 
         Returns
@@ -306,7 +301,7 @@ class BranchMeanSpeed(NodeGlobalFeatureCalculator):
             Mean speed of the cell during the cell cycle.
         """
         speeds = _get_branch_edge_feature_values(
-            "cell_speed", data, lineage, noi, self.include_incoming_edge
+            "cell_speed", data, lineage, nid, self.include_incoming_edge
         )
         return np.nanmean(speeds).item()
 
@@ -335,7 +330,7 @@ class Straightness(NodeGlobalFeatureCalculator):
         self.include_incoming_edge = include_incoming_edge
 
     def compute(  # type: ignore[override]
-        self, data: Data, cycle_lin: CycleLineage, noi: int
+        self, data: Data, cycle_lin: CycleLineage, nid: int
     ) -> float:
         """
         Compute the straightness of the cell displacement within a cell cycle.
@@ -356,7 +351,7 @@ class Straightness(NodeGlobalFeatureCalculator):
         """
         lin_ID = cycle_lin.graph["lineage_ID"]
         cell_lin = data.cell_data[lin_ID]
-        cells = cycle_lin.nodes[noi]["cells"]
+        cells = cycle_lin.nodes[nid]["cells"]
         distances = [
             math.dist(
                 (
@@ -425,7 +420,7 @@ class Angle(NodeGlobalFeatureCalculator):
         self.unit = unit
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage, noi: int
+        self, data: Data, lineage: CellLineage, nid: int
     ) -> float:
         """
         Compute the angle between two consecutive detections of a cell.
@@ -436,7 +431,7 @@ class Angle(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CellLineage
             Lineage graph containing the node of interest.
-        noi : int
+        nid : int
             Node ID (cell_ID) of the cell of interest.
 
         Returns
@@ -445,8 +440,8 @@ class Angle(NodeGlobalFeatureCalculator):
             Angle between the two consecutive displacements.
         """
         # Find the incoming and outgoing edges of the node of interest.
-        predecessors = list(lineage.predecessors(noi))
-        successors = list(lineage.successors(noi))
+        predecessors = list(lineage.predecessors(nid))
+        successors = list(lineage.successors(nid))
         if len(predecessors) == 0 or len(successors) != 1:
             # The angle is not defined for:
             # - the first node of the lineage (no incoming edge)
@@ -454,7 +449,7 @@ class Angle(NodeGlobalFeatureCalculator):
             # - a dividing node (more than one outgoing edges).
             return math.nan
         elif len(predecessors) > 1:
-            raise FusionError(noi, lineage.graph["lineage_ID"])
+            raise FusionError(nid, lineage.graph["lineage_ID"])
 
         # Compute the angle between the incoming and outgoing edges.
         in_coords = (
@@ -462,18 +457,18 @@ class Angle(NodeGlobalFeatureCalculator):
             lineage.nodes[predecessors[0]]["cell_y"],
             lineage.nodes[predecessors[0]]["cell_z"],
         )
-        noi_coords = (
-            lineage.nodes[noi]["cell_x"],
-            lineage.nodes[noi]["cell_y"],
-            lineage.nodes[noi]["cell_z"],
+        nid_coords = (
+            lineage.nodes[nid]["cell_x"],
+            lineage.nodes[nid]["cell_y"],
+            lineage.nodes[nid]["cell_z"],
         )
         out_coords = (
             lineage.nodes[successors[0]]["cell_x"],
             lineage.nodes[successors[0]]["cell_y"],
             lineage.nodes[successors[0]]["cell_z"],
         )
-        vector_in = np.array(noi_coords) - np.array(in_coords)
-        vector_out = np.array(out_coords) - np.array(noi_coords)
+        vector_in = np.array(nid_coords) - np.array(in_coords)
+        vector_out = np.array(out_coords) - np.array(nid_coords)
         cross_prod = np.cross(vector_in, vector_out)
         dot_prod = np.dot(vector_in, vector_out)
         angle = math.atan2(np.linalg.norm(cross_prod), dot_prod)
@@ -482,6 +477,4 @@ class Angle(NodeGlobalFeatureCalculator):
         elif self.unit == "degree":
             return math.degrees(angle)
         else:
-            raise ValueError(
-                f"Unknown unit: {self.unit}. Valid units are 'radian' and 'degree'."
-            )
+            raise ValueError(f"Unknown unit: {self.unit}. Valid units are 'radian' and 'degree'.")

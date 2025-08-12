@@ -141,11 +141,10 @@ class LocalFeatureCalculator(FeatureCalculator):
 
 
 class NodeLocalFeatureCalculator(LocalFeatureCalculator):
-
     _FEATURE_TYPE = "node"
 
     @abstractmethod
-    def compute(self, lineage: Lineage, noi: int) -> Any:
+    def compute(self, lineage: Lineage, nid: int) -> Any:
         """
         Compute the value of a local feature for a single node.
         Need to be implemented in subclasses.
@@ -154,7 +153,7 @@ class NodeLocalFeatureCalculator(LocalFeatureCalculator):
         ----------
         lineage : Lineage
             Lineage object containing the node of interest.
-        noi : int
+        nid : int
             Node ID of the node of interest.
 
         Returns
@@ -164,9 +163,7 @@ class NodeLocalFeatureCalculator(LocalFeatureCalculator):
         """
         pass
 
-    def enrich(
-        self, data: Data, nodes_to_enrich: list[tuple[int, int]], **kwargs
-    ) -> None:
+    def enrich(self, data: Data, nodes_to_enrich: list[tuple[int, int]], **kwargs) -> None:
         """
         Enrich the data with the value of a local feature for a list of nodes.
 
@@ -179,13 +176,12 @@ class NodeLocalFeatureCalculator(LocalFeatureCalculator):
             to enrich with the feature value.
         """
         lineages = _get_lin_data_from_lin_type(data, self.feature.lin_type)
-        for noi, lin_ID in nodes_to_enrich:
+        for nid, lin_ID in nodes_to_enrich:
             lin = lineages[lin_ID]
-            lin.nodes[noi][self.feature.name] = self.compute(lin, noi)
+            lin.nodes[nid][self.feature.name] = self.compute(lin, nid)
 
 
 class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
-
     _FEATURE_TYPE = "edge"
 
     @abstractmethod
@@ -208,9 +204,7 @@ class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
         """
         pass
 
-    def enrich(
-        self, data: Data, edges_to_enrich: list[tuple[int, int, int]], **kwargs
-    ) -> None:
+    def enrich(self, data: Data, edges_to_enrich: list[tuple[int, int, int]], **kwargs) -> None:
         """
         Enrich the data with the value of a local feature for a list of edges.
 
@@ -230,7 +224,6 @@ class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
 
 
 class LineageLocalFeatureCalculator(LocalFeatureCalculator):
-
     _FEATURE_TYPE = "lineage"
 
     @abstractmethod
@@ -311,11 +304,10 @@ class GlobalFeatureCalculator(FeatureCalculator):
 
 
 class NodeGlobalFeatureCalculator(GlobalFeatureCalculator):
-
     _FEATURE_TYPE = "node"
 
     @abstractmethod
-    def compute(self, data: Data, lineage: Lineage, noi: int) -> Any:
+    def compute(self, data: Data, lineage: Lineage, nid: int) -> Any:
         """
         Compute the value of a global feature for a single node.
         Need to be implemented in subclasses.
@@ -326,7 +318,7 @@ class NodeGlobalFeatureCalculator(GlobalFeatureCalculator):
             Data object containing the lineages.
         lineage : Lineage
             Lineage containing the node of interest.
-        noi : int
+        nid : int
             Node ID of the node of interest.
 
         Returns
@@ -347,12 +339,11 @@ class NodeGlobalFeatureCalculator(GlobalFeatureCalculator):
         """
         lineages = _get_lin_data_from_lin_type(data, self.feature.lin_type)
         for lin in lineages.values():
-            for noi in lin.nodes:
-                lin.nodes[noi][self.feature.name] = self.compute(data, lin, noi)
+            for nid in lin.nodes:
+                lin.nodes[nid][self.feature.name] = self.compute(data, lin, nid)
 
 
 class EdgeGlobalFeatureCalculator(GlobalFeatureCalculator):
-
     _FEATURE_TYPE = "edge"
 
     @abstractmethod
@@ -393,7 +384,6 @@ class EdgeGlobalFeatureCalculator(GlobalFeatureCalculator):
 
 
 class LineageGlobalFeatureCalculator(GlobalFeatureCalculator):
-
     _FEATURE_TYPE = "lineage"
 
     @abstractmethod

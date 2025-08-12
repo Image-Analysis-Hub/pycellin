@@ -62,7 +62,7 @@ class AbsoluteAge(NodeGlobalFeatureCalculator):
         self.time_step = time_step
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage, noi: int
+        self, data: Data, lineage: CellLineage, nid: int
     ) -> int | float:
         """
         Compute the absolute age of a given cell.
@@ -73,7 +73,7 @@ class AbsoluteAge(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CellLineage
             Lineage graph containing the node of interest.
-        noi : int
+        nid : int
             Node ID (cell_ID) of the cell of interest.
 
         Returns
@@ -87,9 +87,9 @@ class AbsoluteAge(NodeGlobalFeatureCalculator):
             If the cell is not in the lineage.
         """
         root = lineage.get_root()
-        if noi not in lineage.nodes:
-            raise KeyError(f"Cell {noi} not in the lineage.")
-        age_in_frame = lineage.nodes[noi]["frame"] - lineage.nodes[root]["frame"]
+        if nid not in lineage.nodes:
+            raise KeyError(f"Cell {nid} not in the lineage.")
+        age_in_frame = lineage.nodes[nid]["frame"] - lineage.nodes[root]["frame"]
         return age_in_frame * self.time_step
 
 
@@ -117,7 +117,7 @@ class RelativeAge(NodeGlobalFeatureCalculator):
         self.time_step = time_step
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage, noi: int
+        self, data: Data, lineage: CellLineage, nid: int
     ) -> int | float:
         """
         Compute the relative age of a given cell.
@@ -128,7 +128,7 @@ class RelativeAge(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CellLineage
             Lineage graph containing the node of interest.
-        noi : int
+        nid : int
             Node ID (cell_ID) of the cell of interest.
 
         Returns
@@ -141,10 +141,10 @@ class RelativeAge(NodeGlobalFeatureCalculator):
         KeyError
             If the cell is not in the lineage.
         """
-        if noi not in lineage.nodes:
-            raise KeyError(f"Cell {noi} not in the lineage.")
-        first_cell = lineage.get_cell_cycle(noi)[0]
-        age_in_frame = lineage.nodes[noi]["frame"] - lineage.nodes[first_cell]["frame"]
+        if nid not in lineage.nodes:
+            raise KeyError(f"Cell {nid} not in the lineage.")
+        first_cell = lineage.get_cell_cycle(nid)[0]
+        age_in_frame = lineage.nodes[nid]["frame"] - lineage.nodes[first_cell]["frame"]
         return age_in_frame * self.time_step
 
 
@@ -161,7 +161,7 @@ class CycleCompleteness(NodeGlobalFeatureCalculator):
     """
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage | CycleLineage, noi: int
+        self, data: Data, lineage: CellLineage | CycleLineage, nid: int
     ) -> bool:
         """
         Compute the cell cycle completeness of a given cell or cell cycle.
@@ -172,7 +172,7 @@ class CycleCompleteness(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CellLineage | CycleLineage
             Lineage graph containing the node (cell or cell cycle) of interest.
-        noi : int
+        nid : int
             Node ID of the node (cell or cell cycle) of interest.
 
         Returns
@@ -186,23 +186,23 @@ class CycleCompleteness(NodeGlobalFeatureCalculator):
             If the cell or cycle is not in the lineage.
         """
         if isinstance(lineage, CellLineage):
-            if noi not in lineage.nodes:
-                raise KeyError(f"Cell {noi} not in the lineage.")
-            cell_cycle = lineage.get_cell_cycle(noi)
+            if nid not in lineage.nodes:
+                raise KeyError(f"Cell {nid} not in the lineage.")
+            cell_cycle = lineage.get_cell_cycle(nid)
             if lineage.is_root(cell_cycle[0]) or lineage.is_leaf(cell_cycle[-1]):
                 return False
             else:
                 return True
         elif isinstance(lineage, CycleLineage):
-            if noi not in lineage.nodes:
-                raise KeyError(f"Cycle {noi} not in the lineage.")
-            if lineage.is_root(noi) or lineage.is_leaf(noi):
+            if nid not in lineage.nodes:
+                raise KeyError(f"Cycle {nid} not in the lineage.")
+            if lineage.is_root(nid) or lineage.is_leaf(nid):
                 return False
             else:
                 return True
 
 
-def _get_cell_lin_frames(lineage: CellLineage, noi: int) -> tuple[int, int]:
+def _get_cell_lin_frames(lineage: CellLineage, nid: int) -> tuple[int, int]:
     """
     Get the frames of the divisions defining the cell cycle.
 
@@ -212,7 +212,7 @@ def _get_cell_lin_frames(lineage: CellLineage, noi: int) -> tuple[int, int]:
     ----------
     lineage : CellLineage
         Lineage graph containing the node of interest.
-    noi : int
+    nid : int
         Node ID (cell_ID) of the cell of interest.
 
     Returns
@@ -227,13 +227,13 @@ def _get_cell_lin_frames(lineage: CellLineage, noi: int) -> tuple[int, int]:
     FusionError
         If the cell has more than one ancestor.
     """
-    if noi not in lineage.nodes:
-        raise KeyError(f"Cell {noi} not in the lineage.")
-    cells = lineage.get_cell_cycle(noi)
+    if nid not in lineage.nodes:
+        raise KeyError(f"Cell {nid} not in the lineage.")
+    cells = lineage.get_cell_cycle(nid)
     frame_current_div = lineage.nodes[cells[-1]]["frame"]
     ancestors = list(lineage.predecessors(cells[0]))
     if len(ancestors) > 1:
-        raise FusionError(noi, lineage.graph["lineage_ID"])
+        raise FusionError(nid, lineage.graph["lineage_ID"])
     elif len(ancestors) == 0:
         frame_prev_div = lineage.nodes[cells[0]]["frame"]
     else:
@@ -241,9 +241,7 @@ def _get_cell_lin_frames(lineage: CellLineage, noi: int) -> tuple[int, int]:
     return frame_current_div, frame_prev_div
 
 
-def _get_cycle_lin_frames(
-    data: Data, lineage: CycleLineage, noi: int
-) -> tuple[int, int]:
+def _get_cycle_lin_frames(data: Data, lineage: CycleLineage, nid: int) -> tuple[int, int]:
     """
     Get the frames of the divisions defining the cell cycle.
 
@@ -255,7 +253,7 @@ def _get_cycle_lin_frames(
         Data object containing the lineage.
     lineage : CycleLineage
         Lineage graph containing the node of interest.
-    noi : int
+    nid : int
         Node ID (cell_ID) of the cell of interest.
 
     Returns
@@ -270,14 +268,14 @@ def _get_cycle_lin_frames(
     FusionError
         If the cycle has more than one ancestor.
     """
-    if noi not in lineage.nodes:
-        raise KeyError(f"Cycle {noi} not in the lineage.")
-    cells = lineage.nodes[noi]["cells"]
+    if nid not in lineage.nodes:
+        raise KeyError(f"Cycle {nid} not in the lineage.")
+    cells = lineage.nodes[nid]["cells"]
     cell_lin = data.cell_data[lineage.graph["lineage_ID"]]
     frame_current_div = cell_lin.nodes[cells[-1]]["frame"]
-    ancestors = list(lineage.predecessors(noi))
+    ancestors = list(lineage.predecessors(nid))
     if len(ancestors) > 1:
-        raise FusionError(noi, lineage.graph["lineage_ID"])
+        raise FusionError(nid, lineage.graph["lineage_ID"])
     elif len(ancestors) == 0:
         frame_prev_div = cell_lin.nodes[cells[0]]["frame"]
     else:
@@ -308,7 +306,7 @@ class DivisionTime(NodeGlobalFeatureCalculator):
         self.time_step = time_step
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage | CycleLineage, noi: int
+        self, data: Data, lineage: CellLineage | CycleLineage, nid: int
     ) -> int | float:
         """
         Compute the division time of a given cell or cell cycle.
@@ -319,7 +317,7 @@ class DivisionTime(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CellLineage | CycleLineage
             Lineage graph containing the node (cell or cell cycle) of interest.
-        noi : int
+        nid : int
             Node ID of the node (cell or cell cycle) of interest.
 
         Returns
@@ -333,13 +331,12 @@ class DivisionTime(NodeGlobalFeatureCalculator):
             If the cell or cycle is not in the lineage.
         """
         if isinstance(lineage, CellLineage):
-            frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, noi)
+            frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, nid)
         elif isinstance(lineage, CycleLineage):
-            frame_curr_div, frame_prev_div = _get_cycle_lin_frames(data, lineage, noi)
+            frame_curr_div, frame_prev_div = _get_cycle_lin_frames(data, lineage, nid)
         else:
             raise TypeError(
-                f"Lineage must be of type CellLineage or CycleLineage, "
-                f"not {type(lineage)}."
+                f"Lineage must be of type CellLineage or CycleLineage, not {type(lineage)}."
             )
 
         return (frame_curr_div - frame_prev_div) * self.time_step
@@ -355,9 +352,7 @@ class DivisionRate(NodeGlobalFeatureCalculator):
     to divisions per time unit of the model if specified.
     """
 
-    def __init__(
-        self, feature: Feature, time_step: int | float = 1, use_div_time: bool = False
-    ):
+    def __init__(self, feature: Feature, time_step: int | float = 1, use_div_time: bool = False):
         """
         Parameters
         ----------
@@ -380,7 +375,7 @@ class DivisionRate(NodeGlobalFeatureCalculator):
         self.use_div_time = use_div_time
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage | CycleLineage, noi: int
+        self, data: Data, lineage: CellLineage | CycleLineage, nid: int
     ) -> int | float:
         """
         Compute the division rate of a given cell or cell cycle.
@@ -391,7 +386,7 @@ class DivisionRate(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CellLineage | CycleLineage
             Lineage graph containing the node (cell or cell cycle) of interest.
-        noi : int
+        nid : int
             Node ID of the node (cell or cell cycle) of interest.
 
         Returns
@@ -405,22 +400,21 @@ class DivisionRate(NodeGlobalFeatureCalculator):
             If the cell or cycle is not in the lineage.
         """
         if self.use_div_time:
-            if noi not in lineage.nodes:
+            if nid not in lineage.nodes:
                 if isinstance(lineage, CellLineage):
                     lin_txt = "Cell"
                 elif isinstance(lineage, CycleLineage):
                     lin_txt = "Cycle"
                 else:
                     raise TypeError(
-                        f"Lineage must be of type CellLineage or CycleLineage, "
-                        f"not {type(lineage)}."
+                        f"Lineage must be of type CellLineage or CycleLineage, not {type(lineage)}."
                     )
-                raise KeyError(f"{lin_txt} {noi} not in the lineage.")
+                raise KeyError(f"{lin_txt} {nid} not in the lineage.")
             try:
-                div_time = lineage.nodes[noi]["division_time"]
+                div_time = lineage.nodes[nid]["division_time"]
             except KeyError:
                 raise KeyError(
-                    f"Division time not present for cell {noi} in lineage "
+                    f"Division time not present for cell {nid} in lineage "
                     f"{lineage.graph['lineage_ID']}."
                 )
             if div_time == 0:
@@ -429,13 +423,12 @@ class DivisionRate(NodeGlobalFeatureCalculator):
                 return 1 / div_time
 
         if isinstance(lineage, CellLineage):
-            frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, noi)
+            frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, nid)
         elif isinstance(lineage, CycleLineage):
-            frame_curr_div, frame_prev_div = _get_cycle_lin_frames(data, lineage, noi)
+            frame_curr_div, frame_prev_div = _get_cycle_lin_frames(data, lineage, nid)
         else:
             raise TypeError(
-                f"Lineage must be of type CellLineage or CycleLineage, "
-                f"not {type(lineage)}."
+                f"Lineage must be of type CellLineage or CycleLineage, not {type(lineage)}."
             )
 
         div_time = (frame_curr_div - frame_prev_div) * self.time_step
@@ -447,7 +440,7 @@ class DivisionRate(NodeGlobalFeatureCalculator):
 
 # class CellPhase(NodeGlobalFeatureCalculator):
 
-#     def compute(self, data: Data, lineage: CellLineage, noi: int) -> str:
+#     def compute(self, data: Data, lineage: CellLineage, nid: int) -> str:
 #         """
 #         Compute the phase(s) of the cell of interest.
 
@@ -468,7 +461,7 @@ class DivisionRate(NodeGlobalFeatureCalculator):
 #             Data object containing the lineage.
 #         lineage : CellLineage
 #             Lineage graph containing the cell of interest.
-#         noi : int
+#         nid : int
 #             Node ID (cell_ID) of the cell of interest.
 
 #         Returns
@@ -486,15 +479,15 @@ class DivisionRate(NodeGlobalFeatureCalculator):
 
 #         tag = ""
 #         # Straightforward cases.
-#         if lineage.is_root(noi):
+#         if lineage.is_root(nid):
 #             tag = append_tag(tag, "first")
-#         if lineage.is_leaf(noi):
+#         if lineage.is_leaf(nid):
 #             tag = append_tag(tag, "last")
-#         if lineage.is_division(noi):
+#         if lineage.is_division(nid):
 #             tag = append_tag(tag, "division")
 #         # Checking for cell birth.
-#         cc = lineage.get_cell_cycle(noi)
-#         if noi == cc[0]:
+#         cc = lineage.get_cell_cycle(nid)
+#         if nid == cc[0]:
 #             tag = append_tag(tag, "birth")
 
 #         if not tag:

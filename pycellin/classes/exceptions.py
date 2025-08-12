@@ -66,9 +66,9 @@ class TimeFlowError(LineageStructureError):
 
     Parameters
     ----------
-    source_noi : int
+    source_nid : int
         The ID of the source node.
-    target_noi : int
+    target_nid : int
         The ID of the target node.
     source_lineage_ID : int, optional
         The ID of the lineage of the source node.
@@ -83,15 +83,15 @@ class TimeFlowError(LineageStructureError):
 
     def __init__(
         self,
-        source_noi: int,
-        target_noi: int,
+        source_nid: int,
+        target_nid: int,
         source_lineage_ID: int | None = None,
         target_lineage_ID: int | None = None,
         message: str | None = None,
     ):
-        self.source_noi = source_noi
+        self.source_nid = source_nid
         self.source_lineage_ID = source_lineage_ID
-        self.target_noi = target_noi
+        self.target_nid = target_nid
         self.target_lineage_ID = target_lineage_ID
         if message is None:
             txt_source_lin = (
@@ -101,9 +101,9 @@ class TimeFlowError(LineageStructureError):
                 "" if target_lineage_ID is None else f" in lineage {target_lineage_ID}"
             )
             message = (
-                f"Node {target_noi}{txt_target_lin} "
+                f"Node {target_nid}{txt_target_lin} "
                 f"has a time value lower than its parent node, "
-                f"node {source_noi}{txt_source_lin}."
+                f"node {source_nid}{txt_source_lin}."
             )
         super().__init__(message)
 

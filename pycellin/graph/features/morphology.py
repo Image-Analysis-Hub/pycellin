@@ -105,7 +105,7 @@ def from_path_to_line(path, tol):
 
 
 def get_width_and_length(
-    noi: int,
+    nid: int,
     lineage: CellLineage,
     pixel_size: float,
     skel_algo: str = "zhang",
@@ -120,7 +120,7 @@ def get_width_and_length(
 
     Parameters
     ----------
-    noi : int
+    nid : int
         Node ID (cell_ID) of the cell of interest.
     lineage : CellLineage
         Lineage graph containing the node of interest.
@@ -148,7 +148,7 @@ def get_width_and_length(
         Width and length of the ROI.
     """
     if debug:
-        print("NODE", noi)
+        print("NODE", nid)
         if skel_algo == "zhang":
             not_skel_algo = "lee"
         elif skel_algo == "lee":
@@ -157,7 +157,7 @@ def get_width_and_length(
     # First we need to reconstruct the image of the object we are working on.
     # This is done by drawing and filling a polygon defined by the points
     # in the ROI list.
-    roi = lineage.nodes[noi]["ROI_coords"]
+    roi = lineage.nodes[nid]["ROI_coords"]
     # The coordinates extracted from the graph are in microns, not in pixels.
     # roi = [(int(x * x_resolution), int(y * x_resolution)) for (x, y) in roi]
     roi = [(int(x * 1 / pixel_size), int(y * 1 / pixel_size)) for (x, y) in roi]
@@ -184,7 +184,7 @@ def get_width_and_length(
         ax[0, 0].imshow(img, cmap="gray")
         ax[0, 0].set_aspect("equal")
         ax[0, 0].axis("off")
-        ax[0, 0].set_title(f"ROI node {noi}", fontsize=6)
+        ax[0, 0].set_title(f"ROI node {nid}", fontsize=6)
 
     # Now that we have a numpy array modelling our object, we can compute
     # its distance transform and its skeleton.
@@ -242,17 +242,17 @@ def get_width_and_length(
         # is probably roundish. The method for mesuring length is not
         # adapted to this kind of morphology.
         try:
-            track_ID = lineage.nodes[noi]["TRACK_ID"]
+            track_ID = lineage.nodes[nid]["TRACK_ID"]
         except KeyError:
             print(
-                f"WARNING: One pixel skeleton on node {noi}! "
+                f"WARNING: One pixel skeleton on node {nid}! "
                 f"The object is probably roundish and the radius "
                 f"is a better metric in that case. Setting the length and "
                 f"width to NaN."
             )
         else:
             print(
-                f"WARNING: One pixel skeleton on node {noi} of track "
+                f"WARNING: One pixel skeleton on node {nid} of track "
                 f"{track_ID}! The object is probably roundish and the radius"
                 f" is a better metric in that case. Setting the length and "
                 f"width to NaN."
@@ -264,17 +264,17 @@ def get_width_and_length(
         # probably roundish. The method for mesuring length is not adapted to
         # this kind of morphology.
         try:
-            track_ID = lineage.nodes[noi]["TRACK_ID"]
+            track_ID = lineage.nodes[nid]["TRACK_ID"]
         except KeyError:
             print(
-                f"WARNING: One pixel skeleton on node {noi}! "
+                f"WARNING: One pixel skeleton on node {nid}! "
                 f"The object is probably roundish and the radius "
                 f"is a better metric in that case. Setting the length and "
                 f"width to NaN."
             )
         else:
             print(
-                f"WARNING: Circular skeleton on node {noi} of track "
+                f"WARNING: Circular skeleton on node {nid} of track "
                 f"{track_ID}! The object is probably roundish and the radius "
                 f"is a better metric in that case. Setting the length and "
                 f"width to NaN."
@@ -303,7 +303,7 @@ def get_width_and_length(
             ax[0, 2].plot(*line.xy, color="purple")
             ax[0, 2].contour(img, [0.5], colors="b")
             ax[0, 2].set_title(
-                f"Pruned skeleton {skel_algo.capitalize()}" f"\n+ simplified line",
+                f"Pruned skeleton {skel_algo.capitalize()}\n+ simplified line",
                 fontsize=6,
             )
 
@@ -327,9 +327,7 @@ def get_width_and_length(
                 adjacency_dict2[(i, j)] = adj_px2
             if pruning2:
                 adjacency_dict2 = prune_skel(adjacency_dict2)
-            tip_px2 = [
-                px for px, list_px in adjacency_dict2.items() if len(list_px) == 1
-            ]
+            tip_px2 = [px for px, list_px in adjacency_dict2.items() if len(list_px) == 1]
             path2 = from_skel_to_path(adjacency_dict2, tip_px2[0])
             points2 = [Point((x, y)) for (y, x) in path2]
             xs = [point.x for point in points2]
@@ -343,7 +341,7 @@ def get_width_and_length(
             ax[1, 2].plot(*line2.xy, color="purple")
             ax[1, 2].contour(img, [0.5], colors="b")
             ax[1, 2].set_title(
-                f"Pruned skeleton {not_skel_algo.capitalize()}" f"\n+ simplified line",
+                f"Pruned skeleton {not_skel_algo.capitalize()}\n+ simplified line",
                 fontsize=6,
             )
             length2 = line2.length
@@ -384,12 +382,12 @@ def get_width_and_length(
             # TODO: raise an error when method is not supported
 
         if debug:
-            print(f"Width: {width:.2f} px i.e. {width*pixel_size:.2f} μm.")
-            print(f"Length: {length:.2f} px i.e. {length*pixel_size:.2f} μm.\n")
+            print(f"Width: {width:.2f} px i.e. {width * pixel_size:.2f} μm.")
+            print(f"Length: {length:.2f} px i.e. {length * pixel_size:.2f} μm.\n")
 
             txt = (
-                f'Length: {length*pixel_size:.2f} μm\n{" "*10}i.e. {length:.2f} px'
-                f'\nWidth: {width*pixel_size:.2f} μm\n{" "*10}i.e. {width:.2f} px'
+                f"Length: {length * pixel_size:.2f} μm\n{' ' * 10}i.e. {length:.2f} px"
+                f"\nWidth: {width * pixel_size:.2f} μm\n{' ' * 10}i.e. {width:.2f} px"
             )
             ax[0, 2].annotate(
                 txt,
@@ -404,8 +402,8 @@ def get_width_and_length(
 
             width2 = (np.sum(dist_on_skel2) / len(pixels_i2)) * 2 - 1
             txt2 = (
-                f'Length: {length2*pixel_size:.2f} μm\n{" "*10}i.e. {length2:.2f} px'
-                f'\nWidth: {width2*pixel_size:.2f} μm\n{" "*10}i.e. {width2:.2f} px'
+                f"Length: {length2 * pixel_size:.2f} μm\n{' ' * 10}i.e. {length2:.2f} px"
+                f"\nWidth: {width2 * pixel_size:.2f} μm\n{' ' * 10}i.e. {width2:.2f} px"
             )
             ax[1, 2].annotate(
                 txt2,
@@ -420,8 +418,8 @@ def get_width_and_length(
 
             ax[1, 0].remove()
             plt.show()
-            lin_id = lineage.nodes[noi]["lineage_ID"]
-            file = f"{debug_folder}/Lineage{lin_id}_Node{noi}_{skel_algo}"
+            lin_id = lineage.nodes[nid]["lineage_ID"]
+            file = f"{debug_folder}/Lineage{lin_id}_Node{nid}_{skel_algo}"
             plt.savefig(file)
             plt.close()
 
@@ -453,10 +451,10 @@ class CellWidth(NodeLocalFeatureCalculator):
         self.debug_folder = debug_folder
 
     def compute(  # type: ignore[override]
-        self, lineage: CellLineage, noi: int
+        self, lineage: CellLineage, nid: int
     ) -> float:
         return get_width_and_length(
-            noi,
+            nid,
             lineage,
             self.pixel_size,
             self.skel_algo,
@@ -490,10 +488,10 @@ class CellLength(NodeLocalFeatureCalculator):
         self.debug_folder = debug_folder
 
     def compute(  # type: ignore[override]
-        self, lineage: CellLineage, noi: int
+        self, lineage: CellLineage, nid: int
     ) -> float:
         return get_width_and_length(
-            noi,
+            nid,
             lineage,
             self.pixel_size,
             self.skel_algo,
@@ -509,13 +507,13 @@ class CellLength(NodeLocalFeatureCalculator):
 # the area increment. Since it is user dependent, I should put it in a notebook
 # as an example of custom feature.
 
-# def get_area_increment(noi: int, lineage: CellLineage) -> float:
+# def get_area_increment(nid: int, lineage: CellLineage) -> float:
 #     """
 #     Compute the area increment of a node.
 
 #     Parameters
 #     ----------
-#     noi : int
+#     nid : int
 #         Node ID (cell_ID) of the cell of interest.
 #     lineage : CellLineage
 #         Lineage graph containing the node of interest.
@@ -530,16 +528,16 @@ class CellLength(NodeLocalFeatureCalculator):
 #     # Should give 2 nodes as input and compute the area increment between them.
 #     # Or add a parameter to specify if t-1 or t+1.
 #     # Area of node at t minus area at t-1.
-#     predecessors = list(lineage.predecessors(noi))
+#     predecessors = list(lineage.predecessors(nid))
 #     if len(predecessors) == 0:
 #         return np.nan
 #     else:
 #         err_mes = (
-#             f'Node {noi} in track {lineage.graph["name"]} has multiple predecessors.'
+#             f'Node {nid} in track {lineage.graph["name"]} has multiple predecessors.'
 #         )
 #         assert len(predecessors) == 1, err_mes
 #         # print(predecessors)
-#         return lineage.nodes[noi]["AREA"] - lineage.nodes[predecessors[0]]["AREA"]
+#         return lineage.nodes[nid]["AREA"] - lineage.nodes[predecessors[0]]["AREA"]
 
 
 # def _add_area_increment(lineages: list[CellLineage]) -> None:
@@ -557,7 +555,6 @@ class CellLength(NodeLocalFeatureCalculator):
 
 
 if __name__ == "__main__":
-
     import itertools
     import math
     from shapely.geometry import Polygon
@@ -578,9 +575,7 @@ if __name__ == "__main__":
     # Shoelace formula
     vertices = lineage.nodes[node]["ROI_coords"]
     border = vertices + [vertices[0]]
-    area = sum(
-        [p1[0] * p2[1] - p1[1] * p2[0] for (p1, p2) in itertools.pairwise(border)]
-    )
+    area = sum([p1[0] * p2[1] - p1[1] * p2[0] for (p1, p2) in itertools.pairwise(border)])
     print(abs(area) / 2)
 
     # Perimeter shapely vs by hand

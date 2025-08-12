@@ -368,11 +368,7 @@ class Model:
         list[T]
             The lineages with the specified feature value.
         """
-        return [
-            lin
-            for lin in lineages
-            if lin.graph[lineage_feature] == lineage_feature_value
-        ]
+        return [lin for lin in lineages if lin.graph[lineage_feature] == lineage_feature_value]
 
     def get_cell_lineages_from_lin_feat(
         self,
@@ -466,8 +462,8 @@ class Model:
         self._updater._full_data_update = True
         self._updater._update_required = True
         for lin_ID, lin in self.data.cell_data.items():
-            for noi in lin.nodes:
-                self._updater._added_cells.add(Cell(noi, lin_ID))
+            for nid in lin.nodes:
+                self._updater._added_cells.add(Cell(nid, lin_ID))
             for edge in lin.edges:
                 self._updater._added_links.add(Link(edge[0], edge[1], lin_ID))
         self._updater._added_lineages = set(self.data.cell_data.keys())
@@ -515,9 +511,7 @@ class Model:
 
         if features_to_update is not None:
             missing_feats = [
-                feat
-                for feat in features_to_update
-                if not self.feat_declaration._has_feature(feat)
+                feat for feat in features_to_update if not self.feat_declaration._has_feature(feat)
             ]
             if missing_feats:
                 warnings.warn(
@@ -528,9 +522,7 @@ class Model:
                     feat for feat in features_to_update if feat not in missing_feats
                 ]
                 if not features_to_update:
-                    warnings.warn(
-                        "No features to update. The model will not be updated."
-                    )
+                    warnings.warn("No features to update. The model will not be updated.")
                     return
 
         # self.data._freeze_lineage_data()
@@ -586,8 +578,7 @@ class Model:
         if with_CycleLineage:
             if self.data.cycle_data is None:
                 msg = (
-                    f"Cannot add cycle lineage {lineage_ID} when "
-                    "cycle data has not been added yet."
+                    f"Cannot add cycle lineage {lineage_ID} when cycle data has not been added yet."
                 )
                 warnings.warn(msg)
             else:
@@ -820,16 +811,12 @@ class Model:
         try:
             source_lineage = self.data.cell_data[source_lineage_ID]
         except KeyError as err:
-            raise KeyError(
-                f"Lineage with ID {source_lineage_ID} does not exist."
-            ) from err
+            raise KeyError(f"Lineage with ID {source_lineage_ID} does not exist.") from err
         if target_lineage_ID is not None:
             try:
                 target_lineage = self.data.cell_data[target_lineage_ID]
             except KeyError as err:
-                raise KeyError(
-                    f"Lineage with ID {target_lineage_ID} does not exist."
-                ) from err
+                raise KeyError(f"Lineage with ID {target_lineage_ID} does not exist.") from err
         else:
             target_lineage_ID = source_lineage_ID
             target_lineage = self.data.cell_data[source_lineage_ID]
@@ -841,15 +828,11 @@ class Model:
         else:
             feat_values = dict()
 
-        source_lineage._add_link(
-            source_cell_ID, target_cell_ID, target_lineage, **feat_values
-        )
+        source_lineage._add_link(source_cell_ID, target_cell_ID, target_lineage, **feat_values)
 
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
-        self._updater._added_links.add(
-            Link(source_cell_ID, target_cell_ID, source_lineage_ID)
-        )
+        self._updater._added_links.add(Link(source_cell_ID, target_cell_ID, source_lineage_ID))
         self._updater._modified_lineages.add(source_lineage_ID)
         if target_lineage_ID != source_lineage_ID:
             self._updater._modified_lineages.add(target_lineage_ID)
@@ -887,9 +870,7 @@ class Model:
 
         # Notify that an update of the feature values may be required.
         self._updater._update_required = True
-        self._updater._removed_links.add(
-            Link(source_cell_ID, target_cell_ID, lineage_ID)
-        )
+        self._updater._removed_links.add(Link(source_cell_ID, target_cell_ID, lineage_ID))
         self._updater._modified_lineages.add(lineage_ID)
 
         return link_attrs
@@ -1017,9 +998,7 @@ class Model:
         """
         feat = Feature(
             name=rename if rename else "angle",
-            description=(
-                "Angle of the cell trajectory between two consecutive detections"
-            ),
+            description=("Angle of the cell trajectory between two consecutive detections"),
             provenance="pycellin",
             feat_type="edge",
             lin_type="CellLineage",
@@ -1285,7 +1264,7 @@ class Model:
             feat_type="node",
             lin_type="CycleLineage",
             data_type="float",
-            unit=f'1/{self.metadata["time_unit"]}' if in_time_unit else "1/frame",
+            unit=f"1/{self.metadata['time_unit']}" if in_time_unit else "1/frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(tracking.DivisionRate(feat, time_step))
@@ -1445,9 +1424,7 @@ class Model:
         cell_lin_feats = list(futils.get_pycellin_cell_lineage_features().keys())
         cycle_lin_feats = list(futils.get_pycellin_cycle_lineage_features().keys())
         if feature_name not in cell_lin_feats + cycle_lin_feats:
-            raise KeyError(
-                f"Feature {feature_name} is not a predefined feature of pycellin."
-            )
+            raise KeyError(f"Feature {feature_name} is not a predefined feature of pycellin.")
         elif feature_name in cycle_lin_feats and not self.data.cycle_data:
             raise ValueError(
                 f"Feature {feature_name} is a feature of cycle lineages, "
@@ -1540,9 +1517,7 @@ class Model:
         """
         # Preliminary checks.
         if not self.feat_declaration._has_feature(feature_name):
-            raise ValueError(
-                f"There is no feature {feature_name} in the declared features."
-            )
+            raise ValueError(f"There is no feature {feature_name} in the declared features.")
         if feature_name in self.feat_declaration._get_protected_features():
             raise ProtectedFeatureError(feature_name)
 
@@ -1624,15 +1599,9 @@ class Model:
         """
         feats = self.get_cycle_lineage_features()
         if features is None:
-            node_feats = [
-                name for name, feat in feats.items() if feat.feat_type == "node"
-            ]
-            edge_feats = [
-                name for name, feat in feats.items() if feat.feat_type == "edge"
-            ]
-            lin_feats = [
-                name for name, feat in feats.items() if feat.feat_type == "lineage"
-            ]
+            node_feats = [name for name, feat in feats.items() if feat.feat_type == "node"]
+            edge_feats = [name for name, feat in feats.items() if feat.feat_type == "edge"]
+            lin_feats = [name for name, feat in feats.items() if feat.feat_type == "lineage"]
         else:
             missing_feats = [feat for feat in features if feat not in feats]
             if missing_feats:
@@ -1854,9 +1823,7 @@ class Model:
             raise err
         columns = ["lineage_ID", "frame", "cell_ID"] + columns
         df = df[columns]
-        df.sort_values(
-            ["lineage_ID", "frame", "cell_ID"], ignore_index=True, inplace=True
-        )
+        df.sort_values(["lineage_ID", "frame", "cell_ID"], ignore_index=True, inplace=True)
 
         return df
 
@@ -1901,9 +1868,7 @@ class Model:
 
         return df
 
-    def to_lineage_dataframe(
-        self, lineages_ID: list[int] | None = None
-    ) -> pd.DataFrame:
+    def to_lineage_dataframe(self, lineages_ID: list[int] | None = None) -> pd.DataFrame:
         """
         Return the lineage data of the model as a pandas DataFrame.
 
@@ -1992,15 +1957,11 @@ class Model:
             raise err
         columns = ["lineage_ID", "level", "cycle_ID"] + columns
         df = df[columns]
-        df.sort_values(
-            ["lineage_ID", "level", "cycle_ID"], ignore_index=True, inplace=True
-        )
+        df.sort_values(["lineage_ID", "level", "cycle_ID"], ignore_index=True, inplace=True)
 
         return df
 
-    def save_to_pickle(
-        self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL
-    ) -> None:
+    def save_to_pickle(self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL) -> None:
         """
         Save the model to a file by pickling it.
 
