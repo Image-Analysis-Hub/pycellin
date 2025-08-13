@@ -429,7 +429,7 @@ def get_width_and_length(
     return width, length
 
 
-class CellWidth(NodeLocalFeatureCalculator):
+class RodWidth(NodeLocalFeatureCalculator):
     def __init__(
         self,
         feature,
@@ -466,7 +466,7 @@ class CellWidth(NodeLocalFeatureCalculator):
         )[0]
 
 
-class CellLength(NodeLocalFeatureCalculator):
+class RodLength(NodeLocalFeatureCalculator):
     def __init__(
         self,
         feature,

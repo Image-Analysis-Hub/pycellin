@@ -79,8 +79,8 @@ for clin in model.get_cycle_lineages():
 
 # Enrich your lineages with additional predefined features.
 model.add_pycellin_features([
-    "cell_length", 
-    "cell_width",
+    "rod_length", 
+    "rod_width",
     "cell_displacement", 
     "cell_speed", 
     "branch_mean_speed",

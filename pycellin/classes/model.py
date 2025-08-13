@@ -1142,7 +1142,7 @@ class Model:
         )
         self.add_custom_feature(motion.CellDisplacement(feat))
 
-    def add_cell_length(
+    def add_rod_length(
         self,
         skel_algo: str = "zhang",
         tolerance: float = 0.5,
@@ -1151,15 +1151,15 @@ class Model:
         rename: str | None = None,
     ) -> None:
         feat = Feature(
-            name=rename if rename else "cell_length",
-            description="Length of the cell",
+            name=rename if rename else "rod_length",
+            description="Length of the cell, for rod-shaped cells only",
             provenance="pycellin",
             feat_type="node",
             lin_type="CellLineage",
             dtype="float",
             unit=self.metadata["space_unit"],
         )
-        calc = morpho.CellLength(
+        calc = morpho.RodLength(
             feat,
             self.metadata["pixel_size"]["width"],
             skel_algo=skel_algo,
@@ -1206,7 +1206,7 @@ class Model:
         time_step = self.metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(motion.CellSpeed(feat, time_step))
 
-    def add_cell_width(
+    def add_rod_width(
         self,
         skel_algo: str = "zhang",
         tolerance: float = 0.5,
@@ -1215,15 +1215,15 @@ class Model:
         rename: str | None = None,
     ) -> None:
         feat = Feature(
-            name=rename if rename else "cell_width",
-            description="Width of the cell",
+            name=rename if rename else "rod_width",
+            description="Width of the cell, for rod-shaped cells only",
             feat_type="node",
             lin_type="CellLineage",
             dtype="float",
             provenance="pycellin",
             unit=self.metadata["space_unit"],
         )
-        calc = morpho.CellWidth(
+        calc = morpho.RodWidth(
             feat,
             self.metadata["pixel_size"]["width"],
             skel_algo=skel_algo,

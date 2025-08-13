@@ -135,9 +135,9 @@ def _unit_to_dimension(
         # Cell features.
         "angle": "ANGLE",
         "cell_displacement": "LENGTH",
-        "cell_length": "LENGTH",
         "cell_speed": "VELOCITY",
-        "cell_width": "LENGTH",
+        "rod_length": "LENGTH",
+        "rod_width": "LENGTH",
         # Cycle features.
         "branch_total_displacement": "LENGTH",
         "branch_mean_displacement": "LENGTH",

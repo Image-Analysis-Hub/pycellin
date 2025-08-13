@@ -50,10 +50,7 @@ class FusionError(LineageStructureError):
             if lineage_ID is None:
                 message = f"Node {node_ID} has more than one parent node."
             else:
-                message = (
-                    f"Node {node_ID} in lineage {lineage_ID} has "
-                    f"more than one parent node."
-                )
+                message = f"Node {node_ID} in lineage {lineage_ID} has more than one parent node."
         super().__init__(message)
 
 
@@ -94,12 +91,8 @@ class TimeFlowError(LineageStructureError):
         self.target_nid = target_nid
         self.target_lineage_ID = target_lineage_ID
         if message is None:
-            txt_source_lin = (
-                "" if source_lineage_ID is None else f" in lineage {source_lineage_ID}"
-            )
-            txt_target_lin = (
-                "" if target_lineage_ID is None else f" in lineage {target_lineage_ID}"
-            )
+            txt_source_lin = "" if source_lineage_ID is None else f" in lineage {source_lineage_ID}"
+            txt_target_lin = "" if target_lineage_ID is None else f" in lineage {target_lineage_ID}"
             message = (
                 f"Node {target_nid}{txt_target_lin} "
                 f"has a time value lower than its parent node, "
@@ -144,8 +137,5 @@ class ProtectedFeatureError(Exception):
     def __init__(self, feat_name: str, message: str | None = None):
         self.feature_name = feat_name
         if message is None:
-            message = (
-                f"The feature '{feat_name}' is protected and cannot be modified "
-                f"nor removed."
-            )
+            message = f"The feature '{feat_name}' is protected and cannot be modified nor removed."
         super().__init__(message)
