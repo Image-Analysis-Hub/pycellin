@@ -214,10 +214,7 @@ def _unit_to_dimension(
         # TODO: It's going to be a nightmare to deal with all the possible cases.
         # Is it even possible? Maybe I could ask the user for a file with
         # a feature-dimension mapping. For now, I just set the dimension to NONE.
-        msg = (
-            f"Cannot infer dimension for feature '{name}'. "
-            f"Dimension is set to NONE."
-        )
+        msg = f"Cannot infer dimension for feature '{name}'. Dimension is set to NONE."
         warnings.warn(msg)
         dimension = "NONE"
 
@@ -294,7 +291,7 @@ def _convert_feature(
     trackmate_feat["name"] = new_name
     trackmate_feat["shortname"] = new_name
     trackmate_feat["dimension"] = _unit_to_dimension(feat)
-    if feat.data_type == "int":
+    if feat.dtype == "int":
         trackmate_feat["isint"] = "true"
     else:
         trackmate_feat["isint"] = "false"
@@ -320,13 +317,13 @@ def _write_FeatureDeclarations(
     model : Model
         Model containing the data to write.
     """
-    xf.write(f"\n{' '*4}")
+    xf.write(f"\n{' ' * 4}")
     with xf.element("FeatureDeclarations"):
         features_type = ["SpotFeatures", "EdgeFeatures", "TrackFeatures"]
         for f_type in features_type:
-            xf.write(f"\n{' '*6}")
+            xf.write(f"\n{' ' * 6}")
             with xf.element(f_type):
-                xf.write(f"\n{' '*8}")
+                xf.write(f"\n{' ' * 8}")
                 match f_type:
                     case "SpotFeatures":
                         features = model.get_node_features()
@@ -339,12 +336,12 @@ def _write_FeatureDeclarations(
                     trackmate_feat = _convert_feature(feat)
                     if trackmate_feat:
                         if first_feat_written:
-                            xf.write(f"\n{' '*8}")
+                            xf.write(f"\n{' ' * 8}")
                         else:
                             first_feat_written = True
                         xf.write(ET.Element("Feature", trackmate_feat))
-                xf.write(f"\n{' '*6}")
-        xf.write(f"\n{' '*4}")
+                xf.write(f"\n{' ' * 6}")
+        xf.write(f"\n{' ' * 4}")
 
 
 def _value_to_str(
@@ -405,11 +402,7 @@ def _create_Spot(
         The newly created Spot Element.
     """
     exluded_keys = ["TRACK_ID", "ROI_coords"]
-    n_attr = {
-        k: _value_to_str(v)
-        for k, v in lineage.nodes[node].items()
-        if k not in exluded_keys
-    }
+    n_attr = {k: _value_to_str(v) for k, v in lineage.nodes[node].items() if k not in exluded_keys}
     if "ROI_coords" in lineage.nodes[node]:
         n_attr["ROI_N_POINTS"] = str(len(lineage.nodes[node]["ROI_coords"]))
         # The text of a Spot is the coordinates of its ROI points, in a flattened list.
@@ -438,7 +431,7 @@ def _write_AllSpots(
     data : dict[int, CellLineage]
         Cell lineages containing the data to write.
     """
-    xf.write(f"\n{' '*4}")
+    xf.write(f"\n{' ' * 4}")
     lineages = data.values()
     nb_nodes = sum([len(lin) for lin in lineages])
     with xf.element("AllSpots", {"nspots": str(nb_nodes)}):
@@ -450,15 +443,15 @@ def _write_AllSpots(
 
         # Then at each frame, we can find the nodes and write its data.
         for frame in frames:
-            xf.write(f"\n{' '*6}")
+            xf.write(f"\n{' ' * 6}")
             with xf.element("SpotsInFrame", {"frame": str(frame)}):
                 for lin in lineages:
                     nodes = [n for n in lin.nodes() if lin.nodes[n]["FRAME"] == frame]
                     for node in nodes:
-                        xf.write(f"\n{' '*8}")
+                        xf.write(f"\n{' ' * 8}")
                         xf.write(_create_Spot(lin, node))
-                xf.write(f"\n{' '*6}")
-        xf.write(f"\n{' '*4}")
+                xf.write(f"\n{' ' * 6}")
+        xf.write(f"\n{' ' * 4}")
 
 
 def _write_AllTracks(
@@ -475,7 +468,7 @@ def _write_AllTracks(
     data : dict[int, CellLineage]
         Cell lineages containing the data to write.
     """
-    xf.write(f"\n{' '*4}")
+    xf.write(f"\n{' ' * 4}")
     with xf.element("AllTracks"):
         for lineage in data.values():
             # We have track tags to add only for tracks with several spots,
@@ -485,21 +478,19 @@ def _write_AllTracks(
                 continue
 
             # Track tags.
-            xf.write(f"\n{' '*6}")
+            xf.write(f"\n{' ' * 6}")
             exluded_keys = ["Model", "FilteredTrack"]
             t_attr = {
-                k: _value_to_str(v)
-                for k, v in lineage.graph.items()
-                if k not in exluded_keys
+                k: _value_to_str(v) for k, v in lineage.graph.items() if k not in exluded_keys
             }
             with xf.element("Track", t_attr):
                 # Edge tags.
                 for edge in lineage.edges.data():
-                    xf.write(f"\n{' '*8}")
+                    xf.write(f"\n{' ' * 8}")
                     e_attr = {k: _value_to_str(v) for k, v in edge[2].items()}
                     xf.write(ET.Element("Edge", e_attr))
-                xf.write(f"\n{' '*6}")
-        xf.write(f"\n{' '*4}")
+                xf.write(f"\n{' ' * 6}")
+        xf.write(f"\n{' ' * 4}")
 
 
 def _write_track_id(xf: ET.xmlfile, lineage: CellLineage) -> None:
@@ -524,7 +515,7 @@ def _write_track_id(xf: ET.xmlfile, lineage: CellLineage) -> None:
             return
     except KeyError as err:
         raise KeyError("The lineage does not have a TRACK_ID attribute.") from err
-    xf.write(f"\n{' '*6}")
+    xf.write(f"\n{' ' * 6}")
     t_attr = {"TRACK_ID": str(lineage.graph["TRACK_ID"])}
     xf.write(ET.Element("TrackID", t_attr))
 
@@ -551,7 +542,7 @@ def _write_FilteredTracks(
     KeyError
         If the lineage does not have a TRACK_IDif lineage.graph["TRACK_ID"] < 0: attribute.
     """
-    xf.write(f"\n{' '*4}")
+    xf.write(f"\n{' ' * 4}")
     with xf.element("FilteredTracks"):
         if has_FilteredTracks:
             for lineage in data.values():
@@ -562,8 +553,8 @@ def _write_FilteredTracks(
             # because TrackMate only displays tracks that are in this tag.
             for lineage in data.values():
                 _write_track_id(xf, lineage)
-        xf.write(f"\n{' '*4}")
-    xf.write(f"\n{' '*2}")
+        xf.write(f"\n{' ' * 4}")
+    xf.write(f"\n{' ' * 2}")
 
 
 def _update_nodes(lineage: CellLineage) -> None:
@@ -590,10 +581,7 @@ def _update_nodes(lineage: CellLineage) -> None:
             except KeyError:
                 # This feature is mandatory in TrackMate for x, y and z dimensions.
                 if axis in ["X", "Y"]:
-                    raise KeyError(
-                        f"A mandatory TrackMate feature is missing: "
-                        f"POSITION_{axis}."
-                    )
+                    raise KeyError(f"A mandatory TrackMate feature is missing: POSITION_{axis}.")
                 else:
                     # We add the missing z dimension.
                     data[f"POSITION_{axis}"] = 0.0
@@ -640,9 +628,7 @@ def _update_lineages(lineage: CellLineage) -> None:
     # Position features.
     for axis in ["X", "Y", "Z"]:
         try:
-            lineage.graph[f"TRACK_{axis}_LOCATION"] = lineage.graph.pop(
-                f"lineage_{axis.lower()}"
-            )
+            lineage.graph[f"TRACK_{axis}_LOCATION"] = lineage.graph.pop(f"lineage_{axis.lower()}")
         except KeyError:
             pass  # Not a mandatory feature.
 
@@ -701,7 +687,7 @@ def _remove_non_numeric_features(model: Model) -> None:
     to_remove = [
         name
         for name, feat in model.get_features().items()
-        if feat.provenance != "TrackMate" and feat.data_type.lower() not in valid_dtype
+        if feat.provenance != "TrackMate" and feat.dtype.lower() not in valid_dtype
     ]
     if to_remove:
         for name in to_remove:
@@ -779,7 +765,7 @@ def _add_mandatory_features(fd: FeaturesDeclaration) -> None:
             provenance="TrackMate",
             feat_type="edge",
             lin_type="CellLineage",
-            data_type="int",
+            dtype="int",
             unit="NONE",
         )
         fd._add_feature(source_feat)
@@ -790,7 +776,7 @@ def _add_mandatory_features(fd: FeaturesDeclaration) -> None:
             provenance="TrackMate",
             feat_type="edge",
             lin_type="CellLineage",
-            data_type="int",
+            dtype="int",
             unit="NONE",
         )
         fd._add_feature(target_feat)
@@ -801,7 +787,7 @@ def _add_mandatory_features(fd: FeaturesDeclaration) -> None:
             provenance="TrackMate",
             feat_type="node",
             lin_type="CellLineage",
-            data_type="int",
+            dtype="int",
             unit="NONE",
         )
         fd._add_feature(visibility_feat)
@@ -830,10 +816,7 @@ def _update_location_features(fd: FeaturesDeclaration) -> None:
         except KeyError:
             # This feature is mandatory in TrackMate for x, y and z dimensions.
             if axis in ["x", "y"]:
-                raise KeyError(
-                    f"A feature mandatory for TrackMate export is missing: "
-                    f"cell_{axis}."
-                )
+                raise KeyError(f"A feature mandatory for TrackMate export is missing: cell_{axis}.")
             else:
                 # We add the missing z dimension.
                 fd._add_feature(
@@ -843,7 +826,7 @@ def _update_location_features(fd: FeaturesDeclaration) -> None:
                         provenance="TrackMate",
                         feat_type="node",
                         lin_type="CellLineage",
-                        data_type="float",
+                        dtype="float",
                         unit="pixel",
                     )
                 )
@@ -1030,7 +1013,6 @@ def export_TrackMate_XML(
 
 
 if __name__ == "__main__":
-
     xml_in = "sample_data/FakeTracks.xml"
     # xml_out = "sample_data/results/FakeTracks_TMtoTM.xml"
     xml_out = "/home/laura/FakeTracks_exported_TM.xml"
@@ -1056,8 +1038,6 @@ if __name__ == "__main__":
     #     edge_hover_features=["link_x", "link_y", "link_z"],
     # )
     # print(model.feat_declaration)
-    export_TrackMate_XML(
-        model, xml_out, {"spatialunits": "pixel", "temporalunits": "sec"}
-    )
+    export_TrackMate_XML(model, xml_out, {"spatialunits": "pixel", "temporalunits": "sec"})
     # print()
     # print(model.feat_declaration)

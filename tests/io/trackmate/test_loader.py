@@ -57,9 +57,7 @@ def is_equal(obt, exp):
         for data1, data2 in zip(sorted(obt.edges.data()), sorted(exp.edges.data())):
             n11, n12, attr1 = data1
             n21, n22, attr2 = data2
-            if sorted(attr1) == sorted(attr2) and sorted((n11, n12)) == sorted(
-                (n21, n22)
-            ):
+            if sorted(attr1) == sorted(attr2) and sorted((n11, n12)) == sorted((n21, n22)):
                 same_edges = True
             else:
                 same_edges = False
@@ -91,7 +89,7 @@ def feat_QUALITY():
         provenance="TrackMate",
         feat_type="node",
         lin_type="CellLineage",
-        data_type="float",
+        dtype="float",
     )
 
 
@@ -103,7 +101,7 @@ def feat_FRAME():
         provenance="TrackMate",
         feat_type="node",
         lin_type="CellLineage",
-        data_type="int",
+        dtype="int",
     )
 
 
@@ -115,7 +113,7 @@ def feat_spot_name():
         provenance="TrackMate",
         feat_type="node",
         lin_type="CellLineage",
-        data_type="string",
+        dtype="string",
     )
 
 
@@ -136,7 +134,7 @@ def feat_SPOT_SOURCE_ID():
         provenance="TrackMate",
         feat_type="edge",
         lin_type="CellLineage",
-        data_type="int",
+        dtype="int",
     )
 
 
@@ -148,7 +146,7 @@ def feat_SPOT_TARGET_ID():
         provenance="TrackMate",
         feat_type="edge",
         lin_type="CellLineage",
-        data_type="int",
+        dtype="int",
     )
 
 
@@ -168,7 +166,7 @@ def feat_TRACK_INDEX():
         provenance="TrackMate",
         feat_type="lineage",
         lin_type="CellLineage",
-        data_type="int",
+        dtype="int",
     )
 
 
@@ -180,7 +178,7 @@ def feat_NUMBER_SPOTS():
         provenance="TrackMate",
         feat_type="lineage",
         lin_type="CellLineage",
-        data_type="int",
+        dtype="int",
     )
 
 
@@ -192,14 +190,12 @@ def feat_track_name():
         provenance="TrackMate",
         feat_type="lineage",
         lin_type="CellLineage",
-        data_type="string",
+        dtype="string",
     )
 
 
 @pytest.fixture(scope="module")
-def track_feats(
-    feat_TRACK_INDEX: Feature, feat_NUMBER_SPOTS: Feature, feat_track_name: Feature
-):
+def track_feats(feat_TRACK_INDEX: Feature, feat_NUMBER_SPOTS: Feature, feat_track_name: Feature):
     return {
         "TRACK_INDEX": feat_TRACK_INDEX,
         "NUMBER_SPOTS": feat_NUMBER_SPOTS,
@@ -211,7 +207,7 @@ def track_feats(
 
 
 def test_get_units():
-    xml_data = '<Model spatialunits="µm" timeunits="min">' "</Model>"
+    xml_data = '<Model spatialunits="µm" timeunits="min"></Model>'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     obtained = tml._get_units(element)
@@ -222,7 +218,7 @@ def test_get_units():
 
 
 def test_get_units_missing_spaceunits():
-    xml_data = '<Model timeunits="min">' "</Model>"
+    xml_data = '<Model timeunits="min"></Model>'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     obtained = tml._get_units(element)
@@ -233,7 +229,7 @@ def test_get_units_missing_spaceunits():
 
 
 def test_get_units_missing_timeunits():
-    xml_data = '<Model spatialunits="µm">' "</Model>"
+    xml_data = '<Model spatialunits="µm"></Model>'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     obtained = tml._get_units(element)
@@ -244,7 +240,7 @@ def test_get_units_missing_timeunits():
 
 
 def test_get_units_no_units():
-    xml_data = "<Model>" "</Model>"
+    xml_data = "<Model></Model>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     obtained = tml._get_units(element)
@@ -275,7 +271,7 @@ def test_get_features_dict():
 
 
 def test_get_features_dict_no_feature_tag():
-    xml_data = "<SpotFeatures>" "</SpotFeatures>"
+    xml_data = "<SpotFeatures></SpotFeatures>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     features = tml._get_features_dict(it, element)
@@ -299,9 +295,7 @@ def test_get_features_dict_other_tag():
 # _convert_and_add_feature ####################################################
 
 
-def test_convert_and_add_feature_spot_feature(
-    units: dict[str, str], feat_QUALITY: Feature
-):
+def test_convert_and_add_feature_spot_feature(units: dict[str, str], feat_QUALITY: Feature):
     trackmate_feature = {
         "feature": "QUALITY",
         "name": "Quality",
@@ -317,9 +311,7 @@ def test_convert_and_add_feature_spot_feature(
     assert obtained == expected
 
 
-def test_convert_and_add_feature_edge_feature(
-    units: dict[str, str], feat_SPOT_SOURCE_ID: Feature
-):
+def test_convert_and_add_feature_edge_feature(units: dict[str, str], feat_SPOT_SOURCE_ID: Feature):
     trackmate_feature = {
         "feature": "SPOT_SOURCE_ID",
         "name": "Source spot ID",
@@ -335,9 +327,7 @@ def test_convert_and_add_feature_edge_feature(
     assert obtained == expected
 
 
-def test_convert_and_add_feature_track_feature(
-    units: dict[str, str], feat_TRACK_INDEX: Feature
-):
+def test_convert_and_add_feature_track_feature(units: dict[str, str], feat_TRACK_INDEX: Feature):
     trackmate_feature = {
         "feature": "TRACK_INDEX",
         "name": "Track index",
@@ -364,9 +354,7 @@ def test_convert_and_add_feature_invalid_feature_type(units: dict[str, str]):
     feat_declaration = FeaturesDeclaration()
 
     with pytest.raises(ValueError, match="Invalid feature type: InvalidFeatureType"):
-        tml._convert_and_add_feature(
-            trackmate_feature, feature_type, feat_declaration, units
-        )
+        tml._convert_and_add_feature(trackmate_feature, feature_type, feat_declaration, units)
 
 
 # _add_all_features ###########################################################
@@ -408,7 +396,7 @@ def test_add_all_features(
 
 
 def test_add_all_features_empty():
-    xml_data = "<FeatureDeclarations>" "</FeatureDeclarations>"
+    xml_data = "<FeatureDeclarations></FeatureDeclarations>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
@@ -454,10 +442,10 @@ def test_add_all_features_tag_with_no_feature_tag(
 
 def test_convert_attributes():
     features = {
-        "feat_float": Feature("", "", "", "node", "CellLineage", data_type="float"),
-        "feat_int": Feature("", "", "", "node", "CellLineage", data_type="int"),
-        "feat_neg": Feature("", "", "", "node", "CellLineage", data_type="int"),
-        "feat_string": Feature("", "", "", "node", "CellLineage", data_type="string"),
+        "feat_float": Feature("", "", "", "node", "CellLineage", dtype="float"),
+        "feat_int": Feature("", "", "", "node", "CellLineage", dtype="int"),
+        "feat_neg": Feature("", "", "", "node", "CellLineage", dtype="int"),
+        "feat_string": Feature("", "", "", "node", "CellLineage", dtype="string"),
     }
 
     obtained_attr = {
@@ -490,9 +478,7 @@ def test_convert_attributes_specific_keys():
 
 
 def test_convert_attributes_ValueError():
-    features = {
-        "feat_int": Feature("", "", "", "node", "CellLineage", data_type="integer")
-    }
+    features = {"feat_int": Feature("", "", "", "node", "CellLineage", dtype="integer")}
     attributes = {"feat_int": "20"}
 
     with pytest.raises(ValueError):
@@ -501,7 +487,7 @@ def test_convert_attributes_ValueError():
 
 def test_convert_attributes_missing_feat():
     features = {
-        "feat_float": Feature("", "", "", "node", "CellLineage", data_type="float"),
+        "feat_float": Feature("", "", "", "node", "CellLineage", dtype="float"),
     }
     attributes = {"feat_float": "30", "feat_int": "20"}
 
@@ -512,7 +498,7 @@ def test_convert_attributes_missing_feat():
     assert features["feat_int"].provenance == "unknown"
     assert features["feat_int"].feat_type == "node"
     assert features["feat_int"].lin_type == "CellLineage"
-    assert features["feat_int"].data_type == "unknown"
+    assert features["feat_int"].dtype == "unknown"
     assert features["feat_int"].unit == "unknown"
 
 
@@ -585,8 +571,8 @@ def test_add_all_nodes_several_attributes():
     _, element = next(it)
 
     spot_features = {
-        "x": Feature("", "", "", "node", "CellLineage", data_type="float"),
-        "y": Feature("", "", "", "node", "CellLineage", data_type="int"),
+        "x": Feature("", "", "", "node", "CellLineage", dtype="float"),
+        "y": Feature("", "", "", "node", "CellLineage", dtype="int"),
     }
     feat_decl = FeaturesDeclaration(spot_features)
     obtained = nx.DiGraph()
@@ -605,12 +591,7 @@ def test_add_all_nodes_several_attributes():
 
 def test_add_all_nodes_only_ID_attribute():
     xml_data = (
-        "<data>"
-        "   <frame>"
-        '       <Spot ID="1000" />'
-        '       <Spot ID="1001" />'
-        "   </frame>"
-        "</data>"
+        '<data>   <frame>       <Spot ID="1000" />       <Spot ID="1001" />   </frame></data>'
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
@@ -625,14 +606,7 @@ def test_add_all_nodes_only_ID_attribute():
 
 
 def test_add_all_nodes_no_node_attributes():
-    xml_data = (
-        "<data>"
-        "   <frame>"
-        "       <Spot />"
-        '       <Spot ID="1001" />'
-        "   </frame>"
-        "</data>"
-    )
+    xml_data = '<data>   <frame>       <Spot />       <Spot ID="1001" />   </frame></data>'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
@@ -646,7 +620,7 @@ def test_add_all_nodes_no_node_attributes():
 
 
 def test_add_all_nodes_no_nodes():
-    xml_data = "<data>" "   <frame />" "</data>"
+    xml_data = "<data>   <frame /></data>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
@@ -666,10 +640,10 @@ def test_add_edge():
     track_id = 0
 
     edge_feats = {
-        "x": Feature("", "", "", "edge", "CellLineage", data_type="float"),
-        "y": Feature("", "", "", "edge", "CellLineage", data_type="int"),
-        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
-        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
+        "x": Feature("", "", "", "edge", "CellLineage", dtype="float"),
+        "y": Feature("", "", "", "edge", "CellLineage", dtype="int"),
+        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
+        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
     }
     obtained = nx.DiGraph()
     feat_decl = FeaturesDeclaration(edge_feats)
@@ -690,9 +664,9 @@ def test_add_edge_no_node_ID():
     track_id = 0
 
     edge_feats = {
-        "x": Feature("", "", "", "edge", "CellLineage", data_type="float"),
-        "y": Feature("", "", "", "edge", "CellLineage", data_type="int"),
-        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
+        "x": Feature("", "", "", "edge", "CellLineage", dtype="float"),
+        "y": Feature("", "", "", "edge", "CellLineage", dtype="int"),
+        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
     }
     obtained = nx.DiGraph()
     feat_decl = FeaturesDeclaration(edge_feats)
@@ -710,8 +684,8 @@ def test_add_edge_no_edge_attributes():
     track_id = 0
 
     edge_feats = {
-        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
-        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
+        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
+        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
     }
     obtained = nx.DiGraph()
     feat_decl = FeaturesDeclaration(edge_feats)
@@ -746,14 +720,12 @@ def test_build_tracks_several_attributes():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     edge_feats = {
-        "x": Feature("", "", "", "edge", "CellLineage", data_type="float"),
-        "y": Feature("", "", "", "edge", "CellLineage", data_type="int"),
-        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
-        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
+        "x": Feature("", "", "", "edge", "CellLineage", dtype="float"),
+        "y": Feature("", "", "", "edge", "CellLineage", dtype="int"),
+        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
+        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
     }
-    track_feats = {
-        "TRACK_ID": Feature("", "", "", "lineage", "CellLineage", data_type="int")
-    }
+    track_feats = {"TRACK_ID": Feature("", "", "", "lineage", "CellLineage", dtype="int")}
 
     obtained = nx.DiGraph()
     feat_decl = FeaturesDeclaration({**edge_feats, **track_feats})
@@ -798,12 +770,10 @@ def test_build_tracks_no_nodes_ID():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     edge_feats = {
-        "x": Feature("", "", "", "edge", "CellLineage", data_type="float"),
-        "y": Feature("", "", "", "edge", "CellLineage", data_type="int"),
+        "x": Feature("", "", "", "edge", "CellLineage", dtype="float"),
+        "y": Feature("", "", "", "edge", "CellLineage", dtype="int"),
     }
-    track_feats = {
-        "TRACK_ID": Feature("", "", "", "lineage", "CellLineage", data_type="int")
-    }
+    track_feats = {"TRACK_ID": Feature("", "", "", "lineage", "CellLineage", dtype="int")}
 
     obtained = nx.DiGraph()
     feat_decl = FeaturesDeclaration({**edge_feats, **track_feats})
@@ -823,16 +793,11 @@ def test_build_tracks_no_nodes_ID():
 
 def test_build_tracks_no_edges():
     xml_data = (
-        "<data>"
-        '   <Track TRACK_ID="1" name="blob" />'
-        '   <Track TRACK_ID="2" name="blub" />'
-        "</data>"
+        '<data>   <Track TRACK_ID="1" name="blob" />   <Track TRACK_ID="2" name="blub" /></data>'
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    track_feats = {
-        "TRACK_ID": Feature("", "", "", "lineage", "CellLineage", data_type="int")
-    }
+    track_feats = {"TRACK_ID": Feature("", "", "", "lineage", "CellLineage", dtype="int")}
 
     obtained = nx.DiGraph()
     feat_decl = FeaturesDeclaration(track_feats)
@@ -868,10 +833,10 @@ def test_build_tracks_no_track_ID():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     edge_feats = {
-        "x": Feature("", "", "", "edge", "CellLineage", data_type="float"),
-        "y": Feature("", "", "", "edge", "CellLineage", data_type="int"),
-        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
-        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", data_type="int"),
+        "x": Feature("", "", "", "edge", "CellLineage", dtype="float"),
+        "y": Feature("", "", "", "edge", "CellLineage", dtype="int"),
+        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
+        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
     }
 
     obtained = nx.DiGraph()
@@ -885,9 +850,7 @@ def test_build_tracks_no_track_ID():
 
 
 def test_get_filtered_tracks_ID():
-    xml_data = (
-        "<data>" '   <TrackID TRACK_ID="0" />' '   <TrackID TRACK_ID="1" />' "</data>"
-    )
+    xml_data = '<data>   <TrackID TRACK_ID="0" />   <TrackID TRACK_ID="1" /></data>'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
@@ -897,7 +860,7 @@ def test_get_filtered_tracks_ID():
 
 
 def test_get_filtered_tracks_ID_no_ID():
-    xml_data = "<data>" "   <TrackID />" "   <TrackID />" "</data>"
+    xml_data = "<data>   <TrackID />   <TrackID /></data>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     obtained_ID = tml._get_filtered_tracks_ID(it, element)
@@ -905,7 +868,7 @@ def test_get_filtered_tracks_ID_no_ID():
 
 
 def test_get_filtered_tracks_ID_no_tracks():
-    xml_data = "<data>" "   <tag />" "   <tag />" "</data>"
+    xml_data = "<data>   <tag />   <tag /></data>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     obtained_ID = tml._get_filtered_tracks_ID(it, element)
@@ -1255,16 +1218,12 @@ def test_get_pixel_size_invalid_attribute():
     image_data.attrib["pixelheight"] = "2.0"
     image_data.attrib["voxeldepth"] = "invalid"
 
-    with pytest.raises(
-        ValueError, match="The voxeldepth attribute cannot be converted to float."
-    ):
+    with pytest.raises(ValueError, match="The voxeldepth attribute cannot be converted to float."):
         tml._get_pixel_size(settings)
 
 
 def test_get_pixel_size_missing_image_data():
     settings = ET.Element("Settings")
 
-    with pytest.raises(
-        KeyError, match="The 'ImageData' element is not found in the settings."
-    ):
+    with pytest.raises(KeyError, match="The 'ImageData' element is not found in the settings."):
         tml._get_pixel_size(settings)

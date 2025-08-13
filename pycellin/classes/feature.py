@@ -19,7 +19,7 @@ class Feature:
         provenance: str,
         feat_type: FeatureType,
         lin_type: LineageType,
-        data_type: str,
+        dtype: str,
         unit: str | None = None,
     ) -> None:
         """
@@ -38,7 +38,7 @@ class Feature:
         lin_type : LineageType
             The type of lineage the feature is associated with: `CellLineage`,
             `CycleLineage`, or `Lineage` for both.
-        data_type : str
+        dtype : str
             The data type of the feature (int, float, string).
         unit : str, optional
             The unit of the feature (e.g. µm, min, cell).
@@ -52,16 +52,12 @@ class Feature:
         self.description = description
         self.provenance = provenance
         if not check_literal_type(feat_type, FeatureType):
-            raise ValueError(
-                f"Feature type must be one of {', '.join(get_args(FeatureType))}."
-            )
+            raise ValueError(f"Feature type must be one of {', '.join(get_args(FeatureType))}.")
         self.feat_type = feat_type
         if not check_literal_type(lin_type, LineageType):
-            raise ValueError(
-                f"Lineage type must be one of {', '.join(get_args(LineageType))}."
-            )
+            raise ValueError(f"Lineage type must be one of {', '.join(get_args(LineageType))}.")
         self.lin_type = lin_type
-        self.data_type = data_type
+        self.dtype = dtype
         self.unit = unit
 
     def __eq__(self, other: object) -> bool:
@@ -73,7 +69,7 @@ class Feature:
             and self.provenance == other.provenance
             and self.feat_type == other.feat_type
             and self.lin_type == other.lin_type
-            and self.data_type == other.data_type
+            and self.dtype == other.dtype
             and self.unit == other.unit
         )
 
@@ -89,7 +85,7 @@ class Feature:
         return (
             f"Feature(name={self.name!r}, description={self.description!r}, "
             f"provenance={self.provenance!r}, feat_type={self.feat_type!r}, "
-            f"lin_type={self.lin_type!r}, data_type={self.data_type!r}, "
+            f"lin_type={self.lin_type!r}, dtype={self.dtype!r}, "
             f"unit={self.unit!r})"
         )
 
@@ -108,7 +104,7 @@ class Feature:
             f"  Provenance: {self.provenance}\n"
             f"  Type: {self.feat_type}\n"
             f"  Lineage type: {self.lin_type}\n"
-            f"  Data type: {self.data_type}\n"
+            f"  Data type: {self.dtype}\n"
             f"  Unit: {self.unit}"
         )
         return string
@@ -191,7 +187,7 @@ class Feature:
                 and self.description == other.description
                 and self.provenance == other.provenance
                 and self.lin_type == other.lin_type
-                and self.data_type == other.data_type
+                and self.dtype == other.dtype
                 and self.unit == other.unit
             )
         else:
@@ -205,7 +201,7 @@ def frame_Feature(provenance: str = "pycellin") -> Feature:
         provenance=provenance,
         feat_type="node",
         lin_type="CellLineage",
-        data_type="int",
+        dtype="int",
         unit="frame",
     )
     return feat
@@ -218,7 +214,7 @@ def cell_ID_Feature(provenance: str = "pycellin") -> Feature:
         provenance=provenance,
         feat_type="node",
         lin_type="CellLineage",
-        data_type="int",
+        dtype="int",
     )
     return feat
 
@@ -230,7 +226,7 @@ def lineage_ID_Feature(provenance: str = "pycellin") -> Feature:
         provenance=provenance,
         feat_type="lineage",
         lin_type="Lineage",
-        data_type="int",
+        dtype="int",
     )
     return feat
 
@@ -242,7 +238,7 @@ def cell_coord_Feature(unit: str, axis: str, provenance: str = "pycellin") -> Fe
         provenance=provenance,
         feat_type="node",
         lin_type="CellLineage",
-        data_type="float",
+        dtype="float",
         unit=unit,
     )
     return feat
@@ -252,31 +248,27 @@ def link_coord_Feature(unit: str, axis: str, provenance: str = "pycellin") -> Fe
     feat = Feature(
         name=f"link_{axis}",
         description=(
-            f"{axis.upper()} coordinate of the link, "
-            f"i.e. mean coordinate of its two cells"
+            f"{axis.upper()} coordinate of the link, i.e. mean coordinate of its two cells"
         ),
         provenance=provenance,
         feat_type="edge",
         lin_type="CellLineage",
-        data_type="float",
+        dtype="float",
         unit=unit,
     )
     return feat
 
 
-def lineage_coord_Feature(
-    unit: str, axis: str, provenance: str = "pycellin"
-) -> Feature:
+def lineage_coord_Feature(unit: str, axis: str, provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name=f"lineage_{axis}",
         description=(
-            f"{axis.upper()} coordinate of the lineage, "
-            f"i.e. mean coordinate of its cells"
+            f"{axis.upper()} coordinate of the lineage, i.e. mean coordinate of its cells"
         ),
         provenance=provenance,
         feat_type="lineage",
         lin_type="CellLineage",
-        data_type="float",
+        dtype="float",
         unit=unit,
     )
     return feat
@@ -286,13 +278,12 @@ def cycle_ID_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
         name="cycle_ID",
         description=(
-            "Unique identifier of the cell cycle, "
-            "i.e. cell_ID of the last cell in the cell cycle"
+            "Unique identifier of the cell cycle, i.e. cell_ID of the last cell in the cell cycle"
         ),
         provenance=provenance,
         feat_type="node",
         lin_type="CycleLineage",
-        data_type="int",
+        dtype="int",
     )
     return feat
 
@@ -304,7 +295,7 @@ def cells_Feature(provenance: str = "pycellin") -> Feature:
         provenance=provenance,
         feat_type="node",
         lin_type="CycleLineage",
-        data_type="list[int]",
+        dtype="list[int]",
     )
     return feat
 
@@ -316,7 +307,7 @@ def cycle_length_Feature(provenance: str = "pycellin") -> Feature:
         provenance=provenance,
         feat_type="node",
         lin_type="CycleLineage",
-        data_type="int",
+        dtype="int",
     )
     return feat
 
@@ -328,7 +319,7 @@ def cycle_duration_Feature(provenance: str = "pycellin") -> Feature:
         provenance=provenance,
         feat_type="node",
         lin_type="CycleLineage",
-        data_type="int",
+        dtype="int",
         unit="frame",
     )
     return feat
@@ -344,7 +335,7 @@ def level_Feature(provenance: str = "pycellin") -> Feature:
         provenance=provenance,
         feat_type="node",
         lin_type="CycleLineage",
-        data_type="int",
+        dtype="int",
     )
     return feat
 
@@ -461,9 +452,7 @@ class FeaturesDeclaration:
             If the feature type is invalid.
         """
         if not check_literal_type(feat_type, FeatureType):
-            raise ValueError(
-                f"Feature type must be one of {', '.join(get_args(FeatureType))}."
-            )
+            raise ValueError(f"Feature type must be one of {', '.join(get_args(FeatureType))}.")
         feats = {k: v for k, v in self.feats_dict.items() if feat_type == v.feat_type}
         return feats
 
@@ -488,9 +477,7 @@ class FeaturesDeclaration:
             If the lineage type is invalid.
         """
         if not check_literal_type(lin_type, LineageType):
-            raise ValueError(
-                f"Lineage type must be one of {', '.join(get_args(LineageType))}."
-            )
+            raise ValueError(f"Lineage type must be one of {', '.join(get_args(LineageType))}.")
         feats = {k: v for k, v in self.feats_dict.items() if lin_type == v.lin_type}
         return feats
 
@@ -533,10 +520,7 @@ class FeaturesDeclaration:
 
             if feature.is_equal(old_feat, ignore_feat_type=True):
                 if feature.feat_type == old_feat.feat_type:
-                    msg = (
-                        f"An identical Feature '{feature.name}' "
-                        f"has already been declared."
-                    )
+                    msg = f"An identical Feature '{feature.name}' has already been declared."
                     warnings.warn(msg)
                 else:
                     msg = (
@@ -615,9 +599,7 @@ class FeaturesDeclaration:
             If the feature is protected and cannot be removed.
         """
         if feature_name not in self.feats_dict:
-            raise KeyError(
-                f"Feature '{feature_name}' does not exist in the declared features."
-            )
+            raise KeyError(f"Feature '{feature_name}' does not exist in the declared features.")
         if feature_name in self._protected_feats:
             msg = (
                 f"Feature '{feature_name}' is protected and cannot be removed. "
@@ -665,9 +647,7 @@ class FeaturesDeclaration:
             If the feature is protected and cannot be modified.
         """
         if feature_name not in self.feats_dict:
-            raise KeyError(
-                f"Feature '{feature_name}' does not exist in the declared features."
-            )
+            raise KeyError(f"Feature '{feature_name}' does not exist in the declared features.")
         if feature_name in self._protected_feats:
             msg = (
                 f"Feature '{feature_name}' is protected and cannot be modified. "
@@ -702,9 +682,7 @@ class FeaturesDeclaration:
             (i.e. it is in the list of protected features).
         """
         if feature_name not in self.feats_dict:
-            raise KeyError(
-                f"Feature '{feature_name}' does not exist in the declared features."
-            )
+            raise KeyError(f"Feature '{feature_name}' does not exist in the declared features.")
         if feature_name in self._protected_feats:
             msg = (
                 f"Feature '{feature_name}' is protected and cannot be modified. "
@@ -786,7 +764,6 @@ class FeaturesDeclaration:
 
 
 if __name__ == "__main__":
-
     # Basic testing of the Feature and FeaturesDeclaration classes.
     # TODO: do this properly in test_feature.py.
 

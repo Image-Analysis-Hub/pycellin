@@ -969,7 +969,7 @@ class Model:
             provenance="pycellin",
             feat_type="node",
             lin_type="CellLineage",
-            data_type="float" if in_time_unit else "int",
+            dtype="float" if in_time_unit else "int",
             unit=self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
@@ -999,7 +999,7 @@ class Model:
             provenance="pycellin",
             feat_type="edge",
             lin_type="CellLineage",
-            data_type="float",
+            dtype="float",
             unit=unit,
         )
         self.add_custom_feature(motion.Angle(feat, unit))
@@ -1025,7 +1025,7 @@ class Model:
             provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
-            data_type="float",
+            dtype="float",
             unit=self.metadata["space_unit"],
         )
         self.add_custom_feature(motion.BranchMeanDisplacement(feat))
@@ -1055,7 +1055,7 @@ class Model:
             provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
-            data_type="float",
+            dtype="float",
             unit=f"{self.metadata['space_unit']} / {self.metadata['time_unit']}",
         )
         self.add_custom_feature(motion.BranchMeanSpeed(feat, include_incoming_edge))
@@ -1081,7 +1081,7 @@ class Model:
             provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
-            data_type="float",
+            dtype="float",
             unit=self.metadata["space_unit"],
         )
         self.add_custom_feature(motion.BranchTotalDisplacement(feat))
@@ -1111,7 +1111,7 @@ class Model:
             provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
-            data_type="bool",
+            dtype="bool",
             unit="none",
         )
         self.add_custom_feature(tracking.CycleCompleteness(feat))
@@ -1137,7 +1137,7 @@ class Model:
             provenance="pycellin",
             feat_type="edge",
             lin_type="CellLineage",
-            data_type="float",
+            dtype="float",
             unit=self.metadata["space_unit"],
         )
         self.add_custom_feature(motion.CellDisplacement(feat))
@@ -1156,7 +1156,7 @@ class Model:
             provenance="pycellin",
             feat_type="node",
             lin_type="CellLineage",
-            data_type="float",
+            dtype="float",
             unit=self.metadata["space_unit"],
         )
         calc = morpho.CellLength(
@@ -1196,7 +1196,7 @@ class Model:
             provenance="pycellin",
             feat_type="edge",
             lin_type="CellLineage",
-            data_type="float",
+            dtype="float",
             unit=(
                 f"{self.metadata['space_unit']}/{self.metadata['time_unit']}"
                 if in_time_unit
@@ -1219,7 +1219,7 @@ class Model:
             description="Width of the cell",
             feat_type="node",
             lin_type="CellLineage",
-            data_type="float",
+            dtype="float",
             provenance="pycellin",
             unit=self.metadata["space_unit"],
         )
@@ -1260,7 +1260,7 @@ class Model:
             provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
-            data_type="float",
+            dtype="float",
             unit=f"1/{self.metadata['time_unit']}" if in_time_unit else "1/frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
@@ -1293,7 +1293,7 @@ class Model:
             provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
-            data_type="float" if in_time_unit else "int",
+            dtype="float" if in_time_unit else "int",
             unit=self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
@@ -1327,7 +1327,7 @@ class Model:
             provenance="pycellin",
             feat_type="node",
             lin_type="CellLineage",
-            data_type="float" if in_time_unit else "int",
+            dtype="float" if in_time_unit else "int",
             unit=self.metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.metadata["time_step"] if in_time_unit else 1
@@ -1361,7 +1361,7 @@ class Model:
             provenance="pycellin",
             feat_type="node",
             lin_type="CycleLineage",
-            data_type="float",
+            dtype="float",
         )
         self.add_custom_feature(motion.Straightness(feat, include_incoming_edge))
 

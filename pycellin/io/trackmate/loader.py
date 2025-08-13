@@ -150,9 +150,9 @@ def _convert_and_add_feature(
         If the feature type is invalid.
     """
     if trackmate_feature["isint"] == "true":
-        feat_data_type = "int"
+        feat_dtype = "int"
     else:
-        feat_data_type = "float"
+        feat_dtype = "float"
 
     match feature_type:
         case "SpotFeatures":
@@ -169,7 +169,7 @@ def _convert_and_add_feature(
         provenance="TrackMate",
         feat_type=feat_type,
         lin_type="CellLineage",
-        data_type=feat_data_type,
+        dtype=feat_dtype,
         unit=_dimension_to_unit(trackmate_feature, units),
     )
 
@@ -217,7 +217,7 @@ def _add_all_features(
                 provenance="TrackMate",
                 feat_type="node",
                 lin_type="CellLineage",
-                data_type="string",
+                dtype="string",
             )
             fdec._add_feature(name_feat)
 
@@ -229,7 +229,7 @@ def _add_all_features(
                 provenance="TrackMate",
                 feat_type="lineage",
                 lin_type="CellLineage",
-                data_type="string",
+                dtype="string",
             )
             fdec._add_feature(name_feat)
         element.clear()
@@ -260,7 +260,7 @@ def _convert_attributes(
     Raises
     ------
     ValueError
-        If a feature has an invalid data_type (not "int", "float" nor "string").
+        If a feature has an invalid dtype (not "int", "float" nor "string").
 
     Warns
     -----
@@ -270,7 +270,7 @@ def _convert_attributes(
     # TODO: Rewrite this.
     for key in attributes:
         if key in features:
-            match features[key].data_type:
+            match features[key].dtype:
                 case "int":
                     attributes[key] = int(attributes[key])  # type: ignore
                 case "float":
@@ -278,7 +278,7 @@ def _convert_attributes(
                 case "string":
                     pass  # Nothing to do.
                 case _:
-                    raise ValueError(f"Invalid data type: {features[key].data_type}")
+                    raise ValueError(f"Invalid data type: {features[key].dtype}")
         elif key == "ID":
             # IDs are always integers.
             attributes[key] = int(attributes[key])  # type: ignore
@@ -291,8 +291,7 @@ def _convert_attributes(
             pass
         else:
             msg = (
-                f"{feature_type.capitalize()} feature {key} not found in "
-                "the features declaration."
+                f"{feature_type.capitalize()} feature {key} not found in the features declaration."
             )
             warnings.warn(msg)
             # In that case we add a stub version of the feature to the features
@@ -303,7 +302,7 @@ def _convert_attributes(
                 provenance="unknown",
                 feat_type=feature_type,
                 lin_type="CellLineage",
-                data_type="unknown",
+                dtype="unknown",
                 unit="unknown",
             )
             features[key] = missing_feat
@@ -330,8 +329,7 @@ def _convert_ROI_coordinates(
     """
     if "ROI_N_POINTS" not in attribs:
         raise KeyError(
-            f"No key 'ROI_N_POINTS' in the attributes "
-            f"of current element '{element.tag}'."
+            f"No key 'ROI_N_POINTS' in the attributes of current element '{element.tag}'."
         )
     n_points = int(attribs["ROI_N_POINTS"])
     if element.text:
@@ -662,9 +660,7 @@ def _add_tracks_info(
 
         current_track_id = list(tmp)[0]
         current_track_attr = [
-            d_attr
-            for d_attr in tracks_attributes
-            if d_attr["TRACK_ID"] == current_track_id
+            d_attr for d_attr in tracks_attributes if d_attr["TRACK_ID"] == current_track_id
         ][0]
 
         # Adding the attributes to the lineage.
@@ -695,8 +691,7 @@ def _split_graph_into_lineages(
     # One subgraph is created per lineage, so each subgraph is
     # a connected component of `graph`.
     lineages = [
-        CellLineage(graph.subgraph(c).copy())
-        for c in nx.weakly_connected_components(graph)
+        CellLineage(graph.subgraph(c).copy()) for c in nx.weakly_connected_components(graph)
     ]
     del graph  # Redondant with the subgraphs.
 
@@ -735,9 +730,7 @@ def _update_features_declaration(
     fdec._protect_feature("cell_ID")
     for axis in ["x", "y", "z"]:
         fdec._rename_feature(f"POSITION_{axis.upper()}", f"cell_{axis}")
-        fdec._modify_feature_description(
-            f"cell_{axis}", f"{axis.upper()} coordinate of the cell"
-        )
+        fdec._modify_feature_description(f"cell_{axis}", f"{axis.upper()} coordinate of the cell")
     fdec._rename_feature("FRAME", "frame")
     fdec._protect_feature("frame")
     if segmentation:
@@ -747,7 +740,7 @@ def _update_features_declaration(
             provenance="TrackMate",
             feat_type="node",
             lin_type="CellLineage",
-            data_type="float",
+            dtype="float",
             unit=units["spatialunits"],
         )
         fdec._add_feature(roi_coord_feat)
@@ -756,10 +749,7 @@ def _update_features_declaration(
     if "EDGE_X_LOCATION" in fdec.feats_dict:
         for axis in ["x", "y", "z"]:
             fdec._rename_feature(f"EDGE_{axis.upper()}_LOCATION", f"link_{axis}")
-            desc = (
-                f"{axis.upper()} coordinate of the link, "
-                "i.e. mean coordinate of its two cells"
-            )
+            desc = f"{axis.upper()} coordinate of the link, i.e. mean coordinate of its two cells"
             fdec._modify_feature_description(f"link_{axis}", desc)
 
     # Lineage features.
@@ -772,16 +762,13 @@ def _update_features_declaration(
         provenance="TrackMate",
         feat_type="lineage",
         lin_type="CellLineage",
-        data_type="int",
+        dtype="int",
     )
     fdec._add_feature(feat_filtered_track)
     if "TRACK_X_LOCATION" in fdec.feats_dict:
         for axis in ["x", "y", "z"]:
             fdec._rename_feature(f"TRACK_{axis.upper()}_LOCATION", f"lineage_{axis}")
-            desc = (
-                f"{axis.upper()} coordinate of the lineage, "
-                "i.e. mean coordinate of its cells"
-            )
+            desc = f"{axis.upper()} coordinate of the lineage, i.e. mean coordinate of its cells"
             fdec._modify_feature_description(f"lineage_{axis}", desc)
 
 
@@ -881,9 +868,7 @@ def _update_location_related_features(
         if has_edge_location:
             for _, _, data in lineage.edges(data=True):
                 for axis in ["x", "y", "z"]:
-                    data[f"link_{axis}"] = data.pop(
-                        f"EDGE_{axis.upper()}_LOCATION", None
-                    )
+                    data[f"link_{axis}"] = data.pop(f"EDGE_{axis.upper()}_LOCATION", None)
         # else:
         #     # If the EDGE_{axis}_LOCATION features are not present, we compute the mean
         #     # coordinate of the two nodes of the edge.
@@ -994,9 +979,7 @@ def _parse_model_tag(
             # Removal of filtered tracks.
             id_to_keep = _get_filtered_tracks_ID(it, element)
             if not keep_all_tracks:
-                to_remove = [
-                    n for n, t in graph.nodes(data="TRACK_ID") if t not in id_to_keep
-                ]
+                to_remove = [n for n, t in graph.nodes(data="TRACK_ID") if t not in id_to_keep]
                 graph.remove_nodes_from(to_remove)
 
         if element.tag == "Model" and event == "end":
@@ -1116,13 +1099,9 @@ def _get_time_step(settings: ET._Element) -> float:
         try:
             return float(element.attrib["timeinterval"])
         except KeyError:
-            raise KeyError(
-                "The 'timeinterval' attribute is missing in the 'ImageData' element."
-            )
+            raise KeyError("The 'timeinterval' attribute is missing in the 'ImageData' element.")
         except ValueError:
-            raise ValueError(
-                "The 'timeinterval' attribute cannot be converted to float."
-            )
+            raise ValueError("The 'timeinterval' attribute cannot be converted to float.")
 
     raise KeyError("The 'ImageData' element is not found in the settings.")
 
@@ -1159,13 +1138,9 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
             try:
                 pixel_size[key_pycellin] = float(element.attrib[key_TM])
             except KeyError:
-                raise KeyError(
-                    f"The {key_TM} attribute is missing " "in the 'ImageData' element."
-                )
+                raise KeyError(f"The {key_TM} attribute is missing in the 'ImageData' element.")
             except ValueError:
-                raise ValueError(
-                    f"The {key_TM} attribute cannot be converted to float."
-                )
+                raise ValueError(f"The {key_TM} attribute cannot be converted to float.")
         return pixel_size
 
     raise KeyError("The 'ImageData' element is not found in the settings.")
@@ -1220,9 +1195,7 @@ def load_TrackMate_XML(
         version = "unknown"
     metadata["pycellin_version"] = version
     metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
-    dict_tags = _get_specific_tags(
-        xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
-    )
+    dict_tags = _get_specific_tags(xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"])
     metadata["time_step"] = _get_time_step(dict_tags["Settings"])
     metadata["pixel_size"] = _get_pixel_size(dict_tags["Settings"])
     for tag_name, tag in dict_tags.items():

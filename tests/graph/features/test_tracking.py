@@ -58,7 +58,7 @@ def feat_cell_lin():
         provenance="pycellin",
         feat_type="node",
         lin_type="CellLineage",
-        data_type="int",
+        dtype="int",
         unit="um",
     )
     return Feature
@@ -79,7 +79,7 @@ def feat_cycle_lin():
         provenance="pycellin",
         feat_type="node",
         lin_type="CycleLineage",
-        data_type="int",
+        dtype="int",
         unit="um",
     )
     return Feature

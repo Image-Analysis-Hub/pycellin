@@ -234,7 +234,7 @@ def _create_FeaturesDeclaration(seg_data: bool) -> FeaturesDeclaration:
             provenance="CTC",
             feat_type="node",
             lin_type="CellLineage",
-            data_type="float",
+            dtype="float",
             unit="pixel",
         )
         feat_declaration._add_features([cell_x_feat, cell_y_feat, roi_coords_feat])
