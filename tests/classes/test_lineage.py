@@ -930,7 +930,7 @@ def test_add_link_time_flow_error(cell_lin):
 
 def test_add_link_different_lineages(cell_lin):
     # Add a link between different lineages.
-    new_lin = CellLineage(lineage_ID=2)
+    new_lin = CellLineage(lid=2)
     new_lin.add_node(19, frame=1, cell_ID=19)
     new_lin.add_node(20, frame=2, cell_ID=20)
     new_lin.add_node(21, frame=3, cell_ID=21)
@@ -974,7 +974,7 @@ def test_add_link_different_lineages_unconnected_component(
 
 def test_add_link_conflicting_ID(cell_lin):
     # Add a link between different lineages with a conflicting ID.
-    new_lin = CellLineage(lineage_ID=2)
+    new_lin = CellLineage(lid=2)
     new_lin.add_node(5, frame=1, cell_ID=5)
     IDs_mapping = cell_lin._add_link(1, 5, target_lineage=new_lin)
     assert IDs_mapping == {5: 17}
@@ -1022,7 +1022,7 @@ def test_add_link_conflicting_IDs(cell_lin, cell_lin_successive_divs_and_root):
 
 
 def test_add_link_same_IDs(cell_lin):
-    new_lin = CellLineage(lineage_ID=2)
+    new_lin = CellLineage(lid=2)
     new_lin.add_node(1, frame=1, cell_ID=1)
     IDs_mapping = cell_lin._add_link(1, 1, new_lin)
     assert IDs_mapping == {1: 17}

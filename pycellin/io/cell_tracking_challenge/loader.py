@@ -339,12 +339,12 @@ def _merge_tracks(
 
 def _update_node_attributes(
     lineage: CellLineage,
-    lineage_id: int,
+    lid: int,
 ) -> None:
     """
     Update the nodes attributes in a lineage graph.
 
-    This function assigns a new unique track ID to the entire lineage
+    This function assigns a new unique ID to the entire lineage
     and to each node within it. It also cleans up the node attributes
     by removing the 'TRACK' and 'PARENT' attributes, that were only needed
     for graph construction.
@@ -353,10 +353,10 @@ def _update_node_attributes(
     ----------
     lineage : CellLineage
         The lineage graph whose node attributes are to be updated.
-    lineage_id : int
-        The new track ID to be assigned to the lineage graph and its nodes.
+    lid : int
+        The new lineage ID to be assigned to the lineage graph and its nodes.
     """
-    lineage.graph["lineage_ID"] = lineage_id
+    lineage.graph["lineage_ID"] = lid
     for _, data in lineage.nodes(data=True):
         # Removing obsolete attributes.
         if "TRACK" in data:
@@ -457,9 +457,7 @@ def _integrate_seg_data(
         if len(node) < 1:
             raise ValueError(f"Label {label} not found in the graph for frame {frame}.")
         elif len(node) > 1:
-            raise ValueError(
-                f"Multiple nodes found for label {label} in frame {frame}."
-            )
+            raise ValueError(f"Multiple nodes found for label {label} in frame {frame}.")
         node = node[0]
         # Updating the nodes.
         graph.nodes[node]["cell_x"] = centroid[0]
@@ -548,9 +546,7 @@ def load_CTC_file(
         if Path(labels_path).is_dir():
             list_paths = sorted(Path(labels_path).glob("*.tif"))
             if len(list_paths) == 0:
-                raise ValueError(
-                    f"No label images found in the directory: {labels_path}"
-                )
+                raise ValueError(f"No label images found in the directory: {labels_path}")
             pattern = r"(\d+)\.tif"
             for label_img_path in list_paths:
                 match = re.search(pattern, str(label_img_path))
@@ -566,8 +562,7 @@ def load_CTC_file(
 
     # We want one lineage per connected component of the graph.
     lineages = [
-        CellLineage(graph.subgraph(c).copy())
-        for c in nx.weakly_connected_components(graph)
+        CellLineage(graph.subgraph(c).copy()) for c in nx.weakly_connected_components(graph)
     ]
 
     # Adding a unique lineage_ID to each lineage and their nodes.
@@ -603,7 +598,6 @@ def load_CTC_file(
 
 
 if __name__ == "__main__":
-
     ctc_file = "sample_data/FakeTracks_TMtoCTC.txt"
     ctc_file = "sample_data/Ecoli_growth_on_agar_pad_TMtoCTC.txt"
     ctc_file = (

@@ -49,35 +49,35 @@ class Data:
             txt = ""
         return f"Data object with {self.number_of_lineages()} cell lineages{txt}."
 
-    def _add_cycle_lineages(self, lineage_IDs: list[int] | None = None) -> None:
+    def _add_cycle_lineages(self, lids: list[int] | None = None) -> None:
         """
         Add the cell cycle lineages from the cell lineages.
 
         Parameters
         ----------
-        lineage_IDs : list[int], optional
-            The IDs of the lineages to compute the cycle lineages for,
+        lids : list[int], optional
+            The IDs of the lineages for which to compute cycle lineages,
             by default None i.e. all lineages.
         """
-        if lineage_IDs is None:
-            lineage_IDs = list(self.cell_data.keys())
-        self.cycle_data = {lin_id: self._compute_cycle_lineage(lin_id) for lin_id in lineage_IDs}
+        if lids is None:
+            lids = list(self.cell_data.keys())
+        self.cycle_data = {lin_id: self._compute_cycle_lineage(lin_id) for lin_id in lids}
 
-    def _compute_cycle_lineage(self, lineage_ID: int) -> CycleLineage:
+    def _compute_cycle_lineage(self, lid: int) -> CycleLineage:
         """
         Compute and return the cycle lineage corresponding to a given cell lineage.
 
         Parameters
         ----------
-        lineage_ID : int
-            The ID of the cell lineage.
+        lid : int
+            The ID of the cell lineage for which to compute the cycle lineage.
 
         Returns
         -------
         CycleLineage
             The cycle lineage corresponding to the cell lineage.
         """
-        return CycleLineage(self.cell_data[lineage_ID])
+        return CycleLineage(self.cell_data[lid])
 
     def _freeze_lineage_data(self):
         """

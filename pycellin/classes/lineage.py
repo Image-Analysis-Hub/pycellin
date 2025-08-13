@@ -23,7 +23,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     Abstract class for a lineage graph.
     """
 
-    def __init__(self, nx_digraph: nx.DiGraph | None = None, lineage_ID: int | None = None) -> None:
+    def __init__(self, nx_digraph: nx.DiGraph | None = None, lid: int | None = None) -> None:
         """
         Initialize a lineage graph.
 
@@ -32,13 +32,13 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         nx_digraph : nx.DiGraph, optional
             A NetworkX directed graph to initialize the lineage with,
             by default None.
-        lineage_ID : int, optional
+        lid : int, optional
             The ID of the lineage, by default None.
         """
         super().__init__(incoming_graph_data=nx_digraph)
-        if lineage_ID is not None:
-            assert isinstance(lineage_ID, int), "The lineage ID must be an integer."
-            self.graph["lineage_ID"] = lineage_ID
+        if lid is not None:
+            assert isinstance(lid, int), "The lineage ID must be an integer."
+            self.graph["lineage_ID"] = lid
 
     def _remove_feature(self, feature_name: str, feature_type: str) -> None:
         """
@@ -643,13 +643,13 @@ class CellLineage(Lineage):
         TimeFlowError
             If the target cell happens before the source cell.
         """
-        source_lineage_ID, txt_src = CellLineage._get_lineage_ID_and_err_msg(self)
+        source_lid, txt_src = CellLineage._get_lineage_ID_and_err_msg(self)
 
         if target_lineage is not None:
-            target_lineage_ID, txt_tgt = CellLineage._get_lineage_ID_and_err_msg(target_lineage)
+            target_lid, txt_tgt = CellLineage._get_lineage_ID_and_err_msg(target_lineage)
         else:
             target_lineage = self
-            target_lineage_ID = source_lineage_ID
+            target_lid = source_lid
             txt_tgt = txt_src
             # If the link already exists, NetworX does not raise an error but updates
             # the already existing link, potentially overwriting edge attributes.
@@ -669,15 +669,15 @@ class CellLineage(Lineage):
 
         # Check that the link will not create a fusion event.
         if target_lineage.in_degree(target_nid) != 0:
-            raise FusionError(target_nid, source_lineage_ID)
+            raise FusionError(target_nid, source_lid)
 
         # Check that the link respects the flow of time.
         if self.nodes[source_nid]["frame"] >= target_lineage.nodes[target_nid]["frame"]:
             raise TimeFlowError(
                 source_nid,
                 target_nid,
-                source_lineage_ID,
-                target_lineage_ID,
+                source_lid,
+                target_lid,
             )
 
         conflicting_ids = None
@@ -889,7 +889,7 @@ class CellLineage(Lineage):
             If the given cell has more than one predecessor.
         """
         # TODO: factorize
-        lineage_ID, _ = CellLineage._get_lineage_ID_and_err_msg(self)
+        lid, _ = CellLineage._get_lineage_ID_and_err_msg(self)
         cell_cycle = [cid]
         start = False
         end = False
@@ -902,13 +902,13 @@ class CellLineage(Lineage):
         if not start:
             predecessors = list(self.predecessors(cid))
             if len(predecessors) != 1:
-                raise FusionError(cid, lineage_ID)
+                raise FusionError(cid, lid)
             while not self.is_division(*predecessors) and not self.is_root(*predecessors):
                 # While not the generation birth.
                 cell_cycle.append(*predecessors)
                 predecessors = list(self.predecessors(*predecessors))
                 if len(predecessors) != 1:
-                    raise FusionError(cid, lineage_ID)
+                    raise FusionError(cid, lid)
             if self.is_root(*predecessors) and not self.is_division(*predecessors):
                 cell_cycle.append(*predecessors)
             cell_cycle.reverse()  # We built it from the end.
@@ -1000,8 +1000,8 @@ class CellLineage(Lineage):
                         [n for n in sister_cell_cycle if self.nodes[n]["frame"] == current_frame]
                     )
             elif len(parents) > 1:
-                lineage_ID, _ = CellLineage._get_lineage_ID_and_err_msg(self)
-                raise FusionError(cid, lineage_ID)
+                lid, _ = CellLineage._get_lineage_ID_and_err_msg(self)
+                raise FusionError(cid, lid)
         return sister_cells
 
     def is_division(self, cid: int) -> bool:
@@ -1189,12 +1189,12 @@ class CellLineage(Lineage):
             The text to display in error messages.
         """
         try:
-            lineage_ID = lineage.graph["lineage_ID"]
-            txt = f" in lineage {lineage_ID}"
+            lid = lineage.graph["lineage_ID"]
+            txt = f" in lineage {lid}"
         except KeyError:
-            lineage_ID = None
+            lid = None
             txt = ""
-        return lineage_ID, txt
+        return lid, txt
 
 
 class CycleLineage(Lineage):
