@@ -47,7 +47,7 @@ def _unit_to_dimension(
     """
     # TODO: finish this function and try to make it less nightmarish
     unit = feat.unit
-    name = feat.name
+    name = feat.identifier
     # desc = feat.description
     provenance = feat.provenance
 
@@ -280,14 +280,14 @@ def _convert_feature(
         Dictionary of the converted feature.
     """
     trackmate_feat = {}
-    trackmate_feat["feature"] = feat.name
+    trackmate_feat["feature"] = feat.identifier
     # TrackMate uses in the GUI the following attributes:
     # - `name` as the display name of the feature for filtering and plotting
     # - `shortname` as the display name of the feature in the nodes, edges and
     # tracks tables
     # So we need to convert the name to a more user-friendly format that is close
     # to what TrackMate is using.
-    new_name = _transform_name(feat.name)
+    new_name = _transform_name(feat.identifier)
     trackmate_feat["name"] = new_name
     trackmate_feat["shortname"] = new_name
     trackmate_feat["dimension"] = _unit_to_dimension(feat)
@@ -715,10 +715,10 @@ def _rename_features(fd: FeaturesDeclaration) -> None:
         Feature declaration to modify.
     """
     fd._unprotect_feature("lineage_ID")
-    fd._rename_feature("lineage_ID", "TRACK_ID")
-    fd._modify_feature_description("TRACK_ID", "Track ID")
+    fd._change_feature_identifier("lineage_ID", "TRACK_ID")
+    fd._change_feature_description("TRACK_ID", "Track ID")
     fd._unprotect_feature("frame")
-    fd._rename_feature("frame", "FRAME")
+    fd._change_feature_identifier("frame", "FRAME")
 
 
 def _remove_features(fd: FeaturesDeclaration) -> None:
@@ -812,7 +812,7 @@ def _update_location_features(fd: FeaturesDeclaration) -> None:
     """
     for axis in ["x", "y", "z"]:
         try:
-            fd._rename_feature(f"cell_{axis}", f"POSITION_{axis.upper()}")
+            fd._change_feature_identifier(f"cell_{axis}", f"POSITION_{axis.upper()}")
         except KeyError:
             # This feature is mandatory in TrackMate for x, y and z dimensions.
             if axis in ["x", "y"]:
@@ -831,11 +831,11 @@ def _update_location_features(fd: FeaturesDeclaration) -> None:
                     )
                 )
         try:
-            fd._rename_feature(f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION")
+            fd._change_feature_identifier(f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION")
         except KeyError:
             pass  # Not a mandatory feature.
         try:
-            fd._rename_feature(f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION")
+            fd._change_feature_identifier(f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION")
         except KeyError:
             pass  # Not a mandatory feature.
 

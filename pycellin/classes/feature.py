@@ -14,6 +14,7 @@ class Feature:
 
     def __init__(
         self,
+        identifier: str,
         name: str,
         description: str,
         provenance: str,
@@ -27,8 +28,10 @@ class Feature:
 
         Parameters
         ----------
+        identifier : str
+            A unique identifier for the feature.
         name : str
-            The name of the feature.
+            A human-readable name for the feature.
         description : str
             A description of the feature.
         provenance : str
@@ -48,6 +51,7 @@ class Feature:
         ValueError
             If the feature type or the lineage type is not a valid value.
         """
+        self.identifier = identifier
         self.name = name
         self.description = description
         self.provenance = provenance
@@ -64,7 +68,8 @@ class Feature:
         if not isinstance(other, Feature):
             return NotImplemented
         return (
-            self.name == other.name
+            self.identifier == other.identifier
+            and self.name == other.name
             and self.description == other.description
             and self.provenance == other.provenance
             and self.feat_type == other.feat_type
@@ -83,10 +88,10 @@ class Feature:
             A string representation of the Feature object.
         """
         return (
-            f"Feature(name={self.name!r}, description={self.description!r}, "
-            f"provenance={self.provenance!r}, feat_type={self.feat_type!r}, "
-            f"lin_type={self.lin_type!r}, dtype={self.dtype!r}, "
-            f"unit={self.unit!r})"
+            f"Feature(identifier={self.identifier!r}, name={self.name!r}, "
+            f"description={self.description!r}, provenance={self.provenance!r}, "
+            f"feat_type={self.feat_type!r}, lin_type={self.lin_type!r}, "
+            f"dtype={self.dtype!r}, unit={self.unit!r})"
         )
 
     def __str__(self) -> str:
@@ -99,7 +104,8 @@ class Feature:
             A human-readable string representation of the Feature object.
         """
         string = (
-            f"Feature '{self.name}'\n"
+            f"Feature '{self.identifier}'\n"
+            f"  Name: {self.name}\n"
             f"  Description: {self.description}\n"
             f"  Provenance: {self.provenance}\n"
             f"  Type: {self.feat_type}\n"
@@ -109,9 +115,27 @@ class Feature:
         )
         return string
 
-    def _rename(self, new_name: str) -> None:
+    def _change_identifier(self, new_identifier: str) -> None:
         """
-        Rename the feature.
+        Change the identifier of the feature.
+
+        Parameters
+        ----------
+        new_identifier : str
+            The new identifier of the feature.
+
+        Raises
+        ------
+        ValueError
+            If the new identifier is not a string.
+        """
+        if not isinstance(new_identifier, str):
+            raise ValueError("Feature identifier must be a string.")
+        self.identifier = new_identifier
+
+    def _change_name(self, new_name: str) -> None:
+        """
+        Change the name of the feature.
 
         Parameters
         ----------
@@ -127,9 +151,9 @@ class Feature:
             raise ValueError("Feature name must be a string.")
         self.name = new_name
 
-    def _modify_description(self, new_description: str) -> None:
+    def _change_description(self, new_description: str) -> None:
         """
-        Modify the description of the feature.
+        Change the description of the feature.
 
         Parameters
         ----------
@@ -145,9 +169,9 @@ class Feature:
             raise ValueError("Feature description must be a string.")
         self.description = new_description
 
-    def _modify_provenance(self, new_provenance: str) -> None:
+    def _change_provenance(self, new_provenance: str) -> None:
         """
-        Modify the provenance of the feature.
+        Change the provenance of the feature.
 
         Parameters
         ----------
@@ -163,6 +187,7 @@ class Feature:
             raise ValueError("Feature provenance must be a string.")
         self.provenance = new_provenance
 
+    # Is this really needed?
     def is_equal(self, other: Feature, ignore_feat_type: bool = False) -> bool:
         """
         Check if the feature is equal to another feature.
@@ -183,7 +208,7 @@ class Feature:
             return NotImplemented
         if ignore_feat_type:
             return (
-                self.name == other.name
+                self.identifier == other.identifier
                 and self.description == other.description
                 and self.provenance == other.provenance
                 and self.lin_type == other.lin_type
@@ -196,6 +221,7 @@ class Feature:
 
 def frame_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
+        identifier="frame",
         name="frame",
         description="Frame number of the cell ",
         provenance=provenance,
@@ -209,7 +235,8 @@ def frame_Feature(provenance: str = "pycellin") -> Feature:
 
 def cell_ID_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
-        name="cell_ID",
+        identifier="cell_ID",
+        name="cell ID",
         description="Unique identifier of the cell",
         provenance=provenance,
         feat_type="node",
@@ -221,7 +248,8 @@ def cell_ID_Feature(provenance: str = "pycellin") -> Feature:
 
 def lineage_ID_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
-        name="lineage_ID",
+        identifier="lineage_ID",
+        name="lineage ID",
         description="Unique identifier of the lineage",
         provenance=provenance,
         feat_type="lineage",
@@ -233,7 +261,8 @@ def lineage_ID_Feature(provenance: str = "pycellin") -> Feature:
 
 def cell_coord_Feature(unit: str, axis: str, provenance: str = "pycellin") -> Feature:
     feat = Feature(
-        name=f"cell_{axis}",
+        identifier=f"cell_{axis}",
+        name=f"cell {axis}",
         description=f"{axis.upper()} coordinate of the cell",
         provenance=provenance,
         feat_type="node",
@@ -246,7 +275,8 @@ def cell_coord_Feature(unit: str, axis: str, provenance: str = "pycellin") -> Fe
 
 def link_coord_Feature(unit: str, axis: str, provenance: str = "pycellin") -> Feature:
     feat = Feature(
-        name=f"link_{axis}",
+        identifier=f"link_{axis}",
+        name=f"link {axis}",
         description=(
             f"{axis.upper()} coordinate of the link, i.e. mean coordinate of its two cells"
         ),
@@ -261,7 +291,8 @@ def link_coord_Feature(unit: str, axis: str, provenance: str = "pycellin") -> Fe
 
 def lineage_coord_Feature(unit: str, axis: str, provenance: str = "pycellin") -> Feature:
     feat = Feature(
-        name=f"lineage_{axis}",
+        identifier=f"lineage_{axis}",
+        name=f"lineage {axis}",
         description=(
             f"{axis.upper()} coordinate of the lineage, i.e. mean coordinate of its cells"
         ),
@@ -276,7 +307,8 @@ def lineage_coord_Feature(unit: str, axis: str, provenance: str = "pycellin") ->
 
 def cycle_ID_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
-        name="cycle_ID",
+        identifier="cycle_ID",
+        name="cycle ID",
         description=(
             "Unique identifier of the cell cycle, i.e. cell_ID of the last cell in the cell cycle"
         ),
@@ -290,6 +322,7 @@ def cycle_ID_Feature(provenance: str = "pycellin") -> Feature:
 
 def cells_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
+        identifier="cells",
         name="cells",
         description="cell_IDs of the cells in the cell cycle, in chronological order",
         provenance=provenance,
@@ -302,7 +335,8 @@ def cells_Feature(provenance: str = "pycellin") -> Feature:
 
 def cycle_length_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
-        name="cycle_length",
+        identifier="cycle_length",
+        name="cycle length",
         description="Number of cells in the cell cycle, minding gaps",
         provenance=provenance,
         feat_type="node",
@@ -314,7 +348,8 @@ def cycle_length_Feature(provenance: str = "pycellin") -> Feature:
 
 def cycle_duration_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
-        name="cycle_duration",
+        identifier="cycle_duration",
+        name="cycle duration",
         description="Number of frames in the cell cycle, regardless of gaps",
         provenance=provenance,
         feat_type="node",
@@ -327,6 +362,7 @@ def cycle_duration_Feature(provenance: str = "pycellin") -> Feature:
 
 def level_Feature(provenance: str = "pycellin") -> Feature:
     feat = Feature(
+        identifier="level",
         name="level",
         description=(
             "Level of the cell cycle in the lineage, "
@@ -348,10 +384,10 @@ class FeaturesDeclaration:
     Attributes
     ----------
     feats_dict : dict[str, Feature]
-        A dictionary of features where the keys are the feature names and
+        A dictionary of features where the keys are the feature identifiers and
         the values are the Feature objects.
     protected_feats : list[str]
-        A list of feature names that are protected from being modified or removed.
+        A list of feature identifiers that are protected from being modified or removed.
 
     Notes
     -----
@@ -412,22 +448,22 @@ class FeaturesDeclaration:
 
     def _has_feature(
         self,
-        feature_name: str,
+        feat_id: str,
     ) -> bool:
         """
         Check if the FeaturesDeclaration contains the specified feature.
 
         Parameters
         ----------
-        feature_name : str
-            The name of the feature to check.
+        feat_id : str
+            The identifier of the feature to check.
 
         Returns
         -------
         bool
             True if the feature has been declared, False otherwise.
         """
-        if feature_name in self.feats_dict:
+        if feat_id in self.feats_dict:
             return True
         else:
             return False
@@ -492,7 +528,7 @@ class FeaturesDeclaration:
         """
         return self._protected_feats
 
-    def _add_feature(self, feature: Feature) -> None:
+    def _add_feature(self, feature: Feature, overwrite: bool = False) -> None:
         """
         Add the specified feature to the FeaturesDeclaration.
 
@@ -500,59 +536,41 @@ class FeaturesDeclaration:
         ----------
         feature : Feature
             The feature to add.
+        overwrite : bool, optional
+            Whether to overwrite an existing feature with the same identifier.
+            If False (default), existing features will not be overwritten but a
+            warning will be issued. If True, existing features will be overwritten.
 
-        Raises
-        ------
+        Warns
+        -----
         UserWarning
-            If an identical feature has already been declared.
+            If a feature with the same identifier already exists and overwrite=True.
+            The existing feature will be overwritten.
         UserWarning
-            If an identical feature has already been declared
-            but with a different type.
-        UserWarning
-            If a feature with the same name has already been declared
-            but with a different definition.
-        UserWarning
-            If a feature with the same name has already been declared
-            but with a different type and definition.
+            If a feature with the same identifier already exists and overwrite=False.
+            The existing feature will NOT be overwritten.
         """
-        if feature.name in self.feats_dict:
-            old_feat = self.feats_dict[feature.name]
-
-            if feature.is_equal(old_feat, ignore_feat_type=True):
-                if feature.feat_type == old_feat.feat_type:
-                    msg = f"An identical Feature '{feature.name}' has already been declared."
-                    warnings.warn(msg)
-                else:
-                    msg = (
-                        f"An identical Feature '{feature.name}' has already been "
-                        f"declared but with a different type ({old_feat.feat_type}). "
-                        f"The feature will be overwritten."
-                    )
-                    warnings.warn(msg)
-                    self.feats_dict[feature.name] = feature
+        if feature.identifier in self.feats_dict:
+            old_feat = self.feats_dict[feature.identifier]
+            if feature.feat_type == old_feat.feat_type:
+                txt = "with the same type"
             else:
-                if feature.feat_type == old_feat.feat_type:
-                    msg = (
-                        f"A Feature called '{feature.name}' has already been declared "
-                        f"but with a different definition. "
-                        f"The feature will be overwritten."
-                    )
-                    warnings.warn(msg)
-                    self.feats_dict[feature.name] = feature
-                else:
-                    msg = (
-                        f"A Feature called '{feature.name}' has already been declared "
-                        f"but with a different type ({old_feat.feat_type}) "
-                        f"and definition. The feature will be overwritten."
-                    )
-                    warnings.warn(msg)
-                    self.feats_dict[feature.name] = feature
+                txt = "with a different type"
+
+            if overwrite:
+                msg = f"A Feature '{feature.identifier}' already exists {txt}. Overwriting the old Feature."
+                warnings.warn(msg, stacklevel=2)
+                self.feats_dict[feature.identifier] = feature
+            else:
+                msg = f"A Feature '{feature.identifier}' already exists {txt}. Not overwriting the old Feature."
+                warnings.warn(msg, stacklevel=2)
         else:
-            self.feats_dict[feature.name] = feature
+            self.feats_dict[feature.identifier] = feature
 
     def _add_features(
         self,
         features: list[Feature],
+        overwrite: bool = False,
     ) -> None:
         """
         Add the specified features to the FeaturesDeclaration.
@@ -561,9 +579,13 @@ class FeaturesDeclaration:
         ----------
         features : list[Feature]
             The features to add.
+        overwrite : bool, optional
+            Whether to overwrite existing features with the same identifier.
+            If False (default), existing features will not be overwritten but a
+            warning will be issued. If True, existing features will be overwritten.
         """
         for feature in features:
-            self._add_feature(feature)
+            self._add_feature(feature, overwrite=overwrite)
 
     def _add_cycle_lineage_features(self) -> None:
         """
@@ -575,21 +597,21 @@ class FeaturesDeclaration:
         feat_duration = cycle_duration_Feature()
         feat_level = level_Feature()
         for feat in [feat_ID, feat_cells, feat_length, feat_duration, feat_level]:
-            if feat.name not in self.feats_dict:
+            if feat.identifier not in self.feats_dict:
                 self._add_feature(feat)
-                self._protect_feature(feat.name)
+                self._protect_feature(feat.identifier)
 
     def _remove_feature(
         self,
-        feature_name: str,
+        feat_id: str,
     ) -> None:
         """
         Remove the specified feature from the FeaturesDeclaration.
 
         Parameters
         ----------
-        feature_name : str
-            The name of the feature to remove.
+        feat_id : str
+            The identifier of the feature to remove.
 
         Raises
         ------
@@ -598,46 +620,46 @@ class FeaturesDeclaration:
         UserWarning
             If the feature is protected and cannot be removed.
         """
-        if feature_name not in self.feats_dict:
-            raise KeyError(f"Feature '{feature_name}' does not exist in the declared features.")
-        if feature_name in self._protected_feats:
+        if feat_id not in self.feats_dict:
+            raise KeyError(f"Feature '{feat_id}' does not exist in the declared features.")
+        if feat_id in self._protected_feats:
             msg = (
-                f"Feature '{feature_name}' is protected and cannot be removed. "
+                f"Feature '{feat_id}' is protected and cannot be removed. "
                 "Unprotect the feature before modifying it."
             )
             warnings.warn(msg)
         else:
-            del self.feats_dict[feature_name]
+            del self.feats_dict[feat_id]
 
     def _remove_features(
         self,
-        feature_names: list[str],
+        feat_ids: list[str],
     ) -> None:
         """
         Remove the specified features from the FeaturesDeclaration.
 
         Parameters
         ----------
-        feature_names : list[str]
-            The names of the features to remove.
+        feat_ids : list[str]
+            The identifiers of the features to remove.
         """
-        for feature_name in feature_names:
-            self._remove_feature(feature_name)
+        for feat_id in feat_ids:
+            self._remove_feature(feat_id)
 
-    def _rename_feature(
+    def _change_feature_identifier(
         self,
-        feature_name: str,
-        new_name: str,
+        feat_id: str,
+        new_id: str,
     ) -> None:
         """
-        Rename a specified feature.
+        Change the identifier of a specified feature.
 
         Parameters
         ----------
-        feature_name : str
-            The current name of the feature to rename.
-        new_name : str
-            The new name for the feature.
+        feat_id : str
+            The current identifier of the feature.
+        new_id : str
+            The new identifier for the feature.
 
         Raises
         ------
@@ -646,30 +668,52 @@ class FeaturesDeclaration:
         UserWarning
             If the feature is protected and cannot be modified.
         """
-        if feature_name not in self.feats_dict:
-            raise KeyError(f"Feature '{feature_name}' does not exist in the declared features.")
-        if feature_name in self._protected_feats:
+        if feat_id not in self.feats_dict:
+            raise KeyError(f"Feature '{feat_id}' does not exist in the declared features.")
+        if feat_id in self._protected_feats:
             msg = (
-                f"Feature '{feature_name}' is protected and cannot be modified. "
+                f"Feature '{feat_id}' is protected and cannot be modified. "
                 "Unprotect the feature before modifying it."
             )
             warnings.warn(msg)
         else:
-            self.feats_dict[new_name] = self.feats_dict.pop(feature_name)
-            self.feats_dict[new_name]._rename(new_name)
+            self.feats_dict[new_id] = self.feats_dict.pop(feat_id)
+            self.feats_dict[new_id]._change_identifier(new_id)
 
-    def _modify_feature_description(
-        self,
-        feature_name: str,
-        new_description: str,
-    ) -> None:
+    def _change_feature_name(self, feat_id: str, new_name: str) -> None:
         """
-        Modify the description of a specified feature.
+        Change the name of a specified feature.
 
         Parameters
         ----------
-        feature_name : str
-            The name of the feature whose description is to be modified.
+        feat_id : str
+            The identifier of the feature whose name is to be changed.
+        new_name : str
+            The new name for the feature.
+        """
+        if feat_id not in self.feats_dict:
+            raise KeyError(f"Feature '{feat_id}' does not exist in the declared features.")
+        if feat_id in self._protected_feats:
+            msg = (
+                f"Feature '{feat_id}' is protected and cannot be modified. "
+                "Unprotect the feature before modifying it."
+            )
+            warnings.warn(msg)
+        else:
+            self.feats_dict[feat_id]._change_name(new_name)
+
+    def _change_feature_description(
+        self,
+        feat_id: str,
+        new_description: str,
+    ) -> None:
+        """
+        Change the description of a specified feature.
+
+        Parameters
+        ----------
+        feat_id : str
+            The identifier of the feature whose description is to be changed.
         new_description : str
             The new description for the feature.
 
@@ -681,64 +725,64 @@ class FeaturesDeclaration:
             If the feature is protected and cannot be modified
             (i.e. it is in the list of protected features).
         """
-        if feature_name not in self.feats_dict:
-            raise KeyError(f"Feature '{feature_name}' does not exist in the declared features.")
-        if feature_name in self._protected_feats:
+        if feat_id not in self.feats_dict:
+            raise KeyError(f"Feature '{feat_id}' does not exist in the declared features.")
+        if feat_id in self._protected_feats:
             msg = (
-                f"Feature '{feature_name}' is protected and cannot be modified. "
+                f"Feature '{feat_id}' is protected and cannot be modified. "
                 "Unprotect the feature before modifying it."
             )
             warnings.warn(msg)
         else:
-            self.feats_dict[feature_name]._modify_description(new_description)
+            self.feats_dict[feat_id]._change_description(new_description)
 
-    def _protect_feature(self, feature_name: str) -> None:
+    def _protect_feature(self, feat_id: str) -> None:
         """
         Protect the specified feature from being modified or removed.
 
         Parameters
         ----------
-        feature_name : str
-            The name of the feature to protect.
+        feat_id : str
+            The identifier of the feature to protect.
 
         Raises
         ------
         UserWarning
             If the feature does not exist in the declared features.
         """
-        if feature_name not in self.feats_dict:
+        if feat_id not in self.feats_dict:
             msg = (
-                f"Feature '{feature_name}' does not exist in the declared features "
+                f"Feature '{feat_id}' does not exist in the declared features "
                 "and cannot be protected."
             )
             warnings.warn(msg)
 
-        if feature_name not in self._protected_feats:
-            self._protected_feats.append(feature_name)
+        if feat_id not in self._protected_feats:
+            self._protected_feats.append(feat_id)
 
-    def _unprotect_feature(self, feature_name: str) -> None:
+    def _unprotect_feature(self, feat_id: str) -> None:
         """
         Unprotect the specified feature.
 
         Parameters
         ----------
-        feature_name : str
-            The name of the feature to unprotect.
+        feat_id : str
+            The identifier of the feature to unprotect.
 
         Raises
         ------
         UserWarning
             If the feature does not exist in the declared features.
         """
-        if feature_name not in self.feats_dict:
+        if feat_id not in self.feats_dict:
             msg = (
-                f"Feature '{feature_name}' does not exist in the declared features "
+                f"Feature '{feat_id}' does not exist in the declared features "
                 "and cannot be unprotected."
             )
             warnings.warn(msg)
 
-        if feature_name in self._protected_feats:
-            self._protected_feats.remove(feature_name)
+        if feat_id in self._protected_feats:
+            self._protected_feats.remove(feat_id)
 
     def _get_units_per_features(self) -> dict[str, list[str]]:
         """
@@ -751,15 +795,15 @@ class FeaturesDeclaration:
         -------
         dict[str, list[str]]
             A dictionary where the keys are units and the values are lists
-            of feature names. For example:
+            of feature identifiers. For example:
             {'unit1': ['feature1', 'feature2'], 'unit2': ['feature3']}.
         """
         units = {}  # type: dict[str, list[str]]
         for feat in self.feats_dict.values():
             if feat.unit in units:
-                units[feat.unit].append(feat.name)
+                units[feat.unit].append(feat.identifier)
             else:
-                units[feat.unit] = [feat.name]
+                units[feat.unit] = [feat.identifier]
         return units
 
 
@@ -826,11 +870,11 @@ if __name__ == "__main__":
     # fd._remove_feature("cell_ID", "nod")
 
     # Rename feature
-    fd._rename_feature("cell_ID", "cell_ID_new")
+    fd._change_feature_identifier("cell_ID", "cell_ID_new")
     # print(fd.feats_dict.keys(), fd.feats_dict["cell_ID_new"].name)
 
     # Modify description
-    fd._modify_feature_description("cell_ID_new", "New description")
+    fd._change_feature_description("cell_ID_new", "New description")
     # print(fd.feats_dict["cell_ID_new"])
 
     print(cell_ID_Feature().is_equal(cell_ID_Feature()))

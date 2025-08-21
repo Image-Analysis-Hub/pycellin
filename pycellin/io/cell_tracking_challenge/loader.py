@@ -222,7 +222,7 @@ def _create_FeaturesDeclaration(seg_data: bool) -> FeaturesDeclaration:
     lin_ID_feat = lineage_ID_Feature()
     for feat in [cell_ID_feat, frame_feat, lin_ID_feat]:
         feat_declaration._add_feature(feat)
-        feat_declaration._protect_feature(feat.name)
+        feat_declaration._protect_feature(feat.identifier)
     if seg_data:
         # TODO: deal with z dimension
         # TODO: put the real unit, pixel is juste a placeholder for now

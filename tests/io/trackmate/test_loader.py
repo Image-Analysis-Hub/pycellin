@@ -84,7 +84,8 @@ def units():
 @pytest.fixture(scope="module")
 def feat_QUALITY():
     return Feature(
-        name="QUALITY",
+        identifier="QUALITY",
+        name="Quality",
         description="Quality",
         provenance="TrackMate",
         feat_type="node",
@@ -96,7 +97,8 @@ def feat_QUALITY():
 @pytest.fixture(scope="module")
 def feat_FRAME():
     return Feature(
-        name="FRAME",
+        identifier="FRAME",
+        name="Frame",
         description="Frame",
         provenance="TrackMate",
         feat_type="node",
@@ -108,7 +110,8 @@ def feat_FRAME():
 @pytest.fixture(scope="module")
 def feat_spot_name():
     return Feature(
-        name="cell_name",
+        identifier="cell_name",
+        name="cell name",
         description="Name of the spot",
         provenance="TrackMate",
         feat_type="node",
@@ -129,7 +132,8 @@ def spot_feats(feat_QUALITY: Feature, feat_FRAME: Feature, feat_spot_name: Featu
 @pytest.fixture(scope="module")
 def feat_SPOT_SOURCE_ID():
     return Feature(
-        name="SPOT_SOURCE_ID",
+        identifier="SPOT_SOURCE_ID",
+        name="Source spot ID",
         description="Source spot ID",
         provenance="TrackMate",
         feat_type="edge",
@@ -141,7 +145,8 @@ def feat_SPOT_SOURCE_ID():
 @pytest.fixture(scope="module")
 def feat_SPOT_TARGET_ID():
     return Feature(
-        name="SPOT_TARGET_ID",
+        identifier="SPOT_TARGET_ID",
+        name="Target spot ID",
         description="Target spot ID",
         provenance="TrackMate",
         feat_type="edge",
@@ -161,7 +166,8 @@ def edge_feats(feat_SPOT_SOURCE_ID: Feature, feat_SPOT_TARGET_ID: Feature):
 @pytest.fixture(scope="module")
 def feat_TRACK_INDEX():
     return Feature(
-        name="TRACK_INDEX",
+        identifier="TRACK_INDEX",
+        name="Track index",
         description="Track index",
         provenance="TrackMate",
         feat_type="lineage",
@@ -173,7 +179,8 @@ def feat_TRACK_INDEX():
 @pytest.fixture(scope="module")
 def feat_NUMBER_SPOTS():
     return Feature(
-        name="NUMBER_SPOTS",
+        identifier="NUMBER_SPOTS",
+        name="Number of spots",
         description="Number of spots",
         provenance="TrackMate",
         feat_type="lineage",
@@ -185,7 +192,8 @@ def feat_NUMBER_SPOTS():
 @pytest.fixture(scope="module")
 def feat_track_name():
     return Feature(
-        name="lineage_name",
+        identifier="lineage_name",
+        name="lineage name",
         description="Name of the track",
         provenance="TrackMate",
         feat_type="lineage",
@@ -366,8 +374,7 @@ def test_add_all_features(
     xml_data = (
         "<FeatureDeclarations>"
         "   <SpotFeatures>"
-        '       <Feature feature="QUALITY" name="Quality" isint="false" '
-        '                dimension="NONE"/>'
+        '       <Feature feature="QUALITY" name="Quality" isint="false" dimension="NONE"/>'
         '       <Feature feature="FRAME" name="Frame" isint="true" dimension="NONE"/>'
         "   </SpotFeatures>"
         "   <EdgeFeatures>"
@@ -377,8 +384,7 @@ def test_add_all_features(
         '                dimension="NONE"/>'
         "   </EdgeFeatures>"
         "   <TrackFeatures>"
-        '       <Feature feature="TRACK_INDEX" name="Track index" isint="true" '
-        '                dimension="NONE"/>'
+        '       <Feature feature="TRACK_INDEX" name="Track index" isint="true" dimension="NONE"/>'
         '       <Feature feature="NUMBER_SPOTS" name="Number of spots" isint="true" '
         '                dimension="NONE"/>'
         "   </TrackFeatures>"
@@ -442,10 +448,42 @@ def test_add_all_features_tag_with_no_feature_tag(
 
 def test_convert_attributes():
     features = {
-        "feat_float": Feature("", "", "", "node", "CellLineage", dtype="float"),
-        "feat_int": Feature("", "", "", "node", "CellLineage", dtype="int"),
-        "feat_neg": Feature("", "", "", "node", "CellLineage", dtype="int"),
-        "feat_string": Feature("", "", "", "node", "CellLineage", dtype="string"),
+        "feat_float": Feature(
+            identifier="feat_float",
+            name="",
+            description="",
+            provenance="",
+            feat_type="node",
+            lin_type="CellLineage",
+            dtype="float",
+        ),
+        "feat_int": Feature(
+            identifier="feat_int",
+            name="",
+            description="",
+            provenance="",
+            feat_type="node",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
+        "feat_neg": Feature(
+            identifier="feat_neg",
+            name="",
+            description="",
+            provenance="",
+            feat_type="node",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
+        "feat_string": Feature(
+            identifier="feat_string",
+            name="",
+            description="",
+            provenance="",
+            feat_type="node",
+            lin_type="CellLineage",
+            dtype="string",
+        ),
     }
 
     obtained_attr = {
@@ -478,7 +516,17 @@ def test_convert_attributes_specific_keys():
 
 
 def test_convert_attributes_ValueError():
-    features = {"feat_int": Feature("", "", "", "node", "CellLineage", dtype="integer")}
+    features = {
+        "feat_int": Feature(
+            identifier="feat_int",
+            name="",
+            description="",
+            provenance="",
+            feat_type="node",
+            lin_type="CellLineage",
+            dtype="integer",
+        )
+    }
     attributes = {"feat_int": "20"}
 
     with pytest.raises(ValueError):
@@ -487,12 +535,21 @@ def test_convert_attributes_ValueError():
 
 def test_convert_attributes_missing_feat():
     features = {
-        "feat_float": Feature("", "", "", "node", "CellLineage", dtype="float"),
+        "feat_float": Feature(
+            identifier="feat_float",
+            name="",
+            description="",
+            provenance="",
+            feat_type="node",
+            lin_type="CellLineage",
+            dtype="float",
+        ),
     }
     attributes = {"feat_float": "30", "feat_int": "20"}
 
     with pytest.warns(UserWarning):
         tml._convert_attributes(attributes, features, "node")
+    assert features["feat_int"].identifier == "feat_int"
     assert features["feat_int"].name == "feat_int"
     assert features["feat_int"].description == "unknown"
     assert features["feat_int"].provenance == "unknown"
@@ -571,8 +628,24 @@ def test_add_all_nodes_several_attributes():
     _, element = next(it)
 
     spot_features = {
-        "x": Feature("", "", "", "node", "CellLineage", dtype="float"),
-        "y": Feature("", "", "", "node", "CellLineage", dtype="int"),
+        "x": Feature(
+            identifier="x",
+            name="",
+            description="",
+            provenance="",
+            feat_type="node",
+            lin_type="CellLineage",
+            dtype="float",
+        ),
+        "y": Feature(
+            identifier="y",
+            name="",
+            description="",
+            provenance="",
+            feat_type="node",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
     }
     feat_decl = FeaturesDeclaration(spot_features)
     obtained = nx.DiGraph()
@@ -640,10 +713,42 @@ def test_add_edge():
     track_id = 0
 
     edge_feats = {
-        "x": Feature("", "", "", "edge", "CellLineage", dtype="float"),
-        "y": Feature("", "", "", "edge", "CellLineage", dtype="int"),
-        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
-        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
+        "x": Feature(
+            identifier="x",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="float",
+        ),
+        "y": Feature(
+            identifier="y",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
+        "SPOT_SOURCE_ID": Feature(
+            identifier="SPOT_SOURCE_ID",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
+        "SPOT_TARGET_ID": Feature(
+            identifier="SPOT_TARGET_ID",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
     }
     obtained = nx.DiGraph()
     feat_decl = FeaturesDeclaration(edge_feats)
@@ -664,9 +769,33 @@ def test_add_edge_no_node_ID():
     track_id = 0
 
     edge_feats = {
-        "x": Feature("", "", "", "edge", "CellLineage", dtype="float"),
-        "y": Feature("", "", "", "edge", "CellLineage", dtype="int"),
-        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
+        "x": Feature(
+            identifier="x",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="float",
+        ),
+        "y": Feature(
+            identifier="y",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
+        "SPOT_SOURCE_ID": Feature(
+            identifier="SPOT_SOURCE_ID",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
     }
     obtained = nx.DiGraph()
     feat_decl = FeaturesDeclaration(edge_feats)
@@ -684,8 +813,24 @@ def test_add_edge_no_edge_attributes():
     track_id = 0
 
     edge_feats = {
-        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
-        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
+        "SPOT_SOURCE_ID": Feature(
+            identifier="SPOT_SOURCE_ID",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
+        "SPOT_TARGET_ID": Feature(
+            identifier="SPOT_TARGET_ID",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
     }
     obtained = nx.DiGraph()
     feat_decl = FeaturesDeclaration(edge_feats)
@@ -720,12 +865,54 @@ def test_build_tracks_several_attributes():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     edge_feats = {
-        "x": Feature("", "", "", "edge", "CellLineage", dtype="float"),
-        "y": Feature("", "", "", "edge", "CellLineage", dtype="int"),
-        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
-        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
+        "x": Feature(
+            identifier="x",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="float",
+        ),
+        "y": Feature(
+            identifier="y",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
+        "SPOT_SOURCE_ID": Feature(
+            identifier="SPOT_SOURCE_ID",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
+        "SPOT_TARGET_ID": Feature(
+            identifier="SPOT_TARGET_ID",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
     }
-    track_feats = {"TRACK_ID": Feature("", "", "", "lineage", "CellLineage", dtype="int")}
+    track_feats = {
+        "TRACK_ID": Feature(
+            identifier="TRACK_ID",
+            name="",
+            description="",
+            provenance="",
+            feat_type="lineage",
+            lin_type="CellLineage",
+            dtype="int",
+        )
+    }
 
     obtained = nx.DiGraph()
     feat_decl = FeaturesDeclaration({**edge_feats, **track_feats})
@@ -770,10 +957,36 @@ def test_build_tracks_no_nodes_ID():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     edge_feats = {
-        "x": Feature("", "", "", "edge", "CellLineage", dtype="float"),
-        "y": Feature("", "", "", "edge", "CellLineage", dtype="int"),
+        "x": Feature(
+            identifier="x",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="float",
+        ),
+        "y": Feature(
+            identifier="y",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
     }
-    track_feats = {"TRACK_ID": Feature("", "", "", "lineage", "CellLineage", dtype="int")}
+    track_feats = {
+        "TRACK_ID": Feature(
+            identifier="TRACK_ID",
+            name="",
+            description="",
+            provenance="",
+            feat_type="lineage",
+            lin_type="CellLineage",
+            dtype="int",
+        )
+    }
 
     obtained = nx.DiGraph()
     feat_decl = FeaturesDeclaration({**edge_feats, **track_feats})
@@ -797,7 +1010,17 @@ def test_build_tracks_no_edges():
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    track_feats = {"TRACK_ID": Feature("", "", "", "lineage", "CellLineage", dtype="int")}
+    track_feats = {
+        "TRACK_ID": Feature(
+            identifier="TRACK_ID",
+            name="",
+            description="",
+            provenance="",
+            feat_type="lineage",
+            lin_type="CellLineage",
+            dtype="int",
+        )
+    }
 
     obtained = nx.DiGraph()
     feat_decl = FeaturesDeclaration(track_feats)
@@ -833,10 +1056,42 @@ def test_build_tracks_no_track_ID():
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     edge_feats = {
-        "x": Feature("", "", "", "edge", "CellLineage", dtype="float"),
-        "y": Feature("", "", "", "edge", "CellLineage", dtype="int"),
-        "SPOT_SOURCE_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
-        "SPOT_TARGET_ID": Feature("", "", "", "edge", "CellLineage", dtype="int"),
+        "x": Feature(
+            identifier="x",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="float",
+        ),
+        "y": Feature(
+            identifier="y",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
+        "SPOT_SOURCE_ID": Feature(
+            identifier="SPOT_SOURCE_ID",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
+        "SPOT_TARGET_ID": Feature(
+            identifier="SPOT_TARGET_ID",
+            name="",
+            description="",
+            provenance="",
+            feat_type="edge",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
     }
 
     obtained = nx.DiGraph()

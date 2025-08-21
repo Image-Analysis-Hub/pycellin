@@ -10,9 +10,7 @@ from pycellin.custom_types import Cell, Link
 
 
 class ModelUpdater:
-
     def __init__(self):
-
         self._update_required = False
         self._full_data_update = False
 
@@ -83,7 +81,7 @@ class ModelUpdater:
         calculator : FeatureCalculator
             The calculator to use to compute the feature.
         """
-        self._calculators[calculator.feature.name] = calculator
+        self._calculators[calculator.feature.identifier] = calculator
 
     def delete_calculator(self, feature_name: str) -> None:
         """
@@ -127,9 +125,7 @@ class ModelUpdater:
         # TODO: refactor, this method is too long and does too many things.
 
         # Remove empty lineages.
-        for lin_ID in (
-            self._added_lineages | self._modified_lineages
-        ) - self._removed_lineages:
+        for lin_ID in (self._added_lineages | self._modified_lineages) - self._removed_lineages:
             if len(data.cell_data[lin_ID]) == 0:
                 del data.cell_data[lin_ID]
                 self._removed_lineages.add(lin_ID)
@@ -138,8 +134,7 @@ class ModelUpdater:
         lineages = list(data.cell_data.values())
         for lin in lineages:
             splitted_lins = [
-                CellLineage(lin.subgraph(c).copy())
-                for c in nx.weakly_connected_components(lin)
+                CellLineage(lin.subgraph(c).copy()) for c in nx.weakly_connected_components(lin)
             ]
             if len(splitted_lins) == 1:
                 continue
@@ -208,9 +203,7 @@ class ModelUpdater:
         # In case of modifications in the structure of some cell lineages,
         # we need to recompute the cycle lineages and their features.
         # TODO: optimize so we don't have to recompute EVERYTHING for cycle lineages?
-        for lin_ID in (
-            self._modified_lineages | self._added_lineages
-        ) - self._removed_lineages:
+        for lin_ID in (self._modified_lineages | self._added_lineages) - self._removed_lineages:
             if data.cycle_data is not None:
                 # To preserve references, but cannot work on frozen lineages...:
                 # new_cycle_data = data._compute_cycle_lineage(lin_ID)

@@ -98,8 +98,7 @@ def _split_into_lineages(graph: nx.DiGraph) -> dict[int, CellLineage]:
     """
     # We want one lineage per connected component of the graph.
     lineages = [
-        CellLineage(graph.subgraph(c).copy())
-        for c in nx.weakly_connected_components(graph)
+        CellLineage(graph.subgraph(c).copy()) for c in nx.weakly_connected_components(graph)
     ]
     data = {}
     current_node_id = 0
@@ -212,14 +211,12 @@ def _create_FeaturesDeclaration(
     lin_ID_feat = lineage_ID_Feature()
     for feat in [cell_ID_feat, frame_feat, lin_ID_feat]:
         fd._add_feature(feat)
-        fd._protect_feature(feat.name)
+        fd._protect_feature(feat.identifier)
 
     # Trackpy features.
     for axis in ["x", "y", "z"]:
         if axis in features:
-            feat = cell_coord_Feature(
-                unit=metadata["space_unit"], axis=axis, provenance="trackpy"
-            )
+            feat = cell_coord_Feature(unit=metadata["space_unit"], axis=axis, provenance="trackpy")
             fd._add_feature(feat)
     # TODO: add fd for other trackpy features
 
@@ -260,9 +257,7 @@ def load_trackpy_dataframe(
     del graph  # # Redondant with the subgraphs.
 
     # Create a pycellin model.
-    md = _create_metadata(
-        space_unit, pixel_width, pixel_height, pixel_depth, time_unit, time_step
-    )
+    md = _create_metadata(space_unit, pixel_width, pixel_height, pixel_depth, time_unit, time_step)
     fd = _create_FeaturesDeclaration(features, md)
     model = Model(md, fd, Data(data))
 
@@ -270,7 +265,6 @@ def load_trackpy_dataframe(
 
 
 if __name__ == "__main__":
-
     folder = "E:/Pasteur/Code/trackpy-examples-master/sample_data/"
     tracks = "FakeTracks_trackpy.pkl"
 

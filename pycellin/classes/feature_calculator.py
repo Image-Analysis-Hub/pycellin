@@ -178,7 +178,7 @@ class NodeLocalFeatureCalculator(LocalFeatureCalculator):
         lineages = _get_lin_data_from_lin_type(data, self.feature.lin_type)
         for nid, lin_ID in nodes_to_enrich:
             lin = lineages[lin_ID]
-            lin.nodes[nid][self.feature.name] = self.compute(lin, nid)
+            lin.nodes[nid][self.feature.identifier] = self.compute(lin, nid)
 
 
 class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
@@ -220,7 +220,7 @@ class EdgeLocalFeatureCalculator(LocalFeatureCalculator):
         for source, target, lin_ID in edges_to_enrich:
             link = (source, target)
             lin = lineages[lin_ID]
-            lin.edges[link][self.feature.name] = self.compute(lin, link)
+            lin.edges[link][self.feature.identifier] = self.compute(lin, link)
 
 
 class LineageLocalFeatureCalculator(LocalFeatureCalculator):
@@ -256,7 +256,7 @@ class LineageLocalFeatureCalculator(LocalFeatureCalculator):
         lineages = _get_lin_data_from_lin_type(data, self.feature.lin_type)
         for lin_ID in lineages_to_enrich:
             lin = lineages[lin_ID]
-            lin.graph[self.feature.name] = self.compute(lin)
+            lin.graph[self.feature.identifier] = self.compute(lin)
 
 
 class GlobalFeatureCalculator(FeatureCalculator):
@@ -340,7 +340,7 @@ class NodeGlobalFeatureCalculator(GlobalFeatureCalculator):
         lineages = _get_lin_data_from_lin_type(data, self.feature.lin_type)
         for lin in lineages.values():
             for nid in lin.nodes:
-                lin.nodes[nid][self.feature.name] = self.compute(data, lin, nid)
+                lin.nodes[nid][self.feature.identifier] = self.compute(data, lin, nid)
 
 
 class EdgeGlobalFeatureCalculator(GlobalFeatureCalculator):
@@ -380,7 +380,7 @@ class EdgeGlobalFeatureCalculator(GlobalFeatureCalculator):
         lineages = _get_lin_data_from_lin_type(data, self.feature.lin_type)
         for lin in lineages.values():
             for edge in lin.edges:
-                lin.edges[edge][self.feature.name] = self.compute(data, lin, edge)
+                lin.edges[edge][self.feature.identifier] = self.compute(data, lin, edge)
 
 
 class LineageGlobalFeatureCalculator(GlobalFeatureCalculator):
@@ -418,4 +418,4 @@ class LineageGlobalFeatureCalculator(GlobalFeatureCalculator):
         """
         lineages = _get_lin_data_from_lin_type(data, self.feature.lin_type)
         for lin in lineages.values():
-            lin.graph[self.feature.name] = self.compute(data, lin)
+            lin.graph[self.feature.identifier] = self.compute(data, lin)

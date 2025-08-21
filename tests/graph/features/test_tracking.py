@@ -52,8 +52,9 @@ def cell_lin():
 
 @pytest.fixture
 def feat_cell_lin():
-    Feature(
-        name="test_feature",
+    return Feature(
+        identifier="test_feature",
+        name="test feature",
         description="test feature",
         provenance="pycellin",
         feat_type="node",
@@ -61,7 +62,6 @@ def feat_cell_lin():
         dtype="int",
         unit="um",
     )
-    return Feature
 
 
 @pytest.fixture
@@ -73,8 +73,9 @@ def cycle_lin(cell_lin):
 
 @pytest.fixture
 def feat_cycle_lin():
-    Feature(
-        name="test_feature",
+    return Feature(
+        identifier="test_feature",
+        name="test feature",
         description="test feature",
         provenance="pycellin",
         feat_type="node",
@@ -82,7 +83,6 @@ def feat_cycle_lin():
         dtype="int",
         unit="um",
     )
-    return Feature
 
 
 # AbsoluteAge #################################################################

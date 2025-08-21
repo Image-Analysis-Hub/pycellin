@@ -164,7 +164,8 @@ def _convert_and_add_feature(
         case _:
             raise ValueError(f"Invalid feature type: {feature_type}")
     feature = Feature(
-        name=trackmate_feature["feature"],
+        identifier=trackmate_feature["feature"],
+        name=trackmate_feature["name"],
         description=trackmate_feature["name"],
         provenance="TrackMate",
         feat_type=feat_type,
@@ -212,7 +213,8 @@ def _add_all_features(
         # Features used in Spot tags but not declared in the FeatureDeclarations tag.
         if element.tag == "SpotFeatures":
             name_feat = Feature(
-                name="cell_name",
+                identifier="cell_name",
+                name="cell name",
                 description="Name of the spot",
                 provenance="TrackMate",
                 feat_type="node",
@@ -224,7 +226,8 @@ def _add_all_features(
         # Feature used in Track tags but not declared in the FeatureDeclarations tag.
         if element.tag == "TrackFeatures":
             name_feat = Feature(
-                name="lineage_name",
+                identifier="lineage_name",
+                name="lineage name",
                 description="Name of the track",
                 provenance="TrackMate",
                 feat_type="lineage",
@@ -297,6 +300,7 @@ def _convert_attributes(
             # In that case we add a stub version of the feature to the features
             # declaration. The user will need to manually update the feature later on.
             missing_feat = Feature(
+                identifier=key,
                 name=key,
                 description="unknown",
                 provenance="unknown",
@@ -729,13 +733,14 @@ def _update_features_declaration(
     fdec._add_feature(feat_cell_ID)
     fdec._protect_feature("cell_ID")
     for axis in ["x", "y", "z"]:
-        fdec._rename_feature(f"POSITION_{axis.upper()}", f"cell_{axis}")
-        fdec._modify_feature_description(f"cell_{axis}", f"{axis.upper()} coordinate of the cell")
-    fdec._rename_feature("FRAME", "frame")
+        fdec._change_feature_identifier(f"POSITION_{axis.upper()}", f"cell_{axis}")
+        fdec._change_feature_description(f"cell_{axis}", f"{axis.upper()} coordinate of the cell")
+    fdec._change_feature_identifier("FRAME", "frame")
     fdec._protect_feature("frame")
     if segmentation:
         roi_coord_feat = Feature(
-            name="ROI_coords",
+            identifier="ROI_coords",
+            name="ROI coords",
             description="List of coordinates of the region of interest",
             provenance="TrackMate",
             feat_type="node",
@@ -748,15 +753,16 @@ def _update_features_declaration(
     # Edge features.
     if "EDGE_X_LOCATION" in fdec.feats_dict:
         for axis in ["x", "y", "z"]:
-            fdec._rename_feature(f"EDGE_{axis.upper()}_LOCATION", f"link_{axis}")
+            fdec._change_feature_identifier(f"EDGE_{axis.upper()}_LOCATION", f"link_{axis}")
             desc = f"{axis.upper()} coordinate of the link, i.e. mean coordinate of its two cells"
-            fdec._modify_feature_description(f"link_{axis}", desc)
+            fdec._change_feature_description(f"link_{axis}", desc)
 
     # Lineage features.
-    fdec._rename_feature("TRACK_ID", "lineage_ID")
-    fdec._modify_feature_description("lineage_ID", "Unique identifier of the lineage")
+    fdec._change_feature_identifier("TRACK_ID", "lineage_ID")
+    fdec._change_feature_description("lineage_ID", "Unique identifier of the lineage")
     fdec._protect_feature("lineage_ID")
     feat_filtered_track = Feature(
+        identifier="FilteredTrack",
         name="FilteredTrack",
         description="True if the track was not filtered out in TrackMate",
         provenance="TrackMate",
@@ -767,9 +773,9 @@ def _update_features_declaration(
     fdec._add_feature(feat_filtered_track)
     if "TRACK_X_LOCATION" in fdec.feats_dict:
         for axis in ["x", "y", "z"]:
-            fdec._rename_feature(f"TRACK_{axis.upper()}_LOCATION", f"lineage_{axis}")
+            fdec._change_feature_identifier(f"TRACK_{axis.upper()}_LOCATION", f"lineage_{axis}")
             desc = f"{axis.upper()} coordinate of the lineage, i.e. mean coordinate of its cells"
-            fdec._modify_feature_description(f"lineage_{axis}", desc)
+            fdec._change_feature_description(f"lineage_{axis}", desc)
 
 
 def _update_node_feature_key(
