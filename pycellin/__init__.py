@@ -30,7 +30,7 @@ from .io.trackmate.exporter import export_TrackMate_XML
 from .io.trackpy.loader import load_trackpy_dataframe
 from .io.trackpy.exporter import export_trackpy_dataframe
 
-from .graph.features.utils import (
+from .graph.properties.utils import (
     get_pycellin_cell_lineage_properties,
     get_pycellin_cycle_lineage_properties,
 )

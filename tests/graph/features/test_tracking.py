@@ -7,7 +7,7 @@ import pytest
 
 import networkx as nx
 
-from pycellin.graph.features.tracking import (
+from pycellin.graph.properties.tracking import (
     AbsoluteAge,
     RelativeAge,
     CycleCompleteness,

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-A collection of features related to cell mobility/motility.
+A collection of properties related to cell mobility/motility.
 """
 
 from itertools import pairwise
@@ -18,20 +18,20 @@ from pycellin.classes.property_calculator import (
 )
 
 
-def _get_branch_edge_feature_values(
-    feat_name: str,
+def _get_branch_edge_property_values(
+    prop_name: str,
     data: Data,
     lineage: CycleLineage,
     nid: int,
     include_incoming_edge: bool,
 ) -> list[Any]:
     """
-    Get the values of a given feature for all edges within a cell cycle.
+    Get the values of a given property for all edges within a cell cycle.
 
     Parameters
     ----------
-    feat_name : str
-        Name of the feature to retrieve.
+    prop_name : str
+        Name of the property to retrieve.
     data : Data
         Data object containing the lineage.
     lineage : CycleLineage
@@ -44,26 +44,26 @@ def _get_branch_edge_feature_values(
     Returns
     -------
     list of Any
-        List of values of the feature for all edges within the cell cycle.
+        List of values of the property for all edges within the cell cycle.
 
     Raises
     ------
     KeyError
-        If the feature does not exist in the cell lineage.
+        If the property does not exist in the cell lineage.
     """
     lin_ID = lineage.graph["lineage_ID"]
     cell_lin = data.cell_data[lin_ID]
     try:
-        values = [cell_lin.edges[edge][feat_name] for edge in lineage.yield_links_within_cycle(nid)]
+        values = [cell_lin.edges[edge][prop_name] for edge in lineage.yield_links_within_cycle(nid)]
     except KeyError:
-        raise KeyError(f"Feature '{feat_name}' does not exist in the cell lineage '{lin_ID}'.")
+        raise KeyError(f"Property '{prop_name}' does not exist in the cell lineage '{lin_ID}'.")
 
     if include_incoming_edge:
         first_cell = lineage.nodes[nid]["cells"][0]
         predecessors = list(cell_lin.predecessors(first_cell))
         if len(predecessors) == 1:
             edge = (predecessors[0], first_cell)
-            values.append(cell_lin.edges[edge][feat_name])
+            values.append(cell_lin.edges[edge][prop_name])
         elif len(predecessors) > 1:
             raise FusionError(first_cell, lin_ID)
 
@@ -120,17 +120,17 @@ class BranchTotalDisplacement(NodeGlobalPropCalculator):
     the cell cycle.
     """
 
-    def __init__(self, feature: Property, include_incoming_edge: bool = False):
+    def __init__(self, property: Property, include_incoming_edge: bool = False):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         include_incoming_edge : bool, optional
             Whether to include the incoming edge of the first cell of the cell cycle.
             Default is False.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.include_incoming_edge = include_incoming_edge
 
     def compute(  # type: ignore[override]
@@ -153,7 +153,7 @@ class BranchTotalDisplacement(NodeGlobalPropCalculator):
         float
             Total displacement of the cell during the cell cycle.
         """
-        disps = _get_branch_edge_feature_values(
+        disps = _get_branch_edge_property_values(
             "cell_displacement", data, lineage, nid, self.include_incoming_edge
         )
         return np.nansum(disps)
@@ -167,17 +167,17 @@ class BranchMeanDisplacement(NodeGlobalPropCalculator):
     the cell cycle.
     """
 
-    def __init__(self, feature: Property, include_incoming_edge: bool = False):
+    def __init__(self, property: Property, include_incoming_edge: bool = False):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         include_incoming_edge : bool, optional
             Whether to include the incoming edge of the first cell of the cell cycle.
             Default is False.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.include_incoming_edge = include_incoming_edge
 
     def compute(  # type: ignore[override]
@@ -200,7 +200,7 @@ class BranchMeanDisplacement(NodeGlobalPropCalculator):
         float
             Mean displacement of the cell during the cell cycle.
         """
-        disps = _get_branch_edge_feature_values(
+        disps = _get_branch_edge_property_values(
             "cell_displacement", data, lineage, nid, self.include_incoming_edge
         )
         return np.nanmean(disps).item()
@@ -214,16 +214,16 @@ class CellSpeed(EdgeLocalPropCalculator):
     between the two consecutive detections.
     """
 
-    def __init__(self, feature: Property, time_step: int | float = 1):
+    def __init__(self, property: Property, time_step: int | float = 1):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         time_step : int or float, optional
             Time step between 2 frames, in time unit. Default is 1.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.time_step = time_step
 
     def compute(  # type: ignore[override]
@@ -267,17 +267,17 @@ class BranchMeanSpeed(NodeGlobalPropCalculator):
     during the cell cycle.
     """
 
-    def __init__(self, feature: Property, include_incoming_edge: bool = False):
+    def __init__(self, property: Property, include_incoming_edge: bool = False):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         include_incoming_edge : bool, optional
             Whether to include the incoming edge of the first cell of the cell cycle.
             Default is False.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.include_incoming_edge = include_incoming_edge
 
     def compute(  # type: ignore[override]
@@ -300,7 +300,7 @@ class BranchMeanSpeed(NodeGlobalPropCalculator):
         float
             Mean speed of the cell during the cell cycle.
         """
-        speeds = _get_branch_edge_feature_values(
+        speeds = _get_branch_edge_property_values(
             "cell_speed", data, lineage, nid, self.include_incoming_edge
         )
         return np.nanmean(speeds).item()
@@ -316,17 +316,17 @@ class Straightness(NodeGlobalPropCalculator):
     while a trajectory with many turns has a straightness close to 0.
     """
 
-    def __init__(self, feature: Property, include_incoming_edge: bool = False):
+    def __init__(self, property: Property, include_incoming_edge: bool = False):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         include_incoming_edge : bool, optional
             Whether to include the distance between the first cell and its predecessor.
             Default is False.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.include_incoming_edge = include_incoming_edge
 
     def compute(  # type: ignore[override]
@@ -407,16 +407,16 @@ class Angle(NodeGlobalPropCalculator):
     of the cell at two consecutive detections.
     """
 
-    def __init__(self, feature: Property, unit: Literal["radian", "degree"] = "radian"):
+    def __init__(self, property: Property, unit: Literal["radian", "degree"] = "radian"):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         unit : {'radian', 'degree'}, optional
             Unit in which the angle is computed. Default is 'radian'.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.unit = unit
 
     def compute(  # type: ignore[override]

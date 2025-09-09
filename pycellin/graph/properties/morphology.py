@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-A collection of diverse morphology features that can be added to
+A collection of diverse morphology properties that can be added to
 lineage graphs.
 """
 
@@ -26,7 +26,7 @@ from pycellin.classes.property_calculator import NodeLocalPropCalculator
 # - separate width and length. Width only requires skeleton length and the distance
 # transform so I should compute the skeleton in a separate function.
 # - recode every thing and avoid drawing
-# - move area_increment to a notebook as an example of custom feature
+# - move area_increment to a notebook as an example of custom property
 
 
 def from_roi_to_array(roi, width, height):
@@ -432,7 +432,7 @@ def get_width_and_length(
 class RodWidth(NodeLocalPropCalculator):
     def __init__(
         self,
-        feature,
+        property,
         pixel_size: float,
         skel_algo: str = "zhang",
         tolerance: float = 0.5,
@@ -441,7 +441,7 @@ class RodWidth(NodeLocalPropCalculator):
         debug: bool = False,
         debug_folder: str | None = None,
     ):
-        super().__init__(feature)
+        super().__init__(property)
         self.pixel_size = pixel_size
         self.skel_algo = skel_algo
         self.tolerance = tolerance
@@ -469,7 +469,7 @@ class RodWidth(NodeLocalPropCalculator):
 class RodLength(NodeLocalPropCalculator):
     def __init__(
         self,
-        feature,
+        property,
         pixel_size: float,
         skel_algo: str = "zhang",
         tolerance: float = 0.5,
@@ -478,7 +478,7 @@ class RodLength(NodeLocalPropCalculator):
         debug: bool = False,
         debug_folder: str | None = None,
     ):
-        super().__init__(feature)
+        super().__init__(property)
         self.pixel_size = pixel_size
         self.skel_algo = skel_algo
         self.tolerance = tolerance
@@ -503,9 +503,9 @@ class RodLength(NodeLocalPropCalculator):
         )[1]
 
 
-# TODO: this is a feature that should not be in pycellin, too many ways to define
+# TODO: this is a property that should not be in pycellin, too many ways to define
 # the area increment. Since it is user dependent, I should put it in a notebook
-# as an example of custom feature.
+# as an example of custom property.
 
 # def get_area_increment(nid: int, lineage: CellLineage) -> float:
 #     """
@@ -542,12 +542,12 @@ class RodLength(NodeLocalPropCalculator):
 
 # def _add_area_increment(lineages: list[CellLineage]) -> None:
 #     """
-#     Add the area increment feature to the nodes of the lineages.
+#     Add the area increment property to the nodes of the lineages.
 
 #     Parameters
 #     ----------
 #     lineages : list[CellLineage]
-#         Cell lineages to update with the area increment feature.
+#         Cell lineages to update with the area increment property.
 #     """
 #     for lin in lineages:
 #         for node in lin.nodes:

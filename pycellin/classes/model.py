@@ -20,10 +20,10 @@ from pycellin.classes.lineage import Lineage
 from pycellin.classes.exceptions import FusionError, ProtectedPropertyError
 from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.updater import ModelUpdater
-import pycellin.graph.features.tracking as tracking
-import pycellin.graph.features.motion as motion
-import pycellin.graph.features.morphology as morpho
-import pycellin.graph.features.utils as futils
+import pycellin.graph.properties.tracking as tracking
+import pycellin.graph.properties.motion as motion
+import pycellin.graph.properties.morphology as morpho
+import pycellin.graph.properties.utils as futils
 from pycellin.custom_types import Cell, Link
 
 L = TypeVar("L", bound="Lineage")
