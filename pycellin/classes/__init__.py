@@ -14,11 +14,11 @@ from .property import (
     level_Property,
 )
 from .model import Model
-from .feature_calculator import (
-    NodeLocalFeatureCalculator,
-    EdgeLocalFeatureCalculator,
-    LineageLocalFeatureCalculator,
-    NodeGlobalFeatureCalculator,
-    EdgeGlobalFeatureCalculator,
-    LineageGlobalFeatureCalculator,
+from .property_calculator import (
+    NodeLocalPropCalculator,
+    EdgeLocalPropCalculator,
+    LineageLocalPropCalculator,
+    NodeGlobalPropCalculator,
+    EdgeGlobalPropCalculator,
+    LineageGlobalPropCalculator,
 )

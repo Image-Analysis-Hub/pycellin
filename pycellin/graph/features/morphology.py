@@ -18,7 +18,7 @@ from shapely.geometry import Point, LineString
 from skimage.morphology import skeletonize
 
 from pycellin.classes.lineage import CellLineage
-from pycellin.classes.feature_calculator import NodeLocalFeatureCalculator
+from pycellin.classes.property_calculator import NodeLocalPropCalculator
 
 # TODO:
 # - remove debug code
@@ -429,7 +429,7 @@ def get_width_and_length(
     return width, length
 
 
-class RodWidth(NodeLocalFeatureCalculator):
+class RodWidth(NodeLocalPropCalculator):
     def __init__(
         self,
         feature,
@@ -466,7 +466,7 @@ class RodWidth(NodeLocalFeatureCalculator):
         )[0]
 
 
-class RodLength(NodeLocalFeatureCalculator):
+class RodLength(NodeLocalPropCalculator):
     def __init__(
         self,
         feature,

@@ -12,9 +12,9 @@ from typing import Any, Literal
 
 from pycellin.classes import Data, CellLineage, CycleLineage, Property
 from pycellin.classes.exceptions import FusionError
-from pycellin.classes.feature_calculator import (
-    EdgeLocalFeatureCalculator,
-    NodeGlobalFeatureCalculator,
+from pycellin.classes.property_calculator import (
+    EdgeLocalPropCalculator,
+    NodeGlobalPropCalculator,
 )
 
 
@@ -70,7 +70,7 @@ def _get_branch_edge_feature_values(
     return values
 
 
-class CellDisplacement(EdgeLocalFeatureCalculator):
+class CellDisplacement(EdgeLocalPropCalculator):
     """
     Calculator to compute the displacement of a cell between two consecutive detections.
 
@@ -112,7 +112,7 @@ class CellDisplacement(EdgeLocalFeatureCalculator):
         return math.dist(pos1, pos2)
 
 
-class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
+class BranchTotalDisplacement(NodeGlobalPropCalculator):
     """
     Calculator to compute the total displacement of a cell during a cell cycle.
 
@@ -159,7 +159,7 @@ class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
         return np.nansum(disps)
 
 
-class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
+class BranchMeanDisplacement(NodeGlobalPropCalculator):
     """
     Calculator to compute the mean displacement of a cell during a cell cycle.
 
@@ -206,7 +206,7 @@ class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
         return np.nanmean(disps).item()
 
 
-class CellSpeed(EdgeLocalFeatureCalculator):
+class CellSpeed(EdgeLocalPropCalculator):
     """
     Calculator to compute the speed of a cell between two consecutive detections.
 
@@ -259,7 +259,7 @@ class CellSpeed(EdgeLocalFeatureCalculator):
             return math.dist(pos1, pos2) / (time2 - time1)
 
 
-class BranchMeanSpeed(NodeGlobalFeatureCalculator):
+class BranchMeanSpeed(NodeGlobalPropCalculator):
     """
     Calculator to compute the mean speed of a cell during a cell cycle.
 
@@ -306,7 +306,7 @@ class BranchMeanSpeed(NodeGlobalFeatureCalculator):
         return np.nanmean(speeds).item()
 
 
-class Straightness(NodeGlobalFeatureCalculator):
+class Straightness(NodeGlobalPropCalculator):
     """
     Calculator to compute the straightness of the cell displacement within a cell cycle.
 
@@ -399,7 +399,7 @@ class Straightness(NodeGlobalFeatureCalculator):
         return math.dist(first_cell_loc, last_cell_loc) / sum(distances)
 
 
-class Angle(NodeGlobalFeatureCalculator):
+class Angle(NodeGlobalPropCalculator):
     """
     Calculator to compute the angle between two consecutive detections of a cell.
 

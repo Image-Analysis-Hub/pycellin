@@ -14,13 +14,13 @@ from .classes.property import (
     level_Property,
 )
 from .classes.model import Model
-from .classes.feature_calculator import (
-    NodeLocalFeatureCalculator,
-    EdgeLocalFeatureCalculator,
-    LineageLocalFeatureCalculator,
-    NodeGlobalFeatureCalculator,
-    EdgeGlobalFeatureCalculator,
-    LineageGlobalFeatureCalculator,
+from .classes.property_calculator import (
+    NodeLocalPropCalculator,
+    EdgeLocalPropCalculator,
+    LineageLocalPropCalculator,
+    NodeGlobalPropCalculator,
+    EdgeGlobalPropCalculator,
+    LineageGlobalPropCalculator,
 )
 
 from .io.cell_tracking_challenge.loader import load_CTC_file
@@ -53,12 +53,12 @@ __all__ = [
     "cycle_length_Property",
     "level_Property",
     "Model",
-    "NodeLocalFeatureCalculator",
-    "EdgeLocalFeatureCalculator",
-    "LineageLocalFeatureCalculator",
-    "NodeGlobalFeatureCalculator",
-    "EdgeGlobalFeatureCalculator",
-    "LineageGlobalFeatureCalculator",
+    "NodeLocalPropCalculator",
+    "EdgeLocalPropCalculator",
+    "LineageLocalPropCalculator",
+    "NodeGlobalPropCalculator",
+    "EdgeGlobalPropCalculator",
+    "LineageGlobalPropCalculator",
     "load_CTC_file",
     "export_CTC_file",
     "load_TrackMate_XML",

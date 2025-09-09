@@ -18,7 +18,7 @@ from pycellin.classes import (
 )
 from pycellin.classes.lineage import Lineage
 from pycellin.classes.exceptions import FusionError, ProtectedPropertyError
-from pycellin.classes.feature_calculator import FeatureCalculator
+from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features.tracking as tracking
 import pycellin.graph.features.motion as motion
@@ -907,7 +907,7 @@ class Model:
 
     def add_custom_property(
         self,
-        calculator: FeatureCalculator,
+        calculator: PropertyCalculator,
     ) -> None:
         """
         Add a custom property to the model.
@@ -919,7 +919,7 @@ class Model:
 
         Parameters
         ----------
-        calculator : FeatureCalculator
+        calculator : PropertyCalculator
             Calculator to compute the property.
 
         Raises
@@ -928,12 +928,12 @@ class Model:
             If the property is a cycle lineage property and cycle lineages
             have not been computed yet.
         """
-        if calculator.feature.lin_type == "CycleLineage" and not self.data.cycle_data:
+        if calculator.prop.lin_type == "CycleLineage" and not self.data.cycle_data:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with `model.add_cycle_data()`."
             )
-        self.props_metadata._add_prop(calculator.feature)
+        self.props_metadata._add_prop(calculator.prop)
         self._updater.register_calculator(calculator)
         self.prepare_full_data_update()
 
@@ -1521,7 +1521,7 @@ class Model:
         ------
         ValueError
             If the property does not exist.
-        ProtectedFeatureError
+        ProtectedPropertyError
             If the property is a protected property.
         """
         # Preliminary checks.

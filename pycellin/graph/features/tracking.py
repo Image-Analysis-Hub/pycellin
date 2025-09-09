@@ -33,13 +33,13 @@ import numpy as np
 
 from pycellin.classes import CellLineage, CycleLineage, Data, Property
 from pycellin.classes.exceptions import FusionError
-from pycellin.classes.feature_calculator import NodeGlobalFeatureCalculator
+from pycellin.classes.property_calculator import NodeGlobalPropCalculator
 
 # TODO: should I add the word Calc or Calculator to the class names?
 # TODO: add calculator for mandatory cycle lineage features (e.g. cycle length)
 
 
-class AbsoluteAge(NodeGlobalFeatureCalculator):
+class AbsoluteAge(NodeGlobalPropCalculator):
     """
     Calculator to compute the absolute age of cells.
 
@@ -93,7 +93,7 @@ class AbsoluteAge(NodeGlobalFeatureCalculator):
         return age_in_frame * self.time_step
 
 
-class RelativeAge(NodeGlobalFeatureCalculator):
+class RelativeAge(NodeGlobalPropCalculator):
     """
     Calculator to compute the relative age of cells.
 
@@ -148,7 +148,7 @@ class RelativeAge(NodeGlobalFeatureCalculator):
         return age_in_frame * self.time_step
 
 
-class CycleCompleteness(NodeGlobalFeatureCalculator):
+class CycleCompleteness(NodeGlobalPropCalculator):
     """
     Calculator to compute the cell cycle completeness.
 
@@ -284,7 +284,7 @@ def _get_cycle_lin_frames(data: Data, lineage: CycleLineage, nid: int) -> tuple[
     return frame_current_div, frame_prev_div
 
 
-class DivisionTime(NodeGlobalFeatureCalculator):
+class DivisionTime(NodeGlobalPropCalculator):
     """
     Calculator to compute the division time of cells.
 
@@ -342,7 +342,7 @@ class DivisionTime(NodeGlobalFeatureCalculator):
         return (frame_curr_div - frame_prev_div) * self.time_step
 
 
-class DivisionRate(NodeGlobalFeatureCalculator):
+class DivisionRate(NodeGlobalPropCalculator):
     """
     Calculator to compute the division rate of cells.
 
