@@ -14,7 +14,7 @@ from pycellin.graph.features.tracking import (
     DivisionTime,
     DivisionRate,
 )
-from pycellin.classes import Feature, Data, CellLineage, CycleLineage
+from pycellin.classes import Property, Data, CellLineage, CycleLineage
 
 
 # Fixtures ####################################################################
@@ -52,12 +52,12 @@ def cell_lin():
 
 @pytest.fixture
 def feat_cell_lin():
-    return Feature(
+    return Property(
         identifier="test_feature",
         name="test feature",
         description="test feature",
         provenance="pycellin",
-        feat_type="node",
+        prop_type="node",
         lin_type="CellLineage",
         dtype="int",
         unit="um",
@@ -73,12 +73,12 @@ def cycle_lin(cell_lin):
 
 @pytest.fixture
 def feat_cycle_lin():
-    return Feature(
+    return Property(
         identifier="test_feature",
         name="test feature",
         description="test feature",
         provenance="pycellin",
-        feat_type="node",
+        prop_type="node",
         lin_type="CycleLineage",
         dtype="int",
         unit="um",

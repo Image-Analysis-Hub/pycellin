@@ -1,17 +1,17 @@
 from .data import Data
 from .lineage import CellLineage, CycleLineage
-from .feature import FeaturesDeclaration, Feature
-from .feature import (
-    frame_Feature,
-    cell_ID_Feature,
-    lineage_ID_Feature,
-    cell_coord_Feature,
-    link_coord_Feature,
-    lineage_coord_Feature,
-    cycle_ID_Feature,
-    cells_Feature,
-    cycle_length_Feature,
-    level_Feature,
+from .property import PropsMetadata, Property
+from .property import (
+    frame_Property,
+    cell_ID_Property,
+    lineage_ID_Property,
+    cell_coord_Property,
+    link_coord_Property,
+    lineage_coord_Property,
+    cycle_ID_Property,
+    cells_Property,
+    cycle_length_Property,
+    level_Property,
 )
 from .model import Model
 from .feature_calculator import (

@@ -8,7 +8,7 @@ This module is part of the pycellin package.
 
 This module provides functions to load and process Cell Tracking Challenge (CTC) files
 into pycellin models. It includes a function to load a CTC file into pycellin model
-and helper functions to create metadata, features, and lineage graphs.
+and helper functions to create metadata, properties, and lineage graphs.
 
 References:
 - CTC website: https://celltrackingchallenge.net/
@@ -27,13 +27,13 @@ import networkx as nx
 from skimage.measure import regionprops, find_contours
 import tifffile
 
-from pycellin.classes.feature import (
-    Feature,
-    FeaturesDeclaration,
-    cell_ID_Feature,
-    frame_Feature,
-    lineage_ID_Feature,
-    cell_coord_Feature,
+from pycellin.classes.property import (
+    Property,
+    PropsMetadata,
+    cell_ID_Property,
+    frame_Property,
+    lineage_ID_Property,
+    cell_coord_Property,
 )
 from pycellin.classes import CellLineage, Data, Model
 
@@ -201,9 +201,9 @@ def _create_metadata(
     return metadata
 
 
-def _create_FeaturesDeclaration(seg_data: bool) -> FeaturesDeclaration:
+def _create_PropsMetadata(seg_data: bool) -> PropsMetadata:
     """
-    Return a FeaturesDeclaration object populated with pycellin basic features.
+    Return a PropsMetadata object populated with pycellin basic properties.
 
     Parameters
     ----------
@@ -212,34 +212,35 @@ def _create_FeaturesDeclaration(seg_data: bool) -> FeaturesDeclaration:
 
     Returns
     -------
-    FeaturesDeclaration
-        An instance of FeaturesDeclaration populated with cell and lineage
-        identification features.
+    PropsMetadata
+        An instance of PropsMetadata populated with cell and lineage
+        identification properties.
     """
-    feat_declaration = FeaturesDeclaration()
-    cell_ID_feat = cell_ID_Feature()
-    frame_feat = frame_Feature()
-    lin_ID_feat = lineage_ID_Feature()
-    for feat in [cell_ID_feat, frame_feat, lin_ID_feat]:
-        feat_declaration._add_feature(feat)
-        feat_declaration._protect_feature(feat.identifier)
+    props_md = PropsMetadata()
+    cell_ID_prop = cell_ID_Property()
+    frame_prop = frame_Property()
+    lin_ID_prop = lineage_ID_Property()
+    for prop in [cell_ID_prop, frame_prop, lin_ID_prop]:
+        props_md._add_prop(prop)
+        props_md._protect_prop(prop.identifier)
     if seg_data:
         # TODO: deal with z dimension
         # TODO: put the real unit, pixel is juste a placeholder for now
-        cell_x_feat = cell_coord_Feature(unit="pixel", axis="x", provenance="CTC")
-        cell_y_feat = cell_coord_Feature(unit="pixel", axis="y", provenance="CTC")
-        roi_coords_feat = Feature(
-            name="ROI_coords",
+        cell_x_prop = cell_coord_Property(unit="pixel", axis="x", provenance="CTC")
+        cell_y_prop = cell_coord_Property(unit="pixel", axis="y", provenance="CTC")
+        roi_coords_prop = Property(
+            identifier="ROI_coords",
+            name="ROI coords",
             description="List of coordinates of the region of interest",
             provenance="CTC",
-            feat_type="node",
+            prop_type="node",
             lin_type="CellLineage",
             dtype="float",
             unit="pixel",
         )
-        feat_declaration._add_features([cell_x_feat, cell_y_feat, roi_coords_feat])
+        props_md._add_props([cell_x_prop, cell_y_prop, roi_coords_prop])
 
-    return feat_declaration
+    return props_md
 
 
 def _read_track_line(
@@ -592,7 +593,7 @@ def load_CTC_file(
         time_unit=time_unit,
         time_step=time_step,
     )
-    fd = _create_FeaturesDeclaration(labels_path is not None)
+    fd = _create_PropsMetadata(labels_path is not None)
     model = Model(md, fd, Data(data))
     return model
 

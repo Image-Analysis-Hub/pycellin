@@ -10,7 +10,7 @@ import math
 import numpy as np
 from typing import Any, Literal
 
-from pycellin.classes import Data, CellLineage, CycleLineage, Feature
+from pycellin.classes import Data, CellLineage, CycleLineage, Property
 from pycellin.classes.exceptions import FusionError
 from pycellin.classes.feature_calculator import (
     EdgeLocalFeatureCalculator,
@@ -120,7 +120,7 @@ class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
     the cell cycle.
     """
 
-    def __init__(self, feature: Feature, include_incoming_edge: bool = False):
+    def __init__(self, feature: Property, include_incoming_edge: bool = False):
         """
         Parameters
         ----------
@@ -167,7 +167,7 @@ class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
     the cell cycle.
     """
 
-    def __init__(self, feature: Feature, include_incoming_edge: bool = False):
+    def __init__(self, feature: Property, include_incoming_edge: bool = False):
         """
         Parameters
         ----------
@@ -214,7 +214,7 @@ class CellSpeed(EdgeLocalFeatureCalculator):
     between the two consecutive detections.
     """
 
-    def __init__(self, feature: Feature, time_step: int | float = 1):
+    def __init__(self, feature: Property, time_step: int | float = 1):
         """
         Parameters
         ----------
@@ -267,7 +267,7 @@ class BranchMeanSpeed(NodeGlobalFeatureCalculator):
     during the cell cycle.
     """
 
-    def __init__(self, feature: Feature, include_incoming_edge: bool = False):
+    def __init__(self, feature: Property, include_incoming_edge: bool = False):
         """
         Parameters
         ----------
@@ -316,7 +316,7 @@ class Straightness(NodeGlobalFeatureCalculator):
     while a trajectory with many turns has a straightness close to 0.
     """
 
-    def __init__(self, feature: Feature, include_incoming_edge: bool = False):
+    def __init__(self, feature: Property, include_incoming_edge: bool = False):
         """
         Parameters
         ----------
@@ -407,7 +407,7 @@ class Angle(NodeGlobalFeatureCalculator):
     of the cell at two consecutive detections.
     """
 
-    def __init__(self, feature: Feature, unit: Literal["radian", "degree"] = "radian"):
+    def __init__(self, feature: Property, unit: Literal["radian", "degree"] = "radian"):
         """
         Parameters
         ----------

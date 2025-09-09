@@ -184,47 +184,47 @@ def cycle_lin_triple_div(cycle_lin):
     return cycle_lin
 
 
-# _remove_feature() ###########################################################
+# _remove_prop() ###########################################################
 
 
-def test_remove_feature_node(cell_lin):
-    cell_lin._remove_feature("frame", "node")
+def test_remove_prop_node(cell_lin):
+    cell_lin._remove_prop("frame", "node")
     for node in cell_lin.nodes:
         assert "frame" not in cell_lin.nodes[node]
 
 
-def test_remove_feature_edge(cell_lin):
-    cell_lin._remove_feature("name", "edge")
+def test_remove_prop_edge(cell_lin):
+    cell_lin._remove_prop("name", "edge")
     for edge in cell_lin.edges:
         assert "name" not in cell_lin.edges[edge]
 
 
-def test_remove_feature_lineage(cell_lin):
-    cell_lin._remove_feature("lineage_ID", "lineage")
+def test_remove_prop_lineage(cell_lin):
+    cell_lin._remove_prop("lineage_ID", "lineage")
     assert "lineage_ID" not in cell_lin.graph
 
 
-def test_remove_feature_unknown_feature(cell_lin):
-    # Attempting to remove a feature that does not exist should not raise an error.
-    cell_lin._remove_feature("unknown_feature", "node")
-    cell_lin._remove_feature("unknown_feature", "edge")
-    cell_lin._remove_feature("unknown_feature", "lineage")
+def test_remove_prop_unknown_property(cell_lin):
+    # Attempting to remove a property that does not exist should not raise an error.
+    cell_lin._remove_prop("unknown_property", "node")
+    cell_lin._remove_prop("unknown_property", "edge")
+    cell_lin._remove_prop("unknown_property", "lineage")
 
 
-def test_remove_feature_missing_feature(cell_lin):
-    # Attempting to remove a feature not present in some elements should not raise
+def test_remove_prop_missing_property(cell_lin):
+    # Attempting to remove a property not present in some elements should not raise
     # an error.
     cell_lin.add_edge(16, 17)
-    cell_lin._remove_feature("frame", "node")
-    cell_lin._remove_feature("name", "edge")
+    cell_lin._remove_prop("frame", "node")
+    cell_lin._remove_prop("name", "edge")
 
 
-def test_remove_feature_invalid_type(cell_lin):
+def test_remove_prop_invalid_type(cell_lin):
     with pytest.raises(
         ValueError,
-        match="Invalid feature_type. Must be one of 'node', 'edge', or 'lineage'.",
+        match="Invalid prop_type. Must be one of 'node', 'edge', or 'lineage'.",
     ):
-        cell_lin._remove_feature("custom_feature", "invalid_type")
+        cell_lin._remove_prop("custom_property", "invalid_type")
 
 
 # get_root() ##################################################################
@@ -463,7 +463,7 @@ def test_get_ancestors_node_ID_error(cell_lin, cycle_lin):
 def test_get_ancestors_cannot_order(cell_lin):
     for n in cell_lin.nodes:
         del cell_lin.nodes[n]["frame"]
-    with pytest.warns(UserWarning, match="No 'frame' feature to order the cells."):
+    with pytest.warns(UserWarning, match="No 'frame' property to order the cells."):
         cell_lin.get_ancestors(16)
 
 
@@ -779,7 +779,7 @@ def test_add_cell_with_frame(cell_lin):
     assert cell_lin.nodes[next_id]["frame"] == 5
 
 
-def test_add_cell_with_features(cell_lin):
+def test_add_cell_with_propertys(cell_lin):
     cell_id = 20
     assert cell_lin._add_cell(20, color="red", size=10) == cell_id
     assert cell_lin.nodes[cell_id]["cell_ID"] == cell_id
@@ -1938,7 +1938,7 @@ def test_get_ancestors_key_error(cycle_lin):
 def test_get_ancestors_cannot_order_cycle(cycle_lin):
     for n in cycle_lin.nodes:
         del cycle_lin.nodes[n]["level"]
-    msg = "No 'level' feature to order the cell cycles."
+    msg = "No 'level' property to order the cell cycles."
     with pytest.warns(UserWarning, match=msg):
         cycle_lin.get_ancestors(5)
 

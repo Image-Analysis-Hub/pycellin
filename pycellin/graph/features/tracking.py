@@ -31,7 +31,7 @@ Vocabulary:
 
 import numpy as np
 
-from pycellin.classes import CellLineage, CycleLineage, Data, Feature
+from pycellin.classes import CellLineage, CycleLineage, Data, Property
 from pycellin.classes.exceptions import FusionError
 from pycellin.classes.feature_calculator import NodeGlobalFeatureCalculator
 
@@ -49,7 +49,7 @@ class AbsoluteAge(NodeGlobalFeatureCalculator):
     to the time unit of the model if specified.
     """
 
-    def __init__(self, feature: Feature, time_step: int | float = 1):
+    def __init__(self, feature: Property, time_step: int | float = 1):
         """
         Parameters
         ----------
@@ -104,7 +104,7 @@ class RelativeAge(NodeGlobalFeatureCalculator):
     to the time unit of the model if specified.
     """
 
-    def __init__(self, feature: Feature, time_step: int | float = 1):
+    def __init__(self, feature: Property, time_step: int | float = 1):
         """
         Parameters
         ----------
@@ -293,7 +293,7 @@ class DivisionTime(NodeGlobalFeatureCalculator):
     be converted to the time unit of the model if specified.
     """
 
-    def __init__(self, feature: Feature, time_step: int | float = 1):
+    def __init__(self, feature: Property, time_step: int | float = 1):
         """
         Parameters
         ----------
@@ -352,7 +352,7 @@ class DivisionRate(NodeGlobalFeatureCalculator):
     to divisions per time unit of the model if specified.
     """
 
-    def __init__(self, feature: Feature, time_step: int | float = 1, use_div_time: bool = False):
+    def __init__(self, feature: Property, time_step: int | float = 1, use_div_time: bool = False):
         """
         Parameters
         ----------

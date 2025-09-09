@@ -40,35 +40,33 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             assert isinstance(lid, int), "The lineage ID must be an integer."
             self.graph["lineage_ID"] = lid
 
-    def _remove_feature(self, feature_name: str, feature_type: str) -> None:
+    def _remove_prop(self, prop_name: str, prop_type: str) -> None:
         """
-        Remove a feature from the lineage graph based on the feature type.
+        Remove a property from the lineage graph based on the property type.
 
         Parameters
         ----------
-        feature_name : str
-            The name of the feature to remove.
-        feature_type : str
-            The type of feature to remove. Must be one of `node`, `edge`, or `lineage`.
+        prop_name : str
+            The name of the property to remove.
+        prop_type : str
+            The type of property to remove. Must be one of `node`, `edge`, or `lineage`.
 
         Raises
         ------
         ValueError
-            If the feature_type is not one of `node`, `edge`, or `lineage`.
+            If the prop_type is not one of `node`, `edge`, or `lineage`.
         """
-        match feature_type:
+        match prop_type:
             case "node":
                 for _, data in self.nodes(data=True):
-                    data.pop(feature_name, None)
+                    data.pop(prop_name, None)
             case "edge":
                 for _, _, data in self.edges(data=True):
-                    data.pop(feature_name, None)
+                    data.pop(prop_name, None)
             case "lineage":
-                self.graph.pop(feature_name, None)
+                self.graph.pop(prop_name, None)
             case _:
-                raise ValueError(
-                    "Invalid feature_type. Must be one of 'node', 'edge', or 'lineage'."
-                )
+                raise ValueError("Invalid prop_type. Must be one of 'node', 'edge', or 'lineage'.")
 
     def get_root(self, ignore_lone_nodes: bool = False) -> int | list[int]:
         """
@@ -223,18 +221,18 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     @abstractmethod
     def plot(
         self,
-        ID_feature: str,
-        y_feature: str,
+        ID_prop: str,
+        y_prop: str,
         y_legend: str,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
-        node_colormap_feature: str | None = None,
+        node_colormap_prop: str | None = None,
         node_color_scale: str | None = None,
-        node_hover_features: list[str] | None = None,
+        node_hover_props: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
-        edge_hover_features: list[str] | None = None,
+        edge_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
@@ -248,16 +246,16 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        ID_feature : str
-            The feature of the nodes to use as identifier.
-        y_feature : str
-            The feature of the nodes to use for the y-axis.
+        ID_prop : str
+            The property of the nodes to use as identifier.
+        y_prop : str
+            The property of the nodes to use for the y-axis.
         y_legend : str
             The label of the y-axis.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
-            The feature of the nodes to display as text inside the nodes
+            The property of the nodes to display as text inside the nodes
             of the plot. If None, no text is displayed. None by default.
         node_text_font : dict, optional
             The font style of the text inside the nodes (size, color, etc).
@@ -266,19 +264,19 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The style of the markers representing the nodes in the plot
             (symbol, size, color, line, etc). If None, defaults to
             current Plotly template.
-        node_colormap_feature : str, optional
-            The feature of the nodes to use for coloring the nodes.
+        node_colormap_prop : str, optional
+            The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
         node_color_scale : str, optional
             The color scale to use for coloring the nodes. If None,
             defaults to current Plotly template.
-        node_hover_features : list[str], optional
+        node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_feature.
+            displaying `cell_ID` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
-        edge_hover_features : list[str], optional
+        edge_hover_props : list[str], optional
             The hover template for the edges. If None, defaults to
             displaying the source and target nodes.
         plot_bgcolor : str, optional
@@ -363,31 +361,32 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 )
             return annotations
 
-        def node_feature_color_mapping():
+        def node_prop_color_mapping():
             # TODO: add colorbar units, but the info is stored in the model
             # FIXME: the colorbar is partially hiding the traces names
             assert node_marker_style is not None
-            node_marker_style["color"] = G.vs[node_colormap_feature]
+            node_marker_style["color"] = G.vs[node_colormap_prop]
             node_marker_style["colorscale"] = node_color_scale
-            node_marker_style["colorbar"] = dict(title=node_colormap_feature)
+            node_marker_style["colorbar"] = dict(title=node_colormap_prop)
 
         def node_hovertemplate():
-            # TODO: when feature is float, display only 2 decimals
+            # TODO: when property is float, display only 2 decimals
             # or give control to the user.
-            if node_hover_features:
+            if node_hover_props:
                 node_hover_text = []
                 for node in G.vs:
                     text = ""
-                    for feat in node_hover_features:
-                        if feat not in node.attributes():
-                            raise KeyError(f"Feature {feat} is not present in the node attributes.")
-                        hover_text = f"{feat}: {node[feat]}<br>"
+                    for prop in node_hover_props:
+                        if prop not in node.attributes():
+                            raise KeyError(
+                                f"Property {prop} is not present in the node attributes."
+                            )
+                        hover_text = f"{prop}: {node[prop]}<br>"
                         text += hover_text
                     node_hover_text.append(text)
             else:
                 node_hover_text = [
-                    (f"{ID_feature}: {node[ID_feature]}<br>{y_feature}: {node[y_feature]}")
-                    for node in G.vs
+                    (f"{ID_prop}: {node[ID_prop]}<br>{y_prop}: {node[y_prop]}") for node in G.vs
                 ]
             if "lineage_ID" in G.attributes():
                 graph_name = f"lineage_ID: {G['lineage_ID']}"
@@ -401,11 +400,13 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 source_id = index_to_nx_id[edge.source]
                 target_id = index_to_nx_id[edge.target]
                 text = f"Source cell_ID: {source_id}<br>Target cell_ID: {target_id}<br>"
-                if edge_hover_features:
-                    for feat in edge_hover_features:
-                        if feat not in edge.attributes():
-                            raise KeyError(f"Feature {feat} is not present in the edge attributes.")
-                        hover_text = f"{feat}: {edge[feat]}<br>"
+                if edge_hover_props:
+                    for prop in edge_hover_props:
+                        if prop not in edge.attributes():
+                            raise KeyError(
+                                f"Property {prop} is not present in the edge attributes."
+                            )
+                        hover_text = f"{prop}: {edge[prop]}<br>"
                         text += hover_text
                     edge_hover_text += [text, text, text]
             return edge_hover_text
@@ -417,19 +418,19 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         nodes_count = G.vcount()
         layout = G.layout("rt")  # Basic tree layout.
         # Updating the layout so the y position of the nodes is given
-        # by the value of y_feature.
-        layout = [(layout[k][0], G.vs[y_feature][k]) for k in range(nodes_count)]
+        # by the value of y_prop.
+        layout = [(layout[k][0], G.vs[y_prop][k]) for k in range(nodes_count)]
 
         # Computing the exact positions of nodes and edges.
         positions = {k: layout[k] for k in range(nodes_count)}
         x_nodes, y_nodes = get_nodes_position()
         x_edges, y_edges = get_edges_position()
 
-        # Color mapping the nodes to a node feature.
-        if node_colormap_feature:
+        # Color mapping the nodes to a node property.
+        if node_colormap_prop:
             if not node_marker_style:
                 node_marker_style = dict()
-            node_feature_color_mapping()
+            node_prop_color_mapping()
 
         # Text in the nodes.
         node_annotations = node_text_annotations() if node_text else None
@@ -533,7 +534,7 @@ class CellLineage(Lineage):
         else:
             return max(self.nodes()) + 1
 
-    def _add_cell(self, nid: int | None = None, frame: int | None = 0, **cell_feats) -> int:
+    def _add_cell(self, nid: int | None = None, frame: int | None = 0, **cell_props) -> int:
         """
         Add a cell to the lineage graph.
 
@@ -544,8 +545,8 @@ class CellLineage(Lineage):
             available node ID is used.
         frame : int, optional
             The frame of the cell. If None, the frame is set to 0.
-        **cell_feats
-            Feature values to set for the node.
+        **cell_props
+            Property values to set for the node.
 
         Returns
         -------
@@ -565,7 +566,7 @@ class CellLineage(Lineage):
             _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
             msg = f"Cell {nid} already exists{txt}."
             raise ValueError(msg)
-        self.add_node(nid, **cell_feats)
+        self.add_node(nid, **cell_props)
         self.nodes[nid]["cell_ID"] = nid
         self.nodes[nid]["frame"] = frame
         return nid
@@ -584,7 +585,7 @@ class CellLineage(Lineage):
         Returns
         -------
         dict[str, Any]
-            The feature values of the removed node.
+            The property values of the removed node.
 
         Raises
         ------
@@ -592,20 +593,20 @@ class CellLineage(Lineage):
             If the cell does not exist in the lineage.
         """
         try:
-            cell_feats = self.nodes[nid]
+            cell_props = self.nodes[nid]
         except KeyError as err:
             _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
             msg = f"Cell {nid} does not exist{txt}."
             raise KeyError(msg) from err
         self.remove_node(nid)
-        return cell_feats
+        return cell_props
 
     def _add_link(
         self,
         source_nid: int,
         target_nid: int,
         target_lineage: CellLineage | None = None,
-        **link_feats,
+        **link_props,
     ) -> dict[int, int] | None:
         """
         Create a link beween 2 cells.
@@ -623,8 +624,8 @@ class CellLineage(Lineage):
         target_lineage : CellLineage, optional
             The lineage of the target cell. If None, the target cell is
             assumed to be in the same lineage as the source cell.
-        **link_feats
-            Feature values to set for the edge.
+        **link_props
+            Property values to set for the edge.
 
         Returns
         -------
@@ -710,7 +711,7 @@ class CellLineage(Lineage):
             )
             del tmp_lineage
 
-        self.add_edge(source_nid, target_nid, **link_feats)
+        self.add_edge(source_nid, target_nid, **link_props)
         return ids_mapping if conflicting_ids else None
 
     def _remove_link(self, source_nid: int, target_nid: int) -> dict[str, Any]:
@@ -733,7 +734,7 @@ class CellLineage(Lineage):
         Returns
         -------
         dict[str, Any]
-            The feature values of the removed edge.
+            The property values of the removed edge.
 
         Raises
         ------
@@ -749,13 +750,13 @@ class CellLineage(Lineage):
             raise ValueError(f"Target cell (ID {target_nid}) does not exist{txt}.")
 
         try:
-            link_feats = self[source_nid][target_nid]
+            link_props = self[source_nid][target_nid]
         except KeyError as err:
             raise KeyError(
                 f"Link 'Cell {source_nid} -> Cell {target_nid}' does not exist{txt}."
             ) from err
         self.remove_edge(source_nid, target_nid)
-        return link_feats
+        return link_props
 
     def _split_from_cell(
         self,
@@ -830,7 +831,7 @@ class CellLineage(Lineage):
         Warns
         -----
         UserWarning
-            If the cells have no 'frame' feature to order them.
+            If the cells have no 'frame' property to order them.
         """
         try:
             ancestors = super().get_ancestors(cid)
@@ -840,7 +841,7 @@ class CellLineage(Lineage):
             try:
                 ancestors.sort(key=lambda n: self.nodes[n]["frame"])
             except KeyError:
-                warnings.warn("No 'frame' feature to order the cells.")
+                warnings.warn("No 'frame' property to order the cells.")
         return ancestors
 
     def get_divisions(self, cids: list[int] | None = None) -> list[int]:
@@ -1059,18 +1060,18 @@ class CellLineage(Lineage):
 
     def plot(
         self,
-        ID_feature: str = "cell_ID",
-        y_feature: str = "frame",
+        ID_prop: str = "cell_ID",
+        y_prop: str = "frame",
         y_legend: str = "Time (frames)",
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
-        node_colormap_feature: str | None = None,
+        node_colormap_prop: str | None = None,
         node_color_scale: str | None = None,
-        node_hover_features: list[str] | None = None,
+        node_hover_props: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
-        edge_hover_features: list[str] | None = None,
+        edge_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
@@ -1082,16 +1083,16 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        ID_feature : str, optional
-            The feature of the nodes to use as the node ID. "cell_ID" by default.
-        y_feature : str, optional
-            The feature of the nodes to use as the y-axis. "frame" by default.
+        ID_prop : str, optional
+            The property of the nodes to use as the node ID. "cell_ID" by default.
+        y_prop : str, optional
+            The property of the nodes to use as the y-axis. "frame" by default.
         y_legend : str, optional
             The label of the y-axis. "Time (frames)" by default.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
-            The feature of the nodes to display as text inside the nodes
+            The property of the nodes to display as text inside the nodes
             of the plot. If None, no text is displayed. None by default.
         node_text_font : dict, optional
             The font style of the text inside the nodes (size, color, etc).
@@ -1100,19 +1101,19 @@ class CellLineage(Lineage):
             The style of the markers representing the nodes in the plot
             (symbol, size, color, line, etc). If None, defaults to
             current Plotly template.
-        node_colormap_feature : str, optional
-            The feature of the nodes to use for coloring the nodes.
+        node_colormap_prop : str, optional
+            The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
         node_color_scale : str, optional
             The color scale to use for coloring the nodes. If None,
             defaults to current Plotly template.
-        node_hover_features : list[str], optional
+        node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_feature.
+            displaying `cell_ID` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
-        edge_hover_features : list[str], optional
+        edge_hover_props : list[str], optional
             The hover template for the edges. If None, defaults to
             displaying the source and target nodes.
         plot_bgcolor : str, optional
@@ -1151,18 +1152,18 @@ class CellLineage(Lineage):
         """
         # TODO: and if we want to plot in time units instead of frames?
         super().plot(
-            ID_feature=ID_feature,
-            y_feature=y_feature,
+            ID_prop=ID_prop,
+            y_prop=y_prop,
             y_legend=y_legend,
             title=title,
             node_text=node_text,
             node_text_font=node_text_font,
             node_marker_style=node_marker_style,
-            node_colormap_feature=node_colormap_feature,
+            node_colormap_prop=node_colormap_prop,
             node_color_scale=node_color_scale,
-            node_hover_features=node_hover_features,
+            node_hover_props=node_hover_props,
             edge_line_style=edge_line_style,
-            edge_hover_features=edge_hover_features,
+            edge_hover_props=edge_hover_props,
             plot_bgcolor=plot_bgcolor,
             show_horizontal_grid=show_horizontal_grid,
             showlegend=showlegend,
@@ -1215,7 +1216,7 @@ class CycleLineage(Lineage):
             # Freezing the structure since it's mapped on the cell lineage one.
             nx.freeze(self)
 
-            # Adding node and graph features.
+            # Adding node and graph props.
             self.graph["lineage_ID"] = cell_lineage.graph["lineage_ID"]
             for n in divs + leaves:
                 cells_in_cycle = cell_lineage.get_cell_cycle(n)
@@ -1273,7 +1274,7 @@ class CycleLineage(Lineage):
         Warns
         -----
         UserWarning
-            If there is no 'level' feature to order the cell cycles.
+            If there is no 'level' property to order the cell cycles.
         """
         try:
             ancestors = super().get_ancestors(ccid)
@@ -1283,7 +1284,7 @@ class CycleLineage(Lineage):
             try:
                 ancestors.sort(key=lambda n: self.nodes[n]["level"])
             except KeyError:
-                warnings.warn("No 'level' feature to order the cell cycles.")
+                warnings.warn("No 'level' property to order the cell cycles.")
         return ancestors
 
     def get_links_within_cycle(self, ccid: int) -> list[tuple[int, int]]:
@@ -1325,18 +1326,18 @@ class CycleLineage(Lineage):
 
     def plot(
         self,
-        ID_feature: str = "cycle_ID",
-        y_feature: str = "level",
+        ID_prop: str = "cycle_ID",
+        y_prop: str = "level",
         y_legend: str = "Cell cycle level",
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
-        node_colormap_feature: str | None = None,
+        node_colormap_prop: str | None = None,
         node_color_scale: str | None = None,
-        node_hover_features: list[str] | None = None,
+        node_hover_props: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
-        edge_hover_features: list[str] | None = None,
+        edge_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
@@ -1348,16 +1349,16 @@ class CycleLineage(Lineage):
 
         Parameters
         ----------
-        ID_feature : str, optional
-            The feature of the nodes to use as the node ID. "cycle_ID" by default.
-        y_feature : str, optional
-            The feature of the nodes to use as the y-axis. "level" by default.
+        ID_prop : str, optional
+            The property of the nodes to use as the node ID. "cycle_ID" by default.
+        y_prop : str, optional
+            The property of the nodes to use as the y-axis. "level" by default.
         y_legend : str, optional
             The label of the y-axis. "Cell cycle level" by default.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
-            The feature of the nodes to display as text inside the nodes
+            The property of the nodes to display as text inside the nodes
             of the plot. If None, no text is displayed. None by default.
         node_text_font : dict, optional
             The font style of the text inside the nodes (size, color, etc).
@@ -1366,19 +1367,19 @@ class CycleLineage(Lineage):
             The style of the markers representing the nodes in the plot
             (symbol, size, color, line, etc). If None, defaults to
             current Plotly template.
-        node_colormap_feature : str, optional
-            The feature of the nodes to use for coloring the nodes.
+        node_colormap_prop : str, optional
+            The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
         node_color_scale : str, optional
             The color scale to use for coloring the nodes. If None,
             defaults to current Plotly template.
-        node_hover_features : list[str], optional
+        node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_feature.
+            displaying `cell_ID` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
-        edge_hover_features : list[str], optional
+        edge_hover_props : list[str], optional
             The hover template for the edges. If None, defaults to
             displaying the source and target nodes.
         plot_bgcolor : str, optional
@@ -1416,18 +1417,18 @@ class CycleLineage(Lineage):
         )
         """
         super().plot(
-            ID_feature=ID_feature,
-            y_feature=y_feature,
+            ID_prop=ID_prop,
+            y_prop=y_prop,
             y_legend=y_legend,
             title=title,
             node_text=node_text,
             node_text_font=node_text_font,
             node_marker_style=node_marker_style,
-            node_colormap_feature=node_colormap_feature,
+            node_colormap_prop=node_colormap_prop,
             node_color_scale=node_color_scale,
-            node_hover_features=node_hover_features,
+            node_hover_props=node_hover_props,
             edge_line_style=edge_line_style,
-            edge_hover_features=edge_hover_features,
+            edge_hover_props=edge_hover_props,
             plot_bgcolor=plot_bgcolor,
             show_horizontal_grid=show_horizontal_grid,
             showlegend=showlegend,

@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from pycellin.classes.data import Data
-from pycellin.classes.feature import Feature
+from pycellin.classes.property import Property
 from pycellin.classes.lineage import Lineage
 
 
@@ -43,7 +43,7 @@ class FeatureCalculator(ABC):
     _LOCAL_FEATURE = None  # type: bool | None
     _FEATURE_TYPE = None  # type: str | None
 
-    def __init__(self, feature: Feature):
+    def __init__(self, feature: Property):
         self.feature = feature
 
     @classmethod

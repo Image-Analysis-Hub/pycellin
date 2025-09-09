@@ -3,7 +3,7 @@
 
 from itertools import pairwise
 import pickle
-from typing import Any, Literal, TypeVar
+from typing import Any, Callable, Literal, TypeVar
 import warnings
 
 import pandas as pd
@@ -13,8 +13,8 @@ from pycellin.classes import (
     CellLineage,
     CycleLineage,
     Data,
-    Feature,
-    FeaturesDeclaration,
+    Property,
+    PropsMetadata,
 )
 from pycellin.classes.lineage import Lineage
 from pycellin.classes.exceptions import FusionError, ProtectedFeatureError
@@ -35,7 +35,7 @@ class Model:
     def __init__(
         self,
         model_metadata: dict[str, Any] | None = None,
-        props_metadata: FeaturesDeclaration | None = None,
+        props_metadata: PropsMetadata | None = None,
         data: Data | None = None,
     ) -> None:
         """
@@ -45,15 +45,13 @@ class Model:
         ----------
         model_metadata : dict[str, Any] | None, optional
             Metadata of the model (default is None).
-        props_metadata : FeaturesDeclaration, optional
-            The declaration of the features present in the model (default is None).
+        props_metadata : PropsMetadata, optional
+            The declaration of the properties present in the model (default is None).
         data : Data, optional
             The lineages data of the model (default is None).
         """
         self.model_metadata = model_metadata if model_metadata is not None else dict()
-        self.props_metadata = (
-            props_metadata if props_metadata is not None else FeaturesDeclaration()
-        )
+        self.props_metadata = props_metadata if props_metadata is not None else PropsMetadata()
         self.data = data if data is not None else Data(dict())
 
         self._updater = ModelUpdater()
@@ -178,111 +176,111 @@ class Model:
         """
         return self.model_metadata["time_step"]
 
-    def get_units_per_features(self) -> dict[str, list[str]]:
+    def get_units_per_properties(self) -> dict[str, list[str]]:
         """
-        Return a dict of units and the features associated with each unit.
+        Return a dict of units and the properties associated with each unit.
 
-        The method iterates over the node, edge, and lineage features
-        of the features declaration object, grouping them by unit.
+        The method iterates over the node, edge, and lineage properties
+        of the properties declaration object, grouping them by unit.
 
         Returns
         -------
         dict[str, list[str]]
             A dictionary where the keys are units and the values are lists
-            of feature identifiers. For example:
-            {'unit1': ['feature1', 'feature2'], 'unit2': ['feature3']}.
+            of property identifiers. For example:
+            {'unit1': ['property1', 'property2'], 'unit2': ['property3']}.
         """
-        return self.props_metadata._get_units_per_features()
+        return self.props_metadata._get_units_per_props()
 
-    def get_features(self) -> dict[str, Feature]:
+    def get_properties(self) -> dict[str, Property]:
         """
-        Return the features present in the model.
+        Return the properties present in the model.
 
         Returns
         -------
-        dict[str, Feature]
-            Dictionary of the features present in the model.
+        dict[str, Property]
+            Dictionary of the properties present in the model.
         """
-        return self.props_metadata.feats_dict
+        return self.props_metadata.props
 
-    def get_cell_lineage_features(
+    def get_cell_lineage_properties(
         self,
-        include_Lineage_feats: bool = True,
-    ) -> dict[str, Feature]:
+        include_Lineage_props: bool = True,
+    ) -> dict[str, Property]:
         """
-        Return the cell lineages features present in the model.
+        Return the cell lineages properties present in the model.
 
         Parameters
         ----------
-        include_Lineage_feats : bool, optional
-            True to return Lineage features along with CellLineage ones,
-            False to only return CellLineage features (default is True).
+        include_Lineage_props : bool, optional
+            True to return Lineage properties along with CellLineage ones,
+            False to only return CellLineage properties (default is True).
 
         Returns
         -------
-        dict[str, Feature]
-            Dictionary of the cell lineages features present in the model.
+        dict[str, Property]
+            Dictionary of the cell lineages properties present in the model.
         """
-        feats = self.props_metadata._get_feat_dict_from_lin_type("CellLineage")
-        if include_Lineage_feats:
-            feats.update(self.props_metadata._get_feat_dict_from_lin_type("Lineage"))
-        return feats
+        props = self.props_metadata._get_prop_dict_from_lin_type("CellLineage")
+        if include_Lineage_props:
+            props.update(self.props_metadata._get_prop_dict_from_lin_type("Lineage"))
+        return props
 
-    def get_cycle_lineage_features(
+    def get_cycle_lineage_properties(
         self,
-        include_Lineage_feats: bool = True,
-    ) -> dict[str, Feature]:
+        include_Lineage_props: bool = True,
+    ) -> dict[str, Property]:
         """
-        Return the cycle lineages features present in the model.
+        Return the cycle lineages properties present in the model.
 
         Parameters
         ----------
-        include_Lineage_feats : bool, optional
-            True to return Lineage features along with CycleLineage ones,
-            False to only return CycleLineage features (default is True).
+        include_Lineage_props : bool, optional
+            True to return Lineage properties along with CycleLineage ones,
+            False to only return CycleLineage properties (default is True).
 
         Returns
         -------
-        dict[str, Feature]
-            Dictionary of the cycle lineages features present in the model.
+        dict[str, Property]
+            Dictionary of the cycle lineages properties present in the model.
         """
-        feats = self.props_metadata._get_feat_dict_from_lin_type("CycleLineage")
-        if include_Lineage_feats:
-            feats.update(self.props_metadata._get_feat_dict_from_lin_type("Lineage"))
-        return feats
+        props = self.props_metadata._get_prop_dict_from_lin_type("CycleLineage")
+        if include_Lineage_props:
+            props.update(self.props_metadata._get_prop_dict_from_lin_type("Lineage"))
+        return props
 
-    def get_node_features(self) -> dict[str, Feature]:
+    def get_node_properties(self) -> dict[str, Property]:
         """
-        Return the node features present in the model.
-
-        Returns
-        -------
-        dict[str, Feature]
-            Dictionary of the node features present in the model.
-        """
-        return self.props_metadata._get_feat_dict_from_feat_type("node")
-
-    def get_edge_features(self) -> dict[str, Feature]:
-        """
-        Return the edge features present in the model.
+        Return the node properties present in the model.
 
         Returns
         -------
-        dict[str, Feature]
-            Dictionary of the edge features present in the model.
+        dict[str, Property]
+            Dictionary of the node properties present in the model.
         """
-        return self.props_metadata._get_feat_dict_from_feat_type("edge")
+        return self.props_metadata._get_prop_dict_from_prop_type("node")
 
-    def get_lineage_features(self) -> dict[str, Feature]:
+    def get_edge_properties(self) -> dict[str, Property]:
         """
-        Return the lineage features present in the model.
+        Return the edge properties present in the model.
 
         Returns
         -------
-        dict[str, Feature]
-            Dictionary of the lineage features present in the model.
+        dict[str, Property]
+            Dictionary of the edge properties present in the model.
         """
-        return self.props_metadata._get_feat_dict_from_feat_type("lineage")
+        return self.props_metadata._get_prop_dict_from_prop_type("edge")
+
+    def get_lineage_properties(self) -> dict[str, Property]:
+        """
+        Return the lineage properties present in the model.
+
+        Returns
+        -------
+        dict[str, Property]
+            Dictionary of the lineage properties present in the model.
+        """
+        return self.props_metadata._get_prop_dict_from_prop_type("lineage")
 
     def get_cell_lineages(self) -> list[CellLineage]:
         """
@@ -348,78 +346,78 @@ class Model:
             return None
 
     @staticmethod
-    def _get_lineages_from_lin_feat(
+    def _get_lineages_from_lin_prop(
         lineages: list[L],
-        lineage_feature: str,
-        lineage_feature_value: Any,
+        lin_prop: str,
+        lin_prop_value: Any,
     ) -> list[L]:
         """
-        Return the lineages with the specified feature value.
+        Return the lineages with the specified property value.
 
         Parameters
         ----------
         lineages : list[T]
             The lineages.
-        lineage_feature : str
-            The identifier of the feature to check.
-        lineage_feature_value : Any
-            The value of the feature to check.
+        lin_prop : str
+            The identifier of the property to check.
+        lin_prop_value : Any
+            The value of the property to check.
 
         Returns
         -------
         list[T]
-            The lineages with the specified feature value.
+            The lineages with the specified property value.
         """
-        return [lin for lin in lineages if lin.graph[lineage_feature] == lineage_feature_value]
+        return [lin for lin in lineages if lin.graph[lin_prop] == lin_prop_value]
 
-    def get_cell_lineages_from_lin_feat(
+    def get_cell_lineages_from_lin_prop(
         self,
-        lineage_feature: str,
-        lineage_feature_value: Any,
+        lin_prop: str,
+        lin_prop_value: Any,
     ) -> list[CellLineage]:
         """
-        Return the cell lineages with the specified feature value.
+        Return the cell lineages with the specified property value.
 
         Parameters
         ----------
-        lineage_feature : str
-            The identifier of the feature to check.
-        lineage_feature_value : Any
-            The value of the feature to check.
+        lin_prop : str
+            The identifier of the property to check.
+        lin_prop_value : Any
+            The value of the property to check.
 
         Returns
         -------
         list[CellLineage]
-            The cell lineage(s) with the specified feature value.
+            The cell lineage(s) with the specified property value.
         """
-        return self._get_lineages_from_lin_feat(
-            list(self.data.cell_data.values()), lineage_feature, lineage_feature_value
+        return self._get_lineages_from_lin_prop(
+            list(self.data.cell_data.values()), lin_prop, lin_prop_value
         )
 
-    def get_cycle_lineages_from_lin_feat(
+    def get_cycle_lineages_from_lin_prop(
         self,
-        lineage_feature: str,
-        lineage_feature_value: Any,
+        lin_prop: str,
+        lin_prop_value: Any,
     ) -> list[CycleLineage]:
         """
-        Return the cycle lineages with the specified feature value.
+        Return the cycle lineages with the specified property value.
 
         Parameters
         ----------
-        lineage_feature : str
-            The identifier of the feature to check.
-        lineage_feature_value : Any
-            The value of the feature to check.
+        lin_prop : str
+            The identifier of the property to check.
+        lin_prop_value : Any
+            The value of the property to check.
 
         Returns
         -------
         list[CycleLineage]
-            The cycle lineages with the specified feature value.
+            The cycle lineages with the specified property value.
         """
         if self.data.cycle_data is None:
             return []
-        return self._get_lineages_from_lin_feat(
-            list(self.data.cycle_data.values()), lineage_feature, lineage_feature_value
+        return self._get_lineages_from_lin_prop(
+            list(self.data.cycle_data.values()), lin_prop, lin_prop_value
         )
 
     def get_next_available_lineage_ID(self) -> int:
@@ -434,31 +432,31 @@ class Model:
         # TODO: maybe should check for unused IDs
         return max(self.data.cell_data.keys()) + 1
 
-    def has_feature(
+    def has_property(
         self,
-        feature_identifier: str,
+        prop_identifier: str,
     ) -> bool:
         """
-        Check if the model contains the specified feature.
+        Check if the model contains the specified property.
 
         Parameters
         ----------
-        feature_identifier : str
-            The identifier of the feature to check.
+        prop_identifier : str
+            The identifier of the property to check.
 
         Returns
         -------
         bool
-            True if the feature is in the model, False otherwise.
+            True if the property is in the model, False otherwise.
         """
-        return self.props_metadata._has_feature(feature_identifier)
+        return self.props_metadata._has_prop(prop_identifier)
 
     def prepare_full_data_update(self) -> None:
         """
         Prepare the updater for a full data update.
 
         All cells, links and lineages in the model data will see
-        their feature values recomputed during the next update.
+        their property values recomputed during the next update.
         """
         if self._updater._full_data_update:
             return
@@ -475,9 +473,9 @@ class Model:
         """
         Check if the model requires an update.
 
-        The model requires an update if new features have been added to the model,
+        The model requires an update if new properties have been added to the model,
         or if cells, links or lineages have been added or removed.
-        In that case, some features need to be recomputed to account for the changes.
+        In that case, some properties need to be recomputed to account for the changes.
 
         Returns
         -------
@@ -486,46 +484,44 @@ class Model:
         """
         return self._updater._update_required
 
-    def update(self, features_to_update: list[str] | None = None) -> None:
+    def update(self, props_to_update: list[str] | None = None) -> None:
         """
-        Bring the model up to date by recomputing features.
+        Bring the model up to date by recomputing properties.
 
-        This method will recompute the features of the model
-        based on the current data and the features declaration.
+        This method will recompute the properties of the model
+        based on the current data and the properties declaration.
 
         Parameters
         ----------
-        features_to_update : list[str], optional
-            List of features to update. If None, all features are updated.
+        props_to_update : list[str], optional
+            List of properties to update. If None, all properties are updated.
 
         Warns
         -----
         If the model is already up to date, a warning is raised and no update
         is performed. If the user wants to force an update, they can call
         `prepare_full_data_update()` before calling this method.
-        If a feature in the `features_to_update` list has not been declared,
-        a warning is raised and that feature is ignored during the update.
-        If no features are left to update after filtering, a warning is raised
+        If a property in the `props_to_update` list has not been declared,
+        a warning is raised and that property is ignored during the update.
+        If no properties are left to update after filtering, a warning is raised
         and the model is not updated.
         """
         if not self._updater._update_required:
             warnings.warn("Model is already up to date.")
             return
 
-        if features_to_update is not None:
-            missing_feats = [
-                feat for feat in features_to_update if not self.props_metadata._has_feature(feat)
+        if props_to_update is not None:
+            missing_props = [
+                prop for prop in props_to_update if not self.props_metadata._has_prop(prop)
             ]
-            if missing_feats:
+            if missing_props:
                 warnings.warn(
-                    f"The following features have not been declared "
-                    f"and will be ignored: {', '.join(missing_feats)}."
+                    f"The following properties have not been declared "
+                    f"and will be ignored: {', '.join(missing_props)}."
                 )
-                features_to_update = [
-                    feat for feat in features_to_update if feat not in missing_feats
-                ]
-                if not features_to_update:
-                    warnings.warn("No features to update. The model will not be updated.")
+                props_to_update = [prop for prop in props_to_update if prop not in missing_props]
+                if not props_to_update:
+                    warnings.warn("No properties to update. The model will not be updated.")
                     return
 
         # self.data._freeze_lineage_data()
@@ -534,7 +530,7 @@ class Model:
         # by the updater methods to avoid incoherent states.
         # => saving a copy of the model before the update so we can roll back?
 
-        self._updater._update(self.data, features_to_update)
+        self._updater._update(self.data, props_to_update)
 
         # self.data._unfreeze_lineage_data()
 
@@ -586,7 +582,7 @@ class Model:
                 cycle_lineage = self.data._compute_cycle_lineage(lid)
                 self.data.cycle_data[lid] = cycle_lineage
 
-        # Notify that an update of the feature values may be required.
+        # Notify that an update of the property values may be required.
         self._updater._update_required = True
         self._updater._added_lineages.add(lid)
 
@@ -619,7 +615,7 @@ class Model:
         if self.data.cycle_data and lid in self.data.cycle_data:
             self.data.cycle_data.pop(lid)
 
-        # Notify that an update of the feature values may be required.
+        # Notify that an update of the property values may be required.
         self._updater._update_required = True
         self._updater._removed_lineages.add(lid)
 
@@ -681,7 +677,7 @@ class Model:
         # The update of the cycle lineages (if needed) will be
         # done by the updater.
 
-        # Notify that an update of the feature values may be required.
+        # Notify that an update of the property values may be required.
         self._updater._update_required = True
         self._updater._added_lineages.add(new_lid)
         self._updater._modified_lineages.add(lid)
@@ -693,7 +689,7 @@ class Model:
         lid: int,
         cid: int | None = None,
         frame: int | None = 0,
-        feat_values: dict[str, Any] | None = None,
+        prop_values: dict[str, Any] | None = None,
     ) -> int:
         """
         Add a cell to the lineage.
@@ -706,8 +702,8 @@ class Model:
             The ID of the cell to add (default is None).
         frame : int, optional
             The frame of the cell (default is 0).
-        feat_values : dict, optional
-            A dictionary containing the features values of the cell to add.
+        prop_values : dict, optional
+            A dictionary containing the properties values of the cell to add.
 
         Returns
         -------
@@ -719,23 +715,23 @@ class Model:
         KeyError
             If the lineage with the specified ID does not exist in the model.
         KeyError
-            If a feature in the feat_values is not declared.
+            If a property in the prop_values is not declared.
         """
         try:
             lineage = self.data.cell_data[lid]
         except KeyError as err:
             raise KeyError(f"Lineage with ID {lid} does not exist.") from err
 
-        if feat_values is not None:
-            for feat in feat_values:
-                if not self.props_metadata._has_feature(feat):
-                    raise KeyError(f"The feature {feat} has not been declared.")
+        if prop_values is not None:
+            for prop in prop_values:
+                if not self.props_metadata._has_prop(prop):
+                    raise KeyError(f"The property {prop} has not been declared.")
         else:
-            feat_values = dict()
+            prop_values = dict()
 
-        cid = lineage._add_cell(cid, frame, **feat_values)
+        cid = lineage._add_cell(cid, frame, **prop_values)
 
-        # Notify that an update of the feature values may be required.
+        # Notify that an update of the property values may be required.
         self._updater._update_required = True
         self._updater._added_cells.add(Cell(cid, lid))
         self._updater._modified_lineages.add(lid)
@@ -756,7 +752,7 @@ class Model:
         Returns
         -------
         dict
-            Feature values of the removed cell.
+            Property values of the removed cell.
 
         Raises
         ------
@@ -770,7 +766,7 @@ class Model:
 
         cell_attrs = lineage._remove_cell(cid)
 
-        # Notify that an update of the feature values may be required.
+        # Notify that an update of the property values may be required.
         self._updater._update_required = True
         self._updater._removed_cells.add(Cell(cid, lid))
         self._updater._modified_lineages.add(lid)
@@ -783,7 +779,7 @@ class Model:
         source_lid: int,
         target_cid: int,
         target_lid: int | None = None,
-        feat_values: dict[str, Any] | None = None,
+        prop_values: dict[str, Any] | None = None,
     ) -> None:
         """
         Add a link between two cells.
@@ -798,8 +794,8 @@ class Model:
             The ID of the target cell.
         target_lid : int, optional
             The ID of the target lineage (default is None).
-        feat_values : dict, optional
-            A dictionary containing the features value of
+        prop_values : dict, optional
+            A dictionary containing the properties value of
             the link between the two cells.
 
         Raises
@@ -807,7 +803,7 @@ class Model:
         KeyError
             If the lineage with the specified ID does not exist in the model.
         KeyError
-            If a feature in the link_attributes is not declared.
+            If a property in the link_attributes is not declared.
         """
         try:
             source_lineage = self.data.cell_data[source_lid]
@@ -822,16 +818,16 @@ class Model:
             target_lid = source_lid
             target_lineage = self.data.cell_data[source_lid]
 
-        if feat_values is not None:
-            for feat in feat_values:
-                if not self.props_metadata._has_feature(feat):
-                    raise KeyError(f"The feature '{feat}' has not been declared.")
+        if prop_values is not None:
+            for prop in prop_values:
+                if not self.props_metadata._has_prop(prop):
+                    raise KeyError(f"The property '{prop}' has not been declared.")
         else:
-            feat_values = dict()
+            prop_values = dict()
 
-        source_lineage._add_link(source_cid, target_cid, target_lineage, **feat_values)
+        source_lineage._add_link(source_cid, target_cid, target_lineage, **prop_values)
 
-        # Notify that an update of the feature values may be required.
+        # Notify that an update of the property values may be required.
         self._updater._update_required = True
         self._updater._added_links.add(Link(source_cid, target_cid, source_lid))
         self._updater._modified_lineages.add(source_lid)
@@ -854,7 +850,7 @@ class Model:
         Returns
         -------
         dict
-            Feature values of the removed link.
+            Property values of the removed link.
 
         Raises
         ------
@@ -867,7 +863,7 @@ class Model:
             raise KeyError(f"Lineage with ID {lid} does not exist.") from err
         link_attrs = lineage._remove_link(source_cid, target_cid)
 
-        # Notify that an update of the feature values may be required.
+        # Notify that an update of the property values may be required.
         self._updater._update_required = True
         self._updater._removed_links.add(Link(source_cid, target_cid, lid))
         self._updater._modified_lineages.add(lid)
@@ -909,27 +905,27 @@ class Model:
                 fusions.extend([Cell(cell_ID, lin_ID) for cell_ID in tmp])
         return fusions
 
-    def add_custom_feature(
+    def add_custom_property(
         self,
         calculator: FeatureCalculator,
     ) -> None:
         """
-        Add a custom feature to the model.
+        Add a custom property to the model.
 
-        This method adds the feature to the FeaturesDeclaration,
-        register the way to compute the feature,
+        This method adds the property to the PropsMetadata,
+        register the way to compute the property,
         and notify the updater that all data needs to be updated.
         To actually update the data, the user needs to call the update() method.
 
         Parameters
         ----------
         calculator : FeatureCalculator
-            Calculator to compute the feature.
+            Calculator to compute the property.
 
         Raises
         ------
         ValueError
-            If the feature is a cycle lineage feature and cycle lineages
+            If the property is a cycle lineage property and cycle lineages
             have not been computed yet.
         """
         if calculator.feature.lin_type == "CycleLineage" and not self.data.cycle_data:
@@ -937,12 +933,12 @@ class Model:
                 "Cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with `model.add_cycle_data()`."
             )
-        self.props_metadata._add_feature(calculator.feature)
+        self.props_metadata._add_prop(calculator.feature)
         self._updater.register_calculator(calculator)
         self.prepare_full_data_update()
 
     # TODO: in case of data coming from a loader, there is no calculator associated
-    # with the declared features.
+    # with the declared properties.
 
     def add_absolute_age(
         self,
@@ -950,7 +946,7 @@ class Model:
         custom_identifier: str | None = None,
     ) -> None:
         """
-        Add the cell absolute age feature to the model.
+        Add the cell absolute age property to the model.
 
         The absolute age of a cell is defined as the number of nodes since
         the beginning of the lineage. Absolute age of the root is 0.
@@ -963,20 +959,20 @@ class Model:
             True to give the absolute age in the time unit of the model,
             False to give it in frames (default is False).
         custom_identifier : str, optional
-            New identifier for the feature (default is None).
+            New identifier for the property (default is None).
         """
-        feat = Feature(
+        prop = Property(
             identifier=custom_identifier if custom_identifier else "absolute_age",
             name="Absolute age",
             description="Age of the cell since the beginning of the lineage",
             provenance="pycellin",
-            feat_type="node",
+            prop_type="node",
             lin_type="CellLineage",
             dtype="float" if in_time_unit else "int",
             unit=self.model_metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.model_metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(tracking.AbsoluteAge(feat, time_step))
+        self.add_custom_property(tracking.AbsoluteAge(prop, time_step))
 
     def add_angle(
         self,
@@ -984,7 +980,7 @@ class Model:
         custom_identifier: str | None = None,
     ) -> None:
         """
-        Add the angle feature to the model.
+        Add the angle property to the model.
 
         The angle is defined as the angle between the vectors representing
         the displacement of the cell at two consecutive detections.
@@ -994,26 +990,26 @@ class Model:
         unit : Literal["radian", "degree"], optional
             Unit of the angle (default is "radian").
         custom_identifier : str, optional
-            New identifier for the feature (default is None).
+            New identifier for the property (default is None).
         """
-        feat = Feature(
+        prop = Property(
             identifier=custom_identifier if custom_identifier else "angle",
             name="Angle",
             description=("Angle of the cell trajectory between two consecutive detections"),
             provenance="pycellin",
-            feat_type="edge",
+            prop_type="edge",
             lin_type="CellLineage",
             dtype="float",
             unit=unit,
         )
-        self.add_custom_feature(motion.Angle(feat, unit))
+        self.add_custom_property(motion.Angle(prop, unit))
 
     def add_branch_mean_displacement(
         self,
         custom_identifier: str | None = None,
     ) -> None:
         """
-        Add the branch mean displacement feature to the model.
+        Add the branch mean displacement property to the model.
 
         The branch mean displacement is defined as the mean displacement of the cell
         during the cell cycle.
@@ -1021,19 +1017,19 @@ class Model:
         Parameters
         ----------
         custom_identifier : str, optional
-            New identifier for the feature (default is None).
+            New identifier for the property (default is None).
         """
-        feat = Feature(
+        prop = Property(
             identifier=custom_identifier if custom_identifier else "branch_mean_displacement",
             name="Branch mean displacement",
             description="Mean displacement of the cell during the cell cycle",
             provenance="pycellin",
-            feat_type="node",
+            prop_type="node",
             lin_type="CycleLineage",
             dtype="float",
             unit=self.model_metadata["space_unit"],
         )
-        self.add_custom_feature(motion.BranchMeanDisplacement(feat))
+        self.add_custom_property(motion.BranchMeanDisplacement(prop))
 
     def add_branch_mean_speed(
         self,
@@ -1041,7 +1037,7 @@ class Model:
         custom_identifier: str | None = None,
     ) -> None:
         """
-        Add the branch mean speed feature to the model.
+        Add the branch mean speed property to the model.
 
         The branch mean speed is defined as the mean speed of the cell
         during the cell cycle.
@@ -1052,26 +1048,26 @@ class Model:
             Whether to include the distance between the first cell and its predecessor.
             Default is False.
         custom_identifier : str, optional
-            New identifier for the feature (default is None).
+            New identifier for the property (default is None).
         """
-        feat = Feature(
+        prop = Property(
             identifier=custom_identifier if custom_identifier else "branch_mean_speed",
             name="Branch mean speed",
             description="Mean speed of the cell during the cell cycle",
             provenance="pycellin",
-            feat_type="node",
+            prop_type="node",
             lin_type="CycleLineage",
             dtype="float",
             unit=f"{self.model_metadata['space_unit']} / {self.model_metadata['time_unit']}",
         )
-        self.add_custom_feature(motion.BranchMeanSpeed(feat, include_incoming_edge))
+        self.add_custom_property(motion.BranchMeanSpeed(prop, include_incoming_edge))
 
     def add_branch_total_displacement(
         self,
         custom_identifier: str | None = None,
     ) -> None:
         """
-        Add the branch displacement feature to the model.
+        Add the branch displacement property to the model.
 
         The branch total displacement is defined as the displacement of the cell during
         the cell cycle.
@@ -1079,57 +1075,57 @@ class Model:
         Parameters
         ----------
         custom_identifier : str, optional
-            New identifier for the feature (default is None).
+            New identifier for the property (default is None).
         """
-        feat = Feature(
+        prop = Property(
             identifier=custom_identifier if custom_identifier else "branch_total_displacement",
             name="Branch total displacement",
             description="Displacement of the cell during the cell cycle",
             provenance="pycellin",
-            feat_type="node",
+            prop_type="node",
             lin_type="CycleLineage",
             dtype="float",
             unit=self.model_metadata["space_unit"],
         )
-        self.add_custom_feature(motion.BranchTotalDisplacement(feat))
+        self.add_custom_property(motion.BranchTotalDisplacement(prop))
 
     def add_cycle_completeness(
         self,
         custom_identifier: str | None = None,
     ) -> None:
         """
-        Add the cell cycle completeness feature to the model.
+        Add the cell cycle completeness property to the model.
 
         A cell cycle is defined as complete when it starts by a division
         AND ends by a division. Cell cycles that start at the root
         or end with a leaf are thus incomplete.
-        This can be useful when analyzing features like division time. It avoids
+        This can be useful when analyzing properties like division time. It avoids
         the introduction of a bias since we have no information on what happened
         before the root or after the leaves.
 
         Parameters
         ----------
         custom_identifier : str, optional
-            New identifier for the feature (default is None).
+            New identifier for the property (default is None).
         """
-        feat = Feature(
+        prop = Property(
             identifier=custom_identifier if custom_identifier else "cycle_completeness",
             name="Cycle completeness",
             description="Completeness of the cell cycle",
             provenance="pycellin",
-            feat_type="node",
+            prop_type="node",
             lin_type="CycleLineage",
             dtype="bool",
             unit="none",
         )
-        self.add_custom_feature(tracking.CycleCompleteness(feat))
+        self.add_custom_property(tracking.CycleCompleteness(prop))
 
     def add_cell_displacement(
         self,
         custom_identifier: str | None = None,
     ) -> None:
         """
-        Add the displacement feature to the model.
+        Add the displacement property to the model.
 
         The displacement is defined as the Euclidean distance between the positions
         of the cell at two consecutive detections.
@@ -1137,19 +1133,19 @@ class Model:
         Parameters
         ----------
         custom_identifier : str, optional
-            New identifier for the feature (default is None).
+            New identifier for the property (default is None).
         """
-        feat = Feature(
+        prop = Property(
             identifier=custom_identifier if custom_identifier else "cell_displacement",
             name="Cell displacement",
             description="Displacement of the cell between two consecutive detections",
             provenance="pycellin",
-            feat_type="edge",
+            prop_type="edge",
             lin_type="CellLineage",
             dtype="float",
             unit=self.model_metadata["space_unit"],
         )
-        self.add_custom_feature(motion.CellDisplacement(feat))
+        self.add_custom_property(motion.CellDisplacement(prop))
 
     def add_rod_length(
         self,
@@ -1159,25 +1155,25 @@ class Model:
         width_ignore_tips: bool = False,
         custom_identifier: str | None = None,
     ) -> None:
-        feat = Feature(
+        prop = Property(
             identifier=custom_identifier if custom_identifier else "rod_length",
             name="Rod length",
             description="Length of the cell, for rod-shaped cells only",
             provenance="pycellin",
-            feat_type="node",
+            prop_type="node",
             lin_type="CellLineage",
             dtype="float",
             unit=self.model_metadata["space_unit"],
         )
         calc = morpho.RodLength(
-            feat,
+            prop,
             self.model_metadata["pixel_size"]["width"],
             skel_algo=skel_algo,
             tolerance=tolerance,
             method_width=method_width,
             width_ignore_tips=width_ignore_tips,
         )
-        self.add_custom_feature(calc)
+        self.add_custom_property(calc)
 
     def add_cell_speed(
         self,
@@ -1185,7 +1181,7 @@ class Model:
         custom_identifier: str | None = None,
     ) -> None:
         """
-        Add the speed feature to the model.
+        Add the speed property to the model.
 
         The speed is defined as the displacement of the cell between two consecutive
         detections divided by the time elapsed between these two detections.
@@ -1198,14 +1194,14 @@ class Model:
             True to give the speed in the time unit of the model,
             False to give it in frames (default is False).
         custom_identifier : str, optional
-            New identifier for the feature (default is None).
+            New identifier for the property (default is None).
         """
-        feat = Feature(
+        prop = Property(
             identifier=custom_identifier if custom_identifier else "cell_speed",
             name="Cell speed",
             description="Speed of the cell between two consecutive detections",
             provenance="pycellin",
-            feat_type="edge",
+            prop_type="edge",
             lin_type="CellLineage",
             dtype="float",
             unit=(
@@ -1215,7 +1211,7 @@ class Model:
             ),
         )
         time_step = self.model_metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(motion.CellSpeed(feat, time_step))
+        self.add_custom_property(motion.CellSpeed(prop, time_step))
 
     def add_rod_width(
         self,
@@ -1225,25 +1221,25 @@ class Model:
         width_ignore_tips: bool = False,
         custom_identifier: str | None = None,
     ) -> None:
-        feat = Feature(
+        prop = Property(
             identifier=custom_identifier if custom_identifier else "rod_width",
             name="Rod width",
             description="Width of the cell, for rod-shaped cells only",
             provenance="pycellin",
-            feat_type="node",
+            prop_type="node",
             lin_type="CellLineage",
             dtype="float",
             unit=self.model_metadata["space_unit"],
         )
         calc = morpho.RodWidth(
-            feat,
+            prop,
             self.model_metadata["pixel_size"]["width"],
             skel_algo=skel_algo,
             tolerance=tolerance,
             method_width=method_width,
             width_ignore_tips=width_ignore_tips,
         )
-        self.add_custom_feature(calc)
+        self.add_custom_property(calc)
 
     def add_division_rate(
         self,
@@ -1251,7 +1247,7 @@ class Model:
         custom_identifier: str | None = None,
     ) -> None:
         """
-        Add the division rate feature to the model.
+        Add the division rate property to the model.
 
         Division rate is defined as the number of divisions per time unit.
         It is the inverse of the division time.
@@ -1264,20 +1260,20 @@ class Model:
             True to give the division rate in the time unit of the model,
             False to give it in frames (default is False).
         custom_identifier : str, optional
-            New identifier for the feature (default is None).
+            New identifier for the property (default is None).
         """
-        feat = Feature(
+        prop = Property(
             identifier=custom_identifier if custom_identifier else "division_rate",
             name="Division rate",
             description="Number of divisions per time unit",
             provenance="pycellin",
-            feat_type="node",
+            prop_type="node",
             lin_type="CycleLineage",
             dtype="float",
             unit=f"1/{self.model_metadata['time_unit']}" if in_time_unit else "1/frame",
         )
         time_step = self.model_metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(tracking.DivisionRate(feat, time_step))
+        self.add_custom_property(tracking.DivisionRate(prop, time_step))
 
     def add_division_time(
         self,
@@ -1285,7 +1281,7 @@ class Model:
         custom_identifier: str | None = None,
     ) -> None:
         """
-        Add the division time feature to the model.
+        Add the division time property to the model.
 
         Division time is defined as the time between 2 divisions.
         It is also the length of the cell cycle of the cell of interest.
@@ -1298,20 +1294,20 @@ class Model:
             True to give the division time in the time unit of the model,
             False to give it in frames (default is False).
         custom_identifier : str, optional
-            New identifier for the feature (default is None).
+            New identifier for the property (default is None).
         """
-        feat = Feature(
+        prop = Property(
             identifier=custom_identifier if custom_identifier else "division_time",
             name="Division time",
             description="Time elapsed between the birth of a cell and its division",
             provenance="pycellin",
-            feat_type="node",
+            prop_type="node",
             lin_type="CycleLineage",
             dtype="float" if in_time_unit else "int",
             unit=self.model_metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.model_metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(tracking.DivisionTime(feat, time_step))
+        self.add_custom_property(tracking.DivisionTime(prop, time_step))
 
     def add_relative_age(
         self,
@@ -1319,7 +1315,7 @@ class Model:
         custom_identifier: str | None = None,
     ) -> None:
         """
-        Add the cell relative age feature to the model.
+        Add the cell relative age property to the model.
 
         The relative age of a cell is defined as the number of nodes since
         the start of the cell cycle (i.e. previous division, or beginning
@@ -1333,20 +1329,20 @@ class Model:
             True to give the relative age in the time unit of the model,
             False to give it in frames (default is False).
         custom_identifier : str, optional
-            New identifier for the feature (default is None).
+            New identifier for the property (default is None).
         """
-        feat = Feature(
+        prop = Property(
             identifier=custom_identifier if custom_identifier else "relative_age",
             name="Relative age",
             description="Age of the cell since the beginning of the current cell cycle",
             provenance="pycellin",
-            feat_type="node",
+            prop_type="node",
             lin_type="CellLineage",
             dtype="float" if in_time_unit else "int",
             unit=self.model_metadata["time_step"] if in_time_unit else "frame",
         )
         time_step = self.model_metadata["time_step"] if in_time_unit else 1
-        self.add_custom_feature(tracking.RelativeAge(feat, time_step))
+        self.add_custom_property(tracking.RelativeAge(prop, time_step))
 
     def add_straightness(
         self,
@@ -1354,7 +1350,7 @@ class Model:
         custom_identifier: str | None = None,
     ) -> None:
         """
-        Add the straightness feature to the model.
+        Add the straightness property to the model.
 
         The straightness is defined as the ratio between the Euclidean distance
         between the first and last positions of the cell and the total length
@@ -1368,108 +1364,108 @@ class Model:
             Whether to include the distance between the first cell and its predecessor.
             Default is False.
         custom_identifier : str, optional
-            New identifier for the feature (default is None).
+            New identifier for the property (default is None).
         """
-        feat = Feature(
+        prop = Property(
             identifier=custom_identifier if custom_identifier else "straightness",
             name="Straightness",
             description="Straightness of the cell displacement",
             provenance="pycellin",
-            feat_type="node",
+            prop_type="node",
             lin_type="CycleLineage",
             dtype="float",
         )
-        self.add_custom_feature(motion.Straightness(feat, include_incoming_edge))
+        self.add_custom_property(motion.Straightness(prop, include_incoming_edge))
 
-    def _get_feature_method(self, feature_identifier):
+    def _get_prop_method(self, prop_identifier: str) -> Callable:
         """
-        Return the method to compute the feature from its identifier.
+        Return the method to compute the property from its identifier.
 
         Parameters
         ----------
-        feature_identifier : str
-            Identifier of the feature.
+        prop_identifier : str
+            Identifier of the property.
 
         Returns
         -------
         callable
-            Method to compute the feature.
+            Method to compute the property.
 
         Raises
         ------
         AttributeError
-            If the method to compute the feature is not found in the Model class.
+            If the method to compute the property is not found in the Model class.
 
         Notes
         -----
-        The method name must follow the pattern "add_{feature_name}", otherwise
+        The method name must follow the pattern "add_{property_name}", otherwise
         it won't be recognized.
         """
-        method_name = f"add_{feature_identifier}"
+        method_name = f"add_{prop_identifier}"
         method = getattr(self, method_name, None)
         if method:
             return method
         else:
             raise AttributeError(f"Method {method_name} not found in Model class.")
 
-    def add_pycellin_feature(self, feature_identifier: str, **kwargs: bool) -> None:
+    def add_pycellin_property(self, prop_identifier: str, **kwargs: bool) -> None:
         """
-        Add a single predefined pycellin feature to the model.
+        Add a single predefined pycellin property to the model.
 
         Parameters
         ----------
-        feature_identifier : str
-            Identifier of the feature to add. Needs to be an available feature.
+        prop_identifier : str
+            Identifier of the property to add. Needs to be an available property.
         kwargs : bool
             Additional keyword arguments to pass to the function
-            computing the feature. For example, for absolute_age,
+            computing the property. For example, for absolute_age,
             in_time_unit=True can be used to yield the age
             in the time unit of the model instead of in frames.
 
         Raises
         ------
         KeyError
-            If the feature is not a predefined feature of pycellin.
+            If the property is not a predefined property of pycellin.
         ValueError
-            If the feature is a feature of cycle lineages and the cycle lineages
+            If the property is a property of cycle lineages and the cycle lineages
             have not been computed yet.
         """
-        cell_lin_feats = list(futils.get_pycellin_cell_lineage_features().keys())
-        cycle_lin_feats = list(futils.get_pycellin_cycle_lineage_features().keys())
-        if feature_identifier not in cell_lin_feats + cycle_lin_feats:
-            raise KeyError(f"Feature {feature_identifier} is not a predefined feature of pycellin.")
-        elif feature_identifier in cycle_lin_feats and not self.data.cycle_data:
+        cell_lin_props = list(futils.get_pycellin_cell_lineage_features().keys())
+        cycle_lin_props = list(futils.get_pycellin_cycle_lineage_features().keys())
+        if prop_identifier not in cell_lin_props + cycle_lin_props:
+            raise KeyError(f"Property {prop_identifier} is not a predefined property of pycellin.")
+        elif prop_identifier in cycle_lin_props and not self.data.cycle_data:
             raise ValueError(
-                f"Feature {feature_identifier} is a feature of cycle lineages, "
+                f"Property {prop_identifier} is a property of cycle lineages, "
                 "but the cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with `model.add_cycle_data()`."
             )
-        self._get_feature_method(feature_identifier)(**kwargs)
+        self._get_prop_method(prop_identifier)(**kwargs)
 
-    def add_pycellin_features(self, features_info: list[str | dict[str, Any]]) -> None:
+    def add_pycellin_properties(self, props_info: list[str | dict[str, Any]]) -> None:
         """
-        Add the specified predefined pycellin features to the model.
+        Add the specified predefined pycellin properties to the model.
 
         Parameters
         ----------
-        features_info : list[str | dict[str, Any]]
-            List of the features to add. Each feature can be a string
-            (the identifier of the feature) or a dictionary with the identifier
-            of the feature as the key and additional keyword arguments as values.
+        props_info : list[str | dict[str, Any]]
+            List of the properties to add. Each property can be a string
+            (the identifier of the property) or a dictionary with the identifier
+            of the property as the key and additional keyword arguments as values.
 
         Examples
         --------
         With no additional arguments:
-        >>> model.add_pycellin_features(["absolute_age", "relative_age"])
+        >>> model.add_pycellin_properties(["absolute_age", "relative_age"])
         With additional arguments:
-        >>> model.add_pycellin_features(
+        >>> model.add_pycellin_properties(
         ...     [
         ...         {"absolute_age": {"in_time_unit": True}},
         ...         {"relative_age": {"in_time_unit": True}},
         ...     ]
         )
-        It is possible to mix features with and without additional arguments:
-        >>> model.add_pycellin_features(
+        It is possible to mix properties with and without additional arguments:
+        >>> model.add_pycellin_properties(
         ...     [
         ...         {"absolute_age": {"in_time_unit": True}},
         ...         "cell_cycle_completeness",
@@ -1477,82 +1473,82 @@ class Model:
         ...     ]
         )
         """
-        for feat_info in features_info:
-            if isinstance(feat_info, str):
-                self.add_pycellin_feature(feat_info)
-            elif isinstance(feat_info, dict):
-                for feat_id, kwargs in feat_info.items():
-                    self.add_pycellin_feature(feat_id, **kwargs)
+        for prop_info in props_info:
+            if isinstance(prop_info, str):
+                self.add_pycellin_property(prop_info)
+            elif isinstance(prop_info, dict):
+                for prop_id, kwargs in prop_info.items():
+                    self.add_pycellin_property(prop_id, **kwargs)
 
-    def recompute_feature(self, feature_identifier: str) -> None:
+    def recompute_property(self, prop_identifier: str) -> None:
         """
-        Recompute the values of the specified feature for all lineages.
+        Recompute the values of the specified property for all lineages.
 
         Parameters
         ----------
-        feature_identifier : str
-            Identifier of the feature to recompute.
+        prop_identifier : str
+            Identifier of the property to recompute.
 
         Raises
         ------
         ValueError
-            If the feature does not exist.
+            If the property does not exist.
         """
-        # First need to check if the feature exists.
-        if not self.props_metadata._has_feature(feature_identifier):
-            raise ValueError(f"Feature '{feature_identifier}' does not exist.")
+        # First need to check if the property exists.
+        if not self.props_metadata._has_prop(prop_identifier):
+            raise ValueError(f"Property '{prop_identifier}' does not exist.")
 
         # Then need to update the data.
-        # TODO: implement recompute_feature
+        # TODO: implement
         pass
 
-    def remove_feature(
+    def remove_property(
         self,
-        feature_identifier: str,
+        prop_identifier: str,
     ) -> None:
         """
-        Remove the specified feature from the model.
+        Remove the specified property from the model.
 
-        This updates the FeaturesDeclaration, remove the feature values
+        This updates the PropsMetadata, remove the property values
         for all lineages, and notify the updater to unregister the calculator.
 
         Parameters
         ----------
-        feature_identifier : str
-            Identifier of the feature to remove.
+        prop_identifier : str
+            Identifier of the property to remove.
 
         Raises
         ------
         ValueError
-            If the feature does not exist.
+            If the property does not exist.
         ProtectedFeatureError
-            If the feature is a protected feature.
+            If the property is a protected property.
         """
         # Preliminary checks.
-        if not self.props_metadata._has_feature(feature_identifier):
-            raise ValueError(f"There is no feature {feature_identifier} in the declared features.")
-        if feature_identifier in self.props_metadata._get_protected_features():
-            raise ProtectedFeatureError(feature_identifier)
+        if not self.props_metadata._has_prop(prop_identifier):
+            raise ValueError(f"There is no property {prop_identifier} in the declared properties.")
+        if prop_identifier in self.props_metadata._get_protected_props():
+            raise ProtectedFeatureError(prop_identifier)
 
-        # First we update the FeaturesDeclaration...
-        feature_type = self.props_metadata.feats_dict[feature_identifier].feat_type
-        lineage_type = self.props_metadata.feats_dict[feature_identifier].lin_type
-        self.props_metadata.feats_dict.pop(feature_identifier)
+        # First we update the PropsMetadata...
+        prop_type = self.props_metadata.props[prop_identifier].prop_type
+        lin_type = self.props_metadata.props[prop_identifier].lin_type
+        self.props_metadata.props.pop(prop_identifier)
 
-        # ... we remove the feature values...
-        match lineage_type:
+        # ... we remove the property values...
+        match lin_type:
             case "CellLineage":
                 for lin in self.data.cell_data.values():
-                    lin._remove_feature(feature_identifier, feature_type)
+                    lin._remove_prop(prop_identifier, prop_type)
             case "CycleLineage" if self.data.cycle_data:
                 for clin in self.data.cycle_data.values():
-                    clin._remove_feature(feature_identifier, feature_type)
+                    clin._remove_prop(prop_identifier, prop_type)
             case "Lineage":
                 for lin in self.data.cell_data.values():
-                    lin._remove_feature(feature_identifier, feature_type)
+                    lin._remove_prop(prop_identifier, prop_type)
                 if self.data.cycle_data:
                     for clin in self.data.cycle_data.values():
-                        clin._remove_feature(feature_identifier, feature_type)
+                        clin._remove_prop(prop_identifier, prop_type)
             case _:
                 raise ValueError(
                     "Lineage type not recognized. Must be 'CellLineage', 'CycleLineage'"
@@ -1561,15 +1557,15 @@ class Model:
 
         # ... and finally we update the updater.
         try:
-            self._updater.delete_calculator(feature_identifier)
+            self._updater.delete_calculator(prop_identifier)
         except KeyError:
             # No calculator doesn't mean there is something wrong,
-            # maybe it's just an imported feature.
+            # maybe it's just an imported property.
             pass
 
-    # TODO: add a method to remove several features at the same time?
-    # When no argument is provided, remove all features?
-    # def remove_features(self, features_info: list[str | dict[str, Any]]) -> None:
+    # TODO: add a method to remove several properties at the same time?
+    # When no argument is provided, remove all properties?
+    # def remove_properties(self, props_info: list[str | dict[str, Any]]) -> None:
     #     pass
 
     def add_cycle_data(self) -> None:
@@ -1584,67 +1580,65 @@ class Model:
         #     )
         #     raise UpdateRequiredError(txt)
         # TODO: I have nothing to check if the structure was modified since
-        # _update_required becomes true when features are added...
+        # _update_required becomes true when properties are added...
         self.data._add_cycle_lineages()
-        self.props_metadata._add_cycle_lineage_features()
+        self.props_metadata._add_cycle_lineage_props()
 
-    def _categorize_features(
-        self, features: list[str] | None
-    ) -> tuple[list[str], list[str], list[str]]:
+    def _categorize_props(self, props: list[str] | None) -> tuple[list[str], list[str], list[str]]:
         """
-        Categorize features by type (node, edge, lineage).
+        Categorize properties by type (node, edge, lineage).
 
         Parameters
         ----------
-        features : list[str] | None
-            List of features to categorize. If None, all cycle features are used.
+        props : list[str] | None
+            List of properties to categorize. If None, all cycle properties are used.
 
         Returns
         -------
         tuple[list[str], list[str], list[str]]
-            Tuple containing a list of node features, a list of edge features,
-            and a list of lineage features.
+            Tuple containing a list of node properties, a list of edge properties,
+            and a list of lineage properties.
 
         Raises
         ------
         ValueError
-            If a feature is not a cycle lineage feature or not declared in the model.
+            If a property is not a cycle lineage property or not declared in the model.
         """
-        feats = self.get_cycle_lineage_features()
-        if features is None:
-            node_feats = [feat_id for feat_id, feat in feats.items() if feat.feat_type == "node"]
-            edge_feats = [feat_id for feat_id, feat in feats.items() if feat.feat_type == "edge"]
-            lin_feats = [feat_id for feat_id, feat in feats.items() if feat.feat_type == "lineage"]
+        props = self.get_cycle_lineage_properties()
+        if props is None:
+            node_props = [prop_id for prop_id, prop in props.items() if prop.prop_type == "node"]
+            edge_props = [prop_id for prop_id, prop in props.items() if prop.prop_type == "edge"]
+            lin_props = [prop_id for prop_id, prop in props.items() if prop.prop_type == "lineage"]
         else:
-            missing_feats = [feat for feat in features if feat not in feats]
-            if missing_feats:
-                missing_str = ", ".join(repr(f) for f in missing_feats)
-                plural = len(missing_feats) > 1
+            missing_props = [prop for prop in props if prop not in props]
+            if missing_props:
+                missing_str = ", ".join(repr(f) for f in missing_props)
+                plural = len(missing_props) > 1
                 raise ValueError(
-                    f"Feature{'s' if plural else ''} {missing_str} "
+                    f"Propert{'ies' if plural else 'y'} {missing_str} "
                     f"{'are' if plural else 'is'} either not{' ' if plural else 'a'}"
-                    f"cycle lineage feature{'s' if plural else ''} or not declared "
+                    f"cycle lineage propert{'ies' if plural else 'y'} or not declared "
                     f"in the model."
                 )
-            node_feats = [f for f in features if f in self.get_node_features()]
-            edge_feats = [f for f in features if f in self.get_edge_features()]
-            lin_feats = [f for f in features if f in self.get_lineage_features()]
+            node_props = [f for f in props if f in self.get_node_properties()]
+            edge_props = [f for f in props if f in self.get_edge_properties()]
+            lin_props = [f for f in props if f in self.get_lineage_properties()]
 
-        return (node_feats, edge_feats, lin_feats)
+        return (node_props, edge_props, lin_props)
 
     @staticmethod
-    def _propagate_node_features(
-        node_feats: list[str],
+    def _propagate_node_props(
+        node_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
     ) -> None:
         """
-        Propagate node features from cycle lineage to cell lineage.
+        Propagate node properties from cycle lineage to cell lineage.
 
         Parameters
         ----------
-        node_feats : list[str]
-            List of node features to propagate.
+        node_props : list[str]
+            List of node properties to propagate.
         clin : CycleLineage
             Source cycle lineage.
         lin : CellLineage
@@ -1652,26 +1646,26 @@ class Model:
         """
         for cycle, cells in clin.nodes(data="cells"):
             for cell in cells:
-                for feat in node_feats:
+                for prop in node_props:
                     try:
-                        lin.nodes[cell][feat] = clin.nodes[cycle][feat]
+                        lin.nodes[cell][prop] = clin.nodes[cycle][prop]
                     except KeyError:
-                        # If the feature is not present, we skip it.
+                        # If the property is not present, we skip it.
                         continue
 
     @staticmethod
-    def _propagate_edge_features(
-        edge_feats: list[str],
+    def _propagate_edge_props(
+        edge_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
     ) -> None:
         """
-        Propagate edge features from cycle lineage to cell lineage.
+        Propagate edge properties from cycle lineage to cell lineage.
 
         Parameters
         ----------
-        edge_feats : list[str]
-            List of edge features to propagate.
+        edge_props : list[str]
+            List of edge properties to propagate.
         clin : CycleLineage
             Source cycle lineage.
         lin : CellLineage
@@ -1688,62 +1682,62 @@ class Model:
 
             # Intracycle edges.
             for link in pairwise(cells):
-                for feat in edge_feats:
+                for prop in edge_props:
                     try:
-                        lin.edges[link][feat] = clin.edges[edge][feat]
+                        lin.edges[link][prop] = clin.edges[edge][prop]
                     except KeyError:
-                        # If the feature is not present, we skip it.
+                        # If the property is not present, we skip it.
                         continue
 
             # Intercycle edge.
             incoming_edges = list(lin.in_edges(cells[0]))
-            # TODO: check this, feat just below is unbound
+            # TODO: check this, prop just below is unbound
             if len(incoming_edges) > 1:
                 raise FusionError(cells[0], lin.graph["lineage_ID"])
             try:
-                lin.edges[incoming_edges[0]][feat] = clin.edges[edge][feat]
+                lin.edges[incoming_edges[0]][prop] = clin.edges[edge][prop]
             except (IndexError, KeyError):
-                # Either the cell is a root or the feature is not present.
+                # Either the cell is a root or the property is not present.
                 # In both cases, we skip it.
                 continue
 
     @staticmethod
-    def _propagate_lineage_features(
-        lin_feats: list[str],
+    def _propagate_lineage_props(
+        lin_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
     ) -> None:
         """
-        Propagate lineage features from cycle lineage to cell lineage.
+        Propagate lineage properties from cycle lineage to cell lineage.
 
         Parameters
         ----------
-        lin_feats : list[str]
-            List of lineage features to propagate.
+        lin_props : list[str]
+            List of lineage properties to propagate.
         clin : CycleLineage
             Source cycle lineage.
         lin : CellLineage
             Target cell lineage.
         """
-        for feat in lin_feats:
+        for prop in lin_props:
             try:
-                lin.graph[feat] = clin.graph[feat]
+                lin.graph[prop] = clin.graph[prop]
             except KeyError:
                 continue
 
-    def propagate_cycle_features(
-        self, features: list[str] | None = None, update: bool = True
+    def propagate_cycle_properties(
+        self, props: list[str] | None = None, update: bool = True
     ) -> None:
         """
-        Propagate the cycle features to the cell lineages.
+        Propagate the cycle properties to the cell lineages.
 
         Parameters
         ----------
-        features : list[str], optional
-            List of the features to propagate. If None, all cycle features are
+        props : list[str], optional
+            List of the properties to propagate. If None, all cycle properties are
             propagated. Default is None.
         update : bool, optional
-            Whether to update the model before propagating the features.
+            Whether to update the model before propagating the properties.
             Default is True. For a correct propagation, the model must be updated
             beforehand. If you are not sure about the state of the model, leave
             this parameter to True. If you are sure that the model is up to date,
@@ -1753,7 +1747,7 @@ class Model:
         ------
         ValueError
             If the cycle lineages have not been computed yet.
-            If a feature in the list is not a cycle lineage feature or not declared
+            If a property in the list is not a cycle lineage property or not declared
             in the model.
         FusionError
             If a cell has more than one incoming edge in the cycle lineage,
@@ -1761,11 +1755,11 @@ class Model:
 
         Warnings
         --------
-        Quantitative analysis of cell cycle features should not be done on cell
-        lineages after propagation of cycle features, UNLESS you account for cell
+        Quantitative analysis of cell cycle properties should not be done on cell
+        lineages after propagation of cycle properties, UNLESS you account for cell
         cycle length. Otherwise you will introduce a bias in your quantification.
-        Indeed, after propagation, cycle features (like division time) become
-        over-represented in long cell cycles since these features are propagated on each
+        Indeed, after propagation, cycle properties (like division time) become
+        over-represented in long cell cycles since these properties are propagated on each
         node of the cell cycle in cell lineages, whereas they are stored only once
         per cell cycle on the cycle node in cycle lineages.
         """
@@ -1776,24 +1770,24 @@ class Model:
             )
         if self._updater._update_required and update:
             self.update()
-        node_feats, edge_feats, lin_feats = self._categorize_features(features)
+        node_props, edge_props, lin_props = self._categorize_props(props)
 
-        # Update the features declaration: now the feature type is `Lineage`
-        # instead of just `CycleLineage` since the features are now present on cycle
+        # Update the properties declaration: now the property type is `Lineage`
+        # instead of just `CycleLineage` since the properties are now present on cycle
         # AND cell lineages.
-        for feat in node_feats + edge_feats + lin_feats:
-            self.props_metadata.feats_dict[feat].lin_type = "Lineage"
+        for prop in node_props + edge_props + lin_props:
+            self.props_metadata.props[prop].lin_type = "Lineage"
 
         # Actual propagation.
         for lin_ID in self.data.cell_data:
             lin = self.data.cell_data[lin_ID]
             clin = self.data.cycle_data[lin_ID]
-            if node_feats:
-                Model._propagate_node_features(node_feats, clin, lin)
-            if edge_feats:
-                Model._propagate_edge_features(edge_feats, clin, lin)
-            if lin_feats:
-                Model._propagate_lineage_features(lin_feats, clin, lin)
+            if node_props:
+                Model._propagate_node_props(node_props, clin, lin)
+            if edge_props:
+                Model._propagate_edge_props(edge_props, clin, lin)
+            if lin_props:
+                Model._propagate_lineage_props(lin_props, clin, lin)
 
     def to_cell_dataframe(self, lids: list[int] | None = None) -> pd.DataFrame:
         """
@@ -1813,7 +1807,7 @@ class Model:
         Raises
         ------
         ValueError
-            If the `lineage_ID`, `frame` or `cell_ID` feature is not found in the model.
+            If the `lineage_ID`, `frame` or `cell_ID` property is not found in the model.
         """
         list_df = []
         nb_nodes = 0
@@ -1827,7 +1821,7 @@ class Model:
         df = pd.concat(list_df, ignore_index=True)
         assert nb_nodes == len(df)
 
-        # Reoder the columns to have pycellin mandatory features first.
+        # Reoder the columns to have pycellin mandatory properties first.
         columns = df.columns.tolist()
         try:
             columns.remove("lineage_ID")
@@ -1870,7 +1864,7 @@ class Model:
         df = pd.concat(list_df, ignore_index=True)
         assert nb_edges == len(df)
 
-        # Reoder the columns to have pycellin mandatory features first.
+        # Reoder the columns to have pycellin mandatory properties first.
         columns = df.columns.tolist()
         try:
             columns.remove("lineage_ID")
@@ -1910,7 +1904,7 @@ class Model:
             list_df.append(tmp_df)
         df = pd.concat(list_df, ignore_index=True)
 
-        # Reoder the columns to have pycellin mandatory features first.
+        # Reoder the columns to have pycellin mandatory properties first.
         columns = df.columns.tolist()
         try:
             columns.remove("lineage_ID")
@@ -1941,7 +1935,7 @@ class Model:
         ------
         ValueError
             If the cycle lineages have not been computed yet.
-            If the `lineage_ID`, `level` or `cycle_ID` feature is not found
+            If the `lineage_ID`, `level` or `cycle_ID` property is not found
             in the model.
         """
         list_df = []  # type: list[pd.DataFrame]
@@ -1961,7 +1955,7 @@ class Model:
         df = pd.concat(list_df, ignore_index=True)
         assert nb_nodes == len(df)
 
-        # Reoder the columns to have pycellin mandatory features first.
+        # Reoder the columns to have pycellin mandatory properties first.
         columns = df.columns.tolist()
         try:
             columns.remove("lineage_ID")
