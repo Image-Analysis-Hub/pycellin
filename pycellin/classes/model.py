@@ -17,7 +17,7 @@ from pycellin.classes import (
     PropsMetadata,
 )
 from pycellin.classes.lineage import Lineage
-from pycellin.classes.exceptions import FusionError, ProtectedFeatureError
+from pycellin.classes.exceptions import FusionError, ProtectedPropertyError
 from pycellin.classes.feature_calculator import FeatureCalculator
 from pycellin.classes.updater import ModelUpdater
 import pycellin.graph.features.tracking as tracking
@@ -1430,8 +1430,8 @@ class Model:
             If the property is a property of cycle lineages and the cycle lineages
             have not been computed yet.
         """
-        cell_lin_props = list(futils.get_pycellin_cell_lineage_features().keys())
-        cycle_lin_props = list(futils.get_pycellin_cycle_lineage_features().keys())
+        cell_lin_props = list(futils.get_pycellin_cell_lineage_properties().keys())
+        cycle_lin_props = list(futils.get_pycellin_cycle_lineage_properties().keys())
         if prop_identifier not in cell_lin_props + cycle_lin_props:
             raise KeyError(f"Property {prop_identifier} is not a predefined property of pycellin.")
         elif prop_identifier in cycle_lin_props and not self.data.cycle_data:
@@ -1528,7 +1528,7 @@ class Model:
         if not self.props_metadata._has_prop(prop_identifier):
             raise ValueError(f"There is no property {prop_identifier} in the declared properties.")
         if prop_identifier in self.props_metadata._get_protected_props():
-            raise ProtectedFeatureError(prop_identifier)
+            raise ProtectedPropertyError(prop_identifier)
 
         # First we update the PropsMetadata...
         prop_type = self.props_metadata.props[prop_identifier].prop_type

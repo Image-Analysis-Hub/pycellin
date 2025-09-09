@@ -17,7 +17,7 @@ import warnings
 from lxml import etree as ET
 import networkx as nx
 
-from pycellin.classes.exceptions import ProtectedFeatureError
+from pycellin.classes.exceptions import ProtectedPropertyError
 from pycellin.classes.model import Model
 from pycellin.classes.property import PropsMetadata, Property
 from pycellin.classes.lineage import CellLineage
@@ -696,7 +696,7 @@ def _remove_non_numeric_props(model: Model) -> None:
         for name in to_remove:
             try:
                 model.remove_property(name)
-            except ProtectedFeatureError:
+            except ProtectedPropertyError:
                 model.props_metadata._unprotect_prop(name)
                 model.remove_property(name)
         plural = True if len(to_remove) > 1 else False
