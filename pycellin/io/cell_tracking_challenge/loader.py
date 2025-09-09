@@ -611,7 +611,7 @@ if __name__ == "__main__":
 
     model = load_CTC_file(ctc_file, labels_path)
     print(model)
-    print(model.feat_declaration)
+    print(model.props_metadata)
     print(model.data)
 
     # for lin_id, lin in model.data.cell_data.items():

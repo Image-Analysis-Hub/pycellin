@@ -34,8 +34,8 @@ class Model:
 
     def __init__(
         self,
-        metadata: dict[str, Any] | None = None,
-        fd: FeaturesDeclaration | None = None,
+        model_metadata: dict[str, Any] | None = None,
+        props_metadata: FeaturesDeclaration | None = None,
         data: Data | None = None,
     ) -> None:
         """
@@ -43,15 +43,17 @@ class Model:
 
         Parameters
         ----------
-        metadata : dict[str, Any] | None, optional
+        model_metadata : dict[str, Any] | None, optional
             Metadata of the model (default is None).
-        fd : FeaturesDeclaration, optional
+        props_metadata : FeaturesDeclaration, optional
             The declaration of the features present in the model (default is None).
         data : Data, optional
             The lineages data of the model (default is None).
         """
-        self.metadata = metadata if metadata is not None else dict()
-        self.feat_declaration = fd if fd is not None else FeaturesDeclaration()
+        self.model_metadata = model_metadata if model_metadata is not None else dict()
+        self.props_metadata = (
+            props_metadata if props_metadata is not None else FeaturesDeclaration()
+        )
         self.data = data if data is not None else Data(dict())
 
         self._updater = ModelUpdater()
@@ -67,45 +69,45 @@ class Model:
 
     def __repr__(self) -> str:
         return (
-            f"Model(metadata={self.metadata!r}, "
-            f"feat_declaration={self.feat_declaration!r}, "
+            f"Model(model_metadata={self.model_metadata!r}, "
+            f"props_metadata={self.props_metadata!r}, "
             f"data={self.data!r})"
         )
 
     def __str__(self) -> str:
-        if self.metadata and self.data:
+        if self.model_metadata and self.data:
             nb_lin = self.data.number_of_lineages()
-            if "name" in self.metadata and "provenance" in self.metadata:
+            if "name" in self.model_metadata and "provenance" in self.model_metadata:
                 txt = (
-                    f"Model named '{self.metadata['name']}' "
+                    f"Model named '{self.model_metadata['name']}' "
                     f"with {nb_lin} lineage{'s' if nb_lin > 1 else ''}, "
-                    f"built from {self.metadata['provenance']}."
+                    f"built from {self.model_metadata['provenance']}."
                 )
-            elif "name" in self.metadata:
+            elif "name" in self.model_metadata:
                 txt = (
-                    f"Model named '{self.metadata['name']}' "
+                    f"Model named '{self.model_metadata['name']}' "
                     f"with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
                 )
-            elif "provenance" in self.metadata:
+            elif "provenance" in self.model_metadata:
                 txt = (
                     f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}, "
-                    f"built from {self.metadata['provenance']}."
+                    f"built from {self.model_metadata['provenance']}."
                 )
             else:
                 txt = f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
         elif self.data:
             nb_lin = self.data.number_of_lineages()
             txt = f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
-        elif self.metadata:
-            if "name" in self.metadata and "provenance" in self.metadata:
+        elif self.model_metadata:
+            if "name" in self.model_metadata and "provenance" in self.model_metadata:
                 txt = (
-                    f"Model named '{self.metadata['name']}' "
-                    f"built from {self.metadata['provenance']}."
+                    f"Model named '{self.model_metadata['name']}' "
+                    f"built from {self.model_metadata['provenance']}."
                 )
-            elif "name" in self.metadata:
-                txt = f"Model named '{self.metadata['name']}'."
-            elif "provenance" in self.metadata:
-                txt = f"Model built from {self.metadata['provenance']}."
+            elif "name" in self.model_metadata:
+                txt = f"Model named '{self.model_metadata['name']}'."
+            elif "provenance" in self.model_metadata:
+                txt = f"Model built from {self.model_metadata['provenance']}."
             else:
                 txt = "Empty model."
         else:
@@ -126,7 +128,7 @@ class Model:
         KeyError
             If the metadata does not contain the spatial unit.
         """
-        return self.metadata["space_unit"]
+        return self.model_metadata["space_unit"]
 
     def get_pixel_size(self) -> dict[str, float] | None:
         """
@@ -142,7 +144,7 @@ class Model:
         KeyError
             If the metadata does not contain the pixel size.
         """
-        return self.metadata["pixel_size"]
+        return self.model_metadata["pixel_size"]
 
     def get_time_unit(self) -> str | None:
         """
@@ -158,7 +160,7 @@ class Model:
         KeyError
             If the metadata does not contain the temporal unit.
         """
-        return self.metadata["time_unit"]
+        return self.model_metadata["time_unit"]
 
     def get_time_step(self) -> float | None:
         """
@@ -174,7 +176,7 @@ class Model:
         KeyError
             If the metadata does not contain the time step.
         """
-        return self.metadata["time_step"]
+        return self.model_metadata["time_step"]
 
     def get_units_per_features(self) -> dict[str, list[str]]:
         """
@@ -190,7 +192,7 @@ class Model:
             of feature identifiers. For example:
             {'unit1': ['feature1', 'feature2'], 'unit2': ['feature3']}.
         """
-        return self.feat_declaration._get_units_per_features()
+        return self.props_metadata._get_units_per_features()
 
     def get_features(self) -> dict[str, Feature]:
         """
@@ -201,7 +203,7 @@ class Model:
         dict[str, Feature]
             Dictionary of the features present in the model.
         """
-        return self.feat_declaration.feats_dict
+        return self.props_metadata.feats_dict
 
     def get_cell_lineage_features(
         self,
@@ -221,9 +223,9 @@ class Model:
         dict[str, Feature]
             Dictionary of the cell lineages features present in the model.
         """
-        feats = self.feat_declaration._get_feat_dict_from_lin_type("CellLineage")
+        feats = self.props_metadata._get_feat_dict_from_lin_type("CellLineage")
         if include_Lineage_feats:
-            feats.update(self.feat_declaration._get_feat_dict_from_lin_type("Lineage"))
+            feats.update(self.props_metadata._get_feat_dict_from_lin_type("Lineage"))
         return feats
 
     def get_cycle_lineage_features(
@@ -244,9 +246,9 @@ class Model:
         dict[str, Feature]
             Dictionary of the cycle lineages features present in the model.
         """
-        feats = self.feat_declaration._get_feat_dict_from_lin_type("CycleLineage")
+        feats = self.props_metadata._get_feat_dict_from_lin_type("CycleLineage")
         if include_Lineage_feats:
-            feats.update(self.feat_declaration._get_feat_dict_from_lin_type("Lineage"))
+            feats.update(self.props_metadata._get_feat_dict_from_lin_type("Lineage"))
         return feats
 
     def get_node_features(self) -> dict[str, Feature]:
@@ -258,7 +260,7 @@ class Model:
         dict[str, Feature]
             Dictionary of the node features present in the model.
         """
-        return self.feat_declaration._get_feat_dict_from_feat_type("node")
+        return self.props_metadata._get_feat_dict_from_feat_type("node")
 
     def get_edge_features(self) -> dict[str, Feature]:
         """
@@ -269,7 +271,7 @@ class Model:
         dict[str, Feature]
             Dictionary of the edge features present in the model.
         """
-        return self.feat_declaration._get_feat_dict_from_feat_type("edge")
+        return self.props_metadata._get_feat_dict_from_feat_type("edge")
 
     def get_lineage_features(self) -> dict[str, Feature]:
         """
@@ -280,7 +282,7 @@ class Model:
         dict[str, Feature]
             Dictionary of the lineage features present in the model.
         """
-        return self.feat_declaration._get_feat_dict_from_feat_type("lineage")
+        return self.props_metadata._get_feat_dict_from_feat_type("lineage")
 
     def get_cell_lineages(self) -> list[CellLineage]:
         """
@@ -449,7 +451,7 @@ class Model:
         bool
             True if the feature is in the model, False otherwise.
         """
-        return self.feat_declaration._has_feature(feature_identifier)
+        return self.props_metadata._has_feature(feature_identifier)
 
     def prepare_full_data_update(self) -> None:
         """
@@ -512,7 +514,7 @@ class Model:
 
         if features_to_update is not None:
             missing_feats = [
-                feat for feat in features_to_update if not self.feat_declaration._has_feature(feat)
+                feat for feat in features_to_update if not self.props_metadata._has_feature(feat)
             ]
             if missing_feats:
                 warnings.warn(
@@ -726,7 +728,7 @@ class Model:
 
         if feat_values is not None:
             for feat in feat_values:
-                if not self.feat_declaration._has_feature(feat):
+                if not self.props_metadata._has_feature(feat):
                     raise KeyError(f"The feature {feat} has not been declared.")
         else:
             feat_values = dict()
@@ -822,7 +824,7 @@ class Model:
 
         if feat_values is not None:
             for feat in feat_values:
-                if not self.feat_declaration._has_feature(feat):
+                if not self.props_metadata._has_feature(feat):
                     raise KeyError(f"The feature '{feat}' has not been declared.")
         else:
             feat_values = dict()
@@ -935,7 +937,7 @@ class Model:
                 "Cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with `model.add_cycle_data()`."
             )
-        self.feat_declaration._add_feature(calculator.feature)
+        self.props_metadata._add_feature(calculator.feature)
         self._updater.register_calculator(calculator)
         self.prepare_full_data_update()
 
@@ -971,9 +973,9 @@ class Model:
             feat_type="node",
             lin_type="CellLineage",
             dtype="float" if in_time_unit else "int",
-            unit=self.metadata["time_step"] if in_time_unit else "frame",
+            unit=self.model_metadata["time_step"] if in_time_unit else "frame",
         )
-        time_step = self.metadata["time_step"] if in_time_unit else 1
+        time_step = self.model_metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(tracking.AbsoluteAge(feat, time_step))
 
     def add_angle(
@@ -1029,7 +1031,7 @@ class Model:
             feat_type="node",
             lin_type="CycleLineage",
             dtype="float",
-            unit=self.metadata["space_unit"],
+            unit=self.model_metadata["space_unit"],
         )
         self.add_custom_feature(motion.BranchMeanDisplacement(feat))
 
@@ -1060,7 +1062,7 @@ class Model:
             feat_type="node",
             lin_type="CycleLineage",
             dtype="float",
-            unit=f"{self.metadata['space_unit']} / {self.metadata['time_unit']}",
+            unit=f"{self.model_metadata['space_unit']} / {self.model_metadata['time_unit']}",
         )
         self.add_custom_feature(motion.BranchMeanSpeed(feat, include_incoming_edge))
 
@@ -1087,7 +1089,7 @@ class Model:
             feat_type="node",
             lin_type="CycleLineage",
             dtype="float",
-            unit=self.metadata["space_unit"],
+            unit=self.model_metadata["space_unit"],
         )
         self.add_custom_feature(motion.BranchTotalDisplacement(feat))
 
@@ -1145,7 +1147,7 @@ class Model:
             feat_type="edge",
             lin_type="CellLineage",
             dtype="float",
-            unit=self.metadata["space_unit"],
+            unit=self.model_metadata["space_unit"],
         )
         self.add_custom_feature(motion.CellDisplacement(feat))
 
@@ -1165,11 +1167,11 @@ class Model:
             feat_type="node",
             lin_type="CellLineage",
             dtype="float",
-            unit=self.metadata["space_unit"],
+            unit=self.model_metadata["space_unit"],
         )
         calc = morpho.RodLength(
             feat,
-            self.metadata["pixel_size"]["width"],
+            self.model_metadata["pixel_size"]["width"],
             skel_algo=skel_algo,
             tolerance=tolerance,
             method_width=method_width,
@@ -1207,12 +1209,12 @@ class Model:
             lin_type="CellLineage",
             dtype="float",
             unit=(
-                f"{self.metadata['space_unit']}/{self.metadata['time_unit']}"
+                f"{self.model_metadata['space_unit']}/{self.model_metadata['time_unit']}"
                 if in_time_unit
-                else f"{self.metadata['space_unit']}/frame"
+                else f"{self.model_metadata['space_unit']}/frame"
             ),
         )
-        time_step = self.metadata["time_step"] if in_time_unit else 1
+        time_step = self.model_metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(motion.CellSpeed(feat, time_step))
 
     def add_rod_width(
@@ -1231,11 +1233,11 @@ class Model:
             feat_type="node",
             lin_type="CellLineage",
             dtype="float",
-            unit=self.metadata["space_unit"],
+            unit=self.model_metadata["space_unit"],
         )
         calc = morpho.RodWidth(
             feat,
-            self.metadata["pixel_size"]["width"],
+            self.model_metadata["pixel_size"]["width"],
             skel_algo=skel_algo,
             tolerance=tolerance,
             method_width=method_width,
@@ -1272,9 +1274,9 @@ class Model:
             feat_type="node",
             lin_type="CycleLineage",
             dtype="float",
-            unit=f"1/{self.metadata['time_unit']}" if in_time_unit else "1/frame",
+            unit=f"1/{self.model_metadata['time_unit']}" if in_time_unit else "1/frame",
         )
-        time_step = self.metadata["time_step"] if in_time_unit else 1
+        time_step = self.model_metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(tracking.DivisionRate(feat, time_step))
 
     def add_division_time(
@@ -1306,9 +1308,9 @@ class Model:
             feat_type="node",
             lin_type="CycleLineage",
             dtype="float" if in_time_unit else "int",
-            unit=self.metadata["time_step"] if in_time_unit else "frame",
+            unit=self.model_metadata["time_step"] if in_time_unit else "frame",
         )
-        time_step = self.metadata["time_step"] if in_time_unit else 1
+        time_step = self.model_metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(tracking.DivisionTime(feat, time_step))
 
     def add_relative_age(
@@ -1341,9 +1343,9 @@ class Model:
             feat_type="node",
             lin_type="CellLineage",
             dtype="float" if in_time_unit else "int",
-            unit=self.metadata["time_step"] if in_time_unit else "frame",
+            unit=self.model_metadata["time_step"] if in_time_unit else "frame",
         )
-        time_step = self.metadata["time_step"] if in_time_unit else 1
+        time_step = self.model_metadata["time_step"] if in_time_unit else 1
         self.add_custom_feature(tracking.RelativeAge(feat, time_step))
 
     def add_straightness(
@@ -1497,7 +1499,7 @@ class Model:
             If the feature does not exist.
         """
         # First need to check if the feature exists.
-        if not self.feat_declaration._has_feature(feature_identifier):
+        if not self.props_metadata._has_feature(feature_identifier):
             raise ValueError(f"Feature '{feature_identifier}' does not exist.")
 
         # Then need to update the data.
@@ -1527,15 +1529,15 @@ class Model:
             If the feature is a protected feature.
         """
         # Preliminary checks.
-        if not self.feat_declaration._has_feature(feature_identifier):
+        if not self.props_metadata._has_feature(feature_identifier):
             raise ValueError(f"There is no feature {feature_identifier} in the declared features.")
-        if feature_identifier in self.feat_declaration._get_protected_features():
+        if feature_identifier in self.props_metadata._get_protected_features():
             raise ProtectedFeatureError(feature_identifier)
 
         # First we update the FeaturesDeclaration...
-        feature_type = self.feat_declaration.feats_dict[feature_identifier].feat_type
-        lineage_type = self.feat_declaration.feats_dict[feature_identifier].lin_type
-        self.feat_declaration.feats_dict.pop(feature_identifier)
+        feature_type = self.props_metadata.feats_dict[feature_identifier].feat_type
+        lineage_type = self.props_metadata.feats_dict[feature_identifier].lin_type
+        self.props_metadata.feats_dict.pop(feature_identifier)
 
         # ... we remove the feature values...
         match lineage_type:
@@ -1584,7 +1586,7 @@ class Model:
         # TODO: I have nothing to check if the structure was modified since
         # _update_required becomes true when features are added...
         self.data._add_cycle_lineages()
-        self.feat_declaration._add_cycle_lineage_features()
+        self.props_metadata._add_cycle_lineage_features()
 
     def _categorize_features(
         self, features: list[str] | None
@@ -1695,6 +1697,7 @@ class Model:
 
             # Intercycle edge.
             incoming_edges = list(lin.in_edges(cells[0]))
+            # TODO: check this, feat just below is unbound
             if len(incoming_edges) > 1:
                 raise FusionError(cells[0], lin.graph["lineage_ID"])
             try:
@@ -1779,7 +1782,7 @@ class Model:
         # instead of just `CycleLineage` since the features are now present on cycle
         # AND cell lineages.
         for feat in node_feats + edge_feats + lin_feats:
-            self.feat_declaration.feats_dict[feat].lin_type = "Lineage"
+            self.props_metadata.feats_dict[feat].lin_type = "Lineage"
 
         # Actual propagation.
         for lin_ID in self.data.cell_data:

@@ -273,6 +273,6 @@ if __name__ == "__main__":
     print(df.head())
 
     model = load_trackpy_dataframe(df)
-    print(model.metadata)
+    print(model.model_metadata)
     # for lin in model.get_cell_lineages():
     #     lin.plot(node_hover_features=["cell_ID", "frame", "particle"])

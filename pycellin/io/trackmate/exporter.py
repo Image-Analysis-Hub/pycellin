@@ -694,7 +694,7 @@ def _remove_non_numeric_features(model: Model) -> None:
             try:
                 model.remove_feature(name)
             except ProtectedFeatureError:
-                model.feat_declaration._unprotect_feature(name)
+                model.props_metadata._unprotect_feature(name)
                 model.remove_feature(name)
         plural = True if len(to_remove) > 1 else False
         msg = (
@@ -850,7 +850,7 @@ def _update_feature_declarations(model: Model) -> None:
     model : Model
         Model whose feature declarations to update.
     """
-    fd = model.feat_declaration
+    fd = model.props_metadata
     _rename_features(fd)
     _remove_features(fd)
     _add_mandatory_features(fd)
@@ -983,9 +983,9 @@ def export_TrackMate_XML(
         model_copy.propagate_cycle_features()
 
     if not units:
-        units = _ask_units(model_copy.feat_declaration)
-    if "TrackMate_version" in model_copy.metadata:
-        tm_version = model_copy.metadata["TrackMate_version"]
+        units = _ask_units(model_copy.props_metadata)
+    if "TrackMate_version" in model_copy.model_metadata:
+        tm_version = model_copy.model_metadata["TrackMate_version"]
     else:
         tm_version = "unknown"
     has_FilteredTrack = model_copy.has_feature("FilteredTrack")
@@ -995,7 +995,7 @@ def export_TrackMate_XML(
         xf.write_declaration()
         with xf.element("TrackMate", {"version": tm_version}):
             xf.write("\n  ")
-            _write_metadata_tag(xf, model_copy.metadata, "Log")
+            _write_metadata_tag(xf, model_copy.model_metadata, "Log")
             xf.write("\n  ")
             with xf.element("Model", units):
                 _write_FeatureDeclarations(xf, model_copy)
@@ -1004,7 +1004,7 @@ def export_TrackMate_XML(
                 _write_FilteredTracks(xf, model_copy.data.cell_data, has_FilteredTrack)
             xf.write("\n  ")
             for tag in ["Settings", "GUIState", "DisplaySettings"]:
-                _write_metadata_tag(xf, model_copy.metadata, tag)
+                _write_metadata_tag(xf, model_copy.model_metadata, tag)
                 if tag == "DisplaySettings":
                     xf.write("\n")
                 else:

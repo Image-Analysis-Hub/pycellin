@@ -1235,9 +1235,9 @@ if __name__ == "__main__":
     model = load_TrackMate_XML(xml)  # , keep_all_spots=True, keep_all_tracks=True)
     print(model)
 
-    print(model.feat_declaration)
-    print(model.metadata["pycellin_version"])
-    print(model.metadata)
+    print(model.props_metadata)
+    print(model.model_metadata["pycellin_version"])
+    print(model.model_metadata)
     # print(model.fdec.node_feats.keys())
     # print(model.data)
 
