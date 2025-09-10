@@ -812,8 +812,8 @@ def test_add_cell_single_node(one_node_cell_lin):
 
 
 def check_correct_cell_removal(cell_lin, node_id):
-    cell_feats = cell_lin.nodes[node_id]
-    assert cell_lin._remove_cell(node_id) == cell_feats
+    cell_props = cell_lin.nodes[node_id]
+    assert cell_lin._remove_cell(node_id) == cell_props
     assert node_id not in cell_lin.nodes
     assert not any(node_id in edge for edge in cell_lin.edges)
 
@@ -1044,8 +1044,8 @@ def test_add_link_same_IDs(cell_lin):
 
 
 def check_correct_link_removal(cell_lin, source_nid, target_nid):
-    link_feats = cell_lin[source_nid][target_nid]
-    assert cell_lin._remove_link(source_nid, target_nid) == link_feats
+    link_props = cell_lin[source_nid][target_nid]
+    assert cell_lin._remove_link(source_nid, target_nid) == link_props
     assert not cell_lin.has_edge(source_nid, target_nid)
 
 

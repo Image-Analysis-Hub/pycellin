@@ -82,7 +82,7 @@ def units():
 
 
 @pytest.fixture(scope="module")
-def feat_QUALITY():
+def prop_QUALITY():
     return Property(
         identifier="QUALITY",
         name="Quality",
@@ -95,7 +95,7 @@ def feat_QUALITY():
 
 
 @pytest.fixture(scope="module")
-def feat_FRAME():
+def prop_FRAME():
     return Property(
         identifier="FRAME",
         name="Frame",
@@ -108,7 +108,7 @@ def feat_FRAME():
 
 
 @pytest.fixture(scope="module")
-def feat_spot_name():
+def prop_spot_name():
     return Property(
         identifier="cell_name",
         name="cell name",
@@ -121,16 +121,16 @@ def feat_spot_name():
 
 
 @pytest.fixture(scope="module")
-def spot_feats(feat_QUALITY: Property, feat_FRAME: Property, feat_spot_name: Property):
+def spot_props(prop_QUALITY: Property, prop_FRAME: Property, prop_spot_name: Property):
     return {
-        "QUALITY": feat_QUALITY,
-        "FRAME": feat_FRAME,
-        "cell_name": feat_spot_name,
+        "QUALITY": prop_QUALITY,
+        "FRAME": prop_FRAME,
+        "cell_name": prop_spot_name,
     }
 
 
 @pytest.fixture(scope="module")
-def feat_SPOT_SOURCE_ID():
+def prop_SPOT_SOURCE_ID():
     return Property(
         identifier="SPOT_SOURCE_ID",
         name="Source spot ID",
@@ -143,7 +143,7 @@ def feat_SPOT_SOURCE_ID():
 
 
 @pytest.fixture(scope="module")
-def feat_SPOT_TARGET_ID():
+def prop_SPOT_TARGET_ID():
     return Property(
         identifier="SPOT_TARGET_ID",
         name="Target spot ID",
@@ -156,15 +156,15 @@ def feat_SPOT_TARGET_ID():
 
 
 @pytest.fixture(scope="module")
-def edge_feats(feat_SPOT_SOURCE_ID: Property, feat_SPOT_TARGET_ID: Property):
+def edge_props(prop_SPOT_SOURCE_ID: Property, prop_SPOT_TARGET_ID: Property):
     return {
-        "SPOT_SOURCE_ID": feat_SPOT_SOURCE_ID,
-        "SPOT_TARGET_ID": feat_SPOT_TARGET_ID,
+        "SPOT_SOURCE_ID": prop_SPOT_SOURCE_ID,
+        "SPOT_TARGET_ID": prop_SPOT_TARGET_ID,
     }
 
 
 @pytest.fixture(scope="module")
-def feat_TRACK_INDEX():
+def prop_TRACK_INDEX():
     return Property(
         identifier="TRACK_INDEX",
         name="Track index",
@@ -177,7 +177,7 @@ def feat_TRACK_INDEX():
 
 
 @pytest.fixture(scope="module")
-def feat_NUMBER_SPOTS():
+def prop_NUMBER_SPOTS():
     return Property(
         identifier="NUMBER_SPOTS",
         name="Number of spots",
@@ -190,7 +190,7 @@ def feat_NUMBER_SPOTS():
 
 
 @pytest.fixture(scope="module")
-def feat_track_name():
+def prop_track_name():
     return Property(
         identifier="lineage_name",
         name="lineage name",
@@ -203,11 +203,11 @@ def feat_track_name():
 
 
 @pytest.fixture(scope="module")
-def track_feats(feat_TRACK_INDEX: Property, feat_NUMBER_SPOTS: Property, feat_track_name: Property):
+def track_props(prop_TRACK_INDEX: Property, prop_NUMBER_SPOTS: Property, prop_track_name: Property):
     return {
-        "TRACK_INDEX": feat_TRACK_INDEX,
-        "NUMBER_SPOTS": feat_NUMBER_SPOTS,
-        "lineage_name": feat_track_name,
+        "TRACK_INDEX": prop_TRACK_INDEX,
+        "NUMBER_SPOTS": prop_NUMBER_SPOTS,
+        "lineage_name": prop_track_name,
     }
 
 
@@ -303,7 +303,7 @@ def test_get_props_dict_other_tag():
 # _convert_and_add_prop ####################################################
 
 
-def test_convert_and_add_prop_spot_feature(units: dict[str, str], feat_QUALITY: Property):
+def test_convert_and_add_prop_spot_feature(units: dict[str, str], prop_QUALITY: Property):
     trackmate_feature = {
         "feature": "QUALITY",
         "name": "Quality",
@@ -314,12 +314,12 @@ def test_convert_and_add_prop_spot_feature(units: dict[str, str], feat_QUALITY: 
     obtained = PropsMetadata()
     tml._convert_and_add_prop(trackmate_feature, feature_type, obtained, units)
 
-    expected = PropsMetadata({"QUALITY": feat_QUALITY})
+    expected = PropsMetadata({"QUALITY": prop_QUALITY})
 
     assert obtained == expected
 
 
-def test_convert_and_add_prop_edge_feature(units: dict[str, str], feat_SPOT_SOURCE_ID: Property):
+def test_convert_and_add_prop_edge_feature(units: dict[str, str], prop_SPOT_SOURCE_ID: Property):
     trackmate_feature = {
         "feature": "SPOT_SOURCE_ID",
         "name": "Source spot ID",
@@ -330,12 +330,12 @@ def test_convert_and_add_prop_edge_feature(units: dict[str, str], feat_SPOT_SOUR
     obtained = PropsMetadata()
     tml._convert_and_add_prop(trackmate_feature, feature_type, obtained, units)
 
-    expected = PropsMetadata({"SPOT_SOURCE_ID": feat_SPOT_SOURCE_ID})
+    expected = PropsMetadata({"SPOT_SOURCE_ID": prop_SPOT_SOURCE_ID})
 
     assert obtained == expected
 
 
-def test_convert_and_add_prop_track_feature(units: dict[str, str], feat_TRACK_INDEX: Property):
+def test_convert_and_add_prop_track_feature(units: dict[str, str], prop_TRACK_INDEX: Property):
     trackmate_feature = {
         "feature": "TRACK_INDEX",
         "name": "Track index",
@@ -346,7 +346,7 @@ def test_convert_and_add_prop_track_feature(units: dict[str, str], feat_TRACK_IN
     obtained = PropsMetadata()
     tml._convert_and_add_prop(trackmate_feature, feature_type, obtained, units)
 
-    expected = PropsMetadata({"TRACK_INDEX": feat_TRACK_INDEX})
+    expected = PropsMetadata({"TRACK_INDEX": prop_TRACK_INDEX})
 
     assert obtained == expected
 
@@ -359,17 +359,17 @@ def test_convert_and_add_prop_invalid_feature_type(units: dict[str, str]):
         "dimension": "NONE",
     }
     feature_type = "InvalidFeatureType"
-    feat_declaration = PropsMetadata()
+    props_md = PropsMetadata()
 
     with pytest.raises(ValueError, match="Invalid property type: InvalidFeatureType"):
-        tml._convert_and_add_prop(trackmate_feature, feature_type, feat_declaration, units)
+        tml._convert_and_add_prop(trackmate_feature, feature_type, props_md, units)
 
 
 # _add_all_props ###########################################################
 
 
 def test_add_all_props(
-    spot_feats: dict[str, Any], edge_feats: dict[str, Any], track_feats: dict[str, Any]
+    spot_props: dict[str, Any], edge_props: dict[str, Any], track_props: dict[str, Any]
 ):
     xml_data = (
         "<FeatureDeclarations>"
@@ -396,7 +396,7 @@ def test_add_all_props(
     obtained = PropsMetadata()
     tml._add_all_props(it, element, obtained, {})
 
-    expected = PropsMetadata({**spot_feats, **edge_feats, **track_feats})
+    expected = PropsMetadata({**spot_props, **edge_props, **track_props})
 
     assert obtained == expected
 
@@ -413,7 +413,7 @@ def test_add_all_props_empty():
 
 
 def test_add_all_props_tag_with_no_feature_tag(
-    spot_feats: dict[str, Any], track_feats: dict[str, Any]
+    spot_props: dict[str, Any], track_props: dict[str, Any]
 ):
     xml_data = (
         "<FeatureDeclarations>"
@@ -438,7 +438,7 @@ def test_add_all_props_tag_with_no_feature_tag(
     obtained = PropsMetadata()
     tml._add_all_props(it, element, obtained, {})
 
-    expected = PropsMetadata({**spot_feats, **track_feats})
+    expected = PropsMetadata({**spot_props, **track_props})
 
     assert obtained == expected
 
@@ -448,8 +448,8 @@ def test_add_all_props_tag_with_no_feature_tag(
 
 def test_convert_attributes():
     props = {
-        "feat_float": Property(
-            identifier="feat_float",
+        "prop_float": Property(
+            identifier="prop_float",
             name="",
             description="",
             provenance="",
@@ -457,8 +457,8 @@ def test_convert_attributes():
             lin_type="CellLineage",
             dtype="float",
         ),
-        "feat_int": Property(
-            identifier="feat_int",
+        "prop_int": Property(
+            identifier="prop_int",
             name="",
             description="",
             provenance="",
@@ -466,8 +466,8 @@ def test_convert_attributes():
             lin_type="CellLineage",
             dtype="int",
         ),
-        "feat_neg": Property(
-            identifier="feat_neg",
+        "prop_neg": Property(
+            identifier="prop_neg",
             name="",
             description="",
             provenance="",
@@ -475,8 +475,8 @@ def test_convert_attributes():
             lin_type="CellLineage",
             dtype="int",
         ),
-        "feat_string": Property(
-            identifier="feat_string",
+        "prop_string": Property(
+            identifier="prop_string",
             name="",
             description="",
             provenance="",
@@ -487,18 +487,18 @@ def test_convert_attributes():
     }
 
     obtained_attr = {
-        "feat_float": "30",
-        "feat_int": "20",
-        "feat_neg": "-10",
-        "feat_string": "nope",
+        "prop_float": "30",
+        "prop_int": "20",
+        "prop_neg": "-10",
+        "prop_string": "nope",
     }
     tml._convert_attributes(obtained_attr, props, "node")
 
     expected_attr = {
-        "feat_float": 30.0,
-        "feat_int": 20,
-        "feat_neg": -10.0,
-        "feat_string": "nope",
+        "prop_float": 30.0,
+        "prop_int": 20,
+        "prop_neg": -10.0,
+        "prop_string": "nope",
     }
 
     assert obtained_attr == expected_attr
@@ -517,8 +517,8 @@ def test_convert_attributes_specific_keys():
 
 def test_convert_attributes_ValueError():
     props = {
-        "feat_int": Property(
-            identifier="feat_int",
+        "prop_int": Property(
+            identifier="prop_int",
             name="",
             description="",
             provenance="",
@@ -527,16 +527,16 @@ def test_convert_attributes_ValueError():
             dtype="integer",
         )
     }
-    attributes = {"feat_int": "20"}
+    attributes = {"prop_int": "20"}
 
     with pytest.raises(ValueError):
         tml._convert_attributes(attributes, props, "node")
 
 
-def test_convert_attributes_missing_feat():
+def test_convert_attributes_missing_prop():
     props = {
-        "feat_float": Property(
-            identifier="feat_float",
+        "prop_float": Property(
+            identifier="prop_float",
             name="",
             description="",
             provenance="",
@@ -545,18 +545,18 @@ def test_convert_attributes_missing_feat():
             dtype="float",
         ),
     }
-    attributes = {"feat_float": "30", "feat_int": "20"}
+    attributes = {"prop_float": "30", "prop_int": "20"}
 
     with pytest.warns(UserWarning):
         tml._convert_attributes(attributes, props, "node")
-    assert props["feat_int"].identifier == "feat_int"
-    assert props["feat_int"].name == "feat_int"
-    assert props["feat_int"].description == "unknown"
-    assert props["feat_int"].provenance == "unknown"
-    assert props["feat_int"].prop_type == "node"
-    assert props["feat_int"].lin_type == "CellLineage"
-    assert props["feat_int"].dtype == "unknown"
-    assert props["feat_int"].unit == "unknown"
+    assert props["prop_int"].identifier == "prop_int"
+    assert props["prop_int"].name == "prop_int"
+    assert props["prop_int"].description == "unknown"
+    assert props["prop_int"].provenance == "unknown"
+    assert props["prop_int"].prop_type == "node"
+    assert props["prop_int"].lin_type == "CellLineage"
+    assert props["prop_int"].dtype == "unknown"
+    assert props["prop_int"].unit == "unknown"
 
 
 # _convert_ROI_coordinates ####################################################
@@ -647,9 +647,9 @@ def test_add_all_nodes_several_attributes():
             dtype="int",
         ),
     }
-    feat_decl = PropsMetadata(spot_props)
+    props_md = PropsMetadata(spot_props)
     obtained = nx.DiGraph()
-    tml._add_all_nodes(it, element, feat_decl, obtained)
+    tml._add_all_nodes(it, element, props_md, obtained)
 
     expected = nx.DiGraph()
     expected.add_nodes_from(
@@ -712,7 +712,7 @@ def test_add_edge():
     _, element = next(it)
     track_id = 0
 
-    edge_feats = {
+    edge_props = {
         "x": Property(
             identifier="x",
             name="",
@@ -751,8 +751,8 @@ def test_add_edge():
         ),
     }
     obtained = nx.DiGraph()
-    feat_decl = PropsMetadata(edge_feats)
-    tml._add_edge(element, feat_decl, obtained, track_id)
+    props_md = PropsMetadata(edge_props)
+    tml._add_edge(element, props_md, obtained, track_id)
 
     expected = nx.DiGraph()
     expected.add_edge(1, 2, x=20.0, y=25, SPOT_SOURCE_ID=1, SPOT_TARGET_ID=2)
@@ -768,7 +768,7 @@ def test_add_edge_no_node_ID():
     _, element = next(it)
     track_id = 0
 
-    edge_feats = {
+    edge_props = {
         "x": Property(
             identifier="x",
             name="",
@@ -798,8 +798,8 @@ def test_add_edge_no_node_ID():
         ),
     }
     obtained = nx.DiGraph()
-    feat_decl = PropsMetadata(edge_feats)
-    tml._add_edge(element, feat_decl, obtained, track_id)
+    props_md = PropsMetadata(edge_props)
+    tml._add_edge(element, props_md, obtained, track_id)
 
     expected = nx.DiGraph()
 
@@ -812,7 +812,7 @@ def test_add_edge_no_edge_attributes():
     _, element = next(it)
     track_id = 0
 
-    edge_feats = {
+    edge_props = {
         "SPOT_SOURCE_ID": Property(
             identifier="SPOT_SOURCE_ID",
             name="",
@@ -833,8 +833,8 @@ def test_add_edge_no_edge_attributes():
         ),
     }
     obtained = nx.DiGraph()
-    feat_decl = PropsMetadata(edge_feats)
-    tml._add_edge(element, feat_decl, obtained, track_id)
+    props_md = PropsMetadata(edge_props)
+    tml._add_edge(element, props_md, obtained, track_id)
 
     expected = nx.DiGraph()
     expected.add_edge(1, 2, SPOT_SOURCE_ID=1, SPOT_TARGET_ID=2)
@@ -864,7 +864,7 @@ def test_build_tracks_several_attributes():
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    edge_feats = {
+    edge_props = {
         "x": Property(
             identifier="x",
             name="",
@@ -902,7 +902,7 @@ def test_build_tracks_several_attributes():
             dtype="int",
         ),
     }
-    track_feats = {
+    track_props = {
         "TRACK_ID": Property(
             identifier="TRACK_ID",
             name="",
@@ -915,8 +915,8 @@ def test_build_tracks_several_attributes():
     }
 
     obtained = nx.DiGraph()
-    feat_decl = PropsMetadata({**edge_feats, **track_feats})
-    obtained_tracks_attrib = tml._build_tracks(it, element, feat_decl, obtained)
+    props_md = PropsMetadata({**edge_props, **track_props})
+    obtained_tracks_attrib = tml._build_tracks(it, element, props_md, obtained)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
 
     expected = nx.DiGraph()
@@ -956,7 +956,7 @@ def test_build_tracks_no_nodes_ID():
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    edge_feats = {
+    edge_props = {
         "x": Property(
             identifier="x",
             name="",
@@ -976,7 +976,7 @@ def test_build_tracks_no_nodes_ID():
             dtype="int",
         ),
     }
-    track_feats = {
+    track_props = {
         "TRACK_ID": Property(
             identifier="TRACK_ID",
             name="",
@@ -989,8 +989,8 @@ def test_build_tracks_no_nodes_ID():
     }
 
     obtained = nx.DiGraph()
-    feat_decl = PropsMetadata({**edge_feats, **track_feats})
-    obtained_tracks_attrib = tml._build_tracks(it, element, feat_decl, obtained)
+    props_md = PropsMetadata({**edge_props, **track_props})
+    obtained_tracks_attrib = tml._build_tracks(it, element, props_md, obtained)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
 
     expected = nx.DiGraph()
@@ -1010,7 +1010,7 @@ def test_build_tracks_no_edges():
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    track_feats = {
+    track_props = {
         "TRACK_ID": Property(
             identifier="TRACK_ID",
             name="",
@@ -1023,8 +1023,8 @@ def test_build_tracks_no_edges():
     }
 
     obtained = nx.DiGraph()
-    feat_decl = PropsMetadata(track_feats)
-    obtained_tracks_attrib = tml._build_tracks(it, element, feat_decl, obtained)
+    props_md = PropsMetadata(track_props)
+    obtained_tracks_attrib = tml._build_tracks(it, element, props_md, obtained)
     obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
 
     expected = nx.DiGraph()
@@ -1055,7 +1055,7 @@ def test_build_tracks_no_track_ID():
     )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    edge_feats = {
+    edge_props = {
         "x": Property(
             identifier="x",
             name="",
@@ -1095,10 +1095,10 @@ def test_build_tracks_no_track_ID():
     }
 
     obtained = nx.DiGraph()
-    feat_decl = PropsMetadata(edge_feats)
+    props_md = PropsMetadata(edge_props)
 
     with pytest.raises(KeyError):
-        tml._build_tracks(it, element, feat_decl, obtained)
+        tml._build_tracks(it, element, props_md, obtained)
 
 
 # _get_filtered_tracks_ID #####################################################

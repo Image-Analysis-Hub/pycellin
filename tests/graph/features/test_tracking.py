@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Unit test for tracking feature classe from graph.features."""
+"""Unit test for tracking property classes from graph.properties."""
 
 import pytest
 
@@ -51,11 +51,11 @@ def cell_lin():
 
 
 @pytest.fixture
-def feat_cell_lin():
+def prop_cell_lin():
     return Property(
-        identifier="test_feature",
-        name="test feature",
-        description="test feature",
+        identifier="test_property",
+        name="test property",
+        description="test property",
         provenance="pycellin",
         prop_type="node",
         lin_type="CellLineage",
@@ -72,11 +72,11 @@ def cycle_lin(cell_lin):
 
 
 @pytest.fixture
-def feat_cycle_lin():
+def prop_cycle_lin():
     return Property(
-        identifier="test_feature",
-        name="test feature",
-        description="test feature",
+        identifier="test_property",
+        name="test property",
+        description="test property",
         provenance="pycellin",
         prop_type="node",
         lin_type="CycleLineage",
@@ -88,9 +88,9 @@ def feat_cycle_lin():
 # AbsoluteAge #################################################################
 
 
-def test_absolute_age_default_time_step(cell_lin, feat_cell_lin):
+def test_absolute_age_default_time_step(cell_lin, prop_cell_lin):
     """Test AbsoluteAge with default time step."""
-    calculator = AbsoluteAge(feat_cell_lin)
+    calculator = AbsoluteAge(prop_cell_lin)
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 0
     # Divisions.
@@ -107,9 +107,9 @@ def test_absolute_age_default_time_step(cell_lin, feat_cell_lin):
         calculator.compute(Data({}), cell_lin, nid=99)
 
 
-def test_absolute_age_custom_time_step(cell_lin, feat_cell_lin):
+def test_absolute_age_custom_time_step(cell_lin, prop_cell_lin):
     """Test AbsoluteAge with a custom time step."""
-    calculator = AbsoluteAge(feat_cell_lin, time_step=2.5)
+    calculator = AbsoluteAge(prop_cell_lin, time_step=2.5)
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 0
     # Divisions.
@@ -129,9 +129,9 @@ def test_absolute_age_custom_time_step(cell_lin, feat_cell_lin):
 # RelativeAge #################################################################
 
 
-def test_relative_age_default_time_step(cell_lin, feat_cell_lin):
+def test_relative_age_default_time_step(cell_lin, prop_cell_lin):
     """Test RelativeAge with default time step."""
-    calculator = RelativeAge(feat_cell_lin)
+    calculator = RelativeAge(prop_cell_lin)
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 0
     # Divisions.
@@ -148,9 +148,9 @@ def test_relative_age_default_time_step(cell_lin, feat_cell_lin):
         calculator.compute(Data({}), cell_lin, nid=99)
 
 
-def test_relative_age_custom_time_step(cell_lin, feat_cell_lin):
+def test_relative_age_custom_time_step(cell_lin, prop_cell_lin):
     """Test RelativeAge with a custom time step."""
-    calculator = RelativeAge(feat_cell_lin, time_step=2.5)
+    calculator = RelativeAge(prop_cell_lin, time_step=2.5)
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 0
     # Divisions.
@@ -170,8 +170,8 @@ def test_relative_age_custom_time_step(cell_lin, feat_cell_lin):
 # CellCycleCompleteness #######################################################
 
 
-def test_cell_cycle_completeness_cell_lin(cell_lin, feat_cell_lin):
-    calculator = CycleCompleteness(feat_cell_lin)
+def test_cell_cycle_completeness_cell_lin(cell_lin, prop_cell_lin):
+    calculator = CycleCompleteness(prop_cell_lin)
     # Complete cell cycles.
     assert calculator.compute(Data({}), cell_lin, nid=4) is True  # division
     assert calculator.compute(Data({}), cell_lin, nid=14) is True  # division
@@ -188,8 +188,8 @@ def test_cell_cycle_completeness_cell_lin(cell_lin, feat_cell_lin):
         calculator.compute(Data({}), cell_lin, nid=99)
 
 
-def test_cell_cycle_completeness_cycle_lin(cycle_lin, feat_cycle_lin):
-    calculator = CycleCompleteness(feat_cycle_lin)
+def test_cell_cycle_completeness_cycle_lin(cycle_lin, prop_cycle_lin):
+    calculator = CycleCompleteness(prop_cycle_lin)
     # Complete cell cycles.
     assert calculator.compute(Data({}), cycle_lin, nid=4) is True  # division
     assert calculator.compute(Data({}), cycle_lin, nid=8) is True  # division
@@ -207,9 +207,9 @@ def test_cell_cycle_completeness_cycle_lin(cycle_lin, feat_cycle_lin):
 # DivisionTime ################################################################
 
 
-def test_division_time_default_time_step(cell_lin, feat_cell_lin):
+def test_division_time_default_time_step(cell_lin, prop_cell_lin):
     """Test DivisionTime with default time step."""
-    calculator = DivisionTime(feat_cell_lin)
+    calculator = DivisionTime(prop_cell_lin)
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 1
     # Divisions.
@@ -226,9 +226,9 @@ def test_division_time_default_time_step(cell_lin, feat_cell_lin):
         calculator.compute(Data({}), cell_lin, nid=99)
 
 
-def test_division_time_custom_time_step(cell_lin, feat_cell_lin):
+def test_division_time_custom_time_step(cell_lin, prop_cell_lin):
     """Test DivisionTime with a custom time step."""
-    calculator = DivisionTime(feat_cell_lin, time_step=2.5)
+    calculator = DivisionTime(prop_cell_lin, time_step=2.5)
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 2.5
     # Divisions.
@@ -245,12 +245,12 @@ def test_division_time_custom_time_step(cell_lin, feat_cell_lin):
         calculator.compute(Data({}), cell_lin, nid=99)
 
 
-def test_division_time_gap(cell_lin, feat_cell_lin):
+def test_division_time_gap(cell_lin, prop_cell_lin):
     """Test DivisionTime with a gap in the lineage."""
     # Create a lineage with a gap.
     cell_lin.remove_nodes_from([3, 12, 13])
     cell_lin.add_edges_from([(2, 4), (11, 14)])
-    calculator = DivisionTime(feat_cell_lin)
+    calculator = DivisionTime(prop_cell_lin)
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 1
     # Divisions.
@@ -267,9 +267,9 @@ def test_division_time_gap(cell_lin, feat_cell_lin):
         calculator.compute(Data({}), cell_lin, nid=99)
 
 
-def test_division_time_cycle_lin_default_time_step(cell_lin, feat_cycle_lin):
+def test_division_time_cycle_lin_default_time_step(cell_lin, prop_cycle_lin):
     """Test DivisionTime with CycleLineage and default time step."""
-    calculator = DivisionTime(feat_cycle_lin)
+    calculator = DivisionTime(prop_cycle_lin)
     data = Data({1: cell_lin}, add_cycle_data=True)
     cycle_lin = data.cycle_data[1]
     # Complete cell cycles.
@@ -286,9 +286,9 @@ def test_division_time_cycle_lin_default_time_step(cell_lin, feat_cycle_lin):
         calculator.compute(data, cycle_lin, nid=99)
 
 
-def test_division_time_cycle_lin_custom_time_step(cell_lin, feat_cycle_lin):
+def test_division_time_cycle_lin_custom_time_step(cell_lin, prop_cycle_lin):
     """Test DivisionTime with CycleLineage and custom time step."""
-    calculator = DivisionTime(feat_cycle_lin, time_step=2.5)
+    calculator = DivisionTime(prop_cycle_lin, time_step=2.5)
     data = Data({1: cell_lin}, add_cycle_data=True)
     cycle_lin = data.cycle_data[1]
     # Complete cell cycles.
@@ -308,9 +308,9 @@ def test_division_time_cycle_lin_custom_time_step(cell_lin, feat_cycle_lin):
 # DivisionRate ################################################################
 
 
-def test_division_rate_default_time_step(cell_lin, feat_cell_lin):
+def test_division_rate_default_time_step(cell_lin, prop_cell_lin):
     """Test DivisionRate with default time step."""
-    calculator = DivisionRate(feat_cell_lin)
+    calculator = DivisionRate(prop_cell_lin)
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 1 / 1
     # Divisions.
@@ -327,9 +327,9 @@ def test_division_rate_default_time_step(cell_lin, feat_cell_lin):
         calculator.compute(Data({}), cell_lin, nid=99)
 
 
-def test_division_rate_custom_time_step(cell_lin, feat_cell_lin):
+def test_division_rate_custom_time_step(cell_lin, prop_cell_lin):
     """Test DivisionRate with a custom time step."""
-    calculator = DivisionRate(feat_cell_lin, time_step=2.5)
+    calculator = DivisionRate(prop_cell_lin, time_step=2.5)
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 1 / 2.5
     # Divisions.
@@ -346,12 +346,12 @@ def test_division_rate_custom_time_step(cell_lin, feat_cell_lin):
         calculator.compute(Data({}), cell_lin, nid=99)
 
 
-def test_division_rate_gap(cell_lin, feat_cell_lin):
+def test_division_rate_gap(cell_lin, prop_cell_lin):
     """Test DivisionRate with a gap in the lineage."""
     # Create a lineage with a gap.
     cell_lin.remove_nodes_from([3, 12, 13])
     cell_lin.add_edges_from([(2, 4), (11, 14)])
-    calculator = DivisionRate(feat_cell_lin)
+    calculator = DivisionRate(prop_cell_lin)
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 1 / 1
     # Divisions.
@@ -368,9 +368,9 @@ def test_division_rate_gap(cell_lin, feat_cell_lin):
         calculator.compute(Data({}), cell_lin, nid=99)
 
 
-def test_division_rate_from_division_time(cell_lin, feat_cell_lin):
+def test_division_rate_from_division_time(cell_lin, prop_cell_lin):
     """Test DivisionRate from DivisionTime."""
-    calculator = DivisionRate(feat_cell_lin, use_div_time=True)
+    calculator = DivisionRate(prop_cell_lin, use_div_time=True)
     # Root.
     nid = 1
     cell_lin.nodes[nid]["division_time"] = 10
@@ -401,9 +401,9 @@ def test_division_rate_from_division_time(cell_lin, feat_cell_lin):
         calculator.compute(Data({}), cell_lin, nid=99)
 
 
-def test_division_rate_cycle_lin_default_time_step(cell_lin, feat_cycle_lin):
+def test_division_rate_cycle_lin_default_time_step(cell_lin, prop_cycle_lin):
     """Test DivisionRate with CycleLineage and default time step."""
-    calculator = DivisionRate(feat_cycle_lin)
+    calculator = DivisionRate(prop_cycle_lin)
     data = Data({1: cell_lin}, add_cycle_data=True)
     cycle_lin = data.cycle_data[1]
     # Complete cell cycles.
@@ -420,9 +420,9 @@ def test_division_rate_cycle_lin_default_time_step(cell_lin, feat_cycle_lin):
         calculator.compute(data, cycle_lin, nid=99)
 
 
-def test_division_rate_cycle_lin_custom_time_step(cell_lin, feat_cycle_lin):
+def test_division_rate_cycle_lin_custom_time_step(cell_lin, prop_cycle_lin):
     """Test DivisionRate with CycleLineage and custom time step."""
-    calculator = DivisionRate(feat_cycle_lin, time_step=2.5)
+    calculator = DivisionRate(prop_cycle_lin, time_step=2.5)
     data = Data({1: cell_lin}, add_cycle_data=True)
     cycle_lin = data.cycle_data[1]
     # Complete cell cycles.

@@ -210,7 +210,7 @@ def _add_all_props(
         for prop in props:
             _convert_and_add_prop(prop, element.tag, props_md, units)
 
-        # Features used in Spot tags but not declared in the FeatureDeclarations tag.
+        # Feature used in Spot tags but not declared in the FeatureDeclarations tag.
         if element.tag == "SpotFeatures":
             name_prop = Property(
                 identifier="cell_name",
@@ -223,7 +223,7 @@ def _add_all_props(
             )
             props_md._add_prop(name_prop)
 
-        # Property used in Track tags but not declared in the FeatureDeclarations tag.
+        # Feature used in Track tags but not declared in the FeatureDeclarations tag.
         if element.tag == "TrackFeatures":
             name_prop = Property(
                 identifier="lineage_name",

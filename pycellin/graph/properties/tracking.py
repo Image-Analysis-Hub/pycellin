@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-A collection of diverse tracking features/attributes that can be added to 
+A collection of diverse tracking properties/attributes that can be added to 
 lineage graphs.
 
 Vocabulary:
-- Feature/Attribute: TrackMate (resp. networkX) uses the word feature (resp. attribute) 
+- Property/Attribute: TrackMate (resp. networkX) uses the word property (resp. attribute) 
   to refer to spot (resp. node), link (resp. edge) or track (resp. graph) information. 
   Both naming are used here, depending on the context.
 - Generation: A generation is a list of nodes between 2 successive divisions. 
@@ -36,7 +36,7 @@ from pycellin.classes.exceptions import FusionError
 from pycellin.classes.property_calculator import NodeGlobalPropCalculator
 
 # TODO: should I add the word Calc or Calculator to the class names?
-# TODO: add calculator for mandatory cycle lineage features (e.g. cycle length)
+# TODO: add calculator for mandatory cycle lineage properties (e.g. cycle length)
 
 
 class AbsoluteAge(NodeGlobalPropCalculator):
@@ -49,16 +49,16 @@ class AbsoluteAge(NodeGlobalPropCalculator):
     to the time unit of the model if specified.
     """
 
-    def __init__(self, feature: Property, time_step: int | float = 1):
+    def __init__(self, property: Property, time_step: int | float = 1):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         time_step : int | float, optional
             Time step between 2 frames, in time unit. Default is 1.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.time_step = time_step
 
     def compute(  # type: ignore[override]
@@ -104,16 +104,16 @@ class RelativeAge(NodeGlobalPropCalculator):
     to the time unit of the model if specified.
     """
 
-    def __init__(self, feature: Property, time_step: int | float = 1):
+    def __init__(self, property: Property, time_step: int | float = 1):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         time_step : int | float, optional
             Time step between 2 frames, in time unit. Default is 1.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.time_step = time_step
 
     def compute(  # type: ignore[override]
@@ -155,7 +155,7 @@ class CycleCompleteness(NodeGlobalPropCalculator):
     A cell cycle is defined as complete when it starts by a division
     AND ends by a division. Cell cycles that start at the root
     or end with a leaf are thus incomplete.
-    This can be useful when analyzing features like division time. It avoids
+    This can be useful when analyzing properties like division time. It avoids
     the introduction of a bias since we have no information on what happened
     before the root or after the leaves.
     """
@@ -293,16 +293,16 @@ class DivisionTime(NodeGlobalPropCalculator):
     be converted to the time unit of the model if specified.
     """
 
-    def __init__(self, feature: Property, time_step: int | float = 1):
+    def __init__(self, property: Property, time_step: int | float = 1):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         time_step : int | float, optional
             Time step between 2 frames, in time unit. Default is 1.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.time_step = time_step
 
     def compute(  # type: ignore[override]
@@ -352,12 +352,12 @@ class DivisionRate(NodeGlobalPropCalculator):
     to divisions per time unit of the model if specified.
     """
 
-    def __init__(self, feature: Property, time_step: int | float = 1, use_div_time: bool = False):
+    def __init__(self, property: Property, time_step: int | float = 1, use_div_time: bool = False):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         time_step : int | float, optional
             Time step between 2 frames, in time unit. Default is 1.
         use_div_time : bool, optional
@@ -365,12 +365,12 @@ class DivisionRate(NodeGlobalPropCalculator):
             If False, compute the division time from the lineage. Default is False.
             The first option is faster but you need to ensure that the division time
             is computed and updated BEFORE division rate. This can be ensured
-            by adding to the model the division time feature before the division
-            rate feature. Moreover, if `use_div_time` is True, `time_step` will be
+            by adding to the model the division time property before the division
+            rate property. Moreover, if `use_div_time` is True, `time_step` will be
             ignored: division rate will use the division time unit (e.g. if division
             time is in frames, division rate will be in divisions per frame).
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.time_step = time_step
         self.use_div_time = use_div_time
 
@@ -438,7 +438,7 @@ class DivisionRate(NodeGlobalPropCalculator):
             return 1 / div_time
 
 
-# class CellPhase(NodeGlobalFeatureCalculator):
+# class CellPhase(NodeGlobalPropCalculator):
 
 #     def compute(self, data: Data, lineage: CellLineage, nid: int) -> str:
 #         """
