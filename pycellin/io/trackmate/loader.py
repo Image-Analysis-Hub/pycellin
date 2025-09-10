@@ -11,11 +11,15 @@ import warnings
 from lxml import etree as ET
 import networkx as nx
 
-from pycellin.classes import Model
-from pycellin.classes import PropsMetadata, Property, cell_ID_Property
-from pycellin.classes import Data
-from pycellin.classes import CellLineage
+from pycellin.classes import (
+    Model,
+    PropsMetadata,
+    Property,
+    Data,
+    CellLineage,
+)
 from pycellin.custom_types import PropertyType
+from pycellin.graph.properties.core import cell_ID_Property
 
 
 def _get_units(

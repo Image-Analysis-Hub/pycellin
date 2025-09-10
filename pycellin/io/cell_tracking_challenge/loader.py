@@ -27,15 +27,13 @@ import networkx as nx
 from skimage.measure import regionprops, find_contours
 import tifffile
 
-from pycellin.classes.property import (
-    Property,
-    PropsMetadata,
+from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
+from pycellin.graph.properties.core import (
     cell_ID_Property,
     frame_Property,
     lineage_ID_Property,
     cell_coord_Property,
 )
-from pycellin.classes import CellLineage, Data, Model
 
 # TODO: what if the first frame is empty...?
 

@@ -1,18 +1,7 @@
 from .classes.data import Data
 from .classes.lineage import CellLineage, CycleLineage
-from .classes.property import PropsMetadata, Property
-from .classes.property import (
-    frame_Property,
-    cell_ID_Property,
-    lineage_ID_Property,
-    cell_coord_Property,
-    link_coord_Property,
-    lineage_coord_Property,
-    cycle_ID_Property,
-    cells_Property,
-    cycle_length_Property,
-    level_Property,
-)
+from .classes.property import Property
+from .classes.props_metadata import PropsMetadata
 from .classes.model import Model
 from .classes.property_calculator import (
     NodeLocalPropCalculator,
@@ -42,16 +31,6 @@ __all__ = [
     "CycleLineage",
     "PropsMetadata",
     "Property",
-    "frame_Property",
-    "cell_ID_Property",
-    "lineage_ID_Property",
-    "cell_coord_Property",
-    "link_coord_Property",
-    "lineage_coord_Property",
-    "cycle_ID_Property",
-    "cells_Property",
-    "cycle_length_Property",
-    "level_Property",
     "Model",
     "NodeLocalPropCalculator",
     "EdgeLocalPropCalculator",

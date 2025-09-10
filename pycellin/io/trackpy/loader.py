@@ -29,6 +29,8 @@ from pycellin.classes import (
     Data,
     PropsMetadata,
     Model,
+)
+from pycellin.graph.properties.core import (
     cell_ID_Property,
     frame_Property,
     lineage_ID_Property,

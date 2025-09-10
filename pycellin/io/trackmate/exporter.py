@@ -19,7 +19,8 @@ import networkx as nx
 
 from pycellin.classes.exceptions import ProtectedPropertyError
 from pycellin.classes.model import Model
-from pycellin.classes.property import PropsMetadata, Property
+from pycellin.classes.property import Property
+from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.classes.lineage import CellLineage
 from pycellin.io.trackmate.loader import load_TrackMate_XML
 
