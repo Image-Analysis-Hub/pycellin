@@ -29,10 +29,10 @@ import tifffile
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.graph.properties.core import (
-    cell_ID_Property,
-    frame_Property,
-    lineage_ID_Property,
-    cell_coord_Property,
+    create_cell_id_property,
+    create_frame_property,
+    create_lineage_id_property,
+    create_cell_coord_property,
 )
 
 # TODO: what if the first frame is empty...?
@@ -215,17 +215,17 @@ def _create_PropsMetadata(seg_data: bool) -> PropsMetadata:
         identification properties.
     """
     props_md = PropsMetadata()
-    cell_ID_prop = cell_ID_Property()
-    frame_prop = frame_Property()
-    lin_ID_prop = lineage_ID_Property()
+    cell_ID_prop = create_cell_id_property()
+    frame_prop = create_frame_property()
+    lin_ID_prop = create_lineage_id_property()
     for prop in [cell_ID_prop, frame_prop, lin_ID_prop]:
         props_md._add_prop(prop)
         props_md._protect_prop(prop.identifier)
     if seg_data:
         # TODO: deal with z dimension
         # TODO: put the real unit, pixel is juste a placeholder for now
-        cell_x_prop = cell_coord_Property(unit="pixel", axis="x", provenance="CTC")
-        cell_y_prop = cell_coord_Property(unit="pixel", axis="y", provenance="CTC")
+        cell_x_prop = create_cell_coord_property(unit="pixel", axis="x", provenance="CTC")
+        cell_y_prop = create_cell_coord_property(unit="pixel", axis="y", provenance="CTC")
         roi_coords_prop = Property(
             identifier="ROI_coords",
             name="ROI coords",

@@ -6,7 +6,7 @@
 from pycellin.classes.property import Property
 
 
-def frame_Property(provenance: str = "pycellin") -> Property:
+def create_frame_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="frame",
         name="frame",
@@ -19,7 +19,7 @@ def frame_Property(provenance: str = "pycellin") -> Property:
     )
 
 
-def cell_ID_Property(provenance: str = "pycellin") -> Property:
+def create_cell_id_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cell_ID",
         name="cell ID",
@@ -31,7 +31,7 @@ def cell_ID_Property(provenance: str = "pycellin") -> Property:
     )
 
 
-def lineage_ID_Property(provenance: str = "pycellin") -> Property:
+def create_lineage_id_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="lineage_ID",
         name="lineage ID",
@@ -43,7 +43,7 @@ def lineage_ID_Property(provenance: str = "pycellin") -> Property:
     )
 
 
-def cell_coord_Property(unit: str, axis: str, provenance: str = "pycellin") -> Property:
+def create_cell_coord_property(unit: str, axis: str, provenance: str = "pycellin") -> Property:
     return Property(
         identifier=f"cell_{axis}",
         name=f"cell {axis}",
@@ -56,7 +56,7 @@ def cell_coord_Property(unit: str, axis: str, provenance: str = "pycellin") -> P
     )
 
 
-def link_coord_Property(unit: str, axis: str, provenance: str = "pycellin") -> Property:
+def create_link_coord_property(unit: str, axis: str, provenance: str = "pycellin") -> Property:
     return Property(
         identifier=f"link_{axis}",
         name=f"link {axis}",
@@ -71,7 +71,7 @@ def link_coord_Property(unit: str, axis: str, provenance: str = "pycellin") -> P
     )
 
 
-def lineage_coord_Property(unit: str, axis: str, provenance: str = "pycellin") -> Property:
+def create_lineage_coord_property(unit: str, axis: str, provenance: str = "pycellin") -> Property:
     return Property(
         identifier=f"lineage_{axis}",
         name=f"lineage {axis}",
@@ -86,7 +86,7 @@ def lineage_coord_Property(unit: str, axis: str, provenance: str = "pycellin") -
     )
 
 
-def cycle_ID_Property(provenance: str = "pycellin") -> Property:
+def create_cycle_id_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cycle_ID",
         name="cycle ID",
@@ -100,7 +100,7 @@ def cycle_ID_Property(provenance: str = "pycellin") -> Property:
     )
 
 
-def cells_Property(provenance: str = "pycellin") -> Property:
+def create_cells_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cells",
         name="cells",
@@ -112,7 +112,7 @@ def cells_Property(provenance: str = "pycellin") -> Property:
     )
 
 
-def cycle_length_Property(provenance: str = "pycellin") -> Property:
+def create_cycle_length_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cycle_length",
         name="cycle length",
@@ -124,7 +124,7 @@ def cycle_length_Property(provenance: str = "pycellin") -> Property:
     )
 
 
-def cycle_duration_Property(provenance: str = "pycellin") -> Property:
+def create_cycle_duration_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cycle_duration",
         name="cycle duration",
@@ -137,7 +137,7 @@ def cycle_duration_Property(provenance: str = "pycellin") -> Property:
     )
 
 
-def level_Property(provenance: str = "pycellin") -> Property:
+def create_level_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="level",
         name="level",

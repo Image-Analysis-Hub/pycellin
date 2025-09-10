@@ -31,10 +31,10 @@ from pycellin.classes import (
     Model,
 )
 from pycellin.graph.properties.core import (
-    cell_ID_Property,
-    frame_Property,
-    lineage_ID_Property,
-    cell_coord_Property,
+    create_cell_id_property,
+    create_frame_property,
+    create_lineage_id_property,
+    create_cell_coord_property,
 )
 
 
@@ -206,9 +206,9 @@ def _create_PropsMetadata(props: list[str], metadata: dict[str, Any]) -> PropsMe
     props_md = PropsMetadata()
 
     # Pycellin mandatory properties.
-    cell_ID_prop = cell_ID_Property()
-    frame_prop = frame_Property()
-    lin_ID_prop = lineage_ID_Property()
+    cell_ID_prop = create_cell_id_property()
+    frame_prop = create_frame_property()
+    lin_ID_prop = create_lineage_id_property()
     for prop in [cell_ID_prop, frame_prop, lin_ID_prop]:
         props_md._add_prop(prop)
         props_md._protect_prop([prop.identifier])
@@ -216,7 +216,9 @@ def _create_PropsMetadata(props: list[str], metadata: dict[str, Any]) -> PropsMe
     # Trackpy properties.
     for axis in ["x", "y", "z"]:
         if axis in props:
-            prop = cell_coord_Property(unit=metadata["space_unit"], axis=axis, provenance="trackpy")
+            prop = create_cell_coord_property(
+                unit=metadata["space_unit"], axis=axis, provenance="trackpy"
+            )
             props_md._add_prop(prop)
     # TODO: add props for other trackpy properties
 

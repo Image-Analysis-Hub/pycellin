@@ -226,18 +226,18 @@ class PropsMetadata:
         """
         # Import property functions - no circular dependency since PropsMetadata is now separate
         from pycellin.graph.properties.core import (
-            cycle_ID_Property,
-            cells_Property,
-            cycle_length_Property,
-            cycle_duration_Property,
-            level_Property,
+            create_cycle_id_property,
+            create_cells_property,
+            create_cycle_length_property,
+            create_cycle_duration_property,
+            create_level_property,
         )
 
-        prop_ID = cycle_ID_Property()
-        prop_cells = cells_Property()
-        prop_length = cycle_length_Property()
-        prop_duration = cycle_duration_Property()
-        prop_level = level_Property()
+        prop_ID = create_cycle_id_property()
+        prop_cells = create_cells_property()
+        prop_length = create_cycle_length_property()
+        prop_duration = create_cycle_duration_property()
+        prop_level = create_level_property()
         for prop in [prop_ID, prop_cells, prop_length, prop_duration, prop_level]:
             if prop.identifier not in self.props:
                 self._add_prop(prop)

@@ -19,7 +19,7 @@ from pycellin.classes import (
     CellLineage,
 )
 from pycellin.custom_types import PropertyType
-from pycellin.graph.properties.core import cell_ID_Property
+from pycellin.graph.properties.core import create_cell_id_property
 
 
 def _get_units(
@@ -731,7 +731,7 @@ def _update_props_metadata(
         True if the model has segmentation data, False otherwise.
     """
     # Node properties.
-    prop_cell_ID = cell_ID_Property("TrackMate")
+    prop_cell_ID = create_cell_id_property("TrackMate")
     props_md._add_prop(prop_cell_ID)
     props_md._protect_prop("cell_ID")
     for axis in ["x", "y", "z"]:
