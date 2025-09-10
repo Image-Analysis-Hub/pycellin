@@ -210,7 +210,7 @@ def _unit_to_dimension(
                     dimension = "POSITION"
                 else:
                     dimension = "LENGTH"
-            case "none" | "frame":
+            case None | "frame":
                 dimension = "NONE"
         # TODO: It's going to be a nightmare to deal with all the possible cases.
         # Is it even possible? Maybe I could ask the user for a file with
@@ -1025,8 +1025,7 @@ def export_TrackMate_XML(
 if __name__ == "__main__":
     xml_in = "sample_data/FakeTracks.xml"
     # xml_out = "sample_data/results/FakeTracks_TMtoTM.xml"
-    xml_out = "/home/lxenard/Documents/FakeTracks_exported_TM.xml"
-
+    xml_out = "sample_data/results/FakeTracks_exported_TM.xml"
     # xml_in = "sample_data/Celegans-5pc-17timepoints.xml"
     # xml_out = "sample_data/Celegans-5pc-17timepoints_exported_TM.xml"
 

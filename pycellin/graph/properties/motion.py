@@ -70,6 +70,19 @@ def _get_branch_edge_property_values(
     return values
 
 
+def create_cell_displacement_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "cell_displacement",
+        name="Cell displacement",
+        description="Displacement of the cell between two consecutive detections",
+        provenance="pycellin",
+        prop_type="edge",
+        lin_type="CellLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
 class CellDisplacement(EdgeLocalPropCalculator):
     """
     Calculator to compute the displacement of a cell between two consecutive detections.
@@ -110,6 +123,22 @@ class CellDisplacement(EdgeLocalPropCalculator):
         # pos1 = lineage.nodes[edge[0]]["cell_location"]
         # pos2 = lineage.nodes[edge[1]]["cell_location"]
         return math.dist(pos1, pos2)
+
+
+def create_branch_total_displacement_property(
+    custom_identifier: str | None,
+    unit: str,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "branch_total_displacement",
+        name="Branch total displacement",
+        description="Displacement of the cell during the cell cycle",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=unit,
+    )
 
 
 class BranchTotalDisplacement(NodeGlobalPropCalculator):
@@ -159,6 +188,19 @@ class BranchTotalDisplacement(NodeGlobalPropCalculator):
         return np.nansum(disps)
 
 
+def create_branch_mean_displacement_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "branch_mean_displacement",
+        name="Branch mean displacement",
+        description="Mean displacement of the cell during the cell cycle",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
 class BranchMeanDisplacement(NodeGlobalPropCalculator):
     """
     Calculator to compute the mean displacement of a cell during a cell cycle.
@@ -204,6 +246,19 @@ class BranchMeanDisplacement(NodeGlobalPropCalculator):
             "cell_displacement", data, lineage, nid, self.include_incoming_edge
         )
         return np.nanmean(disps).item()
+
+
+def create_cell_speed_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "cell_speed",
+        name="Cell speed",
+        description="Speed of the cell between two consecutive detections",
+        provenance="pycellin",
+        prop_type="edge",
+        lin_type="CellLineage",
+        dtype="float",
+        unit=unit,
+    )
 
 
 class CellSpeed(EdgeLocalPropCalculator):
@@ -259,6 +314,19 @@ class CellSpeed(EdgeLocalPropCalculator):
             return math.dist(pos1, pos2) / (time2 - time1)
 
 
+def create_branch_mean_speed_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "branch_mean_speed",
+        name="Branch mean speed",
+        description="Mean speed of the cell during the cell cycle",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
 class BranchMeanSpeed(NodeGlobalPropCalculator):
     """
     Calculator to compute the mean speed of a cell during a cell cycle.
@@ -304,6 +372,18 @@ class BranchMeanSpeed(NodeGlobalPropCalculator):
             "cell_speed", data, lineage, nid, self.include_incoming_edge
         )
         return np.nanmean(speeds).item()
+
+
+def create_straightness_property(custom_identifier: str | None) -> Property:
+    return Property(
+        identifier=custom_identifier or "straightness",
+        name="Straightness",
+        description="Straightness of the cell displacement",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+    )
 
 
 class Straightness(NodeGlobalPropCalculator):
@@ -397,6 +477,21 @@ class Straightness(NodeGlobalPropCalculator):
             cell_lin.nodes[cells[-1]]["cell_z"],
         )
         return math.dist(first_cell_loc, last_cell_loc) / sum(distances)
+
+
+def create_angle_property(
+    custom_identifier: str | None, unit: Literal["radian", "degree"]
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "angle",
+        name="Angle",
+        description="Angle of the cell trajectory between two consecutive detections",
+        provenance="pycellin",
+        prop_type="edge",
+        lin_type="CellLineage",
+        dtype="float",
+        unit=unit,
+    )
 
 
 class Angle(NodeGlobalPropCalculator):

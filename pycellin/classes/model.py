@@ -961,15 +961,9 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
-        prop = Property(
-            identifier=custom_identifier if custom_identifier else "absolute_age",
-            name="Absolute age",
-            description="Age of the cell since the beginning of the lineage",
-            provenance="pycellin",
-            prop_type="node",
-            lin_type="CellLineage",
-            dtype="float" if in_time_unit else "int",
-            unit=self.model_metadata["time_step"] if in_time_unit else "frame",
+        prop = tracking.create_absolute_age_property(
+            custom_identifier=custom_identifier,
+            unit=self.model_metadata["time_unit"] if in_time_unit else "frame",
         )
         time_step = self.model_metadata["time_step"] if in_time_unit else 1
         self.add_custom_property(tracking.AbsoluteAge(prop, time_step))
@@ -992,14 +986,8 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
-        prop = Property(
-            identifier=custom_identifier if custom_identifier else "angle",
-            name="Angle",
-            description=("Angle of the cell trajectory between two consecutive detections"),
-            provenance="pycellin",
-            prop_type="edge",
-            lin_type="CellLineage",
-            dtype="float",
+        prop = motion.create_angle_property(
+            custom_identifier=custom_identifier,
             unit=unit,
         )
         self.add_custom_property(motion.Angle(prop, unit))
@@ -1019,14 +1007,8 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
-        prop = Property(
-            identifier=custom_identifier if custom_identifier else "branch_mean_displacement",
-            name="Branch mean displacement",
-            description="Mean displacement of the cell during the cell cycle",
-            provenance="pycellin",
-            prop_type="node",
-            lin_type="CycleLineage",
-            dtype="float",
+        prop = motion.create_branch_mean_displacement_property(
+            custom_identifier=custom_identifier,
             unit=self.model_metadata["space_unit"],
         )
         self.add_custom_property(motion.BranchMeanDisplacement(prop))
@@ -1050,14 +1032,8 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
-        prop = Property(
-            identifier=custom_identifier if custom_identifier else "branch_mean_speed",
-            name="Branch mean speed",
-            description="Mean speed of the cell during the cell cycle",
-            provenance="pycellin",
-            prop_type="node",
-            lin_type="CycleLineage",
-            dtype="float",
+        prop = motion.create_branch_mean_speed_property(
+            custom_identifier=custom_identifier,
             unit=f"{self.model_metadata['space_unit']} / {self.model_metadata['time_unit']}",
         )
         self.add_custom_property(motion.BranchMeanSpeed(prop, include_incoming_edge))
@@ -1077,14 +1053,8 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
-        prop = Property(
-            identifier=custom_identifier if custom_identifier else "branch_total_displacement",
-            name="Branch total displacement",
-            description="Displacement of the cell during the cell cycle",
-            provenance="pycellin",
-            prop_type="node",
-            lin_type="CycleLineage",
-            dtype="float",
+        prop = motion.create_branch_total_displacement_property(
+            custom_identifier=custom_identifier,
             unit=self.model_metadata["space_unit"],
         )
         self.add_custom_property(motion.BranchTotalDisplacement(prop))
@@ -1108,15 +1078,8 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
-        prop = Property(
-            identifier=custom_identifier if custom_identifier else "cycle_completeness",
-            name="Cycle completeness",
-            description="Completeness of the cell cycle",
-            provenance="pycellin",
-            prop_type="node",
-            lin_type="CycleLineage",
-            dtype="bool",
-            unit="none",
+        prop = tracking.create_cycle_completeness_property(
+            custom_identifier=custom_identifier,
         )
         self.add_custom_property(tracking.CycleCompleteness(prop))
 
@@ -1135,14 +1098,8 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
-        prop = Property(
-            identifier=custom_identifier if custom_identifier else "cell_displacement",
-            name="Cell displacement",
-            description="Displacement of the cell between two consecutive detections",
-            provenance="pycellin",
-            prop_type="edge",
-            lin_type="CellLineage",
-            dtype="float",
+        prop = motion.create_cell_displacement_property(
+            custom_identifier=custom_identifier,
             unit=self.model_metadata["space_unit"],
         )
         self.add_custom_property(motion.CellDisplacement(prop))
@@ -1155,14 +1112,8 @@ class Model:
         width_ignore_tips: bool = False,
         custom_identifier: str | None = None,
     ) -> None:
-        prop = Property(
-            identifier=custom_identifier if custom_identifier else "rod_length",
-            name="Rod length",
-            description="Length of the cell, for rod-shaped cells only",
-            provenance="pycellin",
-            prop_type="node",
-            lin_type="CellLineage",
-            dtype="float",
+        prop = morpho.create_rod_length_property(
+            custom_identifier=custom_identifier,
             unit=self.model_metadata["space_unit"],
         )
         calc = morpho.RodLength(
@@ -1196,14 +1147,8 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
-        prop = Property(
-            identifier=custom_identifier if custom_identifier else "cell_speed",
-            name="Cell speed",
-            description="Speed of the cell between two consecutive detections",
-            provenance="pycellin",
-            prop_type="edge",
-            lin_type="CellLineage",
-            dtype="float",
+        prop = motion.create_cell_speed_property(
+            custom_identifier=custom_identifier,
             unit=(
                 f"{self.model_metadata['space_unit']}/{self.model_metadata['time_unit']}"
                 if in_time_unit
@@ -1221,14 +1166,8 @@ class Model:
         width_ignore_tips: bool = False,
         custom_identifier: str | None = None,
     ) -> None:
-        prop = Property(
-            identifier=custom_identifier if custom_identifier else "rod_width",
-            name="Rod width",
-            description="Width of the cell, for rod-shaped cells only",
-            provenance="pycellin",
-            prop_type="node",
-            lin_type="CellLineage",
-            dtype="float",
+        prop = morpho.create_rod_width_property(
+            custom_identifier=custom_identifier,
             unit=self.model_metadata["space_unit"],
         )
         calc = morpho.RodWidth(
@@ -1262,14 +1201,8 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
-        prop = Property(
-            identifier=custom_identifier if custom_identifier else "division_rate",
-            name="Division rate",
-            description="Number of divisions per time unit",
-            provenance="pycellin",
-            prop_type="node",
-            lin_type="CycleLineage",
-            dtype="float",
+        prop = tracking.create_division_rate_property(
+            custom_identifier=custom_identifier,
             unit=f"1/{self.model_metadata['time_unit']}" if in_time_unit else "1/frame",
         )
         time_step = self.model_metadata["time_step"] if in_time_unit else 1
@@ -1296,15 +1229,9 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
-        prop = Property(
-            identifier=custom_identifier if custom_identifier else "division_time",
-            name="Division time",
-            description="Time elapsed between the birth of a cell and its division",
-            provenance="pycellin",
-            prop_type="node",
-            lin_type="CycleLineage",
-            dtype="float" if in_time_unit else "int",
-            unit=self.model_metadata["time_step"] if in_time_unit else "frame",
+        prop = tracking.create_division_time_property(
+            custom_identifier=custom_identifier,
+            unit=self.model_metadata["time_unit"] if in_time_unit else "frame",
         )
         time_step = self.model_metadata["time_step"] if in_time_unit else 1
         self.add_custom_property(tracking.DivisionTime(prop, time_step))
@@ -1331,15 +1258,9 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
-        prop = Property(
-            identifier=custom_identifier if custom_identifier else "relative_age",
-            name="Relative age",
-            description="Age of the cell since the beginning of the current cell cycle",
-            provenance="pycellin",
-            prop_type="node",
-            lin_type="CellLineage",
-            dtype="float" if in_time_unit else "int",
-            unit=self.model_metadata["time_step"] if in_time_unit else "frame",
+        prop = tracking.create_relative_age_property(
+            custom_identifier=custom_identifier,
+            unit=self.model_metadata["time_unit"] if in_time_unit else "frame",
         )
         time_step = self.model_metadata["time_step"] if in_time_unit else 1
         self.add_custom_property(tracking.RelativeAge(prop, time_step))
@@ -1366,15 +1287,7 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
-        prop = Property(
-            identifier=custom_identifier if custom_identifier else "straightness",
-            name="Straightness",
-            description="Straightness of the cell displacement",
-            provenance="pycellin",
-            prop_type="node",
-            lin_type="CycleLineage",
-            dtype="float",
-        )
+        prop = motion.create_straightness_property(custom_identifier=custom_identifier)
         self.add_custom_property(motion.Straightness(prop, include_incoming_edge))
 
     def _get_prop_method(self, prop_identifier: str) -> Callable:

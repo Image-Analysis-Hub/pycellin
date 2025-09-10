@@ -18,6 +18,7 @@ from shapely.geometry import Point, LineString
 from skimage.morphology import skeletonize
 
 from pycellin.classes.lineage import CellLineage
+from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import NodeLocalPropCalculator
 
 # TODO:
@@ -429,6 +430,19 @@ def get_width_and_length(
     return width, length
 
 
+def create_rod_width_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "rod_width",
+        name="Rod width",
+        description="Width of the cell, for rod-shaped cells only",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
 class RodWidth(NodeLocalPropCalculator):
     def __init__(
         self,
@@ -464,6 +478,19 @@ class RodWidth(NodeLocalPropCalculator):
             self.debug,
             self.debug_folder,
         )[0]
+
+
+def create_rod_length_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "rod_length",
+        name="Rod length",
+        description="Length of the cell, for rod-shaped cells only",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float",
+        unit=unit,
+    )
 
 
 class RodLength(NodeLocalPropCalculator):

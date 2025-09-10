@@ -39,6 +39,19 @@ from pycellin.classes.property_calculator import NodeGlobalPropCalculator
 # TODO: add calculator for mandatory cycle lineage properties (e.g. cycle length)
 
 
+def create_absolute_age_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "absolute_age",
+        name="absolute age",
+        description="Age of the cell since the beginning of the lineage",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float" if unit != "frame" else "int",
+        unit=unit,
+    )
+
+
 class AbsoluteAge(NodeGlobalPropCalculator):
     """
     Calculator to compute the absolute age of cells.
@@ -91,6 +104,19 @@ class AbsoluteAge(NodeGlobalPropCalculator):
             raise KeyError(f"Cell {nid} not in the lineage.")
         age_in_frame = lineage.nodes[nid]["frame"] - lineage.nodes[root]["frame"]
         return age_in_frame * self.time_step
+
+
+def create_relative_age_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "relative_age",
+        name="Relative age",
+        description="Age of the cell since the beginning of the current cell cycle",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float" if unit != "frame" else "int",
+        unit=unit,
+    )
 
 
 class RelativeAge(NodeGlobalPropCalculator):
@@ -146,6 +172,20 @@ class RelativeAge(NodeGlobalPropCalculator):
         first_cell = lineage.get_cell_cycle(nid)[0]
         age_in_frame = lineage.nodes[nid]["frame"] - lineage.nodes[first_cell]["frame"]
         return age_in_frame * self.time_step
+
+
+def create_cycle_completeness_property(
+    custom_identifier: str | None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "cycle_completeness",
+        name="Cycle completeness",
+        description="Completeness of the cell cycle",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="bool",
+    )
 
 
 class CycleCompleteness(NodeGlobalPropCalculator):
@@ -284,6 +324,19 @@ def _get_cycle_lin_frames(data: Data, lineage: CycleLineage, nid: int) -> tuple[
     return frame_current_div, frame_prev_div
 
 
+def create_division_time_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "division_time",
+        name="Division time",
+        description="Time between two successive divisions",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float" if unit != "frame" else "int",
+        unit=unit,
+    )
+
+
 class DivisionTime(NodeGlobalPropCalculator):
     """
     Calculator to compute the division time of cells.
@@ -340,6 +393,19 @@ class DivisionTime(NodeGlobalPropCalculator):
             )
 
         return (frame_curr_div - frame_prev_div) * self.time_step
+
+
+def create_division_rate_property(custom_identifier: str | None, unit: str | None) -> Property:
+    return Property(
+        identifier=custom_identifier or "division_rate",
+        name="Division rate",
+        description="Number of divisions per time unit",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=unit,
+    )
 
 
 class DivisionRate(NodeGlobalPropCalculator):
