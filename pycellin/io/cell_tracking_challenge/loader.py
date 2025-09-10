@@ -8,7 +8,7 @@ This module is part of the pycellin package.
 
 This module provides functions to load and process Cell Tracking Challenge (CTC) files
 into pycellin models. It includes a function to load a CTC file into pycellin model
-and helper functions to create metadata, features, and lineage graphs.
+and helper functions to create metadata, properties, and lineage graphs.
 
 References:
 - CTC website: https://celltrackingchallenge.net/
@@ -27,15 +27,13 @@ import networkx as nx
 from skimage.measure import regionprops, find_contours
 import tifffile
 
-from pycellin.classes.feature import (
-    Feature,
-    FeaturesDeclaration,
-    cell_ID_Feature,
-    frame_Feature,
-    lineage_ID_Feature,
-    cell_coord_Feature,
+from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
+from pycellin.graph.properties.core import (
+    create_cell_id_property,
+    create_frame_property,
+    create_lineage_id_property,
+    create_cell_coord_property,
 )
-from pycellin.classes import CellLineage, Data, Model
 
 # TODO: what if the first frame is empty...?
 
@@ -201,9 +199,9 @@ def _create_metadata(
     return metadata
 
 
-def _create_FeaturesDeclaration(seg_data: bool) -> FeaturesDeclaration:
+def _create_PropsMetadata(seg_data: bool) -> PropsMetadata:
     """
-    Return a FeaturesDeclaration object populated with pycellin basic features.
+    Return a PropsMetadata object populated with pycellin basic properties.
 
     Parameters
     ----------
@@ -212,34 +210,35 @@ def _create_FeaturesDeclaration(seg_data: bool) -> FeaturesDeclaration:
 
     Returns
     -------
-    FeaturesDeclaration
-        An instance of FeaturesDeclaration populated with cell and lineage
-        identification features.
+    PropsMetadata
+        An instance of PropsMetadata populated with cell and lineage
+        identification properties.
     """
-    feat_declaration = FeaturesDeclaration()
-    cell_ID_feat = cell_ID_Feature()
-    frame_feat = frame_Feature()
-    lin_ID_feat = lineage_ID_Feature()
-    for feat in [cell_ID_feat, frame_feat, lin_ID_feat]:
-        feat_declaration._add_feature(feat)
-        feat_declaration._protect_feature(feat.name)
+    props_md = PropsMetadata()
+    cell_ID_prop = create_cell_id_property()
+    frame_prop = create_frame_property()
+    lin_ID_prop = create_lineage_id_property()
+    for prop in [cell_ID_prop, frame_prop, lin_ID_prop]:
+        props_md._add_prop(prop)
+        props_md._protect_prop(prop.identifier)
     if seg_data:
         # TODO: deal with z dimension
         # TODO: put the real unit, pixel is juste a placeholder for now
-        cell_x_feat = cell_coord_Feature(unit="pixel", axis="x", provenance="CTC")
-        cell_y_feat = cell_coord_Feature(unit="pixel", axis="y", provenance="CTC")
-        roi_coords_feat = Feature(
-            name="ROI_coords",
+        cell_x_prop = create_cell_coord_property(unit="pixel", axis="x", provenance="CTC")
+        cell_y_prop = create_cell_coord_property(unit="pixel", axis="y", provenance="CTC")
+        roi_coords_prop = Property(
+            identifier="ROI_coords",
+            name="ROI coords",
             description="List of coordinates of the region of interest",
             provenance="CTC",
-            feat_type="node",
+            prop_type="node",
             lin_type="CellLineage",
-            data_type="float",
+            dtype="float",
             unit="pixel",
         )
-        feat_declaration._add_features([cell_x_feat, cell_y_feat, roi_coords_feat])
+        props_md._add_props([cell_x_prop, cell_y_prop, roi_coords_prop])
 
-    return feat_declaration
+    return props_md
 
 
 def _read_track_line(
@@ -339,12 +338,12 @@ def _merge_tracks(
 
 def _update_node_attributes(
     lineage: CellLineage,
-    lineage_id: int,
+    lid: int,
 ) -> None:
     """
     Update the nodes attributes in a lineage graph.
 
-    This function assigns a new unique track ID to the entire lineage
+    This function assigns a new unique ID to the entire lineage
     and to each node within it. It also cleans up the node attributes
     by removing the 'TRACK' and 'PARENT' attributes, that were only needed
     for graph construction.
@@ -353,10 +352,10 @@ def _update_node_attributes(
     ----------
     lineage : CellLineage
         The lineage graph whose node attributes are to be updated.
-    lineage_id : int
-        The new track ID to be assigned to the lineage graph and its nodes.
+    lid : int
+        The new lineage ID to be assigned to the lineage graph and its nodes.
     """
-    lineage.graph["lineage_ID"] = lineage_id
+    lineage.graph["lineage_ID"] = lid
     for _, data in lineage.nodes(data=True):
         # Removing obsolete attributes.
         if "TRACK" in data:
@@ -457,9 +456,7 @@ def _integrate_seg_data(
         if len(node) < 1:
             raise ValueError(f"Label {label} not found in the graph for frame {frame}.")
         elif len(node) > 1:
-            raise ValueError(
-                f"Multiple nodes found for label {label} in frame {frame}."
-            )
+            raise ValueError(f"Multiple nodes found for label {label} in frame {frame}.")
         node = node[0]
         # Updating the nodes.
         graph.nodes[node]["cell_x"] = centroid[0]
@@ -548,9 +545,7 @@ def load_CTC_file(
         if Path(labels_path).is_dir():
             list_paths = sorted(Path(labels_path).glob("*.tif"))
             if len(list_paths) == 0:
-                raise ValueError(
-                    f"No label images found in the directory: {labels_path}"
-                )
+                raise ValueError(f"No label images found in the directory: {labels_path}")
             pattern = r"(\d+)\.tif"
             for label_img_path in list_paths:
                 match = re.search(pattern, str(label_img_path))
@@ -566,8 +561,7 @@ def load_CTC_file(
 
     # We want one lineage per connected component of the graph.
     lineages = [
-        CellLineage(graph.subgraph(c).copy())
-        for c in nx.weakly_connected_components(graph)
+        CellLineage(graph.subgraph(c).copy()) for c in nx.weakly_connected_components(graph)
     ]
 
     # Adding a unique lineage_ID to each lineage and their nodes.
@@ -597,13 +591,12 @@ def load_CTC_file(
         time_unit=time_unit,
         time_step=time_step,
     )
-    fd = _create_FeaturesDeclaration(labels_path is not None)
+    fd = _create_PropsMetadata(labels_path is not None)
     model = Model(md, fd, Data(data))
     return model
 
 
 if __name__ == "__main__":
-
     ctc_file = "sample_data/FakeTracks_TMtoCTC.txt"
     ctc_file = "sample_data/Ecoli_growth_on_agar_pad_TMtoCTC.txt"
     ctc_file = (
@@ -617,7 +610,7 @@ if __name__ == "__main__":
 
     model = load_CTC_file(ctc_file, labels_path)
     print(model)
-    print(model.feat_declaration)
+    print(model.props_metadata)
     print(model.data)
 
     # for lin_id, lin in model.data.cell_data.items():

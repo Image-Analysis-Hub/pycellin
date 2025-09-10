@@ -15,7 +15,7 @@
 
 Pycellin is a graph-based Python framework to easily manipulate and extract information from cell tracking data, at the single-cell level. In pycellin, cell lineages are modeled intuitively by directed rooted trees. Graph nodes represent cells at a specific point in time and space, and graph edges represent the time and space displacement of the cells. Please note that while pycellin is built to support cell division events, **it does not authorize cell merging events**: a cell at a specific timepoint cannot have more than one parent.
 
-Pycellin provides predefined features related to cell morphology, cell motion and tracking that can be automatically added to enrich lineages. More predefined features will be implemented in the future. The framework also facilitates the creation of new features defined by the user to accommodate the wide variety of experiments and biological questions.
+Pycellin provides predefined properties related to cell morphology, cell motion and tracking that can be automatically added to enrich lineages. More predefined properties will be implemented in the future. The framework also facilitates the creation of new properties defined by the user to accommodate the wide variety of experiments and biological questions.
 
 Pycellin can read from and write to:
 - [TrackMate](https://imagej.net/plugins/trackmate/) XMLs,
@@ -77,10 +77,10 @@ model.add_cycle_data()
 for clin in model.get_cycle_lineages():
     plot(clin)
 
-# Enrich your lineages with additional predefined features.
-model.add_pycellin_features([
-    "cell_length", 
-    "cell_width",
+# Enrich your lineages with additional predefined properties.
+model.add_pycellin_properties([
+    "rod_length", 
+    "rod_width",
     "cell_displacement", 
     "cell_speed", 
     "branch_mean_speed",
@@ -105,10 +105,10 @@ Please note that the following notebooks are still a work in progress. There may
 | Notebook                                                                                 | Description                                                       | Level    | State |
 |------------------------------------------------------------------------------------------|-------------------------------------------------------------------|----------|-------|
 | [Getting started](./notebooks/Getting%20started.ipynb)                                   | The basics of pycellin, through examples                          | Beginner | WIP   |
-| [Managing features](./notebooks/Managing%20features.ipynb)                               | How to add, compute and remove features from a model              | Beginner | WIP   |
+| [Managing properties](./notebooks/Managing%20properties.ipynb)                               | How to add, compute and remove properties from a model              | Beginner | WIP   |
 | [Working with TrackMate data](./notebooks/Working%20with%20TrackMate%20data.ipynb)       | How pycellin can work with TrackMate, through an example          | Beginner | WIP   |
 | [Creating a model from scratch](./notebooks/Creating%20a%20model%20from%20scratch.ipynb) | How to manually create a pycellin model, including its lineages   | Advanced | Stub  |
-| [Custom features](./notebooks/Custom%20features.ipynb)                                   | How to create user-defined features and augment a model with them | Advanced | WIP   |
+| [Custom properties](./notebooks/Custom%20properties.ipynb)                                   | How to create user-defined properties and augment a model with them | Advanced | WIP   |
 
 
 ## Credits and references

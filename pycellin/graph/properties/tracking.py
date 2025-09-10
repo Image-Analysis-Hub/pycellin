@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-A collection of diverse tracking features/attributes that can be added to 
+A collection of diverse tracking properties/attributes that can be added to 
 lineage graphs.
 
 Vocabulary:
-- Feature/Attribute: TrackMate (resp. networkX) uses the word feature (resp. attribute) 
+- Property/Attribute: TrackMate (resp. networkX) uses the word property (resp. attribute) 
   to refer to spot (resp. node), link (resp. edge) or track (resp. graph) information. 
   Both naming are used here, depending on the context.
 - Generation: A generation is a list of nodes between 2 successive divisions. 
@@ -31,15 +31,28 @@ Vocabulary:
 
 import numpy as np
 
-from pycellin.classes import CellLineage, CycleLineage, Data, Feature
+from pycellin.classes import CellLineage, CycleLineage, Data, Property
 from pycellin.classes.exceptions import FusionError
-from pycellin.classes.feature_calculator import NodeGlobalFeatureCalculator
+from pycellin.classes.property_calculator import NodeGlobalPropCalculator
 
 # TODO: should I add the word Calc or Calculator to the class names?
-# TODO: add calculator for mandatory cycle lineage features (e.g. cycle length)
+# TODO: add calculator for mandatory cycle lineage properties (e.g. cycle length)
 
 
-class AbsoluteAge(NodeGlobalFeatureCalculator):
+def create_absolute_age_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "absolute_age",
+        name="absolute age",
+        description="Age of the cell since the beginning of the lineage",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float" if unit != "frame" else "int",
+        unit=unit,
+    )
+
+
+class AbsoluteAge(NodeGlobalPropCalculator):
     """
     Calculator to compute the absolute age of cells.
 
@@ -49,20 +62,20 @@ class AbsoluteAge(NodeGlobalFeatureCalculator):
     to the time unit of the model if specified.
     """
 
-    def __init__(self, feature: Feature, time_step: int | float = 1):
+    def __init__(self, property: Property, time_step: int | float = 1):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         time_step : int | float, optional
             Time step between 2 frames, in time unit. Default is 1.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.time_step = time_step
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage, noi: int
+        self, data: Data, lineage: CellLineage, nid: int
     ) -> int | float:
         """
         Compute the absolute age of a given cell.
@@ -73,7 +86,7 @@ class AbsoluteAge(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CellLineage
             Lineage graph containing the node of interest.
-        noi : int
+        nid : int
             Node ID (cell_ID) of the cell of interest.
 
         Returns
@@ -87,13 +100,26 @@ class AbsoluteAge(NodeGlobalFeatureCalculator):
             If the cell is not in the lineage.
         """
         root = lineage.get_root()
-        if noi not in lineage.nodes:
-            raise KeyError(f"Cell {noi} not in the lineage.")
-        age_in_frame = lineage.nodes[noi]["frame"] - lineage.nodes[root]["frame"]
+        if nid not in lineage.nodes:
+            raise KeyError(f"Cell {nid} not in the lineage.")
+        age_in_frame = lineage.nodes[nid]["frame"] - lineage.nodes[root]["frame"]
         return age_in_frame * self.time_step
 
 
-class RelativeAge(NodeGlobalFeatureCalculator):
+def create_relative_age_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "relative_age",
+        name="Relative age",
+        description="Age of the cell since the beginning of the current cell cycle",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float" if unit != "frame" else "int",
+        unit=unit,
+    )
+
+
+class RelativeAge(NodeGlobalPropCalculator):
     """
     Calculator to compute the relative age of cells.
 
@@ -104,20 +130,20 @@ class RelativeAge(NodeGlobalFeatureCalculator):
     to the time unit of the model if specified.
     """
 
-    def __init__(self, feature: Feature, time_step: int | float = 1):
+    def __init__(self, property: Property, time_step: int | float = 1):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         time_step : int | float, optional
             Time step between 2 frames, in time unit. Default is 1.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.time_step = time_step
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage, noi: int
+        self, data: Data, lineage: CellLineage, nid: int
     ) -> int | float:
         """
         Compute the relative age of a given cell.
@@ -128,7 +154,7 @@ class RelativeAge(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CellLineage
             Lineage graph containing the node of interest.
-        noi : int
+        nid : int
             Node ID (cell_ID) of the cell of interest.
 
         Returns
@@ -141,27 +167,41 @@ class RelativeAge(NodeGlobalFeatureCalculator):
         KeyError
             If the cell is not in the lineage.
         """
-        if noi not in lineage.nodes:
-            raise KeyError(f"Cell {noi} not in the lineage.")
-        first_cell = lineage.get_cell_cycle(noi)[0]
-        age_in_frame = lineage.nodes[noi]["frame"] - lineage.nodes[first_cell]["frame"]
+        if nid not in lineage.nodes:
+            raise KeyError(f"Cell {nid} not in the lineage.")
+        first_cell = lineage.get_cell_cycle(nid)[0]
+        age_in_frame = lineage.nodes[nid]["frame"] - lineage.nodes[first_cell]["frame"]
         return age_in_frame * self.time_step
 
 
-class CycleCompleteness(NodeGlobalFeatureCalculator):
+def create_cycle_completeness_property(
+    custom_identifier: str | None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "cycle_completeness",
+        name="Cycle completeness",
+        description="Completeness of the cell cycle",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="bool",
+    )
+
+
+class CycleCompleteness(NodeGlobalPropCalculator):
     """
     Calculator to compute the cell cycle completeness.
 
     A cell cycle is defined as complete when it starts by a division
     AND ends by a division. Cell cycles that start at the root
     or end with a leaf are thus incomplete.
-    This can be useful when analyzing features like division time. It avoids
+    This can be useful when analyzing properties like division time. It avoids
     the introduction of a bias since we have no information on what happened
     before the root or after the leaves.
     """
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage | CycleLineage, noi: int
+        self, data: Data, lineage: CellLineage | CycleLineage, nid: int
     ) -> bool:
         """
         Compute the cell cycle completeness of a given cell or cell cycle.
@@ -172,7 +212,7 @@ class CycleCompleteness(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CellLineage | CycleLineage
             Lineage graph containing the node (cell or cell cycle) of interest.
-        noi : int
+        nid : int
             Node ID of the node (cell or cell cycle) of interest.
 
         Returns
@@ -186,23 +226,23 @@ class CycleCompleteness(NodeGlobalFeatureCalculator):
             If the cell or cycle is not in the lineage.
         """
         if isinstance(lineage, CellLineage):
-            if noi not in lineage.nodes:
-                raise KeyError(f"Cell {noi} not in the lineage.")
-            cell_cycle = lineage.get_cell_cycle(noi)
+            if nid not in lineage.nodes:
+                raise KeyError(f"Cell {nid} not in the lineage.")
+            cell_cycle = lineage.get_cell_cycle(nid)
             if lineage.is_root(cell_cycle[0]) or lineage.is_leaf(cell_cycle[-1]):
                 return False
             else:
                 return True
         elif isinstance(lineage, CycleLineage):
-            if noi not in lineage.nodes:
-                raise KeyError(f"Cycle {noi} not in the lineage.")
-            if lineage.is_root(noi) or lineage.is_leaf(noi):
+            if nid not in lineage.nodes:
+                raise KeyError(f"Cycle {nid} not in the lineage.")
+            if lineage.is_root(nid) or lineage.is_leaf(nid):
                 return False
             else:
                 return True
 
 
-def _get_cell_lin_frames(lineage: CellLineage, noi: int) -> tuple[int, int]:
+def _get_cell_lin_frames(lineage: CellLineage, nid: int) -> tuple[int, int]:
     """
     Get the frames of the divisions defining the cell cycle.
 
@@ -212,7 +252,7 @@ def _get_cell_lin_frames(lineage: CellLineage, noi: int) -> tuple[int, int]:
     ----------
     lineage : CellLineage
         Lineage graph containing the node of interest.
-    noi : int
+    nid : int
         Node ID (cell_ID) of the cell of interest.
 
     Returns
@@ -227,13 +267,13 @@ def _get_cell_lin_frames(lineage: CellLineage, noi: int) -> tuple[int, int]:
     FusionError
         If the cell has more than one ancestor.
     """
-    if noi not in lineage.nodes:
-        raise KeyError(f"Cell {noi} not in the lineage.")
-    cells = lineage.get_cell_cycle(noi)
+    if nid not in lineage.nodes:
+        raise KeyError(f"Cell {nid} not in the lineage.")
+    cells = lineage.get_cell_cycle(nid)
     frame_current_div = lineage.nodes[cells[-1]]["frame"]
     ancestors = list(lineage.predecessors(cells[0]))
     if len(ancestors) > 1:
-        raise FusionError(noi, lineage.graph["lineage_ID"])
+        raise FusionError(nid, lineage.graph["lineage_ID"])
     elif len(ancestors) == 0:
         frame_prev_div = lineage.nodes[cells[0]]["frame"]
     else:
@@ -241,9 +281,7 @@ def _get_cell_lin_frames(lineage: CellLineage, noi: int) -> tuple[int, int]:
     return frame_current_div, frame_prev_div
 
 
-def _get_cycle_lin_frames(
-    data: Data, lineage: CycleLineage, noi: int
-) -> tuple[int, int]:
+def _get_cycle_lin_frames(data: Data, lineage: CycleLineage, nid: int) -> tuple[int, int]:
     """
     Get the frames of the divisions defining the cell cycle.
 
@@ -255,7 +293,7 @@ def _get_cycle_lin_frames(
         Data object containing the lineage.
     lineage : CycleLineage
         Lineage graph containing the node of interest.
-    noi : int
+    nid : int
         Node ID (cell_ID) of the cell of interest.
 
     Returns
@@ -270,14 +308,14 @@ def _get_cycle_lin_frames(
     FusionError
         If the cycle has more than one ancestor.
     """
-    if noi not in lineage.nodes:
-        raise KeyError(f"Cycle {noi} not in the lineage.")
-    cells = lineage.nodes[noi]["cells"]
+    if nid not in lineage.nodes:
+        raise KeyError(f"Cycle {nid} not in the lineage.")
+    cells = lineage.nodes[nid]["cells"]
     cell_lin = data.cell_data[lineage.graph["lineage_ID"]]
     frame_current_div = cell_lin.nodes[cells[-1]]["frame"]
-    ancestors = list(lineage.predecessors(noi))
+    ancestors = list(lineage.predecessors(nid))
     if len(ancestors) > 1:
-        raise FusionError(noi, lineage.graph["lineage_ID"])
+        raise FusionError(nid, lineage.graph["lineage_ID"])
     elif len(ancestors) == 0:
         frame_prev_div = cell_lin.nodes[cells[0]]["frame"]
     else:
@@ -286,7 +324,20 @@ def _get_cycle_lin_frames(
     return frame_current_div, frame_prev_div
 
 
-class DivisionTime(NodeGlobalFeatureCalculator):
+def create_division_time_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "division_time",
+        name="Division time",
+        description="Time between two successive divisions",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float" if unit != "frame" else "int",
+        unit=unit,
+    )
+
+
+class DivisionTime(NodeGlobalPropCalculator):
     """
     Calculator to compute the division time of cells.
 
@@ -295,20 +346,20 @@ class DivisionTime(NodeGlobalFeatureCalculator):
     be converted to the time unit of the model if specified.
     """
 
-    def __init__(self, feature: Feature, time_step: int | float = 1):
+    def __init__(self, property: Property, time_step: int | float = 1):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         time_step : int | float, optional
             Time step between 2 frames, in time unit. Default is 1.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.time_step = time_step
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage | CycleLineage, noi: int
+        self, data: Data, lineage: CellLineage | CycleLineage, nid: int
     ) -> int | float:
         """
         Compute the division time of a given cell or cell cycle.
@@ -319,7 +370,7 @@ class DivisionTime(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CellLineage | CycleLineage
             Lineage graph containing the node (cell or cell cycle) of interest.
-        noi : int
+        nid : int
             Node ID of the node (cell or cell cycle) of interest.
 
         Returns
@@ -333,19 +384,31 @@ class DivisionTime(NodeGlobalFeatureCalculator):
             If the cell or cycle is not in the lineage.
         """
         if isinstance(lineage, CellLineage):
-            frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, noi)
+            frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, nid)
         elif isinstance(lineage, CycleLineage):
-            frame_curr_div, frame_prev_div = _get_cycle_lin_frames(data, lineage, noi)
+            frame_curr_div, frame_prev_div = _get_cycle_lin_frames(data, lineage, nid)
         else:
             raise TypeError(
-                f"Lineage must be of type CellLineage or CycleLineage, "
-                f"not {type(lineage)}."
+                f"Lineage must be of type CellLineage or CycleLineage, not {type(lineage)}."
             )
 
         return (frame_curr_div - frame_prev_div) * self.time_step
 
 
-class DivisionRate(NodeGlobalFeatureCalculator):
+def create_division_rate_property(custom_identifier: str | None, unit: str | None) -> Property:
+    return Property(
+        identifier=custom_identifier or "division_rate",
+        name="Division rate",
+        description="Number of divisions per time unit",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
+class DivisionRate(NodeGlobalPropCalculator):
     """
     Calculator to compute the division rate of cells.
 
@@ -355,14 +418,12 @@ class DivisionRate(NodeGlobalFeatureCalculator):
     to divisions per time unit of the model if specified.
     """
 
-    def __init__(
-        self, feature: Feature, time_step: int | float = 1, use_div_time: bool = False
-    ):
+    def __init__(self, property: Property, time_step: int | float = 1, use_div_time: bool = False):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         time_step : int | float, optional
             Time step between 2 frames, in time unit. Default is 1.
         use_div_time : bool, optional
@@ -370,17 +431,17 @@ class DivisionRate(NodeGlobalFeatureCalculator):
             If False, compute the division time from the lineage. Default is False.
             The first option is faster but you need to ensure that the division time
             is computed and updated BEFORE division rate. This can be ensured
-            by adding to the model the division time feature before the division
-            rate feature. Moreover, if `use_div_time` is True, `time_step` will be
+            by adding to the model the division time property before the division
+            rate property. Moreover, if `use_div_time` is True, `time_step` will be
             ignored: division rate will use the division time unit (e.g. if division
             time is in frames, division rate will be in divisions per frame).
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.time_step = time_step
         self.use_div_time = use_div_time
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage | CycleLineage, noi: int
+        self, data: Data, lineage: CellLineage | CycleLineage, nid: int
     ) -> int | float:
         """
         Compute the division rate of a given cell or cell cycle.
@@ -391,7 +452,7 @@ class DivisionRate(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CellLineage | CycleLineage
             Lineage graph containing the node (cell or cell cycle) of interest.
-        noi : int
+        nid : int
             Node ID of the node (cell or cell cycle) of interest.
 
         Returns
@@ -405,22 +466,21 @@ class DivisionRate(NodeGlobalFeatureCalculator):
             If the cell or cycle is not in the lineage.
         """
         if self.use_div_time:
-            if noi not in lineage.nodes:
+            if nid not in lineage.nodes:
                 if isinstance(lineage, CellLineage):
                     lin_txt = "Cell"
                 elif isinstance(lineage, CycleLineage):
                     lin_txt = "Cycle"
                 else:
                     raise TypeError(
-                        f"Lineage must be of type CellLineage or CycleLineage, "
-                        f"not {type(lineage)}."
+                        f"Lineage must be of type CellLineage or CycleLineage, not {type(lineage)}."
                     )
-                raise KeyError(f"{lin_txt} {noi} not in the lineage.")
+                raise KeyError(f"{lin_txt} {nid} not in the lineage.")
             try:
-                div_time = lineage.nodes[noi]["division_time"]
+                div_time = lineage.nodes[nid]["division_time"]
             except KeyError:
                 raise KeyError(
-                    f"Division time not present for cell {noi} in lineage "
+                    f"Division time not present for cell {nid} in lineage "
                     f"{lineage.graph['lineage_ID']}."
                 )
             if div_time == 0:
@@ -429,13 +489,12 @@ class DivisionRate(NodeGlobalFeatureCalculator):
                 return 1 / div_time
 
         if isinstance(lineage, CellLineage):
-            frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, noi)
+            frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, nid)
         elif isinstance(lineage, CycleLineage):
-            frame_curr_div, frame_prev_div = _get_cycle_lin_frames(data, lineage, noi)
+            frame_curr_div, frame_prev_div = _get_cycle_lin_frames(data, lineage, nid)
         else:
             raise TypeError(
-                f"Lineage must be of type CellLineage or CycleLineage, "
-                f"not {type(lineage)}."
+                f"Lineage must be of type CellLineage or CycleLineage, not {type(lineage)}."
             )
 
         div_time = (frame_curr_div - frame_prev_div) * self.time_step
@@ -445,9 +504,9 @@ class DivisionRate(NodeGlobalFeatureCalculator):
             return 1 / div_time
 
 
-# class CellPhase(NodeGlobalFeatureCalculator):
+# class CellPhase(NodeGlobalPropCalculator):
 
-#     def compute(self, data: Data, lineage: CellLineage, noi: int) -> str:
+#     def compute(self, data: Data, lineage: CellLineage, nid: int) -> str:
 #         """
 #         Compute the phase(s) of the cell of interest.
 
@@ -468,7 +527,7 @@ class DivisionRate(NodeGlobalFeatureCalculator):
 #             Data object containing the lineage.
 #         lineage : CellLineage
 #             Lineage graph containing the cell of interest.
-#         noi : int
+#         nid : int
 #             Node ID (cell_ID) of the cell of interest.
 
 #         Returns
@@ -486,15 +545,15 @@ class DivisionRate(NodeGlobalFeatureCalculator):
 
 #         tag = ""
 #         # Straightforward cases.
-#         if lineage.is_root(noi):
+#         if lineage.is_root(nid):
 #             tag = append_tag(tag, "first")
-#         if lineage.is_leaf(noi):
+#         if lineage.is_leaf(nid):
 #             tag = append_tag(tag, "last")
-#         if lineage.is_division(noi):
+#         if lineage.is_division(nid):
 #             tag = append_tag(tag, "division")
 #         # Checking for cell birth.
-#         cc = lineage.get_cell_cycle(noi)
-#         if noi == cc[0]:
+#         cc = lineage.get_cell_cycle(nid)
+#         if nid == cc[0]:
 #             tag = append_tag(tag, "birth")
 
 #         if not tag:
