@@ -23,8 +23,8 @@ from pycellin.graph.properties.core import create_cell_id_property
 from pycellin.io.utils import (
     _split_graph_into_lineages,
     check_fusions,
-    _update_node_feature_key,
-    _update_lineage_feature_key,
+    _update_node_prop_key,
+    _update_lineage_prop_key,
     _update_lineages_IDs_key,
 )
 
@@ -840,7 +840,7 @@ def _parse_model_tag(
     # into its connected components.
     lineages = _split_graph_into_lineages(
         graph,
-        lin_features=tracks_attributes,
+        lin_props=tracks_attributes,
         lineage_ID_key="TRACK_ID",
     )
 
@@ -856,8 +856,8 @@ def _parse_model_tag(
             ("FRAME", "frame"),  # mandatory
             ("name", "cell_name"),  # confusing
         ]:
-            _update_node_feature_key(lin, key_name, new_key)
-        _update_lineage_feature_key(lin, "name", "lineage_name")
+            _update_node_prop_key(lin, key_name, new_key)
+        _update_lineage_prop_key(lin, "name", "lineage_name")
         _update_location_related_props(lin)
 
         # Adding if each track was present in the 'FilteredTracks' tag

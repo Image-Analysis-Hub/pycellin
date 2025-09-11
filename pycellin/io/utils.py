@@ -25,23 +25,23 @@ def check_fusions(model: Model) -> None:
         fusion_warning = (
             f"Unsupported data, {len(all_fusions)} cell fusions detected. "
             "It is advised to deal with them before any other processing, "
-            "especially for tracking related features. Crashes and incorrect "
+            "especially for tracking related properties. Crashes and incorrect "
             "results can occur. See documentation for more details."
         )
         warnings.warn(fusion_warning)
 
 
-def _add_lineages_features(
+def _add_lineage_props(
     lineages: list[CellLineage],
-    lin_features: list[dict[str, Any]],
+    lin_props: list[dict[str, Any]],
     lineage_ID_key: str | None = "lineage_ID",
 ) -> None:
     """
-    Update each CellLineage in the list with corresponding lineage features.
+    Update each CellLineage in the list with corresponding lineage properties.
 
     This function iterates over a list of CellLineage objects,
     attempting to match each lineage with its corresponding lineage
-    features based on the 'lineage_ID_key' feature present in the
+    properties based on the 'lineage_ID_key' property present in the
     lineage nodes. It then updates the lineage graph with these
     attributes.
 
@@ -49,8 +49,8 @@ def _add_lineages_features(
     ----------
     lineages : list[CellLineage]
         A list of the lineages to update.
-    lin_features : list[dict[str, Any]]
-        A list of dictionaries, where each dictionary contains features
+    lin_props : list[dict[str, Any]]
+        A list of dictionaries, where each dictionary contains properties
         for a specific lineage, identified by a the given 'lineage_ID_key' key.
     lineage_ID_key : str | None, optional
         The key used to identify the lineage in the attributes.
@@ -63,7 +63,7 @@ def _add_lineages_features(
         assignment.
     """
     for lin in lineages:
-        # Finding the dict of features matching the lineage.
+        # Finding the dict of properties matching the lineage.
         tmp = set(t_id for _, t_id in lin.nodes(data=lineage_ID_key))
 
         if not tmp:
@@ -71,28 +71,28 @@ def _add_lineages_features(
             # Even if it can't be updated, we still want to return this graph.
             continue
         elif tmp == {None}:
-            # Happens when all the nodes do not have a 'lineage_ID_key' feature.
+            # Happens when all the nodes do not have a 'lineage_ID_key' property.
             continue
         elif None in tmp:
             # Happens when at least one node does not have a 'lineage_ID_key'
-            # feature, so we clean 'tmp' and carry on.
+            # property, so we clean 'tmp' and carry on.
             tmp.remove(None)
         elif len(tmp) != 1:
             raise ValueError("Impossible state: several IDs for one lineage.")
 
         current_lineage_id = list(tmp)[0]
         current_lineage_attr = [
-            d_attr for d_attr in lin_features if d_attr[lineage_ID_key] == current_lineage_id
+            d_attr for d_attr in lin_props if d_attr[lineage_ID_key] == current_lineage_id
         ][0]
 
-        # Adding the features to the lineage.
+        # Adding the properties to the lineage.
         for k, v in current_lineage_attr.items():
             lin.graph[k] = v
 
 
 def _split_graph_into_lineages(
     graph: nx.DiGraph,
-    lin_features: list[dict[str, Any]] | None = None,
+    lin_props: list[dict[str, Any]] | None = None,
     lineage_ID_key: str | None = "lineage_ID",
 ) -> list[CellLineage]:
     """
@@ -102,7 +102,7 @@ def _split_graph_into_lineages(
     ----------
     lineage : nx.DiGraph
         The graph to split.
-    lin_features : list[dict[str, Any]] | None
+    lin_props : list[dict[str, Any]] | None
         A list of dictionaries, where each dictionary contains TrackMate
         attributes for a specific track, identified by a 'TRACK_ID' key.
         If None, no attributes will be added to the lineages.
@@ -118,14 +118,14 @@ def _split_graph_into_lineages(
         CellLineage(graph.subgraph(c).copy()) for c in nx.weakly_connected_components(graph)
     ]
     del graph  # Redondant with the subgraphs.
-    if not lin_features:
+    if not lin_props:
         # We need to create and add a lineage_ID key to each lineage.
         for i, lin in enumerate(lineages):
             lin.graph["lineage_ID"] = i
     else:
-        # Adding lineage features to each lineage.
+        # Adding lineage properties to each lineage.
         try:
-            _add_lineages_features(lineages, lin_features, lineage_ID_key)
+            _add_lineage_props(lineages, lin_props, lineage_ID_key)
         except ValueError as err:
             print(err)
             # The program is in an impossible state so we need to stop.
@@ -134,7 +134,7 @@ def _split_graph_into_lineages(
     return lineages
 
 
-def _update_node_feature_key(
+def _update_node_prop_key(
     lineage: CellLineage,
     old_key: str,
     new_key: str,
@@ -143,16 +143,16 @@ def _update_node_feature_key(
     default_value: Any | None = None,
 ) -> None:
     """
-    Update the key of a feature in all the nodes of a lineage.
+    Update the key of a property in all the nodes of a lineage.
 
     Parameters
     ----------
     lineage : CellLineage
         The lineage to update.
     old_key : str
-        The old key of the feature.
+        The old key of the property.
     new_key : str
-        The new key of the feature.
+        The new key of the property.
     enforce_old_key_existence : bool, optional
         If True, raises an error when the old key does not exist in a node.
         If False, the function will skip nodes that do not have the old key.
@@ -181,22 +181,22 @@ def _update_node_feature_key(
                 lineage.nodes[node][new_key] = default_value
 
 
-def _update_lineage_feature_key(
+def _update_lineage_prop_key(
     lineage: CellLineage,
     old_key: str,
     new_key: str,
 ) -> None:
     """
-    Update the key of a feature in the graph of a lineage.
+    Update the key of a property in the graph of a lineage.
 
     Parameters
     ----------
     lineage : CellLineage
         The lineage to update.
     old_key : str
-        The old key of the feature.
+        The old key of the property.
     new_key : str
-        The new key of the feature.
+        The new key of the property.
     """
     if old_key in lineage.graph:
         lineage.graph[new_key] = lineage.graph.pop(old_key)
