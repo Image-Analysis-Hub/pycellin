@@ -23,9 +23,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     Abstract class for a lineage graph.
     """
 
-    def __init__(
-        self, nx_digraph: nx.DiGraph | None = None, lineage_ID: int | None = None
-    ) -> None:
+    def __init__(self, nx_digraph: nx.DiGraph | None = None, lid: int | None = None) -> None:
         """
         Initialize a lineage graph.
 
@@ -34,43 +32,41 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         nx_digraph : nx.DiGraph, optional
             A NetworkX directed graph to initialize the lineage with,
             by default None.
-        lineage_ID : int, optional
+        lid : int, optional
             The ID of the lineage, by default None.
         """
         super().__init__(incoming_graph_data=nx_digraph)
-        if lineage_ID is not None:
-            assert isinstance(lineage_ID, int), "The lineage ID must be an integer."
-            self.graph["lineage_ID"] = lineage_ID
+        if lid is not None:
+            assert isinstance(lid, int), "The lineage ID must be an integer."
+            self.graph["lineage_ID"] = lid
 
-    def _remove_feature(self, feature_name: str, feature_type: str) -> None:
+    def _remove_prop(self, prop_name: str, prop_type: str) -> None:
         """
-        Remove a feature from the lineage graph based on the feature type.
+        Remove a property from the lineage graph based on the property type.
 
         Parameters
         ----------
-        feature_name : str
-            The name of the feature to remove.
-        feature_type : str
-            The type of feature to remove. Must be one of `node`, `edge`, or `lineage`.
+        prop_name : str
+            The name of the property to remove.
+        prop_type : str
+            The type of property to remove. Must be one of `node`, `edge`, or `lineage`.
 
         Raises
         ------
         ValueError
-            If the feature_type is not one of `node`, `edge`, or `lineage`.
+            If the prop_type is not one of `node`, `edge`, or `lineage`.
         """
-        match feature_type:
+        match prop_type:
             case "node":
                 for _, data in self.nodes(data=True):
-                    data.pop(feature_name, None)
+                    data.pop(prop_name, None)
             case "edge":
                 for _, _, data in self.edges(data=True):
-                    data.pop(feature_name, None)
+                    data.pop(prop_name, None)
             case "lineage":
-                self.graph.pop(feature_name, None)
+                self.graph.pop(prop_name, None)
             case _:
-                raise ValueError(
-                    "Invalid feature_type. Must be one of 'node', 'edge', or 'lineage'."
-                )
+                raise ValueError("Invalid prop_type. Must be one of 'node', 'edge', or 'lineage'.")
 
     def get_root(self, ignore_lone_nodes: bool = False) -> int | list[int]:
         """
@@ -125,16 +121,12 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The list of leaf nodes in the lineage.
         """
         if ignore_lone_nodes:
-            leaves = [
-                n
-                for n in self.nodes()
-                if self.in_degree(n) != 0 and self.out_degree(n) == 0
-            ]
+            leaves = [n for n in self.nodes() if self.in_degree(n) != 0 and self.out_degree(n) == 0]
         else:
             leaves = [n for n in self.nodes() if self.out_degree(n) == 0]
         return leaves
 
-    def get_ancestors(self, node: int) -> list[int]:
+    def get_ancestors(self, nid: int) -> list[int]:
         """
         Return all the ancestors of a given node.
 
@@ -144,35 +136,35 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        node : int
-            A node of the lineage.
+        nid : int
+            ID of the node for which to find ancestors.
 
         Returns
         -------
         list[int]
             A list of all the ancestor nodes.
         """
-        ancestors = list(nx.ancestors(self, node))
+        ancestors = list(nx.ancestors(self, nid))
         return ancestors
 
-    def get_descendants(self, node: int) -> list[int]:
+    def get_descendants(self, nid: int) -> list[int]:
         """
         Return all the descendants of a given node.
 
         Parameters
         ----------
-        node : int
-            A node of the lineage.
+        nid : int
+            ID of the node for which to find descendants.
 
         Returns
         -------
         list[int]
             A list of all the descendant nodes, from target node to leaf nodes.
         """
-        descendants = nx.descendants(self, node)
+        descendants = nx.descendants(self, nid)
         return list(descendants)
 
-    def is_root(self, node: int) -> bool:
+    def is_root(self, nid: int) -> bool:
         """
         Check if a given node is a root node.
 
@@ -181,20 +173,20 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        node : int
-            The node to check.
+        nid : int
+            ID of the node to check.
 
         Returns
         -------
         bool
             True if the node is a root node, False otherwise.
         """
-        if self.in_degree(node) == 0:
+        if self.in_degree(nid) == 0:
             return True
         else:
             return False
 
-    def is_leaf(self, node: int) -> bool:
+    def is_leaf(self, nid: int) -> bool:
         """
         Check if a given node is a leaf node.
 
@@ -202,15 +194,15 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        node : int
-            The node to check.
+        nid : int
+            ID of the node to check.
 
         Returns
         -------
         bool
             True if the node is a leaf node, False otherwise.
         """
-        if self.out_degree(node) == 0:
+        if self.out_degree(nid) == 0:
             return True
         else:
             return False
@@ -229,18 +221,18 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     @abstractmethod
     def plot(
         self,
-        ID_feature: str,
-        y_feature: str,
+        ID_prop: str,
+        y_prop: str,
         y_legend: str,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
-        node_colormap_feature: str | None = None,
+        node_colormap_prop: str | None = None,
         node_color_scale: str | None = None,
-        node_hover_features: list[str] | None = None,
+        node_hover_props: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
-        edge_hover_features: list[str] | None = None,
+        edge_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
@@ -254,16 +246,16 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        ID_feature : str
-            The feature of the nodes to use as identifier.
-        y_feature : str
-            The feature of the nodes to use for the y-axis.
+        ID_prop : str
+            The property of the nodes to use as identifier.
+        y_prop : str
+            The property of the nodes to use for the y-axis.
         y_legend : str
             The label of the y-axis.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
-            The feature of the nodes to display as text inside the nodes
+            The property of the nodes to display as text inside the nodes
             of the plot. If None, no text is displayed. None by default.
         node_text_font : dict, optional
             The font style of the text inside the nodes (size, color, etc).
@@ -272,19 +264,19 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The style of the markers representing the nodes in the plot
             (symbol, size, color, line, etc). If None, defaults to
             current Plotly template.
-        node_colormap_feature : str, optional
-            The feature of the nodes to use for coloring the nodes.
+        node_colormap_prop : str, optional
+            The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
         node_color_scale : str, optional
             The color scale to use for coloring the nodes. If None,
             defaults to current Plotly template.
-        node_hover_features : list[str], optional
+        node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_feature.
+            displaying `cell_ID` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
-        edge_hover_features : list[str], optional
+        edge_hover_props : list[str], optional
             The hover template for the edges. If None, defaults to
             displaying the source and target nodes.
         plot_bgcolor : str, optional
@@ -369,36 +361,32 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 )
             return annotations
 
-        def node_feature_color_mapping():
+        def node_prop_color_mapping():
             # TODO: add colorbar units, but the info is stored in the model
             # FIXME: the colorbar is partially hiding the traces names
             assert node_marker_style is not None
-            node_marker_style["color"] = G.vs[node_colormap_feature]
+            node_marker_style["color"] = G.vs[node_colormap_prop]
             node_marker_style["colorscale"] = node_color_scale
-            node_marker_style["colorbar"] = dict(title=node_colormap_feature)
+            node_marker_style["colorbar"] = dict(title=node_colormap_prop)
 
         def node_hovertemplate():
-            # TODO: when feature is float, display only 2 decimals
+            # TODO: when property is float, display only 2 decimals
             # or give control to the user.
-            if node_hover_features:
+            if node_hover_props:
                 node_hover_text = []
                 for node in G.vs:
                     text = ""
-                    for feat in node_hover_features:
-                        if feat not in node.attributes():
+                    for prop in node_hover_props:
+                        if prop not in node.attributes():
                             raise KeyError(
-                                f"Feature {feat} is not present in the node attributes."
+                                f"Property {prop} is not present in the node attributes."
                             )
-                        hover_text = f"{feat}: {node[feat]}<br>"
+                        hover_text = f"{prop}: {node[prop]}<br>"
                         text += hover_text
                     node_hover_text.append(text)
             else:
                 node_hover_text = [
-                    (
-                        f"{ID_feature}: {node[ID_feature]}<br>"
-                        f"{y_feature}: {node[y_feature]}"
-                    )
-                    for node in G.vs
+                    (f"{ID_prop}: {node[ID_prop]}<br>{y_prop}: {node[y_prop]}") for node in G.vs
                 ]
             if "lineage_ID" in G.attributes():
                 graph_name = f"lineage_ID: {G['lineage_ID']}"
@@ -412,13 +400,13 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 source_id = index_to_nx_id[edge.source]
                 target_id = index_to_nx_id[edge.target]
                 text = f"Source cell_ID: {source_id}<br>Target cell_ID: {target_id}<br>"
-                if edge_hover_features:
-                    for feat in edge_hover_features:
-                        if feat not in edge.attributes():
+                if edge_hover_props:
+                    for prop in edge_hover_props:
+                        if prop not in edge.attributes():
                             raise KeyError(
-                                f"Feature {feat} is not present in the edge attributes."
+                                f"Property {prop} is not present in the edge attributes."
                             )
-                        hover_text = f"{feat}: {edge[feat]}<br>"
+                        hover_text = f"{prop}: {edge[prop]}<br>"
                         text += hover_text
                     edge_hover_text += [text, text, text]
             return edge_hover_text
@@ -430,19 +418,19 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         nodes_count = G.vcount()
         layout = G.layout("rt")  # Basic tree layout.
         # Updating the layout so the y position of the nodes is given
-        # by the value of y_feature.
-        layout = [(layout[k][0], G.vs[y_feature][k]) for k in range(nodes_count)]
+        # by the value of y_prop.
+        layout = [(layout[k][0], G.vs[y_prop][k]) for k in range(nodes_count)]
 
         # Computing the exact positions of nodes and edges.
         positions = {k: layout[k] for k in range(nodes_count)}
         x_nodes, y_nodes = get_nodes_position()
         x_edges, y_edges = get_edges_position()
 
-        # Color mapping the nodes to a node feature.
-        if node_colormap_feature:
+        # Color mapping the nodes to a node property.
+        if node_colormap_prop:
             if not node_marker_style:
                 node_marker_style = dict()
-            node_feature_color_mapping()
+            node_prop_color_mapping()
 
         # Text in the nodes.
         node_annotations = node_text_annotations() if node_text else None
@@ -524,7 +512,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
 
 class CellLineage(Lineage):
-
     def __str__(self) -> str:
         name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
         txt = (
@@ -547,21 +534,19 @@ class CellLineage(Lineage):
         else:
             return max(self.nodes()) + 1
 
-    def _add_cell(
-        self, noi: int | None = None, frame: int | None = 0, **cell_feats
-    ) -> int:
+    def _add_cell(self, nid: int | None = None, frame: int | None = 0, **cell_props) -> int:
         """
         Add a cell to the lineage graph.
 
         Parameters
         ----------
-        noi : int, optional
+        nid : int, optional
             The node ID to assign to the new cell. If None, the next
             available node ID is used.
         frame : int, optional
             The frame of the cell. If None, the frame is set to 0.
-        **cell_feats
-            Feature values to set for the node.
+        **cell_props
+            Property values to set for the node.
 
         Returns
         -------
@@ -575,18 +560,18 @@ class CellLineage(Lineage):
         ValueError
             If the cell already exists in the lineage.
         """
-        if noi is None:
-            noi = self._get_next_available_node_ID()
-        elif noi in self.nodes():
+        if nid is None:
+            nid = self._get_next_available_node_ID()
+        elif nid in self.nodes():
             _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
-            msg = f"Cell {noi} already exists{txt}."
+            msg = f"Cell {nid} already exists{txt}."
             raise ValueError(msg)
-        self.add_node(noi, **cell_feats)
-        self.nodes[noi]["cell_ID"] = noi
-        self.nodes[noi]["frame"] = frame
-        return noi
+        self.add_node(nid, **cell_props)
+        self.nodes[nid]["cell_ID"] = nid
+        self.nodes[nid]["frame"] = frame
+        return nid
 
-    def _remove_cell(self, noi: int) -> dict[str, Any]:
+    def _remove_cell(self, nid: int) -> dict[str, Any]:
         """
         Remove a cell from the lineage graph.
 
@@ -594,13 +579,13 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        noi : int
+        nid : int
             The node ID of the cell to remove.
 
         Returns
         -------
         dict[str, Any]
-            The feature values of the removed node.
+            The property values of the removed node.
 
         Raises
         ------
@@ -608,20 +593,20 @@ class CellLineage(Lineage):
             If the cell does not exist in the lineage.
         """
         try:
-            cell_feats = self.nodes[noi]
+            cell_props = self.nodes[nid]
         except KeyError as err:
             _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
-            msg = f"Cell {noi} does not exist{txt}."
+            msg = f"Cell {nid} does not exist{txt}."
             raise KeyError(msg) from err
-        self.remove_node(noi)
-        return cell_feats
+        self.remove_node(nid)
+        return cell_props
 
     def _add_link(
         self,
-        source_noi: int,
-        target_noi: int,
+        source_nid: int,
+        target_nid: int,
         target_lineage: CellLineage | None = None,
-        **link_feats,
+        **link_props,
     ) -> dict[int, int] | None:
         """
         Create a link beween 2 cells.
@@ -632,15 +617,15 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        source_noi : int
+        source_nid : int
             The node ID of the source cell.
-        target_noi : int
+        target_nid : int
             The node ID of the target cell.
         target_lineage : CellLineage, optional
             The lineage of the target cell. If None, the target cell is
             assumed to be in the same lineage as the source cell.
-        **link_feats
-            Feature values to set for the edge.
+        **link_props
+            Property values to set for the edge.
 
         Returns
         -------
@@ -659,52 +644,47 @@ class CellLineage(Lineage):
         TimeFlowError
             If the target cell happens before the source cell.
         """
-        source_lineage_ID, txt_src = CellLineage._get_lineage_ID_and_err_msg(self)
+        source_lid, txt_src = CellLineage._get_lineage_ID_and_err_msg(self)
 
         if target_lineage is not None:
-            target_lineage_ID, txt_tgt = CellLineage._get_lineage_ID_and_err_msg(
-                target_lineage
-            )
+            target_lid, txt_tgt = CellLineage._get_lineage_ID_and_err_msg(target_lineage)
         else:
             target_lineage = self
-            target_lineage_ID = source_lineage_ID
+            target_lid = source_lid
             txt_tgt = txt_src
             # If the link already exists, NetworX does not raise an error but updates
             # the already existing link, potentially overwriting edge attributes.
             # To avoid any unwanted modifications to the lineage, we raise an error.
-            if self.has_edge(source_noi, target_noi):
+            if self.has_edge(source_nid, target_nid):
                 raise ValueError(
-                    f"Link 'Cell {source_noi} -> Cell {target_noi}' "
-                    f"already exists{txt_tgt}."
+                    f"Link 'Cell {source_nid} -> Cell {target_nid}' already exists{txt_tgt}."
                 )
 
         # NetworkX does not raise an error if the cells don't exist,
         # it creates them along the link. To avoid any unwanted modifications
         # to the lineage, we raise an error if the cells don't exist.
-        if source_noi not in self.nodes():
-            raise ValueError(f"Source cell (ID {source_noi}) does not exist{txt_src}.")
-        if target_noi not in target_lineage.nodes():
-            raise ValueError(f"Target cell (ID {target_noi}) does not exist{txt_tgt}.")
+        if source_nid not in self.nodes():
+            raise ValueError(f"Source cell (ID {source_nid}) does not exist{txt_src}.")
+        if target_nid not in target_lineage.nodes():
+            raise ValueError(f"Target cell (ID {target_nid}) does not exist{txt_tgt}.")
 
         # Check that the link will not create a fusion event.
-        if target_lineage.in_degree(target_noi) != 0:
-            raise FusionError(target_noi, source_lineage_ID)
+        if target_lineage.in_degree(target_nid) != 0:
+            raise FusionError(target_nid, source_lid)
 
         # Check that the link respects the flow of time.
-        if self.nodes[source_noi]["frame"] >= target_lineage.nodes[target_noi]["frame"]:
+        if self.nodes[source_nid]["frame"] >= target_lineage.nodes[target_nid]["frame"]:
             raise TimeFlowError(
-                source_noi,
-                target_noi,
-                source_lineage_ID,
-                target_lineage_ID,
+                source_nid,
+                target_nid,
+                source_lid,
+                target_lid,
             )
 
         conflicting_ids = None
         if target_lineage != self:
             # Identify cell ID conflict between lineages.
-            target_descendants = nx.descendants(target_lineage, target_noi) | {
-                target_noi
-            }
+            target_descendants = nx.descendants(target_lineage, target_nid) | {target_nid}
             conflicting_ids = set(self.nodes()) & set(target_descendants)
             if conflicting_ids:
                 next_id = self._get_next_available_node_ID()
@@ -715,14 +695,14 @@ class CellLineage(Lineage):
 
             # Create a new lineage from the target cell and its descendants,
             # including links.
-            tmp_lineage = target_lineage._split_from_cell(target_noi)
+            tmp_lineage = target_lineage._split_from_cell(target_nid)
             if conflicting_ids:
                 nx.relabel_nodes(tmp_lineage, ids_mapping, copy=False)
                 for id, new_id in ids_mapping.items():
                     tmp_lineage.nodes[new_id]["cell_ID"] = new_id
-                if target_noi in ids_mapping:
-                    target_noi = ids_mapping[target_noi]
-                assert tmp_lineage.get_root() == target_noi
+                if target_nid in ids_mapping:
+                    target_nid = ids_mapping[target_nid]
+                assert tmp_lineage.get_root() == target_nid
 
             # Merge all the elements of the target lineage into the source lineage.
             self.update(
@@ -731,10 +711,10 @@ class CellLineage(Lineage):
             )
             del tmp_lineage
 
-        self.add_edge(source_noi, target_noi, **link_feats)
+        self.add_edge(source_nid, target_nid, **link_props)
         return ids_mapping if conflicting_ids else None
 
-    def _remove_link(self, source_noi: int, target_noi: int) -> dict[str, Any]:
+    def _remove_link(self, source_nid: int, target_nid: int) -> dict[str, Any]:
         """
         Remove a link between two cells.
 
@@ -746,15 +726,15 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        source_noi : int
+        source_nid : int
             The node ID of the source cell.
-        target_noi : int
+        target_nid : int
             The node ID of the target cell.
 
         Returns
         -------
         dict[str, Any]
-            The feature values of the removed edge.
+            The property values of the removed edge.
 
         Raises
         ------
@@ -764,23 +744,23 @@ class CellLineage(Lineage):
             If the link does not exist in the lineage.
         """
         _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
-        if source_noi not in self.nodes():
-            raise ValueError(f"Source cell (ID {source_noi}) does not exist{txt}.")
-        if target_noi not in self.nodes():
-            raise ValueError(f"Target cell (ID {target_noi}) does not exist{txt}.")
+        if source_nid not in self.nodes():
+            raise ValueError(f"Source cell (ID {source_nid}) does not exist{txt}.")
+        if target_nid not in self.nodes():
+            raise ValueError(f"Target cell (ID {target_nid}) does not exist{txt}.")
 
         try:
-            link_feats = self[source_noi][target_noi]
+            link_props = self[source_nid][target_nid]
         except KeyError as err:
             raise KeyError(
-                f"Link 'Cell {source_noi} -> Cell {target_noi}' does not exist{txt}."
+                f"Link 'Cell {source_nid} -> Cell {target_nid}' does not exist{txt}."
             ) from err
-        self.remove_edge(source_noi, target_noi)
-        return link_feats
+        self.remove_edge(source_nid, target_nid)
+        return link_props
 
     def _split_from_cell(
         self,
-        noi: int,
+        nid: int,
         split: Literal["upstream", "downstream"] = "upstream",
     ) -> CellLineage:
         """
@@ -788,7 +768,7 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        noi : int
+        nid : int
             The node ID of the cell from which to split the lineage.
         split : {"upstream", "downstream"}, optional
             Where to split the lineage relative to the given cell.
@@ -809,20 +789,20 @@ class CellLineage(Lineage):
             If the split parameter is not "upstream" or "downstream"
         """
         _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
-        if noi not in self.nodes():
-            raise ValueError(f"Source cell (ID {noi}) does not exist{txt}.")
+        if nid not in self.nodes():
+            raise ValueError(f"Source cell (ID {nid}) does not exist{txt}.")
 
         if split == "upstream":
-            nodes = nx.descendants(self, noi) | {noi}
+            nodes = nx.descendants(self, nid) | {nid}
         elif split == "downstream":
-            nodes = nx.descendants(self, noi)
+            nodes = nx.descendants(self, nid)
         else:
             raise ValueError("The split parameter must be 'upstream' or 'downstream'.")
         new_lineage = self.subgraph(nodes).copy()  # new_lineage has same type as self
         self.remove_nodes_from(nodes)
         return new_lineage  # type: ignore
 
-    def get_ancestors(self, noi: int, sorted=True) -> list[int]:
+    def get_ancestors(self, cid: int, sorted=True) -> list[int]:
         """
         Return all the ancestors of a given cell.
 
@@ -832,8 +812,8 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        noi : int
-            A cell of the lineage.
+        cid : int
+            ID of the cell for which to retrieve ancestor cells.
         sorted : bool, optional
             True to return the ancestors in chronological order, False otherwise.
             True by default.
@@ -851,95 +831,94 @@ class CellLineage(Lineage):
         Warns
         -----
         UserWarning
-            If the cells have no 'frame' feature to order them.
+            If the cells have no 'frame' property to order them.
         """
         try:
-            ancestors = super().get_ancestors(noi)
+            ancestors = super().get_ancestors(cid)
         except nx.NetworkXError as err:
-            raise KeyError(f"Cell {noi} is not in the lineage.") from err
+            raise KeyError(f"Cell {cid} is not in the lineage.") from err
         if sorted:
             try:
                 ancestors.sort(key=lambda n: self.nodes[n]["frame"])
             except KeyError:
-                warnings.warn("No 'frame' feature to order the cells.")
+                warnings.warn("No 'frame' property to order the cells.")
         return ancestors
 
-    def get_divisions(self, nodes: list[int] | None = None) -> list[int]:
+    def get_divisions(self, cids: list[int] | None = None) -> list[int]:
         """
-        Return the division nodes of the lineage.
+        Return the cells that are dividing in the lineage.
 
-        Division nodes are defined as nodes with more than one outgoing edge.
+        Division cells are defined as cells (nodes) with more than one outgoing edge.
 
         Parameters
         ----------
-        nodes : list[int], optional
-            A list of nodes to check for divisions. If None, all nodes
+        cids : list[int], optional
+            A list of cell IDs to check for divisions. If None, all cells
             in the lineage will be checked.
 
         Returns
         -------
         list[int]
-            The list of division nodes in the lineage.
+            The list of dividing cells in the lineage.
         """
-        if nodes is None:
-            nodes = list(self.nodes())
-        return [n for n in nodes if self.out_degree(n) > 1]  # type: ignore
+        if cids is None:
+            cids = list(self.nodes())
+        return [n for n in cids if self.out_degree(n) > 1]  # type: ignore
 
-    def get_cell_cycle(self, node: int) -> list[int]:
+    def get_cell_cycle(self, cid: int) -> list[int]:
         """
-        Give all the nodes in the cell cycle of a given node, in chronological order.
+        Return all the cells in the cell cycle of the given cell, in chronological order.
 
-        The cell cycle starts from the root or a division node,
-        and ends at a division or leaf node.
+        A cell cycle is a lineage segment that starts at the root or at a
+        division cell, ends at a division cell or at a leaf, and doesn't
+        include any other division.
 
         Parameters
         ----------
-        node : int
-            The node for which to identify the nodes in the cell cycle.
+        cid : int
+            ID of the cell for which to identify the cells in the cell cycle.
 
         Returns
         -------
         list[int]
-            A chronologically ordered list of nodes representing
-            the cell cycle for the given node.
+            A chronologically ordered list of cells representing
+            the cell cycle for the given cell.
 
         Raises
         ------
         FusionError
-            If the given node has more than one predecessor.
+            If the given cell has more than one predecessor.
         """
         # TODO: factorize
-        lineage_ID, _ = CellLineage._get_lineage_ID_and_err_msg(self)
-        cell_cycle = [node]
+        lid, _ = CellLineage._get_lineage_ID_and_err_msg(self)
+        cell_cycle = [cid]
         start = False
         end = False
 
-        if self.is_root(node):
+        if self.is_root(cid):
             start = True
-        if self.is_division(node) or self.is_leaf(node):
+        if self.is_division(cid) or self.is_leaf(cid):
             end = True
 
         if not start:
-            predecessors = list(self.predecessors(node))
+            predecessors = list(self.predecessors(cid))
             if len(predecessors) != 1:
-                raise FusionError(node, lineage_ID)
-            while not self.is_division(*predecessors) and not self.is_root(
-                *predecessors
-            ):
+                raise FusionError(cid, lid)
+            while not self.is_division(*predecessors) and not self.is_root(*predecessors):
                 # While not the generation birth.
                 cell_cycle.append(*predecessors)
                 predecessors = list(self.predecessors(*predecessors))
                 if len(predecessors) != 1:
-                    raise FusionError(node, lineage_ID)
+                    raise FusionError(cid, lid)
             if self.is_root(*predecessors) and not self.is_division(*predecessors):
                 cell_cycle.append(*predecessors)
             cell_cycle.reverse()  # We built it from the end.
 
         if not end:
-            successors = list(self.successors(node))
+            successors = list(self.successors(cid))
             err = (
                 f"Something went wrong: division detected in the cell cycle "
-                f"of node {node}. This node has {len(successors)} successors."
+                f"of cell {cid}. This cell has {len(successors)} successors."
             )
             assert len(successors) == 1, err
             while not self.is_division(*successors) and not self.is_leaf(*successors):
@@ -947,18 +926,16 @@ class CellLineage(Lineage):
                 successors = list(self.successors(*successors))
                 err = (
                     f"Something went wrong: division detected in the cell cycle "
-                    f"of node {node}. This node has {len(successors)} successors."
+                    f"of cell {cid}. This cell has {len(successors)} successors."
                 )
                 assert len(successors) == 1, err
             cell_cycle.append(*successors)
 
         return cell_cycle
 
-    def get_cell_cycles(
-        self, ignore_incomplete_cycles: bool = False
-    ) -> list[list[int]]:
+    def get_cell_cycles(self, ignore_incomplete_cycles: bool = False) -> list[list[int]]:
         """
-        Identify all the nodes of each cell cycle in a lineage.
+        Return all the cells of each cell cycle in a lineage.
 
         A cell cycle is a lineage segment that starts at the root or at a
         division cell, ends at a division cell or at a leaf, and doesn't
@@ -988,7 +965,7 @@ class CellLineage(Lineage):
 
         return cell_cycles
 
-    def get_sister_cells(self, noi: int) -> list[int]:
+    def get_sister_cells(self, cid: int) -> list[int]:
         """
         Return the sister cells of a given cell.
 
@@ -997,14 +974,13 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        noi : int
-            Node ID of the cell of interest, for which
-            to find the sister cells.
+        cid : int
+            ID of the cell for which to find the sister cells.
 
         Returns
         -------
         list[int]
-            The list of node IDs of the sister cells of the given node.
+            The list of cell IDs of the sister cells of the given cell.
 
         Raises
         ------
@@ -1012,9 +988,9 @@ class CellLineage(Lineage):
             If the given cell has more than one parent cell.
         """
         sister_cells = []
-        current_frame = self.nodes[noi]["frame"]
-        if not self.is_root(noi):
-            current_cell_cycle = self.get_cell_cycle(noi)
+        current_frame = self.nodes[cid]["frame"]
+        if not self.is_root(cid):
+            current_cell_cycle = self.get_cell_cycle(cid)
             parents = list(self.predecessors(current_cell_cycle[0]))
             if len(parents) == 1:
                 children = list(self.successors(parents[0]))
@@ -1022,35 +998,31 @@ class CellLineage(Lineage):
                 for child in children:
                     sister_cell_cycle = self.get_cell_cycle(child)
                     sister_cells.extend(
-                        [
-                            n
-                            for n in sister_cell_cycle
-                            if self.nodes[n]["frame"] == current_frame
-                        ]
+                        [n for n in sister_cell_cycle if self.nodes[n]["frame"] == current_frame]
                     )
             elif len(parents) > 1:
-                lineage_ID, _ = CellLineage._get_lineage_ID_and_err_msg(self)
-                raise FusionError(noi, lineage_ID)
+                lid, _ = CellLineage._get_lineage_ID_and_err_msg(self)
+                raise FusionError(cid, lid)
         return sister_cells
 
-    def is_division(self, node: int) -> bool:
+    def is_division(self, cid: int) -> bool:
         """
-        Check if a given node is a division node.
+        Check if a given cell is dividing.
 
-        A division node is defined as a node with more than one outgoing edge
+        A division cell is defined as a cell with more than one outgoing edge
         and at most one incoming edge.
 
         Parameters
         ----------
-        node : int
-            The node to check.
+        cid : int
+            ID of the cell to check.
 
         Returns
         -------
         bool
-            True if the node is a division node, False otherwise.
+            True if the cell is a division cell, False otherwise.
         """
-        if self.in_degree(node) <= 1 and self.out_degree(node) > 1:  # type: ignore
+        if self.in_degree(cid) <= 1 and self.out_degree(cid) > 1:  # type: ignore
             return True
         else:
             return False
@@ -1088,18 +1060,18 @@ class CellLineage(Lineage):
 
     def plot(
         self,
-        ID_feature: str = "cell_ID",
-        y_feature: str = "frame",
+        ID_prop: str = "cell_ID",
+        y_prop: str = "frame",
         y_legend: str = "Time (frames)",
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
-        node_colormap_feature: str | None = None,
+        node_colormap_prop: str | None = None,
         node_color_scale: str | None = None,
-        node_hover_features: list[str] | None = None,
+        node_hover_props: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
-        edge_hover_features: list[str] | None = None,
+        edge_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
@@ -1111,16 +1083,16 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        ID_feature : str, optional
-            The feature of the nodes to use as the node ID. "cell_ID" by default.
-        y_feature : str, optional
-            The feature of the nodes to use as the y-axis. "frame" by default.
+        ID_prop : str, optional
+            The property of the nodes to use as the node ID. "cell_ID" by default.
+        y_prop : str, optional
+            The property of the nodes to use as the y-axis. "frame" by default.
         y_legend : str, optional
             The label of the y-axis. "Time (frames)" by default.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
-            The feature of the nodes to display as text inside the nodes
+            The property of the nodes to display as text inside the nodes
             of the plot. If None, no text is displayed. None by default.
         node_text_font : dict, optional
             The font style of the text inside the nodes (size, color, etc).
@@ -1129,19 +1101,19 @@ class CellLineage(Lineage):
             The style of the markers representing the nodes in the plot
             (symbol, size, color, line, etc). If None, defaults to
             current Plotly template.
-        node_colormap_feature : str, optional
-            The feature of the nodes to use for coloring the nodes.
+        node_colormap_prop : str, optional
+            The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
         node_color_scale : str, optional
             The color scale to use for coloring the nodes. If None,
             defaults to current Plotly template.
-        node_hover_features : list[str], optional
+        node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_feature.
+            displaying `cell_ID` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
-        edge_hover_features : list[str], optional
+        edge_hover_props : list[str], optional
             The hover template for the edges. If None, defaults to
             displaying the source and target nodes.
         plot_bgcolor : str, optional
@@ -1180,18 +1152,18 @@ class CellLineage(Lineage):
         """
         # TODO: and if we want to plot in time units instead of frames?
         super().plot(
-            ID_feature=ID_feature,
-            y_feature=y_feature,
+            ID_prop=ID_prop,
+            y_prop=y_prop,
             y_legend=y_legend,
             title=title,
             node_text=node_text,
             node_text_font=node_text_font,
             node_marker_style=node_marker_style,
-            node_colormap_feature=node_colormap_feature,
+            node_colormap_prop=node_colormap_prop,
             node_color_scale=node_color_scale,
-            node_hover_features=node_hover_features,
+            node_hover_props=node_hover_props,
             edge_line_style=edge_line_style,
-            edge_hover_features=edge_hover_features,
+            edge_hover_props=edge_hover_props,
             plot_bgcolor=plot_bgcolor,
             show_horizontal_grid=show_horizontal_grid,
             showlegend=showlegend,
@@ -1218,16 +1190,15 @@ class CellLineage(Lineage):
             The text to display in error messages.
         """
         try:
-            lineage_ID = lineage.graph["lineage_ID"]
-            txt = f" in lineage {lineage_ID}"
+            lid = lineage.graph["lineage_ID"]
+            txt = f" in lineage {lid}"
         except KeyError:
-            lineage_ID = None
+            lid = None
             txt = ""
-        return lineage_ID, txt
+        return lid, txt
 
 
 class CycleLineage(Lineage):
-
     def __init__(self, cell_lineage: CellLineage | None = None) -> None:
         super().__init__()
 
@@ -1245,7 +1216,7 @@ class CycleLineage(Lineage):
             # Freezing the structure since it's mapped on the cell lineage one.
             nx.freeze(self)
 
-            # Adding node and graph features.
+            # Adding node and graph props.
             self.graph["lineage_ID"] = cell_lineage.graph["lineage_ID"]
             for n in divs + leaves:
                 cells_in_cycle = cell_lineage.get_cell_cycle(n)
@@ -1257,14 +1228,11 @@ class CycleLineage(Lineage):
                 self.nodes[n]["cycle_length"] = len(cells_in_cycle)
                 # How many frames in the cycle?
                 self.nodes[n]["cycle_duration"] = (
-                    cell_lineage.nodes[last]["frame"]
-                    - cell_lineage.nodes[first]["frame"]
+                    cell_lineage.nodes[last]["frame"] - cell_lineage.nodes[first]["frame"]
                 ) + 1
                 root = self.get_root()
                 if isinstance(root, list):
-                    raise LineageStructureError(
-                        "A cycle lineage cannot have multiple roots."
-                    )
+                    raise LineageStructureError("A cycle lineage cannot have multiple roots.")
                 self.nodes[n]["level"] = nx.shortest_path_length(self, root, n)
 
     def __str__(self) -> str:
@@ -1277,9 +1245,9 @@ class CycleLineage(Lineage):
 
     # Methods to freeze / unfreeze?
 
-    def get_ancestors(self, noi: int, sorted=True) -> list[int]:
+    def get_ancestors(self, ccid: int, sorted=True) -> list[int]:
         """
-        Return all the ancestors of a given cell cycle.
+        Return all the ancestor cell cycles of a given cell cycle.
 
         Chronological order means from the root cell cycle to the target cell cycle.
         In terms of graph theory, it is the shortest path from the root cell cycle
@@ -1287,8 +1255,8 @@ class CycleLineage(Lineage):
 
         Parameters
         ----------
-        noi : int
-            A cell cycle of the lineage.
+        ccid : int
+            ID of the cell cycle for which to retrieve ancestor cell cycle.
         sorted : bool, optional
             True to return the ancestors in chronological order, False otherwise.
             True by default.
@@ -1306,72 +1274,70 @@ class CycleLineage(Lineage):
         Warns
         -----
         UserWarning
-            If there is no 'level' feature to order the cell cycles.
+            If there is no 'level' property to order the cell cycles.
         """
         try:
-            ancestors = super().get_ancestors(noi)
+            ancestors = super().get_ancestors(ccid)
         except nx.NetworkXError as err:
-            raise KeyError(f"Cell cycle {noi} is not in the lineage.") from err
+            raise KeyError(f"Cell cycle {ccid} is not in the lineage.") from err
         if sorted:
             try:
                 ancestors.sort(key=lambda n: self.nodes[n]["level"])
             except KeyError:
-                warnings.warn("No 'level' feature to order the cell cycles.")
+                warnings.warn("No 'level' property to order the cell cycles.")
         return ancestors
 
-    def get_edges_within_cycle(self, noi: int) -> list[tuple[int, int]]:
+    def get_links_within_cycle(self, ccid: int) -> list[tuple[int, int]]:
         """
-        Return the edges within a cell cycle.
+        Return all the links between the cells of a cell cycle.
 
-        This doesn't include the edge from the previous cell cycle to the current one.
+        This doesn't include the link from the previous cell cycle to the current one.
 
         Parameters
         ----------
-        noi : int
-            The node ID of the cell cycle.
+        ccid : int
+            The ID of the cell cycle for which to retrieve links.
 
         Returns
         -------
         list[tuple(int, int)]
-            A list of edges within the cell cycle.
+            A list of links between the cells of a cell cycle.
         """
-        return list(pairwise(self.nodes[noi]["cells"]))
+        return list(pairwise(self.nodes[ccid]["cells"]))
 
-    def yield_edges_within_cycle(
-        self, noi: int
-    ) -> Generator[Tuple[int, int], None, None]:
+    def yield_links_within_cycle(self, ccid: int) -> Generator[Tuple[int, int], None, None]:
         """
-        Yield the edges within a cell cycle.
+        Yield all the links between the cells of a cell cycle.
 
-        This doesn't include the edge from the previous cell cycle to the current one.
+        This doesn't include the link from the previous cell cycle to the current one.
 
         Parameters
         ----------
-        noi : int
-            The node ID of the cell cycle.
+        ccid : int
+            The ID of the cell cycle for which to retrieve links.
 
         Yields
         ------
         tuple(int, int)
-            The edges within the cell cycle.
+            The links between the cells of a cell cycle.
         """
-        for edge in pairwise(self.nodes[noi]["cells"]):
+        for edge in pairwise(self.nodes[ccid]["cells"]):
             yield edge
 
     def plot(
         self,
-        ID_feature: str = "cycle_ID",
-        y_feature: str = "level",
+        ID_prop: str = "cycle_ID",
+        y_prop: str = "level",
         y_legend: str = "Cell cycle level",
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
-        node_colormap_feature: str | None = None,
+        node_colormap_prop: str | None = None,
         node_color_scale: str | None = None,
-        node_hover_features: list[str] | None = None,
+        node_hover_props: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
-        edge_hover_features: list[str] | None = None,
+        edge_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
         showlegend: bool = True,
@@ -1383,16 +1349,16 @@ class CycleLineage(Lineage):
 
         Parameters
         ----------
-        ID_feature : str, optional
-            The feature of the nodes to use as the node ID. "cycle_ID" by default.
-        y_feature : str, optional
-            The feature of the nodes to use as the y-axis. "level" by default.
+        ID_prop : str, optional
+            The property of the nodes to use as the node ID. "cycle_ID" by default.
+        y_prop : str, optional
+            The property of the nodes to use as the y-axis. "level" by default.
         y_legend : str, optional
             The label of the y-axis. "Cell cycle level" by default.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
-            The feature of the nodes to display as text inside the nodes
+            The property of the nodes to display as text inside the nodes
             of the plot. If None, no text is displayed. None by default.
         node_text_font : dict, optional
             The font style of the text inside the nodes (size, color, etc).
@@ -1401,19 +1367,19 @@ class CycleLineage(Lineage):
             The style of the markers representing the nodes in the plot
             (symbol, size, color, line, etc). If None, defaults to
             current Plotly template.
-        node_colormap_feature : str, optional
-            The feature of the nodes to use for coloring the nodes.
+        node_colormap_prop : str, optional
+            The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
         node_color_scale : str, optional
             The color scale to use for coloring the nodes. If None,
             defaults to current Plotly template.
-        node_hover_features : list[str], optional
+        node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_feature.
+            displaying `cell_ID` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
-        edge_hover_features : list[str], optional
+        edge_hover_props : list[str], optional
             The hover template for the edges. If None, defaults to
             displaying the source and target nodes.
         plot_bgcolor : str, optional
@@ -1451,18 +1417,18 @@ class CycleLineage(Lineage):
         )
         """
         super().plot(
-            ID_feature=ID_feature,
-            y_feature=y_feature,
+            ID_prop=ID_prop,
+            y_prop=y_prop,
             y_legend=y_legend,
             title=title,
             node_text=node_text,
             node_text_font=node_text_font,
             node_marker_style=node_marker_style,
-            node_colormap_feature=node_colormap_feature,
+            node_colormap_prop=node_colormap_prop,
             node_color_scale=node_color_scale,
-            node_hover_features=node_hover_features,
+            node_hover_props=node_hover_props,
             edge_line_style=edge_line_style,
-            edge_hover_features=edge_hover_features,
+            edge_hover_props=edge_hover_props,
             plot_bgcolor=plot_bgcolor,
             show_horizontal_grid=show_horizontal_grid,
             showlegend=showlegend,

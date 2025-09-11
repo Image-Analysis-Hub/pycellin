@@ -6,7 +6,7 @@ from typing import Literal
 
 
 LineageType = Literal["CellLineage", "CycleLineage", "Lineage"]
-FeatureType = Literal["node", "edge", "lineage"]
+PropertyType = Literal["node", "edge", "lineage"]
 
 # TODO: should I force the user to use the Cell and Link named tuples?
 # Would impact the signature of a lot of methods, but would make these

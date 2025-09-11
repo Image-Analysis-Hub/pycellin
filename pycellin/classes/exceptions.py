@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# TODO: add a Warning when a feature is not present across all cells,
+# TODO: add a Warning when a property is not present across all cells,
 # links, or lineages?
 
 # TODO: create an exception when unknown cell, cell cycle, link, lineage...
 
-# TODO: maybe add a FeatureTypeValueError and a LineageTypeValueError
+# TODO: maybe add a PropertyTypeValueError and a LineageTypeValueError
 
 
 class LineageStructureError(Exception):
@@ -50,10 +50,7 @@ class FusionError(LineageStructureError):
             if lineage_ID is None:
                 message = f"Node {node_ID} has more than one parent node."
             else:
-                message = (
-                    f"Node {node_ID} in lineage {lineage_ID} has "
-                    f"more than one parent node."
-                )
+                message = f"Node {node_ID} in lineage {lineage_ID} has more than one parent node."
         super().__init__(message)
 
 
@@ -66,9 +63,9 @@ class TimeFlowError(LineageStructureError):
 
     Parameters
     ----------
-    source_noi : int
+    source_nid : int
         The ID of the source node.
-    target_noi : int
+    target_nid : int
         The ID of the target node.
     source_lineage_ID : int, optional
         The ID of the lineage of the source node.
@@ -83,27 +80,23 @@ class TimeFlowError(LineageStructureError):
 
     def __init__(
         self,
-        source_noi: int,
-        target_noi: int,
+        source_nid: int,
+        target_nid: int,
         source_lineage_ID: int | None = None,
         target_lineage_ID: int | None = None,
         message: str | None = None,
     ):
-        self.source_noi = source_noi
+        self.source_nid = source_nid
         self.source_lineage_ID = source_lineage_ID
-        self.target_noi = target_noi
+        self.target_nid = target_nid
         self.target_lineage_ID = target_lineage_ID
         if message is None:
-            txt_source_lin = (
-                "" if source_lineage_ID is None else f" in lineage {source_lineage_ID}"
-            )
-            txt_target_lin = (
-                "" if target_lineage_ID is None else f" in lineage {target_lineage_ID}"
-            )
+            txt_source_lin = "" if source_lineage_ID is None else f" in lineage {source_lineage_ID}"
+            txt_target_lin = "" if target_lineage_ID is None else f" in lineage {target_lineage_ID}"
             message = (
-                f"Node {target_noi}{txt_target_lin} "
+                f"Node {target_nid}{txt_target_lin} "
                 f"has a time value lower than its parent node, "
-                f"node {source_noi}{txt_source_lin}."
+                f"node {source_nid}{txt_source_lin}."
             )
         super().__init__(message)
 
@@ -128,24 +121,21 @@ class UpdateRequiredError(Exception):
         super().__init__(message)
 
 
-class ProtectedFeatureError(Exception):
+class ProtectedPropertyError(Exception):
     """
-    Raised when trying to modify or delete a protected feature.
+    Raised when trying to modify or delete a protected property.
 
     Parameters
     ----------
-    feature_name : str
-        The name of the feature that is protected.
+    property_name : str
+        The name of the property that is protected.
     message : str, optional
         The error message to display.
         If not provided, a default message is displayed.
     """
 
-    def __init__(self, feat_name: str, message: str | None = None):
-        self.feature_name = feat_name
+    def __init__(self, prop_name: str, message: str | None = None):
+        self.property_name = prop_name
         if message is None:
-            message = (
-                f"The feature '{feat_name}' is protected and cannot be modified "
-                f"nor removed."
-            )
+            message = f"The property '{prop_name}' is protected and cannot be modified nor removed."
         super().__init__(message)

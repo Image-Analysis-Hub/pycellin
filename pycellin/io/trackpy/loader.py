@@ -8,7 +8,7 @@ This module is part of the pycellin package.
 
 This module provides functions to load and process trackpy data into pycellin models.
 It includes a function to load a trackpy file into pycellin model and helper functions
-to create metadata, features, and lineage graphs.
+to create metadata, properties, and lineage graphs.
 
 References:
 - trackpy: D. B. Allan, T. Caswell, N. C. Keim, C. M. van der Weland R. W. Verweij,
@@ -27,12 +27,14 @@ import pandas as pd
 from pycellin.classes import (
     CellLineage,
     Data,
-    FeaturesDeclaration,
+    PropsMetadata,
     Model,
-    cell_ID_Feature,
-    frame_Feature,
-    lineage_ID_Feature,
-    cell_coord_Feature,
+)
+from pycellin.graph.properties.core import (
+    create_cell_id_property,
+    create_frame_property,
+    create_lineage_id_property,
+    create_cell_coord_property,
 )
 
 
@@ -98,8 +100,7 @@ def _split_into_lineages(graph: nx.DiGraph) -> dict[int, CellLineage]:
     """
     # We want one lineage per connected component of the graph.
     lineages = [
-        CellLineage(graph.subgraph(c).copy())
-        for c in nx.weakly_connected_components(graph)
+        CellLineage(graph.subgraph(c).copy()) for c in nx.weakly_connected_components(graph)
     ]
     data = {}
     current_node_id = 0
@@ -186,44 +187,42 @@ def _create_metadata(
     return metadata
 
 
-def _create_FeaturesDeclaration(
-    features: list[str], metadata: dict[str, Any]
-) -> FeaturesDeclaration:
+def _create_PropsMetadata(props: list[str], metadata: dict[str, Any]) -> PropsMetadata:
     """
-    Return a FeaturesDeclaration object populated with the needed features.
+    Return a PropsMetadata object populated with the needed properties.
 
     Parameters
     ----------
-    features : list[str]
-        List of features to be included in the FeaturesDeclaration.
+    props : list[str]
+        List of properties to be included in the PropsMetadata.
     metadata : dict[str, Any]
         Metadata dictionary containing information about the data.
 
     Returns
     -------
-    FeaturesDeclaration
-        An instance of FeaturesDeclaration populated with pycellin and trackpy features.
+    PropsMetadata
+        An instance of PropsMetadata populated with pycellin and trackpy properties.
     """
-    fd = FeaturesDeclaration()
+    props_md = PropsMetadata()
 
-    # Pycellin mandatory features.
-    cell_ID_feat = cell_ID_Feature()
-    frame_feat = frame_Feature()
-    lin_ID_feat = lineage_ID_Feature()
-    for feat in [cell_ID_feat, frame_feat, lin_ID_feat]:
-        fd._add_feature(feat)
-        fd._protect_feature(feat.name)
+    # Pycellin mandatory properties.
+    cell_ID_prop = create_cell_id_property()
+    frame_prop = create_frame_property()
+    lin_ID_prop = create_lineage_id_property()
+    for prop in [cell_ID_prop, frame_prop, lin_ID_prop]:
+        props_md._add_prop(prop)
+        props_md._protect_prop([prop.identifier])
 
-    # Trackpy features.
+    # Trackpy properties.
     for axis in ["x", "y", "z"]:
-        if axis in features:
-            feat = cell_coord_Feature(
+        if axis in props:
+            prop = create_cell_coord_property(
                 unit=metadata["space_unit"], axis=axis, provenance="trackpy"
             )
-            fd._add_feature(feat)
-    # TODO: add fd for other trackpy features
+            props_md._add_prop(prop)
+    # TODO: add props for other trackpy properties
 
-    return fd
+    return props_md
 
 
 def load_trackpy_dataframe(
@@ -251,7 +250,7 @@ def load_trackpy_dataframe(
     # Build the lineages.
     graph = nx.DiGraph()
     _add_nodes(graph, df)
-    features = df.columns.to_list()
+    props = df.columns.to_list()
     particles = df["particle"].unique()
     del df  # Free memory.
     _add_edges(graph, particles)
@@ -260,17 +259,14 @@ def load_trackpy_dataframe(
     del graph  # # Redondant with the subgraphs.
 
     # Create a pycellin model.
-    md = _create_metadata(
-        space_unit, pixel_width, pixel_height, pixel_depth, time_unit, time_step
-    )
-    fd = _create_FeaturesDeclaration(features, md)
+    md = _create_metadata(space_unit, pixel_width, pixel_height, pixel_depth, time_unit, time_step)
+    fd = _create_PropsMetadata(props, md)
     model = Model(md, fd, Data(data))
 
     return model
 
 
 if __name__ == "__main__":
-
     folder = "E:/Pasteur/Code/trackpy-examples-master/sample_data/"
     tracks = "FakeTracks_trackpy.pkl"
 
@@ -279,6 +275,6 @@ if __name__ == "__main__":
     print(df.head())
 
     model = load_trackpy_dataframe(df)
-    print(model.metadata)
+    print(model.model_metadata)
     # for lin in model.get_cell_lineages():
-    #     lin.plot(node_hover_features=["cell_ID", "frame", "particle"])
+    #     lin.plot(node_hover_props=["cell_ID", "frame", "particle"])

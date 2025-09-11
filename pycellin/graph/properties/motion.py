@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-A collection of features related to cell mobility/motility.
+A collection of properties related to cell mobility/motility.
 """
 
 from itertools import pairwise
@@ -10,33 +10,33 @@ import math
 import numpy as np
 from typing import Any, Literal
 
-from pycellin.classes import Data, CellLineage, CycleLineage, Feature
+from pycellin.classes import Data, CellLineage, CycleLineage, Property
 from pycellin.classes.exceptions import FusionError
-from pycellin.classes.feature_calculator import (
-    EdgeLocalFeatureCalculator,
-    NodeGlobalFeatureCalculator,
+from pycellin.classes.property_calculator import (
+    EdgeLocalPropCalculator,
+    NodeGlobalPropCalculator,
 )
 
 
-def _get_branch_edge_feature_values(
-    feat_name: str,
+def _get_branch_edge_property_values(
+    prop_name: str,
     data: Data,
     lineage: CycleLineage,
-    noi: int,
+    nid: int,
     include_incoming_edge: bool,
 ) -> list[Any]:
     """
-    Get the values of a given feature for all edges within a cell cycle.
+    Get the values of a given property for all edges within a cell cycle.
 
     Parameters
     ----------
-    feat_name : str
-        Name of the feature to retrieve.
+    prop_name : str
+        Name of the property to retrieve.
     data : Data
         Data object containing the lineage.
     lineage : CycleLineage
         Lineage graph containing the node of interest.
-    noi : int
+    nid : int
         Node ID (cycle_ID) of the cell of interest.
     include_incoming_edge : bool
         Whether to include the incoming edge of the first cell of the cell cycle.
@@ -44,38 +44,46 @@ def _get_branch_edge_feature_values(
     Returns
     -------
     list of Any
-        List of values of the feature for all edges within the cell cycle.
+        List of values of the property for all edges within the cell cycle.
 
     Raises
     ------
     KeyError
-        If the feature does not exist in the cell lineage.
+        If the property does not exist in the cell lineage.
     """
     lin_ID = lineage.graph["lineage_ID"]
     cell_lin = data.cell_data[lin_ID]
     try:
-        values = [
-            cell_lin.edges[edge][feat_name]
-            for edge in lineage.yield_edges_within_cycle(noi)
-        ]
+        values = [cell_lin.edges[edge][prop_name] for edge in lineage.yield_links_within_cycle(nid)]
     except KeyError:
-        raise KeyError(
-            f"Feature '{feat_name}' does not exist in the cell lineage '{lin_ID}'."
-        )
+        raise KeyError(f"Property '{prop_name}' does not exist in the cell lineage '{lin_ID}'.")
 
     if include_incoming_edge:
-        first_cell = lineage.nodes[noi]["cells"][0]
+        first_cell = lineage.nodes[nid]["cells"][0]
         predecessors = list(cell_lin.predecessors(first_cell))
         if len(predecessors) == 1:
             edge = (predecessors[0], first_cell)
-            values.append(cell_lin.edges[edge][feat_name])
+            values.append(cell_lin.edges[edge][prop_name])
         elif len(predecessors) > 1:
             raise FusionError(first_cell, lin_ID)
 
     return values
 
 
-class CellDisplacement(EdgeLocalFeatureCalculator):
+def create_cell_displacement_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "cell_displacement",
+        name="Cell displacement",
+        description="Displacement of the cell between two consecutive detections",
+        provenance="pycellin",
+        prop_type="edge",
+        lin_type="CellLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
+class CellDisplacement(EdgeLocalPropCalculator):
     """
     Calculator to compute the displacement of a cell between two consecutive detections.
 
@@ -117,7 +125,23 @@ class CellDisplacement(EdgeLocalFeatureCalculator):
         return math.dist(pos1, pos2)
 
 
-class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
+def create_branch_total_displacement_property(
+    custom_identifier: str | None,
+    unit: str,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "branch_total_displacement",
+        name="Branch total displacement",
+        description="Displacement of the cell during the cell cycle",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
+class BranchTotalDisplacement(NodeGlobalPropCalculator):
     """
     Calculator to compute the total displacement of a cell during a cell cycle.
 
@@ -125,21 +149,21 @@ class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
     the cell cycle.
     """
 
-    def __init__(self, feature: Feature, include_incoming_edge: bool = False):
+    def __init__(self, property: Property, include_incoming_edge: bool = False):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         include_incoming_edge : bool, optional
             Whether to include the incoming edge of the first cell of the cell cycle.
             Default is False.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.include_incoming_edge = include_incoming_edge
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, noi: int
+        self, data: Data, lineage: CycleLineage, nid: int
     ) -> float:
         """
         Compute the total displacement of a cell during the cell cycle.
@@ -150,7 +174,7 @@ class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        noi : int
+        nid : int
             Node ID (cycle_ID) of the cell cycle of interest.
 
         Returns
@@ -158,13 +182,26 @@ class BranchTotalDisplacement(NodeGlobalFeatureCalculator):
         float
             Total displacement of the cell during the cell cycle.
         """
-        disps = _get_branch_edge_feature_values(
-            "cell_displacement", data, lineage, noi, self.include_incoming_edge
+        disps = _get_branch_edge_property_values(
+            "cell_displacement", data, lineage, nid, self.include_incoming_edge
         )
         return np.nansum(disps)
 
 
-class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
+def create_branch_mean_displacement_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "branch_mean_displacement",
+        name="Branch mean displacement",
+        description="Mean displacement of the cell during the cell cycle",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
+class BranchMeanDisplacement(NodeGlobalPropCalculator):
     """
     Calculator to compute the mean displacement of a cell during a cell cycle.
 
@@ -172,21 +209,21 @@ class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
     the cell cycle.
     """
 
-    def __init__(self, feature: Feature, include_incoming_edge: bool = False):
+    def __init__(self, property: Property, include_incoming_edge: bool = False):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         include_incoming_edge : bool, optional
             Whether to include the incoming edge of the first cell of the cell cycle.
             Default is False.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.include_incoming_edge = include_incoming_edge
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, noi: int
+        self, data: Data, lineage: CycleLineage, nid: int
     ) -> float:
         """
         Compute the mean displacement of a cell during the cell cycle.
@@ -197,7 +234,7 @@ class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        noi : int
+        nid : int
             Node ID (cycle_ID) of the cell cycle of interest.
 
         Returns
@@ -205,13 +242,26 @@ class BranchMeanDisplacement(NodeGlobalFeatureCalculator):
         float
             Mean displacement of the cell during the cell cycle.
         """
-        disps = _get_branch_edge_feature_values(
-            "cell_displacement", data, lineage, noi, self.include_incoming_edge
+        disps = _get_branch_edge_property_values(
+            "cell_displacement", data, lineage, nid, self.include_incoming_edge
         )
         return np.nanmean(disps).item()
 
 
-class CellSpeed(EdgeLocalFeatureCalculator):
+def create_cell_speed_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "cell_speed",
+        name="Cell speed",
+        description="Speed of the cell between two consecutive detections",
+        provenance="pycellin",
+        prop_type="edge",
+        lin_type="CellLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
+class CellSpeed(EdgeLocalPropCalculator):
     """
     Calculator to compute the speed of a cell between two consecutive detections.
 
@@ -219,16 +269,16 @@ class CellSpeed(EdgeLocalFeatureCalculator):
     between the two consecutive detections.
     """
 
-    def __init__(self, feature: Feature, time_step: int | float = 1):
+    def __init__(self, property: Property, time_step: int | float = 1):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         time_step : int or float, optional
             Time step between 2 frames, in time unit. Default is 1.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.time_step = time_step
 
     def compute(  # type: ignore[override]
@@ -264,7 +314,20 @@ class CellSpeed(EdgeLocalFeatureCalculator):
             return math.dist(pos1, pos2) / (time2 - time1)
 
 
-class BranchMeanSpeed(NodeGlobalFeatureCalculator):
+def create_branch_mean_speed_property(custom_identifier: str | None, unit: str) -> Property:
+    return Property(
+        identifier=custom_identifier or "branch_mean_speed",
+        name="Branch mean speed",
+        description="Mean speed of the cell during the cell cycle",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
+class BranchMeanSpeed(NodeGlobalPropCalculator):
     """
     Calculator to compute the mean speed of a cell during a cell cycle.
 
@@ -272,21 +335,21 @@ class BranchMeanSpeed(NodeGlobalFeatureCalculator):
     during the cell cycle.
     """
 
-    def __init__(self, feature: Feature, include_incoming_edge: bool = False):
+    def __init__(self, property: Property, include_incoming_edge: bool = False):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         include_incoming_edge : bool, optional
             Whether to include the incoming edge of the first cell of the cell cycle.
             Default is False.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.include_incoming_edge = include_incoming_edge
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, noi: int
+        self, data: Data, lineage: CycleLineage, nid: int
     ) -> float:
         """
         Compute the mean speed of a cell during the cell cycle.
@@ -297,7 +360,7 @@ class BranchMeanSpeed(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        noi : int
+        nid : int
             Node ID (cycle_ID) of the cell cycle of interest.
 
         Returns
@@ -305,13 +368,25 @@ class BranchMeanSpeed(NodeGlobalFeatureCalculator):
         float
             Mean speed of the cell during the cell cycle.
         """
-        speeds = _get_branch_edge_feature_values(
-            "cell_speed", data, lineage, noi, self.include_incoming_edge
+        speeds = _get_branch_edge_property_values(
+            "cell_speed", data, lineage, nid, self.include_incoming_edge
         )
         return np.nanmean(speeds).item()
 
 
-class Straightness(NodeGlobalFeatureCalculator):
+def create_straightness_property(custom_identifier: str | None) -> Property:
+    return Property(
+        identifier=custom_identifier or "straightness",
+        name="Straightness",
+        description="Straightness of the cell displacement",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+    )
+
+
+class Straightness(NodeGlobalPropCalculator):
     """
     Calculator to compute the straightness of the cell displacement within a cell cycle.
 
@@ -321,21 +396,21 @@ class Straightness(NodeGlobalFeatureCalculator):
     while a trajectory with many turns has a straightness close to 0.
     """
 
-    def __init__(self, feature: Feature, include_incoming_edge: bool = False):
+    def __init__(self, property: Property, include_incoming_edge: bool = False):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         include_incoming_edge : bool, optional
             Whether to include the distance between the first cell and its predecessor.
             Default is False.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.include_incoming_edge = include_incoming_edge
 
     def compute(  # type: ignore[override]
-        self, data: Data, cycle_lin: CycleLineage, noi: int
+        self, data: Data, cycle_lin: CycleLineage, nid: int
     ) -> float:
         """
         Compute the straightness of the cell displacement within a cell cycle.
@@ -356,7 +431,7 @@ class Straightness(NodeGlobalFeatureCalculator):
         """
         lin_ID = cycle_lin.graph["lineage_ID"]
         cell_lin = data.cell_data[lin_ID]
-        cells = cycle_lin.nodes[noi]["cells"]
+        cells = cycle_lin.nodes[nid]["cells"]
         distances = [
             math.dist(
                 (
@@ -404,7 +479,22 @@ class Straightness(NodeGlobalFeatureCalculator):
         return math.dist(first_cell_loc, last_cell_loc) / sum(distances)
 
 
-class Angle(NodeGlobalFeatureCalculator):
+def create_angle_property(
+    custom_identifier: str | None, unit: Literal["radian", "degree"]
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "angle",
+        name="Angle",
+        description="Angle of the cell trajectory between two consecutive detections",
+        provenance="pycellin",
+        prop_type="edge",
+        lin_type="CellLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
+class Angle(NodeGlobalPropCalculator):
     """
     Calculator to compute the angle between two consecutive detections of a cell.
 
@@ -412,20 +502,20 @@ class Angle(NodeGlobalFeatureCalculator):
     of the cell at two consecutive detections.
     """
 
-    def __init__(self, feature: Feature, unit: Literal["radian", "degree"] = "radian"):
+    def __init__(self, property: Property, unit: Literal["radian", "degree"] = "radian"):
         """
         Parameters
         ----------
-        feature : Feature
-            Feature object to which the calculator is associated.
+        property : Property
+            Property object to which the calculator is associated.
         unit : {'radian', 'degree'}, optional
             Unit in which the angle is computed. Default is 'radian'.
         """
-        super().__init__(feature)
+        super().__init__(property)
         self.unit = unit
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage, noi: int
+        self, data: Data, lineage: CellLineage, nid: int
     ) -> float:
         """
         Compute the angle between two consecutive detections of a cell.
@@ -436,7 +526,7 @@ class Angle(NodeGlobalFeatureCalculator):
             Data object containing the lineage.
         lineage : CellLineage
             Lineage graph containing the node of interest.
-        noi : int
+        nid : int
             Node ID (cell_ID) of the cell of interest.
 
         Returns
@@ -445,8 +535,8 @@ class Angle(NodeGlobalFeatureCalculator):
             Angle between the two consecutive displacements.
         """
         # Find the incoming and outgoing edges of the node of interest.
-        predecessors = list(lineage.predecessors(noi))
-        successors = list(lineage.successors(noi))
+        predecessors = list(lineage.predecessors(nid))
+        successors = list(lineage.successors(nid))
         if len(predecessors) == 0 or len(successors) != 1:
             # The angle is not defined for:
             # - the first node of the lineage (no incoming edge)
@@ -454,7 +544,7 @@ class Angle(NodeGlobalFeatureCalculator):
             # - a dividing node (more than one outgoing edges).
             return math.nan
         elif len(predecessors) > 1:
-            raise FusionError(noi, lineage.graph["lineage_ID"])
+            raise FusionError(nid, lineage.graph["lineage_ID"])
 
         # Compute the angle between the incoming and outgoing edges.
         in_coords = (
@@ -462,18 +552,18 @@ class Angle(NodeGlobalFeatureCalculator):
             lineage.nodes[predecessors[0]]["cell_y"],
             lineage.nodes[predecessors[0]]["cell_z"],
         )
-        noi_coords = (
-            lineage.nodes[noi]["cell_x"],
-            lineage.nodes[noi]["cell_y"],
-            lineage.nodes[noi]["cell_z"],
+        nid_coords = (
+            lineage.nodes[nid]["cell_x"],
+            lineage.nodes[nid]["cell_y"],
+            lineage.nodes[nid]["cell_z"],
         )
         out_coords = (
             lineage.nodes[successors[0]]["cell_x"],
             lineage.nodes[successors[0]]["cell_y"],
             lineage.nodes[successors[0]]["cell_z"],
         )
-        vector_in = np.array(noi_coords) - np.array(in_coords)
-        vector_out = np.array(out_coords) - np.array(noi_coords)
+        vector_in = np.array(nid_coords) - np.array(in_coords)
+        vector_out = np.array(out_coords) - np.array(nid_coords)
         cross_prod = np.cross(vector_in, vector_out)
         dot_prod = np.dot(vector_in, vector_out)
         angle = math.atan2(np.linalg.norm(cross_prod), dot_prod)
@@ -482,6 +572,4 @@ class Angle(NodeGlobalFeatureCalculator):
         elif self.unit == "degree":
             return math.degrees(angle)
         else:
-            raise ValueError(
-                f"Unknown unit: {self.unit}. Valid units are 'radian' and 'degree'."
-            )
+            raise ValueError(f"Unknown unit: {self.unit}. Valid units are 'radian' and 'degree'.")

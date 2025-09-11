@@ -16,7 +16,6 @@ References:
 - trackpy GitHub: https://github.com/soft-matter/trackpy
 """
 
-
 import copy
 
 import pandas as pd
@@ -71,9 +70,7 @@ def renumber_negative_lineage_IDs(model: Model) -> None:
         The pycellin model to modify.
     """
     one_node_lin_IDs = [
-        lin.graph["lineage_ID"]
-        for lin in model.get_cell_lineages()
-        if lin.graph["lineage_ID"] < 0
+        lin.graph["lineage_ID"] for lin in model.get_cell_lineages() if lin.graph["lineage_ID"] < 0
     ]
     for lin_ID in one_node_lin_IDs:
         lin = model.get_cell_lineage_from_ID(lin_ID)
@@ -195,7 +192,6 @@ def export_trackpy_dataframe(model: Model) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-
     # # Test with a sample TrackMate XML file.
     # from pycellin import load_TrackMate_XML
 
@@ -221,9 +217,7 @@ if __name__ == "__main__":
     model = load_trackpy_dataframe(df)
     for lin in model.get_cell_lineages():
         print(lin)
-    model.add_link(
-        source_cell_ID=8, source_lineage_ID=0, target_cell_ID=10, target_lineage_ID=1
-    )
+    model.add_link(source_cid=8, source_lid=0, target_cid=10, target_lid=1)
     model.update()
 
     df = export_trackpy_dataframe(model)

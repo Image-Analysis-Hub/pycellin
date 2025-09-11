@@ -184,47 +184,47 @@ def cycle_lin_triple_div(cycle_lin):
     return cycle_lin
 
 
-# _remove_feature() ###########################################################
+# _remove_prop() ###########################################################
 
 
-def test_remove_feature_node(cell_lin):
-    cell_lin._remove_feature("frame", "node")
+def test_remove_prop_node(cell_lin):
+    cell_lin._remove_prop("frame", "node")
     for node in cell_lin.nodes:
         assert "frame" not in cell_lin.nodes[node]
 
 
-def test_remove_feature_edge(cell_lin):
-    cell_lin._remove_feature("name", "edge")
+def test_remove_prop_edge(cell_lin):
+    cell_lin._remove_prop("name", "edge")
     for edge in cell_lin.edges:
         assert "name" not in cell_lin.edges[edge]
 
 
-def test_remove_feature_lineage(cell_lin):
-    cell_lin._remove_feature("lineage_ID", "lineage")
+def test_remove_prop_lineage(cell_lin):
+    cell_lin._remove_prop("lineage_ID", "lineage")
     assert "lineage_ID" not in cell_lin.graph
 
 
-def test_remove_feature_unknown_feature(cell_lin):
-    # Attempting to remove a feature that does not exist should not raise an error.
-    cell_lin._remove_feature("unknown_feature", "node")
-    cell_lin._remove_feature("unknown_feature", "edge")
-    cell_lin._remove_feature("unknown_feature", "lineage")
+def test_remove_prop_unknown_property(cell_lin):
+    # Attempting to remove a property that does not exist should not raise an error.
+    cell_lin._remove_prop("unknown_property", "node")
+    cell_lin._remove_prop("unknown_property", "edge")
+    cell_lin._remove_prop("unknown_property", "lineage")
 
 
-def test_remove_feature_missing_feature(cell_lin):
-    # Attempting to remove a feature not present in some elements should not raise
+def test_remove_prop_missing_property(cell_lin):
+    # Attempting to remove a property not present in some elements should not raise
     # an error.
     cell_lin.add_edge(16, 17)
-    cell_lin._remove_feature("frame", "node")
-    cell_lin._remove_feature("name", "edge")
+    cell_lin._remove_prop("frame", "node")
+    cell_lin._remove_prop("name", "edge")
 
 
-def test_remove_feature_invalid_type(cell_lin):
+def test_remove_prop_invalid_type(cell_lin):
     with pytest.raises(
         ValueError,
-        match="Invalid feature_type. Must be one of 'node', 'edge', or 'lineage'.",
+        match="Invalid prop_type. Must be one of 'node', 'edge', or 'lineage'.",
     ):
-        cell_lin._remove_feature("custom_feature", "invalid_type")
+        cell_lin._remove_prop("custom_property", "invalid_type")
 
 
 # get_root() ##################################################################
@@ -463,7 +463,7 @@ def test_get_ancestors_node_ID_error(cell_lin, cycle_lin):
 def test_get_ancestors_cannot_order(cell_lin):
     for n in cell_lin.nodes:
         del cell_lin.nodes[n]["frame"]
-    with pytest.warns(UserWarning, match="No 'frame' feature to order the cells."):
+    with pytest.warns(UserWarning, match="No 'frame' property to order the cells."):
         cell_lin.get_ancestors(16)
 
 
@@ -767,7 +767,7 @@ def test_add_cell_no_no_arg(cell_lin):
 
 
 def test_add_cell_with_id(cell_lin):
-    assert cell_lin._add_cell(noi=20) == 20
+    assert cell_lin._add_cell(nid=20) == 20
     assert cell_lin.nodes[20]["cell_ID"] == 20
     assert cell_lin.nodes[20]["frame"] == 0
 
@@ -779,7 +779,7 @@ def test_add_cell_with_frame(cell_lin):
     assert cell_lin.nodes[next_id]["frame"] == 5
 
 
-def test_add_cell_with_features(cell_lin):
+def test_add_cell_with_propertys(cell_lin):
     cell_id = 20
     assert cell_lin._add_cell(20, color="red", size=10) == cell_id
     assert cell_lin.nodes[cell_id]["cell_ID"] == cell_id
@@ -812,8 +812,8 @@ def test_add_cell_single_node(one_node_cell_lin):
 
 
 def check_correct_cell_removal(cell_lin, node_id):
-    cell_feats = cell_lin.nodes[node_id]
-    assert cell_lin._remove_cell(node_id) == cell_feats
+    cell_props = cell_lin.nodes[node_id]
+    assert cell_lin._remove_cell(node_id) == cell_props
     assert node_id not in cell_lin.nodes
     assert not any(node_id in edge for edge in cell_lin.edges)
 
@@ -930,7 +930,7 @@ def test_add_link_time_flow_error(cell_lin):
 
 def test_add_link_different_lineages(cell_lin):
     # Add a link between different lineages.
-    new_lin = CellLineage(lineage_ID=2)
+    new_lin = CellLineage(lid=2)
     new_lin.add_node(19, frame=1, cell_ID=19)
     new_lin.add_node(20, frame=2, cell_ID=20)
     new_lin.add_node(21, frame=3, cell_ID=21)
@@ -945,9 +945,7 @@ def test_add_link_different_lineages(cell_lin):
     assert len(new_lin.nodes) == 0
 
 
-def test_add_link_different_lineages_unconnected_node(
-    cell_lin, cell_lin_unconnected_node
-):
+def test_add_link_different_lineages_unconnected_node(cell_lin, cell_lin_unconnected_node):
     # Add a link between a lineage and an unconnected node of another lineage.
     cell_lin._add_link(1, 17, target_lineage=cell_lin_unconnected_node)
     assert cell_lin.has_node(17)
@@ -976,7 +974,7 @@ def test_add_link_different_lineages_unconnected_component(
 
 def test_add_link_conflicting_ID(cell_lin):
     # Add a link between different lineages with a conflicting ID.
-    new_lin = CellLineage(lineage_ID=2)
+    new_lin = CellLineage(lid=2)
     new_lin.add_node(5, frame=1, cell_ID=5)
     IDs_mapping = cell_lin._add_link(1, 5, target_lineage=new_lin)
     assert IDs_mapping == {5: 17}
@@ -1024,7 +1022,7 @@ def test_add_link_conflicting_IDs(cell_lin, cell_lin_successive_divs_and_root):
 
 
 def test_add_link_same_IDs(cell_lin):
-    new_lin = CellLineage(lineage_ID=2)
+    new_lin = CellLineage(lid=2)
     new_lin.add_node(1, frame=1, cell_ID=1)
     IDs_mapping = cell_lin._add_link(1, 1, new_lin)
     assert IDs_mapping == {1: 17}
@@ -1045,10 +1043,10 @@ def test_add_link_same_IDs(cell_lin):
 # _remove_link() ##############################################################
 
 
-def check_correct_link_removal(cell_lin, source_noi, target_noi):
-    link_feats = cell_lin[source_noi][target_noi]
-    assert cell_lin._remove_link(source_noi, target_noi) == link_feats
-    assert not cell_lin.has_edge(source_noi, target_noi)
+def check_correct_link_removal(cell_lin, source_nid, target_nid):
+    link_props = cell_lin[source_nid][target_nid]
+    assert cell_lin._remove_link(source_nid, target_nid) == link_props
+    assert not cell_lin.has_edge(source_nid, target_nid)
 
 
 def test_remove_link_normal_lin(cell_lin):
@@ -1940,7 +1938,7 @@ def test_get_ancestors_key_error(cycle_lin):
 def test_get_ancestors_cannot_order_cycle(cycle_lin):
     for n in cycle_lin.nodes:
         del cycle_lin.nodes[n]["level"]
-    msg = "No 'level' feature to order the cell cycles."
+    msg = "No 'level' property to order the cell cycles."
     with pytest.warns(UserWarning, match=msg):
         cycle_lin.get_ancestors(5)
 
@@ -1951,57 +1949,57 @@ def test_get_ancestors_cannot_order_cycle(cycle_lin):
 def test_get_edges_within_cycle_normal_lin(cell_lin):
     cycle_lin = CycleLineage(cell_lin)
     # From division.
-    assert cycle_lin.get_edges_within_cycle(2) == [(1, 2)]
-    assert cycle_lin.get_edges_within_cycle(4) == [(3, 4)]
-    assert cycle_lin.get_edges_within_cycle(8) == [(7, 8)]
-    assert cycle_lin.get_edges_within_cycle(14) == [(11, 12), (12, 13), (13, 14)]
+    assert cycle_lin.get_links_within_cycle(2) == [(1, 2)]
+    assert cycle_lin.get_links_within_cycle(4) == [(3, 4)]
+    assert cycle_lin.get_links_within_cycle(8) == [(7, 8)]
+    assert cycle_lin.get_links_within_cycle(14) == [(11, 12), (12, 13), (13, 14)]
     # From leaf.
-    assert cycle_lin.get_edges_within_cycle(6) == [(5, 6)]
-    assert cycle_lin.get_edges_within_cycle(9) == []
-    assert cycle_lin.get_edges_within_cycle(16) == []
+    assert cycle_lin.get_links_within_cycle(6) == [(5, 6)]
+    assert cycle_lin.get_links_within_cycle(9) == []
+    assert cycle_lin.get_links_within_cycle(16) == []
 
 
 def test_get_edges_within_cycle_single_node(one_node_cell_lin):
     cycle_lin = CycleLineage(one_node_cell_lin)
-    assert cycle_lin.get_edges_within_cycle(1) == []
+    assert cycle_lin.get_links_within_cycle(1) == []
 
 
 def test_get_edges_within_cycle_gap(cell_lin_gap):
     cycle_lin = CycleLineage(cell_lin_gap)
     # From division.
-    assert cycle_lin.get_edges_within_cycle(2) == [(1, 2)]
-    assert cycle_lin.get_edges_within_cycle(4) == [(3, 4)]
-    assert cycle_lin.get_edges_within_cycle(8) == []
-    assert cycle_lin.get_edges_within_cycle(14) == [(11, 14)]
+    assert cycle_lin.get_links_within_cycle(2) == [(1, 2)]
+    assert cycle_lin.get_links_within_cycle(4) == [(3, 4)]
+    assert cycle_lin.get_links_within_cycle(8) == []
+    assert cycle_lin.get_links_within_cycle(14) == [(11, 14)]
     # From leaf.
-    assert cycle_lin.get_edges_within_cycle(6) == []
-    assert cycle_lin.get_edges_within_cycle(9) == []
-    assert cycle_lin.get_edges_within_cycle(16) == []
+    assert cycle_lin.get_links_within_cycle(6) == []
+    assert cycle_lin.get_links_within_cycle(9) == []
+    assert cycle_lin.get_links_within_cycle(16) == []
 
 
 def test_get_edges_within_cycle_div_root(cell_lin_div_root):
     cycle_lin = CycleLineage(cell_lin_div_root)
-    assert cycle_lin.get_edges_within_cycle(1) == []
-    assert cycle_lin.get_edges_within_cycle(2) == []
-    assert cycle_lin.get_edges_within_cycle(17) == []
+    assert cycle_lin.get_links_within_cycle(1) == []
+    assert cycle_lin.get_links_within_cycle(2) == []
+    assert cycle_lin.get_links_within_cycle(17) == []
 
 
 def test_get_edges_within_cycle_successive_divs_and_root(
     cell_lin_successive_divs_and_root,
 ):
     cycle_lin = CycleLineage(cell_lin_successive_divs_and_root)
-    assert cycle_lin.get_edges_within_cycle(2) == []
-    assert cycle_lin.get_edges_within_cycle(3) == []
-    assert cycle_lin.get_edges_within_cycle(5) == [(4, 5)]
-    assert cycle_lin.get_edges_within_cycle(6) == []
-    assert cycle_lin.get_edges_within_cycle(8) == []
-    assert cycle_lin.get_edges_within_cycle(9) == []
-    assert cycle_lin.get_edges_within_cycle(11) == []
+    assert cycle_lin.get_links_within_cycle(2) == []
+    assert cycle_lin.get_links_within_cycle(3) == []
+    assert cycle_lin.get_links_within_cycle(5) == [(4, 5)]
+    assert cycle_lin.get_links_within_cycle(6) == []
+    assert cycle_lin.get_links_within_cycle(8) == []
+    assert cycle_lin.get_links_within_cycle(9) == []
+    assert cycle_lin.get_links_within_cycle(11) == []
 
 
 def test_get_edges_within_cycle_triple_div(cell_lin_triple_div):
     cycle_lin = CycleLineage(cell_lin_triple_div)
-    assert cycle_lin.get_edges_within_cycle(4) == [(3, 4)]
-    assert cycle_lin.get_edges_within_cycle(6) == [(5, 6)]
-    assert cycle_lin.get_edges_within_cycle(8) == [(7, 8)]
-    assert cycle_lin.get_edges_within_cycle(18) == [(17, 18)]
+    assert cycle_lin.get_links_within_cycle(4) == [(3, 4)]
+    assert cycle_lin.get_links_within_cycle(6) == [(5, 6)]
+    assert cycle_lin.get_links_within_cycle(8) == [(7, 8)]
+    assert cycle_lin.get_links_within_cycle(18) == [(17, 18)]
