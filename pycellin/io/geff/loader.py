@@ -17,7 +17,7 @@ from typing import Any
 import geff
 import networkx as nx
 
-from pycellin.classes import Data, Property, Model
+from pycellin.classes import Data, Property, PropsMetadata, Model
 from pycellin.custom_types import PropertyType
 from pycellin.io.utils import (
     _split_graph_into_lineages,
@@ -27,12 +27,41 @@ from pycellin.io.utils import (
 )
 
 
+def _recursive_dict_search(data: dict[str, Any], target_key: str) -> dict[str, Any] | None:
+    """
+    Recursively search for a target key in a nested dictionary structure.
+
+    Parameters
+    ----------
+    data : dict
+        The dictionary to search through.
+    target_key : str
+        The key to search for.
+
+    Returns
+    -------
+    dict[str, Any] | None
+        The dict associated with the target key if found, None otherwise.
+    """
+    if not isinstance(data, dict):
+        return None
+    if target_key in data:  # does the current level contain the target key?
+        return data[target_key]
+    for value in data.values():  # recursively search in nested dictionaries
+        if isinstance(value, dict):
+            result = _recursive_dict_search(value, target_key)
+            if result is not None:
+                return result
+    return None
+
+
 def _extract_props_metadata(
     md: dict[str, geff.metadata_schema.PropMetadata],
     props_dict: dict[str, Property],
     prop_type: PropertyType,
 ) -> None:
     for key, prop in md.items():
+        # print(key, prop)
         if key not in props_dict:
             props_dict[key] = Property(
                 identifier=key,
@@ -77,6 +106,27 @@ def _extract_props_metadata(
                 # Directly ask the user how to rename?
 
 
+def _extract_lin_props_metadata(
+    md: dict[str, Any],
+    props_dict: dict[str, Property],
+) -> None:
+    for key, prop in md.items():
+        if key not in props_dict:
+            props_dict[key] = Property(
+                identifier=key,
+                name=prop.get("name") or key,
+                description=prop.get("description") or key,
+                provenance="geff",
+                prop_type="lineage",
+                lin_type="CellLineage",
+                dtype=prop.get("dtype"),
+                unit=prop.get("unit") or None,
+            )
+        else:
+            # TODO: deal with the case where the property already exists and needs to be renamed.
+            pass
+
+
 def load_geff_file(
     geff_file: Path | str,
     cell_id_key: str | None = None,
@@ -103,6 +153,7 @@ def load_geff_file(
     geff_graph, geff_md = geff.read_nx(geff_file, validate=True)
     for node in geff_graph.nodes:
         print(f"Node {node}: {geff_graph.nodes[node]}")
+        break
 
     print(type(geff_graph))
     print(geff_md.directed)
@@ -111,6 +162,7 @@ def load_geff_file(
     else:
         lin_id_key = None
     print("lin_id_key:", lin_id_key)
+
     # Determine axes
     # If no axes, need to have them as arguments...? Set a default to x, y, z, t...?
     print("Axes:", geff_md.axes)
@@ -125,11 +177,29 @@ def load_geff_file(
     # int_graph = nx.relabel_nodes(geff_graph, {node: int(node) for node in geff_graph.nodes()})
 
     # Extract and dispatch metadata
-    # TODO: but for now we wait for the change in geff metadata specs
-    props_dict = {}
+    # Generic metadata
+    metadata = {}  # type: dict[str, Any]
+
+    # Property metadata
+    props_dict: dict[str, Property] = {}
     if geff_md.node_props_metadata is not None:
+        # print(type(geff_md.node_props_metadata))
         # print(geff_md.node_props_metadata)
         _extract_props_metadata(geff_md.node_props_metadata, props_dict, "node")
+    if geff_md.edge_props_metadata is not None:
+        _extract_props_metadata(geff_md.edge_props_metadata, props_dict, "edge")
+    # TODO: for now lineage properties are not associated to a specific tag but stored
+    # somewhere in the "extra" field. We need to check recurrently if there is a dict
+    # key called "lineage_props_metadata" in the "extra" field.
+    if geff_md.extra is not None:
+        # Recursive search for the "lineage_props_metadata" key through the "extra"
+        # field dict of dicts of dicts...
+        lin_props_metadata = _recursive_dict_search(geff_md.extra, "lineage_props_metadata")
+        if lin_props_metadata is not None:
+            # print(type(lin_props_metadata))
+            # print(lin_props_metadata)
+            _extract_lin_props_metadata(lin_props_metadata, props_dict)
+    print("props_dict:", props_dict)
 
     # Split the graph into lineages
     lineages = _split_graph_into_lineages(geff_graph, lineage_ID_key=lin_id_key)
@@ -146,9 +216,11 @@ def load_geff_file(
     # TODO: cells positions and edges positions (keys from axes)
     # Time?
 
+    # All the stuff in field extra is stored in the model meta
+
     # Check for fusions
     data = Data({lin.graph["lineage_ID"]: lin for lin in lineages})
-    model = Model(data=data)
+    model = Model(data=data, props_metadata=PropsMetadata(props=props_dict))
     # print(model.data)
     # print(model.data.cell_data)
     check_fusions(model)  # pycellin DOES NOT support fusion events
@@ -166,7 +238,7 @@ if __name__ == "__main__":
     print(geff_file)
     model = load_geff_file(geff_file)
     # print(model)
-    print("props_dict", model.props_metadata.props)
+    # print("props_dict", model.props_metadata.props)
     # lineages = model.get_cell_lineages()
     # print(f"Number of lineages: {len(lineages)}")
     # for lin in lineages:
