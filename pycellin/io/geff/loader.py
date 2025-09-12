@@ -60,6 +60,26 @@ def _extract_props_metadata(
     props_dict: dict[str, Property],
     prop_type: PropertyType,
 ) -> None:
+    """
+    Extract properties metadata from a given dictionary and update the props_dict.
+
+    Parameters
+    ----------
+    md : dict[str, geff.metadata_schema.PropMetadata]
+        The dictionary containing properties metadata.
+    props_dict : dict[str, Property]
+        The dictionary to update with extracted properties metadata.
+    prop_type : PropertyType
+        The type of property being extracted ('node' or 'edge').
+
+    Raises
+    ------
+    ValueError
+        If an unsupported property type is provided.
+    KeyError
+        If a property identifier already exists in props_dict for the same property
+        type.
+    """
     for key, prop in md.items():
         if key not in props_dict:
             props_dict[key] = Property(
@@ -116,6 +136,21 @@ def _extract_lin_props_metadata(
     md: dict[str, Any],
     props_dict: dict[str, Property],
 ) -> None:
+    """
+    Extract lineage properties metadata from a given dictionary and update the props_dict.
+
+    Parameters
+    ----------
+    md : dict[str, Any]
+        The dictionary containing lineage properties metadata.
+    props_dict : dict[str, Property]
+        The dictionary to update with extracted lineage properties metadata.
+
+    Raises
+    ------
+    KeyError
+        If a property identifier already exists in props_dict for lineages.
+    """
     for key, prop in md.items():
         if key not in props_dict:
             props_dict[key] = Property(
