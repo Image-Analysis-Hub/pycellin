@@ -330,7 +330,7 @@ Computing track features:&#xD;
   - Track quality in 0 ms.&#xD;
   - Track motility analysis in 1 ms.&#xD;
 Computation done in 6 ms.</Log>
-  <Model spatialunits="µm" timeunits="min">
+  <Model spatialunits="micrometer" timeunits="minute">
     <FeatureDeclarations>
       <SpotFeatures>
         <Feature feature="QUALITY" name="Quality" shortname="Quality" dimension="QUALITY" isint="false" />
