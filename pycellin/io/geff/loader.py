@@ -47,7 +47,7 @@ def _recursive_dict_search(data: dict[str, Any], target_key: str) -> dict[str, A
         return None
     if target_key in data:  # does the current level contain the target key?
         return data[target_key]
-    for value in data.values():  # recursively search in nested dictionaries
+    for value in data.values():  # recursive search in nested dictionaries
         if isinstance(value, dict):
             result = _recursive_dict_search(value, target_key)
             if result is not None:
@@ -61,12 +61,11 @@ def _extract_props_metadata(
     prop_type: PropertyType,
 ) -> None:
     for key, prop in md.items():
-        # print(key, prop)
         if key not in props_dict:
             props_dict[key] = Property(
                 identifier=key,
                 name=prop.name or key,
-                description=prop.description or key,
+                description=prop.description or prop.name or key,
                 provenance="geff",
                 prop_type=prop_type,
                 lin_type="CellLineage",
@@ -75,35 +74,42 @@ def _extract_props_metadata(
             )
         else:
             if props_dict[key].prop_type != prop_type:
-                # If the key is already taken, we rename with prefix.
+                # The key must be unique but it already exists for nodes or edges,
+                # so it needs to be renamed.
                 if prop_type == "node":
-                    prefix = "cell"
+                    current_prefix = "cell"
+                    other_prefix = "link"
                 elif prop_type == "edge":
-                    prefix = "link"
+                    current_prefix = "link"
+                    other_prefix = "cell"
                 else:
                     raise ValueError(
                         f"Unsupported property type: {prop_type}. Expected 'node' or 'edge'."
                     )
-                # TODO: should we rename both properties?
-                new_key = f"{prefix}_{key}"
+                # Rename the new property to be added.
+                new_key = f"{current_prefix}_{key}"
                 props_dict[new_key] = Property(
                     identifier=new_key,
-                    name=prop.name or new_key,
-                    description=prop.description or new_key,
+                    name=prop.name or key,
+                    description=prop.description or prop.name or key,
                     provenance="geff",
                     prop_type=prop_type,
                     lin_type="CellLineage",
                     dtype=prop.dtype,
                     unit=prop.unit or None,
                 )
+                # Rename the other property as well for clarity.
+                other_key = f"{other_prefix}_{key}"
+                other_prop = props_dict.pop(key)
+                other_prop.identifier = other_key
+                props_dict[other_key] = other_prop
             else:
+                # GEFF ensure uniqueness of property keys for nodes and edges separately,
+                # so this should never happen.
                 raise KeyError(
-                    f"Property '{key}' already exists in props_dict for nodes and edges. "
-                    "Please ensure unique property names."
+                    f"Property '{key}' already exists in props_dict for {prop_type}s. "
+                    "Please ensure unique property identifiers."
                 )
-                # TODO: but then, what does the user do? They might not be able to rename
-                # the property from the tool that generated the geff file.
-                # Directly ask the user how to rename?
 
 
 def _extract_lin_props_metadata(
@@ -115,7 +121,7 @@ def _extract_lin_props_metadata(
             props_dict[key] = Property(
                 identifier=key,
                 name=prop.get("name") or key,
-                description=prop.get("description") or key,
+                description=prop.get("description") or prop.get("name") or key,
                 provenance="geff",
                 prop_type="lineage",
                 lin_type="CellLineage",
@@ -123,8 +129,58 @@ def _extract_lin_props_metadata(
                 unit=prop.get("unit") or None,
             )
         else:
-            # TODO: deal with the case where the property already exists and needs to be renamed.
-            pass
+            if props_dict[key].prop_type != "lineage":
+                # The key must be unique but it already exists for nodes or edges,
+                # so it needs to be renamed.
+                new_key = f"lin_{key}"
+                props_dict[new_key] = Property(
+                    identifier=new_key,
+                    name=prop.name or key,
+                    description=prop.description or prop.get("name") or key,
+                    provenance="geff",
+                    prop_type="lineage",
+                    lin_type="CellLineage",
+                    dtype=prop.dtype,
+                    unit=prop.unit or None,
+                )
+            else:
+                raise KeyError(
+                    f"Property '{key}' already exists in props_dict for lineages. "
+                    "Please ensure unique property identifiers."
+                )
+
+
+def _read_props_metadata(geff_md: geff.metadata_schema.GeffMetadata) -> dict[str, Property]:
+    """
+    Read and extract properties metadata from geff metadata.
+
+    Parameters
+    ----------
+    geff_md : geff.metadata_schema.GeffMetadata
+        The geff metadata object containing properties metadata.
+
+    Returns
+    -------
+    dict[str, Property]
+        Dictionary mapping property identifiers to Property objects.
+    """
+    props_dict: dict[str, Property] = {}
+    if geff_md.node_props_metadata is not None:
+        _extract_props_metadata(geff_md.node_props_metadata, props_dict, "node")
+    if geff_md.edge_props_metadata is not None:
+        _extract_props_metadata(geff_md.edge_props_metadata, props_dict, "edge")
+
+    # TODO: for now lineage properties are not associated to a specific tag but stored
+    # somewhere in the "extra" field. We need to check recurrently if there is a dict
+    # key called "lineage_props_metadata" in the "extra" field.
+    if geff_md.extra is not None:
+        # Recursive search for the "lineage_props_metadata" key through the "extra"
+        # field dict of dicts of dicts...
+        lin_props_metadata = _recursive_dict_search(geff_md.extra, "lineage_props_metadata")
+        if lin_props_metadata is not None:
+            _extract_lin_props_metadata(lin_props_metadata, props_dict)
+
+    return props_dict
 
 
 def load_geff_file(
@@ -181,25 +237,7 @@ def load_geff_file(
     metadata = {}  # type: dict[str, Any]
 
     # Property metadata
-    props_dict: dict[str, Property] = {}
-    if geff_md.node_props_metadata is not None:
-        # print(type(geff_md.node_props_metadata))
-        # print(geff_md.node_props_metadata)
-        _extract_props_metadata(geff_md.node_props_metadata, props_dict, "node")
-    if geff_md.edge_props_metadata is not None:
-        _extract_props_metadata(geff_md.edge_props_metadata, props_dict, "edge")
-    # TODO: for now lineage properties are not associated to a specific tag but stored
-    # somewhere in the "extra" field. We need to check recurrently if there is a dict
-    # key called "lineage_props_metadata" in the "extra" field.
-    if geff_md.extra is not None:
-        # Recursive search for the "lineage_props_metadata" key through the "extra"
-        # field dict of dicts of dicts...
-        lin_props_metadata = _recursive_dict_search(geff_md.extra, "lineage_props_metadata")
-        if lin_props_metadata is not None:
-            # print(type(lin_props_metadata))
-            # print(lin_props_metadata)
-            _extract_lin_props_metadata(lin_props_metadata, props_dict)
-    print("props_dict:", props_dict)
+    props_dict = _read_props_metadata(geff_md)
 
     # Split the graph into lineages
     lineages = _split_graph_into_lineages(geff_graph, lineage_ID_key=lin_id_key)
