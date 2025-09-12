@@ -242,6 +242,10 @@ def load_geff_file(
 
     # Read the geff file
     geff_graph, geff_md = geff.read_nx(geff_file, validate=True)
+    if not geff_md.directed:
+        raise ValueError(
+            "The geff graph is undirected: pycellin does not support undirected graphs."
+        )
     for node in geff_graph.nodes:
         print(f"Node {node}: {geff_graph.nodes[node]}")
         break
@@ -270,6 +274,7 @@ def load_geff_file(
     # Extract and dispatch metadata
     # Generic metadata
     metadata = {}  # type: dict[str, Any]
+    # All the stuff in field extra is stored in the model metadata
 
     # Property metadata
     props_dict = _read_props_metadata(geff_md)
@@ -288,8 +293,6 @@ def load_geff_file(
             _update_node_prop_key(lin, old_key=cell_id_key, new_key="cell_ID")
     # TODO: cells positions and edges positions (keys from axes)
     # Time?
-
-    # All the stuff in field extra is stored in the model meta
 
     # Check for fusions
     data = Data({lin.graph["lineage_ID"]: lin for lin in lineages})
