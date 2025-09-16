@@ -3,21 +3,23 @@
 """
 loader.py
 
+This module is part of the pycellin package.
+It provides functionality to load a GEFF file into a pycellin model.
+
 References:
 - geff GitHub: https://github.com/live-image-tracking-tools/geff
 - geff Documentation: https://live-image-tracking-tools.github.io/geff/latest/
 """
 
 from datetime import datetime
-from importlib.metadata import version
+import importlib.metadata
 from pathlib import Path
-from tkinter import N
 from typing import Any
 
 import geff
-import networkx as nx
+from geff.metadata_schema import GeffMetadata
 
-from pycellin.classes import Data, Property, PropsMetadata, Model
+from pycellin.classes import Data, Model, Property, PropsMetadata
 from pycellin.custom_types import PropertyType
 from pycellin.io.utils import (
     _split_graph_into_lineages,
@@ -218,9 +220,101 @@ def _read_props_metadata(geff_md: geff.metadata_schema.GeffMetadata) -> dict[str
     return props_dict
 
 
-def load_geff_file(
+def _extract_units_from_axes(geff_md: GeffMetadata) -> dict[str, Any]:
+    """
+    Extract and validate space and time units from geff metadata axes.
+
+    Parameters
+    ----------
+    geff_md : geff.metadata_schema.GeffMetadata
+        The geff metadata object containing axes information.
+
+    Returns
+    -------
+    dict[str, Any]
+        Dictionary containing space_unit and time_unit keys.
+
+    Raises
+    ------
+    ValueError
+        If multiple space units or time units are found in axes.
+    """
+    units_metadata = {}
+
+    if geff_md.axes is not None:
+        # Check unicity of space and time units
+        space_units = {
+            axis.unit for axis in geff_md.axes if axis.type == "space" and axis.unit is not None
+        }
+        units_metadata["space_unit"] = space_units.pop() if space_units else None
+        time_units = {
+            axis.unit for axis in geff_md.axes if axis.type == "time" and axis.unit is not None
+        }
+        units_metadata["time_unit"] = time_units.pop() if time_units else None
+        if len(space_units) > 1:
+            raise ValueError(
+                f"Multiple space units found in axes: {space_units}. "
+                f"Pycellin assumes a single space unit."
+            )
+        if len(time_units) > 1:
+            raise ValueError(
+                f"Multiple time units found in axes: {time_units}. "
+                f"Pycellin assumes a single time unit."
+            )
+    else:
+        units_metadata["space_unit"] = None
+        units_metadata["time_unit"] = None
+
+    return units_metadata
+
+
+def _set_generic_metadata(
+    geff_file: Path | str, geff_md: geff.metadata_schema.GeffMetadata
+) -> dict[str, Any]:
+    """
+    Set generic metadata for the model based on the geff file and its metadata.
+
+    Parameters
+    ----------
+    geff_file : Path | str
+        Path to the geff file.
+    geff_md : geff.metadata_schema.GeffMetadata
+        The geff metadata object.
+
+    Returns
+    -------
+    dict[str, Any]
+        Dictionary containing generic metadata.
+
+    Raises
+    ------
+    importlib.metadata.PackageNotFoundError
+        If the pycellin package is not found when trying to get its version.
+    """
+    metadata = {}  # type: dict[str, Any]
+    metadata["name"] = Path(geff_file).stem
+    metadata["file_location"] = geff_file
+    metadata["provenance"] = "geff"
+    metadata["date"] = str(datetime.now())
+    try:
+        version = importlib.metadata.version("pycellin")
+    except importlib.metadata.PackageNotFoundError:
+        version = "unknown"
+    metadata["pycellin_version"] = version
+    metadata["geff_version"] = geff_md.geff_version
+    if geff_md.extra is not None:
+        metadata["geff_extra"] = geff_md.extra
+
+    return metadata
+
+
+def load_GEFF(
     geff_file: Path | str,
     cell_id_key: str | None = None,
+    cell_x_key: str | None = None,
+    cell_y_key: str | None = None,
+    cell_z_key: str | None = None,
+    time_key: str | None = None,
 ) -> Model:
     """
     Load a geff file and return a pycellin model containing the data.
@@ -232,13 +326,20 @@ def load_geff_file(
     cell_id_key : str | None, optional
         The key used to identify cells in the geff file. If None, the default
         key 'cell_ID' will be created and populated based on the node IDs.
+    cell_x_key : str | None, optional
+        The key used to identify the x-coordinate of cells in the geff file.
+    cell_y_key : str | None, optional
+        The key used to identify the y-coordinate of cells in the geff file.
+    cell_z_key : str | None, optional
+        The key used to identify the z-coordinate of cells in the geff file.
+    time_key : str | None, optional
+        The key used to identify the time point of cells in the geff file.
 
     Returns
     -------
     Model
         A pycellin model containing the data from the geff file.
     """
-    pass
 
     # Read the geff file
     geff_graph, geff_md = geff.read_nx(geff_file, validate=True)
@@ -246,44 +347,57 @@ def load_geff_file(
         raise ValueError(
             "The geff graph is undirected: pycellin does not support undirected graphs."
         )
-    for node in geff_graph.nodes:
-        print(f"Node {node}: {geff_graph.nodes[node]}")
-        break
+    # for node in geff_graph.nodes:
+    #     print(f"Node {node}: {geff_graph.nodes[node]}")
+    #     break
+    print(geff_md)
 
-    print(type(geff_graph))
-    print(geff_md.directed)
-    if geff_md.track_node_props is not None and "lineage" in geff_md.track_node_props:
-        lin_id_key = geff_md.track_node_props["lineage"]
+    # Extract and dispatch metadata
+    metadata = _set_generic_metadata(geff_file, geff_md)
+    units_metadata = _extract_units_from_axes(geff_md)
+    metadata.update(units_metadata)
+    # print("Metadata:")
+    # for k, v in metadata.items():
+    #     print(f"  {k}: {v}")
+    props_md = _read_props_metadata(geff_md)
+    if geff_md.track_node_props is not None:
+        lin_id_key = geff_md.track_node_props.get("lineage")
     else:
         lin_id_key = None
     print("lin_id_key:", lin_id_key)
 
-    # Determine axes
-    # If no axes, need to have them as arguments...? Set a default to x, y, z, t...?
-    print("Axes:", geff_md.axes)
-    # display_hints=DisplayHint(
-    #         display_horizontal="POSITION_X",
-    #         display_vertical="POSITION_Y",
-    #         display_depth="POSITION_Z",
-    #         display_time="POSITION_T",
-    #     ),
+    # Determine properties for x, y, z, t
+    # For now we assume that both display hints and axes are filled...
+    if geff_md.display_hints is not None:
+        prop_mapping = {
+            "cell_x": getattr(geff_md.display_hints, "display_horizontal", None),
+            "cell_y": getattr(geff_md.display_hints, "display_vertical", None),
+            "cell_z": getattr(geff_md.display_hints, "display_depth", None),
+            "time": getattr(geff_md.display_hints, "display_time", None),
+        }
+        print(prop_mapping)
+    else:
+        # We need to rely on axes only, or on inputs from the user.
+        pass
 
-    # Is int ID ensured in geff? YES
-    # int_graph = nx.relabel_nodes(geff_graph, {node: int(node) for node in geff_graph.nodes()})
+    # Identify the axes corresponding to the values of the prop_mapping.
+    # axes_mapping = {axis.name: axis for axis in geff_md.axes if axis.name is not None}
+    # print(axes_mapping)
 
-    # Extract and dispatch metadata
-    # Generic metadata
-    metadata = {}  # type: dict[str, Any]
-    # All the stuff in field extra is stored in the model metadata
-
-    # Property metadata
-    props_dict = _read_props_metadata(geff_md)
+    # Do we have axis related properties in props_md?
+    for axis in geff_md.axes:
+        if axis.name not in props_md:
+            print("Axis", axis.name, "not in props_md")
+            pass
 
     # Split the graph into lineages
     lineages = _split_graph_into_lineages(geff_graph, lineage_ID_key=lin_id_key)
     print(f"Number of lineages: {len(lineages)}")
 
     # Rename properties to match pycellin conventions
+    # In the properties metadata
+    pass
+    # In the actual data
     _update_lineages_IDs_key(lineages, lin_id_key)
     for lin in lineages:
         if cell_id_key is None:
@@ -294,12 +408,14 @@ def load_geff_file(
     # TODO: cells positions and edges positions (keys from axes)
     # Time?
 
-    # Check for fusions
-    data = Data({lin.graph["lineage_ID"]: lin for lin in lineages})
-    model = Model(data=data, props_metadata=PropsMetadata(props=props_dict))
+    model = Model(
+        model_metadata=metadata,
+        props_metadata=PropsMetadata(props=props_md),
+        data=Data({lin.graph["lineage_ID"]: lin for lin in lineages}),
+    )
+    check_fusions(model)  # pycellin DOES NOT support fusion events
     # print(model.data)
     # print(model.data.cell_data)
-    check_fusions(model)  # pycellin DOES NOT support fusion events
 
     return model
 
@@ -308,20 +424,25 @@ if __name__ == "__main__":
     geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/reader_test_graph.geff"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/mouse-20250719.zarr/tracks"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/test.zarr"
-    geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_trackmate_to_geff/FakeTracks.geff"
-    geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_trackmate_to_geff/FakeTracks.geff"
+    # geff_file = (
+    #     "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
+    # )
+    # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_trackmate_to_geff/FakeTracks.geff"
+    # Yohsuke's file for geffception
+    # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/cell_segmentation.zarr/tree.geff"
+    geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/cell_segmentation.zarr/tree.geff/linage_tree.geff"
 
     print(geff_file)
-    model = load_geff_file(geff_file)
+    model = load_GEFF(geff_file)
     # print(model)
     # print("props_dict", model.props_metadata.props)
-    # lineages = model.get_cell_lineages()
+    lineages = model.get_cell_lineages()
     # print(f"Number of lineages: {len(lineages)}")
     # for lin in lineages:
     #     print(lin)
-    # lin0 = lineages[0]
+    lin0 = lineages[0]
     # print(lin0.nodes(data=True))
-    # lin0.plot()
+    lin0.plot()
 
     # cell_id_key
     # lineage_id_key
