@@ -65,8 +65,17 @@ def _get_next_available_id(lineages: list[CellLineage]) -> int:
     int
         The next available node ID.
     """
-    next_ids = [lin._get_next_available_node_ID() for lin in lineages]
-    return max(next_ids)
+    if not lineages:
+        return 0
+
+    max_node_id = -1
+    for lineage in lineages:
+        if lineage.nodes:
+            lineage_max = max(lineage.nodes)
+            if lineage_max > max_node_id:
+                max_node_id = lineage_max
+
+    return max_node_id + 1
 
 
 def _relabel_nodes(
@@ -80,6 +89,8 @@ def _relabel_nodes(
     ----------
     lineages : list[CellLineage]
         List of lineage graphs to relabel in place.
+    overlaps : dict[int, list[int]]
+        Dictionary mapping overlapping node IDs to the list of lineage indices they belong to.
     """
     next_available_id = _get_next_available_id(lineages)
     for nid, lids in overlaps.items():
@@ -308,33 +319,49 @@ def export_GEFF(model: Model, geff_out: str) -> None:
         The pycellin model to export.
     geff_out : str
         Path to the output GEFF file.
+
+    Raises
+    ------
+    ValueError
+        If the model contains no lineage data.
+    OSError
+        If there are file I/O issues with the output path.
+    RuntimeError
+        If the GEFF export process fails.
     """
-    # We don't want to modify the original model.
-    model_copy = copy.deepcopy(model)
-    lineages = list(model_copy.data.cell_data.values())
-    for graph in lineages:
-        print(len(graph.nodes), len(graph.edges))
+    # Validate that model has data to export
+    if not model.data.cell_data:
+        raise ValueError("Model contains no lineage data to export")
 
-    # TODO: remove when GEFF can handle variable length properties
-    if model_copy.has_property("ROI_coords"):
-        model_copy.remove_property("ROI_coords")
+    try:
+        # We don't want to modify the original model.
+        model_copy = copy.deepcopy(model)
+        lineages = list(model_copy.data.cell_data.values())
 
-    # For GEFF compatibility, we need to put all the lineages in the same graph,
-    # but some nodes can have the same identifier across different lineages.
-    _solve_node_overlaps(lineages)
-    geff_graph = nx.compose_all(lineages)
-    print(len(geff_graph))
+        for graph in lineages:
+            print(len(graph.nodes), len(graph.edges))
 
-    metadata = _build_geff_metadata(model_copy)
-    print(metadata)
+        # TODO: remove when GEFF can handle variable length properties
+        if model_copy.has_property("ROI_coords"):
+            model_copy.remove_property("ROI_coords")
 
-    write_nx(
-        geff_graph,
-        geff_out,
-        metadata=metadata,
-    )
+        # For GEFF compatibility, we need to put all the lineages in the same graph,
+        # but some nodes can have the same identifier across different lineages.
+        _solve_node_overlaps(lineages)
+        geff_graph = nx.compose_all(lineages)
+        print(len(geff_graph))
 
-    del model_copy
+        metadata = _build_geff_metadata(model_copy)
+        print(metadata)
+
+        write_nx(
+            geff_graph,
+            geff_out,
+            metadata=metadata,
+        )
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to export GEFF file to '{geff_out}': {e}") from e
 
 
 if __name__ == "__main__":

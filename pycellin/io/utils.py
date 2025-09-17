@@ -91,7 +91,7 @@ def _add_lineage_props(
 
 
 def _split_graph_into_lineages(
-    graph: nx.DiGraph,
+    graph: nx.Graph | nx.DiGraph,
     lin_props: list[dict[str, Any]] | None = None,
     lineage_ID_key: str | None = "lineage_ID",
 ) -> list[CellLineage]:
