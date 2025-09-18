@@ -13,6 +13,8 @@ References:
 """
 
 import copy
+from pathlib import Path
+from typing import Literal
 
 import networkx as nx
 from geff import write_nx
@@ -100,7 +102,7 @@ def _relabel_nodes(
             next_available_id += 1
 
 
-def _solve_node_overlaps(lineages: list[CellLineage]) -> None:
+def _solve_node_overlaps(lineages: list[CellLineage]) -> bool:
     """
     Detect and resolve overlapping node IDs across lineages by reassigning unique IDs.
 
@@ -108,6 +110,11 @@ def _solve_node_overlaps(lineages: list[CellLineage]) -> None:
     ----------
     lineages : list[CellLineage]
         List of lineage graphs to check and modify in place.
+
+    Returns
+    -------
+    bool
+        True if overlaps were found and resolved, False otherwise.
     """
     overlaps = _find_node_overlaps(lineages)
     if overlaps:
@@ -115,19 +122,10 @@ def _solve_node_overlaps(lineages: list[CellLineage]) -> None:
         for nid, lids in overlaps.items():
             print(f"  Node ID {nid} in lineages {lids}")
         _relabel_nodes(lineages, overlaps)
-
-        # Verify no more overlaps
-        # TODO: remove this, it's only for debug, or put in verbose
-        overlaps = _find_node_overlaps(lineages)
-        if overlaps:
-            print("Overlapping node IDs found after relabeling:")
-            for nid, lids in overlaps.items():
-                print(f"  Node ID {nid} in lineages {lids}")
-        else:
-            print("No overlapping node IDs found after relabeling.")
-
+        return True
     else:
         print("No overlapping node IDs found.")
+        return False
 
 
 def _build_axes(
@@ -135,8 +133,9 @@ def _build_axes(
     has_y: bool,
     has_z: bool,
     has_t: bool,
-    space_unit: str | None,
-    time_unit: str | None,
+    space_unit: str | None = None,
+    time_unit: str | None = None,
+    graph_level: Literal["cell", "tracklet"] = "cell",
 ) -> list[Axis]:
     """
     Build a list of Axis objects for GEFF metadata.
@@ -151,10 +150,14 @@ def _build_axes(
         Whether the z-axis is present.
     has_t : bool
         Whether the time axis is present.
-    space_unit : str | None
-        Unit for spatial axes (e.g., "micrometer").
-    time_unit : str | None
-        Unit for time axis (e.g., "second").
+    space_unit : str | None, optional
+        Unit for spatial axes (e.g., "micrometer"). Required if has_x or has_y is True.
+    time_unit : str | None, optional
+        Unit for the time axis (e.g., "second" or "level"). Required if has_t is True.
+    graph_level : {"cell", "tracklet"}, default "cell"
+        The level of graph representation:
+        - "cell": Individual cell-level data with spatial and temporal coordinates
+        - "tracklet": Cell cycle/division data with level-based temporal structure
 
     Returns
     -------
@@ -169,7 +172,10 @@ def _build_axes(
     if has_z:
         axes.append(Axis(name="cell_z", type="space", unit=space_unit))
     if has_t:
-        axes.append(Axis(name="frame", type="time", unit=time_unit))
+        if graph_level == "cell":
+            axes.append(Axis(name="frame", type="time", unit=time_unit))
+        elif graph_level == "tracklet":
+            axes.append(Axis(name="level", type="time", unit=time_unit))
     return axes
 
 
@@ -211,6 +217,7 @@ def _build_display_hints(
 
 def _build_props_metadata(
     properties: dict[str, Property],
+    lineage_geff: bool = False,
 ) -> tuple[dict[str, PropMetadata], dict[str, PropMetadata]]:
     """
     Build property metadata for GEFF from a pycellin model.
@@ -219,6 +226,9 @@ def _build_props_metadata(
     ----------
     properties : dict[str, Property]
         Dictionary of property identifiers to Property objects.
+    lineage_geff : bool, default False
+        Whether the metadata is for a lineage GEFF file. If True, lineage properties
+        are included as node properties.
 
     Returns
     -------
@@ -249,68 +259,147 @@ def _build_props_metadata(
             case "edge":
                 edge_props_md[prop_id] = prop_md
             case "lineage":
-                pass  # not supported in GEFF 0.5.0
+                if lineage_geff:
+                    node_props_md[prop_id] = prop_md
             case _:
                 raise ValueError(f"Unknown property type: {prop.prop_type}")
+
+    # In pycellin, lineage_ID is a lineage property, not a node one, so we need to add it
+    # manually for lineage GEFF files.
+    if lineage_geff and "lineage_ID" not in node_props_md:
+        node_props_md["lineage_ID"] = PropMetadata(
+            identifier="lineage_ID",
+            dtype="int",
+            unit=None,
+            name="lineage ID",
+            description="Unique identifier of the lineage",
+        )
 
     return node_props_md, edge_props_md
 
 
 def _build_geff_metadata(
-    model: Model, export_tracklet_geff: bool, export_lineage_geff: bool
+    model: Model,
+    cell_geff_out: str,
+    graph_level: Literal["cell", "tracklet", "lineage"] = "cell",
+    export_tracklet_geff: bool | None = None,
+    export_lineage_geff: bool | None = None,
 ) -> GeffMetadata:
     """
     Build GEFF metadata from a pycellin model.
 
+    This function constructs the metadata object required for GEFF export based on the
+    specified graph level and model properties. It handles different graph representations
+    (cell, tracklet, lineage) and configures appropriate axes, display hints, property
+    metadata, and related objects for "geffception" (hierarchical GEFF files).
+
     Parameters
     ----------
     model : Model
-        The pycellin model to extract metadata from.
-    export_tracklet_geff : bool
-        Whether to include tracklet (cell cycle) information.
-    export_lineage_geff : bool
-        Whether to include lineage information.
+        The pycellin model to extract metadata from. Must contain the appropriate
+        data structures and properties for the specified graph level.
+    cell_geff_out : str
+        Path to the main cell-level GEFF file. Used to reference related GEFF files
+        for tracklets and lineages in "geffception" setups.
+    graph_level : {"cell", "tracklet", "lineage"}, default "cell"
+        The level of graph representation to build metadata for:
+        - "cell": Individual cell-level data with spatial and temporal coordinates
+        - "tracklet": Cell cycle/division data with level-based temporal structure
+        - "lineage": Lineage-level data without spatial coordinates
+    export_tracklet_geff : bool, optional
+        Whether to include tracklet GEFF as a related object. Only relevant when
+        graph_level is "cell". If None, no tracklet GEFF reference is added.
+    export_lineage_geff : bool, optional
+        Whether to include lineage GEFF as a related object. Only relevant when
+        graph_level is "cell". If None, no lineage GEFF reference is added.
 
     Returns
     -------
     GeffMetadata
-        The GEFF metadata object.
+        A GEFF metadata object containing:
+        - Directed graph specification (always True)
+        - Axis definitions (spatial x/y/z and temporal frame/level)
+        - Display hints for visualization
+        - Track node properties (lineage_ID and optionally cycle_ID)
+        - Node and edge property metadata
+        - Related objects for hierarchical GEFF structures
+
+    Notes
+    -----
+    The function automatically detects available spatial coordinates (cell_x, cell_y,
+    cell_z) and temporal information (frame, level) from the model to configure
+    appropriate axes. For cell-level graphs, spatial units and time units are
+    extracted from the model. For tracklet-level graphs, only level-based temporal
+    axis is considered. Lineage-level graphs have no axis information.
+
+    The "geffception" feature allows for hierarchical GEFF files where a main
+    cell-level GEFF can reference related tracklet and lineage GEFF files.
     """
+    # TODO: refactor
     # Generic metadata
-    has_x = model.has_property("cell_x")
-    has_y = model.has_property("cell_y")
-    has_z = model.has_property("cell_z")
-    has_t = model.has_property("frame")
-    axes = _build_axes(
-        has_x=has_x,
-        has_y=has_y,
-        has_z=has_z,
-        has_t=has_t,
-        space_unit=model.get_space_unit(),
-        time_unit=model.get_time_unit(),
-    )
-    display_hints = _build_display_hints(
-        has_x=has_x,
-        has_y=has_y,
-        has_z=has_z,
-        has_t=has_t,
-    )
+    if graph_level == "cell":
+        has_x = model.has_property("cell_x")
+        has_y = model.has_property("cell_y")
+        has_z = model.has_property("cell_z")
+        has_t = model.has_property("frame")
+        axes = _build_axes(
+            has_x=has_x,
+            has_y=has_y,
+            has_z=has_z,
+            has_t=has_t,
+            space_unit=model.get_space_unit(),
+            time_unit=model.get_time_unit(),
+        )
+        display_hints = _build_display_hints(
+            has_x=has_x,
+            has_y=has_y,
+            has_z=has_z,
+            has_t=has_t,
+        )
+    elif graph_level == "tracklet":
+        has_t = model.has_property("level")
+        axes = _build_axes(
+            has_x=False,
+            has_y=False,
+            has_z=False,
+            has_t=has_t,
+            time_unit="level",
+            graph_level="tracklet",
+        )
+        display_hints = None
+    elif graph_level == "lineage":
+        axes = None
+        display_hints = None
 
     # Property metadata
-    props = model.get_cell_lineage_properties()
-    node_props_md, edge_props_md = _build_props_metadata(props)
+    if graph_level == "cell":
+        props = model.get_cell_lineage_properties()
+        node_props_md, edge_props_md = _build_props_metadata(props)
+    elif graph_level == "tracklet":
+        props = model.get_cycle_lineage_properties()
+        node_props_md, edge_props_md = _build_props_metadata(props)
+    elif graph_level == "lineage":
+        props = model.get_lineage_properties()
+        node_props_md, edge_props_md = _build_props_metadata(props, lineage_geff=True)
 
     # Define identifiers of lineage and cell cycle
     track_node_props = {"lineage": "lineage_ID"}
     if model.has_cycle_data():
         track_node_props["tracklet"] = "cycle_ID"
 
-    # Geffception
-    related_objects = []
-    if export_tracklet_geff:
-        related_objects.append(RelatedObject(type="tracklet_geff", path="./tracklets.geff"))
-    if export_lineage_geff:
-        related_objects.append(RelatedObject(type="lineage_geff", path="./lineages.geff"))
+    # Define related objects for geffception
+    if graph_level == "cell":
+        related_objects = []
+        if export_tracklet_geff:
+            path = str(Path(cell_geff_out, "tracklets.geff"))
+            related_objects.append(RelatedObject(type="tracklet_geff", path=path))
+        if export_lineage_geff:
+            path = str(Path(cell_geff_out, "lineages.geff"))
+            related_objects.append(RelatedObject(type="lineage_geff", path=path))
+        if not related_objects:
+            related_objects = None
+    elif graph_level in ["tracklet", "lineage"]:
+        related_objects = [RelatedObject(type="main_geff", path=cell_geff_out)]
 
     return GeffMetadata(
         directed=True,
@@ -343,54 +432,104 @@ def export_GEFF(model: Model, geff_out: str) -> None:
     RuntimeError
         If the GEFF export process fails.
     """
-    # Validate that model has data to export
+    # Validate that the model has data to export
     if not model.data.cell_data:
         raise ValueError("Model contains no lineage data to export")
-
-    try:
-        # We don't want to modify the original model.
-        model_copy = copy.deepcopy(model)
-        lineages = list(model_copy.data.cell_data.values())
-
-        for lin in lineages:
-            print(lin)
-
+    # We don't want to modify the original model.
+    model_copy = copy.deepcopy(model)
+    lineages = list(model_copy.data.cell_data.values())
+    for lin in lineages:
+        print(lin)
         # TODO: remove when GEFF can handle variable length properties
         if model_copy.has_property("ROI_coords"):
             model_copy.remove_property("ROI_coords")
 
+    #### GEFFCEPTION ####
+    # Do we have cell cycle data?
+    if model_copy.has_cycle_data():
+        export_tracklet_geff = True
+        for lin in model_copy.data.cycle_data.values():
+            print(lin)
+    else:
+        export_tracklet_geff = False
+    # Do we have lineage properties?
+    lin_props = list(model_copy.get_lineage_properties().keys())
+    lin_props.remove("lineage_ID")
+    if len(lin_props) > 0:
+        export_lineage_geff = True
+    else:
+        export_lineage_geff = False
+    print(f"Geffception with tracklets: {export_tracklet_geff}")
+    print(f"Geffception with lineages: {export_lineage_geff}")
+
+    try:
         # For GEFF compatibility, we need to put all the lineages in the same graph,
         # but some nodes can have the same identifier across different lineages.
-        _solve_node_overlaps(lineages)
+        has_overlap = _solve_node_overlaps(lineages)
+        if export_tracklet_geff and has_overlap:
+            model_copy.update()  # needed to propagate the change of IDs to cycle data
         geff_graph = nx.compose_all(lineages)
-        # print(len(geff_graph))
 
-        #### GEFFCEPTION ####
+        if export_tracklet_geff and model_copy.data.cycle_data is not None:
+            cycle_lineages = list(model_copy.data.cycle_data.values())
+            # We need the lineage_ID prop on cycle nodes
+            for lin in cycle_lineages:
+                for nid in lin.nodes:
+                    lin.nodes[nid]["lineage_ID"] = lin.graph["lineage_ID"]
+            tracklet_geff_graph = nx.compose_all(cycle_lineages)
+            # TODO: variable length properties are not supported in GEFF yet
+            for node in tracklet_geff_graph.nodes:
+                tracklet_geff_graph.nodes[node].pop("cells")
 
-        # Do we have cell cycle data?
-        if model_copy.has_cycle_data():
-            export_tracklet_geff = True
-        else:
-            export_tracklet_geff = False
-        # Do we have lineage properties?
-        lin_props = list(model_copy.get_lineage_properties().keys())
-        lin_props.remove("lineage_ID")
-        if len(lin_props) > 0:
-            export_lineage_geff = True
-        else:
-            export_lineage_geff = False
-        print(f"Geffception with tracklets: {export_tracklet_geff}")
-        print(f"Geffception with lineages: {export_lineage_geff}")
+        if export_lineage_geff:
+            # In a GEFF lineage file, each node is a lineage. So we need to create a new
+            # graph with lone nodes, each representing a lineage and on which are stored
+            # the lineage properties.
+            lineage_geff_graph = nx.Graph()
+            for lin in lineages:
+                lineage_id = lin.graph["lineage_ID"]
+                lineage_geff_graph.add_node(lineage_id, **lin.graph)
 
-        metadata = _build_geff_metadata(model_copy, export_tracklet_geff, export_lineage_geff)
-        # print(metadata)
+        metadata = _build_geff_metadata(
+            model_copy,
+            export_tracklet_geff=export_tracklet_geff,
+            export_lineage_geff=export_lineage_geff,
+            cell_geff_out=geff_out,
+        )
 
+        tracklet_metadata = _build_geff_metadata(
+            model_copy, graph_level="tracklet", cell_geff_out=geff_out
+        )
+
+        lineage_metadata = _build_geff_metadata(
+            model_copy, graph_level="lineage", cell_geff_out=geff_out
+        )
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to prepare data for GEFF export: {e}") from e
+
+    try:
         write_nx(
             geff_graph,
             geff_out,
             metadata=metadata,
         )
 
+        if export_tracklet_geff:
+            tracklet_geff_out = Path(geff_out, "tracklets.geff")
+            write_nx(
+                tracklet_geff_graph,
+                tracklet_geff_out,
+                metadata=tracklet_metadata,
+            )
+
+        if export_lineage_geff:
+            lineage_geff_out = Path(geff_out, "lineages.geff")
+            write_nx(
+                geff_graph,
+                lineage_geff_out,
+                metadata=lineage_metadata,
+            )
     except Exception as e:
         raise RuntimeError(f"Failed to export GEFF file to '{geff_out}': {e}") from e
 
@@ -407,6 +546,11 @@ if __name__ == "__main__":
     #     "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
     # )
 
+    import plotly.io as pio
+
+    # Plotly: set the default renderer to browser so I can visualize plots
+    pio.renderers.default = "browser"
+
     # Remove existing folder
     import os
     import shutil
@@ -421,6 +565,8 @@ if __name__ == "__main__":
     model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # model = load_CTC_file(ctc_in)
     print(model)
+    # print(model.get_lineage_properties().keys())
+    # exit()
 
     # Enrich the model
     print(len(model.get_properties().keys()))
