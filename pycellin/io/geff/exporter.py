@@ -16,7 +16,7 @@ import copy
 
 import networkx as nx
 from geff import write_nx
-from geff.metadata_schema import Axis, DisplayHint, GeffMetadata, PropMetadata
+from geff.metadata_schema import Axis, DisplayHint, GeffMetadata, PropMetadata, RelatedObject
 
 from pycellin.classes import CellLineage, Model, Property
 
@@ -256,7 +256,9 @@ def _build_props_metadata(
     return node_props_md, edge_props_md
 
 
-def _build_geff_metadata(model: Model) -> GeffMetadata:
+def _build_geff_metadata(
+    model: Model, export_tracklet_geff: bool, export_lineage_geff: bool
+) -> GeffMetadata:
     """
     Build GEFF metadata from a pycellin model.
 
@@ -264,6 +266,10 @@ def _build_geff_metadata(model: Model) -> GeffMetadata:
     ----------
     model : Model
         The pycellin model to extract metadata from.
+    export_tracklet_geff : bool
+        Whether to include tracklet (cell cycle) information.
+    export_lineage_geff : bool
+        Whether to include lineage information.
 
     Returns
     -------
@@ -299,6 +305,13 @@ def _build_geff_metadata(model: Model) -> GeffMetadata:
     if model.has_cycle_data():
         track_node_props["tracklet"] = "cycle_ID"
 
+    # Geffception
+    related_objects = []
+    if export_tracklet_geff:
+        related_objects.append(RelatedObject(type="tracklet_geff", path="./tracklets.geff"))
+    if export_lineage_geff:
+        related_objects.append(RelatedObject(type="lineage_geff", path="./lineages.geff"))
+
     return GeffMetadata(
         directed=True,
         axes=axes,
@@ -306,6 +319,7 @@ def _build_geff_metadata(model: Model) -> GeffMetadata:
         track_node_props=track_node_props,
         node_props_metadata=node_props_md,
         edge_props_metadata=edge_props_md,
+        related_objects=related_objects,
     )
 
 
@@ -338,8 +352,8 @@ def export_GEFF(model: Model, geff_out: str) -> None:
         model_copy = copy.deepcopy(model)
         lineages = list(model_copy.data.cell_data.values())
 
-        for graph in lineages:
-            print(len(graph.nodes), len(graph.edges))
+        for lin in lineages:
+            print(lin)
 
         # TODO: remove when GEFF can handle variable length properties
         if model_copy.has_property("ROI_coords"):
@@ -349,10 +363,27 @@ def export_GEFF(model: Model, geff_out: str) -> None:
         # but some nodes can have the same identifier across different lineages.
         _solve_node_overlaps(lineages)
         geff_graph = nx.compose_all(lineages)
-        print(len(geff_graph))
+        # print(len(geff_graph))
 
-        metadata = _build_geff_metadata(model_copy)
-        print(metadata)
+        #### GEFFCEPTION ####
+
+        # Do we have cell cycle data?
+        if model_copy.has_cycle_data():
+            export_tracklet_geff = True
+        else:
+            export_tracklet_geff = False
+        # Do we have lineage properties?
+        lin_props = list(model_copy.get_lineage_properties().keys())
+        lin_props.remove("lineage_ID")
+        if len(lin_props) > 0:
+            export_lineage_geff = True
+        else:
+            export_lineage_geff = False
+        print(f"Geffception with tracklets: {export_tracklet_geff}")
+        print(f"Geffception with lineages: {export_lineage_geff}")
+
+        metadata = _build_geff_metadata(model_copy, export_tracklet_geff, export_lineage_geff)
+        # print(metadata)
 
         write_nx(
             geff_graph,
@@ -365,15 +396,16 @@ def export_GEFF(model: Model, geff_out: str) -> None:
 
 
 if __name__ == "__main__":
-    xml_in = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    # xml_in = "sample_data/Ecoli_growth_on_agar_pad.xml"
     # xml_in = "sample_data/Celegans-5pc-17timepoints.xml"
-    # xml_in = "sample_data/FakeTracks.xml"
+    xml_in = "sample_data/FakeTracks.xml"
     # ctc_in = "sample_data/FakeTracks_TMtoCTC.txt"
     # ctc_in = "sample_data/Ecoli_growth_on_agar_pad_TMtoCTC.txt"
     # geff_out = "E:/Janelia_Cell_Trackathon/test_pycellin_geff/test.geff"
-    geff_out = (
-        "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
-    )
+    geff_out = "E:/Janelia_Cell_Trackathon/test_geffception/FakeTracks.geff"
+    # geff_out = (
+    #     "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
+    # )
 
     # Remove existing folder
     import os
@@ -386,17 +418,16 @@ if __name__ == "__main__":
     from pycellin.io.cell_tracking_challenge.loader import load_CTC_file
     from pycellin.io.trackmate.loader import load_TrackMate_XML
 
-    model = load_TrackMate_XML(xml_in)
+    model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
     # model = load_CTC_file(ctc_in)
-    # model.add_cycle_data()
     print(model)
-    print(model.get_cell_lineage_properties().keys())
-    print(model.data.cell_data.keys())
-    # To test overlapping node IDs
-    prop_values = {"cell_x": 10, "cell_y": 15, "cell_z": 20}
-    model.add_cell(lid=0, cid=9510, frame=0, prop_values=prop_values)
-    model.add_cell(lid=1, cid=9510, frame=0, prop_values=prop_values)
-    model.add_cell(lid=1, cid=9509, frame=0, prop_values=prop_values)
-    model.add_cell(lid=2, cid=9498, frame=0, prop_values=prop_values)
+
+    # Enrich the model
+    print(len(model.get_properties().keys()))
+    model.add_pycellin_properties(["relative_age", "absolute_age"])
+    model.add_cycle_data()
+    model.add_pycellin_properties(["division_time", "cycle_completeness"])
+    model.update()
+    print(len(model.get_properties().keys()))
 
     export_GEFF(model, geff_out)
