@@ -225,13 +225,13 @@ def _identify_time_key(
             "that the geff file contains a time display hint."
         )
 
-    # TODO: to update when pycellin supports any time key
+    # TODO: to update when pycellin can support any time key
     if time_key != "frame" and time_key.lower() == "frame":
         time_key = "frame"
     if time_key != "frame":
         raise NotImplementedError(
             f"Time key '{time_key}' cannot be matched to 'frame'. "
-            "Only 'frame' is currently supported."
+            "Pycellin currently only supports frame-like time keys."
         )
 
     return time_key
@@ -740,6 +740,7 @@ def load_GEFF(
     cell_y_key: str | None = None,
     cell_z_key: str | None = None,
     time_key: str | None = None,
+    validate_geff: bool = True,
 ) -> Model:
     """
     Load a geff file and return a pycellin model containing the data.
@@ -763,6 +764,10 @@ def load_GEFF(
         The key used to identify the z-coordinate of cells in the geff file.
     time_key : str | None, optional
         The key used to identify the time point of cells in the geff file.
+        If None, the function will try to infer it from the geff metadata.
+    validate_geff : bool, optional
+        Whether to validate the GEFF file against its schema, i.e. is the GEFF
+        file well-formed and compliant with the GEFF specification. Default is True.
 
     Returns
     -------
@@ -771,11 +776,14 @@ def load_GEFF(
     """
 
     # Read the geff file
-    geff_graph, geff_md = geff.read_nx(geff_file, validate=True)
+    geff_graph, geff_md = geff.read_nx(geff_file, validate=validate_geff)
     if not geff_md.directed:
         raise ValueError(
             "The geff graph is undirected: pycellin does not support undirected graphs."
         )
+    for node in geff_graph.nodes:
+        print(geff_graph.nodes[node])
+        break
 
     # Extract and dispatch metadata
     generic_md = _build_generic_metadata(geff_file, geff_md)
@@ -821,15 +829,21 @@ def load_GEFF(
 
 if __name__ == "__main__":
     geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/reader_test_graph.geff"
+    geff_file = "E:/Janelia_Cell_Trackathon/reader_test_graph.geff"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/mouse-20250719.zarr/tracks"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/test.zarr"
     # geff_file = (
     #     "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
     # )
+    # geff_file = "E:/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_trackmate_to_geff/FakeTracks.geff"
+    # geff_file = "E:/Janelia_Cell_Trackathon/test_trackmate_to_geff/FakeTracks.geff"
+
     # Yohsuke's file for geffception
-    geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/cell_segmentation.zarr/tree.geff"
+    # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/cell_segmentation.zarr/tree.geff"
+    # geff_file = "E:/Janelia_Cell_Trackathon/cell_segmentation.zarr/tree.geff"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/cell_segmentation.zarr/tree.geff/linage_tree.geff"
+    # geff_file = "E:/Janelia_Cell_Trackathon/cell_segmentation.zarr/tree.geff/linage_tree.geff"
 
     import plotly.io as pio
 
@@ -864,7 +878,7 @@ if __name__ == "__main__":
     for node in lin0.nodes(data=True):
         print(node)
         break
-    # lin0.plot()
+    lin0.plot()
 
     # cell_id_key
     # lineage_id_key
