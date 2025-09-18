@@ -500,6 +500,8 @@ def export_GEFF(model: Model, geff_out: str) -> None:
         tracklet_metadata = _build_geff_metadata(
             model_copy, graph_level="tracklet", cell_geff_out=geff_out
         )
+        # TODO: variable length properties are not supported in GEFF yet
+        tracklet_metadata.node_props_metadata.pop("cells")
 
         lineage_metadata = _build_geff_metadata(
             model_copy, graph_level="lineage", cell_geff_out=geff_out
