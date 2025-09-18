@@ -1497,6 +1497,17 @@ class Model:
         self.data._add_cycle_lineages()
         self.props_metadata._add_cycle_lineage_props()
 
+    def has_cycle_data(self) -> bool:
+        """
+        Check if the model has cycle lineages.
+
+        Returns
+        -------
+        bool
+            True if the model has cycle lineages, False otherwise.
+        """
+        return bool(self.data.cycle_data)
+
     def _categorize_props(self, props: list[str] | None) -> tuple[list[str], list[str], list[str]]:
         """
         Categorize properties by type (node, edge, lineage).
