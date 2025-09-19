@@ -833,7 +833,7 @@ def load_GEFF(
         raise ValueError(
             "The geff graph is undirected: pycellin does not support undirected graphs."
         )
-    if load_tracklet_geff is not None:
+    if load_tracklet_geff:
         tracklet_geff = Path(geff_file, "tracklets.geff")
         if tracklet_geff.exists():
             print(f"Loading tracklet GEFF from {tracklet_geff}")
@@ -844,7 +844,7 @@ def load_GEFF(
             # TODO: should this be a warning instead of an error?
             # So the main GEFF can still be loaded?
             raise FileNotFoundError(f"Tracklet GEFF file not found: {tracklet_geff}")
-    if load_lineage_geff is not None:
+    if load_lineage_geff:
         lineage_geff = Path(geff_file, "lineages.geff")
         if lineage_geff.exists():
             print(f"Loading lineage GEFF from {lineage_geff}")
@@ -904,6 +904,7 @@ if __name__ == "__main__":
     geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/reader_test_graph.geff"
     geff_file = "E:/Janelia_Cell_Trackathon/reader_test_graph.geff"
     geff_file = "E:/Janelia_Cell_Trackathon/test_geffception/FakeTracks.geff"
+    geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_geffception/FakeTracks.geff"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/mouse-20250719.zarr/tracks"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/test.zarr"
     # geff_file = (
@@ -927,7 +928,7 @@ if __name__ == "__main__":
     print(geff_file)
     model = load_GEFF(
         geff_file,
-        validate_geff=False,
+        validate_geff=True,
         load_tracklet_geff=True,
         load_lineage_geff=True,
         # cell_x_key="x",
