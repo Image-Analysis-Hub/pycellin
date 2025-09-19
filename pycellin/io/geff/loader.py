@@ -875,11 +875,45 @@ def load_GEFF(
     # print("cell_z_key:", cell_z_key)
 
     # Split the graph into lineages
+    # TODO: what if there are no lin_id_key? It is dealt with below but there is also
+    # a case where _split_graph_into_lineages creates the lineage_ID itself
     lineages = _split_graph_into_lineages(geff_graph, lineage_ID_key=lin_id_key)
     # print(f"Number of lineages: {len(lineages)}")
     if lin_id_key is None:
         _set_lineage_id(lineages)
         lin_id_key = "lineage_ID"
+
+    # Integrate the lineage properties from the lineage GEFF into the pycellin model
+    # TODO: this is wonky. We can generate lineage IDs based on the node IDs of
+    # the lineage GEFF but then the lineage IDs won't match the ones in the main GEFF.
+    # And if no lineage_IDs in any of the GEFFs, there is no way to match them.
+    # Wait for geffception and see if the presence of lineage IDs is enforced.
+    # TODO: apparently I have cell props on lineage GEFF nodes...?!
+    if load_lineage_geff:
+        if len(lineage_geff_graph) != len(lineages):
+            warnings.warn(
+                f"Inconsistency between the number of lineages in the main GEFF ({len(lineages)}) "
+                f"and in the lineage GEFF ({len(lineage_geff_graph)})."
+                "Some lineages might not be updated with their lineage properties.",
+                stacklevel=2,
+            )
+        for lin_node, lin_data in lineage_geff_graph.nodes(data=True):
+            print(lin_data)
+            lin_id = lin_data.get("lineage_ID")
+            if lin_id is None:
+                continue
+            try:
+                lin = next(l for l in lineages if l.graph["lineage_ID"] == lin_id)
+            except StopIteration:
+                warnings.warn(
+                    f"Lineage with lineage_ID '{lin_id}' found in the lineage GEFF "
+                    "but not in the main GEFF. Skipping.",
+                    stacklevel=2,
+                )
+                continue
+            for prop_key, prop_value in lin_data.items():
+                if prop_key != "lineage_ID":
+                    lin.graph[prop_key] = prop_value
 
     # Rename properties to match pycellin conventions
     _normalize_properties_data(
@@ -945,6 +979,7 @@ if __name__ == "__main__":
     # for lin in lineages:
     #     print(lin)
     lin0 = lineages[0]
+    print(lin0.graph)
     # lin7 = model.get_cell_lineage_from_ID(7)
     # lin7.plot(
     #     node_hover_props=[
