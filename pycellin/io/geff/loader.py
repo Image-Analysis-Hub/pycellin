@@ -358,6 +358,7 @@ def _extract_props_metadata(
     md: dict[str, geff.metadata_schema.PropMetadata],
     props_dict: dict[str, Property],
     prop_type: PropertyType,
+    lin_type: str,
 ) -> None:
     """
     Extract properties metadata from a given dictionary and update the props_dict.
@@ -387,7 +388,7 @@ def _extract_props_metadata(
                 description=prop.description or prop.name or key,
                 provenance="geff",
                 prop_type=prop_type,
-                lin_type="CellLineage",
+                lin_type=lin_type,
                 dtype=prop.dtype,
                 unit=prop.unit or None,
             )
@@ -413,7 +414,7 @@ def _extract_props_metadata(
                     description=prop.description or prop.name or key,
                     provenance="geff",
                     prop_type=prop_type,
-                    lin_type="CellLineage",
+                    lin_type=lin_type,
                     dtype=prop.dtype,
                     unit=prop.unit or None,
                 )
@@ -500,21 +501,67 @@ def _build_props_metadata(geff_md: geff.metadata_schema.GeffMetadata) -> dict[st
     """
     props_dict: dict[str, Property] = {}
     if geff_md.node_props_metadata is not None:
-        _extract_props_metadata(geff_md.node_props_metadata, props_dict, "node")
+        _extract_props_metadata(geff_md.node_props_metadata, props_dict, "node", "CellLineage")
     if geff_md.edge_props_metadata is not None:
-        _extract_props_metadata(geff_md.edge_props_metadata, props_dict, "edge")
+        _extract_props_metadata(geff_md.edge_props_metadata, props_dict, "edge", "CellLineage")
 
     # TODO: for now lineage properties are not associated to a specific tag but stored
     # somewhere in the "extra" field. We need to check recursively if there is a dict
     # key called "lineage_props_metadata" in the "extra" field.
-    if geff_md.extra is not None:
-        # Recursive search for the "lineage_props_metadata" key through the "extra"
-        # field dict of dicts of dicts...
-        lin_props_metadata = _recursive_dict_search(geff_md.extra, "lineage_props_metadata")
-        if lin_props_metadata is not None:
-            _extract_lin_props_metadata(lin_props_metadata, props_dict)
+    # => No need for this anymore, thanks to geffception. Lineage properties are now
+    # extracted directly from the lineage GEFF.
+    # if geff_md.extra is not None:
+    #     # Recursive search for the "lineage_props_metadata" key through the "extra"
+    #     # field dict of dicts of dicts...
+    #     lin_props_metadata = _recursive_dict_search(geff_md.extra, "lineage_props_metadata")
+    #     if lin_props_metadata is not None:
+    #         _extract_lin_props_metadata(lin_props_metadata, props_dict)
 
     return props_dict
+
+
+def _update_props_metadata(
+    metadata: dict[str, Property],
+    geff_md: GeffMetadata,
+    graph_level: Literal["tracklet", "lineage"],
+) -> None:
+    """
+    Update properties metadata with additional geff metadata.
+
+    This function extracts and merges properties metadata from tracklet or lineage
+    geff metadata into the main properties metadata dictionary.
+
+    Parameters
+    ----------
+    metadata : dict[str, Property]
+        The main properties metadata dictionary to update.
+    geff_md : GeffMetadata
+        The GEFF metadata to use for updating.
+    graph_level : Literal["tracklet", "lineage"]
+        The graph level that defines the scope of the update ("tracklet" or "lineage").
+    """
+    if geff_md.node_props_metadata is not None:
+        if graph_level == "tracklet":
+            prop_type = "node"
+            lin_type = "CycleLineage"
+        elif graph_level == "lineage":
+            prop_type = "lineage"
+            lin_type = "CellLineage"
+        _extract_props_metadata(
+            md=geff_md.node_props_metadata,
+            props_dict=metadata,
+            prop_type=prop_type,
+            lin_type=lin_type,
+        )
+    if geff_md.edge_props_metadata is not None:
+        # We cannot have edge properties for lineages, so it must be tracklet.
+        # TODO: Should I enforce this?
+        _extract_props_metadata(
+            md=geff_md.edge_props_metadata,
+            props_dict=metadata,
+            prop_type="edge",
+            lin_type="CycleLineage",
+        )
 
 
 def _extract_units_from_axes(geff_md: GeffMetadata) -> dict[str, Any]:
@@ -741,6 +788,8 @@ def load_GEFF(
     cell_z_key: str | None = None,
     time_key: str | None = None,
     validate_geff: bool = True,
+    load_tracklet_geff: bool = False,
+    load_lineage_geff: bool = False,
 ) -> Model:
     """
     Load a geff file and return a pycellin model containing the data.
@@ -768,26 +817,50 @@ def load_GEFF(
     validate_geff : bool, optional
         Whether to validate the GEFF file against its schema, i.e. is the GEFF
         file well-formed and compliant with the GEFF specification. Default is True.
+    load_tracklet_geff : bool, optional
+        Whether to load the tracklet GEFF file if available. Default is False.
+    load_lineage_geff : bool, optional
+        Whether to load the lineage GEFF file if available. Default is False.
 
     Returns
     -------
     Model
         A pycellin model containing the data from the geff file.
     """
-
-    # Read the geff file
+    # Read the GEFF file(s)
     geff_graph, geff_md = geff.read_nx(geff_file, validate=validate_geff)
     if not geff_md.directed:
         raise ValueError(
             "The geff graph is undirected: pycellin does not support undirected graphs."
         )
-    for node in geff_graph.nodes:
-        print(geff_graph.nodes[node])
-        break
+    if load_tracklet_geff:
+        tracklet_geff = Path(geff_file, "tracklets.geff")
+        if tracklet_geff.exists():
+            print(f"Loading tracklet GEFF from {tracklet_geff}")
+            tracklet_geff_graph, tracklet_geff_md = geff.read_nx(
+                tracklet_geff, validate=validate_geff
+            )
+        else:
+            # TODO: should this be a warning instead of an error?
+            # So the main GEFF can still be loaded?
+            raise FileNotFoundError(f"Tracklet GEFF file not found: {tracklet_geff}")
+    if load_lineage_geff:
+        lineage_geff = Path(geff_file, "lineages.geff")
+        if lineage_geff.exists():
+            print(f"Loading lineage GEFF from {lineage_geff}")
+            lineage_geff_graph, lineage_geff_md = geff.read_nx(lineage_geff, validate=validate_geff)
+        else:
+            # TODO: should this be a warning instead of an error?
+            # So the main GEFF can still be loaded?
+            raise FileNotFoundError(f"Lineage GEFF file not found: {lineage_geff}")
 
     # Extract and dispatch metadata
     generic_md = _build_generic_metadata(geff_file, geff_md)
     props_md = _build_props_metadata(geff_md)
+    if load_tracklet_geff:
+        _update_props_metadata(metadata=props_md, geff_md=tracklet_geff_md, graph_level="tracklet")
+    if load_lineage_geff:
+        _update_props_metadata(metadata=props_md, geff_md=lineage_geff_md, graph_level="lineage")
 
     # Identify specific props keys
     lin_id_key = _identify_lin_id_key(lineage_id_key, geff_md.track_node_props, geff_graph)
@@ -802,11 +875,45 @@ def load_GEFF(
     # print("cell_z_key:", cell_z_key)
 
     # Split the graph into lineages
+    # TODO: what if there are no lin_id_key? It is dealt with below but there is also
+    # a case where _split_graph_into_lineages creates the lineage_ID itself
     lineages = _split_graph_into_lineages(geff_graph, lineage_ID_key=lin_id_key)
     # print(f"Number of lineages: {len(lineages)}")
     if lin_id_key is None:
         _set_lineage_id(lineages)
         lin_id_key = "lineage_ID"
+
+    # Integrate the lineage properties from the lineage GEFF into the pycellin model
+    # TODO: this is wonky. We can generate lineage IDs based on the node IDs of
+    # the lineage GEFF but then the lineage IDs won't match the ones in the main GEFF.
+    # And if no lineage_IDs in any of the GEFFs, there is no way to match them.
+    # Wait for geffception and see if the presence of lineage IDs is enforced.
+    # TODO: apparently I have cell props on lineage GEFF nodes...?!
+    if load_lineage_geff:
+        if len(lineage_geff_graph) != len(lineages):
+            warnings.warn(
+                f"Inconsistency between the number of lineages in the main GEFF ({len(lineages)}) "
+                f"and in the lineage GEFF ({len(lineage_geff_graph)})."
+                "Some lineages might not be updated with their lineage properties.",
+                stacklevel=2,
+            )
+        for lin_node, lin_data in lineage_geff_graph.nodes(data=True):
+            print(lin_data)
+            lin_id = lin_data.get("lineage_ID")
+            if lin_id is None:
+                continue
+            try:
+                lin = next(l for l in lineages if l.graph["lineage_ID"] == lin_id)
+            except StopIteration:
+                warnings.warn(
+                    f"Lineage with lineage_ID '{lin_id}' found in the lineage GEFF "
+                    "but not in the main GEFF. Skipping.",
+                    stacklevel=2,
+                )
+                continue
+            for prop_key, prop_value in lin_data.items():
+                if prop_key != "lineage_ID":
+                    lin.graph[prop_key] = prop_value
 
     # Rename properties to match pycellin conventions
     _normalize_properties_data(
@@ -830,6 +937,8 @@ def load_GEFF(
 if __name__ == "__main__":
     geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/reader_test_graph.geff"
     geff_file = "E:/Janelia_Cell_Trackathon/reader_test_graph.geff"
+    geff_file = "E:/Janelia_Cell_Trackathon/test_geffception/FakeTracks.geff"
+    geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_geffception/FakeTracks.geff"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/mouse-20250719.zarr/tracks"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/test.zarr"
     # geff_file = (
@@ -851,8 +960,17 @@ if __name__ == "__main__":
     pio.renderers.default = "browser"
 
     print(geff_file)
-    model = load_GEFF(geff_file)  # , cell_x_key="x", cell_y_key="y")
+    model = load_GEFF(
+        geff_file,
+        validate_geff=True,
+        load_tracklet_geff=True,
+        load_lineage_geff=True,
+        # cell_x_key="x",
+        # cell_y_key="y",
+    )
     # print(model)
+    for prop_key, prop in model.props_metadata.props.items():
+        print(f"{prop_key}: {prop.prop_type}, {prop.lin_type}")
     # print("props_dict", model.props_metadata.props)
     # for k in model.props_metadata.props.keys():
     #     print(f"{k}")
@@ -861,6 +979,7 @@ if __name__ == "__main__":
     # for lin in lineages:
     #     print(lin)
     lin0 = lineages[0]
+    print(lin0.graph)
     # lin7 = model.get_cell_lineage_from_ID(7)
     # lin7.plot(
     #     node_hover_props=[
@@ -875,10 +994,10 @@ if __name__ == "__main__":
     #     ]
     # )
     # print(lin0.nodes(data=True))
-    for node in lin0.nodes(data=True):
-        print(node)
-        break
-    lin0.plot()
+    # for node in lin0.nodes(data=True):
+    #     print(node)
+    #     break
+    # lin0.plot()
 
     # cell_id_key
     # lineage_id_key
