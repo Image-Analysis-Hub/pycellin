@@ -14,13 +14,12 @@ import pycellin.graph.properties.motion as motion
 import pycellin.graph.properties.tracking as tracking
 import pycellin.graph.properties.utils as futils
 from pycellin.classes.data import Data
-from pycellin.classes.lineage import CellLineage, CycleLineage
+from pycellin.classes.exceptions import FusionError, ProtectedPropertyError
+from pycellin.classes.lineage import CellLineage, CycleLineage, Lineage
 from pycellin.classes.model_metadata import ModelMetadata
 from pycellin.classes.property import Property
-from pycellin.classes.props_metadata import PropsMetadata
-from pycellin.classes.exceptions import FusionError, ProtectedPropertyError
-from pycellin.classes.lineage import Lineage
 from pycellin.classes.property_calculator import PropertyCalculator
+from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.classes.updater import ModelUpdater
 from pycellin.custom_types import Cell, Link
 
@@ -131,6 +130,41 @@ class Model:
         else:
             txt = "Empty model."
         return txt
+
+    def __getstate__(self) -> dict[str, Any]:
+        """
+        Custom pickle state preparation.
+
+        Converts ModelMetadata to dictionary format for serialization.
+        This ensures that ModelMetadata with dynamic fields is properly serialized.
+
+        Returns
+        -------
+        dict[str, Any]
+            State dictionary for pickling.
+        """
+        state = self.__dict__.copy()
+        # Convert ModelMetadata to dict for pickling
+        if hasattr(self, "model_metadata") and self.model_metadata is not None:
+            state["model_metadata"] = self.model_metadata.to_dict()
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """
+        Custom pickle state restoration.
+
+        Converts dictionary back to ModelMetadata instance during deserialization.
+        This ensures that ModelMetadata with dynamic fields is properly restored.
+
+        Parameters
+        ----------
+        state : dict[str, Any]
+            State dictionary from pickling.
+        """
+        # Restore ModelMetadata from dict
+        if "model_metadata" in state and isinstance(state["model_metadata"], dict):
+            state["model_metadata"] = ModelMetadata.from_dict(state["model_metadata"])
+        self.__dict__.update(state)
 
     def get_space_unit(self) -> str | None:
         """
@@ -1946,41 +1980,6 @@ class Model:
         df.sort_values(["lineage_ID", "level", "cycle_ID"], ignore_index=True, inplace=True)
 
         return df
-
-    def __getstate__(self) -> dict[str, Any]:
-        """
-        Custom pickle state preparation.
-
-        Converts ModelMetadata to dictionary format for serialization.
-        This ensures that ModelMetadata with dynamic fields is properly serialized.
-
-        Returns
-        -------
-        dict[str, Any]
-            State dictionary for pickling.
-        """
-        state = self.__dict__.copy()
-        # Convert ModelMetadata to dict for pickling
-        if hasattr(self, "model_metadata") and self.model_metadata is not None:
-            state["model_metadata"] = self.model_metadata.to_dict()
-        return state
-
-    def __setstate__(self, state: dict[str, Any]) -> None:
-        """
-        Custom pickle state restoration.
-
-        Converts dictionary back to ModelMetadata instance during deserialization.
-        This ensures that ModelMetadata with dynamic fields is properly restored.
-
-        Parameters
-        ----------
-        state : dict[str, Any]
-            State dictionary from pickling.
-        """
-        # Restore ModelMetadata from dict
-        if "model_metadata" in state and isinstance(state["model_metadata"], dict):
-            state["model_metadata"] = ModelMetadata.from_dict(state["model_metadata"])
-        self.__dict__.update(state)
 
     def save_to_pickle(self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL) -> None:
         """
