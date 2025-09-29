@@ -1,15 +1,14 @@
 from .data import Data
 from .lineage import CellLineage, CycleLineage
-from .property import Property
-from .props_metadata import PropsMetadata
-
-# Property functions moved to pycellin.graph.properties.core
 from .model import Model
+from .model_metadata import ModelMetadata
+from .property import Property
 from .property_calculator import (
-    NodeLocalPropCalculator,
+    EdgeGlobalPropCalculator,
     EdgeLocalPropCalculator,
+    LineageGlobalPropCalculator,
     LineageLocalPropCalculator,
     NodeGlobalPropCalculator,
-    EdgeGlobalPropCalculator,
-    LineageGlobalPropCalculator,
+    NodeLocalPropCalculator,
 )
+from .props_metadata import PropsMetadata

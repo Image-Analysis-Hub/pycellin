@@ -6,7 +6,7 @@ import warnings
 
 from pycellin.custom_types import PropertyType, LineageType
 from pycellin.utils import check_literal_type
-from .property import Property
+from pycellin.classes.property import Property
 
 
 class PropsMetadata:

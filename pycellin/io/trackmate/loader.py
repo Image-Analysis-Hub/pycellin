@@ -1141,7 +1141,7 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
         pixel_size = {}
         for key_TM, key_pycellin in zip(
             ["pixelwidth", "pixelheight", "voxeldepth"],
-            ["width", "height", "depth"],
+            ["pixel_width", "pixel_height", "pixel_depth"],
         ):
             try:
                 pixel_size[key_pycellin] = float(element.attrib[key_TM])
@@ -1194,18 +1194,15 @@ def load_TrackMate_XML(
     metadata["name"] = Path(xml_path).stem
     metadata["file_location"] = xml_path
     metadata["provenance"] = "TrackMate"
-    metadata["date"] = str(datetime.now())
     metadata["space_unit"] = units["spatialunits"]
     metadata["time_unit"] = units["timeunits"]
-    try:
-        version = importlib.metadata.version("pycellin")
-    except importlib.metadata.PackageNotFoundError:
-        version = "unknown"
-    metadata["pycellin_version"] = version
     metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
     dict_tags = _get_specific_tags(xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"])
     metadata["time_step"] = _get_time_step(dict_tags["Settings"])
-    metadata["pixel_size"] = _get_pixel_size(dict_tags["Settings"])
+    pixel_size = _get_pixel_size(dict_tags["Settings"])
+    metadata["pixel_width"] = pixel_size.get("pixel_width")
+    metadata["pixel_height"] = pixel_size.get("pixel_height")
+    metadata["pixel_depth"] = pixel_size.get("pixel_depth")
     for tag_name, tag in dict_tags.items():
         element_string = ET.tostring(tag, encoding="utf-8").decode()
         metadata[tag_name] = element_string
@@ -1238,7 +1235,7 @@ if __name__ == "__main__":
     print(model)
 
     print(model.props_metadata)
-    print(model.model_metadata["pycellin_version"])
+    print(model.model_metadata.pycellin_version)
     print(model.model_metadata)
     # print(model.props_md.node_props.keys())
     # print(model.data)

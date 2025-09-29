@@ -152,12 +152,6 @@ def _create_metadata(
     metadata["name"] = Path(file_path).stem
     metadata["file_location"] = file_path
     metadata["provenance"] = "CTC"
-    metadata["date"] = str(datetime.now())
-    try:
-        version = importlib.metadata.version("pycellin")
-    except importlib.metadata.PackageNotFoundError:
-        version = "unknown"
-    metadata["Pycellin_version"] = version
 
     if time_unit is not None:
         metadata["time_unit"] = time_unit
@@ -169,18 +163,17 @@ def _create_metadata(
         metadata["time_step"] = 1
 
     complete_metadata_flag = [0, 0, 0, 0]
-    metadata["pixel_size"] = {}
     if space_unit is not None:
         metadata["space_unit"] = space_unit
         complete_metadata_flag[0] = 1
     if pixel_width is not None:
-        metadata["pixel_size"]["width"] = pixel_width
+        metadata["pixel_width"] = pixel_width
         complete_metadata_flag[1] = 1
     if pixel_height is not None:
-        metadata["pixel_size"]["height"] = pixel_height
+        metadata["pixel_height"] = pixel_height
         complete_metadata_flag[2] = 1
     if pixel_depth is not None:
-        metadata["pixel_size"]["depth"] = pixel_depth
+        metadata["pixel_depth"] = pixel_depth
         complete_metadata_flag[3] = 1
 
     if sum(complete_metadata_flag) < 4:
@@ -190,11 +183,11 @@ def _create_metadata(
             if complete_metadata_flag[0] == 0:
                 metadata["space_unit"] = "pixel"
             if complete_metadata_flag[1] == 0:
-                metadata["pixel_size"]["width"] = 1.0
+                metadata["pixel_width"] = 1.0
             if complete_metadata_flag[2] == 0:
-                metadata["pixel_size"]["height"] = 1.0
+                metadata["pixel_height"] = 1.0
             if complete_metadata_flag[3] == 0:
-                metadata["pixel_size"]["depth"] = 1.0
+                metadata["pixel_depth"] = 1.0
 
     return metadata
 
@@ -599,17 +592,18 @@ def load_CTC_file(
 if __name__ == "__main__":
     ctc_file = "sample_data/FakeTracks_TMtoCTC.txt"
     ctc_file = "sample_data/Ecoli_growth_on_agar_pad_TMtoCTC.txt"
-    ctc_file = (
-        "/mnt/data/Films_Laure/Benchmarks/CTC/"
-        "EvaluationSoftware/testing_dataset/03_RES/res_track.txt"
-    )
+    # ctc_file = (
+    #     "/mnt/data/Films_Laure/Benchmarks/CTC/"
+    #     "EvaluationSoftware/testing_dataset/03_RES/res_track.txt"
+    # )
 
-    ctc_file = "/mnt/data/Code/pycellin/TrackMate/01_RES/res_track.txt"
+    # ctc_file = "/mnt/data/Code/pycellin/TrackMate/01_RES/res_track.txt"
     labels_path = "/mnt/data/Code/pycellin/TrackMate/01_RES"
     # labels_path = "/mnt/data/Benchmarks/Segmentation/03_RES"
 
-    model = load_CTC_file(ctc_file, labels_path)
+    model = load_CTC_file(ctc_file)  # , labels_path)
     print(model)
+    print(model.model_metadata)
     print(model.props_metadata)
     print(model.data)
 

@@ -702,7 +702,7 @@ def _remove_non_numeric_props(model: Model) -> None:
                 model.remove_property(name)
         plural = True if len(to_remove) > 1 else False
         msg = (
-            f"Ignoring property{'s' if plural else ''} "
+            f"Ignoring property{'s' if plural else ''}: "
             f"{', '.join(to_remove)}. {'They are' if plural else 'It is'} "
             f"not numeric and won't be supported by TrackMate."
         )
@@ -994,8 +994,8 @@ def export_TrackMate_XML(
 
     if not units:
         units = _ask_units(model_copy.props_metadata)
-    if "TrackMate_version" in model_copy.model_metadata:
-        tm_version = model_copy.model_metadata["TrackMate_version"]
+    if hasattr(model_copy.model_metadata, "TrackMate_version"):
+        tm_version = model_copy.model_metadata.TrackMate_version
     else:
         tm_version = "unknown"
     has_FilteredTrack = model_copy.has_property("FilteredTrack")
@@ -1005,7 +1005,7 @@ def export_TrackMate_XML(
         xf.write_declaration()
         with xf.element("TrackMate", {"version": tm_version}):
             xf.write("\n  ")
-            _write_metadata_tag(xf, model_copy.model_metadata, "Log")
+            _write_metadata_tag(xf, model_copy.model_metadata.to_dict(), "Log")
             xf.write("\n  ")
             with xf.element("Model", units):
                 _write_FeatureDeclarations(xf, model_copy)
@@ -1014,7 +1014,7 @@ def export_TrackMate_XML(
                 _write_FilteredTracks(xf, model_copy.data.cell_data, has_FilteredTrack)
             xf.write("\n  ")
             for tag in ["Settings", "GUIState", "DisplaySettings"]:
-                _write_metadata_tag(xf, model_copy.model_metadata, tag)
+                _write_metadata_tag(xf, model_copy.model_metadata.to_dict(), tag)
                 if tag == "DisplaySettings":
                     xf.write("\n")
                 else:

@@ -1,29 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from itertools import pairwise
 import pickle
-from typing import Any, Callable, Literal, TypeVar
 import warnings
+from itertools import pairwise
+from typing import Any, Callable, Literal, TypeVar
 
-import pandas as pd
 import networkx as nx
+import pandas as pd
 
-from pycellin.classes import (
-    CellLineage,
-    CycleLineage,
-    Data,
-    Property,
-    PropsMetadata,
-)
-from pycellin.classes.lineage import Lineage
+import pycellin.graph.properties.morphology as morpho
+import pycellin.graph.properties.motion as motion
+import pycellin.graph.properties.tracking as tracking
+import pycellin.graph.properties.utils as futils
+from pycellin.classes.data import Data
+from pycellin.classes.lineage import CellLineage, CycleLineage
+from pycellin.classes.model_metadata import ModelMetadata
+from pycellin.classes.property import Property
+from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.classes.exceptions import FusionError, ProtectedPropertyError
+from pycellin.classes.lineage import Lineage
 from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.updater import ModelUpdater
-import pycellin.graph.properties.tracking as tracking
-import pycellin.graph.properties.motion as motion
-import pycellin.graph.properties.morphology as morpho
-import pycellin.graph.properties.utils as futils
 from pycellin.custom_types import Cell, Link
 
 L = TypeVar("L", bound="Lineage")
@@ -34,7 +32,7 @@ class Model:
 
     def __init__(
         self,
-        model_metadata: dict[str, Any] | None = None,
+        model_metadata: ModelMetadata | dict[str, Any] | None = None,
         props_metadata: PropsMetadata | None = None,
         data: Data | None = None,
     ) -> None:
@@ -43,24 +41,36 @@ class Model:
 
         Parameters
         ----------
-        model_metadata : dict[str, Any] | None, optional
+        model_metadata : ModelMetadata | dict[str, Any] | None, optional
             Metadata of the model (default is None).
         props_metadata : PropsMetadata, optional
             The declaration of the properties present in the model (default is None).
         data : Data, optional
             The lineages data of the model (default is None).
+
+        Raises
+        ------
+        TypeError
+            If model_metadata is not None, ModelMetadata, or dict.
         """
-        self.model_metadata = model_metadata if model_metadata is not None else dict()
+        if model_metadata is None:
+            self.model_metadata = ModelMetadata()
+        elif isinstance(model_metadata, ModelMetadata):
+            self.model_metadata = model_metadata
+        elif isinstance(model_metadata, dict):
+            self.model_metadata = ModelMetadata.from_dict(model_metadata)
+        else:
+            raise TypeError(
+                f"model_metadata must be None, ModelMetadata, or dict, "
+                f"got {type(model_metadata).__name__}"
+            )
+
         self.props_metadata = props_metadata if props_metadata is not None else PropsMetadata()
         self.data = data if data is not None else Data(dict())
 
         self._updater = ModelUpdater()
 
         # Add an optional argument to ask to compute the CycleLineage?
-        # Add a description in which people can put whatever they want
-        # (string, facultative), or maybe a dict with a few keys (description,
-        # author, etc.) that can be defined by the users, or create a function
-        # to allow the users to add their own fields?
         # Should name be optional or set to None? If optional and not provided, an
         # error will be raised when trying to access the attribute.
         # Same for provenance, description, etc.
@@ -75,21 +85,26 @@ class Model:
     def __str__(self) -> str:
         if self.model_metadata and self.data:
             nb_lin = self.data.number_of_lineages()
-            if "name" in self.model_metadata and "provenance" in self.model_metadata:
+            if (
+                hasattr(self.model_metadata, "name")
+                and self.model_metadata.name
+                and hasattr(self.model_metadata, "provenance")
+                and self.model_metadata.provenance
+            ):
                 txt = (
-                    f"Model named '{self.model_metadata['name']}' "
+                    f"Model named '{self.model_metadata.name}' "
                     f"with {nb_lin} lineage{'s' if nb_lin > 1 else ''}, "
-                    f"built from {self.model_metadata['provenance']}."
+                    f"built from {self.model_metadata.provenance}."
                 )
-            elif "name" in self.model_metadata:
+            elif hasattr(self.model_metadata, "name") and self.model_metadata.name:
                 txt = (
-                    f"Model named '{self.model_metadata['name']}' "
+                    f"Model named '{self.model_metadata.name}' "
                     f"with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
                 )
-            elif "provenance" in self.model_metadata:
+            elif hasattr(self.model_metadata, "provenance") and self.model_metadata.provenance:
                 txt = (
                     f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}, "
-                    f"built from {self.model_metadata['provenance']}."
+                    f"built from {self.model_metadata.provenance}."
                 )
             else:
                 txt = f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
@@ -97,15 +112,20 @@ class Model:
             nb_lin = self.data.number_of_lineages()
             txt = f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
         elif self.model_metadata:
-            if "name" in self.model_metadata and "provenance" in self.model_metadata:
+            if (
+                hasattr(self.model_metadata, "name")
+                and self.model_metadata.name
+                and hasattr(self.model_metadata, "provenance")
+                and self.model_metadata.provenance
+            ):
                 txt = (
-                    f"Model named '{self.model_metadata['name']}' "
-                    f"built from {self.model_metadata['provenance']}."
+                    f"Model named '{self.model_metadata.name}' "
+                    f"built from {self.model_metadata.provenance}."
                 )
-            elif "name" in self.model_metadata:
-                txt = f"Model named '{self.model_metadata['name']}'."
-            elif "provenance" in self.model_metadata:
-                txt = f"Model built from {self.model_metadata['provenance']}."
+            elif hasattr(self.model_metadata, "name") and self.model_metadata.name:
+                txt = f"Model named '{self.model_metadata.name}'."
+            elif hasattr(self.model_metadata, "provenance") and self.model_metadata.provenance:
+                txt = f"Model built from {self.model_metadata.provenance}."
             else:
                 txt = "Empty model."
         else:
@@ -120,13 +140,41 @@ class Model:
         -------
         str
             The spatial unit of the model.
-
-        Raises
-        ------
-        KeyError
-            If the metadata does not contain the spatial unit.
         """
-        return self.model_metadata["space_unit"]
+        return self.model_metadata.space_unit
+
+    def get_pixel_width(self) -> float | None:
+        """
+        Return the pixel width of the model.
+
+        Returns
+        -------
+        float
+            The pixel width of the model.
+        """
+        return self.model_metadata.pixel_width
+
+    def get_pixel_height(self) -> float | None:
+        """
+        Return the pixel height of the model.
+
+        Returns
+        -------
+        float
+            The pixel height of the model.
+        """
+        return self.model_metadata.pixel_height
+
+    def get_pixel_depth(self) -> float | None:
+        """
+        Return the pixel depth of the model.
+
+        Returns
+        -------
+        float
+            The pixel depth of the model.
+        """
+        return self.model_metadata.pixel_depth
 
     def get_pixel_size(self) -> dict[str, float] | None:
         """
@@ -135,14 +183,18 @@ class Model:
         Returns
         -------
         dict[str, float]
-            The pixel size of the model.
-
-        Raises
-        ------
-        KeyError
-            If the metadata does not contain the pixel size.
+            The pixel size of the model as a dictionary with 'width', 'height', and 'depth' keys.
+            Returns None if no pixel sizes are defined.
         """
-        return self.model_metadata["pixel_size"]
+        pixel_size = {}
+        if self.model_metadata.pixel_width is not None:
+            pixel_size["width"] = self.model_metadata.pixel_width
+        if self.model_metadata.pixel_height is not None:
+            pixel_size["height"] = self.model_metadata.pixel_height
+        if self.model_metadata.pixel_depth is not None:
+            pixel_size["depth"] = self.model_metadata.pixel_depth
+
+        return pixel_size if pixel_size else None
 
     def get_time_unit(self) -> str | None:
         """
@@ -152,13 +204,8 @@ class Model:
         -------
         str
             The temporal unit of the model.
-
-        Raises
-        ------
-        KeyError
-            If the metadata does not contain the temporal unit.
         """
-        return self.model_metadata["time_unit"]
+        return self.model_metadata.time_unit
 
     def get_time_step(self) -> float | None:
         """
@@ -166,15 +213,10 @@ class Model:
 
         Returns
         -------
-        int
+        float
             The time step of the model.
-
-        Raises
-        ------
-        KeyError
-            If the metadata does not contain the time step.
         """
-        return self.model_metadata["time_step"]
+        return self.model_metadata.time_step
 
     def get_units_per_properties(self) -> dict[str, list[str]]:
         """
@@ -963,9 +1005,13 @@ class Model:
         """
         prop = tracking.create_absolute_age_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["time_unit"] if in_time_unit else "frame",
+            unit=self.model_metadata.time_unit
+            if (in_time_unit and self.model_metadata.time_unit)
+            else "frame",
         )
-        time_step = self.model_metadata["time_step"] if in_time_unit else 1
+        time_step = (
+            self.model_metadata.time_step if (in_time_unit and self.model_metadata.time_step) else 1
+        )
         self.add_custom_property(tracking.AbsoluteAge(prop, time_step))
 
     def add_angle(
@@ -1009,7 +1055,7 @@ class Model:
         """
         prop = motion.create_branch_mean_displacement_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["space_unit"],
+            unit=self.model_metadata.space_unit or "pixel",
         )
         self.add_custom_property(motion.BranchMeanDisplacement(prop))
 
@@ -1032,9 +1078,11 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
+        space_unit = self.model_metadata.space_unit or "pixel"
+        time_unit = self.model_metadata.time_unit or "frame"
         prop = motion.create_branch_mean_speed_property(
             custom_identifier=custom_identifier,
-            unit=f"{self.model_metadata['space_unit']} / {self.model_metadata['time_unit']}",
+            unit=f"{space_unit} / {time_unit}",
         )
         self.add_custom_property(motion.BranchMeanSpeed(prop, include_incoming_edge))
 
@@ -1055,7 +1103,7 @@ class Model:
         """
         prop = motion.create_branch_total_displacement_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["space_unit"],
+            unit=self.model_metadata.space_unit or "pixel",
         )
         self.add_custom_property(motion.BranchTotalDisplacement(prop))
 
@@ -1100,7 +1148,7 @@ class Model:
         """
         prop = motion.create_cell_displacement_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["space_unit"],
+            unit=self.model_metadata.space_unit or "pixel",
         )
         self.add_custom_property(motion.CellDisplacement(prop))
 
@@ -1114,11 +1162,15 @@ class Model:
     ) -> None:
         prop = morpho.create_rod_length_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["space_unit"],
+            unit=self.model_metadata.space_unit or "pixel",
         )
+        pixel_size = self.get_pixel_size()
+        size_x = pixel_size["width"] if pixel_size else 1.0
+        size_y = pixel_size["height"] if pixel_size else 1.0
+        assert size_x == size_y, "Pixels must be isotropic in x and y."
         calc = morpho.RodLength(
             prop,
-            self.model_metadata["pixel_size"]["width"],
+            size_x,
             skel_algo=skel_algo,
             tolerance=tolerance,
             method_width=method_width,
@@ -1147,15 +1199,15 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
+        space_unit = self.model_metadata.space_unit or "pixel"
+        time_unit = self.model_metadata.time_unit or "frame"
         prop = motion.create_cell_speed_property(
             custom_identifier=custom_identifier,
-            unit=(
-                f"{self.model_metadata['space_unit']}/{self.model_metadata['time_unit']}"
-                if in_time_unit
-                else f"{self.model_metadata['space_unit']}/frame"
-            ),
+            unit=(f"{space_unit}/{time_unit}" if in_time_unit else f"{space_unit}/frame"),
         )
-        time_step = self.model_metadata["time_step"] if in_time_unit else 1
+        time_step = (
+            self.model_metadata.time_step if (in_time_unit and self.model_metadata.time_step) else 1
+        )
         self.add_custom_property(motion.CellSpeed(prop, time_step))
 
     def add_rod_width(
@@ -1168,11 +1220,15 @@ class Model:
     ) -> None:
         prop = morpho.create_rod_width_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["space_unit"],
+            unit=self.model_metadata.space_unit or "pixel",
         )
+        pixel_size = self.get_pixel_size()
+        size_x = pixel_size["width"] if pixel_size else 1.0
+        size_y = pixel_size["height"] if pixel_size else 1.0
+        assert size_x == size_y, "Pixels must be isotropic in x and y."
         calc = morpho.RodWidth(
             prop,
-            self.model_metadata["pixel_size"]["width"],
+            size_x,
             skel_algo=skel_algo,
             tolerance=tolerance,
             method_width=method_width,
@@ -1201,11 +1257,14 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
+        time_unit = self.model_metadata.time_unit or "frame"
         prop = tracking.create_division_rate_property(
             custom_identifier=custom_identifier,
-            unit=f"1/{self.model_metadata['time_unit']}" if in_time_unit else "1/frame",
+            unit=f"1/{time_unit}" if in_time_unit else "1/frame",
         )
-        time_step = self.model_metadata["time_step"] if in_time_unit else 1
+        time_step = (
+            self.model_metadata.time_step if (in_time_unit and self.model_metadata.time_step) else 1
+        )
         self.add_custom_property(tracking.DivisionRate(prop, time_step))
 
     def add_division_time(
@@ -1229,11 +1288,14 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
+        time_unit = self.model_metadata.time_unit or "frame"
         prop = tracking.create_division_time_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["time_unit"] if in_time_unit else "frame",
+            unit=time_unit if in_time_unit else "frame",
         )
-        time_step = self.model_metadata["time_step"] if in_time_unit else 1
+        time_step = (
+            self.model_metadata.time_step if (in_time_unit and self.model_metadata.time_step) else 1
+        )
         self.add_custom_property(tracking.DivisionTime(prop, time_step))
 
     def add_relative_age(
@@ -1258,11 +1320,14 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """
+        time_unit = self.model_metadata.time_unit or "frame"
         prop = tracking.create_relative_age_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["time_unit"] if in_time_unit else "frame",
+            unit=time_unit if in_time_unit else "frame",
         )
-        time_step = self.model_metadata["time_step"] if in_time_unit else 1
+        time_step = (
+            self.model_metadata.time_step if (in_time_unit and self.model_metadata.time_step) else 1
+        )
         self.add_custom_property(tracking.RelativeAge(prop, time_step))
 
     def add_straightness(
@@ -1882,9 +1947,47 @@ class Model:
 
         return df
 
+    def __getstate__(self) -> dict[str, Any]:
+        """
+        Custom pickle state preparation.
+
+        Converts ModelMetadata to dictionary format for serialization.
+        This ensures that ModelMetadata with dynamic fields is properly serialized.
+
+        Returns
+        -------
+        dict[str, Any]
+            State dictionary for pickling.
+        """
+        state = self.__dict__.copy()
+        # Convert ModelMetadata to dict for pickling
+        if hasattr(self, "model_metadata") and self.model_metadata is not None:
+            state["model_metadata"] = self.model_metadata.to_dict()
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """
+        Custom pickle state restoration.
+
+        Converts dictionary back to ModelMetadata instance during deserialization.
+        This ensures that ModelMetadata with dynamic fields is properly restored.
+
+        Parameters
+        ----------
+        state : dict[str, Any]
+            State dictionary from pickling.
+        """
+        # Restore ModelMetadata from dict
+        if "model_metadata" in state and isinstance(state["model_metadata"], dict):
+            state["model_metadata"] = ModelMetadata.from_dict(state["model_metadata"])
+        self.__dict__.update(state)
+
     def save_to_pickle(self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL) -> None:
         """
         Save the model to a file by pickling it.
+
+        Uses custom __getstate__ and __setstate__ methods to ensure ModelMetadata
+        with dynamic fields is properly serialized and deserialized.
 
         Parameters
         ----------
@@ -1900,6 +2003,9 @@ class Model:
     def load_from_pickle(path: str) -> "Model":
         """
         Load a model from a pickled pycellin file.
+
+        Uses custom __getstate__ and __setstate__ methods to ensure ModelMetadata
+        with dynamic fields is properly serialized and deserialized.
 
         Parameters
         ----------

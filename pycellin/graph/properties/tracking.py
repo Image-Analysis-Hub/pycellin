@@ -31,7 +31,9 @@ Vocabulary:
 
 import numpy as np
 
-from pycellin.classes import CellLineage, CycleLineage, Data, Property
+from pycellin.classes.data import Data
+from pycellin.classes.lineage import CellLineage, CycleLineage
+from pycellin.classes.property import Property
 from pycellin.classes.exceptions import FusionError
 from pycellin.classes.property_calculator import NodeGlobalPropCalculator
 
