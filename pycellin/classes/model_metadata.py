@@ -84,13 +84,10 @@ class ModelMetadata:
     """
 
     # Semi-required fields, used to define the model's spatial and temporal context
-    time_unit: str | None = (
-        None  # if None, will be set depending on time_property and props_metadata?
-    )
-    time_step: float | None = (
-        None  # if None, will be set depending on time_property and props_metadata?
-    )
-    time_property: str | None = "frame"
+    time_unit: str | None = None
+
+    time_step: float | None = None
+    time_property: str = "frame"
     space_unit: str | None = None
     pixel_width: float | None = None
     pixel_height: float | None = None

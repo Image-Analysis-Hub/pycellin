@@ -764,7 +764,7 @@ class Model:
         self,
         lid: int,
         cid: int | None = None,
-        frame: int | None = 0,
+        time_point: int | float = 0,
         prop_values: dict[str, Any] | None = None,
     ) -> int:
         """
@@ -776,8 +776,8 @@ class Model:
             The ID of the lineage to which the cell belongs.
         cid : int, optional
             The ID of the cell to add (default is None).
-        frame : int, optional
-            The frame of the cell (default is 0).
+        time_point : int | float, optional
+            The time point of the cell (default is 0).
         prop_values : dict, optional
             A dictionary containing the properties values of the cell to add.
 
@@ -805,7 +805,7 @@ class Model:
         else:
             prop_values = dict()
 
-        cid = lineage._add_cell(cid, frame, **prop_values)
+        cid = lineage._add_cell(cid, time_point, self.model_metadata.time_property, **prop_values)
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True

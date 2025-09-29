@@ -534,7 +534,13 @@ class CellLineage(Lineage):
         else:
             return max(self.nodes()) + 1
 
-    def _add_cell(self, nid: int | None = None, frame: int | None = 0, **cell_props) -> int:
+    def _add_cell(
+        self,
+        nid: int | None = None,
+        time_point: int | float = 0,
+        time_prop: str = "frame",
+        **cell_props,
+    ) -> int:
         """
         Add a cell to the lineage graph.
 
@@ -543,8 +549,10 @@ class CellLineage(Lineage):
         nid : int, optional
             The node ID to assign to the new cell. If None, the next
             available node ID is used.
-        frame : int, optional
-            The frame of the cell. If None, the frame is set to 0.
+        time_point : int | float, optional
+            The time point of the cell. If None, the time point is set to 0.
+        time_prop : str, optional
+            The property name to use for the time point. Default is "frame".
         **cell_props
             Property values to set for the node.
 
@@ -568,7 +576,7 @@ class CellLineage(Lineage):
             raise ValueError(msg)
         self.add_node(nid, **cell_props)
         self.nodes[nid]["cell_ID"] = nid
-        self.nodes[nid]["frame"] = frame
+        self.nodes[nid][time_prop] = time_point
         return nid
 
     def _remove_cell(self, nid: int) -> dict[str, Any]:
