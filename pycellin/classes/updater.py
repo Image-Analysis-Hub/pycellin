@@ -102,7 +102,7 @@ class ModelUpdater:
         else:
             raise KeyError(f"Property {prop_name} has no registered calculator.")
 
-    def _update(self, data: Data, props_to_update: list[str] | None = None) -> None:
+    def _update(self, data: Data, time_prop: str, props_to_update: list[str] | None = None) -> None:
         """
         Update the property values of the data.
 
@@ -110,6 +110,8 @@ class ModelUpdater:
         ----------
         data : Data
             The data to update.
+        time_prop : str
+            The name of the time property to use for the update.
         props_to_update : list of str, optional
             List of properties to update. If None, all properties are updated.
 
@@ -158,11 +160,11 @@ class ModelUpdater:
                         # ID is already taken, so we change the ID of the node.
                         new_cell_ID = max(data.cell_data.keys()) + 1
                         cell_props = lin._remove_cell(-new_lin_ID)
-                        frame = cell_props.pop("frame")
+                        frame = cell_props.pop(time_prop)
                         assert len(lin) == 0
                         lin._add_cell(
                             new_cell_ID,
-                            time_prop_name="frame",
+                            time_prop_name=time_prop,
                             time_prop_value=frame,
                             **cell_props,
                         )

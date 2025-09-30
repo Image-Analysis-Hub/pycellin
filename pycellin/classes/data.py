@@ -174,6 +174,7 @@ class Data:
         nid: int,
         lineage: CellLineage,
         radius: float = 0,
+        time_property: str = "frame",
         time_window: int = 0,
         time_window_type: Literal["before", "after", "symmetric"] = "symmetric",
         lineages_to_search: list[CellLineage] | None = None,
@@ -191,6 +192,8 @@ class Data:
         radius : float, optional
             The maximum distance to consider, by default 0.
             If 0, the whole space is considered.
+        time_property: str = "frame"
+            The name of the time property to use, by default "frame".
         time_window : int, optional
             The time window to consider, by default 0 i.e. only the current frame.
         time_window_type : Literal["before", "after", "symmetric"], optional
@@ -208,25 +211,29 @@ class Data:
         """
         # TODO: implement the reference parameter
 
-        # Identification of the frames to search in.
-        center_frame = lineage.nodes[nid]["frame"]
+        # Identification of the time interval to search in.
+        center_timepoint = lineage.nodes[nid][time_property]
         if time_window == 0:
-            frames_to_search = [center_frame]
+            timepoints_to_search = [center_timepoint]
         else:
             if time_window_type == "symmetric":
-                frames_to_search = list(
-                    range(center_frame - time_window, center_frame + time_window + 1)
+                timepoints_to_search = list(
+                    range(center_timepoint - time_window, center_timepoint + time_window + 1)
                 )
             elif time_window_type == "before":
-                frames_to_search = list(range(center_frame - time_window, center_frame + 1))
+                timepoints_to_search = list(
+                    range(center_timepoint - time_window, center_timepoint + 1)
+                )
             elif time_window_type == "after":
-                frames_to_search = list(range(center_frame, center_frame + time_window + 1))
+                timepoints_to_search = list(
+                    range(center_timepoint, center_timepoint + time_window + 1)
+                )
             else:
                 raise ValueError(
                     f"Unknown time window type: '{time_window_type}'."
                     " Should be 'before', 'after' or 'symmetric'."
                 )
-            frames_to_search.sort()
+            timepoints_to_search.sort()
 
         # Identification of nodes that are good candidates,
         # i.e. nodes that are in the time window
@@ -235,7 +242,11 @@ class Data:
             lineages_to_search = list(self.cell_data.values())
         candidate_cells = {}
         for lin in lineages_to_search:
-            nodes = [node for node, frame in lin.nodes(data="frame") if frame in frames_to_search]
+            nodes = [
+                node
+                for node, timepoint in lin.nodes(data=time_property)
+                if timepoint in timepoints_to_search
+            ]
             if nodes:
                 candidate_cells[lin] = nodes
         # Need to remove the node itself from the candidates.

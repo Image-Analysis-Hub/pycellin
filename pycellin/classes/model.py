@@ -606,7 +606,11 @@ class Model:
         # by the updater methods to avoid incoherent states.
         # => saving a copy of the model before the update so we can roll back?
 
-        self._updater._update(self.data, props_to_update)
+        self._updater._update(
+            self.data,
+            time_prop=self.model_metadata.reference_time_property,
+            props_to_update=props_to_update,
+        )
 
         # self.data._unfreeze_lineage_data()
 
@@ -1855,16 +1859,17 @@ class Model:
         assert nb_nodes == len(df)
 
         # Reoder the columns to have pycellin mandatory properties first.
+        time_prop = self.model_metadata.reference_time_property
         columns = df.columns.tolist()
         try:
             columns.remove("lineage_ID")
-            columns.remove("frame")
+            columns.remove(time_prop)
             columns.remove("cell_ID")
         except ValueError as err:
             raise err
-        columns = ["lineage_ID", "frame", "cell_ID"] + columns
+        columns = ["lineage_ID", time_prop, "cell_ID"] + columns
         df = df[columns]
-        df.sort_values(["lineage_ID", "frame", "cell_ID"], ignore_index=True, inplace=True)
+        df.sort_values(["lineage_ID", time_prop, "cell_ID"], ignore_index=True, inplace=True)
 
         return df
 

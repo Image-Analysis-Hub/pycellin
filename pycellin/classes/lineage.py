@@ -614,6 +614,7 @@ class CellLineage(Lineage):
         source_nid: int,
         target_nid: int,
         target_lineage: CellLineage | None = None,
+        time_prop_name: str = "frame",
         **link_props,
     ) -> dict[int, int] | None:
         """
@@ -632,6 +633,8 @@ class CellLineage(Lineage):
         target_lineage : CellLineage, optional
             The lineage of the target cell. If None, the target cell is
             assumed to be in the same lineage as the source cell.
+        time_prop_name : str, optional
+            The name of the time property. Default is "frame".
         **link_props
             Property values to set for the edge.
 
@@ -681,7 +684,10 @@ class CellLineage(Lineage):
             raise FusionError(target_nid, source_lid)
 
         # Check that the link respects the flow of time.
-        if self.nodes[source_nid]["frame"] >= target_lineage.nodes[target_nid]["frame"]:
+        if (
+            self.nodes[source_nid][time_prop_name]
+            >= target_lineage.nodes[target_nid][time_prop_name]
+        ):
             raise TimeFlowError(
                 source_nid,
                 target_nid,
@@ -810,7 +816,7 @@ class CellLineage(Lineage):
         self.remove_nodes_from(nodes)
         return new_lineage  # type: ignore
 
-    def get_ancestors(self, cid: int, sorted=True) -> list[int]:
+    def get_ancestors(self, cid: int, sorted=True, time_property: str | None = None) -> list[int]:
         """
         Return all the ancestors of a given cell.
 
@@ -825,6 +831,11 @@ class CellLineage(Lineage):
         sorted : bool, optional
             True to return the ancestors in chronological order, False otherwise.
             True by default.
+        time_property : str, optional
+            The name of the time property to use for ordering the cells, used
+            only if `sorted` is True. If the property does not exist or is missing,
+            a warning is issued and the cells are returned in arbitrary order.
+            None by default.
 
         Returns
         -------
@@ -839,17 +850,27 @@ class CellLineage(Lineage):
         Warns
         -----
         UserWarning
-            If the cells have no 'frame' property to order them.
+            If the time_property parameter is None when ordering the cells.
+            If the time property is missing when ordering the cells.
         """
         try:
             ancestors = super().get_ancestors(cid)
         except nx.NetworkXError as err:
             raise KeyError(f"Cell {cid} is not in the lineage.") from err
         if sorted:
-            try:
-                ancestors.sort(key=lambda n: self.nodes[n]["frame"])
-            except KeyError:
-                warnings.warn("No 'frame' property to order the cells.")
+            if time_property is None:
+                warnings.warn(
+                    "The time_property parameter must be set if sorted is True. "
+                    "Returning ancestors in arbitrary order."
+                )
+            else:
+                try:
+                    ancestors.sort(key=lambda n: self.nodes[n][time_property])
+                except KeyError:
+                    warnings.warn(
+                        f"No '{time_property}' property to order the cells. "
+                        "Returning ancestors in arbitrary order."
+                    )
         return ancestors
 
     def get_divisions(self, cids: list[int] | None = None) -> list[int]:
