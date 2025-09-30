@@ -42,7 +42,7 @@ def _get_units(
         A dictionary where the keys are the attribute names and the values are the
         corresponding attribute values (units information).
     """
-    units = {}  # type: dict[str, str]
+    units: dict[str, str] = {}
     if element.attrib:
         units = deepcopy(element.attrib)
     if "spatialunits" not in units:
@@ -943,7 +943,7 @@ def _parse_model_tag(
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
     # the resulting graph will be disconnected.
-    graph = nx.DiGraph()  # type: nx.DiGraph
+    graph: nx.DiGraph = nx.DiGraph()
 
     # So as not to load the entire XML file into memory at once, we're
     # using an iterator to browse over the tags one by one.
@@ -1190,19 +1190,25 @@ def load_TrackMate_XML(
 
     # Add in the metadata all the TrackMate info that was not in the
     # TrackMate XML `Model` tag.
-    metadata = {}  # type: dict[str, Any]
-    metadata["name"] = Path(xml_path).stem
-    metadata["file_location"] = xml_path
-    metadata["provenance"] = "TrackMate"
+    dict_tags = _get_specific_tags(xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"])
+    pixel_size = _get_pixel_size(dict_tags["Settings"])
+    metadata: dict[str, Any] = {}
+    metadata["reference_time_property"] = "frame"  # always the case for TrackMate
+    # Dimensions info
+    # TODO: currently we can have frame as reference time property but seconds as unit
+    # Maybe remove time_unit and time_step from metadata?
     metadata["space_unit"] = units["spatialunits"]
     metadata["time_unit"] = units["timeunits"]
-    metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
-    dict_tags = _get_specific_tags(xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"])
     metadata["time_step"] = _get_time_step(dict_tags["Settings"])
-    pixel_size = _get_pixel_size(dict_tags["Settings"])
     metadata["pixel_width"] = pixel_size.get("pixel_width")
     metadata["pixel_height"] = pixel_size.get("pixel_height")
     metadata["pixel_depth"] = pixel_size.get("pixel_depth")
+    # Traceability info
+    metadata["name"] = Path(xml_path).stem
+    metadata["file_location"] = xml_path
+    metadata["provenance"] = "TrackMate"
+    metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
+    # The rest of the tags
     for tag_name, tag in dict_tags.items():
         element_string = ET.tostring(tag, encoding="utf-8").decode()
         metadata[tag_name] = element_string

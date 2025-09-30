@@ -160,7 +160,12 @@ class ModelUpdater:
                         cell_props = lin._remove_cell(-new_lin_ID)
                         frame = cell_props.pop("frame")
                         assert len(lin) == 0
-                        lin._add_cell(new_cell_ID, frame, **cell_props)
+                        lin._add_cell(
+                            new_cell_ID,
+                            time_prop_name="frame",
+                            time_prop_value=frame,
+                            **cell_props,
+                        )
                         self._added_cells.add(new_cell_ID)
                         lin.graph["lineage_ID"] = -new_cell_ID
                         data.cell_data[-new_cell_ID] = lin

@@ -41,15 +41,21 @@ from pycellin.classes.property_calculator import NodeGlobalPropCalculator
 # TODO: add calculator for mandatory cycle lineage properties (e.g. cycle length)
 
 
-def create_absolute_age_property(custom_identifier: str | None, unit: str) -> Property:
+def create_absolute_age_property(
+    custom_identifier: str | None,
+    custom_name: str | None,
+    custom_description: str | None,
+    dtype: str,
+    unit: str | None,
+) -> Property:
     return Property(
         identifier=custom_identifier or "absolute_age",
-        name="absolute age",
-        description="Age of the cell since the beginning of the lineage",
+        name=custom_name or "absolute age",
+        description=custom_description or "Age of the cell since the beginning of the lineage",
         provenance="pycellin",
         prop_type="node",
         lin_type="CellLineage",
-        dtype="float" if unit != "frame" else "int",
+        dtype=dtype,
         unit=unit,
     )
 
@@ -60,21 +66,22 @@ class AbsoluteAge(NodeGlobalPropCalculator):
 
     The absolute age of a cell is defined as the time elapsed since
     the beginning of the lineage. Absolute age of the root is 0.
-    It is given in frames by default, but can be converted
-    to the time unit of the model if specified.
+    It is computed in the same unit as the time property given as input
+    (e.g. "frame", "time", etc.).
     """
 
-    def __init__(self, property: Property, time_step: int | float = 1):
+    def __init__(self, property: Property, time_prop_name: str):
         """
         Parameters
         ----------
         property : Property
             Property object to which the calculator is associated.
-        time_step : int | float, optional
-            Time step between 2 frames, in time unit. Default is 1.
+        time_prop_name : str
+            The name of the time property (e.g. "frame", "time", etc.) to use
+            for calculation.
         """
         super().__init__(property)
-        self.time_step = time_step
+        self.time_prop_name = time_prop_name
 
     def compute(  # type: ignore[override]
         self, data: Data, lineage: CellLineage, nid: int
@@ -104,8 +111,8 @@ class AbsoluteAge(NodeGlobalPropCalculator):
         root = lineage.get_root()
         if nid not in lineage.nodes:
             raise KeyError(f"Cell {nid} not in the lineage.")
-        age_in_frame = lineage.nodes[nid]["frame"] - lineage.nodes[root]["frame"]
-        return age_in_frame * self.time_step
+        age = lineage.nodes[nid][self.time_prop_name] - lineage.nodes[root][self.time_prop_name]
+        return age
 
 
 def create_relative_age_property(custom_identifier: str | None, unit: str) -> Property:

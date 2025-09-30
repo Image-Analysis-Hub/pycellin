@@ -88,9 +88,8 @@ def prop_cycle_lin():
 # AbsoluteAge #################################################################
 
 
-def test_absolute_age_default_time_step(cell_lin, prop_cell_lin):
-    """Test AbsoluteAge with default time step."""
-    calculator = AbsoluteAge(prop_cell_lin)
+def test_absolute_age(cell_lin, prop_cell_lin):
+    calculator = AbsoluteAge(prop_cell_lin, time_prop_name="frame")
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 0
     # Divisions.
@@ -102,25 +101,6 @@ def test_absolute_age_default_time_step(cell_lin, prop_cell_lin):
     # Intermediate nodes.
     assert calculator.compute(Data({}), cell_lin, nid=3) == 2
     assert calculator.compute(Data({}), cell_lin, nid=13) == 4
-    # Non-existent node.
-    with pytest.raises(KeyError):
-        calculator.compute(Data({}), cell_lin, nid=99)
-
-
-def test_absolute_age_custom_time_step(cell_lin, prop_cell_lin):
-    """Test AbsoluteAge with a custom time step."""
-    calculator = AbsoluteAge(prop_cell_lin, time_step=2.5)
-    # Root.
-    assert calculator.compute(Data({}), cell_lin, nid=1) == 0
-    # Divisions.
-    assert calculator.compute(Data({}), cell_lin, nid=2) == 2.5
-    assert calculator.compute(Data({}), cell_lin, nid=4) == 7.5
-    # Leaves.
-    assert calculator.compute(Data({}), cell_lin, nid=6) == 12.5
-    assert calculator.compute(Data({}), cell_lin, nid=10) == 15.0
-    # Intermediate nodes.
-    assert calculator.compute(Data({}), cell_lin, nid=3) == 5.0
-    assert calculator.compute(Data({}), cell_lin, nid=13) == 10.0
     # Non-existent node.
     with pytest.raises(KeyError):
         calculator.compute(Data({}), cell_lin, nid=99)

@@ -772,7 +772,7 @@ def test_add_cell_with_id(cell_lin):
     assert cell_lin.nodes[20]["frame"] == 0
 
 
-def test_add_cell_with_frame(cell_lin):
+def test_add_cell_with_timepoint(cell_lin):
     next_id = cell_lin._get_next_available_node_ID()
     assert cell_lin._add_cell(time_prop_name="frame", time_prop_value=5) == next_id
     assert cell_lin.nodes[next_id]["cell_ID"] == next_id

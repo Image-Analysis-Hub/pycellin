@@ -764,7 +764,7 @@ class Model:
         self,
         lid: int,
         cid: int | None = None,
-        time_point: int | float = 0,
+        timepoint: int | float = 0,
         prop_values: dict[str, Any] | None = None,
     ) -> int:
         """
@@ -776,8 +776,8 @@ class Model:
             The ID of the lineage to which the cell belongs.
         cid : int, optional
             The ID of the cell to add (default is None).
-        time_point : int | float, optional
-            The time point of the cell (default is 0).
+        timepoint : int | float, optional
+            The timepoint of the cell (default is 0).
         prop_values : dict, optional
             A dictionary containing the properties values of the cell to add.
 
@@ -806,7 +806,10 @@ class Model:
             prop_values = dict()
 
         cid = lineage._add_cell(
-            cid, time_point, self.model_metadata.reference_time_property, **prop_values
+            cid,
+            time_prop_name=self.model_metadata.reference_time_property,
+            time_prop_value=timepoint,
+            **prop_values,
         )
 
         # Notify that an update of the property values may be required.
@@ -1020,31 +1023,51 @@ class Model:
 
     def add_absolute_age(
         self,
+        custom_time_property: str | None = None,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the cell absolute age property to the model.
 
-        The absolute age of a cell is defined as the number of nodes since
+        The absolute age of a cell is defined as the time elapsed since
         the beginning of the lineage. Absolute age of the root is 0.
-        It is given in frames by default, but can be converted
-        to the time unit of the model if specified.
+        By default, it is computed using the reference time property
+        of the model, but a custom time property can be specified.
 
         Parameters
         ----------
+        custom_time_property : str, optional
+            Identifier of the time property to use for the computation
+            (default is None). If None, the reference time property
+            of the model will be used.
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property (default is None). If None,
+            the identifier will be "absolute_age".
+        custom_name : str, optional
+            New name for the property (default is None). If None,
+            the name will be "absolute age".
+        custom_description : str, optional
+            New description for the property (default is None). If None,
+            the description will be "Age of the cell since the beginning of the lineage".
         """
+        if custom_time_property is None:
+            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+        else:
+            time_prop = self.props_metadata.props.get(custom_time_property)
+        if time_prop is None:
+            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+
         prop = tracking.create_absolute_age_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata.time_unit
-            if (in_time_unit and self.model_metadata.time_unit)
-            else "frame",
+            custom_name=custom_name,
+            custom_description=custom_description,
+            dtype=time_prop.dtype,
+            unit=time_prop.unit,
         )
-        time_step = (
-            self.model_metadata.time_step if (in_time_unit and self.model_metadata.time_step) else 1
-        )
-        self.add_custom_property(tracking.AbsoluteAge(prop, time_step))
+        self.add_custom_property(tracking.AbsoluteAge(prop, time_prop.identifier))
 
     def add_angle(
         self,
