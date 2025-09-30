@@ -19,6 +19,19 @@ def create_frame_property(provenance: str = "pycellin") -> Property:
     )
 
 
+def create_timepoint_property(provenance: str = "pycellin") -> Property:
+    return Property(
+        identifier="timepoint",
+        name="timepoint",
+        description="Timepoint of the detection",
+        provenance=provenance,
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="int",
+        unit="frame",
+    )
+
+
 def create_cell_id_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cell_ID",
