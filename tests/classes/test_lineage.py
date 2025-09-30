@@ -774,12 +774,12 @@ def test_add_cell_with_id(cell_lin):
 
 def test_add_cell_with_frame(cell_lin):
     next_id = cell_lin._get_next_available_node_ID()
-    assert cell_lin._add_cell(frame=5) == next_id
+    assert cell_lin._add_cell(time_prop_name="frame", time_prop_value=5) == next_id
     assert cell_lin.nodes[next_id]["cell_ID"] == next_id
     assert cell_lin.nodes[next_id]["frame"] == 5
 
 
-def test_add_cell_with_propertys(cell_lin):
+def test_add_cell_with_properties(cell_lin):
     cell_id = 20
     assert cell_lin._add_cell(20, color="red", size=10) == cell_id
     assert cell_lin.nodes[cell_id]["cell_ID"] == cell_id
