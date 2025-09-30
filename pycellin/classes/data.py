@@ -128,7 +128,7 @@ class Data:
         lineage: CellLineage,
         radius: float = 0,
         time_window: int = 0,
-        time_window_type: Literal["before", "after", "symetric"] = "symetric",
+        time_window_type: Literal["before", "after", "symmetric"] = "symmetric",
         lineages_to_search: list[CellLineage] | None = None,
         reference: Literal["center", "border"] = "center",
     ) -> tuple[int, CellLineage]:
@@ -146,8 +146,8 @@ class Data:
             If 0, the whole space is considered.
         time_window : int, optional
             The time window to consider, by default 0 i.e. only the current frame.
-        time_window_type : Literal["before", "after", "symetric"], optional
-            The type of time window to consider, by default "symetric".
+        time_window_type : Literal["before", "after", "symmetric"], optional
+            The type of time window to consider, by default "symmetric".
         lineages_to_search : list[CellLineage], optional
             The lineages to search in, by default None i.e. all lineages.
         reference : Literal["center", "border"], optional
@@ -175,7 +175,7 @@ class Data:
         lineage: CellLineage,
         radius: float = 0,
         time_window: int = 0,
-        time_window_type: Literal["before", "after", "symetric"] = "symetric",
+        time_window_type: Literal["before", "after", "symmetric"] = "symmetric",
         lineages_to_search: list[CellLineage] | None = None,
         reference: Literal["center", "border"] = "center",
     ) -> list[tuple[int, CellLineage]]:
@@ -193,8 +193,8 @@ class Data:
             If 0, the whole space is considered.
         time_window : int, optional
             The time window to consider, by default 0 i.e. only the current frame.
-        time_window_type : Literal["before", "after", "symetric"], optional
-            The type of time window to consider, by default "symetric".
+        time_window_type : Literal["before", "after", "symmetric"], optional
+            The type of time window to consider, by default "symmetric".
         lineages_to_search : list[CellLineage], optional
             The lineages to search in, by default None i.e. all lineages.
         reference : Literal["center", "border"], optional
@@ -213,7 +213,7 @@ class Data:
         if time_window == 0:
             frames_to_search = [center_frame]
         else:
-            if time_window_type == "symetric":
+            if time_window_type == "symmetric":
                 frames_to_search = list(
                     range(center_frame - time_window, center_frame + time_window + 1)
                 )
@@ -224,7 +224,7 @@ class Data:
             else:
                 raise ValueError(
                     f"Unknown time window type: '{time_window_type}'."
-                    " Should be 'before', 'after' or 'symetric'."
+                    " Should be 'before', 'after' or 'symmetric'."
                 )
             frames_to_search.sort()
 
