@@ -805,7 +805,9 @@ class Model:
         else:
             prop_values = dict()
 
-        cid = lineage._add_cell(cid, time_point, self.model_metadata.time_property, **prop_values)
+        cid = lineage._add_cell(
+            cid, time_point, self.model_metadata.reference_time_property, **prop_values
+        )
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
@@ -1018,7 +1020,6 @@ class Model:
 
     def add_absolute_age(
         self,
-        in_time_unit: bool = False,
         custom_identifier: str | None = None,
     ) -> None:
         """
@@ -1031,9 +1032,6 @@ class Model:
 
         Parameters
         ----------
-        in_time_unit : bool, optional
-            True to give the absolute age in the time unit of the model,
-            False to give it in frames (default is False).
         custom_identifier : str, optional
             New identifier for the property (default is None).
         """

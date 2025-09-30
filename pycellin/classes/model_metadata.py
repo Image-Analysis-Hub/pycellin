@@ -18,6 +18,16 @@ class ModelMetadata:
 
     Parameters
     ----------
+    reference_time_property : str, default "frame"
+        Name of the property used as the reference for time measurements.
+        Common choices are "frame" for frame number or "time" for actual time.
+        All time-related operations will use this property.
+    time_unit : str | None
+        Unit of time measurements (e.g., 's', 'min', 'h', 'frames').
+        If None, will be set depending on reference_time_property and props_metadata.
+    time_step : float | None
+        Time interval between consecutive time points in time_unit.
+        If None, will be set depending on reference_time_property and props_metadata.
     space_unit : str | None
         Unit of spatial measurements (e.g., 'μm', 'nm', 'pixels').
     pixel_width : float | None
@@ -26,20 +36,12 @@ class ModelMetadata:
         Physical size of a pixel in the y-dimension, in space_unit.
     pixel_depth : float | None
         Physical size of a pixel in the z-dimension, in space_unit.
-    time_unit : str | None
-        Unit of time measurements (e.g., 's', 'min', 'h', 'frames').
-        If None, will be set depending on time_property and props_metadata.
-    time_step : float | None
-        Time interval between consecutive time points in time_unit.
-        If None, will be set depending on time_property and props_metadata.
-    time_property : str | None, default "frame"
-        Name of the property representing time in the model.
     pycellin_version : str
-        Version of pycellin used to create this metadata (automatically set).
+        Version of pycellin used to create the model (automatically set).
     creation_timestamp : str
-        ISO format timestamp of when this metadata was created (automatically set).
+        ISO format timestamp of when the model was created (automatically set).
     name : str | None, default None
-        Human-readable name for this model or experiment.
+        Human-readable name for the model.
     provenance : str | None, default None
         Information about the origin or processing history of the data.
     file_location : str | None, default None
@@ -84,10 +86,9 @@ class ModelMetadata:
     """
 
     # Semi-required fields, used to define the model's spatial and temporal context
+    reference_time_property: str = "frame"
     time_unit: str | None = None
-
     time_step: float | None = None
-    time_property: str = "frame"
     space_unit: str | None = None
     pixel_width: float | None = None
     pixel_height: float | None = None
