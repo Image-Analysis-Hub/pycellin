@@ -18,24 +18,25 @@ class ModelMetadata:
 
     Parameters
     ----------
-    reference_time_property : str, default "frame"
+    reference_time_property : str
         Name of the property used as the reference for time measurements.
         Common choices are "frame" for frame number or "time" for actual time.
-        All time-related operations will use this property.
-    time_unit : str | None
-        Unit of time measurements (e.g., 's', 'min', 'h', 'frames').
-        If None, will be set depending on reference_time_property and props_metadata.
+        All time-related operations will use this property so it must be present
+        across all cells.
     time_step : int | float | None
         Time interval between consecutive time points in time_unit.
         If None, will be set depending on reference_time_property and props_metadata.
-    space_unit : str | None
-        Unit of spatial measurements (e.g., 'μm', 'nm', 'pixels').
+    time_unit : str | None
+        Unit of time measurements (e.g., 's', 'min', 'h', 'frames').
+        If None, will be set depending on reference_time_property and props_metadata.
     pixel_width : float | None
         Physical size of a pixel in the x-dimension, in space_unit.
     pixel_height : float | None
         Physical size of a pixel in the y-dimension, in space_unit.
     pixel_depth : float | None
         Physical size of a pixel in the z-dimension, in space_unit.
+    space_unit : str | None
+        Unit of spatial measurements (e.g., 'μm', 'nm', 'pixels').
     pycellin_version : str
         Version of pycellin used to create the model (automatically set).
     creation_timestamp : str
@@ -47,29 +48,17 @@ class ModelMetadata:
     file_location : str | None, default None
         Path or location where the associated data files are stored.
 
-    Notes
-    -----
-    Dynamic Field Support:
-        This class allows dynamic addition of custom fields while maintaining
-        attribute-style access (instance.field_name). Dynamic fields are stored
-        directly in the instance's __dict__ for maximum simplicity and performance.
-
-        Dynamic fields can be added after instantiation using normal attribute assignment:
-
-        >>> metadata = ModelMetadata(space_unit="μm", time_unit="s")
-        >>> metadata.experiment_id = "EXP-001"
-        >>> metadata.researcher = "Dr. Smith"
-
     Examples
     --------
     Create basic metadata:
 
     >>> metadata = ModelMetadata(
+    ...     reference_time_property="time",
+    ...     time_unit="seconds",
+    ...     time_step=30.0,
     ...     space_unit="μm",
     ...     pixel_width=0.1,
     ...     pixel_height=0.1,
-    ...     time_unit="s",
-    ...     time_step=30.0,
     ...     name="Cell Growth Analysis"
     ... )
 
@@ -77,7 +66,7 @@ class ModelMetadata:
 
     >>> metadata.experiment_date = "2025-09-29"
     >>> metadata.temperature = 37.0
-    >>> metadata.conditions = {"pH": 7.4, "CO2": "5%"}
+    >>> metadata.conditions = {"pH": 7.3, "CO2": "5%"}
 
     Serialize and deserialize:
 
@@ -85,14 +74,16 @@ class ModelMetadata:
     >>> restored_metadata = ModelMetadata.from_dict(data_dict)
     """
 
+    # Mandatory field
+    reference_time_property: str
+
     # Semi-required fields, used to define the model's spatial and temporal context
-    reference_time_property: str = "frame"
-    time_unit: str | None = None
     time_step: int | float | None = None
-    space_unit: str | None = None
+    time_unit: str | None = None
     pixel_width: float | None = None
     pixel_height: float | None = None
     pixel_depth: float | None = None
+    space_unit: str | None = None
 
     # Standard optional fields, for traceability
     pycellin_version: str = field(default_factory=get_pycellin_version)
@@ -100,6 +91,24 @@ class ModelMetadata:
     name: str | None = None
     provenance: str | None = None
     file_location: str | None = None
+
+    def __post_init__(self) -> None:
+        """
+        Post-initialization processing for ModelMetadata.
+
+        Handles any additional metadata validation.
+        """
+        # Validate that reference_time_property is not an empty string.
+        if not self.reference_time_property:
+            raise ValueError("reference_time_property cannot be an empty string.")
+
+        # Validate that pixel dimensions are positive, if provided.
+        if self.pixel_width is not None and self.pixel_width <= 0:
+            raise ValueError("`pixel_width` must be positive.")
+        if self.pixel_height is not None and self.pixel_height <= 0:
+            raise ValueError("`pixel_height` must be positive.")
+        if self.pixel_depth is not None and self.pixel_depth <= 0:
+            raise ValueError("`pixel_depth` must be positive.")
 
     def __delattr__(self, name: str) -> None:
         """
