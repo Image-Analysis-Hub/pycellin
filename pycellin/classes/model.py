@@ -3,7 +3,9 @@
 
 import pickle
 import warnings
+from decimal import Decimal
 from itertools import pairwise
+from math import gcd
 from typing import Any, Callable, Literal, TypeVar
 
 import networkx as nx
@@ -63,10 +65,8 @@ class Model:
                 f"model_metadata must be None, ModelMetadata, or dict, "
                 f"got {type(model_metadata).__name__}"
             )
-
         self.props_metadata = props_metadata if props_metadata is not None else PropsMetadata()
         self.data = data if data is not None else Data(dict())
-
         self._updater = ModelUpdater()
 
         # Add an optional argument to ask to compute the CycleLineage?
@@ -165,6 +165,161 @@ class Model:
         if "model_metadata" in state and isinstance(state["model_metadata"], dict):
             state["model_metadata"] = ModelMetadata.from_dict(state["model_metadata"])
         self.__dict__.update(state)
+
+    def _compute_time_step(self, variable_time_step: bool = False) -> int | float:
+        """
+        Compute the time step of the model based on the reference time property.
+
+        By default, the time step is calculated as the minimum difference between
+        consecutive timepoints across all lineages.
+        If the timepoints are irregularly sampled, i.e. not evenly spaced regardless of gaps,
+        `variable_time_step` should be set to True. In this case, the greatest common divisor (GCD)
+        of the differences is used instead. However, this method is more computationally intensive
+        and should be used only when necessary.
+
+        Parameters
+        ----------
+        variable_time_step : bool, optional
+            If True, the time step is computed using the GCD of time differences.
+            If False, the minimum time difference is used (default is False).
+
+        Returns
+        -------
+        int | float
+            The computed time step of the model.
+
+        Raises
+        ------
+        ValueError
+            If no lineages are found in the model data.
+            If no valid time intervals are found (e.g., all nodes have the same timepoint).
+            If reference_time_property is not found in lineage nodes.
+
+        Examples
+        --------
+        Regular time sampling (variable_time_step=False):
+        >>> # Time differences: [1, 1, 1, 1] → time_step = 1 (minimum)
+        >>> model._compute_time_step(variable_time_step=False)
+        1
+
+        Regular time sampling with consistent base interval but gaps (variable_time_step=False):
+        >>> # Time differences: [1, 2, 1, 3] → time_step = 1 (minimum)
+        >>> model._compute_time_step(variable_time_step=False)
+        1
+
+        Regular time sampling with consistent float interval but gaps (variable_time_step=False):
+        >>> # Time differences: [1.5, 3.0, 1.5] → time_step = 1.5 (minimum)
+        >>> model._compute_time_step(variable_time_step=False)
+        1.5
+
+        Irregular time sampling (variable_time_step=True):
+        >>> # Time differences: [1.5, 3.0, 1.1, 0.3] → time_step = 0.1 (GCD)
+        >>> model._compute_time_step(variable_time_step=True)
+        0.1
+        >>> # Default minimum time difference yields incorrect result:
+        >>> model._compute_time_step(variable_time_step=False)
+        0.3
+
+        Negative timepoints are supported in all cases:
+        >>> # Timepoints like [-5, -3, -1, 0, 2] (regular intervals with negatives)
+        >>> # Time differences: [2, 2, 1, 2] → time_step = 1 (minimum)
+        >>> model._compute_time_step(variable_time_step=False)
+        1
+        >>> # Timepoints like [-5, -2, 0, 1.5] (irregular intervals with negatives)
+        >>> # Time differences: [3, 2, 1.5] → time_step = 0.5 (GCD)
+        >>> model._compute_time_step(variable_time_step=True)
+        0.5
+
+        When to use variable_time_step=False:
+        - Regular timepoints like [0, 1, 2, 3, 4] (classic case)
+        - Timepoints like [0, 1, 3, 4, 5, 7] (some gaps but consistent unit steps)
+        - Timepoints like [0, 1.5, 3.0, 4.5] (non-integer but regular intervals)
+        - Timepoints like [0, 1, 1.5, 2.5, 4] (non-integer and gaps but regular intervals)
+
+        When to use variable_time_step=True:
+        - Timepoints like [0, 1, 2.5, 3.5] (non-integer and gaps but no regular intervals)
+          => cannot reach all timepoints by adding a fixed step of 1 from the minimum,
+             we need a smaller step to reach all timepoints (0.5 in this case)
+        - Timepoints like [0, 1.1, 2.5, 2.8] (non-integer and irregular intervals)
+        - Timepoints like [0, 1.1, 3.42, 4.0, 7.61] (completely random intervals)
+        """
+        # TODO: Should time_step be recomputed when doing an update?
+        lineages = self.data.cell_data.values()
+        if not lineages:
+            raise ValueError("Cannot compute time step: no lineages found.")
+
+        time_diffs = set()
+        time_prop = self.model_metadata.reference_time_property
+        for lin in lineages:
+            for source_node, target_node in lin.edges():
+                if time_prop not in lin.nodes[source_node]:
+                    raise ValueError(
+                        f"Reference time property '{time_prop}' not found in node {source_node} "
+                        f"of lineage {lin.graph.get('lineage_ID', 'of unknown ID')}."
+                    )
+                source_time = lin.nodes[source_node][time_prop]
+                if time_prop not in lin.nodes[target_node]:
+                    raise ValueError(
+                        f"Reference time property '{time_prop}' not found in node {target_node} "
+                        f"of lineage {lin.graph.get('lineage_ID', 'of unknown ID')}."
+                    )
+                target_time = lin.nodes[target_node][time_prop]
+                time_diff = abs(target_time - source_time)
+                if time_diff > 0:
+                    time_diffs.add(time_diff)
+
+        if not time_diffs:
+            raise ValueError("Cannot compute time step: no valid time intervals found.")
+
+        time_step: int | float
+        if variable_time_step:  # use GCD of all time differences
+            # TODO: extract EPSILON as a constant
+            EPSILON = 1e-12
+            if all(abs(td - round(td)) < EPSILON for td in time_diffs):
+                # Treat numbers like 2.0000001 as integers for more efficient GCD calculation
+                time_step = gcd(*map(int, map(round, time_diffs)))
+            else:
+                time_step = self._gcd_floats(time_diffs)
+        else:  # use minimum time difference
+            time_step = min(time_diffs)
+
+        return time_step
+
+    @staticmethod
+    def _gcd_floats(values: set[float]) -> float:
+        """
+        Calculate GCD for floating point numbers using exact decimal precision.
+
+        This method converts floats to Decimals to avoid precision issues,
+        scales them to integers, computes the GCD, and then rescales back to float.
+
+        Parameters
+        ----------
+        values : set[float]
+            Set of floating point numbers to compute the GCD for.
+
+        Returns
+        -------
+        float
+            The GCD of the input floating point numbers.
+        """
+        # Convert to Decimal for exact precision handling.
+        # The str() conversion is to avoid precision issues with floats.
+        decimal_values = list(map(Decimal, map(str, values)))
+
+        # Find the maximum number of decimal places among all values
+        max_decimal_places = 0
+        for d in decimal_values:
+            exponent = d.as_tuple().exponent
+            if isinstance(exponent, int) and exponent < 0:
+                max_decimal_places = max(max_decimal_places, abs(exponent))
+
+        # Scale all values to integers
+        scale_factor = 10**max_decimal_places
+        int_values = [int(d * scale_factor) for d in decimal_values]
+        result_scaled = gcd(*int_values)
+
+        return float(result_scaled / scale_factor)
 
     def get_space_unit(self) -> str | None:
         """
