@@ -36,6 +36,8 @@ class Model:
         model_metadata: ModelMetadata | dict[str, Any] | None = None,
         props_metadata: PropsMetadata | None = None,
         data: Data | None = None,
+        reference_time_property: str | None = None,
+        variable_time_step: bool = False,
     ) -> None:
         """
         Constructs all the necessary attributes for the Model object.
@@ -48,23 +50,93 @@ class Model:
             The declaration of the properties present in the model (default is None).
         data : Data, optional
             The lineages data of the model (default is None).
+        reference_time_property : str, optional
+            The name of the property to use as the reference for time measurements.
+            Needs to be provided if model_metadata is None or does not contain it.
+        variable_time_step : bool, optional
+            If True and time_step is not provided in model_metadata, the time step will be
+            computed using the greatest common divisor (GCD) of time differences, which is
+            suitable for irregularly sampled timepoints. If False, the minimum time difference
+            is used instead (default is False). This parameter is only used when time_step
+            needs to be automatically computed from the data.
 
         Raises
         ------
+        ValueError
+            If `reference_time_property` is not provided and cannot be inferred from
+            `model_metadata`.
         TypeError
-            If model_metadata is not None, ModelMetadata, or dict.
+            If `model_metadata` is not None, ModelMetadata, or dict.
+
+        Warns
+        -----
+        UserWarning
+            If `time_step` is not provided in `model_metadata` and cannot be inferred
+            from the data.
         """
+        # Check that we have a reference_time_property.
+        if reference_time_property is None:
+            if model_metadata is None:
+                raise ValueError("`reference_time_property` must be provided.")
+
+            # Extract from metadata regardless of type
+            if isinstance(model_metadata, dict):
+                reference_time_property = model_metadata.get("reference_time_property")
+            else:
+                reference_time_property = getattr(model_metadata, "reference_time_property", None)
+
+            if not reference_time_property:
+                raise ValueError(
+                    "`reference_time_property` must be provided in model_metadata "
+                    "or as an explicit argument."
+                )
+
+        # Do we already have a time_step?
+        if model_metadata is not None:
+            if isinstance(model_metadata, dict):
+                time_step = model_metadata.get("time_step")
+            else:
+                time_step = getattr(model_metadata, "time_step", None)
+        else:
+            time_step = None
+
+        # Determine time_step if not provided in metadata.
+        if time_step is None:
+            if data is None:
+                msg = (
+                    "`time_step` is not defined in model metadata and there is no data "
+                    "in the model to infer it. Set the time_step manually with "
+                    "`model.set_time_step(your_timestep)`. Alternatively, you can set it "
+                    "automatically with `model.set_time_step()` once you have added data "
+                    "to the model."
+                )
+                warnings.warn(msg, UserWarning, stacklevel=2)
+            else:
+                time_step = self._compute_time_step(variable_time_step)
+
+        # Update model metadata with timestep and reference_time_property
+        # when possible.
+        # TODO: add unit extracted from props_metadata, if any
         if model_metadata is None:
-            self.model_metadata = ModelMetadata()
+            self.model_metadata = ModelMetadata(
+                reference_time_property=reference_time_property, time_step=time_step
+            )
         elif isinstance(model_metadata, ModelMetadata):
-            self.model_metadata = model_metadata
+            metadata_dict = model_metadata.to_dict()  # to avoid mutating the original
+            metadata_dict["reference_time_property"] = reference_time_property
+            metadata_dict["time_step"] = time_step
+            self.model_metadata = ModelMetadata.from_dict(metadata_dict)
         elif isinstance(model_metadata, dict):
-            self.model_metadata = ModelMetadata.from_dict(model_metadata)
+            metadata_dict = model_metadata.copy()  # to avoid mutating the original
+            metadata_dict["reference_time_property"] = reference_time_property
+            metadata_dict["time_step"] = time_step
+            self.model_metadata = ModelMetadata.from_dict(metadata_dict)
         else:
             raise TypeError(
-                f"model_metadata must be None, ModelMetadata, or dict, "
-                f"got {type(model_metadata).__name__}"
+                f"`model_metadata` must be None, ModelMetadata, or dict, "
+                f"got `{type(model_metadata).__name__}`."
             )
+
         self.props_metadata = props_metadata if props_metadata is not None else PropsMetadata()
         self.data = data if data is not None else Data(dict())
         self._updater = ModelUpdater()
@@ -284,6 +356,30 @@ class Model:
             time_step = min(time_diffs)
 
         return time_step
+
+    def set_time_step(
+        self,
+        time_step: int | float | None = None,
+        variable_time_step: bool = False,
+    ) -> None:
+        """
+        Set the time step of the model.
+
+        Parameters
+        ----------
+        time_step : int | float | None
+            The time step to set for the model. If None, the time step will be
+            computed automatically based on the data in the model (default is None).
+        variable_time_step : bool, optional
+            If True and time_step is None, the time step will be computed using
+            the GCD of time differences. If False, the minimum time difference
+            will be used (default is False).
+
+        # TODO: should I copy the docstring examples from _compute_time_step() here?
+        """
+        if time_step is None:
+            time_step = self._compute_time_step(variable_time_step)
+        self.model_metadata.time_step = time_step
 
     @staticmethod
     def _gcd_floats(values: set[float]) -> float:
