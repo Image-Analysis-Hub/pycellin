@@ -25,7 +25,7 @@ class ModelMetadata:
     time_unit : str | None
         Unit of time measurements (e.g., 's', 'min', 'h', 'frames').
         If None, will be set depending on reference_time_property and props_metadata.
-    time_step : float | None
+    time_step : int | float | None
         Time interval between consecutive time points in time_unit.
         If None, will be set depending on reference_time_property and props_metadata.
     space_unit : str | None
@@ -88,7 +88,7 @@ class ModelMetadata:
     # Semi-required fields, used to define the model's spatial and temporal context
     reference_time_property: str = "frame"
     time_unit: str | None = None
-    time_step: float | None = None
+    time_step: int | float | None = None
     space_unit: str | None = None
     pixel_width: float | None = None
     pixel_height: float | None = None
