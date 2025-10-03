@@ -31,7 +31,7 @@ def create_timepoint_property(provenance: str = "pycellin") -> Property:
         prop_type="node",
         lin_type="CellLineage",
         dtype="int",
-        unit="frame",
+        unit=None,
     )
 
 
