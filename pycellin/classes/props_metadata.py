@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from typing import get_args
+import copy
 import warnings
+from typing import get_args
 
-from pycellin.custom_types import PropertyType, LineageType
-from pycellin.utils import check_literal_type
 from pycellin.classes.property import Property
+from pycellin.custom_types import LineageType, PropertyType
+from pycellin.graph.properties.core import (
+    create_cells_property,
+    create_cycle_duration_property,
+    create_cycle_id_property,
+    create_cycle_length_property,
+    create_level_property,
+)
+from pycellin.utils import check_literal_type
 
 
 class PropsMetadata:
@@ -44,6 +52,26 @@ class PropsMetadata:
                 )
                 warnings.warn(msg)
                 self._protected_props.remove(prop)
+
+    def __deepcopy__(self, memo):
+        """
+        Create a deep copy of the PropsMetadata object.
+
+        Parameters
+        ----------
+        memo : dict
+            A dictionary used by the copy module to track already copied objects
+            to handle circular references.
+
+        Returns
+        -------
+        PropsMetadata
+            A deep copy of the PropsMetadata object with all properties and
+            protected properties lists independently copied.
+        """
+        props_copy = {prop_id: copy.deepcopy(prop, memo) for prop_id, prop in self.props.items()}
+        protected_props_copy = copy.deepcopy(self._protected_props, memo)
+        return PropsMetadata(props=props_copy, protected_props=protected_props_copy)
 
     def __eq__(self, other):
         if not isinstance(other, PropsMetadata):
@@ -224,15 +252,6 @@ class PropsMetadata:
         """
         Add the basic properties of cell cycle lineages.
         """
-        # Import property functions - no circular dependency since PropsMetadata is now separate
-        from pycellin.graph.properties.core import (
-            create_cycle_id_property,
-            create_cells_property,
-            create_cycle_length_property,
-            create_cycle_duration_property,
-            create_level_property,
-        )
-
         prop_ID = create_cycle_id_property()
         prop_cells = create_cells_property()
         prop_length = create_cycle_length_property()
@@ -447,3 +466,22 @@ class PropsMetadata:
             else:
                 units[prop.unit] = [prop.identifier]
         return units
+
+    def copy(self, deep: bool = True):
+        """
+        Create a copy of the PropsMetadata object.
+
+        Parameters
+        ----------
+        deep : bool, optional
+            If True (default), creates a deep copy. If False, creates a shallow copy.
+
+        Returns
+        -------
+        PropsMetadata
+            A copy of the PropsMetadata object.
+        """
+        if deep:
+            return copy.deepcopy(self)
+        else:
+            return copy.copy(self)

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import copy
 import math
-from typing import Literal
 import warnings
+from typing import Literal
 
 import networkx as nx
 
@@ -38,6 +39,40 @@ class Data:
             self._add_cycle_lineages()
         else:
             self.cycle_data = None  # type: dict[int, CycleLineage] | None
+
+    def __deepcopy__(self, memo) -> "Data":
+        """
+        Create a deep copy of the Data object.
+
+        Parameters
+        ----------
+        memo : dict
+            A dictionary used by the copy module to track already copied objects
+            to handle circular references.
+
+        Returns
+        -------
+        Data
+            A deep copy of the Data object with all cell lineages and
+            cycle lineages (if present) independently copied.
+        """
+        # Cell_data
+        cell_data_copy = {
+            lid: copy.deepcopy(lineage, memo) for lid, lineage in self.cell_data.items()
+        }
+
+        # Cycle_data
+        cycle_data_copy = None
+        if self.cycle_data is not None:
+            cycle_data_copy = {
+                lid: copy.deepcopy(cycle_lineage, memo)
+                for lid, cycle_lineage in self.cycle_data.items()
+            }
+
+        new_data = Data(cell_data_copy, add_cycle_data=False)
+        new_data.cycle_data = cycle_data_copy
+
+        return new_data
 
     def __repr__(self) -> str:
         return f"Data(cell_data={self.cell_data!r}, cycle_data={self.cycle_data!r})"
@@ -97,6 +132,26 @@ class Data:
     #     """
     #     for lineage in self.cell_data.values():
     #         Lineage.unfreeze(lineage)
+
+    def copy(self, deep: bool = True) -> "Data":
+        """
+        Create a copy of the Data instance.
+
+        Parameters
+        ----------
+        deep : bool, optional
+            If True (default), creates a deep copy. If False, creates a shallow copy.
+
+        Returns
+        -------
+        Data
+            A copy of the Data instance. If deep=True, all cell lineages and
+            cycle lineages (if present) are copied independently.
+        """
+        if deep:
+            return copy.deepcopy(self)
+        else:
+            return copy.copy(self)
 
     def number_of_lineages(self) -> int:
         """
