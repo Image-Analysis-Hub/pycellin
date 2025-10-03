@@ -23,18 +23,18 @@ class Data:
         The cycle lineages stored, if any.
     """
 
-    def __init__(self, data: dict[int, CellLineage], add_cycle_data: bool = False) -> None:
+    def __init__(self, cell_data: dict[int, CellLineage], add_cycle_data: bool = False) -> None:
         """
         Initialize a Data object.
 
         Parameters
         ----------
-        data : dict[int, CellLineage]
+        cell_data : dict[int, CellLineage]
             The cell lineages to store.
         add_cycle_data : bool, optional
             Whether to compute and store the cycle lineages, by default False.
         """
-        self.cell_data = data
+        self.cell_data = cell_data
         if add_cycle_data:
             self._add_cycle_lineages()
         else:
