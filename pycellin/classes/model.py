@@ -24,6 +24,7 @@ from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.classes.updater import ModelUpdater
 from pycellin.custom_types import Cell, Link
+from pycellin.graph.properties.core import Timepoint, create_timepoint_property
 
 L = TypeVar("L", bound="Lineage")
 
@@ -79,7 +80,7 @@ class Model:
             if model_metadata is None:
                 raise ValueError("`reference_time_property` must be provided.")
 
-            # Extract from metadata regardless of type
+            # Extract from metadata regardless of type.
             if isinstance(model_metadata, dict):
                 reference_time_property = model_metadata.get("reference_time_property")
             else:
@@ -90,6 +91,9 @@ class Model:
                     "`reference_time_property` must be provided in model_metadata "
                     "or as an explicit argument."
                 )
+
+        # Initialize data early since _compute_time_step() needs it.
+        self.data = data.copy() if data is not None else Data(dict())
 
         # Do we already have a time_step?
         if model_metadata is not None:
@@ -102,7 +106,12 @@ class Model:
 
         # Determine time_step if not provided in metadata.
         if time_step is None:
-            if data is None:
+            if self.data.cell_data:
+                # Create temporary metadata for _compute_time_step().
+                temp_metadata = ModelMetadata(reference_time_property=reference_time_property)
+                self.model_metadata = temp_metadata
+                time_step = self._compute_time_step(variable_time_step)
+            else:
                 msg = (
                     "`time_step` is not defined in model metadata and there is no data "
                     "in the model to infer it. Set the time_step manually with "
@@ -111,11 +120,8 @@ class Model:
                     "to the model."
                 )
                 warnings.warn(msg, UserWarning, stacklevel=2)
-            else:
-                time_step = self._compute_time_step(variable_time_step)
 
-        # Update model metadata with timestep and reference_time_property
-        # when possible.
+        # Create final model metadata with all required values.
         # TODO: add unit extracted from props_metadata, if any
         if model_metadata is None:
             self.model_metadata = ModelMetadata(
@@ -137,9 +143,24 @@ class Model:
                 f"got `{type(model_metadata).__name__}`."
             )
 
-        self.props_metadata = props_metadata if props_metadata is not None else PropsMetadata()
-        self.data = data if data is not None else Data(dict())
+        # Set the rest of the attributes.
+        self.props_metadata = (
+            props_metadata.copy() if props_metadata is not None else PropsMetadata()
+        )
         self._updater = ModelUpdater()
+
+        # Update to actually compute the "timepoint" property.
+        if self.data.cell_data is not None and "timepoint" not in self.get_node_properties():
+            self.add_custom_property(
+                Timepoint(
+                    property=create_timepoint_property(),
+                    data=self.data,
+                    time_step=self.model_metadata.time_step,
+                    reference_time_property=self.model_metadata.reference_time_property,
+                )
+            )
+            self.props_metadata._protect_prop("timepoint")
+            self.update(["timepoint"])
 
         # Add an optional argument to ask to compute the CycleLineage?
         # Should name be optional or set to None? If optional and not provided, an
