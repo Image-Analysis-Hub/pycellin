@@ -150,7 +150,7 @@ class Model:
         self._updater = ModelUpdater()
 
         # Update to actually compute the "timepoint" property.
-        if self.data.cell_data is not None and "timepoint" not in self.get_node_properties():
+        if self.data.cell_data and "timepoint" not in self.get_node_properties():
             self.add_custom_property(
                 Timepoint(
                     property=create_timepoint_property(),
