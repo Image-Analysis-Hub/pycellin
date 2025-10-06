@@ -102,7 +102,13 @@ class ModelUpdater:
         else:
             raise KeyError(f"Property {prop_name} has no registered calculator.")
 
-    def _update(self, data: Data, time_prop: str, props_to_update: list[str] | None = None) -> None:
+    def _update(
+        self,
+        data: Data,
+        time_prop: str,
+        time_step: int | float,
+        props_to_update: list[str] | None = None,
+    ) -> None:
         """
         Update the property values of the data.
 
@@ -112,6 +118,8 @@ class ModelUpdater:
             The data to update.
         time_prop : str
             The name of the time property to use for the update.
+        time_step : int | float
+            The time step to use for the update.
         props_to_update : list of str, optional
             List of properties to update. If None, all properties are updated.
 
@@ -216,7 +224,7 @@ class ModelUpdater:
                 #     data.cycle_data.update({lin_ID: new_cycle_data})
                 # else:
                 #     data.cycle_data[lin_ID] = new_cycle_data
-                data.cycle_data[lin_ID] = data._compute_cycle_lineage(lin_ID)
+                data.cycle_data[lin_ID] = data._compute_cycle_lineage(time_prop, time_step, lin_ID)
         # Remove cycle lineages whose cell lineage has been removed.
         for lin_ID in self._removed_lineages:
             if data.cycle_data is not None and lin_ID in data.cycle_data:

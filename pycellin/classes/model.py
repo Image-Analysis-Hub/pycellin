@@ -878,9 +878,18 @@ class Model:
         # by the updater methods to avoid incoherent states.
         # => saving a copy of the model before the update so we can roll back?
 
+        time_step = self.model_metadata.time_step
+        if time_step is None:
+            # TODO: add "see documentation" to the error message or explain
+            # directly how to set it?
+            raise ValueError(
+                "The time step of the model is currently not defined "
+                "but is required for cycle lineage computation."
+            )
         self._updater._update(
             self.data,
             time_prop=self.model_metadata.reference_time_property,
+            time_step=time_step,
             props_to_update=props_to_update,
         )
 
@@ -1182,7 +1191,13 @@ class Model:
         else:
             prop_values = dict()
 
-        source_lineage._add_link(source_cid, target_cid, target_lineage, **prop_values)
+        source_lineage._add_link(
+            source_cid,
+            target_cid,
+            target_lineage,
+            # time_prop_name=self.model_metadata.reference_time_property,
+            **prop_values,
+        )
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
@@ -1880,6 +1895,15 @@ class Model:
     def add_cycle_data(self) -> None:
         """
         Compute and add the cycle lineages of the model.
+
+        This method computes the cycle lineages from the cell lineages
+        and add them to the model. It also adds the default properties
+        associated with cycle lineages to the PropsMetadata.
+
+        Raises
+        ------
+        ValueError
+            If the time step of the model is not defined.
         """
         # if self._updater._update_required:
         #     txt = (
@@ -1890,8 +1914,18 @@ class Model:
         #     raise UpdateRequiredError(txt)
         # TODO: I have nothing to check if the structure was modified since
         # _update_required becomes true when properties are added...
-        self.data._add_cycle_lineages()
-        self.props_metadata._add_cycle_lineage_props()
+        time_prop = self.model_metadata.reference_time_property
+        time_step = self.model_metadata.time_step
+        if time_step is None:
+            # TODO: add "see documentation" to the error message or explain
+            # directly how to set it?
+            raise ValueError(
+                "The time step of the model is currently not defined "
+                "but is required for cycle lineage computation."
+            )
+        time_unit = self.model_metadata.time_unit
+        self.data._add_cycle_lineages(time_prop, time_step)
+        self.props_metadata._add_cycle_lineage_props(time_unit)
 
     def _categorize_props(self, props: list[str] | None) -> tuple[list[str], list[str], list[str]]:
         """

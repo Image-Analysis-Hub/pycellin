@@ -84,26 +84,38 @@ class Data:
             txt = ""
         return f"Data object with {self.number_of_lineages()} cell lineages{txt}."
 
-    def _add_cycle_lineages(self, lids: list[int] | None = None) -> None:
+    def _add_cycle_lineages(
+        self, time_prop: str, time_step: int | float, lids: list[int] | None = None
+    ) -> None:
         """
         Add the cell cycle lineages from the cell lineages.
 
         Parameters
         ----------
+        time_prop : str
+            The name of the time property to use for cycle lineage computation.
+        time_step : int | float
+            The time step between two consecutive time points.
         lids : list[int], optional
             The IDs of the lineages for which to compute cycle lineages,
             by default None i.e. all lineages.
         """
         if lids is None:
             lids = list(self.cell_data.keys())
-        self.cycle_data = {lin_id: self._compute_cycle_lineage(lin_id) for lin_id in lids}
+        self.cycle_data = {
+            lin_id: self._compute_cycle_lineage(time_prop, time_step, lin_id) for lin_id in lids
+        }
 
-    def _compute_cycle_lineage(self, lid: int) -> CycleLineage:
+    def _compute_cycle_lineage(self, time_prop: str, time_step: float, lid: int) -> CycleLineage:
         """
         Compute and return the cycle lineage corresponding to a given cell lineage.
 
         Parameters
         ----------
+        time_prop : str
+            The name of the time property to use for cycle lineage computation.
+        time_step : float
+            The time step between two consecutive time points.
         lid : int
             The ID of the cell lineage for which to compute the cycle lineage.
 
@@ -112,7 +124,7 @@ class Data:
         CycleLineage
             The cycle lineage corresponding to the cell lineage.
         """
-        return CycleLineage(self.cell_data[lid])
+        return CycleLineage(time_prop, time_step, self.cell_data[lid])
 
     def _freeze_lineage_data(self):
         """

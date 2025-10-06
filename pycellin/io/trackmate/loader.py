@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import warnings
 from copy import deepcopy
-from datetime import datetime
-import importlib.metadata
 from pathlib import Path
 from typing import Any
-import warnings
 
-from lxml import etree as ET
 import networkx as nx
+from lxml import etree as ET
 
 from pycellin.classes import (
-    Model,
-    PropsMetadata,
-    Property,
-    Data,
     CellLineage,
+    Data,
+    Model,
+    Property,
+    PropsMetadata,
 )
 from pycellin.custom_types import PropertyType
 from pycellin.graph.properties.core import create_cell_id_property
@@ -1246,7 +1244,9 @@ if __name__ == "__main__":
     # print(model.props_md.node_props.keys())
     # print(model.data)
 
-    # lineage = model.data.cell_data[0]
+    lineage = model.data.cell_data[0]
+    for n in lineage.nodes(data=True):
+        print(n)
     # lineage.plot(node_hover_props=["cell_ID", "cell_name"])
 
     # lineage = model.data.cell_data[0]

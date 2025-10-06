@@ -248,14 +248,19 @@ class PropsMetadata:
         for property in properties:
             self._add_prop(property, overwrite=overwrite)
 
-    def _add_cycle_lineage_props(self) -> None:
+    def _add_cycle_lineage_props(self, time_unit: str | None) -> None:
         """
         Add the basic properties of cell cycle lineages.
+
+        Parameters
+        ----------
+        time_unit : str | None
+            The unit of the time property (e.g. 'frame', 'minute', 'hour', etc.).
         """
         prop_ID = create_cycle_id_property()
         prop_cells = create_cells_property()
         prop_length = create_cycle_length_property()
-        prop_duration = create_cycle_duration_property()
+        prop_duration = create_cycle_duration_property(time_unit)
         prop_level = create_level_property()
         for prop in [prop_ID, prop_cells, prop_length, prop_duration, prop_level]:
             if prop.identifier not in self.props:

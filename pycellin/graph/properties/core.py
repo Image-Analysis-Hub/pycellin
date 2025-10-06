@@ -214,16 +214,16 @@ def create_cycle_length_property(provenance: str = "pycellin") -> Property:
     )
 
 
-def create_cycle_duration_property(provenance: str = "pycellin") -> Property:
+def create_cycle_duration_property(time_unit: str | None, provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cycle_duration",
         name="cycle duration",
-        description="Number of frames in the cell cycle, regardless of gaps",
+        description="Duration of the cell cycle, regardless of gaps",
         provenance=provenance,
         prop_type="node",
         lin_type="CycleLineage",
-        dtype="int",
-        unit="frame",
+        dtype="float",
+        unit=time_unit,
     )
 
 
