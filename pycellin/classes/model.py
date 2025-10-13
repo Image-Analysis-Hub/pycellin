@@ -1049,7 +1049,7 @@ class Model:
         self,
         lid: int,
         cid: int | None = None,
-        timepoint: int | float = 0,
+        time_value: int | float = 0,
         prop_values: dict[str, Any] | None = None,
     ) -> int:
         """
@@ -1061,8 +1061,8 @@ class Model:
             The ID of the lineage to which the cell belongs.
         cid : int, optional
             The ID of the cell to add (default is None).
-        timepoint : int | float, optional
-            The timepoint of the cell (default is 0).
+        time_value : int | float, optional
+            The value of the reference time property for the cell to add (default is 0).
         prop_values : dict, optional
             A dictionary containing the properties values of the cell to add.
 
@@ -1093,7 +1093,7 @@ class Model:
         cid = lineage._add_cell(
             cid,
             time_prop_name=self.model_metadata.reference_time_property,
-            time_prop_value=timepoint,
+            time_prop_value=time_value,
             **prop_values,
         )
 
@@ -1195,7 +1195,7 @@ class Model:
             source_cid,
             target_cid,
             target_lineage,
-            # time_prop_name=self.model_metadata.reference_time_property,
+            time_prop_name=self.model_metadata.reference_time_property,
             **prop_values,
         )
 

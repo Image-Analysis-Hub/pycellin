@@ -683,8 +683,6 @@ class CellLineage(Lineage):
         if target_lineage.in_degree(target_nid) != 0:
             raise FusionError(target_nid, source_lid)
 
-        print(source_nid, target_nid, target_lineage)
-
         # Check that the link respects the flow of time.
         if (
             self.nodes[source_nid][time_prop_name]
