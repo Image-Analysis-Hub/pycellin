@@ -182,6 +182,7 @@ class ModelUpdater:
                 print(split_lin)
                 print(split_lin.nodes())
             print()
+
             # The other lineages are considered as new lineages.
             for split_lin in splitted_lins:
                 if len(split_lin) == 1:
@@ -200,7 +201,7 @@ class ModelUpdater:
                             time_prop_value=time_value,
                             **cell_props,
                         )
-                        # Track the cell ID change
+                        # Track the cell ID change.
                         self._removed_cells.add(
                             Cell(cell_ID=original_cell_id, lineage_ID=original_lin_id)
                         )
@@ -209,7 +210,7 @@ class ModelUpdater:
                         data.cell_data[-new_cell_ID] = split_lin
                         self._added_lineages.add(-new_cell_ID)
                     else:
-                        # Track that the cell moved to a new lineage
+                        # Track that the cell moved to a new lineage.
                         self._removed_cells.add(
                             Cell(cell_ID=original_cell_id, lineage_ID=original_lin_id)
                         )
@@ -219,10 +220,26 @@ class ModelUpdater:
                         self._added_lineages.add(new_lin_ID)
                 else:
                     new_lin_ID = max(data.cell_data.keys()) + 1
-                    # Track all cells moving to the new lineage
+                    # Track all cells moving to the new lineage.
                     for cell_id in split_lin.nodes():
                         self._removed_cells.add(Cell(cell_ID=cell_id, lineage_ID=original_lin_id))
                         self._added_cells.add(Cell(cell_ID=cell_id, lineage_ID=new_lin_ID))
+                    # Track all edges moving to the new lineage.
+                    for source, target in split_lin.edges():
+                        self._removed_links.add(
+                            Link(
+                                source_cell_ID=source,
+                                target_cell_ID=target,
+                                lineage_ID=original_lin_id,
+                            )
+                        )
+                        self._added_links.add(
+                            Link(
+                                source_cell_ID=source,
+                                target_cell_ID=target,
+                                lineage_ID=new_lin_ID,
+                            )
+                        )
                     split_lin.graph["lineage_ID"] = new_lin_ID
                     data.cell_data[new_lin_ID] = split_lin
                     self._added_lineages.add(new_lin_ID)
@@ -243,28 +260,51 @@ class ModelUpdater:
                 if self._calculators[prop].prop.lin_type == "CellLineage"
             ]
 
-        # Recompute the properties as needed.
         lins_to_process = (self._added_lineages | self._modified_lineages) - self._removed_lineages
+        print(lins_to_process)
+
+        # Prepare the list of nodes to process.
         nodes_to_process = [
             cell
             for cell in self._added_cells - self._removed_cells
             if cell.lineage_ID in lins_to_process
         ]
-        print(lins_to_process)
+        # Also include existing nodes in modified lineages that weren't explicitly added/removed.
+        for lin_ID in self._modified_lineages - self._removed_lineages:
+            if lin_ID in data.cell_data:
+                for cell_id in data.cell_data[lin_ID].nodes():
+                    cell = Cell(cell_ID=cell_id, lineage_ID=lin_ID)
+                    if cell not in self._removed_cells:
+                        nodes_to_process.append(cell)
+        # Remove duplicates.
+        nodes_to_process = list(set(nodes_to_process))
         print(nodes_to_process)
         for lin in lins_to_process:
             print(data.cell_data[lin].nodes())
 
+        # Prepare the list of edges to process.
+        edges_to_process = list(self._added_links - self._removed_links)
+        # Also include existing edges in modified lineages.
+        for lin_ID in self._modified_lineages - self._removed_lineages:
+            if lin_ID in data.cell_data:
+                for source, target in data.cell_data[lin_ID].edges():
+                    link = Link(source_cell_ID=source, target_cell_ID=target, lineage_ID=lin_ID)
+                    if link not in self._removed_links:
+                        edges_to_process.append(link)
+        # Remove duplicates.
+        edges_to_process = list(set(edges_to_process))
+
         print("RIGHT BEFORE ENRICH:")
         self._print_state()
         print()
+        # Recompute the properties as needed.
         for calc in cell_calculators:
             # Depending on the class of the calculator, a different version of
             # the enrich() method is called.
             calc.enrich(
                 data,
                 nodes_to_enrich=nodes_to_process,  # self._added_cells,
-                edges_to_enrich=self._added_links,
+                edges_to_enrich=edges_to_process,  # self._added_links,
                 lineages_to_enrich=lins_to_process,  # self._added_lineages | self._modified_lineages
             )
 
