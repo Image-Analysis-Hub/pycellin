@@ -133,9 +133,6 @@ class ModelUpdater:
         first, then update, then add the cell properties and update again.
         """
         # TODO: refactor, this method is too long and does too many things.
-        print("AT START:")
-        self._print_state()
-        print()
 
         # Remove empty lineages.
         for lin_ID in (self._added_lineages | self._modified_lineages) - self._removed_lineages:
@@ -146,14 +143,9 @@ class ModelUpdater:
         for lin_ID in self._removed_lineages:
             if lin_ID in data.cell_data:
                 del data.cell_data[lin_ID]
-        print("AFTER REMOVE EMPTY LINEAGES:")
-        self._print_state()
-        print()
 
         # Split lineages with several unconnected components.
         lineages = list(data.cell_data.values())
-        for lin in lineages:
-            print(lin.graph["lineage_ID"])
         for lin in lineages:
             splitted_lins = [
                 CellLineage(lin.subgraph(c).copy()) for c in nx.weakly_connected_components(lin)
@@ -169,19 +161,11 @@ class ModelUpdater:
             for lin in splitted_lins:
                 if len(lin) > len(largest_lin):
                     largest_lin = lin
-
             # We replace it in the data, otherwise the unsplitted lineage
             # will be kept.
             data.cell_data[largest_lin.graph["lineage_ID"]] = largest_lin
             self._modified_lineages.add(largest_lin.graph["lineage_ID"])
             splitted_lins.remove(largest_lin)
-            print("IN SPLIT LINEAGES:")
-            self._print_state()
-            print()
-            for split_lin in splitted_lins:
-                print(split_lin)
-                print(split_lin.nodes())
-            print()
 
             # The other lineages are considered as new lineages.
             for split_lin in splitted_lins:
@@ -243,9 +227,6 @@ class ModelUpdater:
                     split_lin.graph["lineage_ID"] = new_lin_ID
                     data.cell_data[new_lin_ID] = split_lin
                     self._added_lineages.add(new_lin_ID)
-        print("AFTER SPLIT LINEAGES:")
-        self._print_state()
-        print()
 
         # Update cell lineage properties.
         # TODO: Deal with property dependencies. See comments in __init__.
@@ -261,7 +242,6 @@ class ModelUpdater:
             ]
 
         lins_to_process = (self._added_lineages | self._modified_lineages) - self._removed_lineages
-        print(lins_to_process)
 
         # Prepare the list of nodes to process.
         nodes_to_process = [
@@ -278,9 +258,6 @@ class ModelUpdater:
                         nodes_to_process.append(cell)
         # Remove duplicates.
         nodes_to_process = list(set(nodes_to_process))
-        print(nodes_to_process)
-        for lin in lins_to_process:
-            print(data.cell_data[lin].nodes())
 
         # Prepare the list of edges to process.
         edges_to_process = list(self._added_links - self._removed_links)
@@ -294,9 +271,6 @@ class ModelUpdater:
         # Remove duplicates.
         edges_to_process = list(set(edges_to_process))
 
-        print("RIGHT BEFORE ENRICH:")
-        self._print_state()
-        print()
         # Recompute the properties as needed.
         for calc in cell_calculators:
             # Depending on the class of the calculator, a different version of
