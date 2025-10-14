@@ -23,7 +23,7 @@ class Data:
         The cycle lineages stored, if any.
     """
 
-    def __init__(self, cell_data: dict[int, CellLineage], add_cycle_data: bool = False) -> None:
+    def __init__(self, cell_data: dict[int, CellLineage]) -> None:
         """
         Initialize a Data object.
 
@@ -35,10 +35,7 @@ class Data:
             Whether to compute and store the cycle lineages, by default False.
         """
         self.cell_data = cell_data
-        if add_cycle_data:
-            self._add_cycle_lineages()
-        else:
-            self.cycle_data = None  # type: dict[int, CycleLineage] | None
+        self.cycle_data: dict[int, CycleLineage] | None = None
 
     def __deepcopy__(self, memo) -> "Data":
         """
@@ -93,7 +90,8 @@ class Data:
         Parameters
         ----------
         time_prop : str
-            The name of the time property to use for cycle lineage computation.
+            The name of the time property to use for computation
+            of cycle lineage properties.
         time_step : int | float
             The time step between two consecutive time points.
         lids : list[int], optional
