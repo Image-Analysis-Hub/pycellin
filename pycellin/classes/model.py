@@ -791,6 +791,9 @@ class Model:
         This way, lineage IDs of previously deleted lineages are not reused.
         This avoids potential confusion or errors in lineage handling.
 
+        The returned lineage ID cannot be 0 in case the user wants to reserve
+        it for special purposes.
+
         Positive lineage IDs should be used for lineages with more than one cell.
         Negative lineage IDs should be used for lineages with a single cell,
         and are equal to the negative of the cell ID.
