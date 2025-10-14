@@ -768,17 +768,34 @@ class Model:
             list(self.data.cycle_data.values()), lin_prop, lin_prop_value
         )
 
-    def get_next_available_lineage_ID(self) -> int:
+    def get_next_available_lineage_ID(self, positive: bool = True) -> int:
         """
-        Return the next available lineage ID.
+        Return the next available lineage ID, positive by default.
+
+        Parameters
+        ----------
+        positive : bool, optional
+            True to return a positive lineage ID,
+            False to return a negative lineage ID (default is True).
 
         Returns
         -------
         int
             The next available lineage ID.
+
+        Notes
+        -----
+        Next available lineage IDs are determined by finding the maximum
+        (for positive IDs) or minimum (for negative IDs) existing lineage ID
+        in the model and incrementing or decrementing it by one, respectively.
+        This way, lineage IDs of previously deleted lineages are not reused.
+        This avoids potential confusion or errors in lineage handling.
+
+        Positive lineage IDs should be used for lineages with more than one cell.
+        Negative lineage IDs should be used for lineages with a single cell,
+        and are equal to the negative of the cell ID.
         """
-        # TODO: maybe should check for unused IDs
-        return max(self.data.cell_data.keys()) + 1
+        return self.data._get_next_available_lineage_ID(positive)
 
     def has_property(
         self,

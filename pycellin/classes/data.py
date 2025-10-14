@@ -189,6 +189,47 @@ class Data:
                 warnings.warn(msg)
         return len(self.cell_data)
 
+    def _get_next_available_lineage_ID(self, positive: bool) -> int:
+        """
+        Return the next available lineage ID, either positive or negative.
+
+        Parameters
+        ----------
+        positive : bool, optional
+            True to return a positive lineage ID,
+            False to return a negative lineage ID.
+
+        Returns
+        -------
+        int
+            The next available lineage ID.
+
+        Notes
+        -----
+        Next available lineage IDs are determined by finding the maximum
+        (for positive IDs) or minimum (for negative IDs) existing lineage ID
+        in the model and incrementing or decrementing it by one, respectively.
+        This way, lineage IDs of previously deleted lineages are not reused.
+        This avoids potential confusion or errors in lineage handling.
+
+        Positive lineage IDs should be used for lineages with more than one cell.
+        Negative lineage IDs should be used for lineages with a single cell,
+        and are equal to the negative of the cell ID.
+        """
+        new_lin_id: int
+        if len(self.cell_data) == 0:
+            new_lin_id = 1 if positive else -1
+        else:
+            if positive:
+                new_lin_id = max(self.cell_data.keys()) + 1
+                if new_lin_id < 1:
+                    new_lin_id = 1
+            else:
+                new_lin_id = min(self.cell_data.keys()) - 1
+                if new_lin_id > -1:
+                    new_lin_id = -1
+        return new_lin_id
+
     def get_closest_cell(
         self,
         nid: int,

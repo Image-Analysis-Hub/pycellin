@@ -174,8 +174,10 @@ class ModelUpdater:
                     original_cell_id = list(split_lin.nodes())[0]
                     new_lin_ID = -original_cell_id
                     if new_lin_ID in data.cell_data:
-                        # ID is already taken, so we change the ID of the node.
-                        new_cell_ID = max(data.cell_data.keys()) + 1
+                        # ID is already taken, so we get a new one based on the
+                        # next available lineage ID. We want a negative lineage ID
+                        # since it is a one-cell lineage.
+                        new_cell_ID = -data._get_next_available_lineage_ID(positive=False)
                         cell_props = split_lin._remove_cell(original_cell_id)
                         time_value = cell_props.pop(time_prop)
                         assert len(split_lin) == 0
@@ -203,7 +205,7 @@ class ModelUpdater:
                         data.cell_data[new_lin_ID] = split_lin
                         self._added_lineages.add(new_lin_ID)
                 else:
-                    new_lin_ID = max(data.cell_data.keys()) + 1
+                    new_lin_ID = data._get_next_available_lineage_ID(positive=True)
                     # Track all cells moving to the new lineage.
                     for cell_id in split_lin.nodes():
                         self._removed_cells.add(Cell(cell_ID=cell_id, lineage_ID=original_lin_id))
