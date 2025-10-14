@@ -67,7 +67,11 @@ def prop_cell_lin():
 @pytest.fixture
 def cycle_lin(cell_lin):
     # Nothing special, just a lineage.
-    lineage = CycleLineage(cell_lin)
+    lineage = CycleLineage(
+        time_prop="frame",
+        time_step=1,
+        cell_lineage=cell_lin,
+    )
     return lineage
 
 
@@ -250,7 +254,8 @@ def test_division_time_gap(cell_lin, prop_cell_lin):
 def test_division_time_cycle_lin_default_time_step(cell_lin, prop_cycle_lin):
     """Test DivisionTime with CycleLineage and default time step."""
     calculator = DivisionTime(prop_cycle_lin)
-    data = Data({1: cell_lin}, add_cycle_data=True)
+    data = Data({1: cell_lin})
+    data._add_cycle_lineages(time_prop="frame", time_step=1)
     cycle_lin = data.cycle_data[1]
     # Complete cell cycles.
     assert calculator.compute(data, cycle_lin, nid=4) == 2  # division
@@ -269,7 +274,8 @@ def test_division_time_cycle_lin_default_time_step(cell_lin, prop_cycle_lin):
 def test_division_time_cycle_lin_custom_time_step(cell_lin, prop_cycle_lin):
     """Test DivisionTime with CycleLineage and custom time step."""
     calculator = DivisionTime(prop_cycle_lin, time_step=2.5)
-    data = Data({1: cell_lin}, add_cycle_data=True)
+    data = Data({1: cell_lin})
+    data._add_cycle_lineages(time_prop="frame", time_step=2.5)
     cycle_lin = data.cycle_data[1]
     # Complete cell cycles.
     assert calculator.compute(data, cycle_lin, nid=4) == 5.0  # division
@@ -384,7 +390,8 @@ def test_division_rate_from_division_time(cell_lin, prop_cell_lin):
 def test_division_rate_cycle_lin_default_time_step(cell_lin, prop_cycle_lin):
     """Test DivisionRate with CycleLineage and default time step."""
     calculator = DivisionRate(prop_cycle_lin)
-    data = Data({1: cell_lin}, add_cycle_data=True)
+    data = Data({1: cell_lin})
+    data._add_cycle_lineages(time_prop="frame", time_step=1)
     cycle_lin = data.cycle_data[1]
     # Complete cell cycles.
     assert calculator.compute(data, cycle_lin, nid=4) == 1 / 2  # division
@@ -403,7 +410,8 @@ def test_division_rate_cycle_lin_default_time_step(cell_lin, prop_cycle_lin):
 def test_division_rate_cycle_lin_custom_time_step(cell_lin, prop_cycle_lin):
     """Test DivisionRate with CycleLineage and custom time step."""
     calculator = DivisionRate(prop_cycle_lin, time_step=2.5)
-    data = Data({1: cell_lin}, add_cycle_data=True)
+    data = Data({1: cell_lin})
+    data._add_cycle_lineages(time_prop="frame", time_step=2.5)
     cycle_lin = data.cycle_data[1]
     # Complete cell cycles.
     assert calculator.compute(data, cycle_lin, nid=4) == 1 / 5.0  # division

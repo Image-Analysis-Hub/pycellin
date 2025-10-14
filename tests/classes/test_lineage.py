@@ -28,7 +28,7 @@ def empty_cell_lin():
 @pytest.fixture
 def one_node_cell_lin():
     lineage = CellLineage()
-    lineage.add_node(1, frame=0)
+    lineage.add_node(1, timepoint=0)
     lineage.graph["lineage_ID"] = 1
     return lineage
 
@@ -57,7 +57,7 @@ def cell_lin():
         ]
     )
     for n in lineage.nodes:
-        lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 1, n)
+        lineage.nodes[n]["timepoint"] = nx.shortest_path_length(lineage, 1, n)
         lineage.nodes[n]["cell_ID"] = n
     lineage.graph["lineage_ID"] = 1
     return lineage
@@ -76,7 +76,7 @@ def cell_lin_gap(cell_lin):
 def cell_lin_div_root(cell_lin):
     # The root is a division.
     new_lin = cell_lin.copy()
-    new_lin.add_node(17, frame=1)
+    new_lin.add_node(17, timepoint=1)
     new_lin.add_edge(1, 17)
     return new_lin
 
@@ -99,7 +99,7 @@ def cell_lin_successive_divs_and_root():
         ]
     )
     for n in lineage.nodes:
-        lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 2, n) + 1
+        lineage.nodes[n]["timepoint"] = nx.shortest_path_length(lineage, 2, n) + 1
         lineage.nodes[n]["cell_ID"] = n
     lineage.graph["lineage_ID"] = 2
     return lineage
@@ -109,8 +109,8 @@ def cell_lin_successive_divs_and_root():
 def cell_lin_triple_div(cell_lin):
     # Triple division.
     new_lin = cell_lin.copy()
-    new_lin.add_node(17, frame=4)
-    new_lin.add_node(18, frame=5)
+    new_lin.add_node(17, timepoint=4)
+    new_lin.add_node(18, timepoint=5)
     new_lin.add_edges_from([(4, 17), (17, 18)])
     return new_lin
 
@@ -118,7 +118,7 @@ def cell_lin_triple_div(cell_lin):
 @pytest.fixture
 def cell_lin_unconnected_node(cell_lin):
     new_lin = cell_lin.copy()
-    new_lin.add_node(17, frame=1, cell_ID=17)
+    new_lin.add_node(17, timepoint=1, cell_ID=17)
     new_lin.graph["lineage_ID"] = 2
     return new_lin
 
@@ -126,8 +126,8 @@ def cell_lin_unconnected_node(cell_lin):
 @pytest.fixture
 def cell_lin_unconnected_component(cell_lin):
     new_lin = cell_lin.copy()
-    new_lin.add_node(17, frame=1, cell_ID=17)
-    new_lin.add_node(18, frame=2, cell_ID=18)
+    new_lin.add_node(17, timepoint=1, cell_ID=17)
+    new_lin.add_node(18, timepoint=2, cell_ID=18)
     new_lin.add_edge(17, 18)
     new_lin.graph["lineage_ID"] = 2
     return new_lin
@@ -136,10 +136,10 @@ def cell_lin_unconnected_component(cell_lin):
 @pytest.fixture
 def cell_lin_unconnected_component_div(cell_lin_unconnected_component):
     new_lin = cell_lin_unconnected_component.copy()
-    new_lin.add_node(19, frame=2)
-    new_lin.add_node(20, frame=3)
-    new_lin.add_node(21, frame=4)
-    new_lin.add_node(22, frame=3)
+    new_lin.add_node(19, timepoint=2)
+    new_lin.add_node(20, timepoint=3)
+    new_lin.add_node(21, timepoint=4)
+    new_lin.add_node(22, timepoint=3)
     new_lin.add_edges_from([(17, 19), (19, 20), (20, 21), (19, 22)])
     return new_lin
 
@@ -149,12 +149,12 @@ def cell_lin_unconnected_component_div(cell_lin_unconnected_component):
 
 @pytest.fixture
 def empty_cycle_lin():
-    return CycleLineage()
+    return CycleLineage(time_prop="timepoint", time_step=1)
 
 
 @pytest.fixture
 def one_node_cycle_lin():
-    lineage = CycleLineage()
+    lineage = CycleLineage(time_prop="timepoint", time_step=1)
     lineage.add_node(1, level=0)
     return lineage
 
@@ -162,7 +162,7 @@ def one_node_cycle_lin():
 @pytest.fixture
 def cycle_lin():
     # Nothing special, just a lineage.
-    lineage = CycleLineage()
+    lineage = CycleLineage(time_prop="timepoint", time_step=1)
     lineage.add_edges_from(
         [
             (1, 2),
@@ -188,9 +188,9 @@ def cycle_lin_triple_div(cycle_lin):
 
 
 def test_remove_prop_node(cell_lin):
-    cell_lin._remove_prop("frame", "node")
+    cell_lin._remove_prop("timepoint", "node")
     for node in cell_lin.nodes:
-        assert "frame" not in cell_lin.nodes[node]
+        assert "timepoint" not in cell_lin.nodes[node]
 
 
 def test_remove_prop_edge(cell_lin):
@@ -215,7 +215,7 @@ def test_remove_prop_missing_property(cell_lin):
     # Attempting to remove a property not present in some elements should not raise
     # an error.
     cell_lin.add_edge(16, 17)
-    cell_lin._remove_prop("frame", "node")
+    cell_lin._remove_prop("timepoint", "node")
     cell_lin._remove_prop("name", "edge")
 
 
@@ -462,8 +462,8 @@ def test_get_ancestors_node_ID_error(cell_lin, cycle_lin):
 
 def test_get_ancestors_cannot_order(cell_lin):
     for n in cell_lin.nodes:
-        del cell_lin.nodes[n]["frame"]
-    with pytest.warns(UserWarning, match="No 'frame' property to order the cells."):
+        del cell_lin.nodes[n]["timepoint"]
+    with pytest.warns(UserWarning, match="No 'timepoint' property to order the cells."):
         cell_lin.get_ancestors(16)
 
 
@@ -763,27 +763,27 @@ def test_add_cell_no_no_arg(cell_lin):
     next_id = cell_lin._get_next_available_node_ID()
     assert cell_lin._add_cell() == next_id
     assert cell_lin.nodes[next_id]["cell_ID"] == next_id
-    assert cell_lin.nodes[next_id]["frame"] == 0
+    assert cell_lin.nodes[next_id]["timepoint"] == 0
 
 
 def test_add_cell_with_id(cell_lin):
     assert cell_lin._add_cell(nid=20) == 20
     assert cell_lin.nodes[20]["cell_ID"] == 20
-    assert cell_lin.nodes[20]["frame"] == 0
+    assert cell_lin.nodes[20]["timepoint"] == 0
 
 
 def test_add_cell_with_timepoint(cell_lin):
     next_id = cell_lin._get_next_available_node_ID()
-    assert cell_lin._add_cell(time_prop_name="frame", time_prop_value=5) == next_id
+    assert cell_lin._add_cell(time_prop_name="timepoint", time_prop_value=5) == next_id
     assert cell_lin.nodes[next_id]["cell_ID"] == next_id
-    assert cell_lin.nodes[next_id]["frame"] == 5
+    assert cell_lin.nodes[next_id]["timepoint"] == 5
 
 
 def test_add_cell_with_properties(cell_lin):
     cell_id = 20
     assert cell_lin._add_cell(20, color="red", size=10) == cell_id
     assert cell_lin.nodes[cell_id]["cell_ID"] == cell_id
-    assert cell_lin.nodes[cell_id]["frame"] == 0
+    assert cell_lin.nodes[cell_id]["timepoint"] == 0
     assert cell_lin.nodes[cell_id]["color"] == "red"
     assert cell_lin.nodes[cell_id]["size"] == 10
 
@@ -799,13 +799,13 @@ def test_add_cell_existing_id(cell_lin):
 def test_add_cell_empty_lin(empty_cell_lin):
     assert empty_cell_lin._add_cell() == 0
     assert empty_cell_lin.nodes[0]["cell_ID"] == 0
-    assert empty_cell_lin.nodes[0]["frame"] == 0
+    assert empty_cell_lin.nodes[0]["timepoint"] == 0
 
 
 def test_add_cell_single_node(one_node_cell_lin):
     assert one_node_cell_lin._add_cell() == 2
     assert one_node_cell_lin.nodes[2]["cell_ID"] == 2
-    assert one_node_cell_lin.nodes[2]["frame"] == 0
+    assert one_node_cell_lin.nodes[2]["timepoint"] == 0
 
 
 # _remove_cell() ##############################################################
@@ -880,17 +880,17 @@ def test_remove_cell_unconnected_component_div(cell_lin_unconnected_component_di
 
 def test_add_link_normal_lin(cell_lin):
     # Add a valid link.
-    cell_lin.add_node(17, frame=6, cell_ID=17)
+    cell_lin.add_node(17, timepoint=6, cell_ID=17)
     cell_lin._add_link(6, 17)
     assert cell_lin.has_edge(6, 17)
     assert cell_lin.nodes[17]["cell_ID"] == 17
-    assert cell_lin.nodes[17]["frame"] == 6
+    assert cell_lin.nodes[17]["timepoint"] == 6
     # Add a link that creates a division.
-    cell_lin.add_node(18, frame=1, cell_ID=18)
+    cell_lin.add_node(18, timepoint=1, cell_ID=18)
     cell_lin._add_link(1, 18)
     assert cell_lin.has_edge(1, 18)
     assert cell_lin.nodes[18]["cell_ID"] == 18
-    assert cell_lin.nodes[18]["frame"] == 1
+    assert cell_lin.nodes[18]["timepoint"] == 1
 
 
 def test_add_link_existing_edge(cell_lin):
@@ -920,10 +920,10 @@ def test_add_link_fusion_error(cell_lin):
 
 def test_add_link_time_flow_error(cell_lin):
     # Add a link that violates the flow of time.
-    cell_lin.add_node(17, frame=1, cell_ID=17)
+    cell_lin.add_node(17, timepoint=1, cell_ID=17)
     with pytest.raises(TimeFlowError):
         cell_lin._add_link(6, 17)
-    cell_lin.add_node(18, frame=0, cell_ID=18)
+    cell_lin.add_node(18, timepoint=0, cell_ID=18)
     with pytest.raises(TimeFlowError):
         cell_lin._add_link(1, 18)
 
@@ -931,14 +931,14 @@ def test_add_link_time_flow_error(cell_lin):
 def test_add_link_different_lineages(cell_lin):
     # Add a link between different lineages.
     new_lin = CellLineage(lid=2)
-    new_lin.add_node(19, frame=1, cell_ID=19)
-    new_lin.add_node(20, frame=2, cell_ID=20)
-    new_lin.add_node(21, frame=3, cell_ID=21)
+    new_lin.add_node(19, timepoint=1, cell_ID=19)
+    new_lin.add_node(20, timepoint=2, cell_ID=20)
+    new_lin.add_node(21, timepoint=3, cell_ID=21)
     new_lin.add_edges_from([(19, 20), (20, 21)])
     cell_lin._add_link(1, 19, target_lineage=new_lin)
     assert cell_lin.has_node(19)
     assert cell_lin.nodes[19]["cell_ID"] == 19
-    assert cell_lin.nodes[19]["frame"] == 1
+    assert cell_lin.nodes[19]["timepoint"] == 1
     assert cell_lin.has_edge(1, 19)
     assert cell_lin.has_node(20)
     assert cell_lin.has_node(21)
@@ -951,7 +951,7 @@ def test_add_link_different_lineages_unconnected_node(cell_lin, cell_lin_unconne
     assert cell_lin.has_node(17)
     assert cell_lin.has_edge(1, 17)
     assert cell_lin.nodes[17]["cell_ID"] == 17
-    assert cell_lin.nodes[17]["frame"] == 1
+    assert cell_lin.nodes[17]["timepoint"] == 1
     assert not cell_lin_unconnected_node.has_node(17)
 
 
@@ -965,9 +965,9 @@ def test_add_link_different_lineages_unconnected_component(
     assert cell_lin.has_edge(1, 17)
     assert cell_lin.has_edge(17, 18)
     assert cell_lin.nodes[17]["cell_ID"] == 17
-    assert cell_lin.nodes[17]["frame"] == 1
+    assert cell_lin.nodes[17]["timepoint"] == 1
     assert cell_lin.nodes[18]["cell_ID"] == 18
-    assert cell_lin.nodes[18]["frame"] == 2
+    assert cell_lin.nodes[18]["timepoint"] == 2
     assert not cell_lin_unconnected_component.has_node(17)
     assert not cell_lin_unconnected_component.has_node(18)
 
@@ -975,7 +975,7 @@ def test_add_link_different_lineages_unconnected_component(
 def test_add_link_conflicting_ID(cell_lin):
     # Add a link between different lineages with a conflicting ID.
     new_lin = CellLineage(lid=2)
-    new_lin.add_node(5, frame=1, cell_ID=5)
+    new_lin.add_node(5, timepoint=1, cell_ID=5)
     IDs_mapping = cell_lin._add_link(1, 5, target_lineage=new_lin)
     assert IDs_mapping == {5: 17}
     # Cell 5 is removed from the target lineage.
@@ -985,11 +985,11 @@ def test_add_link_conflicting_ID(cell_lin):
     assert cell_lin.has_node(17)
     assert cell_lin.has_edge(1, 17)
     assert cell_lin.nodes[17]["cell_ID"] == 17
-    assert cell_lin.nodes[17]["frame"] == 1
+    assert cell_lin.nodes[17]["timepoint"] == 1
     # Cell 5 is untouched.
     assert cell_lin.has_node(5)
     assert cell_lin.nodes[5]["cell_ID"] == 5
-    assert cell_lin.nodes[5]["frame"] == 4
+    assert cell_lin.nodes[5]["timepoint"] == 4
 
 
 def test_add_link_conflicting_IDs(cell_lin, cell_lin_successive_divs_and_root):
@@ -1011,19 +1011,19 @@ def test_add_link_conflicting_IDs(cell_lin, cell_lin_successive_divs_and_root):
     # Cells are added with the new edges.
     assert cell_lin.has_edge(1, 17)
     assert cell_lin.nodes[17]["cell_ID"] == 17
-    assert cell_lin.nodes[17]["frame"] == 1
+    assert cell_lin.nodes[17]["timepoint"] == 1
     assert cell_lin.has_edge(17, 18)
     assert cell_lin.nodes[18]["cell_ID"] == 18
-    assert cell_lin.nodes[18]["frame"] == 2
+    assert cell_lin.nodes[18]["timepoint"] == 2
     # Cells are untouched.
     assert cell_lin.has_node(2)
     assert cell_lin.nodes[2]["cell_ID"] == 2
-    assert cell_lin.nodes[2]["frame"] == 1
+    assert cell_lin.nodes[2]["timepoint"] == 1
 
 
 def test_add_link_same_IDs(cell_lin):
     new_lin = CellLineage(lid=2)
-    new_lin.add_node(1, frame=1, cell_ID=1)
+    new_lin.add_node(1, timepoint=1, cell_ID=1)
     IDs_mapping = cell_lin._add_link(1, 1, new_lin)
     assert IDs_mapping == {1: 17}
     # Cell 1 is removed from the target lineage.
@@ -1033,11 +1033,11 @@ def test_add_link_same_IDs(cell_lin):
     assert cell_lin.has_node(17)
     assert cell_lin.has_edge(1, 17)
     assert cell_lin.nodes[17]["cell_ID"] == 17
-    assert cell_lin.nodes[17]["frame"] == 1
+    assert cell_lin.nodes[17]["timepoint"] == 1
     # Cell 1 is untouched.
     assert cell_lin.has_node(1)
     assert cell_lin.nodes[1]["cell_ID"] == 1
-    assert cell_lin.nodes[1]["frame"] == 0
+    assert cell_lin.nodes[1]["timepoint"] == 0
 
 
 # _remove_link() ##############################################################
@@ -1824,7 +1824,7 @@ def test_is_division_unconnected_component_div(cell_lin_unconnected_component_di
 
 
 def test_cycle_lineage_normal_lin(cell_lin):
-    cycle_lin = CycleLineage(cell_lin)
+    cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin)
     assert sorted(list(cycle_lin.nodes())) == [2, 4, 6, 8, 9, 10, 14, 15, 16]
     assert cycle_lin.graph["lineage_ID"] == 1
     assert cycle_lin.nodes[2]["cycle_ID"] == 2
@@ -1842,13 +1842,13 @@ def test_cycle_lineage_normal_lin(cell_lin):
 
 
 def test_cycle_lineage_empty_lin(empty_cell_lin):
-    cycle_lin = CycleLineage(empty_cell_lin)
+    cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=empty_cell_lin)
     assert len(cycle_lin) == 0
     assert cycle_lin.graph["lineage_ID"] == 1
 
 
 def test_cycle_lineage_single_node(one_node_cell_lin):
-    cycle_lin = CycleLineage(one_node_cell_lin)
+    cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=one_node_cell_lin)
     assert len(cycle_lin) == 1
     assert cycle_lin.graph["lineage_ID"] == 1
     assert cycle_lin.nodes[1]["cycle_ID"] == 1
@@ -1858,7 +1858,7 @@ def test_cycle_lineage_single_node(one_node_cell_lin):
 
 
 def test_cycle_lineage_gap(cell_lin_gap):
-    cycle_lin = CycleLineage(cell_lin_gap)
+    cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin_gap)
     assert sorted(list(cycle_lin.nodes())) == [2, 4, 6, 8, 9, 10, 14, 15, 16]
     assert cycle_lin.graph["lineage_ID"] == 1
     assert cycle_lin.nodes[2]["cycle_ID"] == 2
@@ -1876,7 +1876,7 @@ def test_cycle_lineage_gap(cell_lin_gap):
 
 
 def test_cycle_lineage_div_root(cell_lin_div_root):
-    cycle_lin = CycleLineage(cell_lin_div_root)
+    cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin_div_root)
     assert sorted(list(cycle_lin.nodes())) == [1, 2, 4, 6, 8, 9, 10, 14, 15, 16, 17]
     assert cycle_lin.graph["lineage_ID"] == 1
     assert cycle_lin.nodes[1]["cycle_ID"] == 1
@@ -1890,7 +1890,9 @@ def test_cycle_lineage_div_root(cell_lin_div_root):
 
 
 def test_cycle_lineage_successive_divs_and_root(cell_lin_successive_divs_and_root):
-    cycle_lin = CycleLineage(cell_lin_successive_divs_and_root)
+    cycle_lin = CycleLineage(
+        time_prop="timepoint", time_step=1, cell_lineage=cell_lin_successive_divs_and_root
+    )
     assert sorted(list(cycle_lin.nodes())) == [2, 3, 5, 6, 7, 8, 9, 10, 11]
     assert cycle_lin.graph["lineage_ID"] == 2
     assert cycle_lin.nodes[3]["cycle_ID"] == 3
@@ -1904,7 +1906,7 @@ def test_cycle_lineage_successive_divs_and_root(cell_lin_successive_divs_and_roo
 
 
 def test_cycle_lineage_triple_div(cell_lin_triple_div):
-    cycle_lin = CycleLineage(cell_lin_triple_div)
+    cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin_triple_div)
     assert sorted(list(cycle_lin.nodes())) == [2, 4, 6, 8, 9, 10, 14, 15, 16, 18]
     assert cycle_lin.graph["lineage_ID"] == 1
     assert cycle_lin.nodes[4]["cycle_ID"] == 4
@@ -1919,12 +1921,14 @@ def test_cycle_lineage_triple_div(cell_lin_triple_div):
 
 def test_cycle_lineage_unconnected_node(cell_lin_unconnected_node):
     with pytest.raises(LineageStructureError):
-        CycleLineage(cell_lin_unconnected_node)
+        CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin_unconnected_node)
 
 
 def test_cycle_lineage_unconnected_component(cell_lin_unconnected_component):
     with pytest.raises(LineageStructureError):
-        CycleLineage(cell_lin_unconnected_component)
+        CycleLineage(
+            time_prop="timepoint", time_step=1, cell_lineage=cell_lin_unconnected_component
+        )
 
 
 # get_ancestors() #############################################################
@@ -1947,7 +1951,7 @@ def test_get_ancestors_cannot_order_cycle(cycle_lin):
 
 
 def test_get_edges_within_cycle_normal_lin(cell_lin):
-    cycle_lin = CycleLineage(cell_lin)
+    cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin)
     # From division.
     assert cycle_lin.get_links_within_cycle(2) == [(1, 2)]
     assert cycle_lin.get_links_within_cycle(4) == [(3, 4)]
@@ -1960,12 +1964,12 @@ def test_get_edges_within_cycle_normal_lin(cell_lin):
 
 
 def test_get_edges_within_cycle_single_node(one_node_cell_lin):
-    cycle_lin = CycleLineage(one_node_cell_lin)
+    cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=one_node_cell_lin)
     assert cycle_lin.get_links_within_cycle(1) == []
 
 
 def test_get_edges_within_cycle_gap(cell_lin_gap):
-    cycle_lin = CycleLineage(cell_lin_gap)
+    cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin_gap)
     # From division.
     assert cycle_lin.get_links_within_cycle(2) == [(1, 2)]
     assert cycle_lin.get_links_within_cycle(4) == [(3, 4)]
@@ -1978,7 +1982,7 @@ def test_get_edges_within_cycle_gap(cell_lin_gap):
 
 
 def test_get_edges_within_cycle_div_root(cell_lin_div_root):
-    cycle_lin = CycleLineage(cell_lin_div_root)
+    cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin_div_root)
     assert cycle_lin.get_links_within_cycle(1) == []
     assert cycle_lin.get_links_within_cycle(2) == []
     assert cycle_lin.get_links_within_cycle(17) == []
@@ -1987,7 +1991,9 @@ def test_get_edges_within_cycle_div_root(cell_lin_div_root):
 def test_get_edges_within_cycle_successive_divs_and_root(
     cell_lin_successive_divs_and_root,
 ):
-    cycle_lin = CycleLineage(cell_lin_successive_divs_and_root)
+    cycle_lin = CycleLineage(
+        time_prop="timepoint", time_step=1, cell_lineage=cell_lin_successive_divs_and_root
+    )
     assert cycle_lin.get_links_within_cycle(2) == []
     assert cycle_lin.get_links_within_cycle(3) == []
     assert cycle_lin.get_links_within_cycle(5) == [(4, 5)]
@@ -1998,7 +2004,7 @@ def test_get_edges_within_cycle_successive_divs_and_root(
 
 
 def test_get_edges_within_cycle_triple_div(cell_lin_triple_div):
-    cycle_lin = CycleLineage(cell_lin_triple_div)
+    cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin_triple_div)
     assert cycle_lin.get_links_within_cycle(4) == [(3, 4)]
     assert cycle_lin.get_links_within_cycle(6) == [(5, 6)]
     assert cycle_lin.get_links_within_cycle(8) == [(7, 8)]
