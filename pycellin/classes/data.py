@@ -66,7 +66,7 @@ class Data:
                 for lid, cycle_lineage in self.cycle_data.items()
             }
 
-        new_data = Data(cell_data_copy, add_cycle_data=False)
+        new_data = Data(cell_data_copy)
         new_data.cycle_data = cycle_data_copy
 
         return new_data
