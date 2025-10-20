@@ -185,7 +185,9 @@ def cycle_lin_triple_div(cycle_lin):
     return cycle_lin
 
 
-# Test Classes ###############################################################
+# Test classes ###############################################################
+
+# Base Lineage functionality
 
 
 class TestLineageRemoveProp:
@@ -265,7 +267,10 @@ class TestLineageGetRoot:
     def test_unconnected_component(self, cell_lin_unconnected_component):
         """Test get_root on lineage with unconnected component."""
         assert cell_lin_unconnected_component.get_root() == [1, 17]
-        assert cell_lin_unconnected_component.get_root(ignore_lone_nodes=True) == [1, 17]
+        assert cell_lin_unconnected_component.get_root(ignore_lone_nodes=True) == [
+            1,
+            17,
+        ]
 
 
 class TestLineageGetLeaves:
@@ -468,7 +473,9 @@ class TestLineageGetAncestors:
         """Test get_ancestors issues warning when nodes cannot be ordered."""
         for n in cell_lin.nodes:
             del cell_lin.nodes[n]["timepoint"]
-        with pytest.warns(UserWarning, match="No 'timepoint' property to order the cells."):
+        with pytest.warns(
+            UserWarning, match="No 'timepoint' property to order the cells."
+        ):
             cell_lin.get_ancestors(16)
 
 
@@ -736,6 +743,9 @@ class TestLineageGetFusions:
         assert cell_lin_unconnected_component.get_fusions() == [20]
 
 
+# CellLineage-specific basic operations
+
+
 class TestCellLineageGetNextAvailableNodeID:
     """Test cases for CellLineage._get_next_available_node_ID method."""
 
@@ -783,7 +793,9 @@ class TestCellLineageAddCell:
     def test_with_timepoint(self, cell_lin):
         """Test _add_cell with specific timepoint."""
         next_id = cell_lin._get_next_available_node_ID()
-        assert cell_lin._add_cell(time_prop_name="timepoint", time_prop_value=5) == next_id
+        assert (
+            cell_lin._add_cell(time_prop_name="timepoint", time_prop_value=5) == next_id
+        )
         assert cell_lin.nodes[next_id]["cell_ID"] == next_id
         assert cell_lin.nodes[next_id]["timepoint"] == 5
 
@@ -950,7 +962,9 @@ class TestCellLineageAddLink:
         assert cell_lin.has_node(21)
         assert len(new_lin.nodes) == 0
 
-    def test_different_lineages_unconnected_node(self, cell_lin, cell_lin_unconnected_node):
+    def test_different_lineages_unconnected_node(
+        self, cell_lin, cell_lin_unconnected_node
+    ):
         """Test _add_link between a lineage and an unconnected node of another lineage."""
         cell_lin._add_link(1, 17, target_lineage=cell_lin_unconnected_node)
         assert cell_lin.has_node(17)
@@ -1111,6 +1125,9 @@ class TestCellLineageRemoveLink:
         self.check_correct_link_removal(cell_lin_unconnected_component_div, 19, 22)
 
 
+# CellLineage advanced operations
+
+
 class TestCellLineageSplitFromCell:
     """Test cases for CellLineage.split_from_cell method."""
 
@@ -1219,7 +1236,9 @@ class TestCellLineageSplitFromCell:
 
     def test_downstream_unconnected_component(self, cell_lin_unconnected_component):
         """Test split downstream from a node in an unconnected component."""
-        new_lin = cell_lin_unconnected_component._split_from_cell(17, split="downstream")
+        new_lin = cell_lin_unconnected_component._split_from_cell(
+            17, split="downstream"
+        )
         assert sorted(new_lin.nodes()) == [18]
         assert sorted(cell_lin_unconnected_component.nodes()) == list(range(1, 18))
 
@@ -1253,7 +1272,11 @@ class TestCellLineageGetDivisions:
     def test_gap(self, cell_lin_gap):
         """Test get_divisions on lineage with gaps."""
         assert sorted(cell_lin_gap.get_divisions()) == [2, 4, 8, 14]
-        assert sorted(cell_lin_gap.get_divisions([1, 2, 3, 4, 6, 8, 9, 10])) == [2, 4, 8]
+        assert sorted(cell_lin_gap.get_divisions([1, 2, 3, 4, 6, 8, 9, 10])) == [
+            2,
+            4,
+            8,
+        ]
         assert sorted(cell_lin_gap.get_divisions([1, 2, 3, 4])) == [2, 4]
         assert sorted(cell_lin_gap.get_divisions([4])) == [4]
         assert sorted(cell_lin_gap.get_divisions([1, 3, 11, 15, 16])) == []
@@ -1307,6 +1330,9 @@ class TestCellLineageGetDivisions:
         assert sorted(lin.get_divisions([17])) == [17]
         assert sorted(lin.get_divisions([19])) == [19]
         assert sorted(lin.get_divisions([20, 21, 22])) == []
+
+
+# CellLineage cell cycle operations
 
 
 class TestCellLineageGetCellCycle:
@@ -1475,7 +1501,9 @@ class TestCellLineageGetCellCycles:
         # Remove incomplete cycles.
         incomplete = [[1], [5, 6], [9], [10], [15], [16], [17]]
         expected = [cycle for cycle in expected if cycle not in incomplete]
-        assert cell_lin_div_root.get_cell_cycles(ignore_incomplete_cycles=True) == expected
+        assert (
+            cell_lin_div_root.get_cell_cycles(ignore_incomplete_cycles=True) == expected
+        )
 
     def test_successive_divs_and_root(self, cell_lin_successive_divs_and_root):
         """Test get_cell_cycles on lineage with successive divisions and division root."""
@@ -1794,12 +1822,17 @@ class TestCellLineageIsDivision:
         assert not cell_lin_unconnected_component_div.is_division(22)
 
 
+# CycleLineage operations
+
+
 class TestCycleLineageInit:
     """Test cases for CycleLineage.__init__ method."""
 
     def test_normal_lin(self, cell_lin):
         """Test CycleLineage creation on normal lineage."""
-        cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin)
+        cycle_lin = CycleLineage(
+            time_prop="timepoint", time_step=1, cell_lineage=cell_lin
+        )
         assert sorted(list(cycle_lin.nodes())) == [2, 4, 6, 8, 9, 10, 14, 15, 16]
         assert cycle_lin.graph["lineage_ID"] == 1
         assert cycle_lin.nodes[2]["cycle_ID"] == 2
@@ -1817,13 +1850,17 @@ class TestCycleLineageInit:
 
     def test_empty_lin(self, empty_cell_lin):
         """Test CycleLineage creation on empty lineage."""
-        cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=empty_cell_lin)
+        cycle_lin = CycleLineage(
+            time_prop="timepoint", time_step=1, cell_lineage=empty_cell_lin
+        )
         assert len(cycle_lin) == 0
         assert cycle_lin.graph["lineage_ID"] == 1
 
     def test_single_node(self, one_node_cell_lin):
         """Test CycleLineage creation on single node lineage."""
-        cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=one_node_cell_lin)
+        cycle_lin = CycleLineage(
+            time_prop="timepoint", time_step=1, cell_lineage=one_node_cell_lin
+        )
         assert len(cycle_lin) == 1
         assert cycle_lin.graph["lineage_ID"] == 1
         assert cycle_lin.nodes[1]["cycle_ID"] == 1
@@ -1833,7 +1870,9 @@ class TestCycleLineageInit:
 
     def test_gap(self, cell_lin_gap):
         """Test CycleLineage creation on lineage with gaps."""
-        cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin_gap)
+        cycle_lin = CycleLineage(
+            time_prop="timepoint", time_step=1, cell_lineage=cell_lin_gap
+        )
         assert sorted(list(cycle_lin.nodes())) == [2, 4, 6, 8, 9, 10, 14, 15, 16]
         assert cycle_lin.graph["lineage_ID"] == 1
         assert cycle_lin.nodes[2]["cycle_ID"] == 2
@@ -1851,7 +1890,9 @@ class TestCycleLineageInit:
 
     def test_div_root(self, cell_lin_div_root):
         """Test CycleLineage creation on lineage with division root."""
-        cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin_div_root)
+        cycle_lin = CycleLineage(
+            time_prop="timepoint", time_step=1, cell_lineage=cell_lin_div_root
+        )
         assert sorted(list(cycle_lin.nodes())) == [1, 2, 4, 6, 8, 9, 10, 14, 15, 16, 17]
         assert cycle_lin.graph["lineage_ID"] == 1
         assert cycle_lin.nodes[1]["cycle_ID"] == 1
@@ -1866,7 +1907,9 @@ class TestCycleLineageInit:
     def test_successive_divs_and_root(self, cell_lin_successive_divs_and_root):
         """Test CycleLineage creation on lineage with successive divisions and division root."""
         cycle_lin = CycleLineage(
-            time_prop="timepoint", time_step=1, cell_lineage=cell_lin_successive_divs_and_root
+            time_prop="timepoint",
+            time_step=1,
+            cell_lineage=cell_lin_successive_divs_and_root,
         )
         assert sorted(list(cycle_lin.nodes())) == [2, 3, 5, 6, 7, 8, 9, 10, 11]
         assert cycle_lin.graph["lineage_ID"] == 2
@@ -1898,13 +1941,19 @@ class TestCycleLineageInit:
     def test_unconnected_node(self, cell_lin_unconnected_node):
         """Test CycleLineage creation on lineage with unconnected node."""
         with pytest.raises(LineageStructureError):
-            CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin_unconnected_node)
+            CycleLineage(
+                time_prop="timepoint",
+                time_step=1,
+                cell_lineage=cell_lin_unconnected_node,
+            )
 
     def test_unconnected_component(self, cell_lin_unconnected_component):
         """Test CycleLineage creation on lineage with unconnected component."""
         with pytest.raises(LineageStructureError):
             CycleLineage(
-                time_prop="timepoint", time_step=1, cell_lineage=cell_lin_unconnected_component
+                time_prop="timepoint",
+                time_step=1,
+                cell_lineage=cell_lin_unconnected_component,
             )
 
 
@@ -1930,7 +1979,9 @@ class TestCycleLineageGetEdgesWithinCycle:
 
     def test_normal_lin(self, cell_lin):
         """Test get_edges_within_cycle on normal lineage."""
-        cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin)
+        cycle_lin = CycleLineage(
+            time_prop="timepoint", time_step=1, cell_lineage=cell_lin
+        )
         # From division.
         assert cycle_lin.get_links_within_cycle(2) == [(1, 2)]
         assert cycle_lin.get_links_within_cycle(4) == [(3, 4)]
@@ -1943,12 +1994,16 @@ class TestCycleLineageGetEdgesWithinCycle:
 
     def test_single_node(self, one_node_cell_lin):
         """Test get_edges_within_cycle on single node lineage."""
-        cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=one_node_cell_lin)
+        cycle_lin = CycleLineage(
+            time_prop="timepoint", time_step=1, cell_lineage=one_node_cell_lin
+        )
         assert cycle_lin.get_links_within_cycle(1) == []
 
     def test_gap(self, cell_lin_gap):
         """Test get_edges_within_cycle on lineage with gaps."""
-        cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin_gap)
+        cycle_lin = CycleLineage(
+            time_prop="timepoint", time_step=1, cell_lineage=cell_lin_gap
+        )
         # From division.
         assert cycle_lin.get_links_within_cycle(2) == [(1, 2)]
         assert cycle_lin.get_links_within_cycle(4) == [(3, 4)]
@@ -1961,7 +2016,9 @@ class TestCycleLineageGetEdgesWithinCycle:
 
     def test_div_root(self, cell_lin_div_root):
         """Test get_edges_within_cycle on lineage with division root."""
-        cycle_lin = CycleLineage(time_prop="timepoint", time_step=1, cell_lineage=cell_lin_div_root)
+        cycle_lin = CycleLineage(
+            time_prop="timepoint", time_step=1, cell_lineage=cell_lin_div_root
+        )
         assert cycle_lin.get_links_within_cycle(1) == []
         assert cycle_lin.get_links_within_cycle(2) == []
         assert cycle_lin.get_links_within_cycle(17) == []
@@ -1972,7 +2029,9 @@ class TestCycleLineageGetEdgesWithinCycle:
     ):
         """Test get_edges_within_cycle on lineage with successive divisions and division root."""
         cycle_lin = CycleLineage(
-            time_prop="timepoint", time_step=1, cell_lineage=cell_lin_successive_divs_and_root
+            time_prop="timepoint",
+            time_step=1,
+            cell_lineage=cell_lin_successive_divs_and_root,
         )
         assert cycle_lin.get_links_within_cycle(2) == []
         assert cycle_lin.get_links_within_cycle(3) == []
