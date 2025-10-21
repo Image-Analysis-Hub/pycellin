@@ -1384,6 +1384,8 @@ class Model:
         self,
         unit: Literal["radian", "degree"] = "radian",
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the angle property to the model.
@@ -1397,9 +1399,17 @@ class Model:
             Unit of the angle (default is "radian").
         custom_identifier : str, optional
             New identifier for the property (default is None).
+        custom_name : str, optional
+            New name for the property (default is None). If None,
+            the name will be "absolute age".
+        custom_description : str, optional
+            New description for the property (default is None). If None,
+            the description will be "Age of the cell since the beginning of the lineage".
         """
         prop = motion.create_angle_property(
             custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
             unit=unit,
         )
         self.add_custom_property(motion.Angle(prop, unit))
@@ -1407,6 +1417,8 @@ class Model:
     def add_branch_mean_displacement(
         self,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the branch mean displacement property to the model.
@@ -1418,9 +1430,17 @@ class Model:
         ----------
         custom_identifier : str, optional
             New identifier for the property (default is None).
+        custom_name : str, optional
+            New name for the property (default is None). If None,
+            the name will be "absolute age".
+        custom_description : str, optional
+            New description for the property (default is None). If None,
+            the description will be "Age of the cell since the beginning of the lineage".
         """
         prop = motion.create_branch_mean_displacement_property(
             custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
         self.add_custom_property(motion.BranchMeanDisplacement(prop))
@@ -1429,6 +1449,8 @@ class Model:
         self,
         include_incoming_edge: bool = False,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the branch mean speed property to the model.
@@ -1443,11 +1465,19 @@ class Model:
             Default is False.
         custom_identifier : str, optional
             New identifier for the property (default is None).
+        custom_name : str, optional
+            New name for the property (default is None). If None,
+            the name will be "absolute age".
+        custom_description : str, optional
+            New description for the property (default is None). If None,
+            the description will be "Age of the cell since the beginning of the lineage".
         """
         space_unit = self.model_metadata.space_unit or "pixel"
         time_unit = self.model_metadata.time_unit or "frame"
         prop = motion.create_branch_mean_speed_property(
             custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
             unit=f"{space_unit} / {time_unit}",
         )
         self.add_custom_property(motion.BranchMeanSpeed(prop, include_incoming_edge))
@@ -1455,6 +1485,8 @@ class Model:
     def add_branch_total_displacement(
         self,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the branch displacement property to the model.
@@ -1466,9 +1498,17 @@ class Model:
         ----------
         custom_identifier : str, optional
             New identifier for the property (default is None).
+        custom_name : str, optional
+            New name for the property (default is None). If None,
+            the name will be "absolute age".
+        custom_description : str, optional
+            New description for the property (default is None). If None,
+            the description will be "Age of the cell since the beginning of the lineage".
         """
         prop = motion.create_branch_total_displacement_property(
             custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
         self.add_custom_property(motion.BranchTotalDisplacement(prop))
@@ -1476,6 +1516,8 @@ class Model:
     def add_cycle_completeness(
         self,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the cell cycle completeness property to the model.
@@ -1491,15 +1533,27 @@ class Model:
         ----------
         custom_identifier : str, optional
             New identifier for the property (default is None).
+        custom_name : str, optional
+            New name for the property (default is None). If None,
+            the name will be "absolute age".
+        custom_description : str, optional
+            New description for the property (default is None). If None,
+            the description will be "Age of the cell since the beginning of the lineage".
         """
         prop = tracking.create_cycle_completeness_property(
             custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
         )
         self.add_custom_property(tracking.CycleCompleteness(prop))
+
+    # TODO: update all custom_name and custom_desc docstrings with correct prop
 
     def add_cell_displacement(
         self,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the displacement property to the model.
@@ -1511,9 +1565,17 @@ class Model:
         ----------
         custom_identifier : str, optional
             New identifier for the property (default is None).
+        custom_name : str, optional
+            New name for the property (default is None). If None,
+            the name will be "cell displacement".
+        custom_description : str, optional
+            New description for the property (default is None). If None,
+            the description will be "Age of the cell since the beginning of the lineage".
         """
         prop = motion.create_cell_displacement_property(
             custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
         self.add_custom_property(motion.CellDisplacement(prop))
