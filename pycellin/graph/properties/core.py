@@ -146,6 +146,20 @@ def create_cell_coord_property(unit: str, axis: str, provenance: str = "pycellin
     )
 
 
+def _create_generic_cell_coord_property() -> Property:
+    """Fake property for AST discovery of cell coordinates properties."""
+    return Property(
+        identifier="cell_{axis}",
+        name="cell {axis}",
+        description="{axis} coordinate of the cell",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float",
+        unit="space unit",
+    )
+
+
 def create_link_coord_property(unit: str, axis: str, provenance: str = "pycellin") -> Property:
     return Property(
         identifier=f"link_{axis}",
@@ -161,6 +175,20 @@ def create_link_coord_property(unit: str, axis: str, provenance: str = "pycellin
     )
 
 
+def _create_generic_link_coord_property() -> Property:
+    """Fake property for AST discovery of link coordinates properties."""
+    return Property(
+        identifier="link_{axis}",
+        name="link {axis}",
+        description="{axis} coordinate of the link, i.e. mean coordinate of its two cells",
+        provenance="pycellin",
+        prop_type="edge",
+        lin_type="CellLineage",
+        dtype="float",
+        unit="space unit",
+    )
+
+
 def create_lineage_coord_property(unit: str, axis: str, provenance: str = "pycellin") -> Property:
     return Property(
         identifier=f"lineage_{axis}",
@@ -173,6 +201,20 @@ def create_lineage_coord_property(unit: str, axis: str, provenance: str = "pycel
         lin_type="CellLineage",
         dtype="float",
         unit=unit,
+    )
+
+
+def _create_generic_lineage_coord_property() -> Property:
+    """Fake property for AST discovery of lineage coordinates properties."""
+    return Property(
+        identifier="lineage_{axis}",
+        name="lineage {axis}",
+        description="{axis} coordinate of the lineage, i.e. mean coordinate of its cells",
+        provenance="pycellin",
+        prop_type="lineage",
+        lin_type="CellLineage",
+        dtype="float",
+        unit="space unit",
     )
 
 

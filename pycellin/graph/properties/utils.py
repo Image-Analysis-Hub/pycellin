@@ -5,8 +5,6 @@ import ast
 from pathlib import Path
 from typing import Dict, Optional
 
-# TODO: add coordinates properties
-
 
 class PropertyExtractor(ast.NodeVisitor):
     """AST visitor to extract property information from create_xxxxx_property functions."""
@@ -15,8 +13,17 @@ class PropertyExtractor(ast.NodeVisitor):
         self.properties = {}
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        """Visit function definitions looking for create_xxxxx_property pattern."""
-        if node.name.startswith("create_") and node.name.endswith("_property"):
+        """
+        Visit function definitions looking for create_xxxxx_property pattern.
+
+        Parameters
+        ----------
+        node : ast.FunctionDef
+            The AST FunctionDef node representing the function definition.
+        """
+        if (
+            node.name.startswith("create_") or node.name.startswith("_create_")
+        ) and node.name.endswith("_property"):
             for stmt in node.body:
                 if isinstance(stmt, ast.Return) and isinstance(stmt.value, ast.Call):
                     prop_info = self._extract_from_call(stmt.value)
@@ -25,7 +32,19 @@ class PropertyExtractor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def _extract_from_call(self, call: ast.Call) -> Optional[Dict[str, str]]:
-        """Extract property info from Property constructor call."""
+        """
+        Extract property info from Property constructor call.
+
+        Parameters
+        ----------
+        call : ast.Call
+            The AST Call node representing the Property constructor.
+
+        Returns
+        -------
+        Optional[Dict[str, str]]
+            Dictionary with property information if found, else None.
+        """
         is_property = isinstance(call.func, ast.Name) and call.func.id == "Property"
         if not is_property:
             return None
@@ -58,8 +77,8 @@ class PropertyExtractor(ast.NodeVisitor):
         -----
         This method cannot handle f-strings with variables (like f"cell_{axis}")
         since variable values are only known at runtime. Such properties will be
-        skipped during discovery, which is acceptable for dynamically generated
-        coordinate properties.
+        skipped during discovery. To solve this issue, fake properties have been
+        created for cell, link and lineage coordinates in core.py.
         """
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             return node.value
@@ -116,7 +135,7 @@ def _get_pycellin_props_by_lin_type(
     include_core : bool
         Whether to include core properties.
     lin_type_filter : list[str]
-        The lineage type to filter properties by (e.g., 'CellLineage', 'Lineage', etc.)
+        The lineage type to filter properties by ('Lineage', 'CellLineage', 'CycleLineage')
 
     Returns
     -------
@@ -150,9 +169,10 @@ def get_pycellin_cell_lineage_properties(
     Parameters
     ----------
     include_core_properties : bool, optional
-        Whether to include core properties, by default True.
+        Whether to include core properties, i.e. properties automatically computed by pycellin.
+        True by default.
     include_Lineage_properties : bool, optional
-        Whether to include Lineage properties, by default True.
+        Whether to include Lineage properties. True by default.
 
     Returns
     -------
@@ -160,9 +180,7 @@ def get_pycellin_cell_lineage_properties(
         Dictionary of properties of the cell lineages,
         with properties name as keys and properties description as values.
     """
-    lin_types = (
-        ["CellLineage", "Lineage"] if include_Lineage_properties else ["CellLineage"]
-    )
+    lin_types = ["CellLineage", "Lineage"] if include_Lineage_properties else ["CellLineage"]
     props = _get_pycellin_props_by_lin_type(include_core_properties, lin_types)
     return props
 
@@ -179,9 +197,10 @@ def get_pycellin_cycle_lineage_properties(
     Parameters
     ----------
     include_core_properties : bool, optional
-        Whether to include core properties, by default True.
+        Whether to include core properties, i.e. properties automatically computed by pycellin.
+        True by default.
     include_Lineage_properties : bool, optional
-        Whether to include Lineage properties, by default True.
+        Whether to include Lineage properties. True by default.
 
     Returns
     -------
@@ -189,7 +208,5 @@ def get_pycellin_cycle_lineage_properties(
         Dictionary of properties of the cycle lineages,
         with properties name as keys and properties description as values.
     """
-    lin_types = (
-        ["CycleLineage", "Lineage"] if include_Lineage_properties else ["CycleLineage"]
-    )
+    lin_types = ["CycleLineage", "Lineage"] if include_Lineage_properties else ["CycleLineage"]
     return _get_pycellin_props_by_lin_type(include_core_properties, lin_types)
