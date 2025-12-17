@@ -20,6 +20,9 @@ from pycellin.custom_types import PropertyType
 from pycellin.graph.properties.core import create_cell_id_property
 
 
+# TODO: convert "POSITION_T" into "time"
+
+
 def _get_units(
     element: ET._Element,
 ) -> dict[str, str]:
@@ -1156,6 +1159,7 @@ def load_TrackMate_XML(
     xml_path: str,
     keep_all_spots: bool = False,
     keep_all_tracks: bool = False,
+    reference_time_property: str = "POSITION_T",
 ) -> Model:
     """
     Read a TrackMate XML file and convert the tracks data to directed acyclic graphs.
@@ -1178,6 +1182,10 @@ def load_TrackMate_XML(
     keep_all_tracks : bool, optional
         True to keep the tracks filtered out in TrackMate, False otherwise.
         False by default.
+    reference_time_property : str, optional
+        The property that will be used as reference for time in the pycellin
+        model. Defaults to "POSITION_T". TrackMate native time properties:
+        "frame" (integer frame index) and "POSITION_T" (float time in time units).
 
     Returns
     -------
@@ -1191,7 +1199,7 @@ def load_TrackMate_XML(
     dict_tags = _get_specific_tags(xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"])
     pixel_size = _get_pixel_size(dict_tags["Settings"])
     metadata: dict[str, Any] = {}
-    metadata["reference_time_property"] = "frame"  # always the case for TrackMate
+    metadata["reference_time_property"] = reference_time_property
     # Dimensions info
     # TODO: currently we can have frame as reference time property but seconds as unit
     # Maybe remove time_unit and time_step from metadata?
@@ -1212,6 +1220,7 @@ def load_TrackMate_XML(
         metadata[tag_name] = element_string
 
     model = Model(metadata, props_md, data)
+    print(model.reference_time_property)
 
     # Pycellin DOES NOT support fusion events.
     all_fusions = model.get_fusions()
@@ -1239,14 +1248,14 @@ if __name__ == "__main__":
     print(model)
 
     print(model.props_metadata)
-    print(model.model_metadata.pycellin_version)
-    print(model.model_metadata)
+    # print(model.model_metadata.pycellin_version)
+    # print(model.model_metadata)
     # print(model.props_md.node_props.keys())
     # print(model.data)
 
     lineage = model.data.cell_data[0]
-    for n in lineage.nodes(data=True):
-        print(n)
+    # for n in lineage.nodes(data=True):
+    #     print(n)
     # lineage.plot(node_hover_props=["cell_ID", "cell_name"])
 
     # lineage = model.data.cell_data[0]
