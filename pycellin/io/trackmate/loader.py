@@ -1220,7 +1220,6 @@ def load_TrackMate_XML(
         metadata[tag_name] = element_string
 
     model = Model(metadata, props_md, data)
-    print(model.reference_time_property)
 
     # Pycellin DOES NOT support fusion events.
     all_fusions = model.get_fusions()
