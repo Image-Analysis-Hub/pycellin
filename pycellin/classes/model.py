@@ -91,6 +91,7 @@ class Model:
                     "`reference_time_property` must be provided in model_metadata "
                     "or as an explicit argument."
                 )
+        self.reference_time_property = reference_time_property
 
         # Initialize data early since _compute_time_step() needs it.
         self.data = data.copy() if data is not None else Data(dict())
