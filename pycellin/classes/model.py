@@ -1550,8 +1550,6 @@ class Model:
         )
         self.add_custom_property(tracking.CycleCompleteness(prop))
 
-    # TODO: update all custom_name and custom_desc docstrings with correct prop
-
     def add_cell_displacement(
         self,
         custom_identifier: str | None = None,
