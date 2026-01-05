@@ -1351,18 +1351,16 @@ class Model:
         Parameters
         ----------
         custom_time_property : str, optional
-            Identifier of the time property to use for the computation
-            (default is None). If None, the reference time property
-            of the model will be used.
+            Identifier of the time property to use for the computation.
+            If None, the reference time property of the model will be used.
         custom_identifier : str, optional
-            New identifier for the property (default is None). If None,
-            the identifier will be "absolute_age".
+            New identifier for the property. If None, the identifier will be
+            "absolute_age".
         custom_name : str, optional
-            New name for the property (default is None). If None,
-            the name will be "absolute age".
+            New name for the property. If None, the name will be "Absolute age".
         custom_description : str, optional
-            New description for the property (default is None). If None,
-            the description will be "Age of the cell since the beginning of the lineage".
+            New description for the property. If None, the description will be
+            "Age of the cell since the beginning of the lineage".
         """
         if custom_time_property is None:
             time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
@@ -1399,13 +1397,13 @@ class Model:
         unit : Literal["radian", "degree"], optional
             Unit of the angle (default is "radian").
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "angle".
         custom_name : str, optional
-            New name for the property (default is None). If None,
-            the name will be "absolute age".
+            New name for the property. If None, the name will be "Angle".
         custom_description : str, optional
-            New description for the property (default is None). If None,
-            the description will be "Age of the cell since the beginning of the lineage".
+            New description for the property. If None, the description will be
+            "Angle of the cell trajectory between two consecutive detections".
         """
         prop = motion.create_angle_property(
             custom_identifier=custom_identifier,
@@ -1430,13 +1428,14 @@ class Model:
         Parameters
         ----------
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "branch_mean_displacement".
         custom_name : str, optional
-            New name for the property (default is None). If None,
-            the name will be "absolute age".
+            New name for the property. If None, the name will be
+            "Branch mean displacement".
         custom_description : str, optional
-            New description for the property (default is None). If None,
-            the description will be "Age of the cell since the beginning of the lineage".
+            New description for the property. If None, the description will be
+            "Mean displacement of the cell during the cell cycle".
         """
         prop = motion.create_branch_mean_displacement_property(
             custom_identifier=custom_identifier,
@@ -1462,16 +1461,17 @@ class Model:
         Parameters
         ----------
         include_incoming_edge : bool, optional
-            Whether to include the distance between the first cell and its predecessor.
-            Default is False.
+            Whether to include the distance between the first cell of the cycle
+            and its predecessor. Default is False.
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "branch_mean_speed".
         custom_name : str, optional
-            New name for the property (default is None). If None,
-            the name will be "absolute age".
+            New name for the property. If None, the name will be
+            "Branch mean speed".
         custom_description : str, optional
-            New description for the property (default is None). If None,
-            the description will be "Age of the cell since the beginning of the lineage".
+            New description for the property. If None, the description will be
+            "Mean speed of the cell during the cell cycle".
         """
         space_unit = self.model_metadata.space_unit or "pixel"
         time_unit = self.model_metadata.time_unit or "frame"
@@ -1490,21 +1490,22 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the branch displacement property to the model.
+        Add the branch total displacement property to the model.
 
-        The branch total displacement is defined as the displacement of the cell during
-        the cell cycle.
+        The branch total displacement is defined as the displacement of the cell
+        during the cell cycle.
 
         Parameters
         ----------
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "branch_total_displacement".
         custom_name : str, optional
-            New name for the property (default is None). If None,
-            the name will be "absolute age".
+            New name for the property. If None, the name will be
+            "Branch total displacement".
         custom_description : str, optional
-            New description for the property (default is None). If None,
-            the description will be "Age of the cell since the beginning of the lineage".
+            New description for the property. If None, the description will be
+            "Displacement of the cell during the cell cycle".
         """
         prop = motion.create_branch_total_displacement_property(
             custom_identifier=custom_identifier,
@@ -1533,13 +1534,14 @@ class Model:
         Parameters
         ----------
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "cycle_completeness".
         custom_name : str, optional
-            New name for the property (default is None). If None,
-            the name will be "absolute age".
+            New name for the property. If None, the name will be
+            "Cycle completeness".
         custom_description : str, optional
-            New description for the property (default is None). If None,
-            the description will be "Age of the cell since the beginning of the lineage".
+            New description for the property. If None, the description will be
+            "Completeness of the cell cycle".
         """
         prop = tracking.create_cycle_completeness_property(
             custom_identifier=custom_identifier,
@@ -1557,21 +1559,21 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the displacement property to the model.
+        Add the cell displacement property to the model.
 
-        The displacement is defined as the Euclidean distance between the positions
+        The cell displacement is defined as the Euclidean distance between the positions
         of the cell at two consecutive detections.
 
         Parameters
         ----------
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "cell_displacement".
         custom_name : str, optional
-            New name for the property (default is None). If None,
-            the name will be "cell displacement".
+            New name for the property. If None, the name will be"Cell displacement".
         custom_description : str, optional
-            New description for the property (default is None). If None,
-            the description will be "Age of the cell since the beginning of the lineage".
+            New description for the property. If None, the description will be
+            "Displacement of the cell between two consecutive detections".
         """
         prop = motion.create_cell_displacement_property(
             custom_identifier=custom_identifier,
@@ -1613,20 +1615,21 @@ class Model:
         custom_identifier: str | None = None,
     ) -> None:
         """
-        Add the speed property to the model.
+        Add the cell speed property to the model.
 
-        The speed is defined as the displacement of the cell between two consecutive
-        detections divided by the time elapsed between these two detections.
-        It is given in the spatial unit of the model per time unit by default,
-        but can be converted to the spatial unit of the model per frame if specified.
+        The cell speed is defined as the displacement of the cell between two
+        consecutive detections divided by the time elapsed between these two detections.
+        It is given in the spatial unit of the model per frame by default, but can be
+        converted to the spatial unit of the model per time unit if specified.
 
         Parameters
         ----------
         in_time_unit : bool, optional
-            True to give the speed in the time unit of the model,
-            False to give it in frames (default is False).
+            If True, the speed will be given in the time unit of the model.
+            If False, it will be given in frames (default is False).
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "cell_speed".
         """
         space_unit = self.model_metadata.space_unit or "pixel"
         time_unit = self.model_metadata.time_unit or "frame"
@@ -1674,17 +1677,17 @@ class Model:
         Add the division rate property to the model.
 
         Division rate is defined as the number of divisions per time unit.
-        It is the inverse of the division time.
-        It is given in divisions per frame by default, but can be converted
-        to divisions per time unit of the model if specified.
+        It is the inverse of the division time. It is given in divisions per frame
+        by default, but can be converted to divisions per time unit of the model if specified.
 
         Parameters
         ----------
         in_time_unit : bool, optional
-            True to give the division rate in the time unit of the model,
-            False to give it in frames (default is False).
+            If True, the division rate will be given in the time unit of the model.
+            If False, it will be given in frames (default is False).
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "division_rate".
         """
         time_unit = self.model_metadata.time_unit or "frame"
         prop = tracking.create_division_rate_property(
@@ -1704,18 +1707,18 @@ class Model:
         """
         Add the division time property to the model.
 
-        Division time is defined as the time between 2 divisions.
-        It is also the length of the cell cycle of the cell of interest.
-        It is given in frames by default, but can be converted
-        to the time unit of the model if specified.
+        Division time is defined as the time elapsed between two successive divisions.
+        It is given in frames by default, but can be converted to the time unit of the
+        model if specified.
 
         Parameters
         ----------
         in_time_unit : bool, optional
-            True to give the division time in the time unit of the model,
-            False to give it in frames (default is False).
+            If True, the division time will be given in the time unit of the model.
+            If False, it will be given in frames (default is False).
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "division_time".
         """
         time_unit = self.model_metadata.time_unit or "frame"
         prop = tracking.create_division_time_property(
@@ -1735,19 +1738,19 @@ class Model:
         """
         Add the cell relative age property to the model.
 
-        The relative age of a cell is defined as the number of nodes since
-        the start of the cell cycle (i.e. previous division, or beginning
-        of the lineage).
-        It is given in frames by default, but can be converted
-        to the time unit of the model if specified.
+        The relative age of a cell is defined as the time elapsed since the start
+        of the cell cycle (i.e. previous division, or beginning of the lineage).
+        Relative age of the first cell of a cell cycle is 0. It is given in frames
+        by default, but can be converted to the time unit of the model if specified.
 
         Parameters
         ----------
         in_time_unit : bool, optional
-            True to give the relative age in the time unit of the model,
-            False to give it in frames (default is False).
+            If True, the relative age will be given in the time unit of the model.
+            If False, it will be given in frames (default is False).
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "relative_age".
         """
         time_unit = self.model_metadata.time_unit or "frame"
         prop = tracking.create_relative_age_property(
@@ -1767,19 +1770,19 @@ class Model:
         """
         Add the straightness property to the model.
 
-        The straightness is defined as the ratio between the Euclidean distance
-        between the first and last positions of the cell and the total length
-        of the cell trajectory.
+        The straightness is defined as the ratio of the Euclidean distance between
+        the start and end cells of the cell cycle to the total distance traveled.
         Straightness is a value between 0 and 1. A straight line has a straightness
         of 1, while a trajectory with many turns has a straightness close to 0.
 
         Parameters
         ----------
         include_incoming_edge : bool, optional
-            Whether to include the distance between the first cell and its predecessor.
-            Default is False.
+            Whether to include the distance between the first cell and its predecessor
+            (default is False).
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "straightness".
         """
         prop = motion.create_straightness_property(custom_identifier=custom_identifier)
         self.add_custom_property(motion.Straightness(prop, include_incoming_edge))

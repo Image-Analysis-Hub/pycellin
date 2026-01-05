@@ -72,11 +72,17 @@ def _get_branch_edge_property_values(
     return values
 
 
-def create_cell_displacement_property(custom_identifier: str | None, unit: str) -> Property:
+def create_cell_displacement_property(
+    custom_identifier: str | None,
+    custom_name: str | None,
+    custom_description: str | None,
+    unit: str,
+) -> Property:
     return Property(
         identifier=custom_identifier or "cell_displacement",
-        name="Cell displacement",
-        description="Displacement of the cell between two consecutive detections",
+        name=custom_name or "Cell displacement",
+        description=custom_description
+        or "Displacement of the cell between two consecutive detections",
         provenance="pycellin",
         prop_type="edge",
         lin_type="CellLineage",
@@ -129,12 +135,14 @@ class CellDisplacement(EdgeLocalPropCalculator):
 
 def create_branch_total_displacement_property(
     custom_identifier: str | None,
+    custom_name: str | None,
+    custom_description: str | None,
     unit: str,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "branch_total_displacement",
-        name="Branch total displacement",
-        description="Displacement of the cell during the cell cycle",
+        name=custom_name or "Branch total displacement",
+        description=custom_description or "Displacement of the cell during the cell cycle",
         provenance="pycellin",
         prop_type="node",
         lin_type="CycleLineage",
@@ -190,11 +198,16 @@ class BranchTotalDisplacement(NodeGlobalPropCalculator):
         return np.nansum(disps)
 
 
-def create_branch_mean_displacement_property(custom_identifier: str | None, unit: str) -> Property:
+def create_branch_mean_displacement_property(
+    custom_identifier: str | None,
+    custom_name: str | None,
+    custom_description: str | None,
+    unit: str,
+) -> Property:
     return Property(
         identifier=custom_identifier or "branch_mean_displacement",
-        name="Branch mean displacement",
-        description="Mean displacement of the cell during the cell cycle",
+        name=custom_name or "Branch mean displacement",
+        description=custom_description or "Mean displacement of the cell during the cell cycle",
         provenance="pycellin",
         prop_type="node",
         lin_type="CycleLineage",
@@ -316,11 +329,16 @@ class CellSpeed(EdgeLocalPropCalculator):
             return math.dist(pos1, pos2) / (time2 - time1)
 
 
-def create_branch_mean_speed_property(custom_identifier: str | None, unit: str) -> Property:
+def create_branch_mean_speed_property(
+    custom_identifier: str | None,
+    custom_name: str | None,
+    custom_description: str | None,
+    unit: str,
+) -> Property:
     return Property(
         identifier=custom_identifier or "branch_mean_speed",
-        name="Branch mean speed",
-        description="Mean speed of the cell during the cell cycle",
+        name=custom_name or "Branch mean speed",
+        description=custom_description or "Mean speed of the cell during the cell cycle",
         provenance="pycellin",
         prop_type="node",
         lin_type="CycleLineage",
@@ -482,12 +500,16 @@ class Straightness(NodeGlobalPropCalculator):
 
 
 def create_angle_property(
-    custom_identifier: str | None, unit: Literal["radian", "degree"]
+    custom_identifier: str | None,
+    custom_name: str | None,
+    custom_description: str | None,
+    unit: Literal["radian", "degree"],
 ) -> Property:
     return Property(
         identifier=custom_identifier or "angle",
-        name="Angle",
-        description="Angle of the cell trajectory between two consecutive detections",
+        name=custom_name or "Angle",
+        description=custom_description
+        or "Angle of the cell trajectory between two consecutive detections",
         provenance="pycellin",
         prop_type="edge",
         lin_type="CellLineage",

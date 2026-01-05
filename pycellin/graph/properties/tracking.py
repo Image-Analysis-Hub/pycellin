@@ -50,7 +50,7 @@ def create_absolute_age_property(
 ) -> Property:
     return Property(
         identifier=custom_identifier or "absolute_age",
-        name=custom_name or "absolute age",
+        name=custom_name or "Absolute age",
         description=custom_description or "Age of the cell since the beginning of the lineage",
         provenance="pycellin",
         prop_type="node",
@@ -185,11 +185,13 @@ class RelativeAge(NodeGlobalPropCalculator):
 
 def create_cycle_completeness_property(
     custom_identifier: str | None,
+    custom_name: str | None,
+    custom_description: str | None,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "cycle_completeness",
-        name="Cycle completeness",
-        description="Completeness of the cell cycle",
+        name=custom_name or "Cycle completeness",
+        description=custom_description or "Completeness of the cell cycle",
         provenance="pycellin",
         prop_type="node",
         lin_type="CycleLineage",
