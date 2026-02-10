@@ -1568,7 +1568,7 @@ class Model:
             New identifier for the property. If None, the identifier will be
             "cell_displacement".
         custom_name : str, optional
-            New name for the property. If None, the name will be"Cell displacement".
+            New name for the property. If None, the name will be "Cell displacement".
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Displacement of the cell between two consecutive detections".
@@ -1609,36 +1609,48 @@ class Model:
 
     def add_cell_speed(
         self,
-        in_time_unit: bool = False,
+        custom_time_property: str | None = None,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the cell speed property to the model.
 
         The cell speed is defined as the displacement of the cell between two
         consecutive detections divided by the time elapsed between these two detections.
-        It is given in the spatial unit of the model per frame by default, but can be
-        converted to the spatial unit of the model per time unit if specified.
+        By default, it is computed using the reference time property
+        of the model, but a custom time property can be specified.
 
         Parameters
         ----------
-        in_time_unit : bool, optional
-            If True, the speed will be given in the time unit of the model.
-            If False, it will be given in frames (default is False).
+        custom_time_property : str, optional
+            Identifier of the time property to use for the computation.
+            If None, the reference time property of the model will be used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cell_speed".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cell speed".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Speed of the cell between two consecutive detections".
         """
-        space_unit = self.model_metadata.space_unit or "pixel"
-        time_unit = self.model_metadata.time_unit or "frame"
+        if custom_time_property is None:
+            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+        else:
+            time_prop = self.props_metadata.props.get(custom_time_property)
+        if time_prop is None:
+            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+
         prop = motion.create_cell_speed_property(
             custom_identifier=custom_identifier,
-            unit=(f"{space_unit}/{time_unit}" if in_time_unit else f"{space_unit}/frame"),
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=time_prop.unit,
         )
-        time_step = (
-            self.model_metadata.time_step if (in_time_unit and self.model_metadata.time_step) else 1
-        )
-        self.add_custom_property(motion.CellSpeed(prop, time_step))
+        self.add_custom_property(motion.CellSpeed(prop, time_prop.identifier))
 
     def add_rod_width(
         self,
@@ -1668,8 +1680,10 @@ class Model:
 
     def add_division_rate(
         self,
-        in_time_unit: bool = False,
+        custom_time_property: str | None = None,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the division rate property to the model.
@@ -1680,22 +1694,33 @@ class Model:
 
         Parameters
         ----------
-        in_time_unit : bool, optional
-            If True, the division rate will be given in the time unit of the model.
-            If False, it will be given in frames (default is False).
+        custom_time_property : str, optional
+            Identifier of the time property to use for the computation.
+            If None, the reference time property of the model will be used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "division_rate".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Division rate".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Number of divisions per time unit".
         """
-        time_unit = self.model_metadata.time_unit or "frame"
+        if custom_time_property is None:
+            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+        else:
+            time_prop = self.props_metadata.props.get(custom_time_property)
+        if time_prop is None:
+            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+        
         prop = tracking.create_division_rate_property(
             custom_identifier=custom_identifier,
-            unit=f"1/{time_unit}" if in_time_unit else "1/frame",
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=time_prop.unit,
         )
-        time_step = (
-            self.model_metadata.time_step if (in_time_unit and self.model_metadata.time_step) else 1
-        )
-        self.add_custom_property(tracking.DivisionRate(prop, time_step))
+        self.add_custom_property(tracking.DivisionRate(prop, time_prop.identifier))
 
     def add_division_time(
         self,

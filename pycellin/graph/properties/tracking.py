@@ -253,9 +253,11 @@ class CycleCompleteness(NodeGlobalPropCalculator):
                 return True
 
 
-def _get_cell_lin_frames(lineage: CellLineage, nid: int) -> tuple[int, int]:
+def _get_cell_lin_timepoints(
+    lineage: CellLineage, nid: int, time_prop_name: str
+) -> tuple[int, int]:
     """
-    Get the frames of the divisions defining the cell cycle.
+    Get the timepoints of the divisions defining the cell cycle.
 
     This function is used by the DivisionTime and DivisionRate calculators.
 
@@ -265,6 +267,9 @@ def _get_cell_lin_frames(lineage: CellLineage, nid: int) -> tuple[int, int]:
         Lineage graph containing the node of interest.
     nid : int
         Node ID (cell_ID) of the cell of interest.
+    time_prop_name : str
+        The name of the time property (e.g. "frame", "time", etc.) to use
+        for calculation.
 
     Returns
     -------
@@ -281,20 +286,22 @@ def _get_cell_lin_frames(lineage: CellLineage, nid: int) -> tuple[int, int]:
     if nid not in lineage.nodes:
         raise KeyError(f"Cell {nid} not in the lineage.")
     cells = lineage.get_cell_cycle(nid)
-    frame_current_div = lineage.nodes[cells[-1]]["frame"]
+    frame_current_div = lineage.nodes[cells[-1]][time_prop_name]
     ancestors = list(lineage.predecessors(cells[0]))
     if len(ancestors) > 1:
         raise FusionError(nid, lineage.graph["lineage_ID"])
     elif len(ancestors) == 0:
-        frame_prev_div = lineage.nodes[cells[0]]["frame"]
+        frame_prev_div = lineage.nodes[cells[0]][time_prop_name]
     else:
-        frame_prev_div = lineage.nodes[ancestors[0]]["frame"]
+        frame_prev_div = lineage.nodes[ancestors[0]][time_prop_name]
     return frame_current_div, frame_prev_div
 
 
-def _get_cycle_lin_frames(data: Data, lineage: CycleLineage, nid: int) -> tuple[int, int]:
+def _get_cycle_lin_timepoints(
+    data: Data, lineage: CycleLineage, nid: int, time_prop_name: str
+) -> tuple[int, int]:
     """
-    Get the frames of the divisions defining the cell cycle.
+    Get the timepoints of the divisions defining the cell cycle.
 
     This function is used by the DivisionTime and DivisionRate calculators.
 
@@ -323,15 +330,15 @@ def _get_cycle_lin_frames(data: Data, lineage: CycleLineage, nid: int) -> tuple[
         raise KeyError(f"Cycle {nid} not in the lineage.")
     cells = lineage.nodes[nid]["cells"]
     cell_lin = data.cell_data[lineage.graph["lineage_ID"]]
-    frame_current_div = cell_lin.nodes[cells[-1]]["frame"]
+    frame_current_div = cell_lin.nodes[cells[-1]][time_prop_name]
     ancestors = list(lineage.predecessors(nid))
     if len(ancestors) > 1:
         raise FusionError(nid, lineage.graph["lineage_ID"])
     elif len(ancestors) == 0:
-        frame_prev_div = cell_lin.nodes[cells[0]]["frame"]
+        frame_prev_div = cell_lin.nodes[cells[0]][time_prop_name]
     else:
         prev_cells = lineage.nodes[ancestors[0]]["cells"]
-        frame_prev_div = cell_lin.nodes[prev_cells[-1]]["frame"]
+        frame_prev_div = cell_lin.nodes[prev_cells[-1]][time_prop_name]
     return frame_current_div, frame_prev_div
 
 
@@ -395,9 +402,9 @@ class DivisionTime(NodeGlobalPropCalculator):
             If the cell or cycle is not in the lineage.
         """
         if isinstance(lineage, CellLineage):
-            frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, nid)
+            frame_curr_div, frame_prev_div = _get_cell_lin_timepoints(lineage, nid)
         elif isinstance(lineage, CycleLineage):
-            frame_curr_div, frame_prev_div = _get_cycle_lin_frames(data, lineage, nid)
+            frame_curr_div, frame_prev_div = _get_cycle_lin_timepoints(data, lineage, nid)
         else:
             raise TypeError(
                 f"Lineage must be of type CellLineage or CycleLineage, not {type(lineage)}."
@@ -406,11 +413,16 @@ class DivisionTime(NodeGlobalPropCalculator):
         return (frame_curr_div - frame_prev_div) * self.time_step
 
 
-def create_division_rate_property(custom_identifier: str | None, unit: str | None) -> Property:
+def create_division_rate_property(
+    custom_identifier: str | None,
+    custom_name: str | None,
+    custom_description: str | None,
+    unit: str | None,
+) -> Property:
     return Property(
         identifier=custom_identifier or "division_rate",
-        name="Division rate",
-        description="Number of divisions per time unit",
+        name=custom_name or "Division rate",
+        description=custom_description or "Number of divisions per time unit",
         provenance="pycellin",
         prop_type="node",
         lin_type="CycleLineage",
@@ -425,18 +437,19 @@ class DivisionRate(NodeGlobalPropCalculator):
 
     Division rate is defined as the number of divisions per time unit.
     It is the inverse of the division time.
-    It is given in divisions per frame by default, but can be converted
-    to divisions per time unit of the model if specified.
+    It is computed in the same unit as the time property given as input
+    (e.g. "frame", "time", etc.).
     """
 
-    def __init__(self, property: Property, time_step: int | float = 1, use_div_time: bool = False):
+    def __init__(self, property: Property, time_prop_name: str, use_div_time: bool = False):
         """
         Parameters
         ----------
         property : Property
             Property object to which the calculator is associated.
-        time_step : int | float, optional
-            Time step between 2 frames, in time unit. Default is 1.
+        time_prop_name : str
+            The name of the time property (e.g. "frame", "time", etc.) to use
+            for calculation.
         use_div_time : bool, optional
             If True, use the division time already computed in the lineage.
             If False, compute the division time from the lineage. Default is False.
@@ -448,7 +461,7 @@ class DivisionRate(NodeGlobalPropCalculator):
             time is in frames, division rate will be in divisions per frame).
         """
         super().__init__(property)
-        self.time_step = time_step
+        self.time_prop_name = time_prop_name
         self.use_div_time = use_div_time
 
     def compute(  # type: ignore[override]
@@ -500,15 +513,19 @@ class DivisionRate(NodeGlobalPropCalculator):
                 return 1 / div_time
 
         if isinstance(lineage, CellLineage):
-            frame_curr_div, frame_prev_div = _get_cell_lin_frames(lineage, nid)
+            timepoint_curr_div, timepoint_prev_div = _get_cell_lin_timepoints(
+                lineage, nid, self.time_prop_name
+            )
         elif isinstance(lineage, CycleLineage):
-            frame_curr_div, frame_prev_div = _get_cycle_lin_frames(data, lineage, nid)
+            timepoint_curr_div, timepoint_prev_div = _get_cycle_lin_timepoints(
+                data, lineage, nid, self.time_prop_name
+            )
         else:
             raise TypeError(
                 f"Lineage must be of type CellLineage or CycleLineage, not {type(lineage)}."
             )
 
-        div_time = (frame_curr_div - frame_prev_div) * self.time_step
+        div_time = timepoint_curr_div - timepoint_prev_div
         if div_time == 0:
             return np.nan
         else:
