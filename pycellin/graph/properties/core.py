@@ -8,6 +8,8 @@ from pycellin.classes.exceptions import UpdateRequiredError
 from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import NodeLocalPropCalculator
 
+# TODO: capitalize property names in the code
+
 
 def create_frame_property(provenance: str = "pycellin") -> Property:
     return Property(
