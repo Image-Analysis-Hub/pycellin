@@ -283,7 +283,7 @@ class Data:
         nid: int,
         lineage: CellLineage,
         radius: float = 0,
-        time_property: str = "frame",
+        time_prop: str = "timepoint",
         time_window: int = 0,
         time_window_type: Literal["before", "after", "symmetric"] = "symmetric",
         lineages_to_search: list[CellLineage] | None = None,
@@ -301,8 +301,8 @@ class Data:
         radius : float, optional
             The maximum distance to consider, by default 0.
             If 0, the whole space is considered.
-        time_property: str = "frame"
-            The name of the time property to use, by default "frame".
+        time_prop: str = "timepoint"
+            The name of the time property. Default is "timepoint".
         time_window : int, optional
             The time window to consider, by default 0 i.e. only the current frame.
         time_window_type : Literal["before", "after", "symmetric"], optional
@@ -321,7 +321,7 @@ class Data:
         # TODO: implement the reference parameter
 
         # Identification of the time interval to search in.
-        center_timepoint = lineage.nodes[nid][time_property]
+        center_timepoint = lineage.nodes[nid][time_prop]
         if time_window == 0:
             timepoints_to_search = [center_timepoint]
         else:
@@ -353,7 +353,7 @@ class Data:
         for lin in lineages_to_search:
             nodes = [
                 node
-                for node, timepoint in lin.nodes(data=time_property)
+                for node, timepoint in lin.nodes(data=time_prop)
                 if timepoint in timepoints_to_search
             ]
             if nodes:
