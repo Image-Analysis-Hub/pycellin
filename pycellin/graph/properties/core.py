@@ -45,8 +45,6 @@ class Timepoint(NodeLocalPropCalculator):
         time_step: int | float | None,
         reference_time_property: str,
     ):
-        # TODO: switch all methods relying on "frame" to "timepoint" (cf table in obsidian)
-        # TODO: add missing wrappers (cf obsidian)
         super().__init__(property)
 
         if time_step is None or time_step == 0:
