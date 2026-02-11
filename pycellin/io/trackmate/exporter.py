@@ -11,17 +11,17 @@ import copy
 import math
 import numbers
 import re
-from typing import Any
 import warnings
+from typing import Any
 
-from lxml import etree as ET
 import networkx as nx
+from lxml import etree as ET
 
 from pycellin.classes.exceptions import ProtectedPropertyError
+from pycellin.classes.lineage import CellLineage
 from pycellin.classes.model import Model
 from pycellin.classes.property import Property
 from pycellin.classes.props_metadata import PropsMetadata
-from pycellin.classes.lineage import CellLineage
 from pycellin.io.trackmate.loader import load_TrackMate_XML
 
 
@@ -139,6 +139,7 @@ def _unit_to_dimension(
         "cell_speed": "VELOCITY",
         "rod_length": "LENGTH",
         "rod_width": "LENGTH",
+        "timepoint": "NONE",
         # Cycle features.
         "branch_total_displacement": "LENGTH",
         "branch_mean_displacement": "LENGTH",

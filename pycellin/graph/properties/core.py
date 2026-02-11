@@ -13,7 +13,7 @@ def create_frame_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="frame",
         name="frame",
-        description="Frame number of the cell ",
+        description="Frame number of the cell",
         provenance=provenance,
         prop_type="node",
         lin_type="CellLineage",
@@ -51,7 +51,7 @@ class Timepoint(NodeLocalPropCalculator):
 
         if time_step is None or time_step == 0:
             raise ValueError(
-                "`time_step` cannot be None or zero for timepoint property calculation"
+                "`time_step` cannot be None nor zero for timepoint property calculation."
             )
 
         self.time_step = time_step
@@ -79,7 +79,7 @@ class Timepoint(NodeLocalPropCalculator):
 
         self.min_time = min_time
 
-    def compute(self, lineage, nid: int) -> float:
+    def compute(self, lineage, nid: int) -> int:
         """
         Compute the timepoint of a given node.
 
@@ -92,8 +92,8 @@ class Timepoint(NodeLocalPropCalculator):
 
         Returns
         -------
-        float
-            The computed timepoint value.
+        int
+            The computed timepoint value for the given node.
 
         Raises
         ------
@@ -106,7 +106,15 @@ class Timepoint(NodeLocalPropCalculator):
             )
 
         time = lineage.nodes[nid][self.ref_time_prop]
-        return (time - self.min_time) / self.time_step
+        timepoint = (time - self.min_time) / self.time_step
+
+        if not timepoint.is_integer():
+            raise ValueError(
+                f"Computed timepoint {timepoint} for node {nid} is not an integer. "
+                f"Check time_step and reference time values."
+            )
+
+        return int(timepoint)
 
 
 def create_cell_id_property(provenance: str = "pycellin") -> Property:
