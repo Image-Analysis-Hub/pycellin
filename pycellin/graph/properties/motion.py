@@ -5,15 +5,16 @@
 A collection of properties related to cell mobility/motility.
 """
 
-from itertools import pairwise
 import math
-import numpy as np
+from itertools import pairwise
 from typing import Any, Literal
 
+import numpy as np
+
 from pycellin.classes.data import Data
+from pycellin.classes.exceptions import FusionError
 from pycellin.classes.lineage import CellLineage, CycleLineage
 from pycellin.classes.property import Property
-from pycellin.classes.exceptions import FusionError
 from pycellin.classes.property_calculator import (
     EdgeLocalPropCalculator,
     NodeGlobalPropCalculator,
@@ -398,11 +399,16 @@ class BranchMeanSpeed(NodeGlobalPropCalculator):
         return np.nanmean(speeds).item()
 
 
-def create_straightness_property(custom_identifier: str | None) -> Property:
+def create_straightness_property(
+    custom_identifier: str | None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
     return Property(
         identifier=custom_identifier or "straightness",
-        name="Straightness",
-        description="Straightness of the cell displacement",
+        name=custom_name or "Straightness",
+        description=custom_description
+        or "Straightness of the cell trajectory during the cell cycle",
         provenance="pycellin",
         prop_type="node",
         lin_type="CycleLineage",

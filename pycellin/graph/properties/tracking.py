@@ -32,9 +32,9 @@ Vocabulary:
 import numpy as np
 
 from pycellin.classes.data import Data
+from pycellin.classes.exceptions import FusionError
 from pycellin.classes.lineage import CellLineage, CycleLineage
 from pycellin.classes.property import Property
-from pycellin.classes.exceptions import FusionError
 from pycellin.classes.property_calculator import NodeGlobalPropCalculator
 
 # TODO: should I add the word Calc or Calculator to the class names?
@@ -51,7 +51,7 @@ def create_absolute_age_property(
     return Property(
         identifier=custom_identifier or "absolute_age",
         name=custom_name or "Absolute age",
-        description=custom_description or "Age of the cell since the beginning of the lineage",
+        description=custom_description or "Age of the cell since the start of the lineage",
         provenance="pycellin",
         prop_type="node",
         lin_type="CellLineage",
@@ -108,22 +108,29 @@ class AbsoluteAge(NodeGlobalPropCalculator):
         KeyError
             If the cell is not in the lineage.
         """
-        root = lineage.get_root()
         if nid not in lineage.nodes:
             raise KeyError(f"Cell {nid} not in the lineage.")
+        root = lineage.get_root()
         age = lineage.nodes[nid][self.time_prop_name] - lineage.nodes[root][self.time_prop_name]
         return age
 
 
-def create_relative_age_property(custom_identifier: str | None, unit: str) -> Property:
+def create_relative_age_property(
+    custom_identifier: str | None,
+    custom_name: str | None,
+    custom_description: str | None,
+    dtype: str,
+    unit: str | None,
+) -> Property:
     return Property(
         identifier=custom_identifier or "relative_age",
-        name="Relative age",
-        description="Age of the cell since the beginning of the current cell cycle",
+        name=custom_name or "Relative age",
+        description=custom_description
+        or "Age of the cell since the start of the current cell cycle",
         provenance="pycellin",
         prop_type="node",
         lin_type="CellLineage",
-        dtype="float" if unit != "frame" else "int",
+        dtype=dtype,
         unit=unit,
     )
 
@@ -139,7 +146,7 @@ class RelativeAge(NodeGlobalPropCalculator):
     to the time unit of the model if specified.
     """
 
-    def __init__(self, property: Property, time_step: int | float = 1):
+    def __init__(self, property: Property, time_prop_name: str):
         """
         Parameters
         ----------
@@ -149,7 +156,7 @@ class RelativeAge(NodeGlobalPropCalculator):
             Time step between 2 frames, in time unit. Default is 1.
         """
         super().__init__(property)
-        self.time_step = time_step
+        self.time_prop_name = time_prop_name
 
     def compute(  # type: ignore[override]
         self, data: Data, lineage: CellLineage, nid: int
@@ -179,8 +186,10 @@ class RelativeAge(NodeGlobalPropCalculator):
         if nid not in lineage.nodes:
             raise KeyError(f"Cell {nid} not in the lineage.")
         first_cell = lineage.get_cell_cycle(nid)[0]
-        age_in_frame = lineage.nodes[nid]["frame"] - lineage.nodes[first_cell]["frame"]
-        return age_in_frame * self.time_step
+        age = (
+            lineage.nodes[nid][self.time_prop_name] - lineage.nodes[first_cell][self.time_prop_name]
+        )
+        return age
 
 
 def create_cycle_completeness_property(
@@ -342,15 +351,21 @@ def _get_cycle_lin_timepoints(
     return frame_current_div, frame_prev_div
 
 
-def create_division_time_property(custom_identifier: str | None, unit: str) -> Property:
+def create_division_time_property(
+    custom_identifier: str | None,
+    custom_name: str | None,
+    custom_description: str | None,
+    dtype: str,
+    unit: str | None,
+) -> Property:
     return Property(
         identifier=custom_identifier or "division_time",
-        name="Division time",
-        description="Time between two successive divisions",
+        name=custom_name or "Division time",
+        description=custom_description or "Time elapsed between two successive divisions",
         provenance="pycellin",
         prop_type="node",
         lin_type="CycleLineage",
-        dtype="float" if unit != "frame" else "int",
+        dtype=dtype,
         unit=unit,
     )
 
@@ -360,21 +375,23 @@ class DivisionTime(NodeGlobalPropCalculator):
     Calculator to compute the division time of cells.
 
     Division time is defined as the time elapsed between the 2 divisions
-    that define the cell cycle. It is given in frames by default, but can
-    be converted to the time unit of the model if specified.
+    that define the cell cycle.
+    It is computed in the same unit as the time property given as input
+    (e.g. "frame", "time", etc.).
     """
 
-    def __init__(self, property: Property, time_step: int | float = 1):
+    def __init__(self, property: Property, time_prop_name: str):
         """
         Parameters
         ----------
         property : Property
             Property object to which the calculator is associated.
-        time_step : int | float, optional
-            Time step between 2 frames, in time unit. Default is 1.
+        time_prop_name : str
+            The name of the time property (e.g. "frame", "time", etc.) to use
+            for calculation.
         """
         super().__init__(property)
-        self.time_step = time_step
+        self.time_prop_name = time_prop_name
 
     def compute(  # type: ignore[override]
         self, data: Data, lineage: CellLineage | CycleLineage, nid: int
@@ -402,15 +419,19 @@ class DivisionTime(NodeGlobalPropCalculator):
             If the cell or cycle is not in the lineage.
         """
         if isinstance(lineage, CellLineage):
-            frame_curr_div, frame_prev_div = _get_cell_lin_timepoints(lineage, nid)
+            timepoint_curr_div, timepoint_prev_div = _get_cell_lin_timepoints(
+                lineage, nid, self.time_prop_name
+            )
         elif isinstance(lineage, CycleLineage):
-            frame_curr_div, frame_prev_div = _get_cycle_lin_timepoints(data, lineage, nid)
+            timepoint_curr_div, timepoint_prev_div = _get_cycle_lin_timepoints(
+                data, lineage, nid, self.time_prop_name
+            )
         else:
             raise TypeError(
                 f"Lineage must be of type CellLineage or CycleLineage, not {type(lineage)}."
             )
 
-        return (frame_curr_div - frame_prev_div) * self.time_step
+        return timepoint_curr_div - timepoint_prev_div
 
 
 def create_division_rate_property(

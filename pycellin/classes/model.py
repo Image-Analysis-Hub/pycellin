@@ -1360,7 +1360,7 @@ class Model:
             New name for the property. If None, the name will be "Absolute age".
         custom_description : str, optional
             New description for the property. If None, the description will be
-            "Age of the cell since the beginning of the lineage".
+            "Age of the cell since the start of the lineage".
         """
         if custom_time_property is None:
             time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
@@ -1588,9 +1588,13 @@ class Model:
         method_width: str = "mean",
         width_ignore_tips: bool = False,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         prop = morpho.create_rod_length_property(
             custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
         pixel_size = self.get_pixel_size()
@@ -1659,9 +1663,13 @@ class Model:
         method_width: str = "mean",
         width_ignore_tips: bool = False,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         prop = morpho.create_rod_width_property(
             custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
         pixel_size = self.get_pixel_size()
@@ -1713,7 +1721,7 @@ class Model:
         if time_prop is None:
             time_prop = custom_time_property or self.model_metadata.reference_time_property
             raise KeyError(f"The time property '{time_prop}' has not been declared.")
-        
+
         prop = tracking.create_division_rate_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
@@ -1724,8 +1732,10 @@ class Model:
 
     def add_division_time(
         self,
-        in_time_unit: bool = False,
+        custom_time_property: str | None = None,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the division time property to the model.
@@ -1736,27 +1746,42 @@ class Model:
 
         Parameters
         ----------
-        in_time_unit : bool, optional
-            If True, the division time will be given in the time unit of the model.
-            If False, it will be given in frames (default is False).
+        custom_time_property : str, optional
+            Identifier of the time property to use for the computation.
+            If None, the reference time property of the model will be used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "division_time".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Division time".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Time elapsed between two successive divisions".
         """
-        time_unit = self.model_metadata.time_unit or "frame"
+        if custom_time_property is None:
+            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+        else:
+            time_prop = self.props_metadata.props.get(custom_time_property)
+        if time_prop is None:
+            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+
         prop = tracking.create_division_time_property(
             custom_identifier=custom_identifier,
-            unit=time_unit if in_time_unit else "frame",
+            custom_name=custom_name,
+            custom_description=custom_description,
+            dtype=time_prop.dtype,
+            unit=time_prop.unit,
         )
-        time_step = (
-            self.model_metadata.time_step if (in_time_unit and self.model_metadata.time_step) else 1
-        )
-        self.add_custom_property(tracking.DivisionTime(prop, time_step))
+
+        self.add_custom_property(tracking.DivisionTime(prop, time_prop.identifier))
 
     def add_relative_age(
         self,
-        in_time_unit: bool = False,
+        custom_time_property: str | None = None,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the cell relative age property to the model.
@@ -1768,27 +1793,41 @@ class Model:
 
         Parameters
         ----------
-        in_time_unit : bool, optional
-            If True, the relative age will be given in the time unit of the model.
-            If False, it will be given in frames (default is False).
+        custom_time_property : str, optional
+            Identifier of the time property to use for the computation.
+            If None, the reference time property of the model will be used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "relative_age".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Relative age".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Age of the cell since the start of the current cell cycle".
         """
-        time_unit = self.model_metadata.time_unit or "frame"
+        if custom_time_property is None:
+            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+        else:
+            time_prop = self.props_metadata.props.get(custom_time_property)
+        if time_prop is None:
+            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+
         prop = tracking.create_relative_age_property(
             custom_identifier=custom_identifier,
-            unit=time_unit if in_time_unit else "frame",
+            custom_name=custom_name,
+            custom_description=custom_description,
+            dtype=time_prop.dtype,
+            unit=time_prop.unit,
         )
-        time_step = (
-            self.model_metadata.time_step if (in_time_unit and self.model_metadata.time_step) else 1
-        )
-        self.add_custom_property(tracking.RelativeAge(prop, time_step))
+        self.add_custom_property(tracking.RelativeAge(prop, time_prop.identifier))
 
     def add_straightness(
         self,
         include_incoming_edge: bool = False,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the straightness property to the model.
@@ -1806,8 +1845,17 @@ class Model:
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "straightness".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Straightness".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Straightness of the cell trajectory during the cell cycle".
         """
-        prop = motion.create_straightness_property(custom_identifier=custom_identifier)
+        prop = motion.create_straightness_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
         self.add_custom_property(motion.Straightness(prop, include_incoming_edge))
 
     def _get_prop_method(self, prop_identifier: str) -> Callable:
