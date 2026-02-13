@@ -539,6 +539,7 @@ class CellLineage(Lineage):
         nid: int | None = None,
         time_prop_name: str = "timepoint",
         time_prop_value: int | float = 0,
+        timepoint: int | None = None,
         **cell_props,
     ) -> int:
         """
@@ -553,6 +554,8 @@ class CellLineage(Lineage):
             The name of the time property. Default is "timepoint".
         time_prop_value : int | float, optional
             The value of the time property. Default is 0.
+        timepoint : int, optional
+            The timepoint value to set for the cell. If None, it is not set.
         **cell_props
             Property values to set for the node.
 
@@ -577,6 +580,8 @@ class CellLineage(Lineage):
         self.add_node(nid, **cell_props)
         self.nodes[nid]["cell_ID"] = nid
         self.nodes[nid][time_prop_name] = time_prop_value
+        if timepoint is not None:
+            self.nodes[nid]["timepoint"] = timepoint
         return nid
 
     def _remove_cell(self, nid: int) -> dict[str, Any]:

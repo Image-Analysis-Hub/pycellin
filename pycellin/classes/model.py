@@ -1104,6 +1104,9 @@ class Model:
         except KeyError as err:
             raise KeyError(f"Lineage with ID {lid} does not exist.") from err
 
+        if not isinstance(time_value, (int, float)):
+            raise ValueError("Time value must be an integer or a float.")
+
         if prop_values is not None:
             for prop in prop_values:
                 if not self.props_metadata._has_prop(prop):
@@ -1111,10 +1114,24 @@ class Model:
         else:
             prop_values = dict()
 
+        time_step = self.model_metadata.time_step
+        timepoint = None
+        if time_step is not None:
+            # Is the time value consistent with the time step of the model?
+            if time_value % time_step != 0:
+                warnings.warn(
+                    f"The time value {time_value} is not consistent with the time step "
+                    f"of the model ({time_step}). Use model.set_time_step() to set or "
+                    f"compute a new time step compatible with all time values."
+                )
+            # Timepoint value computation.
+            timepoint = time_value // time_step
+
         cid = lineage._add_cell(
             cid,
             time_prop_name=self.model_metadata.reference_time_property,
             time_prop_value=time_value,
+            timepoint=timepoint,
             **prop_values,
         )
 
