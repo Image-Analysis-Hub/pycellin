@@ -1159,7 +1159,6 @@ def load_TrackMate_XML(
     xml_path: str,
     keep_all_spots: bool = False,
     keep_all_tracks: bool = False,
-    reference_time_property: str = "POSITION_T",
 ) -> Model:
     """
     Read a TrackMate XML file and convert the tracks data to directed acyclic graphs.
@@ -1182,10 +1181,6 @@ def load_TrackMate_XML(
     keep_all_tracks : bool, optional
         True to keep the tracks filtered out in TrackMate, False otherwise.
         False by default.
-    reference_time_property : str, optional
-        The property that will be used as reference for time in the pycellin
-        model. Defaults to "POSITION_T". TrackMate native time properties:
-        "frame" (integer frame index) and "POSITION_T" (float time in time units).
 
     Returns
     -------
@@ -1199,7 +1194,7 @@ def load_TrackMate_XML(
     dict_tags = _get_specific_tags(xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"])
     pixel_size = _get_pixel_size(dict_tags["Settings"])
     metadata: dict[str, Any] = {}
-    metadata["reference_time_property"] = reference_time_property
+    metadata["reference_time_property"] = "POSITION_T"
     # Dimensions info
     # TODO: currently we can have frame as reference time property but seconds as unit
     # Maybe remove time_unit and time_step from metadata?
@@ -1239,7 +1234,7 @@ def load_TrackMate_XML(
 if __name__ == "__main__":
     xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
-    # xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
     # xml = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
     # xml = "sample_data/Celegans-5pc-17timepoints.xml"
 
