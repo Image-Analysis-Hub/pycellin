@@ -102,7 +102,8 @@ class Timepoint(NodeLocalPropCalculator):
         """
         if self.ref_time_prop not in lineage.nodes[nid]:
             raise KeyError(
-                f"Reference time property '{self.ref_time_prop}' not found in node {nid}."
+                f"Reference time property '{self.ref_time_prop}' not found "
+                f"in node {nid} of lineage {lineage.graph['lineage_ID']}."
             )
 
         time = lineage.nodes[nid][self.ref_time_prop]
@@ -110,7 +111,8 @@ class Timepoint(NodeLocalPropCalculator):
 
         if not timepoint.is_integer():
             raise ValueError(
-                f"Computed timepoint {timepoint} for node {nid} is not an integer. "
+                f"Computed timepoint {timepoint} for node {nid} "
+                f"of lineage {lineage.graph['lineage_ID']}is not an integer. "
                 f"Check time_step and reference time values."
             )
 
