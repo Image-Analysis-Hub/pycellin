@@ -1451,7 +1451,7 @@ def test_get_pixel_size():
 
     obtained = tml._get_pixel_size(settings)
 
-    expected = {"width": 1.5, "height": 2.0, "depth": 0.5}
+    expected = {"pixel_width": 1.5, "pixel_height": 2.0, "pixel_depth": 0.5}
 
     assert obtained == expected
 

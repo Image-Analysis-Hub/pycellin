@@ -8,7 +8,7 @@ import pytest
 from pycellin.classes import Property, PropsMetadata
 
 
-# Class Property ###############################################################
+# Property fixtures ###############################################################
 
 
 @pytest.fixture()
@@ -80,99 +80,7 @@ def prop4():
     )
 
 
-# __eq__() ####################################################################
-
-
-def test_prop_equality(prop1, prop1_bis):
-    assert prop1 == prop1_bis
-
-
-def test_prop_unequality(prop1, prop2, prop3):
-    assert prop1 != prop2
-    assert prop1 != prop3
-    assert prop1 != "not a property"
-
-
-def test_prop_invalid_Literal():
-    with pytest.raises(ValueError):
-        Property(
-            identifier="name1",
-            name="name1",
-            description="desc1",
-            provenance="prov1",
-            prop_type="node",
-            lin_type="not a valid Literal",
-            dtype="type1",
-        )
-
-
-# _change_name() ##############################################################
-
-
-def test_change_name(prop1):
-    prop1._change_name("new_name")
-    assert prop1.name == "new_name"
-
-
-def test_change_name_ValueError(prop1):
-    prop1 = Property(
-        identifier="name1",
-        name="name1",
-        description="desc1",
-        provenance="prov1",
-        prop_type="node",
-        lin_type="CellLineage",
-        dtype="type1",
-        unit="unit1",
-    )
-    with pytest.raises(ValueError):
-        prop1._change_name(42)
-
-
-# _change_description() #######################################################
-
-
-def test_change_description(prop1):
-    prop1._change_description("new_desc")
-    assert prop1.description == "new_desc"
-
-
-def test_change_description_ValueError(prop1):
-    with pytest.raises(ValueError):
-        prop1._change_description(42)
-
-
-# _change_provenance() ########################################################
-
-
-def test_change_provenance(prop1):
-    prop1._change_provenance("new_prov")
-    assert prop1.provenance == "new_prov"
-
-
-def test_change_provenance_ValueError(prop1):
-    with pytest.raises(ValueError):
-        prop1._change_provenance(42)
-
-
-# is_equal() ##################################################################
-
-
-def test_prop_is_equal(prop1, prop1_bis, prop2, prop3):
-    assert prop1.is_equal(prop1_bis)
-    assert not prop1.is_equal(prop2)
-    assert not prop1.is_equal(prop3)
-    assert prop1.is_equal("not a property") == NotImplemented
-
-
-def test_prop_is_equal_ignore_prop_type(prop1, prop3, prop4):
-    assert prop1.is_equal(prop4, ignore_prop_type=True)
-    assert not prop1.is_equal(prop4, ignore_prop_type=False)
-    assert not prop1.is_equal(prop3, ignore_prop_type=True)
-    assert prop1.is_equal("not a property", ignore_prop_type=True) == NotImplemented
-
-
-# Class PropsMetadata ###################################################
+# PropsMetadata fixtures #######
 
 
 @pytest.fixture()
@@ -205,19 +113,117 @@ def pmd4():
     return PropsMetadata({"a": "a"})
 
 
-# __eq__() ####################################################################
+# Test classes ###############################################################
+
+# Property tests
 
 
-def test_props_md_equality(prop1, prop1_bis, pmd1, pmd1_bis, pmd2, pmd2_bis):
-    pmd = PropsMetadata({"prop1": prop1})
-    pmd_bis = PropsMetadata({"prop1": prop1_bis})
-    assert pmd == pmd_bis
-    assert pmd1 == pmd1_bis
-    assert pmd2 == pmd2_bis
+class TestPropertyEq:
+    """Test cases for Property.__eq()__ method."""
+
+    def test_equality(self, prop1, prop1_bis):
+        """Test for Property equality."""
+        assert prop1 == prop1_bis
+
+    def test_unequality(self, prop1, prop2, prop3):
+        """Test for Property inequality."""
+        assert prop1 != prop2
+        assert prop1 != prop3
+        assert prop1 != "not a property"
+
+    def test_invalid_Literal(self):
+        """Test Property equality in the case of an invalid Literal for lin_type."""
+        with pytest.raises(ValueError):
+            Property(
+                identifier="name1",
+                name="name1",
+                description="desc1",
+                provenance="prov1",
+                prop_type="node",
+                lin_type="not a valid Literal",
+                dtype="type1",
+            )
 
 
-def test_props_md_inequality(pmd1, pmd2, pmd3, pmd4):
-    assert pmd1 != pmd2
-    assert pmd1 != pmd3
-    assert pmd1 != pmd4
-    assert pmd1 != "not a PropsMetadata"
+class TestPropertyIsEqual:
+    """Test cases for Property.is_equal() method."""
+
+    def test_normal(self, prop1, prop1_bis, prop2, prop3):
+        """Test normal behavior."""
+        assert prop1.is_equal(prop1_bis)
+        assert not prop1.is_equal(prop2)
+        assert not prop1.is_equal(prop3)
+        assert prop1.is_equal("not a property") == NotImplemented
+
+    def test_ignore_prop_type(self, prop1, prop3, prop4):
+        """Test with argument ignore_prop_type."""
+        assert prop1.is_equal(prop4, ignore_prop_type=True)
+        assert not prop1.is_equal(prop4, ignore_prop_type=False)
+        assert not prop1.is_equal(prop3, ignore_prop_type=True)
+        assert prop1.is_equal("not a property", ignore_prop_type=True) == NotImplemented
+
+
+class TestPropertyChangeDescription:
+    """Test cases for Property._change_description() method."""
+
+    def test_normal(self, prop1):
+        """Test normal behavior."""
+        prop1._change_description("new_desc")
+        assert prop1.description == "new_desc"
+
+    # TODO: maybe it should be a TypeError instead?
+    # Same for _change_name() above and _change_provenance() below
+    def test_invalid__description_raises_error(self, prop1):
+        """Test that invalid name raises ValueError."""
+        with pytest.raises(ValueError):
+            prop1._change_description(42)
+
+
+class TestPropertyChangeName:
+    """Test cases for Property._change_name() method."""
+
+    def test_normal(self, prop1):
+        """Test normal behavior."""
+        prop1._change_name("new_name")
+        assert prop1.name == "new_name"
+
+    def test_invalid_name_raises_error(self, prop1):
+        """Test that invalid name raises ValueError."""
+        with pytest.raises(ValueError):
+            prop1._change_name(42)
+
+
+class TestPropertyChangeProvenance:
+    """Test cases for Property._change_provenance() method."""
+
+    def test_normal(self, prop1):
+        """Test normal behavior."""
+        prop1._change_provenance("new_prov")
+        assert prop1.provenance == "new_prov"
+
+    def test_invalid_provenance_raises_error(self, prop1):
+        """Test that invalid name raises ValueError."""
+        with pytest.raises(ValueError):
+            prop1._change_provenance(42)
+
+
+# PropsMetadata tests
+
+
+class TestPropsMetadataEq:
+    """Test cases for Property.is_equal() method."""
+
+    def test_equality(self, prop1, prop1_bis, pmd1, pmd1_bis, pmd2, pmd2_bis):
+        """Test PropsMetadata equality."""
+        pmd = PropsMetadata({"prop1": prop1})
+        pmd_bis = PropsMetadata({"prop1": prop1_bis})
+        assert pmd == pmd_bis
+        assert pmd1 == pmd1_bis
+        assert pmd2 == pmd2_bis
+
+    def test_inequality(self, pmd1, pmd2, pmd3, pmd4):
+        """Test PropsMetadata equality."""
+        assert pmd1 != pmd2
+        assert pmd1 != pmd3
+        assert pmd1 != pmd4
+        assert pmd1 != "not a PropsMetadata"

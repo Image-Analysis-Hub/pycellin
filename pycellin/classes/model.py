@@ -1,30 +1,30 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from itertools import pairwise
 import pickle
-from typing import Any, Callable, Literal, TypeVar
 import warnings
+from decimal import Decimal
+from itertools import pairwise
+from math import gcd
+from typing import Any, Callable, Literal, TypeVar
 
-import pandas as pd
 import networkx as nx
+import pandas as pd
 
-from pycellin.classes import (
-    CellLineage,
-    CycleLineage,
-    Data,
-    Property,
-    PropsMetadata,
-)
-from pycellin.classes.lineage import Lineage
-from pycellin.classes.exceptions import FusionError, ProtectedPropertyError
-from pycellin.classes.property_calculator import PropertyCalculator
-from pycellin.classes.updater import ModelUpdater
-import pycellin.graph.properties.tracking as tracking
-import pycellin.graph.properties.motion as motion
 import pycellin.graph.properties.morphology as morpho
+import pycellin.graph.properties.motion as motion
+import pycellin.graph.properties.tracking as tracking
 import pycellin.graph.properties.utils as futils
+from pycellin.classes.data import Data
+from pycellin.classes.exceptions import FusionError, ProtectedPropertyError
+from pycellin.classes.lineage import CellLineage, CycleLineage, Lineage
+from pycellin.classes.model_metadata import ModelMetadata
+from pycellin.classes.property import Property
+from pycellin.classes.property_calculator import PropertyCalculator
+from pycellin.classes.props_metadata import PropsMetadata
+from pycellin.classes.updater import ModelUpdater
 from pycellin.custom_types import Cell, Link
+from pycellin.graph.properties.core import Timepoint, create_timepoint_property
 
 L = TypeVar("L", bound="Lineage")
 
@@ -34,33 +34,136 @@ class Model:
 
     def __init__(
         self,
-        model_metadata: dict[str, Any] | None = None,
+        model_metadata: ModelMetadata | dict[str, Any] | None = None,
         props_metadata: PropsMetadata | None = None,
         data: Data | None = None,
+        reference_time_property: str | None = None,
+        variable_time_step: bool = False,
     ) -> None:
         """
         Constructs all the necessary attributes for the Model object.
 
         Parameters
         ----------
-        model_metadata : dict[str, Any] | None, optional
+        model_metadata : ModelMetadata | dict[str, Any] | None, optional
             Metadata of the model (default is None).
         props_metadata : PropsMetadata, optional
             The declaration of the properties present in the model (default is None).
         data : Data, optional
             The lineages data of the model (default is None).
-        """
-        self.model_metadata = model_metadata if model_metadata is not None else dict()
-        self.props_metadata = props_metadata if props_metadata is not None else PropsMetadata()
-        self.data = data if data is not None else Data(dict())
+        reference_time_property : str, optional
+            The name of the property to use as the reference for time measurements.
+            Needs to be provided if model_metadata is None or does not contain it.
+        variable_time_step : bool, optional
+            If True and time_step is not provided in model_metadata, the time step will be
+            computed using the greatest common divisor (GCD) of time differences, which is
+            suitable for irregularly sampled timepoints. If False, the minimum time difference
+            is used instead (default is False). This parameter is only used when time_step
+            needs to be automatically computed from the data.
 
+        Raises
+        ------
+        ValueError
+            If `reference_time_property` is not provided and cannot be inferred from
+            `model_metadata`.
+        TypeError
+            If `model_metadata` is not None, ModelMetadata, or dict.
+
+        Warns
+        -----
+        UserWarning
+            If `time_step` is not provided in `model_metadata` and cannot be inferred
+            from the data.
+        """
+        # Check that we have a reference_time_property.
+        if reference_time_property is None:
+            if model_metadata is None:
+                raise ValueError("`reference_time_property` must be provided.")
+
+            # Extract from metadata regardless of type.
+            if isinstance(model_metadata, dict):
+                reference_time_property = model_metadata.get("reference_time_property")
+            else:
+                reference_time_property = getattr(model_metadata, "reference_time_property", None)
+
+            if not reference_time_property:
+                raise ValueError(
+                    "`reference_time_property` must be provided in model_metadata "
+                    "or as an explicit argument."
+                )
+        self.reference_time_property = reference_time_property
+
+        # Initialize data early since _compute_time_step() needs it.
+        self.data = data.copy() if data is not None else Data(dict())
+
+        # Do we already have a time_step?
+        if model_metadata is not None:
+            if isinstance(model_metadata, dict):
+                time_step = model_metadata.get("time_step")
+            else:
+                time_step = getattr(model_metadata, "time_step", None)
+        else:
+            time_step = None
+
+        # Determine time_step if not provided in metadata.
+        if time_step is None:
+            if self.data.cell_data:
+                # Create temporary metadata for _compute_time_step().
+                temp_metadata = ModelMetadata(reference_time_property=reference_time_property)
+                self.model_metadata = temp_metadata
+                time_step = self._compute_time_step(variable_time_step)
+            else:
+                msg = (
+                    "`time_step` is not defined in model metadata and there is no data "
+                    "in the model to infer it. Set the time_step manually with "
+                    "`model.set_time_step(your_timestep)`. Alternatively, you can set it "
+                    "automatically with `model.set_time_step()` once you have added data "
+                    "to the model."
+                )
+                warnings.warn(msg, UserWarning, stacklevel=2)
+
+        # Create final model metadata with all required values.
+        # TODO: add unit extracted from props_metadata, if any
+        if model_metadata is None:
+            self.model_metadata = ModelMetadata(
+                reference_time_property=reference_time_property, time_step=time_step
+            )
+        elif isinstance(model_metadata, ModelMetadata):
+            metadata_dict = model_metadata.to_dict()  # to avoid mutating the original
+            metadata_dict["reference_time_property"] = reference_time_property
+            metadata_dict["time_step"] = time_step
+            self.model_metadata = ModelMetadata.from_dict(metadata_dict)
+        elif isinstance(model_metadata, dict):
+            metadata_dict = model_metadata.copy()  # to avoid mutating the original
+            metadata_dict["reference_time_property"] = reference_time_property
+            metadata_dict["time_step"] = time_step
+            self.model_metadata = ModelMetadata.from_dict(metadata_dict)
+        else:
+            raise TypeError(
+                f"`model_metadata` must be None, ModelMetadata, or dict, "
+                f"got `{type(model_metadata).__name__}`."
+            )
+
+        # Set the rest of the attributes.
+        self.props_metadata = (
+            props_metadata.copy() if props_metadata is not None else PropsMetadata()
+        )
         self._updater = ModelUpdater()
 
+        # Update to actually compute the "timepoint" property.
+        if self.data.cell_data and "timepoint" not in self.get_node_properties():
+            self.add_custom_property(
+                Timepoint(
+                    property=create_timepoint_property(),
+                    data=self.data,
+                    time_step=self.model_metadata.time_step,
+                    reference_time_property=self.model_metadata.reference_time_property,
+                )
+            )
+            self.props_metadata._protect_prop("timepoint")
+            self.update(["timepoint"])
+
         # Add an optional argument to ask to compute the CycleLineage?
-        # Add a description in which people can put whatever they want
-        # (string, facultative), or maybe a dict with a few keys (description,
-        # author, etc.) that can be defined by the users, or create a function
-        # to allow the users to add their own fields?
         # Should name be optional or set to None? If optional and not provided, an
         # error will be raised when trying to access the attribute.
         # Same for provenance, description, etc.
@@ -75,21 +178,26 @@ class Model:
     def __str__(self) -> str:
         if self.model_metadata and self.data:
             nb_lin = self.data.number_of_lineages()
-            if "name" in self.model_metadata and "provenance" in self.model_metadata:
+            if (
+                hasattr(self.model_metadata, "name")
+                and self.model_metadata.name
+                and hasattr(self.model_metadata, "provenance")
+                and self.model_metadata.provenance
+            ):
                 txt = (
-                    f"Model named '{self.model_metadata['name']}' "
+                    f"Model named '{self.model_metadata.name}' "
                     f"with {nb_lin} lineage{'s' if nb_lin > 1 else ''}, "
-                    f"built from {self.model_metadata['provenance']}."
+                    f"built from {self.model_metadata.provenance}."
                 )
-            elif "name" in self.model_metadata:
+            elif hasattr(self.model_metadata, "name") and self.model_metadata.name:
                 txt = (
-                    f"Model named '{self.model_metadata['name']}' "
+                    f"Model named '{self.model_metadata.name}' "
                     f"with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
                 )
-            elif "provenance" in self.model_metadata:
+            elif hasattr(self.model_metadata, "provenance") and self.model_metadata.provenance:
                 txt = (
                     f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}, "
-                    f"built from {self.model_metadata['provenance']}."
+                    f"built from {self.model_metadata.provenance}."
                 )
             else:
                 txt = f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
@@ -97,20 +205,239 @@ class Model:
             nb_lin = self.data.number_of_lineages()
             txt = f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
         elif self.model_metadata:
-            if "name" in self.model_metadata and "provenance" in self.model_metadata:
+            if (
+                hasattr(self.model_metadata, "name")
+                and self.model_metadata.name
+                and hasattr(self.model_metadata, "provenance")
+                and self.model_metadata.provenance
+            ):
                 txt = (
-                    f"Model named '{self.model_metadata['name']}' "
-                    f"built from {self.model_metadata['provenance']}."
+                    f"Model named '{self.model_metadata.name}' "
+                    f"built from {self.model_metadata.provenance}."
                 )
-            elif "name" in self.model_metadata:
-                txt = f"Model named '{self.model_metadata['name']}'."
-            elif "provenance" in self.model_metadata:
-                txt = f"Model built from {self.model_metadata['provenance']}."
+            elif hasattr(self.model_metadata, "name") and self.model_metadata.name:
+                txt = f"Model named '{self.model_metadata.name}'."
+            elif hasattr(self.model_metadata, "provenance") and self.model_metadata.provenance:
+                txt = f"Model built from {self.model_metadata.provenance}."
             else:
                 txt = "Empty model."
         else:
             txt = "Empty model."
         return txt
+
+    def __getstate__(self) -> dict[str, Any]:
+        """
+        Custom pickle state preparation.
+
+        Converts ModelMetadata to dictionary format for serialization.
+        This ensures that ModelMetadata with dynamic fields is properly serialized.
+
+        Returns
+        -------
+        dict[str, Any]
+            State dictionary for pickling.
+        """
+        state = self.__dict__.copy()
+        # Convert ModelMetadata to dict for pickling
+        if hasattr(self, "model_metadata") and self.model_metadata is not None:
+            state["model_metadata"] = self.model_metadata.to_dict()
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """
+        Custom pickle state restoration.
+
+        Converts dictionary back to ModelMetadata instance during deserialization.
+        This ensures that ModelMetadata with dynamic fields is properly restored.
+
+        Parameters
+        ----------
+        state : dict[str, Any]
+            State dictionary from pickling.
+        """
+        # Restore ModelMetadata from dict
+        if "model_metadata" in state and isinstance(state["model_metadata"], dict):
+            state["model_metadata"] = ModelMetadata.from_dict(state["model_metadata"])
+        self.__dict__.update(state)
+
+    def _compute_time_step(self, variable_time_step: bool = False) -> int | float:
+        """
+        Compute the time step of the model based on the reference time property.
+
+        By default, the time step is calculated as the minimum difference between
+        consecutive timepoints across all lineages.
+        If the timepoints are irregularly sampled, i.e. not evenly spaced regardless of gaps,
+        `variable_time_step` should be set to True. In this case, the greatest common divisor (GCD)
+        of the differences is used instead. However, this method is more computationally intensive
+        and should be used only when necessary.
+
+        Parameters
+        ----------
+        variable_time_step : bool, optional
+            If True, the time step is computed using the GCD of time differences.
+            If False, the minimum time difference is used (default is False).
+
+        Returns
+        -------
+        int | float
+            The computed time step of the model.
+
+        Raises
+        ------
+        ValueError
+            If no lineages are found in the model data.
+            If no valid time intervals are found (e.g., all nodes have the same timepoint).
+            If reference_time_property is not found in lineage nodes.
+
+        Examples
+        --------
+        Regular time sampling (variable_time_step=False):
+        >>> # Time differences: [1, 1, 1, 1] → time_step = 1 (minimum)
+        >>> model._compute_time_step(variable_time_step=False)
+        1
+
+        Regular time sampling with consistent base interval but gaps (variable_time_step=False):
+        >>> # Time differences: [1, 2, 1, 3] → time_step = 1 (minimum)
+        >>> model._compute_time_step(variable_time_step=False)
+        1
+
+        Regular time sampling with consistent float interval but gaps (variable_time_step=False):
+        >>> # Time differences: [1.5, 3.0, 1.5] → time_step = 1.5 (minimum)
+        >>> model._compute_time_step(variable_time_step=False)
+        1.5
+
+        Irregular time sampling (variable_time_step=True):
+        >>> # Time differences: [1.5, 3.0, 1.1, 0.3] → time_step = 0.1 (GCD)
+        >>> model._compute_time_step(variable_time_step=True)
+        0.1
+        >>> # Default minimum time difference yields incorrect result:
+        >>> model._compute_time_step(variable_time_step=False)
+        0.3
+
+        Negative timepoints are supported in all cases:
+        >>> # Timepoints like [-5, -3, -1, 0, 2] (regular intervals with negatives)
+        >>> # Time differences: [2, 2, 1, 2] → time_step = 1 (minimum)
+        >>> model._compute_time_step(variable_time_step=False)
+        1
+        >>> # Timepoints like [-5, -2, 0, 1.5] (irregular intervals with negatives)
+        >>> # Time differences: [3, 2, 1.5] → time_step = 0.5 (GCD)
+        >>> model._compute_time_step(variable_time_step=True)
+        0.5
+
+        When to use variable_time_step=False:
+        - Regular timepoints like [0, 1, 2, 3, 4] (classic case)
+        - Timepoints like [0, 1, 3, 4, 5, 7] (some gaps but consistent unit steps)
+        - Timepoints like [0, 1.5, 3.0, 4.5] (non-integer but regular intervals)
+        - Timepoints like [0, 1, 1.5, 2.5, 4] (non-integer and gaps but regular intervals)
+
+        When to use variable_time_step=True:
+        - Timepoints like [0, 1, 2.5, 3.5] (non-integer and gaps but no regular intervals)
+          => cannot reach all timepoints by adding a fixed step of 1 from the minimum,
+             we need a smaller step to reach all timepoints (0.5 in this case)
+        - Timepoints like [0, 1.1, 2.5, 2.8] (non-integer and irregular intervals)
+        - Timepoints like [0, 1.1, 3.42, 4.0, 7.61] (completely random intervals)
+        """
+        # TODO: Should time_step be recomputed when doing an update?
+        lineages = self.data.cell_data.values()
+        if not lineages:
+            raise ValueError("Cannot compute time step: no lineages found.")
+
+        time_diffs = set()
+        time_prop = self.model_metadata.reference_time_property
+        for lin in lineages:
+            for source_node, target_node in lin.edges():
+                if time_prop not in lin.nodes[source_node]:
+                    raise ValueError(
+                        f"Reference time property '{time_prop}' not found in node {source_node} "
+                        f"of lineage {lin.graph.get('lineage_ID', 'of unknown ID')}."
+                    )
+                source_time = lin.nodes[source_node][time_prop]
+                if time_prop not in lin.nodes[target_node]:
+                    raise ValueError(
+                        f"Reference time property '{time_prop}' not found in node {target_node} "
+                        f"of lineage {lin.graph.get('lineage_ID', 'of unknown ID')}."
+                    )
+                target_time = lin.nodes[target_node][time_prop]
+                time_diff = abs(target_time - source_time)
+                if time_diff > 0:
+                    time_diffs.add(time_diff)
+
+        if not time_diffs:
+            raise ValueError("Cannot compute time step: no valid time intervals found.")
+
+        time_step: int | float
+        if variable_time_step:  # use GCD of all time differences
+            # TODO: extract EPSILON as a constant
+            EPSILON = 1e-12
+            if all(abs(td - round(td)) < EPSILON for td in time_diffs):
+                # Treat numbers like 2.0000001 as integers for more efficient GCD calculation
+                time_step = gcd(*map(int, map(round, time_diffs)))
+            else:
+                time_step = self._gcd_floats(time_diffs)
+        else:  # use minimum time difference
+            time_step = min(time_diffs)
+
+        return time_step
+
+    def set_time_step(
+        self,
+        time_step: int | float | None = None,
+        variable_time_step: bool = False,
+    ) -> None:
+        """
+        Set the time step of the model.
+
+        Parameters
+        ----------
+        time_step : int | float | None
+            The time step to set for the model. If None, the time step will be
+            computed automatically based on the data in the model (default is None).
+        variable_time_step : bool, optional
+            If True and time_step is None, the time step will be computed using
+            the GCD of time differences. If False, the minimum time difference
+            will be used (default is False).
+
+        # TODO: should I copy the docstring examples from _compute_time_step() here?
+        """
+        if time_step is None:
+            time_step = self._compute_time_step(variable_time_step)
+        self.model_metadata.time_step = time_step
+
+    @staticmethod
+    def _gcd_floats(values: set[float]) -> float:
+        """
+        Calculate GCD for floating point numbers using exact decimal precision.
+
+        This method converts floats to Decimals to avoid precision issues,
+        scales them to integers, computes the GCD, and then rescales back to float.
+
+        Parameters
+        ----------
+        values : set[float]
+            Set of floating point numbers to compute the GCD for.
+
+        Returns
+        -------
+        float
+            The GCD of the input floating point numbers.
+        """
+        # Convert to Decimal for exact precision handling.
+        # The str() conversion is to avoid precision issues with floats.
+        decimal_values = list(map(Decimal, map(str, values)))
+
+        # Find the maximum number of decimal places among all values
+        max_decimal_places = 0
+        for d in decimal_values:
+            exponent = d.as_tuple().exponent
+            if isinstance(exponent, int) and exponent < 0:
+                max_decimal_places = max(max_decimal_places, abs(exponent))
+
+        # Scale all values to integers
+        scale_factor = 10**max_decimal_places
+        int_values = [int(d * scale_factor) for d in decimal_values]
+        result_scaled = gcd(*int_values)
+
+        return float(result_scaled / scale_factor)
 
     def get_space_unit(self) -> str | None:
         """
@@ -120,13 +447,41 @@ class Model:
         -------
         str
             The spatial unit of the model.
-
-        Raises
-        ------
-        KeyError
-            If the metadata does not contain the spatial unit.
         """
-        return self.model_metadata["space_unit"]
+        return self.model_metadata.space_unit
+
+    def get_pixel_width(self) -> float | None:
+        """
+        Return the pixel width of the model.
+
+        Returns
+        -------
+        float
+            The pixel width of the model.
+        """
+        return self.model_metadata.pixel_width
+
+    def get_pixel_height(self) -> float | None:
+        """
+        Return the pixel height of the model.
+
+        Returns
+        -------
+        float
+            The pixel height of the model.
+        """
+        return self.model_metadata.pixel_height
+
+    def get_pixel_depth(self) -> float | None:
+        """
+        Return the pixel depth of the model.
+
+        Returns
+        -------
+        float
+            The pixel depth of the model.
+        """
+        return self.model_metadata.pixel_depth
 
     def get_pixel_size(self) -> dict[str, float] | None:
         """
@@ -135,14 +490,18 @@ class Model:
         Returns
         -------
         dict[str, float]
-            The pixel size of the model.
-
-        Raises
-        ------
-        KeyError
-            If the metadata does not contain the pixel size.
+            The pixel size of the model as a dictionary with 'width', 'height', and 'depth' keys.
+            Returns None if no pixel sizes are defined.
         """
-        return self.model_metadata["pixel_size"]
+        pixel_size = {}
+        if self.model_metadata.pixel_width is not None:
+            pixel_size["width"] = self.model_metadata.pixel_width
+        if self.model_metadata.pixel_height is not None:
+            pixel_size["height"] = self.model_metadata.pixel_height
+        if self.model_metadata.pixel_depth is not None:
+            pixel_size["depth"] = self.model_metadata.pixel_depth
+
+        return pixel_size if pixel_size else None
 
     def get_time_unit(self) -> str | None:
         """
@@ -152,13 +511,8 @@ class Model:
         -------
         str
             The temporal unit of the model.
-
-        Raises
-        ------
-        KeyError
-            If the metadata does not contain the temporal unit.
         """
-        return self.model_metadata["time_unit"]
+        return self.model_metadata.time_unit
 
     def get_time_step(self) -> float | None:
         """
@@ -166,15 +520,10 @@ class Model:
 
         Returns
         -------
-        int
+        float
             The time step of the model.
-
-        Raises
-        ------
-        KeyError
-            If the metadata does not contain the time step.
         """
-        return self.model_metadata["time_step"]
+        return self.model_metadata.time_step
 
     def get_units_per_properties(self) -> dict[str, list[str]]:
         """
@@ -420,17 +769,37 @@ class Model:
             list(self.data.cycle_data.values()), lin_prop, lin_prop_value
         )
 
-    def get_next_available_lineage_ID(self) -> int:
+    def get_next_available_lineage_ID(self, positive: bool = True) -> int:
         """
-        Return the next available lineage ID.
+        Return the next available lineage ID, positive by default.
+
+        Parameters
+        ----------
+        positive : bool, optional
+            True to return a positive lineage ID,
+            False to return a negative lineage ID (default is True).
 
         Returns
         -------
         int
             The next available lineage ID.
+
+        Notes
+        -----
+        Next available lineage IDs are determined by finding the maximum
+        (for positive IDs) or minimum (for negative IDs) existing lineage ID
+        in the model and incrementing or decrementing it by one, respectively.
+        This way, lineage IDs of previously deleted lineages are not reused.
+        This avoids potential confusion or errors in lineage handling.
+
+        The returned lineage ID cannot be 0 in case the user wants to reserve
+        it for special purposes.
+
+        Positive lineage IDs should be used for lineages with more than one cell.
+        Negative lineage IDs should be used for lineages with a single cell,
+        and are equal to the negative of the cell ID.
         """
-        # TODO: maybe should check for unused IDs
-        return max(self.data.cell_data.keys()) + 1
+        return self.data._get_next_available_lineage_ID(positive)
 
     def has_property(
         self,
@@ -530,7 +899,20 @@ class Model:
         # by the updater methods to avoid incoherent states.
         # => saving a copy of the model before the update so we can roll back?
 
-        self._updater._update(self.data, props_to_update)
+        time_step = self.model_metadata.time_step
+        if time_step is None:
+            # TODO: add "see documentation" to the error message or explain
+            # directly how to set it?
+            raise ValueError(
+                "The time step of the model is currently not defined "
+                "but is required for cycle lineage computation."
+            )
+        self._updater._update(
+            self.data,
+            time_prop=self.model_metadata.reference_time_property,
+            time_step=time_step,
+            props_to_update=props_to_update,
+        )
 
         # self.data._unfreeze_lineage_data()
 
@@ -688,7 +1070,7 @@ class Model:
         self,
         lid: int,
         cid: int | None = None,
-        frame: int | None = 0,
+        time_value: int | float = 0,
         prop_values: dict[str, Any] | None = None,
     ) -> int:
         """
@@ -700,8 +1082,8 @@ class Model:
             The ID of the lineage to which the cell belongs.
         cid : int, optional
             The ID of the cell to add (default is None).
-        frame : int, optional
-            The frame of the cell (default is 0).
+        time_value : int | float, optional
+            The value of the reference time property for the cell to add (default is 0).
         prop_values : dict, optional
             A dictionary containing the properties values of the cell to add.
 
@@ -722,6 +1104,9 @@ class Model:
         except KeyError as err:
             raise KeyError(f"Lineage with ID {lid} does not exist.") from err
 
+        if not isinstance(time_value, (int, float)):
+            raise ValueError("Time value must be an integer or a float.")
+
         if prop_values is not None:
             for prop in prop_values:
                 if not self.props_metadata._has_prop(prop):
@@ -729,7 +1114,26 @@ class Model:
         else:
             prop_values = dict()
 
-        cid = lineage._add_cell(cid, frame, **prop_values)
+        time_step = self.model_metadata.time_step
+        timepoint = None
+        if time_step is not None:
+            # Is the time value consistent with the time step of the model?
+            if time_value % time_step != 0:
+                warnings.warn(
+                    f"The time value {time_value} is not consistent with the time step "
+                    f"of the model ({time_step}). Use model.set_time_step() to set or "
+                    f"compute a new time step compatible with all time values."
+                )
+            # Timepoint value computation.
+            timepoint = time_value // time_step
+
+        cid = lineage._add_cell(
+            cid,
+            time_prop_name=self.model_metadata.reference_time_property,
+            time_prop_value=time_value,
+            timepoint=timepoint,
+            **prop_values,
+        )
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
@@ -825,7 +1229,13 @@ class Model:
         else:
             prop_values = dict()
 
-        source_lineage._add_link(source_cid, target_cid, target_lineage, **prop_values)
+        source_lineage._add_link(
+            source_cid,
+            target_cid,
+            target_lineage,
+            time_prop_name=self.model_metadata.reference_time_property,
+            **prop_values,
+        )
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
@@ -942,36 +1352,56 @@ class Model:
 
     def add_absolute_age(
         self,
-        in_time_unit: bool = False,
+        custom_time_property: str | None = None,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the cell absolute age property to the model.
 
-        The absolute age of a cell is defined as the number of nodes since
+        The absolute age of a cell is defined as the time elapsed since
         the beginning of the lineage. Absolute age of the root is 0.
-        It is given in frames by default, but can be converted
-        to the time unit of the model if specified.
+        By default, it is computed using the reference time property
+        of the model, but a custom time property can be specified.
 
         Parameters
         ----------
-        in_time_unit : bool, optional
-            True to give the absolute age in the time unit of the model,
-            False to give it in frames (default is False).
+        custom_time_property : str, optional
+            Identifier of the time property to use for the computation.
+            If None, the reference time property of the model will be used.
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "absolute_age".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Absolute age".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Age of the cell since the start of the lineage".
         """
+        if custom_time_property is None:
+            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+        else:
+            time_prop = self.props_metadata.props.get(custom_time_property)
+        if time_prop is None:
+            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+
         prop = tracking.create_absolute_age_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["time_unit"] if in_time_unit else "frame",
+            custom_name=custom_name,
+            custom_description=custom_description,
+            dtype=time_prop.dtype,
+            unit=time_prop.unit,
         )
-        time_step = self.model_metadata["time_step"] if in_time_unit else 1
-        self.add_custom_property(tracking.AbsoluteAge(prop, time_step))
+        self.add_custom_property(tracking.AbsoluteAge(prop, time_prop.identifier))
 
     def add_angle(
         self,
         unit: Literal["radian", "degree"] = "radian",
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the angle property to the model.
@@ -984,10 +1414,18 @@ class Model:
         unit : Literal["radian", "degree"], optional
             Unit of the angle (default is "radian").
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "angle".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Angle".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Angle of the cell trajectory between two consecutive detections".
         """
         prop = motion.create_angle_property(
             custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
             unit=unit,
         )
         self.add_custom_property(motion.Angle(prop, unit))
@@ -995,6 +1433,8 @@ class Model:
     def add_branch_mean_displacement(
         self,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the branch mean displacement property to the model.
@@ -1005,11 +1445,20 @@ class Model:
         Parameters
         ----------
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "branch_mean_displacement".
+        custom_name : str, optional
+            New name for the property. If None, the name will be
+            "Branch mean displacement".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Mean displacement of the cell during the cell cycle".
         """
         prop = motion.create_branch_mean_displacement_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["space_unit"],
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self.model_metadata.space_unit or "pixel",
         )
         self.add_custom_property(motion.BranchMeanDisplacement(prop))
 
@@ -1017,6 +1466,8 @@ class Model:
         self,
         include_incoming_edge: bool = False,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the branch mean speed property to the model.
@@ -1027,41 +1478,65 @@ class Model:
         Parameters
         ----------
         include_incoming_edge : bool, optional
-            Whether to include the distance between the first cell and its predecessor.
-            Default is False.
+            Whether to include the distance between the first cell of the cycle
+            and its predecessor. Default is False.
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "branch_mean_speed".
+        custom_name : str, optional
+            New name for the property. If None, the name will be
+            "Branch mean speed".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Mean speed of the cell during the cell cycle".
         """
+        space_unit = self.model_metadata.space_unit or "pixel"
+        time_unit = self.model_metadata.time_unit or "frame"
         prop = motion.create_branch_mean_speed_property(
             custom_identifier=custom_identifier,
-            unit=f"{self.model_metadata['space_unit']} / {self.model_metadata['time_unit']}",
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=f"{space_unit} / {time_unit}",
         )
         self.add_custom_property(motion.BranchMeanSpeed(prop, include_incoming_edge))
 
     def add_branch_total_displacement(
         self,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
-        Add the branch displacement property to the model.
+        Add the branch total displacement property to the model.
 
-        The branch total displacement is defined as the displacement of the cell during
-        the cell cycle.
+        The branch total displacement is defined as the displacement of the cell
+        during the cell cycle.
 
         Parameters
         ----------
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "branch_total_displacement".
+        custom_name : str, optional
+            New name for the property. If None, the name will be
+            "Branch total displacement".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Displacement of the cell during the cell cycle".
         """
         prop = motion.create_branch_total_displacement_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["space_unit"],
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self.model_metadata.space_unit or "pixel",
         )
         self.add_custom_property(motion.BranchTotalDisplacement(prop))
 
     def add_cycle_completeness(
         self,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the cell cycle completeness property to the model.
@@ -1076,31 +1551,50 @@ class Model:
         Parameters
         ----------
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "cycle_completeness".
+        custom_name : str, optional
+            New name for the property. If None, the name will be
+            "Cycle completeness".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Completeness of the cell cycle".
         """
         prop = tracking.create_cycle_completeness_property(
             custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
         )
         self.add_custom_property(tracking.CycleCompleteness(prop))
 
     def add_cell_displacement(
         self,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
-        Add the displacement property to the model.
+        Add the cell displacement property to the model.
 
-        The displacement is defined as the Euclidean distance between the positions
+        The cell displacement is defined as the Euclidean distance between the positions
         of the cell at two consecutive detections.
 
         Parameters
         ----------
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "cell_displacement".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cell displacement".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Displacement of the cell between two consecutive detections".
         """
         prop = motion.create_cell_displacement_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["space_unit"],
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self.model_metadata.space_unit or "pixel",
         )
         self.add_custom_property(motion.CellDisplacement(prop))
 
@@ -1111,14 +1605,22 @@ class Model:
         method_width: str = "mean",
         width_ignore_tips: bool = False,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         prop = morpho.create_rod_length_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["space_unit"],
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self.model_metadata.space_unit or "pixel",
         )
+        pixel_size = self.get_pixel_size()
+        size_x = pixel_size["width"] if pixel_size else 1.0
+        size_y = pixel_size["height"] if pixel_size else 1.0
+        assert size_x == size_y, "Pixels must be isotropic in x and y."
         calc = morpho.RodLength(
             prop,
-            self.model_metadata["pixel_size"]["width"],
+            size_x,
             skel_algo=skel_algo,
             tolerance=tolerance,
             method_width=method_width,
@@ -1128,35 +1630,48 @@ class Model:
 
     def add_cell_speed(
         self,
-        in_time_unit: bool = False,
+        custom_time_property: str | None = None,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
-        Add the speed property to the model.
+        Add the cell speed property to the model.
 
-        The speed is defined as the displacement of the cell between two consecutive
-        detections divided by the time elapsed between these two detections.
-        It is given in the spatial unit of the model per time unit by default,
-        but can be converted to the spatial unit of the model per frame if specified.
+        The cell speed is defined as the displacement of the cell between two
+        consecutive detections divided by the time elapsed between these two detections.
+        By default, it is computed using the reference time property
+        of the model, but a custom time property can be specified.
 
         Parameters
         ----------
-        in_time_unit : bool, optional
-            True to give the speed in the time unit of the model,
-            False to give it in frames (default is False).
+        custom_time_property : str, optional
+            Identifier of the time property to use for the computation.
+            If None, the reference time property of the model will be used.
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "cell_speed".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cell speed".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Speed of the cell between two consecutive detections".
         """
+        if custom_time_property is None:
+            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+        else:
+            time_prop = self.props_metadata.props.get(custom_time_property)
+        if time_prop is None:
+            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+
         prop = motion.create_cell_speed_property(
             custom_identifier=custom_identifier,
-            unit=(
-                f"{self.model_metadata['space_unit']}/{self.model_metadata['time_unit']}"
-                if in_time_unit
-                else f"{self.model_metadata['space_unit']}/frame"
-            ),
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=time_prop.unit,
         )
-        time_step = self.model_metadata["time_step"] if in_time_unit else 1
-        self.add_custom_property(motion.CellSpeed(prop, time_step))
+        self.add_custom_property(motion.CellSpeed(prop, time_prop.identifier))
 
     def add_rod_width(
         self,
@@ -1165,14 +1680,22 @@ class Model:
         method_width: str = "mean",
         width_ignore_tips: bool = False,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         prop = morpho.create_rod_width_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["space_unit"],
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self.model_metadata.space_unit or "pixel",
         )
+        pixel_size = self.get_pixel_size()
+        size_x = pixel_size["width"] if pixel_size else 1.0
+        size_y = pixel_size["height"] if pixel_size else 1.0
+        assert size_x == size_y, "Pixels must be isotropic in x and y."
         calc = morpho.RodWidth(
             prop,
-            self.model_metadata["pixel_size"]["width"],
+            size_x,
             skel_algo=skel_algo,
             tolerance=tolerance,
             method_width=method_width,
@@ -1182,112 +1705,174 @@ class Model:
 
     def add_division_rate(
         self,
-        in_time_unit: bool = False,
+        custom_time_property: str | None = None,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the division rate property to the model.
 
         Division rate is defined as the number of divisions per time unit.
-        It is the inverse of the division time.
-        It is given in divisions per frame by default, but can be converted
-        to divisions per time unit of the model if specified.
+        It is the inverse of the division time. It is given in divisions per frame
+        by default, but can be converted to divisions per time unit of the model if specified.
 
         Parameters
         ----------
-        in_time_unit : bool, optional
-            True to give the division rate in the time unit of the model,
-            False to give it in frames (default is False).
+        custom_time_property : str, optional
+            Identifier of the time property to use for the computation.
+            If None, the reference time property of the model will be used.
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "division_rate".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Division rate".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Number of divisions per time unit".
         """
+        if custom_time_property is None:
+            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+        else:
+            time_prop = self.props_metadata.props.get(custom_time_property)
+        if time_prop is None:
+            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+
         prop = tracking.create_division_rate_property(
             custom_identifier=custom_identifier,
-            unit=f"1/{self.model_metadata['time_unit']}" if in_time_unit else "1/frame",
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=time_prop.unit,
         )
-        time_step = self.model_metadata["time_step"] if in_time_unit else 1
-        self.add_custom_property(tracking.DivisionRate(prop, time_step))
+        self.add_custom_property(tracking.DivisionRate(prop, time_prop.identifier))
 
     def add_division_time(
         self,
-        in_time_unit: bool = False,
+        custom_time_property: str | None = None,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the division time property to the model.
 
-        Division time is defined as the time between 2 divisions.
-        It is also the length of the cell cycle of the cell of interest.
-        It is given in frames by default, but can be converted
-        to the time unit of the model if specified.
+        Division time is defined as the time elapsed between two successive divisions.
+        It is given in frames by default, but can be converted to the time unit of the
+        model if specified.
 
         Parameters
         ----------
-        in_time_unit : bool, optional
-            True to give the division time in the time unit of the model,
-            False to give it in frames (default is False).
+        custom_time_property : str, optional
+            Identifier of the time property to use for the computation.
+            If None, the reference time property of the model will be used.
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "division_time".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Division time".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Time elapsed between two successive divisions".
         """
+        if custom_time_property is None:
+            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+        else:
+            time_prop = self.props_metadata.props.get(custom_time_property)
+        if time_prop is None:
+            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+
         prop = tracking.create_division_time_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["time_unit"] if in_time_unit else "frame",
+            custom_name=custom_name,
+            custom_description=custom_description,
+            dtype=time_prop.dtype,
+            unit=time_prop.unit,
         )
-        time_step = self.model_metadata["time_step"] if in_time_unit else 1
-        self.add_custom_property(tracking.DivisionTime(prop, time_step))
+
+        self.add_custom_property(tracking.DivisionTime(prop, time_prop.identifier))
 
     def add_relative_age(
         self,
-        in_time_unit: bool = False,
+        custom_time_property: str | None = None,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the cell relative age property to the model.
 
-        The relative age of a cell is defined as the number of nodes since
-        the start of the cell cycle (i.e. previous division, or beginning
-        of the lineage).
-        It is given in frames by default, but can be converted
-        to the time unit of the model if specified.
+        The relative age of a cell is defined as the time elapsed since the start
+        of the cell cycle (i.e. previous division, or beginning of the lineage).
+        Relative age of the first cell of a cell cycle is 0. It is given in frames
+        by default, but can be converted to the time unit of the model if specified.
 
         Parameters
         ----------
-        in_time_unit : bool, optional
-            True to give the relative age in the time unit of the model,
-            False to give it in frames (default is False).
+        custom_time_property : str, optional
+            Identifier of the time property to use for the computation.
+            If None, the reference time property of the model will be used.
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "relative_age".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Relative age".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Age of the cell since the start of the current cell cycle".
         """
+        if custom_time_property is None:
+            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+        else:
+            time_prop = self.props_metadata.props.get(custom_time_property)
+        if time_prop is None:
+            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+
         prop = tracking.create_relative_age_property(
             custom_identifier=custom_identifier,
-            unit=self.model_metadata["time_unit"] if in_time_unit else "frame",
+            custom_name=custom_name,
+            custom_description=custom_description,
+            dtype=time_prop.dtype,
+            unit=time_prop.unit,
         )
-        time_step = self.model_metadata["time_step"] if in_time_unit else 1
-        self.add_custom_property(tracking.RelativeAge(prop, time_step))
+        self.add_custom_property(tracking.RelativeAge(prop, time_prop.identifier))
 
     def add_straightness(
         self,
         include_incoming_edge: bool = False,
         custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
     ) -> None:
         """
         Add the straightness property to the model.
 
-        The straightness is defined as the ratio between the Euclidean distance
-        between the first and last positions of the cell and the total length
-        of the cell trajectory.
+        The straightness is defined as the ratio of the Euclidean distance between
+        the start and end cells of the cell cycle to the total distance traveled.
         Straightness is a value between 0 and 1. A straight line has a straightness
         of 1, while a trajectory with many turns has a straightness close to 0.
 
         Parameters
         ----------
         include_incoming_edge : bool, optional
-            Whether to include the distance between the first cell and its predecessor.
-            Default is False.
+            Whether to include the distance between the first cell and its predecessor
+            (default is False).
         custom_identifier : str, optional
-            New identifier for the property (default is None).
+            New identifier for the property. If None, the identifier will be
+            "straightness".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Straightness".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Straightness of the cell trajectory during the cell cycle".
         """
-        prop = motion.create_straightness_property(custom_identifier=custom_identifier)
+        prop = motion.create_straightness_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
         self.add_custom_property(motion.Straightness(prop, include_incoming_edge))
 
     def _get_prop_method(self, prop_identifier: str) -> Callable:
@@ -1484,6 +2069,15 @@ class Model:
     def add_cycle_data(self) -> None:
         """
         Compute and add the cycle lineages of the model.
+
+        This method computes the cycle lineages from the cell lineages
+        and add them to the model. It also adds the default properties
+        associated with cycle lineages to the PropsMetadata.
+
+        Raises
+        ------
+        ValueError
+            If the time step of the model is not defined.
         """
         # if self._updater._update_required:
         #     txt = (
@@ -1494,8 +2088,18 @@ class Model:
         #     raise UpdateRequiredError(txt)
         # TODO: I have nothing to check if the structure was modified since
         # _update_required becomes true when properties are added...
-        self.data._add_cycle_lineages()
-        self.props_metadata._add_cycle_lineage_props()
+        time_prop = self.model_metadata.reference_time_property
+        time_step = self.model_metadata.time_step
+        if time_step is None:
+            # TODO: add "see documentation" to the error message or explain
+            # directly how to set it?
+            raise ValueError(
+                "The time step of the model is currently not defined "
+                "but is required for cycle lineage computation."
+            )
+        time_unit = self.model_metadata.time_unit
+        self.data._add_cycle_lineages(time_prop, time_step)
+        self.props_metadata._add_cycle_lineage_props(time_unit)
 
     def _categorize_props(self, props: list[str] | None) -> tuple[list[str], list[str], list[str]]:
         """
@@ -1735,16 +2339,17 @@ class Model:
         assert nb_nodes == len(df)
 
         # Reoder the columns to have pycellin mandatory properties first.
+        time_prop = self.model_metadata.reference_time_property
         columns = df.columns.tolist()
         try:
             columns.remove("lineage_ID")
-            columns.remove("frame")
+            columns.remove(time_prop)
             columns.remove("cell_ID")
         except ValueError as err:
             raise err
-        columns = ["lineage_ID", "frame", "cell_ID"] + columns
+        columns = ["lineage_ID", time_prop, "cell_ID"] + columns
         df = df[columns]
-        df.sort_values(["lineage_ID", "frame", "cell_ID"], ignore_index=True, inplace=True)
+        df.sort_values(["lineage_ID", time_prop, "cell_ID"], ignore_index=True, inplace=True)
 
         return df
 
@@ -1886,6 +2491,9 @@ class Model:
         """
         Save the model to a file by pickling it.
 
+        Uses custom __getstate__ and __setstate__ methods to ensure ModelMetadata
+        with dynamic fields is properly serialized and deserialized.
+
         Parameters
         ----------
         path : str
@@ -1900,6 +2508,9 @@ class Model:
     def load_from_pickle(path: str) -> "Model":
         """
         Load a model from a pickled pycellin file.
+
+        Uses custom __getstate__ and __setstate__ methods to ensure ModelMetadata
+        with dynamic fields is properly serialized and deserialized.
 
         Parameters
         ----------
