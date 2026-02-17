@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import importlib
 import warnings
 from copy import deepcopy
 from pathlib import Path
@@ -20,14 +19,11 @@ from pycellin.custom_types import PropertyType
 from pycellin.graph.properties.core import create_cell_id_property
 from pycellin.io.utils import (
     _split_graph_into_lineages,
-    check_fusions,
-    _update_node_prop_key,
     _update_lineage_prop_key,
     _update_lineages_IDs_key,
+    _update_node_prop_key,
+    check_fusions,
 )
-
-
-# TODO: convert "POSITION_T" into "time"
 
 
 def _get_units(
@@ -651,8 +647,6 @@ def _update_props_metadata(
     for axis in ["x", "y", "z"]:
         props_md._change_prop_identifier(f"POSITION_{axis.upper()}", f"cell_{axis}")
         props_md._change_prop_description(f"cell_{axis}", f"{axis.upper()} coordinate of the cell")
-    props_md._change_prop_identifier("FRAME", "frame")
-    props_md._protect_prop("frame")
     if segmentation:
         roi_coord_prop = Property(
             identifier="ROI_coords",
@@ -854,7 +848,6 @@ def _parse_model_tag(
         for key_name, new_key in [
             ("TRACK_ID", "lineage_ID"),  # mandatory
             ("ID", "cell_ID"),  # mandatory
-            ("FRAME", "frame"),  # mandatory
             ("name", "cell_name"),  # confusing
         ]:
             _update_node_prop_key(lin, key_name, new_key)
@@ -1043,21 +1036,19 @@ def load_TrackMate_XML(
     pixel_size = _get_pixel_size(dict_tags["Settings"])
     metadata: dict[str, Any] = {}
     metadata["reference_time_property"] = "POSITION_T"
-    # Dimensions info
-    # TODO: currently we can have frame as reference time property but seconds as unit
-    # Maybe remove time_unit and time_step from metadata?
+    # Dimensions info.
     metadata["space_unit"] = units["spatialunits"]
     metadata["time_unit"] = units["timeunits"]
     metadata["time_step"] = _get_time_step(dict_tags["Settings"])
     metadata["pixel_width"] = pixel_size.get("pixel_width")
     metadata["pixel_height"] = pixel_size.get("pixel_height")
     metadata["pixel_depth"] = pixel_size.get("pixel_depth")
-    # Traceability info
+    # Traceability info.
     metadata["name"] = Path(xml_path).stem
     metadata["file_location"] = xml_path
     metadata["provenance"] = "TrackMate"
     metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
-    # The rest of the tags
+    # The rest of the tags.
     for tag_name, tag in dict_tags.items():
         element_string = ET.tostring(tag, encoding="utf-8").decode()
         metadata[tag_name] = element_string

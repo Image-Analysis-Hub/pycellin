@@ -559,7 +559,7 @@ def _write_FilteredTracks(
     xf.write(f"\n{' ' * 2}")
 
 
-def _update_nodes(lin: CellLineage) -> None:
+def _update_nodes(lin: CellLineage, frame_prop: str) -> None:
     """
     Update the node properties in the lineage to match TrackMate requirements.
 
@@ -567,10 +567,14 @@ def _update_nodes(lin: CellLineage) -> None:
     ----------
     lin : CellLineage
         Lineage whose nodes to update.
+    frame_prop : str
+        Name of the property corresponding to the frame/timepoint.
+    lin : CellLineage
+        Lineage whose nodes to update.
     """
     for _, data in lin.nodes(data=True):
         data["ID"] = data.pop("cell_ID")
-        data["FRAME"] = data.pop("frame")
+        data["FRAME"] = data.pop(frame_prop)
         data["VISIBILITY"] = 1
         try:
             data["name"] = data.pop("cell_name")
@@ -638,7 +642,7 @@ def _update_lineages(lin: CellLineage) -> None:
             pass  # Not a mandatory property.
 
 
-def _update_model_data(model: Model) -> None:
+def _update_model_data(model: Model, frame_prop: str) -> None:
     """
     Update the data in the model to match TrackMate requirements.
 
@@ -646,9 +650,11 @@ def _update_model_data(model: Model) -> None:
     ----------
     model : Model
         Model whose data to update.
+    frame_prop : str
+        Name of the property corresponding to the frame/timepoint.
     """
     for lin in model.data.cell_data.values():
-        _update_nodes(lin)
+        _update_nodes(lin, frame_prop)
         _update_edges(lin)
         _update_lineages(lin)
 
@@ -710,20 +716,23 @@ def _remove_non_numeric_props(model: Model) -> None:
         warnings.warn(msg)
 
 
-def _rename_props(props_md: PropsMetadata) -> None:
+def _rename_props(props_md: PropsMetadata, frame_prop: str) -> None:
     """
     Rename some properties in the properties metadata to match TrackMate requirements.
 
-    Parameters
     ----------
     props_md : PropsMetadata
         Properties metadata to modify.
+    frame_prop : str
+        Name of the property corresponding to the frame/timepoint.
     """
     props_md._unprotect_prop("lineage_ID")
     props_md._change_prop_identifier("lineage_ID", "TRACK_ID")
     props_md._change_prop_description("TRACK_ID", "Track ID")
-    props_md._unprotect_prop("frame")
-    props_md._change_prop_identifier("frame", "FRAME")
+
+    if frame_prop != "FRAME":
+        props_md._unprotect_prop(frame_prop)
+        props_md._change_prop_identifier(frame_prop, "FRAME")
 
 
 def _remove_props(props_md: PropsMetadata) -> None:
@@ -852,7 +861,7 @@ def _update_location_props(props_md: PropsMetadata) -> None:
             pass  # Not a mandatory property.
 
 
-def _update_props_metadata(model: Model) -> None:
+def _update_props_metadata(model: Model, frame_prop: str) -> None:
     """
     Update the properties metadata in the model to match TrackMate requirements.
 
@@ -860,12 +869,13 @@ def _update_props_metadata(model: Model) -> None:
     ----------
     model : Model
         Model whose metadata to update.
+    frame_prop : str
+        Name of the property corresponding to the frame/timepoint.
     """
-    props_md = model.props_metadata
-    _rename_props(props_md)
-    _remove_props(props_md)
-    _add_mandatory_props(props_md)
-    _update_location_props(props_md)
+    _rename_props(model.props_metadata, frame_prop)
+    _remove_props(model.props_metadata)
+    _add_mandatory_props(model.props_metadata)
+    _update_location_props(model.props_metadata)
 
 
 def _prepare_model_for_export(
@@ -882,8 +892,18 @@ def _prepare_model_for_export(
     model : Model
         Model to prepare for export.
     """
-    _update_props_metadata(model)
-    _update_model_data(model)
+    # TrackMate requires a FRAME property. If the model does not have a frame-like
+    # property ("FRAME", "frame"...), pycellin fallbacks to "timepoint".
+    frame_prop = None
+    for prop in model.props_metadata._get_prop_dict_from_prop_type("node").values():
+        if prop.identifier.lower() == "frame":
+            frame_prop = prop.identifier
+            break
+    if frame_prop is None:
+        frame_prop = "timepoint"
+
+    _update_props_metadata(model, frame_prop)
+    _update_model_data(model, frame_prop)
     _remove_non_numeric_props(model)
 
 
