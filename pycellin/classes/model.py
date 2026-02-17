@@ -2377,6 +2377,8 @@ class Model:
             tmp_df = nx.to_pandas_edgelist(
                 lineage, source="source_cell_ID", target="target_cell_ID"
             )
+            tmp_df["source_cell_ID"] = tmp_df["source_cell_ID"].astype(int)
+            tmp_df["target_cell_ID"] = tmp_df["target_cell_ID"].astype(int)
             tmp_df["lineage_ID"] = lin_ID
             list_df.append(tmp_df)
         df = pd.concat(list_df, ignore_index=True)
