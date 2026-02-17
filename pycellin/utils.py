@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+import importlib.metadata
 from typing import Literal, get_args, get_origin
 
 import networkx as nx
 import networkx.algorithms.isomorphism as iso
+
 
 
 def check_literal_type(value, literal_type) -> bool:
@@ -70,3 +72,10 @@ def is_equal(obt, exp):
         return True
     else:
         return False
+      
+def get_pycellin_version() -> str:
+    """Get pycellin version from package metadata"""
+    try:
+        return importlib.metadata.version("pycellin")
+    except importlib.metadata.PackageNotFoundError:
+        return "development"

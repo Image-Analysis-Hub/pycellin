@@ -7,7 +7,7 @@ loader.py
 This module is part of the pycellin package.
 
 This module provides functions to load and process trackpy data into pycellin models.
-It includes a function to load a trackpy file into pycellin model and helper functions
+It includes a function to load a trackpy file into a pycellin model and helper functions
 to create metadata, properties, and lineage graphs.
 
 References:
@@ -16,8 +16,8 @@ References:
 - trackpy GitHub: https://github.com/soft-matter/trackpy
 """
 
-from datetime import datetime
 import importlib
+from datetime import datetime
 from itertools import pairwise
 from typing import Any
 
@@ -27,14 +27,14 @@ import pandas as pd
 from pycellin.classes import (
     CellLineage,
     Data,
-    PropsMetadata,
     Model,
+    PropsMetadata,
 )
 from pycellin.graph.properties.core import (
+    create_cell_coord_property,
     create_cell_id_property,
     create_frame_property,
     create_lineage_id_property,
-    create_cell_coord_property,
 )
 
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import copy
 import math
-from typing import Literal
 import warnings
+from typing import Literal
 
 import networkx as nx
 
@@ -22,22 +23,53 @@ class Data:
         The cycle lineages stored, if any.
     """
 
-    def __init__(self, data: dict[int, CellLineage], add_cycle_data: bool = False) -> None:
+    def __init__(self, cell_data: dict[int, CellLineage]) -> None:
         """
         Initialize a Data object.
 
         Parameters
         ----------
-        data : dict[int, CellLineage]
+        cell_data : dict[int, CellLineage]
             The cell lineages to store.
         add_cycle_data : bool, optional
             Whether to compute and store the cycle lineages, by default False.
         """
-        self.cell_data = data
-        if add_cycle_data:
-            self._add_cycle_lineages()
-        else:
-            self.cycle_data = None  # type: dict[int, CycleLineage] | None
+        self.cell_data = cell_data
+        self.cycle_data: dict[int, CycleLineage] | None = None
+
+    def __deepcopy__(self, memo) -> "Data":
+        """
+        Create a deep copy of the Data object.
+
+        Parameters
+        ----------
+        memo : dict
+            A dictionary used by the copy module to track already copied objects
+            to handle circular references.
+
+        Returns
+        -------
+        Data
+            A deep copy of the Data object with all cell lineages and
+            cycle lineages (if present) independently copied.
+        """
+        # Cell_data
+        cell_data_copy = {
+            lid: copy.deepcopy(lineage, memo) for lid, lineage in self.cell_data.items()
+        }
+
+        # Cycle_data
+        cycle_data_copy = None
+        if self.cycle_data is not None:
+            cycle_data_copy = {
+                lid: copy.deepcopy(cycle_lineage, memo)
+                for lid, cycle_lineage in self.cycle_data.items()
+            }
+
+        new_data = Data(cell_data_copy)
+        new_data.cycle_data = cycle_data_copy
+
+        return new_data
 
     def __repr__(self) -> str:
         return f"Data(cell_data={self.cell_data!r}, cycle_data={self.cycle_data!r})"
@@ -49,26 +81,39 @@ class Data:
             txt = ""
         return f"Data object with {self.number_of_lineages()} cell lineages{txt}."
 
-    def _add_cycle_lineages(self, lids: list[int] | None = None) -> None:
+    def _add_cycle_lineages(
+        self, time_prop: str, time_step: int | float, lids: list[int] | None = None
+    ) -> None:
         """
         Add the cell cycle lineages from the cell lineages.
 
         Parameters
         ----------
+        time_prop : str
+            The name of the time property to use for computation
+            of cycle lineage properties.
+        time_step : int | float
+            The time step between two consecutive time points.
         lids : list[int], optional
             The IDs of the lineages for which to compute cycle lineages,
             by default None i.e. all lineages.
         """
         if lids is None:
             lids = list(self.cell_data.keys())
-        self.cycle_data = {lin_id: self._compute_cycle_lineage(lin_id) for lin_id in lids}
+        self.cycle_data = {
+            lin_id: self._compute_cycle_lineage(time_prop, time_step, lin_id) for lin_id in lids
+        }
 
-    def _compute_cycle_lineage(self, lid: int) -> CycleLineage:
+    def _compute_cycle_lineage(self, time_prop: str, time_step: float, lid: int) -> CycleLineage:
         """
         Compute and return the cycle lineage corresponding to a given cell lineage.
 
         Parameters
         ----------
+        time_prop : str
+            The name of the time property to use for cycle lineage computation.
+        time_step : float
+            The time step between two consecutive time points.
         lid : int
             The ID of the cell lineage for which to compute the cycle lineage.
 
@@ -77,7 +122,7 @@ class Data:
         CycleLineage
             The cycle lineage corresponding to the cell lineage.
         """
-        return CycleLineage(self.cell_data[lid])
+        return CycleLineage(time_prop, time_step, self.cell_data[lid])
 
     def _freeze_lineage_data(self):
         """
@@ -97,6 +142,26 @@ class Data:
     #     """
     #     for lineage in self.cell_data.values():
     #         Lineage.unfreeze(lineage)
+
+    def copy(self, deep: bool = True) -> "Data":
+        """
+        Create a copy of the Data instance.
+
+        Parameters
+        ----------
+        deep : bool, optional
+            If True (default), creates a deep copy. If False, creates a shallow copy.
+
+        Returns
+        -------
+        Data
+            A copy of the Data instance. If deep=True, all cell lineages and
+            cycle lineages (if present) are copied independently.
+        """
+        if deep:
+            return copy.deepcopy(self)
+        else:
+            return copy.copy(self)
 
     def number_of_lineages(self) -> int:
         """
@@ -122,13 +187,57 @@ class Data:
                 warnings.warn(msg)
         return len(self.cell_data)
 
+    def _get_next_available_lineage_ID(self, positive: bool) -> int:
+        """
+        Return the next available lineage ID, either positive or negative.
+
+        Parameters
+        ----------
+        positive : bool, optional
+            True to return a positive lineage ID,
+            False to return a negative lineage ID.
+
+        Returns
+        -------
+        int
+            The next available lineage ID.
+
+        Notes
+        -----
+        Next available lineage IDs are determined by finding the maximum
+        (for positive IDs) or minimum (for negative IDs) existing lineage ID
+        in the model and incrementing or decrementing it by one, respectively.
+        This way, lineage IDs of previously deleted lineages are not reused.
+        This avoids potential confusion or errors in lineage handling.
+
+        The returned lineage ID cannot be 0 in case the user wants to reserve
+        it for special purposes.
+
+        Positive lineage IDs should be used for lineages with more than one cell.
+        Negative lineage IDs should be used for lineages with a single cell,
+        and are equal to the negative of the cell ID.
+        """
+        new_lin_id: int
+        if len(self.cell_data) == 0:
+            new_lin_id = 1 if positive else -1
+        else:
+            if positive:
+                new_lin_id = max(self.cell_data.keys()) + 1
+                if new_lin_id < 1:
+                    new_lin_id = 1
+            else:
+                new_lin_id = min(self.cell_data.keys()) - 1
+                if new_lin_id > -1:
+                    new_lin_id = -1
+        return new_lin_id
+
     def get_closest_cell(
         self,
         nid: int,
         lineage: CellLineage,
         radius: float = 0,
         time_window: int = 0,
-        time_window_type: Literal["before", "after", "symetric"] = "symetric",
+        time_window_type: Literal["before", "after", "symmetric"] = "symmetric",
         lineages_to_search: list[CellLineage] | None = None,
         reference: Literal["center", "border"] = "center",
     ) -> tuple[int, CellLineage]:
@@ -146,8 +255,8 @@ class Data:
             If 0, the whole space is considered.
         time_window : int, optional
             The time window to consider, by default 0 i.e. only the current frame.
-        time_window_type : Literal["before", "after", "symetric"], optional
-            The type of time window to consider, by default "symetric".
+        time_window_type : Literal["before", "after", "symmetric"], optional
+            The type of time window to consider, by default "symmetric".
         lineages_to_search : list[CellLineage], optional
             The lineages to search in, by default None i.e. all lineages.
         reference : Literal["center", "border"], optional
@@ -174,8 +283,9 @@ class Data:
         nid: int,
         lineage: CellLineage,
         radius: float = 0,
+        time_prop: str = "timepoint",
         time_window: int = 0,
-        time_window_type: Literal["before", "after", "symetric"] = "symetric",
+        time_window_type: Literal["before", "after", "symmetric"] = "symmetric",
         lineages_to_search: list[CellLineage] | None = None,
         reference: Literal["center", "border"] = "center",
     ) -> list[tuple[int, CellLineage]]:
@@ -191,10 +301,12 @@ class Data:
         radius : float, optional
             The maximum distance to consider, by default 0.
             If 0, the whole space is considered.
+        time_prop: str = "timepoint"
+            The name of the time property. Default is "timepoint".
         time_window : int, optional
             The time window to consider, by default 0 i.e. only the current frame.
-        time_window_type : Literal["before", "after", "symetric"], optional
-            The type of time window to consider, by default "symetric".
+        time_window_type : Literal["before", "after", "symmetric"], optional
+            The type of time window to consider, by default "symmetric".
         lineages_to_search : list[CellLineage], optional
             The lineages to search in, by default None i.e. all lineages.
         reference : Literal["center", "border"], optional
@@ -208,25 +320,29 @@ class Data:
         """
         # TODO: implement the reference parameter
 
-        # Identification of the frames to search in.
-        center_frame = lineage.nodes[nid]["frame"]
+        # Identification of the time interval to search in.
+        center_timepoint = lineage.nodes[nid][time_prop]
         if time_window == 0:
-            frames_to_search = [center_frame]
+            timepoints_to_search = [center_timepoint]
         else:
-            if time_window_type == "symetric":
-                frames_to_search = list(
-                    range(center_frame - time_window, center_frame + time_window + 1)
+            if time_window_type == "symmetric":
+                timepoints_to_search = list(
+                    range(center_timepoint - time_window, center_timepoint + time_window + 1)
                 )
             elif time_window_type == "before":
-                frames_to_search = list(range(center_frame - time_window, center_frame + 1))
+                timepoints_to_search = list(
+                    range(center_timepoint - time_window, center_timepoint + 1)
+                )
             elif time_window_type == "after":
-                frames_to_search = list(range(center_frame, center_frame + time_window + 1))
+                timepoints_to_search = list(
+                    range(center_timepoint, center_timepoint + time_window + 1)
+                )
             else:
                 raise ValueError(
                     f"Unknown time window type: '{time_window_type}'."
-                    " Should be 'before', 'after' or 'symetric'."
+                    " Should be 'before', 'after' or 'symmetric'."
                 )
-            frames_to_search.sort()
+            timepoints_to_search.sort()
 
         # Identification of nodes that are good candidates,
         # i.e. nodes that are in the time window
@@ -235,7 +351,11 @@ class Data:
             lineages_to_search = list(self.cell_data.values())
         candidate_cells = {}
         for lin in lineages_to_search:
-            nodes = [node for node, frame in lin.nodes(data="frame") if frame in frames_to_search]
+            nodes = [
+                node
+                for node, timepoint in lin.nodes(data=time_prop)
+                if timepoint in timepoints_to_search
+            ]
             if nodes:
                 candidate_cells[lin] = nodes
         # Need to remove the node itself from the candidates.

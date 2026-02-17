@@ -3,8 +3,6 @@
 import importlib
 import warnings
 from copy import deepcopy
-from datetime import datetime
-import importlib.metadata
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +27,9 @@ from pycellin.io.utils import (
 )
 
 
+# TODO: convert "POSITION_T" into "time"
+
+
 def _get_units(
     element: ET._Element,
 ) -> dict[str, str]:
@@ -49,7 +50,7 @@ def _get_units(
         A dictionary where the keys are the attribute names and the values are the
         corresponding attribute values (units information).
     """
-    units = {}  # type: dict[str, str]
+    units: dict[str, str] = {}
     if element.attrib:
         units = deepcopy(element.attrib)
     if "spatialunits" not in units:
@@ -786,7 +787,7 @@ def _parse_model_tag(
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
     # the resulting graph will be disconnected.
-    graph = nx.DiGraph()  # type: nx.DiGraph
+    graph: nx.DiGraph = nx.DiGraph()
 
     # So as not to load the entire XML file into memory at once, we're
     # using an iterator to browse over the tags one by one.
@@ -989,7 +990,7 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
         pixel_size = {}
         for key_TM, key_pycellin in zip(
             ["pixelwidth", "pixelheight", "voxeldepth"],
-            ["width", "height", "depth"],
+            ["pixel_width", "pixel_height", "pixel_depth"],
         ):
             try:
                 pixel_size[key_pycellin] = float(element.attrib[key_TM])
@@ -1038,22 +1039,25 @@ def load_TrackMate_XML(
 
     # Add in the metadata all the TrackMate info that was not in the
     # TrackMate XML `Model` tag.
-    metadata = {}  # type: dict[str, Any]
+    dict_tags = _get_specific_tags(xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"])
+    pixel_size = _get_pixel_size(dict_tags["Settings"])
+    metadata: dict[str, Any] = {}
+    metadata["reference_time_property"] = "POSITION_T"
+    # Dimensions info
+    # TODO: currently we can have frame as reference time property but seconds as unit
+    # Maybe remove time_unit and time_step from metadata?
+    metadata["space_unit"] = units["spatialunits"]
+    metadata["time_unit"] = units["timeunits"]
+    metadata["time_step"] = _get_time_step(dict_tags["Settings"])
+    metadata["pixel_width"] = pixel_size.get("pixel_width")
+    metadata["pixel_height"] = pixel_size.get("pixel_height")
+    metadata["pixel_depth"] = pixel_size.get("pixel_depth")
+    # Traceability info
     metadata["name"] = Path(xml_path).stem
     metadata["file_location"] = xml_path
     metadata["provenance"] = "TrackMate"
-    metadata["date"] = str(datetime.now())
-    metadata["space_unit"] = units["spatialunits"]
-    metadata["time_unit"] = units["timeunits"]
-    try:
-        version = importlib.metadata.version("pycellin")
-    except importlib.metadata.PackageNotFoundError:
-        version = "unknown"
-    metadata["pycellin_version"] = version
     metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
-    dict_tags = _get_specific_tags(xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"])
-    metadata["time_step"] = _get_time_step(dict_tags["Settings"])
-    metadata["pixel_size"] = _get_pixel_size(dict_tags["Settings"])
+    # The rest of the tags
     for tag_name, tag in dict_tags.items():
         element_string = ET.tostring(tag, encoding="utf-8").decode()
         metadata[tag_name] = element_string
@@ -1074,14 +1078,16 @@ if __name__ == "__main__":
     model = load_TrackMate_XML(xml)  # , keep_all_spots=True, keep_all_tracks=True)
     print(model)
     print(model.props_metadata)
-    print(model.model_metadata["pycellin_version"])
-    print(model.model_metadata)
+    # print(model.model_metadata.pycellin_version)
+    # print(model.model_metadata)
     # print(model.props_md.node_props.keys())
     # print(model.data)
     # for lin in model.get_cell_lineages():
     #     print(lin)
 
-    # lineage = model.data.cell_data[0]
+    lineage = model.data.cell_data[0]
+    # for n in lineage.nodes(data=True):
+    #     print(n)
     # lineage.plot(node_hover_props=["cell_ID", "cell_name"])
 
     # lineage = model.data.cell_data[0]

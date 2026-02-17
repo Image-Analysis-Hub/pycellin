@@ -6,7 +6,7 @@ A collection of diverse morphology properties that can be added to
 lineage graphs.
 """
 
-from itertools import product, combinations
+from itertools import combinations, product
 from operator import itemgetter
 
 import matplotlib.pyplot as plt
@@ -14,7 +14,7 @@ import networkx as nx
 import numpy as np
 from PIL import Image, ImageDraw
 from scipy import ndimage as ndi
-from shapely.geometry import Point, LineString
+from shapely.geometry import LineString, Point
 from skimage.morphology import skeletonize
 
 from pycellin.classes.lineage import CellLineage
@@ -430,11 +430,16 @@ def get_width_and_length(
     return width, length
 
 
-def create_rod_width_property(custom_identifier: str | None, unit: str) -> Property:
+def create_rod_width_property(
+    custom_identifier: str | None,
+    unit: str,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
     return Property(
         identifier=custom_identifier or "rod_width",
-        name="Rod width",
-        description="Width of the cell, for rod-shaped cells only",
+        name=custom_name or "Rod width",
+        description=custom_description or "Width of the cell, for rod-shaped cells only",
         provenance="pycellin",
         prop_type="node",
         lin_type="CellLineage",
@@ -480,11 +485,16 @@ class RodWidth(NodeLocalPropCalculator):
         )[0]
 
 
-def create_rod_length_property(custom_identifier: str | None, unit: str) -> Property:
+def create_rod_length_property(
+    custom_identifier: str | None,
+    unit: str,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
     return Property(
         identifier=custom_identifier or "rod_length",
-        name="Rod length",
-        description="Length of the cell, for rod-shaped cells only",
+        name=custom_name or "Rod length",
+        description=custom_description or "Length of the cell, for rod-shaped cells only",
         provenance="pycellin",
         prop_type="node",
         lin_type="CellLineage",
@@ -584,7 +594,9 @@ class RodLength(NodeLocalPropCalculator):
 if __name__ == "__main__":
     import itertools
     import math
+
     from shapely.geometry import Polygon
+
     from pycellin.io.trackmate import load_TrackMate_XML
 
     xml = "sample_data/FakeTracks.xml"

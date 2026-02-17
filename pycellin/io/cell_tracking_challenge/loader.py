@@ -16,23 +16,22 @@ References:
 https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content%20conventions.pdf
 """
 
-from datetime import datetime
-import importlib
+import re
 from itertools import pairwise
 from pathlib import Path
-import re
 from typing import Any, Tuple
 
 import networkx as nx
-from skimage.measure import regionprops, find_contours
 import tifffile
+from skimage.measure import find_contours, regionprops
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.graph.properties.core import (
+    create_cell_coord_property,
     create_cell_id_property,
     create_frame_property,
     create_lineage_id_property,
-    create_cell_coord_property,
+    create_timepoint_property,
 )
 
 # TODO: what if the first frame is empty...?
@@ -137,7 +136,7 @@ def _create_metadata(
         The pixel depth in the spatial unit. If not provided, it will be set to 1.0
         by default.
     time_unit : str, optional
-        The temporal unit of the data. If not provided, it will be set to 'frame'
+        The temporal unit of the data. If not provided, it will be set to None
         by default.
     time_step : float, optional
         The time step in the temporal unit. If not provided, it will be set to 1.0
@@ -148,39 +147,32 @@ def _create_metadata(
     dict[str, Any]
         A dictionary containing the generated metadata.
     """
-    metadata = {}  # type: dict[str, Any]
+    metadata: dict[str, Any] = {}
     metadata["name"] = Path(file_path).stem
     metadata["file_location"] = file_path
     metadata["provenance"] = "CTC"
-    metadata["date"] = str(datetime.now())
-    try:
-        version = importlib.metadata.version("pycellin")
-    except importlib.metadata.PackageNotFoundError:
-        version = "unknown"
-    metadata["Pycellin_version"] = version
 
     if time_unit is not None:
         metadata["time_unit"] = time_unit
     else:
-        metadata["time_unit"] = "frame"
+        metadata["time_unit"] = None
     if time_step is not None:
         metadata["time_step"] = time_step
     else:
         metadata["time_step"] = 1
 
     complete_metadata_flag = [0, 0, 0, 0]
-    metadata["pixel_size"] = {}
     if space_unit is not None:
         metadata["space_unit"] = space_unit
         complete_metadata_flag[0] = 1
     if pixel_width is not None:
-        metadata["pixel_size"]["width"] = pixel_width
+        metadata["pixel_width"] = pixel_width
         complete_metadata_flag[1] = 1
     if pixel_height is not None:
-        metadata["pixel_size"]["height"] = pixel_height
+        metadata["pixel_height"] = pixel_height
         complete_metadata_flag[2] = 1
     if pixel_depth is not None:
-        metadata["pixel_size"]["depth"] = pixel_depth
+        metadata["pixel_depth"] = pixel_depth
         complete_metadata_flag[3] = 1
 
     if sum(complete_metadata_flag) < 4:
@@ -190,11 +182,11 @@ def _create_metadata(
             if complete_metadata_flag[0] == 0:
                 metadata["space_unit"] = "pixel"
             if complete_metadata_flag[1] == 0:
-                metadata["pixel_size"]["width"] = 1.0
+                metadata["pixel_width"] = 1.0
             if complete_metadata_flag[2] == 0:
-                metadata["pixel_size"]["height"] = 1.0
+                metadata["pixel_height"] = 1.0
             if complete_metadata_flag[3] == 0:
-                metadata["pixel_size"]["depth"] = 1.0
+                metadata["pixel_depth"] = 1.0
 
     return metadata
 
@@ -216,9 +208,9 @@ def _create_PropsMetadata(seg_data: bool) -> PropsMetadata:
     """
     props_md = PropsMetadata()
     cell_ID_prop = create_cell_id_property()
-    frame_prop = create_frame_property()
+    ref_time_prop = create_timepoint_property()
     lin_ID_prop = create_lineage_id_property()
-    for prop in [cell_ID_prop, frame_prop, lin_ID_prop]:
+    for prop in [cell_ID_prop, ref_time_prop, lin_ID_prop]:
         props_md._add_prop(prop)
         props_md._protect_prop(prop.identifier)
     if seg_data:
@@ -591,25 +583,31 @@ def load_CTC_file(
         time_unit=time_unit,
         time_step=time_step,
     )
-    fd = _create_PropsMetadata(labels_path is not None)
-    model = Model(md, fd, Data(data))
+    props_md = _create_PropsMetadata(labels_path is not None)
+    model = Model(
+        model_metadata=md,
+        props_metadata=props_md,
+        data=Data(data),
+        reference_time_property="timepoint",
+    )
     return model
 
 
 if __name__ == "__main__":
     ctc_file = "sample_data/FakeTracks_TMtoCTC.txt"
     ctc_file = "sample_data/Ecoli_growth_on_agar_pad_TMtoCTC.txt"
-    ctc_file = (
-        "/mnt/data/Films_Laure/Benchmarks/CTC/"
-        "EvaluationSoftware/testing_dataset/03_RES/res_track.txt"
-    )
+    # ctc_file = (
+    #     "/mnt/data/Films_Laure/Benchmarks/CTC/"
+    #     "EvaluationSoftware/testing_dataset/03_RES/res_track.txt"
+    # )
 
-    ctc_file = "/mnt/data/Code/pycellin/TrackMate/01_RES/res_track.txt"
+    # ctc_file = "/mnt/data/Code/pycellin/TrackMate/01_RES/res_track.txt"
     labels_path = "/mnt/data/Code/pycellin/TrackMate/01_RES"
     # labels_path = "/mnt/data/Benchmarks/Segmentation/03_RES"
 
-    model = load_CTC_file(ctc_file, labels_path)
+    model = load_CTC_file(ctc_file)  # , labels_path)
     print(model)
+    print(model.model_metadata)
     print(model.props_metadata)
     print(model.data)
 

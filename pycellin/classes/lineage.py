@@ -534,7 +534,14 @@ class CellLineage(Lineage):
         else:
             return max(self.nodes()) + 1
 
-    def _add_cell(self, nid: int | None = None, frame: int | None = 0, **cell_props) -> int:
+    def _add_cell(
+        self,
+        nid: int | None = None,
+        time_prop_name: str = "timepoint",
+        time_prop_value: int | float = 0,
+        timepoint: int | None = None,
+        **cell_props,
+    ) -> int:
         """
         Add a cell to the lineage graph.
 
@@ -543,8 +550,12 @@ class CellLineage(Lineage):
         nid : int, optional
             The node ID to assign to the new cell. If None, the next
             available node ID is used.
-        frame : int, optional
-            The frame of the cell. If None, the frame is set to 0.
+        time_prop_name : str, optional
+            The name of the time property. Default is "timepoint".
+        time_prop_value : int | float, optional
+            The value of the time property. Default is 0.
+        timepoint : int, optional
+            The timepoint value to set for the cell. If None, it is not set.
         **cell_props
             Property values to set for the node.
 
@@ -568,7 +579,9 @@ class CellLineage(Lineage):
             raise ValueError(msg)
         self.add_node(nid, **cell_props)
         self.nodes[nid]["cell_ID"] = nid
-        self.nodes[nid]["frame"] = frame
+        self.nodes[nid][time_prop_name] = time_prop_value
+        if timepoint is not None:
+            self.nodes[nid]["timepoint"] = timepoint
         return nid
 
     def _remove_cell(self, nid: int) -> dict[str, Any]:
@@ -606,6 +619,7 @@ class CellLineage(Lineage):
         source_nid: int,
         target_nid: int,
         target_lineage: CellLineage | None = None,
+        time_prop_name: str = "timepoint",
         **link_props,
     ) -> dict[int, int] | None:
         """
@@ -624,6 +638,8 @@ class CellLineage(Lineage):
         target_lineage : CellLineage, optional
             The lineage of the target cell. If None, the target cell is
             assumed to be in the same lineage as the source cell.
+        time_prop_name : str, optional
+            The name of the time property. Default is "timepoint".
         **link_props
             Property values to set for the edge.
 
@@ -673,7 +689,10 @@ class CellLineage(Lineage):
             raise FusionError(target_nid, source_lid)
 
         # Check that the link respects the flow of time.
-        if self.nodes[source_nid]["frame"] >= target_lineage.nodes[target_nid]["frame"]:
+        if (
+            self.nodes[source_nid][time_prop_name]
+            >= target_lineage.nodes[target_nid][time_prop_name]
+        ):
             raise TimeFlowError(
                 source_nid,
                 target_nid,
@@ -682,13 +701,13 @@ class CellLineage(Lineage):
             )
 
         conflicting_ids = None
+        ids_mapping = {}  # a dict of {old_ID : new_ID}
         if target_lineage != self:
             # Identify cell ID conflict between lineages.
             target_descendants = nx.descendants(target_lineage, target_nid) | {target_nid}
             conflicting_ids = set(self.nodes()) & set(target_descendants)
             if conflicting_ids:
                 next_id = self._get_next_available_node_ID()
-                ids_mapping = {}  # a dict of {old_ID : new_ID}
                 for id in conflicting_ids:
                     ids_mapping[id] = next_id
                     next_id += 1
@@ -831,7 +850,7 @@ class CellLineage(Lineage):
         Warns
         -----
         UserWarning
-            If the cells have no 'frame' property to order them.
+            If the timepoint property is missing when ordering the cells.
         """
         try:
             ancestors = super().get_ancestors(cid)
@@ -839,9 +858,12 @@ class CellLineage(Lineage):
             raise KeyError(f"Cell {cid} is not in the lineage.") from err
         if sorted:
             try:
-                ancestors.sort(key=lambda n: self.nodes[n]["frame"])
+                ancestors.sort(key=lambda n: self.nodes[n]["timepoint"])
             except KeyError:
-                warnings.warn("No 'frame' property to order the cells.")
+                warnings.warn(
+                    "No 'timepoint' property to order the cells. "
+                    "Returning ancestors in arbitrary order."
+                )
         return ancestors
 
     def get_divisions(self, cids: list[int] | None = None) -> list[int]:
@@ -969,7 +991,7 @@ class CellLineage(Lineage):
         """
         Return the sister cells of a given cell.
 
-        Sister cells are cells that are on the same frame
+        Sister cells are cells that are on the same timepoint
         and share the same parent cell.
 
         Parameters
@@ -988,7 +1010,7 @@ class CellLineage(Lineage):
             If the given cell has more than one parent cell.
         """
         sister_cells = []
-        current_frame = self.nodes[cid]["frame"]
+        current_tp = self.nodes[cid]["timepoint"]
         if not self.is_root(cid):
             current_cell_cycle = self.get_cell_cycle(cid)
             parents = list(self.predecessors(current_cell_cycle[0]))
@@ -998,7 +1020,7 @@ class CellLineage(Lineage):
                 for child in children:
                     sister_cell_cycle = self.get_cell_cycle(child)
                     sister_cells.extend(
-                        [n for n in sister_cell_cycle if self.nodes[n]["frame"] == current_frame]
+                        [n for n in sister_cell_cycle if self.nodes[n]["timepoint"] == current_tp]
                     )
             elif len(parents) > 1:
                 lid, _ = CellLineage._get_lineage_ID_and_err_msg(self)
@@ -1061,8 +1083,8 @@ class CellLineage(Lineage):
     def plot(
         self,
         ID_prop: str = "cell_ID",
-        y_prop: str = "frame",
-        y_legend: str = "Time (frames)",
+        y_prop: str = "timepoint",
+        y_legend: str = "Time (timepoints)",
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -1086,9 +1108,9 @@ class CellLineage(Lineage):
         ID_prop : str, optional
             The property of the nodes to use as the node ID. "cell_ID" by default.
         y_prop : str, optional
-            The property of the nodes to use as the y-axis. "frame" by default.
+            The property of the nodes to use as the y-axis. "timepoint" by default.
         y_legend : str, optional
-            The label of the y-axis. "Time (frames)" by default.
+            The label of the y-axis. "Time (timepoints)" by default.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -1173,6 +1195,8 @@ class CellLineage(Lineage):
 
     @staticmethod
     # TODO: I don't think this function is good design, even if it factorises code.
+    # actually y_prop (prop name) and y_legend should be replaced by the Property y_prop
+    # so we can access name and unit to display in the axis legend.
     def _get_lineage_ID_and_err_msg(lineage):
         """
         Return the lineage ID and a text to display in error messages.
@@ -1199,7 +1223,9 @@ class CellLineage(Lineage):
 
 
 class CycleLineage(Lineage):
-    def __init__(self, cell_lineage: CellLineage | None = None) -> None:
+    def __init__(
+        self, time_prop: str, time_step: float, cell_lineage: CellLineage | None = None
+    ) -> None:
         super().__init__()
 
         if cell_lineage is not None:
@@ -1226,10 +1252,10 @@ class CycleLineage(Lineage):
                 self.nodes[n]["cells"] = cells_in_cycle
                 # How many cells in the cycle?
                 self.nodes[n]["cycle_length"] = len(cells_in_cycle)
-                # How many frames in the cycle?
+                # How long does the cycle last?
                 self.nodes[n]["cycle_duration"] = (
-                    cell_lineage.nodes[last]["frame"] - cell_lineage.nodes[first]["frame"]
-                ) + 1
+                    (cell_lineage.nodes[last][time_prop] - cell_lineage.nodes[first][time_prop]) + 1
+                ) * time_step
                 root = self.get_root()
                 if isinstance(root, list):
                     raise LineageStructureError("A cycle lineage cannot have multiple roots.")
