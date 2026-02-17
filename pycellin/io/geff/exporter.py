@@ -14,11 +14,12 @@ References:
 
 import copy
 
+import geff
+import geff_spec
 import networkx as nx
-from geff import write_nx
-from geff.metadata_schema import Axis, DisplayHint, GeffMetadata, PropMetadata
 
 from pycellin.classes import CellLineage, Model, Property
+from pycellin.io.utils import _ensure_data_metadata_consistency
 
 
 def _find_node_overlaps(lineages: list[CellLineage]) -> dict[int, list[int]]:
@@ -40,7 +41,7 @@ def _find_node_overlaps(lineages: list[CellLineage]) -> dict[int, list[int]]:
 
     for lin_index, lin in enumerate(lineages):
         for nid in lin.nodes:
-            if nid in node_to_lineages:  # Overlap found
+            if nid in node_to_lineages:  # overlap found
                 if nid not in overlaps:
                     overlaps[nid] = [node_to_lineages[nid], lin_index]
                 else:
@@ -134,10 +135,10 @@ def _build_axes(
     has_x: bool,
     has_y: bool,
     has_z: bool,
-    has_t: bool,
+    time_prop: str,
     space_unit: str | None,
     time_unit: str | None,
-) -> list[Axis]:
+) -> list[geff_spec.Axis]:
     """
     Build a list of Axis objects for GEFF metadata.
 
@@ -149,8 +150,8 @@ def _build_axes(
         Whether the y-axis is present.
     has_z : bool
         Whether the z-axis is present.
-    has_t : bool
-        Whether the time axis is present.
+    time_prop : str
+        Name of the time property.
     space_unit : str | None
         Unit for spatial axes (e.g., "micrometer").
     time_unit : str | None
@@ -158,18 +159,18 @@ def _build_axes(
 
     Returns
     -------
-    list[Axis]
+    list[geff_spec.Axis]
         List of Axis objects representing spatial and temporal dimensions.
     """
     axes = []
     if has_x:
-        axes.append(Axis(name="cell_x", type="space", unit=space_unit))
+        axes.append(geff_spec.Axis(name="cell_x", type="space", unit=space_unit))
     if has_y:
-        axes.append(Axis(name="cell_y", type="space", unit=space_unit))
+        axes.append(geff_spec.Axis(name="cell_y", type="space", unit=space_unit))
     if has_z:
-        axes.append(Axis(name="cell_z", type="space", unit=space_unit))
-    if has_t:
-        axes.append(Axis(name="frame", type="time", unit=time_unit))
+        axes.append(geff_spec.Axis(name="cell_z", type="space", unit=space_unit))
+    axes.append(geff_spec.Axis(name=time_prop, type="time", unit=time_unit))
+
     return axes
 
 
@@ -177,8 +178,8 @@ def _build_display_hints(
     has_x: bool,
     has_y: bool,
     has_z: bool,
-    has_t: bool,
-) -> DisplayHint | None:
+    time_prop: str,
+) -> geff_spec.DisplayHint | None:
     """
     Build display hints for GEFF metadata.
 
@@ -190,20 +191,21 @@ def _build_display_hints(
         Whether the y-axis is present.
     has_z : bool
         Whether the z-axis is present.
-    has_t : bool
-        Whether the time axis is present.
+    time_prop : str
+        Name of the time property.
 
     Returns
     -------
-    DisplayHint | None
+    geff_spec.DisplayHint | None
         DisplayHint object if x and y axes are present, otherwise None.
     """
     if has_x and has_y:
-        display_hints = DisplayHint(display_horizontal="cell_x", display_vertical="cell_y")
+        display_hints = geff_spec.DisplayHint(
+            display_horizontal="cell_x", display_vertical="cell_y"
+        )
         if has_z:
             display_hints.display_depth = "cell_z"
-        if has_t:
-            display_hints.display_time = "frame"
+        display_hints.display_time = time_prop
     else:
         display_hints = None
     return display_hints
@@ -211,7 +213,7 @@ def _build_display_hints(
 
 def _build_props_metadata(
     properties: dict[str, Property],
-) -> tuple[dict[str, PropMetadata], dict[str, PropMetadata]]:
+) -> tuple[dict[str, geff_spec.PropMetadata], dict[str, geff_spec.PropMetadata]]:
     """
     Build property metadata for GEFF from a pycellin model.
 
@@ -222,7 +224,7 @@ def _build_props_metadata(
 
     Returns
     -------
-    tuple[dict[str, PropMetadata], dict[str, PropMetadata]]
+    tuple[dict[str, geff_spec.PropMetadata], dict[str, geff_spec.PropMetadata]]
         A tuple containing two dictionaries:
         - Node properties metadata
         - Edge properties metadata
@@ -232,13 +234,18 @@ def _build_props_metadata(
     ValueError
         If an unknown property type is encountered.
     """
-    node_props_md: dict[str, PropMetadata] = {}
-    edge_props_md: dict[str, PropMetadata] = {}
+    node_props_md: dict[str, geff_spec.PropMetadata] = {}
+    edge_props_md: dict[str, geff_spec.PropMetadata] = {}
 
     for prop_id, prop in properties.items():
-        prop_md = PropMetadata(
+        if prop.dtype.lower() == "string":
+            dtype = "str"
+        else:
+            dtype = prop.dtype
+
+        prop_md = geff_spec.PropMetadata(
             identifier=prop_id,
-            dtype=prop.dtype,
+            dtype=dtype,
             unit=prop.unit,
             name=prop.name,
             description=prop.description,
@@ -256,7 +263,7 @@ def _build_props_metadata(
     return node_props_md, edge_props_md
 
 
-def _build_geff_metadata(model: Model) -> GeffMetadata:
+def _build_geff_metadata(model: Model) -> geff.GeffMetadata:
     """
     Build GEFF metadata from a pycellin model.
 
@@ -267,19 +274,18 @@ def _build_geff_metadata(model: Model) -> GeffMetadata:
 
     Returns
     -------
-    GeffMetadata
+    geff.GeffMetadata
         The GEFF metadata object.
     """
-    # Generic metadata
+    # Generic metadata.
     has_x = model.has_property("cell_x")
     has_y = model.has_property("cell_y")
     has_z = model.has_property("cell_z")
-    has_t = model.has_property("frame")
     axes = _build_axes(
         has_x=has_x,
         has_y=has_y,
         has_z=has_z,
-        has_t=has_t,
+        time_prop=model.reference_time_property,
         space_unit=model.get_space_unit(),
         time_unit=model.get_time_unit(),
     )
@@ -287,19 +293,19 @@ def _build_geff_metadata(model: Model) -> GeffMetadata:
         has_x=has_x,
         has_y=has_y,
         has_z=has_z,
-        has_t=has_t,
+        time_prop=model.reference_time_property,
     )
 
-    # Property metadata
+    # Property metadata.
     props = model.get_cell_lineage_properties()
     node_props_md, edge_props_md = _build_props_metadata(props)
 
-    # Define identifiers of lineage and cell cycle
+    # Define identifiers of lineage and cell cycle.
     track_node_props = {"lineage": "lineage_ID"}
     if model.has_cycle_data():
         track_node_props["tracklet"] = "cycle_ID"
 
-    return GeffMetadata(
+    return geff.GeffMetadata(
         directed=True,
         axes=axes,
         display_hints=display_hints,
@@ -329,19 +335,23 @@ def export_GEFF(model: Model, geff_out: str) -> None:
     RuntimeError
         If the GEFF export process fails.
     """
-    # Validate that model has data to export
+    # Validate that model has data to export.
     if not model.data.cell_data:
-        raise ValueError("Model contains no lineage data to export")
+        raise ValueError("Model contains no lineage data to export.")
 
     try:
         # We don't want to modify the original model.
         model_copy = copy.deepcopy(model)
         lineages = list(model_copy.data.cell_data.values())
 
+        # For GEFF compatibility, we need to ensure consistency between
+        # metadata and data.
+        model_copy = _ensure_data_metadata_consistency(model_copy)
+
         for graph in lineages:
             print(len(graph.nodes), len(graph.edges))
 
-        # TODO: remove when GEFF can handle variable length properties
+        # TODO: remove when GEFF can handle variable length properties.
         if model_copy.has_property("ROI_coords"):
             model_copy.remove_property("ROI_coords")
 
@@ -352,16 +362,16 @@ def export_GEFF(model: Model, geff_out: str) -> None:
         print(len(geff_graph))
 
         metadata = _build_geff_metadata(model_copy)
-        print(metadata)
+        # print(metadata)
 
-        write_nx(
+        geff.write(
             geff_graph,
             geff_out,
             metadata=metadata,
         )
 
     except Exception as e:
-        raise RuntimeError(f"Failed to export GEFF file to '{geff_out}': {e}") from e
+        raise RuntimeError(f"Failed to export GEFF file to '{geff_out}': {e}.") from e
 
 
 if __name__ == "__main__":
@@ -389,14 +399,14 @@ if __name__ == "__main__":
     model = load_TrackMate_XML(xml_in)
     # model = load_CTC_file(ctc_in)
     # model.add_cycle_data()
-    print(model)
-    print(model.get_cell_lineage_properties().keys())
-    print(model.data.cell_data.keys())
+    # print(model)
+    # print(model.get_cell_lineage_properties().keys())
+    # print(model.data.cell_data.keys())
     # To test overlapping node IDs
     prop_values = {"cell_x": 10, "cell_y": 15, "cell_z": 20}
-    model.add_cell(lid=0, cid=9510, frame=0, prop_values=prop_values)
-    model.add_cell(lid=1, cid=9510, frame=0, prop_values=prop_values)
-    model.add_cell(lid=1, cid=9509, frame=0, prop_values=prop_values)
-    model.add_cell(lid=2, cid=9498, frame=0, prop_values=prop_values)
+    model.add_cell(lid=0, cid=9510, time_value=0, prop_values=prop_values)
+    model.add_cell(lid=1, cid=9510, time_value=0, prop_values=prop_values)
+    model.add_cell(lid=1, cid=9509, time_value=0, prop_values=prop_values)
+    model.add_cell(lid=2, cid=9498, time_value=0, prop_values=prop_values)
 
     export_GEFF(model, geff_out)
