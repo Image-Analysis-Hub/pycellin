@@ -17,9 +17,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
-import geff
 import networkx as nx
-from geff.metadata_schema import GeffMetadata
+import geff
+import geff_spec
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.custom_types import PropertyType
@@ -166,7 +166,7 @@ def _identify_lin_id_key(
 
 def _identify_time_key(
     time_key: str | None,
-    geff_display_hints: geff.metadata_schema.DisplayHint | None,
+    geff_display_hints: geff_spec.DisplayHint | None,
     geff_graph: nx.Graph,
 ) -> str:
     """
@@ -180,7 +180,7 @@ def _identify_time_key(
     ----------
     time_key : str | None
         The key provided by the user to identify time points.
-    geff_display_hints : geff.metadata_schema.DisplayHint | None
+    geff_display_hints : geff_spec.DisplayHint | None
         The display_hints from geff metadata.
     geff_graph : nx.Graph
         The geff graph.
@@ -239,7 +239,7 @@ def _identify_time_key(
 
 def _extract_space_key_from_display_hints(
     hint_field: str,
-    geff_display_hints: geff.metadata_schema.DisplayHint | None,
+    geff_display_hints: geff_spec.DisplayHint | None,
     geff_graph: nx.Graph,
 ) -> str | None:
     """
@@ -250,7 +250,7 @@ def _extract_space_key_from_display_hints(
     hint_field : str
         The field in the display hints to extract ('display_horizontal', 'display_vertical',
         or 'display_depth').
-    geff_display_hints : geff.metadata_schema.DisplayHint | None
+    geff_display_hints : geff_spec.DisplayHint | None
         The display_hints from geff metadata.
     geff_graph : nx.Graph
         The geff graph.
@@ -298,7 +298,7 @@ def _identify_space_keys(
     cell_x_key: str | None,
     cell_y_key: str | None,
     cell_z_key: str | None,
-    geff_display_hints: geff.metadata_schema.DisplayHint | None,
+    geff_display_hints: geff_spec.DisplayHint | None,
     geff_graph: nx.Graph,
 ) -> tuple[str | None, str | None, str | None]:
     """
@@ -316,7 +316,7 @@ def _identify_space_keys(
         The key provided by the user to identify the y-coordinate.
     cell_z_key : str | None
         The key provided by the user to identify the z-coordinate.
-    geff_display_hints : geff.metadata_schema.DisplayHint | None
+    geff_display_hints : geff_spec.DisplayHint | None
         The display_hints from geff metadata.
     geff_graph : nx.Graph
         The geff graph.
@@ -355,7 +355,7 @@ def _identify_space_keys(
 
 
 def _extract_props_metadata(
-    md: dict[str, geff.metadata_schema.PropMetadata],
+    md: dict[str, geff_spec.PropMetadata],
     props_dict: dict[str, Property],
     prop_type: PropertyType,
 ) -> None:
@@ -364,7 +364,7 @@ def _extract_props_metadata(
 
     Parameters
     ----------
-    md : dict[str, geff.metadata_schema.PropMetadata]
+    md : dict[str, geff_spec.PropMetadata]
         The dictionary containing properties metadata.
     props_dict : dict[str, Property]
         The dictionary to update with extracted properties metadata.
@@ -484,13 +484,13 @@ def _extract_lin_props_metadata(
                 )
 
 
-def _build_props_metadata(geff_md: geff.metadata_schema.GeffMetadata) -> dict[str, Property]:
+def _build_props_metadata(geff_md: geff.GeffMetadata) -> dict[str, Property]:
     """
     Read and extract properties metadata from geff metadata.
 
     Parameters
     ----------
-    geff_md : geff.metadata_schema.GeffMetadata
+    geff_md : geff.GeffMetadata
         The geff metadata object containing properties metadata.
 
     Returns
@@ -517,13 +517,13 @@ def _build_props_metadata(geff_md: geff.metadata_schema.GeffMetadata) -> dict[st
     return props_dict
 
 
-def _extract_units_from_axes(geff_md: GeffMetadata) -> dict[str, Any]:
+def _extract_units_from_axes(geff_md: geff.GeffMetadata) -> dict[str, Any]:
     """
     Extract and validate space and time units from geff metadata axes.
 
     Parameters
     ----------
-    geff_md : geff.metadata_schema.GeffMetadata
+    geff_md : geff.GeffMetadata
         The geff metadata object containing axes information.
 
     Returns
@@ -568,9 +568,7 @@ def _extract_units_from_axes(geff_md: GeffMetadata) -> dict[str, Any]:
     return units_metadata
 
 
-def _extract_generic_metadata(
-    geff_file: Path | str, geff_md: geff.metadata_schema.GeffMetadata
-) -> dict[str, Any]:
+def _extract_generic_metadata(geff_file: Path | str, geff_md: geff.GeffMetadata) -> dict[str, Any]:
     """
     Extract generic metadata for the model based on the geff file and its metadata.
 
@@ -578,7 +576,7 @@ def _extract_generic_metadata(
     ----------
     geff_file : Path | str
         Path to the geff file.
-    geff_md : geff.metadata_schema.GeffMetadata
+    geff_md : geff.GeffMetadata
         The geff metadata object.
 
     Returns
@@ -608,7 +606,7 @@ def _extract_generic_metadata(
     return metadata
 
 
-def _build_generic_metadata(geff_file: Path | str, geff_md: GeffMetadata) -> dict[str, Any]:
+def _build_generic_metadata(geff_file: Path | str, geff_md: geff.GeffMetadata) -> dict[str, Any]:
     """
     Build and return a dictionary containing generic pycellin metadata.
 
@@ -616,7 +614,7 @@ def _build_generic_metadata(geff_file: Path | str, geff_md: GeffMetadata) -> dic
     ----------
     geff_file : Path | str
         Path to the geff file.
-    geff_md : geff.metadata_schema.GeffMetadata
+    geff_md : geff.GeffMetadata
         The geff metadata object to read from.
 
     Returns
@@ -776,7 +774,7 @@ def load_GEFF(
     """
 
     # Read the geff file
-    geff_graph, geff_md = geff.read_nx(geff_file, validate=validate_geff)
+    geff_graph, geff_md = geff.read(geff_file, validate=validate_geff)
     if not geff_md.directed:
         raise ValueError(
             "The geff graph is undirected: pycellin does not support undirected graphs."
