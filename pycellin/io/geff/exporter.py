@@ -214,6 +214,7 @@ def _build_display_hints(
 
 def _build_props_metadata(
     properties: dict[str, Property],
+    variable_length_props: list[str] | None = None,
 ) -> tuple[dict[str, geff_spec.PropMetadata], dict[str, geff_spec.PropMetadata]]:
     """
     Build property metadata for GEFF from a pycellin model.
@@ -222,6 +223,9 @@ def _build_props_metadata(
     ----------
     properties : dict[str, Property]
         Dictionary of property identifiers to Property objects.
+    variable_length_props : list[str] | None, optional
+        List of property identifiers that are variable in length (i.e., their values
+        are lists or arrays). If None, no properties are considered variable length.
 
     Returns
     -------
@@ -247,6 +251,7 @@ def _build_props_metadata(
         prop_md = geff_spec.PropMetadata(
             identifier=prop_id,
             dtype=dtype,
+            varlength=prop_id in variable_length_props if variable_length_props else False,
             unit=prop.unit,
             name=prop.name,
             description=prop.description,
@@ -264,7 +269,10 @@ def _build_props_metadata(
     return node_props_md, edge_props_md
 
 
-def _build_geff_metadata(model: Model) -> geff.GeffMetadata:
+def _build_geff_metadata(
+    model: Model,
+    variable_length_props: list[str] | None = None,
+) -> geff.GeffMetadata:
     """
     Build GEFF metadata from a pycellin model.
 
@@ -272,6 +280,9 @@ def _build_geff_metadata(model: Model) -> geff.GeffMetadata:
     ----------
     model : Model
         The pycellin model to extract metadata from.
+    variable_length_props : list[str] | None, optional
+        List of property identifiers that are variable in length (i.e., their values
+        are lists or arrays). If None, no properties are considered variable length.
 
     Returns
     -------
@@ -299,7 +310,7 @@ def _build_geff_metadata(model: Model) -> geff.GeffMetadata:
 
     # Property metadata.
     props = model.get_cell_lineage_properties()
-    node_props_md, edge_props_md = _build_props_metadata(props)
+    node_props_md, edge_props_md = _build_props_metadata(props, variable_length_props)
 
     # Define identifiers of lineage and cell cycle.
     track_node_props = {"lineage": "lineage_ID"}
@@ -316,7 +327,12 @@ def _build_geff_metadata(model: Model) -> geff.GeffMetadata:
     )
 
 
-def export_GEFF(model: Model, geff_out: str, zarr_format: Literal[2, 3] = 2) -> Model:
+def export_GEFF(
+    model: Model,
+    geff_out: str,
+    zarr_format: Literal[2, 3] = 2,
+    variable_length_props: list[str] | None = None,
+) -> Model:
     """
     Export a pycellin model to GEFF format.
 
@@ -328,12 +344,16 @@ def export_GEFF(model: Model, geff_out: str, zarr_format: Literal[2, 3] = 2) -> 
         Path to the output GEFF file.
     zarr_format : Literal[2, 3], optional
         The Zarr format version to use for the GEFF file. Default is 2.
+    variable_length_props : list[str] | None, optional
+        List of property identifiers that are variable in length (i.e., their values
+        are lists or arrays). If None, no properties are considered variable length.
 
     Returns
     -------
     Model
-        A copy of the input model that was exported, with any necessary modifications `
-        for GEFF compatibility. The original input model is not modified.
+        The model that was exported, which is a copy of the input model with
+        any necessary modifications for GEFF compatibility. The original input model
+        is not modified.
 
     Raises
     ------
@@ -358,7 +378,7 @@ def export_GEFF(model: Model, geff_out: str, zarr_format: Literal[2, 3] = 2) -> 
         _solve_node_overlaps(lineages)
         geff_graph = nx.compose_all(lineages)
 
-        metadata = _build_geff_metadata(model_copy)
+        metadata = _build_geff_metadata(model_copy, variable_length_props)
 
         geff.write(
             geff_graph,
@@ -408,4 +428,4 @@ if __name__ == "__main__":
     model.add_cell(lid=1, cid=9509, time_value=0, prop_values=prop_values)
     model.add_cell(lid=2, cid=9498, time_value=0, prop_values=prop_values)
 
-    export_GEFF(model, geff_out)
+    export_GEFF(model, geff_out, variable_length_props=["ROI_coords"])
