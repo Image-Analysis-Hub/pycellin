@@ -315,7 +315,7 @@ def _build_geff_metadata(model: Model) -> geff.GeffMetadata:
     )
 
 
-def export_GEFF(model: Model, geff_out: str) -> None:
+def export_GEFF(model: Model, geff_out: str) -> Model:
     """
     Export a pycellin model to GEFF format.
 
@@ -326,12 +326,17 @@ def export_GEFF(model: Model, geff_out: str) -> None:
     geff_out : str
         Path to the output GEFF file.
 
+    Returns
+    -------
+    Model
+        A copy of the input model that was exported, with any necessary modifications `
+        for GEFF compatibility. The original input model is not modified.
+
+
     Raises
     ------
     ValueError
         If the model contains no lineage data.
-    OSError
-        If there are file I/O issues with the output path.
     RuntimeError
         If the GEFF export process fails.
     """
@@ -346,10 +351,6 @@ def export_GEFF(model: Model, geff_out: str) -> None:
         # For GEFF compatibility, we need to ensure that there are no property metadata
         # entries that don't correspond to any actual property in the data.
         _remove_orphaned_metadata(model_copy)
-
-        # TODO: remove when GEFF can handle variable length properties.
-        if model_copy.has_property("ROI_coords"):
-            model_copy.remove_property("ROI_coords")
 
         # For GEFF compatibility, we need to put all the lineages in the same graph,
         # but some nodes can have the same identifier across different lineages.
@@ -369,6 +370,8 @@ def export_GEFF(model: Model, geff_out: str) -> None:
     except Exception as e:
         raise RuntimeError(f"Failed to export GEFF file to '{geff_out}': {e}.") from e
 
+    return model_copy
+
 
 if __name__ == "__main__":
     xml_in = "sample_data/Ecoli_growth_on_agar_pad.xml"
@@ -377,9 +380,7 @@ if __name__ == "__main__":
     # ctc_in = "sample_data/FakeTracks_TMtoCTC.txt"
     # ctc_in = "sample_data/Ecoli_growth_on_agar_pad_TMtoCTC.txt"
     # geff_out = "E:/Janelia_Cell_Trackathon/test_pycellin_geff/test.geff"
-    geff_out = (
-        "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
-    )
+    geff_out = "B:/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
 
     # Remove existing folder
     import os
