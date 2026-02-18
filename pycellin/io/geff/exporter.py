@@ -23,6 +23,9 @@ from pycellin.classes import CellLineage, Model, Property
 from pycellin.io.utils import _remove_orphaned_metadata
 
 
+# TODO: geffception for cycle and lineage props
+
+
 def _find_node_overlaps(lineages: list[CellLineage]) -> dict[int, list[int]]:
     """
     Find overlapping node IDs across lineages.
@@ -95,7 +98,7 @@ def _relabel_nodes(
         Dictionary mapping overlapping node IDs to the list of lineage indices they belong to.
     """
     next_available_id = _get_next_available_id(lineages)
-    for nid, lids in overlaps.items():
+    for nid, lids in sorted(overlaps.items()):
         for lid in lids[1:]:
             mapping = {nid: next_available_id}
             nx.relabel_nodes(lineages[lid], mapping, copy=False)
@@ -113,23 +116,7 @@ def _solve_node_overlaps(lineages: list[CellLineage]) -> None:
     """
     overlaps = _find_node_overlaps(lineages)
     if overlaps:
-        print("Overlapping node IDs found:")
-        for nid, lids in overlaps.items():
-            print(f"  Node ID {nid} in lineages {lids}")
         _relabel_nodes(lineages, overlaps)
-
-        # Verify no more overlaps
-        # TODO: remove this, it's only for debug, or put in verbose
-        overlaps = _find_node_overlaps(lineages)
-        if overlaps:
-            print("Overlapping node IDs found after relabeling:")
-            for nid, lids in overlaps.items():
-                print(f"  Node ID {nid} in lineages {lids}")
-        else:
-            print("No overlapping node IDs found after relabeling.")
-
-    else:
-        print("No overlapping node IDs found.")
 
 
 def _build_axes(
