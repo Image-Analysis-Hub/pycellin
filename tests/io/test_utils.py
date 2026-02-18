@@ -5,9 +5,17 @@
 import networkx as nx
 import pytest
 
-from pycellin.classes import CellLineage
+from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
+from pycellin.graph.properties.core import (
+    create_cell_coord_property,
+    create_lineage_id_property,
+    create_link_coord_property,
+    create_timepoint_property,
+)
 from pycellin.io.utils import (
     _add_lineage_props,
+    _get_props_from_data,
+    _remove_orphaned_metadata,
     _split_graph_into_lineages,
     _update_lineage_prop_key,
     _update_lineages_IDs_key,
@@ -55,6 +63,85 @@ def lineage_attrs_with_track_id():
         {"name": "blob", "TRACK_ID": 0},
         {"name": "blub", "TRACK_ID": 1},
     ]
+
+
+@pytest.fixture
+def model():
+    """Model with metadata."""
+    lin1 = CellLineage()
+    lin1.add_node(1, timepoint=0, cell_x=10.0)
+    lin1.add_node(2, timepoint=1, cell_x=12.0)
+    lin1.add_edge(1, 2, link_x=2.0)
+    lin1.graph["lineage_ID"] = 0
+
+    lin2 = CellLineage()
+    lin2.add_node(3, timepoint=0, cell_x=20.0)
+    lin2.add_node(4, timepoint=1, cell_x=22.0)
+    lin2.add_edge(3, 4, link_x=2.0)
+    lin2.graph["lineage_ID"] = 1
+
+    cell_data = {0: lin1, 1: lin2}
+    data = Data(cell_data)
+    props_metadata = PropsMetadata()
+    props_metadata._add_prop(create_timepoint_property(provenance="Test"))
+    props_metadata._add_prop(create_cell_coord_property(provenance="Test", axis="x", unit="µm"))
+    props_metadata._add_prop(create_link_coord_property(provenance="Test", axis="x", unit="µm"))
+    props_metadata._add_prop(create_lineage_id_property(provenance="Test"))
+
+    model = Model(
+        data=data,
+        props_metadata=props_metadata,
+        reference_time_property="timepoint",
+    )
+    return model
+
+
+@pytest.fixture
+def model_with_orphaned_metadata(model):
+    """Model with some metadata properties that have no corresponding data."""
+    model.props_metadata._add_prop(
+        Property(
+            identifier="orphaned_node_prop",
+            name="Orphaned node property",
+            description="This doesn't exist in data",
+            provenance="Test",
+            prop_type="node",
+            lin_type="Lineage",
+            dtype="string",
+        )
+    )
+    model.props_metadata._add_prop(
+        Property(
+            identifier="orphaned_edge_prop",
+            name="Orphaned edge property",
+            description="This doesn't exist in data",
+            provenance="Test",
+            prop_type="edge",
+            lin_type="Lineage",
+            dtype="string",
+        )
+    )
+    model.props_metadata._add_prop(
+        Property(
+            identifier="orphaned_lineage_prop",
+            name="Orphaned lineage property",
+            description="This doesn't exist in data",
+            provenance="Test",
+            prop_type="lineage",
+            lin_type="Lineage",
+            dtype="string",
+        )
+    )
+    return model
+
+
+@pytest.fixture
+def model_with_orphaned_data(model):
+    """Model with some data properties that have no corresponding metadata."""
+    model.data.cell_data[0].nodes[1]["node_prop_no_metadata"] = "value"
+    model.data.cell_data[0].edges[1, 2]["edge_prop_no_metadata"] = 100
+    model.data.cell_data[0].graph["lineage_prop_no_metadata"] = False
+    return model
 
 
 # Test classes ###############################################################
@@ -459,3 +546,118 @@ class TestSplitGraphIntoLineages:
 
         with pytest.raises(ValueError):
             _split_graph_into_lineages(g, [g1_attr, g2_attr])
+
+
+class TestGetPropsFromData:
+    """Test cases for _get_props_from_data function."""
+
+    def test_get_props_from_data(self, model):
+        """Test extracting properties from model data."""
+        node_props, edge_props, lineage_props = _get_props_from_data(model)
+
+        assert "timepoint" in node_props
+        assert "cell_x" in node_props
+        assert len(node_props) == 2
+
+        assert "link_x" in edge_props
+        assert len(edge_props) == 1
+
+        assert "lineage_ID" in lineage_props
+        assert len(lineage_props) == 1
+
+    def test_get_props_from_empty_data(self):
+        """Test with empty data."""
+        data = Data({})
+        model = Model(data=data, reference_time_property="timepoint")
+
+        node_props, edge_props, lineage_props = _get_props_from_data(model)
+
+        assert len(node_props) == 0
+        assert len(edge_props) == 0
+        assert len(lineage_props) == 0
+
+
+class TestRemoveOrphanedMetadata:
+    """Test cases for _remove_orphaned_metadata function."""
+
+    def test_no_orphaned_metadata(self, model):
+        """Test when there are no orphaned properties."""
+        before_node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
+        before_edge_props = model.props_metadata._get_prop_dict_from_prop_type("edge")
+        before_lineage_props = model.props_metadata._get_prop_dict_from_prop_type("lineage")
+
+        _remove_orphaned_metadata(model)
+
+        after_node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
+        after_edge_props = model.props_metadata._get_prop_dict_from_prop_type("edge")
+        after_lineage_props = model.props_metadata._get_prop_dict_from_prop_type("lineage")
+        assert before_node_props == after_node_props
+        assert before_edge_props == after_edge_props
+        assert before_lineage_props == after_lineage_props
+
+    def test_remove_orphaned_metadata(self, model_with_orphaned_metadata):
+        """Test removing orphaned properties from metadata."""
+        with pytest.warns(UserWarning, match="Node metadata with no corresponding data"):
+            with pytest.warns(UserWarning, match="Edge metadata with no corresponding data"):
+                with pytest.warns(UserWarning, match="Lineage metadata with no corresponding data"):
+                    _remove_orphaned_metadata(model_with_orphaned_metadata)
+
+        node_props = model_with_orphaned_metadata.props_metadata._get_prop_dict_from_prop_type(
+            "node"
+        )
+        edge_props = model_with_orphaned_metadata.props_metadata._get_prop_dict_from_prop_type(
+            "edge"
+        )
+        lineage_props = model_with_orphaned_metadata.props_metadata._get_prop_dict_from_prop_type(
+            "lineage"
+        )
+        # Check that orphaned properties are removed.
+        assert "orphaned_node_prop" not in node_props
+        assert "orphaned_edge_prop" not in edge_props
+        assert "orphaned_lineage_prop" not in lineage_props
+
+        # Check that non-orphaned properties are preserved.
+        assert "timepoint" in node_props
+        assert "cell_x" in node_props
+        assert "link_x" in edge_props
+        assert "lineage_ID" in lineage_props
+
+    def test_orphaned_data(self, model_with_orphaned_data):
+        """Test that metadata are unchanged when orphaned data properties are present."""
+        before_node_props = model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+            "node"
+        )
+        before_edge_props = model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+            "edge"
+        )
+        before_lineage_props = (
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type("lineage")
+        )
+
+        _remove_orphaned_metadata(model_with_orphaned_data)
+
+        after_node_props = model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+            "node"
+        )
+        after_edge_props = model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+            "edge"
+        )
+        after_lineage_props = model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+            "lineage"
+        )
+        assert before_node_props == after_node_props
+        assert before_edge_props == after_edge_props
+        assert before_lineage_props == after_lineage_props
+
+    def test_empty_metadata(self, model):
+        """Test with empty metadata."""
+        model.props_metadata = PropsMetadata()  # set empty metadata
+        _remove_orphaned_metadata(model)
+
+        # Metadata should still be empty.
+        node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
+        edge_props = model.props_metadata._get_prop_dict_from_prop_type("edge")
+        lineage_props = model.props_metadata._get_prop_dict_from_prop_type("lineage")
+        assert len(node_props) == 0
+        assert len(edge_props) == 0
+        assert len(lineage_props) == 0
