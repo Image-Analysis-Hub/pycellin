@@ -341,6 +341,7 @@ def _convert_ROI_coordinates(
         raise KeyError(
             f"No key 'ROI_N_POINTS' in the attributes of current element '{element.tag}'."
         )
+
     n_points = int(attribs["ROI_N_POINTS"])
     if element.text:
         points_coordinates = element.text.split()
@@ -351,6 +352,8 @@ def _convert_ROI_coordinates(
         attribs["ROI_coords"] = points_coordinates
     else:
         attribs["ROI_coords"] = None
+
+    del attribs["ROI_N_POINTS"]  # redundant with the new "ROI_coords" attribute
 
 
 def _add_all_nodes(

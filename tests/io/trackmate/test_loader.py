@@ -511,10 +511,7 @@ def test_convert_ROI_coordinates_2D():
     att_obtained = deepcopy(el_obtained.attrib)
     tml._convert_ROI_coordinates(el_obtained, att_obtained)
 
-    att_expected = {
-        "ROI_N_POINTS": "3",
-        "ROI_coords": [(1.0, 2.0), (-3.0, -4.0), (5.5, 6.0)],
-    }
+    att_expected = {"ROI_coords": [(1.0, 2.0), (-3.0, -4.0), (5.5, 6.0)]}
 
     assert att_obtained == att_expected
 
@@ -526,10 +523,7 @@ def test_convert_ROI_coordinates_3D():
     att_obtained = deepcopy(el_obtained.attrib)
     tml._convert_ROI_coordinates(el_obtained, att_obtained)
 
-    att_expected = {
-        "ROI_N_POINTS": "2",
-        "ROI_coords": [(1.0, 2.0, -3.0), (-4.0, 5.5, 6.0)],
-    }
+    att_expected = {"ROI_coords": [(1.0, 2.0, -3.0), (-4.0, 5.5, 6.0)]}
 
     assert att_obtained == att_expected
 
@@ -549,7 +543,7 @@ def test_convert_ROI_coordinates_no_ROI_txt():
     att_obtained = deepcopy(el_obtained.attrib)
     tml._convert_ROI_coordinates(el_obtained, att_obtained)
 
-    att_expected = {"ROI_N_POINTS": "2", "ROI_coords": None}
+    att_expected = {"ROI_coords": None}
 
     assert att_obtained == att_expected
 
@@ -621,9 +615,7 @@ def test_add_all_nodes_only_ID_attribute():
 
 
 def test_add_all_nodes_no_node_attributes():
-    xml_data = (
-        '<data>   <frame>       <Spot />       <Spot ID="1001" />   </frame></data>'
-    )
+    xml_data = '<data>   <frame>       <Spot />       <Spot ID="1001" />   </frame></data>'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
