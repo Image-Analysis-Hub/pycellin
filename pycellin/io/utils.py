@@ -3,7 +3,7 @@ from typing import Any
 
 import networkx as nx
 
-from pycellin.classes import CellLineage, Model, Property
+from pycellin.classes import CellLineage, Model
 
 
 def check_fusions(model: Model) -> None:
@@ -90,50 +90,7 @@ def _add_lineage_props(
             lin.graph[k] = v
 
 
-def _infer_prop_dtype(model, prop_id) -> str:
-    """
-    Infer the data type of a property based on its values.
-
-    This function checks the first non-None value of the property in the model data
-    and infers its data type.
-
-    Parameters
-    ----------
-    model : Model
-        The pycellin model containing the data to check.
-    prop_id : str
-        The identifier of the property to check.
-
-    Returns
-    -------
-    str
-        The inferred data type of the property (e.g., "int", "float", "string", "bool").
-
-    Warnings
-    --------
-    This function is NOT robust and is just a quick and dirty way to infer the
-    data type of a property in case of missing metadata. For example, it doesn't
-    handle mixed data types since it only checks the first non-None value (but
-    mixed types should not happen, right...?).
-    """
-    for lineage in model.data.cell_data.values():
-        for node, prop_value in lineage.nodes(data=prop_id):
-            if prop_value is not None:
-                if isinstance(prop_value, bool):
-                    return "bool"
-                elif isinstance(prop_value, int):
-                    return "int"
-                elif isinstance(prop_value, float):
-                    return "float"
-                elif isinstance(prop_value, str):
-                    return "string"
-                else:
-                    return "string"
-    # Default to string if no values are found.
-    return "string"
-
-
-def _get_properties_from_data(model: Model) -> tuple[set[str], set[str], set[str]]:
+def _get_props_from_data(model: Model) -> tuple[set[str], set[str], set[str]]:
     """
     Collect all property keys present in the model's data.
 
@@ -161,108 +118,121 @@ def _get_properties_from_data(model: Model) -> tuple[set[str], set[str], set[str
     return node_props_data, edge_props_data, lineage_props_data
 
 
-def _remove_missing_props_from_metadata(
-    model: Model, missing_props: set[str], prop_type: str
-) -> None:
+# def _infer_prop_dtype(model, prop_id) -> str:
+#     """
+#     Infer the data type of a property based on its values.
+
+#     This function checks the first non-None value of the property in the model data
+#     and infers its data type.
+
+#     Parameters
+#     ----------
+#     model : Model
+#         The pycellin model containing the data to check.
+#     prop_id : str
+#         The identifier of the property to check.
+
+#     Returns
+#     -------
+#     str
+#         The inferred data type of the property ("int", "float", "string", "bool").
+
+#     Warnings
+#     --------
+#     This function is NOT robust and is just a quick and dirty way to infer the
+#     data type of a property in case of missing metadata. For example, it doesn't
+#     handle mixed data types since it only checks the first non-None value (but
+#     mixed types should not happen, right...?).
+#     """
+#     for lineage in model.data.cell_data.values():
+#         for node, prop_value in lineage.nodes(data=prop_id):
+#             if prop_value is not None:
+#                 if isinstance(prop_value, bool):
+#                     return "bool"
+#                 elif isinstance(prop_value, int):
+#                     return "int"
+#                 elif isinstance(prop_value, float):
+#                     return "float"
+#                 elif isinstance(prop_value, str):
+#                     return "string"
+#                 else:
+#                     return "string"
+#     # Default to string if no values are found.
+#     return "string"
+
+
+# def _add_missing_props_to_metadata(
+#     model: Model,
+#     missing_props: set[str],
+#     prop_type: PropertyType,
+# ) -> None:
+#     """
+#     Add properties that are in data but missing from metadata.
+
+#     Parameters
+#     ----------
+#     model : Model
+#         The pycellin model to update.
+#     missing_props : set[str]
+#         Set of property identifiers to add.
+#     prop_type : PropertyType
+#         Type of properties ("node", "edge", or "lineage").
+#     """
+#     if not missing_props:
+#         return
+
+#     warnings.warn(
+#         f"{prop_type.capitalize()} properties without metadata: {missing_props}. "
+#         "They will be added to the model metadata with default values.",
+#         stacklevel=3,
+#     )
+
+#     prov = "Auto-generated with default values to ensure data-metadata consistency."
+#     for prop in missing_props:
+#         model.props_metadata._add_prop(
+#             Property(
+#                 identifier=prop,
+#                 name=prop,
+#                 description="",
+#                 provenance=prov,
+#                 prop_type=prop_type,
+#                 lin_type="Lineage",
+#                 dtype=_infer_prop_dtype(model, prop),
+#             )
+#         )
+
+
+def _remove_orphaned_metadata(model: Model) -> None:
     """
-    Remove properties that are in metadata but missing from data.
+    Remove properties from metadata that are not present in any lineage.
 
     Parameters
     ----------
     model : Model
         The pycellin model to update.
-    missing_props : set[str]
-        Set of property identifiers to remove.
-    prop_type : str
-        Type of properties ("node", "edge", or "lineage").
     """
-    if not missing_props:
-        return
+    node_props_md = model.props_metadata._get_prop_dict_from_prop_type("node").keys()
+    edge_props_md = model.props_metadata._get_prop_dict_from_prop_type("edge").keys()
+    lineage_props_md = model.props_metadata._get_prop_dict_from_prop_type("lineage").keys()
+    node_props_data, edge_props_data, lineage_props_data = _get_props_from_data(model)
 
-    warnings.warn(
-        f"Missing {prop_type} properties: {missing_props}. "
-        "They will be removed from the model metadata.",
-        stacklevel=3,
-    )
-    model.props_metadata._remove_props(missing_props)
+    orphaned_node_props = list(node_props_md - node_props_data)
+    orphaned_edge_props = list(edge_props_md - edge_props_data)
+    orphaned_lineage_props = list(lineage_props_md - lineage_props_data)
 
-
-def _add_missing_props_to_metadata(model: Model, missing_props: set[str], prop_type: str) -> None:
-    """
-    Add properties that are in data but missing from metadata.
-
-    Parameters
-    ----------
-    model : Model
-        The pycellin model to update.
-    missing_props : set[str]
-        Set of property identifiers to add.
-    prop_type : str
-        Type of properties ("node", "edge", or "lineage").
-    """
-    if not missing_props:
-        return
-
-    warnings.warn(
-        f"{prop_type.capitalize()} properties without metadata: {missing_props}. "
-        "They will be added to the model metadata with default values.",
-        stacklevel=3,
-    )
-
-    prov = "Auto-generated with default values to ensure data-metadata consistency."
-    for prop in missing_props:
-        model.props_metadata._add_prop(
-            Property(
-                identifier=prop,
-                name=prop,
-                description="",
-                provenance=prov,
-                prop_type=prop_type,
-                lin_type="Lineage",
-                dtype=_infer_prop_dtype(model, prop),
+    mapping = {
+        "node": orphaned_node_props,
+        "edge": orphaned_edge_props,
+        "lineage": orphaned_lineage_props,
+    }
+    for prop_type, orphaned_props in mapping.items():
+        if orphaned_props:
+            warnings.warn(
+                f"{prop_type.capitalize()} metadata with no corresponding data: "
+                f"{orphaned_props}. They will be removed from the model metadata.",
+                stacklevel=2,
             )
-        )
-
-
-def _ensure_data_metadata_consistency(model: Model) -> Model:
-    """
-    Ensure consistency between data and metadata in a pycellin model.
-
-    This function checks that all the properties defined in the metadata of the model
-    are present in the data, and that they have the correct type. If any inconsistency
-    is found, it raises an error. If the data is missing a property defined in the
-    metadata, it adds it to the data with a default value (None or an empty string
-    depending on the property type).
-
-    Parameters
-    ----------
-    model : Model
-        The pycellin model to check and update for consistency.
-
-    Returns
-    -------
-    Model
-        The updated pycellin model with consistent data and metadata.
-    """
-    # Get properties from metadata and data.
-    node_props_md = model.props_metadata._get_prop_dict_from_prop_type("node")
-    edge_props_md = model.props_metadata._get_prop_dict_from_prop_type("edge")
-    lineage_props_md = model.props_metadata._get_prop_dict_from_prop_type("lineage")
-    node_props_data, edge_props_data, lineage_props_data = _get_properties_from_data(model)
-
-    # Handle properties in metadata but missing from data.
-    _remove_missing_props_from_metadata(model, node_props_md.keys() - node_props_data, "node")
-    _remove_missing_props_from_metadata(model, edge_props_md.keys() - edge_props_data, "edge")
-    _remove_missing_props_from_metadata(
-        model, lineage_props_md.keys() - lineage_props_data, "lineage"
-    )
-
-    # Handle properties in data but missing from metadata.
-    _add_missing_props_to_metadata(model, node_props_data - node_props_md.keys(), "node")
-    _add_missing_props_to_metadata(model, edge_props_data - edge_props_md.keys(), "edge")
-    _add_missing_props_to_metadata(model, lineage_props_data - lineage_props_md.keys(), "lineage")
-
-    return model
+            model.props_metadata._remove_props(orphaned_props)
 
 
 def _split_graph_into_lineages(

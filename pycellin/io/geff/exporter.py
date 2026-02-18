@@ -19,7 +19,7 @@ import geff_spec
 import networkx as nx
 
 from pycellin.classes import CellLineage, Model, Property
-from pycellin.io.utils import _ensure_data_metadata_consistency
+from pycellin.io.utils import _remove_orphaned_metadata
 
 
 def _find_node_overlaps(lineages: list[CellLineage]) -> dict[int, list[int]]:
@@ -335,7 +335,6 @@ def export_GEFF(model: Model, geff_out: str) -> None:
     RuntimeError
         If the GEFF export process fails.
     """
-    # Validate that model has data to export.
     if not model.data.cell_data:
         raise ValueError("Model contains no lineage data to export.")
 
@@ -344,12 +343,9 @@ def export_GEFF(model: Model, geff_out: str) -> None:
         model_copy = copy.deepcopy(model)
         lineages = list(model_copy.data.cell_data.values())
 
-        # For GEFF compatibility, we need to ensure consistency between
-        # metadata and data.
-        model_copy = _ensure_data_metadata_consistency(model_copy)
-
-        for graph in lineages:
-            print(len(graph.nodes), len(graph.edges))
+        # For GEFF compatibility, we need to ensure that there are no property metadata
+        # entries that don't correspond to any actual property in the data.
+        _remove_orphaned_metadata(model_copy)
 
         # TODO: remove when GEFF can handle variable length properties.
         if model_copy.has_property("ROI_coords"):
