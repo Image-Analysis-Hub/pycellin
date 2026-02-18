@@ -13,6 +13,7 @@ References:
 """
 
 import copy
+from typing import Literal
 
 import geff
 import geff_spec
@@ -315,7 +316,7 @@ def _build_geff_metadata(model: Model) -> geff.GeffMetadata:
     )
 
 
-def export_GEFF(model: Model, geff_out: str) -> Model:
+def export_GEFF(model: Model, geff_out: str, zarr_format: Literal[2, 3] = 2) -> Model:
     """
     Export a pycellin model to GEFF format.
 
@@ -325,13 +326,14 @@ def export_GEFF(model: Model, geff_out: str) -> Model:
         The pycellin model to export.
     geff_out : str
         Path to the output GEFF file.
+    zarr_format : Literal[2, 3], optional
+        The Zarr format version to use for the GEFF file. Default is 2.
 
     Returns
     -------
     Model
         A copy of the input model that was exported, with any necessary modifications `
         for GEFF compatibility. The original input model is not modified.
-
 
     Raises
     ------
@@ -346,25 +348,25 @@ def export_GEFF(model: Model, geff_out: str) -> Model:
     try:
         # We don't want to modify the original model.
         model_copy = copy.deepcopy(model)
-        lineages = list(model_copy.data.cell_data.values())
 
         # For GEFF compatibility, we need to ensure that there are no property metadata
         # entries that don't correspond to any actual property in the data.
         _remove_orphaned_metadata(model_copy)
-
-        # For GEFF compatibility, we need to put all the lineages in the same graph,
-        # but some nodes can have the same identifier across different lineages.
+        # All the lineages must also be in the same graph. However, some nodes can
+        # have the same identifier across different lineages.
+        lineages = list(model_copy.data.cell_data.values())
         _solve_node_overlaps(lineages)
         geff_graph = nx.compose_all(lineages)
-        print(len(geff_graph))
 
         metadata = _build_geff_metadata(model_copy)
-        # print(metadata)
 
         geff.write(
             geff_graph,
             geff_out,
             metadata=metadata,
+            zarr_format=zarr_format,
+            structure_validation=True,
+            overwrite=True,
         )
 
     except Exception as e:
