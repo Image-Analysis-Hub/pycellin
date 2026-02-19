@@ -24,6 +24,7 @@ from pycellin.io.utils import _remove_orphaned_metadata
 
 
 # TODO: geffception for cycle and lineage props
+# TODO: expose display_hints as export options, and fallback to axes if not provided
 
 
 def _find_node_overlaps(lineages: list[CellLineage]) -> dict[int, list[int]]:
@@ -120,88 +121,115 @@ def _solve_node_overlaps(lineages: list[CellLineage]) -> None:
 
 
 def _build_axes(
-    has_x: bool,
-    has_y: bool,
-    has_z: bool,
-    time_prop: str,
-    space_unit: str | None,
-    time_unit: str | None,
+    node_props: dict[str, Property],
+    time_axes: list[str],
+    space_axes: list[str] | None,
+    channel_axes: list[str] | None,
 ) -> list[geff_spec.Axis]:
     """
     Build a list of Axis objects for GEFF metadata.
 
     Parameters
     ----------
-    has_x : bool
-        Whether the x-axis is present.
-    has_y : bool
-        Whether the y-axis is present.
-    has_z : bool
-        Whether the z-axis is present.
-    time_prop : str
-        Name of the time property.
-    space_unit : str | None
-        Unit for spatial axes (e.g., "micrometer").
-    time_unit : str | None
-        Unit for time axis (e.g., "second").
+    node_props : dict[str, Property]
+        Dictionary of node properties from the model, used to validate the axes_mapping.
+    time_axes : list[str]
+        List of property names that Geff will consider as time axes.
+        These should be properties in the model that represent time (e.g., "timepoint").
+    space_axes : list[str] | None, optional
+        List of property names that Geff will consider as space axes.
+        These should be properties in the model that represent spatial coordinates
+        (e.g., "cell_x", "cell_y", "cell_z"). If None, no spatial axes will be included
+        in the GEFF metadata, and no display hints for spatial dimensions will be set.
+    channel_axes : list[str] | None, optional
+        List of property names that Geff will consider as channel axes.
+        These should be properties in the model that represent different channels
+        or modalities (e.g., "chan_1", "chan_2"). If None, no channel axes will be
+        included in the GEFF metadata.
 
     Returns
     -------
     list[geff_spec.Axis]
-        List of Axis objects representing spatial and temporal dimensions.
+        List of Geff Axis objects describing spatial and temporal dimensions.
     """
     axes = []
-    if has_x:
-        axes.append(geff_spec.Axis(name="cell_x", type="space", unit=space_unit))
-    if has_y:
-        axes.append(geff_spec.Axis(name="cell_y", type="space", unit=space_unit))
-    if has_z:
-        axes.append(geff_spec.Axis(name="cell_z", type="space", unit=space_unit))
-    axes.append(geff_spec.Axis(name=time_prop, type="time", unit=time_unit))
-
+    for prop_name in time_axes:
+        if prop_name not in node_props:
+            raise ValueError(
+                f"Unknown node property '{prop_name}', cannot be mapped to time axis."
+            )
+        axes.append(
+            geff_spec.Axis(
+                name=prop_name,
+                type="time",
+                unit=node_props[prop_name].unit,
+            )
+        )
+    if space_axes is not None:
+        for prop_name in space_axes:
+            if prop_name not in node_props:
+                raise ValueError(
+                    f"Unknown node property '{prop_name}', cannot be mapped to space axis."
+                )
+            axes.append(
+                geff_spec.Axis(
+                    name=prop_name,
+                    type="space",
+                    unit=node_props[prop_name].unit,
+                )
+            )
+    if channel_axes is not None:
+        for prop_name in channel_axes:
+            if prop_name not in node_props:
+                raise ValueError(
+                    f"Unknown node property '{prop_name}', cannot be mapped to channel axis."
+                )
+            axes.append(
+                geff_spec.Axis(
+                    name=prop_name,
+                    type="channel",
+                )
+            )
     return axes
 
 
 def _build_display_hints(
-    has_x: bool,
-    has_y: bool,
-    has_z: bool,
-    time_prop: str,
+    time_axis: str,
+    space_axes: list[str] | None,
 ) -> geff_spec.DisplayHint | None:
     """
     Build display hints for GEFF metadata.
 
     Parameters
     ----------
-    has_x : bool
-        Whether the x-axis is present.
-    has_y : bool
-        Whether the y-axis is present.
-    has_z : bool
-        Whether the z-axis is present.
-    time_prop : str
-        Name of the time property.
+    time_axis : str
+        Name of the time axis.
+    space_axes : list[str] | None
+        List of space axis names in order of horizontal, vertical, and depth dimensions.
+        If None or if fewer than 2 space axes are provided, no display hints will
+        be set for spatial dimensions (cf Geff specification).
 
     Returns
     -------
     geff_spec.DisplayHint | None
-        DisplayHint object if x and y axes are present, otherwise None.
+        Geff display hints for spatial and temporal dimensions. Returns None if no
+        valid display hints can be created.
     """
-    if has_x and has_y:
-        display_hints = geff_spec.DisplayHint(
-            display_horizontal="cell_x", display_vertical="cell_y"
-        )
-        if has_z:
-            display_hints.display_depth = "cell_z"
-        display_hints.display_time = time_prop
-    else:
-        display_hints = None
+    if space_axes is None or len(space_axes) < 2:
+        return None
+
+    display_hints = geff_spec.DisplayHint(
+        display_horizontal=space_axes[0],
+        display_vertical=space_axes[1],
+        display_depth=space_axes[2] if len(space_axes) > 2 else None,
+        display_time=time_axis,
+    )
     return display_hints
 
 
 def _build_props_metadata(
     properties: dict[str, Property],
-    variable_length_props: list[str] | None = None,
+    var_length_props: list[str] | None = None,
 ) -> tuple[dict[str, geff_spec.PropMetadata], dict[str, geff_spec.PropMetadata]]:
     """
     Build property metadata for GEFF from a pycellin model.
@@ -210,7 +238,7 @@ def _build_props_metadata(
     ----------
     properties : dict[str, Property]
         Dictionary of property identifiers to Property objects.
-    variable_length_props : list[str] | None, optional
+    var_length_props : list[str] | None, optional
         List of property identifiers that are variable in length (i.e., their values
         are lists or arrays). If None, no properties are considered variable length.
 
@@ -238,7 +266,7 @@ def _build_props_metadata(
         prop_md = geff_spec.PropMetadata(
             identifier=prop_id,
             dtype=dtype,
-            varlength=prop_id in variable_length_props if variable_length_props else False,
+            varlength=prop_id in var_length_props if var_length_props else False,
             unit=prop.unit,
             name=prop.name,
             description=prop.description,
@@ -258,7 +286,10 @@ def _build_props_metadata(
 
 def _build_geff_metadata(
     model: Model,
-    variable_length_props: list[str] | None = None,
+    time_axes: str | list[str] | None = None,
+    space_axes: list[str] | None = None,
+    channel_axes: list[str] | None = None,
+    var_length_props: list[str] | None = None,
 ) -> geff.GeffMetadata:
     """
     Build GEFF metadata from a pycellin model.
@@ -267,7 +298,28 @@ def _build_geff_metadata(
     ----------
     model : Model
         The pycellin model to extract metadata from.
-    variable_length_props : list[str] | None, optional
+    time_axes : str | list[str] | None, optional
+        List of property names that Geff will consider as time axes.
+        These should be properties in the model that represent time (e.g., "timepoint").
+        If None, the model's reference time property will be used as the only time axis.
+        If a list is provided, the order of the property names in the list will
+        determine the order of both the axes and display hint in the GEFF metadata.
+        The time display hint will be set to the first time axis in the list.
+    space_axes : list[str] | None, optional
+        List of property names that Geff will consider as space axes.
+        These should be properties in the model that represent spatial coordinates
+        (e.g., "cell_x", "cell_y", "cell_z"). If None, no spatial axes will be included
+        in the GEFF metadata, and no display hints for spatial dimensions will be set.
+        If provided, the order of the property names in the list will determine
+        the order of both the axes and the display hints in the GEFF metadata.
+        Display hints will be set for the first three space axes as horizontal,
+        vertical, and depth dimensions, respectively.
+    channel_axes : list[str] | None, optional
+        List of property names that Geff will consider as channel axes.
+        These should be properties in the model that represent different channels
+        or modalities (e.g., "chan_1", "chan_2"). If None, no channel axes will be
+        included in the GEFF metadata.
+    var_length_props : list[str] | None, optional
         List of property identifiers that are variable in length (i.e., their values
         are lists or arrays). If None, no properties are considered variable length.
 
@@ -277,27 +329,25 @@ def _build_geff_metadata(
         The GEFF metadata object.
     """
     # Generic metadata.
-    has_x = model.has_property("cell_x")
-    has_y = model.has_property("cell_y")
-    has_z = model.has_property("cell_z")
+    node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
+    if time_axes is None:
+        time_axes = [model.reference_time_property]
+    elif isinstance(time_axes, str):
+        time_axes = [time_axes]
     axes = _build_axes(
-        has_x=has_x,
-        has_y=has_y,
-        has_z=has_z,
-        time_prop=model.reference_time_property,
-        space_unit=model.get_space_unit(),
-        time_unit=model.get_time_unit(),
+        node_props=node_props,
+        time_axes=time_axes,
+        space_axes=space_axes,
+        channel_axes=channel_axes,
     )
     display_hints = _build_display_hints(
-        has_x=has_x,
-        has_y=has_y,
-        has_z=has_z,
-        time_prop=model.reference_time_property,
+        time_axis=time_axes[0],
+        space_axes=space_axes,
     )
 
     # Property metadata.
     props = model.get_cell_lineage_properties()
-    node_props_md, edge_props_md = _build_props_metadata(props, variable_length_props)
+    node_props_md, edge_props_md = _build_props_metadata(props, var_length_props)
 
     # Define identifiers of lineage and cell cycle.
     track_node_props = {"lineage": "lineage_ID"}
@@ -317,8 +367,11 @@ def _build_geff_metadata(
 def export_GEFF(
     model: Model,
     geff_out: str,
-    zarr_format: Literal[2, 3] = 2,
+    time_axes: str | list[str] | None = None,
+    space_axes: list[str] | None = None,
+    channel_axes: list[str] | None = None,
     variable_length_props: list[str] | None = None,
+    zarr_format: Literal[2, 3] = 2,
 ) -> Model:
     """
     Export a pycellin model to GEFF format.
@@ -329,11 +382,32 @@ def export_GEFF(
         The pycellin model to export.
     geff_out : str
         Path to the output GEFF file.
-    zarr_format : Literal[2, 3], optional
-        The Zarr format version to use for the GEFF file. Default is 2.
+    time_axes : str | list[str] | None, optional
+        List of property names that Geff will consider as time axes.
+        These should be properties in the model that represent time (e.g., "timepoint").
+        If None, the model's reference time property will be used as the only time axis.
+        If a list is provided, the order of the property names in the list will
+        determine the order of both the axes and display hint in the GEFF metadata.
+        The time display hint will be set to the first time axis in the list.
+    space_axes : list[str] | None, optional
+        List of property names that Geff will consider as space axes.
+        These should be properties in the model that represent spatial coordinates
+        (e.g., "cell_x", "cell_y", "cell_z"). If None, no spatial axes will be included
+        in the GEFF metadata, and no display hints for spatial dimensions will be set.
+        If provided, the order of the property names in the list will determine
+        the order of both the axes and the display hints in the GEFF metadata.
+        Display hints will be set for the first three space axes as horizontal,
+        vertical, and depth dimensions, respectively.
+    channel_axes : list[str] | None, optional
+        List of property names that Geff will consider as channel axes.
+        These should be properties in the model that represent different channels
+        or modalities (e.g., "chan_1", "chan_2"). If None, no channel axes will be
+        included in the GEFF metadata.
     variable_length_props : list[str] | None, optional
         List of property identifiers that are variable in length (i.e., their values
         are lists or arrays). If None, no properties are considered variable length.
+    zarr_format : Literal[2, 3], optional
+        The Zarr format version to use for the GEFF file. Default is 2.
 
     Returns
     -------
@@ -365,7 +439,13 @@ def export_GEFF(
         _solve_node_overlaps(lineages)
         geff_graph = nx.compose_all(lineages)
 
-        metadata = _build_geff_metadata(model_copy, variable_length_props)
+        metadata = _build_geff_metadata(
+            model=model_copy,
+            time_axes=time_axes,
+            space_axes=space_axes,
+            channel_axes=channel_axes,
+            var_length_props=variable_length_props,
+        )
 
         geff.write(
             geff_graph,
@@ -389,7 +469,8 @@ if __name__ == "__main__":
     # ctc_in = "sample_data/FakeTracks_TMtoCTC.txt"
     # ctc_in = "sample_data/Ecoli_growth_on_agar_pad_TMtoCTC.txt"
     # geff_out = "E:/Janelia_Cell_Trackathon/test_pycellin_geff/test.geff"
-    geff_out = "B:/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
+    # geff_out = "B:/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
+    geff_out = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
 
     # Remove existing folder
     import os
@@ -408,11 +489,12 @@ if __name__ == "__main__":
     # print(model)
     # print(model.get_cell_lineage_properties().keys())
     # print(model.data.cell_data.keys())
-    # To test overlapping node IDs
-    prop_values = {"cell_x": 10, "cell_y": 15, "cell_z": 20}
-    model.add_cell(lid=0, cid=9510, time_value=0, prop_values=prop_values)
-    model.add_cell(lid=1, cid=9510, time_value=0, prop_values=prop_values)
-    model.add_cell(lid=1, cid=9509, time_value=0, prop_values=prop_values)
-    model.add_cell(lid=2, cid=9498, time_value=0, prop_values=prop_values)
 
-    export_GEFF(model, geff_out, variable_length_props=["ROI_coords"])
+    # export_GEFF(model, geff_out, variable_length_props=["ROI_coords"])
+    export_GEFF(
+        model,
+        geff_out,
+        time_axes="POSITION_T",
+        space_axes=["cell_x", "cell_y", "cell_z"],
+        variable_length_props=["ROI_coords"],
+    )

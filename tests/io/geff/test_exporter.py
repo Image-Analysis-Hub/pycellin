@@ -5,7 +5,11 @@
 import pytest
 import geff_spec
 
-from pycellin.classes import CellLineage
+from pycellin.classes import CellLineage, Property
+from pycellin.graph.properties.core import (
+    create_cell_coord_property,
+    create_timepoint_property,
+)
 from pycellin.io.geff.exporter import (
     _find_node_overlaps,
     _get_next_available_id,
@@ -47,6 +51,53 @@ def lineage3():
     lin.add_edges_from([(20, 21), (21, 22)])
     lin.graph["lineage_ID"] = 2
     return lin
+
+
+@pytest.fixture
+def node_props():
+    """Create a dictionary of node properties for testing."""
+    return {
+        "timepoint": create_timepoint_property(provenance="Test"),
+        "cell_x": create_cell_coord_property(
+            axis="x", unit="micrometer", provenance="Test"
+        ),
+        "cell_y": create_cell_coord_property(
+            axis="y", unit="micrometer", provenance="Test"
+        ),
+        "cell_z": create_cell_coord_property(
+            axis="z", unit="micrometer", provenance="Test"
+        ),
+        "POSITION_T": Property(
+            identifier="POSITION_T",
+            name="Position T",
+            description="Time in seconds",
+            provenance="Test",
+            prop_type="node",
+            lin_type="CellLineage",
+            dtype="float",
+            unit="second",
+        ),
+        "channel_1": Property(
+            identifier="channel_1",
+            name="Channel 1",
+            description="Channel 1 intensity",
+            provenance="Test",
+            prop_type="node",
+            lin_type="CellLineage",
+            dtype="float",
+            unit=None,
+        ),
+        "channel_2": Property(
+            identifier="channel_2",
+            name="Channel 2",
+            description="Channel 2 intensity",
+            provenance="Test",
+            prop_type="node",
+            lin_type="CellLineage",
+            dtype="float",
+            unit=None,
+        ),
+    }
 
 
 # Test Classes ################################################################
@@ -175,98 +226,146 @@ class TestSolveNodeOverlaps:
 class TestBuildAxes:
     """Test cases for _build_axes function."""
 
-    def test_only_time_axis(self):
-        """Test building axes with only time axis (no spatial axes)."""
+    def test_one_time_axis(self, node_props):
+        """Test building axes with only time axis (no spatial or channel axes)."""
         axes = _build_axes(
-            has_x=False,
-            has_y=False,
-            has_z=False,
-            time_prop="Time",
-            space_unit=None,
-            time_unit=None,
+            node_props=node_props,
+            time_axes=["timepoint"],
+            space_axes=None,
+            channel_axes=None,
         )
         assert len(axes) == 1
-        assert axes[0] == geff_spec.Axis(name="Time", type="time", unit=None)
+        assert axes[0] == geff_spec.Axis(name="timepoint", type="time", unit=None)
 
-    def test_xy_axes(self):
-        """Test building axes with X and Y spatial axes."""
+    def test_multiple_time_axes(self, node_props):
+        """Test building axes with multiple time axes."""
         axes = _build_axes(
-            has_x=True,
-            has_y=True,
-            has_z=False,
-            time_prop="Time",
-            space_unit="micrometer",
-            time_unit="second",
+            node_props=node_props,
+            time_axes=["timepoint", "POSITION_T"],
+            space_axes=None,
+            channel_axes=None,
         )
-        assert len(axes) == 3
-        assert axes[0] == geff_spec.Axis(name="cell_x", type="space", unit="micrometer")
-        assert axes[1] == geff_spec.Axis(name="cell_y", type="space", unit="micrometer")
-        assert axes[2] == geff_spec.Axis(name="Time", type="time", unit="second")
+        assert len(axes) == 2
+        assert axes[0] == geff_spec.Axis(name="timepoint", type="time", unit=None)
+        assert axes[1] == geff_spec.Axis(name="POSITION_T", type="time", unit="second")
 
-    def test_xyz_axes(self):
-        """Test building axes with X, Y, and Z spatial axes."""
+    def test_time_and_space_axes(self, node_props):
+        """Test building axes with time and X, Y, Z spatial axes."""
         axes = _build_axes(
-            has_x=True,
-            has_y=True,
-            has_z=True,
-            time_prop="Time",
-            space_unit="pixel",
-            time_unit="second",
+            node_props=node_props,
+            time_axes=["POSITION_T"],
+            space_axes=["cell_x", "cell_y", "cell_z"],
+            channel_axes=None,
         )
         assert len(axes) == 4
-        assert axes[0] == geff_spec.Axis(name="cell_x", type="space", unit="pixel")
-        assert axes[1] == geff_spec.Axis(name="cell_y", type="space", unit="pixel")
-        assert axes[2] == geff_spec.Axis(name="cell_z", type="space", unit="pixel")
-        assert axes[3] == geff_spec.Axis(name="Time", type="time", unit="second")
+        assert axes[0] == geff_spec.Axis(name="POSITION_T", type="time", unit="second")
+        assert axes[1] == geff_spec.Axis(name="cell_x", type="space", unit="micrometer")
+        assert axes[2] == geff_spec.Axis(name="cell_y", type="space", unit="micrometer")
+        assert axes[3] == geff_spec.Axis(name="cell_z", type="space", unit="micrometer")
+
+    def test_time_space_and_channel_axes(self, node_props):
+        """Test building axes with time, space, and channel axes."""
+        axes = _build_axes(
+            node_props=node_props,
+            time_axes=["timepoint"],
+            space_axes=["cell_x", "cell_y"],
+            channel_axes=["channel_1", "channel_2"],
+        )
+        assert len(axes) == 5
+        assert axes[0] == geff_spec.Axis(name="timepoint", type="time", unit=None)
+        assert axes[1] == geff_spec.Axis(name="cell_x", type="space", unit="micrometer")
+        assert axes[2] == geff_spec.Axis(name="cell_y", type="space", unit="micrometer")
+        assert axes[3] == geff_spec.Axis(name="channel_1", type="channel")
+        assert axes[4] == geff_spec.Axis(name="channel_2", type="channel")
+
+    def test_unknown_time_property_raises_error(self, node_props):
+        """Test that unknown time property raises ValueError."""
+        with pytest.raises(ValueError, match="Unknown node property 'unknown_time'"):
+            _build_axes(
+                node_props=node_props,
+                time_axes=["unknown_time"],
+                space_axes=None,
+                channel_axes=None,
+            )
+
+    def test_unknown_space_property_raises_error(self, node_props):
+        """Test that unknown space property raises ValueError."""
+        with pytest.raises(ValueError, match="Unknown node property 'unknown_space'"):
+            _build_axes(
+                node_props=node_props,
+                time_axes=["timepoint"],
+                space_axes=["cell_x", "unknown_space"],
+                channel_axes=None,
+            )
+
+    def test_unknown_channel_property_raises_error(self, node_props):
+        """Test that unknown channel property raises ValueError."""
+        with pytest.raises(ValueError, match="Unknown node property 'unknown_channel'"):
+            _build_axes(
+                node_props=node_props,
+                time_axes=["timepoint"],
+                space_axes=None,
+                channel_axes=["unknown_channel"],
+            )
 
 
 class TestBuildDisplayHints:
     """Test cases for _build_display_hints function."""
 
-    def test_no_xy_axes_returns_none(self):
-        """Test that None is returned when X or Y axis is missing."""
-        # No X axis
+    def test_no_space_axes_returns_none(self):
+        """Test that None is returned when space_axes is None."""
         hints = _build_display_hints(
-            has_x=False,
-            has_y=True,
-            has_z=False,
-            time_prop="frame",
+            time_axis="timepoint",
+            space_axes=None,
         )
         assert hints is None
 
-        # No X and Y axes
+    def test_single_space_axis_returns_none(self):
+        """Test that None is returned when there's only one space axis."""
         hints = _build_display_hints(
-            has_x=False,
-            has_y=False,
-            has_z=False,
-            time_prop="frame",
+            time_axis="timepoint",
+            space_axes=["cell_x"],
         )
         assert hints is None
 
-    def test_xy_axes_without_z(self):
-        """Test display hints with X and Y axes but no Z axis."""
-        hints = _build_display_hints(
-            has_x=True,
-            has_y=True,
-            has_z=False,
-            time_prop="time",
+    def test_two_space_axes(self):
+        """Test display hints with two space axes (horizontal and vertical)."""
+        hints_obtained = _build_display_hints(
+            time_axis="POSITION_T",
+            space_axes=["cell_x", "cell_y"],
         )
-        assert hints is not None
-        assert hints.display_horizontal == "cell_x"
-        assert hints.display_vertical == "cell_y"
-        assert hints.display_time == "time"
-        assert not hasattr(hints, "display_depth") or hints.display_depth is None
+        hints_expected = geff_spec.DisplayHint(
+            display_horizontal="cell_x",
+            display_vertical="cell_y",
+            display_depth=None,
+            display_time="POSITION_T",
+        )
+        assert hints_obtained == hints_expected
 
-    def test_xyz_axes(self):
-        """Test display hints with X, Y, and Z axes."""
-        hints = _build_display_hints(
-            has_x=True,
-            has_y=True,
-            has_z=True,
-            time_prop="frame_id",
+    def test_three_space_axes(self):
+        """Test display hints with three space axes (horizontal, vertical, and depth)."""
+        hints_obtained = _build_display_hints(
+            time_axis="timepoint",
+            space_axes=["cell_x", "cell_y", "cell_z"],
         )
-        assert hints is not None
-        assert hints.display_horizontal == "cell_x"
-        assert hints.display_vertical == "cell_y"
-        assert hints.display_depth == "cell_z"
-        assert hints.display_time == "frame_id"
+        hints_expected = geff_spec.DisplayHint(
+            display_horizontal="cell_x",
+            display_vertical="cell_y",
+            display_depth="cell_z",
+            display_time="timepoint",
+        )
+        assert hints_obtained == hints_expected
+
+    def test_more_than_three_space_axes(self):
+        """Test display hints with more than three space axes (only first three used)."""
+        hints_obtained = _build_display_hints(
+            time_axis="time",
+            space_axes=["x", "y", "z", "w"],
+        )
+        hints_expected = geff_spec.DisplayHint(
+            display_horizontal="x",
+            display_vertical="y",
+            display_depth="z",
+            display_time="time",
+        )
+        assert hints_obtained == hints_expected
