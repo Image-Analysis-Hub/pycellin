@@ -17,9 +17,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
-import networkx as nx
 import geff
 import geff_spec
+import networkx as nx
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.custom_types import PropertyType
@@ -37,7 +37,9 @@ from pycellin.io.utils import (
 )
 
 
-def _recursive_dict_search(data: dict[str, Any], target_key: str) -> dict[str, Any] | None:
+def _recursive_dict_search(
+    data: dict[str, Any], target_key: str
+) -> dict[str, Any] | None:
     """
     Recursively search for a target key in a nested dictionary structure.
 
@@ -204,7 +206,9 @@ def _identify_time_key(
     # Use pattern matching?
     if time_key is not None:
         if not _has_node_prop_key(geff_graph, time_key):
-            raise ValueError(f"The provided time_key '{time_key}' is not found in the graph.")
+            raise ValueError(
+                f"The provided time_key '{time_key}' is not found in the graph."
+            )
     else:
         if geff_display_hints is not None:
             time_key = getattr(geff_display_hints, "display_time", None)
@@ -510,7 +514,9 @@ def _build_props_metadata(geff_md: geff.GeffMetadata) -> dict[str, Property]:
     if geff_md.extra is not None:
         # Recursive search for the "lineage_props_metadata" key through the "extra"
         # field dict of dicts of dicts...
-        lin_props_metadata = _recursive_dict_search(geff_md.extra, "lineage_props_metadata")
+        lin_props_metadata = _recursive_dict_search(
+            geff_md.extra, "lineage_props_metadata"
+        )
         if lin_props_metadata is not None:
             _extract_lin_props_metadata(lin_props_metadata, props_dict)
 
@@ -519,7 +525,7 @@ def _build_props_metadata(geff_md: geff.GeffMetadata) -> dict[str, Property]:
 
 def _extract_units_from_axes(geff_md: geff.GeffMetadata) -> dict[str, Any]:
     """
-    Extract and validate space and time units from geff metadata axes.
+    Extract and validate space and time units from GEFF metadata axes.
 
     Parameters
     ----------
@@ -541,7 +547,9 @@ def _extract_units_from_axes(geff_md: geff.GeffMetadata) -> dict[str, Any]:
     if geff_md.axes is not None:
         # Check unicity of space time unit
         space_units = {
-            axis.unit for axis in geff_md.axes if axis.type == "space" and axis.unit is not None
+            axis.unit
+            for axis in geff_md.axes
+            if axis.type == "space" and axis.unit is not None
         }
         if len(space_units) > 1:
             raise ValueError(
@@ -552,7 +560,9 @@ def _extract_units_from_axes(geff_md: geff.GeffMetadata) -> dict[str, Any]:
 
         # Check unicity of time unit
         time_units = {
-            axis.unit for axis in geff_md.axes if axis.type == "time" and axis.unit is not None
+            axis.unit
+            for axis in geff_md.axes
+            if axis.type == "time" and axis.unit is not None
         }
         if len(time_units) > 1:
             raise ValueError(
@@ -568,9 +578,11 @@ def _extract_units_from_axes(geff_md: geff.GeffMetadata) -> dict[str, Any]:
     return units_metadata
 
 
-def _extract_generic_metadata(geff_file: Path | str, geff_md: geff.GeffMetadata) -> dict[str, Any]:
+def _extract_generic_metadata(
+    geff_file: Path | str, geff_md: geff.GeffMetadata
+) -> dict[str, Any]:
     """
-    Extract generic metadata for the model based on the geff file and its metadata.
+    Extract generic metadata for the model based on the GEFF file and its metadata.
 
     Parameters
     ----------
@@ -606,7 +618,9 @@ def _extract_generic_metadata(geff_file: Path | str, geff_md: geff.GeffMetadata)
     return metadata
 
 
-def _build_generic_metadata(geff_file: Path | str, geff_md: geff.GeffMetadata) -> dict[str, Any]:
+def _build_generic_metadata(
+    geff_file: Path | str, geff_md: geff.GeffMetadata
+) -> dict[str, Any]:
     """
     Build and return a dictionary containing generic pycellin metadata.
 
@@ -738,7 +752,7 @@ def load_GEFF(
     cell_y_key: str | None = None,
     cell_z_key: str | None = None,
     time_key: str | None = None,
-    validate_geff: bool = True,
+    structure_validation: bool = True,
 ) -> Model:
     """
     Load a geff file and return a pycellin model containing the data.
@@ -763,32 +777,40 @@ def load_GEFF(
     time_key : str | None, optional
         The key used to identify the time point of cells in the geff file.
         If None, the function will try to infer it from the geff metadata.
-    validate_geff : bool, optional
-        Whether to validate the GEFF file against its schema, i.e. is the GEFF
-        file well-formed and compliant with the GEFF specification. Default is True.
+    structure_validation : bool, optional
+        Whether to validate the GEFF file's structure, i.e. to check that it is
+        compliant with the GEFF specification. Default is True.
 
     Returns
     -------
     Model
         A pycellin model containing the data from the geff file.
+
+    Raises
+    ------
+    ValueError
+        If the geff graph is undirected, as pycellin does not support undirected graphs.
     """
 
-    # Read the geff file
-    geff_graph, geff_md = geff.read(geff_file, validate=validate_geff)
+    # Read the geff file.
+    geff_graph, geff_md = geff.read(geff_file, structure_validation=structure_validation)
     if not geff_md.directed:
         raise ValueError(
             "The geff graph is undirected: pycellin does not support undirected graphs."
         )
-    for node in geff_graph.nodes:
-        print(geff_graph.nodes[node])
-        break
+    # for node in geff_graph.nodes:
+    #     print(geff_graph.nodes[node])
+    #     break
 
-    # Extract and dispatch metadata
+    # Extract and dispatch metadata.
+    # TODO: get first time axis as ref time prop if not given. 
     generic_md = _build_generic_metadata(geff_file, geff_md)
     props_md = _build_props_metadata(geff_md)
 
     # Identify specific props keys
-    lin_id_key = _identify_lin_id_key(lineage_id_key, geff_md.track_node_props, geff_graph)
+    lin_id_key = _identify_lin_id_key(
+        lineage_id_key, geff_md.track_node_props, geff_graph
+    )
     # print("lin_id_key:", lin_id_key)
     time_key = _identify_time_key(time_key, geff_md.display_hints, geff_graph)
     # print("time_key:", time_key)
@@ -826,8 +848,8 @@ def load_GEFF(
 
 
 if __name__ == "__main__":
-    geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/reader_test_graph.geff"
-    geff_file = "E:/Janelia_Cell_Trackathon/reader_test_graph.geff"
+    geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
+    # geff_file = "E:/Janelia_Cell_Trackathon/reader_test_graph.geff"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/mouse-20250719.zarr/tracks"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/test.zarr"
     # geff_file = (
@@ -873,10 +895,10 @@ if __name__ == "__main__":
     #     ]
     # )
     # print(lin0.nodes(data=True))
-    for node in lin0.nodes(data=True):
-        print(node)
-        break
-    lin0.plot()
+    # for node in lin0.nodes(data=True):
+    #     print(node)
+    #     break
+    # lin0.plot()
 
     # cell_id_key
     # lineage_id_key
