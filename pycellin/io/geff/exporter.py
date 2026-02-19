@@ -246,8 +246,8 @@ def _build_props_metadata(
     -------
     tuple[dict[str, geff_spec.PropMetadata], dict[str, geff_spec.PropMetadata]]
         A tuple containing two dictionaries:
-        - Node properties metadata
-        - Edge properties metadata
+        - node properties metadata
+        - edge properties metadata
 
     Raises
     ------
