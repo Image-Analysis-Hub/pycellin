@@ -13,6 +13,8 @@ References:
 """
 
 import copy
+import tempfile
+from pathlib import Path
 from typing import Literal
 
 import geff
@@ -22,9 +24,7 @@ import networkx as nx
 from pycellin.classes import CellLineage, Model, Property
 from pycellin.io.utils import _remove_orphaned_metadata
 
-
 # TODO: geffception for cycle and lineage props
-# TODO: expose display_hints as export options, and fallback to axes if not provided
 
 
 def _find_node_overlaps(lineages: list[CellLineage]) -> dict[int, list[int]]:
@@ -277,7 +277,7 @@ def _build_props_metadata(
             case "edge":
                 edge_props_md[prop_id] = prop_md
             case "lineage":
-                pass  # not supported in GEFF 0.5.0
+                pass  # need geffception for lineage and cycle props
             case _:
                 raise ValueError(f"Unknown property type: {prop.prop_type}")
 
@@ -463,38 +463,20 @@ def export_GEFF(
 
 
 if __name__ == "__main__":
-    xml_in = "sample_data/Ecoli_growth_on_agar_pad.xml"
-    # xml_in = "sample_data/Celegans-5pc-17timepoints.xml"
-    # xml_in = "sample_data/FakeTracks.xml"
-    # ctc_in = "sample_data/FakeTracks_TMtoCTC.txt"
-    # ctc_in = "sample_data/Ecoli_growth_on_agar_pad_TMtoCTC.txt"
-    # geff_out = "E:/Janelia_Cell_Trackathon/test_pycellin_geff/test.geff"
-    # geff_out = "B:/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
-    geff_out = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
+    """
+    Quick demo with sample data.
+    """
 
-    # Remove existing folder
-    import os
-    import shutil
-
-    if os.path.exists(geff_out):
-        shutil.rmtree(geff_out)
-
-    # Load data
-    from pycellin.io.cell_tracking_challenge.loader import load_CTC_file
     from pycellin.io.trackmate.loader import load_TrackMate_XML
 
+    xml_in = "sample_data/Ecoli_growth_on_agar_pad.xml"
     model = load_TrackMate_XML(xml_in)
-    # model = load_CTC_file(ctc_in)
-    # model.add_cycle_data()
-    # print(model)
-    # print(model.get_cell_lineage_properties().keys())
-    # print(model.data.cell_data.keys())
 
-    # export_GEFF(model, geff_out, variable_length_props=["ROI_coords"])
-    export_GEFF(
-        model,
-        geff_out,
-        time_axes="POSITION_T",
-        space_axes=["cell_x", "cell_y", "cell_z"],
-        variable_length_props=["ROI_coords"],
-    )
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        geff_out = Path(tmp_dir) / "output.geff"
+        export_GEFF(
+            model,
+            geff_out,
+            space_axes=["cell_x", "cell_y"],
+            variable_length_props=["ROI_coords"],
+        )
