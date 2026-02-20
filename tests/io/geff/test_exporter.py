@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """Unit test for GEFF file exporter."""
 
 import geff

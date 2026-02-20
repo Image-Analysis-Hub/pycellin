@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """Unit test for IO utilities functions."""
 
 import networkx as nx
@@ -15,6 +13,7 @@ from pycellin.graph.properties.core import (
 from pycellin.io.utils import (
     _add_lineage_props,
     _get_props_from_data,
+    _graph_has_node_prop,
     _remove_orphaned_metadata,
     _split_graph_into_lineages,
     _update_lineage_prop_key,
@@ -23,8 +22,16 @@ from pycellin.io.utils import (
 )
 from pycellin.utils import is_equal
 
-
 # Fixtures ####################################################################
+
+
+@pytest.fixture
+def graph():
+    graph = nx.DiGraph()
+    graph.add_node(1, all_val=0, one_none_val=None, all_none_val=None, missing_val="a")
+    graph.add_node(2, all_val=1, one_none_val=15.0, all_none_val=None, missing_val="b")
+    graph.add_node(3, all_val=2, one_none_val=20.0, all_none_val=None)
+    return graph
 
 
 @pytest.fixture
@@ -84,8 +91,12 @@ def model():
     data = Data(cell_data)
     props_metadata = PropsMetadata()
     props_metadata._add_prop(create_timepoint_property(provenance="Test"))
-    props_metadata._add_prop(create_cell_coord_property(provenance="Test", axis="x", unit="µm"))
-    props_metadata._add_prop(create_link_coord_property(provenance="Test", axis="x", unit="µm"))
+    props_metadata._add_prop(
+        create_cell_coord_property(provenance="Test", axis="x", unit="µm")
+    )
+    props_metadata._add_prop(
+        create_link_coord_property(provenance="Test", axis="x", unit="µm")
+    )
     props_metadata._add_prop(create_lineage_id_property(provenance="Test"))
 
     model = Model(
@@ -145,6 +156,382 @@ def model_with_orphaned_data(model):
 
 
 # Test classes ###############################################################
+
+
+class TestAddLineagesProps:
+    """Test cases for _add_lineage_props function."""
+
+    def test_add_lineages_props(self, lineage_attrs):
+        """Test adding lineage properties to graphs."""
+        g1_attr, g2_attr = lineage_attrs
+
+        g1_obt = nx.DiGraph()
+        g1_obt.add_node(1, lineage_ID=0)
+        g2_obt = nx.DiGraph()
+        g2_obt.add_node(2, lineage_ID=1)
+        _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr])
+
+        g1_exp = nx.DiGraph()
+        g1_exp.graph["name"] = "blob"
+        g1_exp.graph["lineage_ID"] = 0
+        g1_exp.add_node(1, lineage_ID=0)
+        g2_exp = nx.DiGraph()
+        g2_exp.graph["name"] = "blub"
+        g2_exp.graph["lineage_ID"] = 1
+        g2_exp.add_node(2, lineage_ID=1)
+
+        assert is_equal(g1_obt, g1_exp)
+        assert is_equal(g2_obt, g2_exp)
+
+    def test_different_lin_ID_key(self, lineage_attrs_with_track_id):
+        """Test adding lineage properties with different lineage ID key."""
+        g1_attr, g2_attr = lineage_attrs_with_track_id
+
+        g1_obt = nx.DiGraph()
+        g1_obt.add_node(1, TRACK_ID=0)
+        g2_obt = nx.DiGraph()
+        g2_obt.add_node(2, TRACK_ID=1)
+        _add_lineage_props(
+            [g1_obt, g2_obt], [g1_attr, g2_attr], lineage_ID_key="TRACK_ID"
+        )
+
+        g1_exp = nx.DiGraph()
+        g1_exp.graph["name"] = "blob"
+        g1_exp.graph["TRACK_ID"] = 0
+        g1_exp.add_node(1, TRACK_ID=0)
+        g2_exp = nx.DiGraph()
+        g2_exp.graph["name"] = "blub"
+        g2_exp.graph["TRACK_ID"] = 1
+        g2_exp.add_node(2, TRACK_ID=1)
+
+        assert is_equal(g1_obt, g1_exp)
+        assert is_equal(g2_obt, g2_exp)
+
+    def test_no_lin_ID_on_all_nodes(self, lineage_attrs):
+        """Test adding lineage properties when no nodes have lineage ID."""
+        g1_attr, g2_attr = lineage_attrs
+
+        g1_obt = nx.DiGraph()
+        g1_obt.add_node(1)
+        g1_obt.add_node(3)
+        g2_obt = nx.DiGraph()
+        g2_obt.add_node(2, lineage_ID=1)
+        _add_lineage_props(
+            [g1_obt, g2_obt], [g1_attr, g2_attr], lineage_ID_key="lineage_ID"
+        )
+
+        g1_exp = nx.DiGraph()
+        g1_exp.add_node(1)
+        g1_exp.add_node(3)
+        g2_exp = nx.DiGraph()
+        g2_exp.graph["name"] = "blub"
+        g2_exp.graph["lineage_ID"] = 1
+        g2_exp.add_node(2, lineage_ID=1)
+
+        assert is_equal(g1_obt, g1_exp)
+        assert is_equal(g2_obt, g2_exp)
+
+    def test_no_lin_ID_on_one_node(self, lineage_attrs):
+        """Test adding lineage properties when some nodes lack lineage ID."""
+        g1_attr, g2_attr = lineage_attrs
+
+        g1_obt = nx.DiGraph()
+        g1_obt.add_node(1)
+        g1_obt.add_node(3)
+        g1_obt.add_node(4, lineage_ID=0)
+
+        g2_obt = nx.DiGraph()
+        g2_obt.add_node(2, lineage_ID=1)
+        _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr])
+
+        g1_exp = nx.DiGraph()
+        g1_exp.graph["name"] = "blob"
+        g1_exp.graph["lineage_ID"] = 0
+        g1_exp.add_node(1)
+        g1_exp.add_node(3)
+        g1_exp.add_node(4, lineage_ID=0)
+        g2_exp = nx.DiGraph()
+        g2_exp.graph["name"] = "blub"
+        g2_exp.graph["lineage_ID"] = 1
+        g2_exp.add_node(2, lineage_ID=1)
+
+        assert is_equal(g1_obt, g1_exp)
+        assert is_equal(g2_obt, g2_exp)
+
+    def test_different_ID_for_one_track(self, lineage_attrs):
+        """Test that different lineage IDs within one graph raises error."""
+        g1_attr, g2_attr = lineage_attrs
+
+        g1_obt = nx.DiGraph()
+        g1_obt.add_node(1, lineage_ID=0)
+        g1_obt.add_node(3, lineage_ID=2)
+        g1_obt.add_node(4, lineage_ID=0)
+
+        g2_obt = nx.DiGraph()
+        g2_obt.add_node(2, lineage_ID=1)
+        with pytest.raises(ValueError):
+            _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr])
+
+    def test_no_nodes(self, lineage_attrs):
+        """Test adding lineage properties to graph with no nodes."""
+        g1_attr, g2_attr = lineage_attrs
+
+        g1_obt = nx.DiGraph()
+        g2_obt = nx.DiGraph()
+        g2_obt.add_node(2, lineage_ID=1)
+        _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr])
+
+        g1_exp = nx.DiGraph()
+        g2_exp = nx.DiGraph()
+        g2_exp.graph["name"] = "blub"
+        g2_exp.graph["lineage_ID"] = 1
+        g2_exp.add_node(2, lineage_ID=1)
+
+        assert is_equal(g1_obt, g1_exp)
+        assert is_equal(g2_obt, g2_exp)
+
+
+class TestGetPropsFromData:
+    """Test cases for _get_props_from_data function."""
+
+    def test_get_props_from_data(self, model):
+        """Test extracting properties from model data."""
+        node_props, edge_props, lineage_props = _get_props_from_data(model)
+
+        assert "timepoint" in node_props
+        assert "cell_x" in node_props
+        assert len(node_props) == 2
+
+        assert "link_x" in edge_props
+        assert len(edge_props) == 1
+
+        assert "lineage_ID" in lineage_props
+        assert len(lineage_props) == 1
+
+    def test_get_props_from_empty_data(self):
+        """Test with empty data."""
+        data = Data({})
+        model = Model(data=data, reference_time_property="timepoint")
+
+        node_props, edge_props, lineage_props = _get_props_from_data(model)
+
+        assert len(node_props) == 0
+        assert len(edge_props) == 0
+        assert len(lineage_props) == 0
+
+
+class TestGraphHasNodeProp:
+    """Test cases for _graph_has_node_prop function."""
+
+    def test_empty_graph_returns_true(self):
+        """Vacuously true: all (zero) nodes have the property."""
+        assert _graph_has_node_prop(nx.DiGraph(), "frame") is True
+
+    def test_all_nodes_have_prop(self, graph):
+        assert _graph_has_node_prop(graph, "all_val") is True
+
+    def test_some_nodes_missing_prop(self, graph):
+        assert _graph_has_node_prop(graph, "missing_val") is False
+
+    def test_nonexistent_key(self, graph):
+        assert _graph_has_node_prop(graph, "value") is False
+
+    def test_prop_with_none_value(self, graph):
+        """Key presence is checked, not value truthiness."""
+        assert _graph_has_node_prop(graph, "one_none_val") is True
+
+    def test_prop_with_only_none_value(self, graph):
+        """Key presence is checked, not value truthiness."""
+        assert _graph_has_node_prop(graph, "all_none_val") is True
+
+
+class TestRemoveOrphanedMetadata:
+    """Test cases for _remove_orphaned_metadata function."""
+
+    def test_no_orphaned_metadata(self, model):
+        """Test when there are no orphaned properties."""
+        before_node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
+        before_edge_props = model.props_metadata._get_prop_dict_from_prop_type("edge")
+        before_lineage_props = model.props_metadata._get_prop_dict_from_prop_type(
+            "lineage"
+        )
+
+        _remove_orphaned_metadata(model)
+
+        after_node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
+        after_edge_props = model.props_metadata._get_prop_dict_from_prop_type("edge")
+        after_lineage_props = model.props_metadata._get_prop_dict_from_prop_type(
+            "lineage"
+        )
+        assert before_node_props == after_node_props
+        assert before_edge_props == after_edge_props
+        assert before_lineage_props == after_lineage_props
+
+    def test_remove_orphaned_metadata(self, model_with_orphaned_metadata):
+        """Test removing orphaned properties from metadata."""
+        with pytest.warns(UserWarning, match="Node metadata with no corresponding data"):
+            with pytest.warns(
+                UserWarning, match="Edge metadata with no corresponding data"
+            ):
+                with pytest.warns(
+                    UserWarning, match="Lineage metadata with no corresponding data"
+                ):
+                    _remove_orphaned_metadata(model_with_orphaned_metadata)
+
+        node_props = (
+            model_with_orphaned_metadata.props_metadata._get_prop_dict_from_prop_type(
+                "node"
+            )
+        )
+        edge_props = (
+            model_with_orphaned_metadata.props_metadata._get_prop_dict_from_prop_type(
+                "edge"
+            )
+        )
+        lineage_props = (
+            model_with_orphaned_metadata.props_metadata._get_prop_dict_from_prop_type(
+                "lineage"
+            )
+        )
+        # Check that orphaned properties are removed.
+        assert "orphaned_node_prop" not in node_props
+        assert "orphaned_edge_prop" not in edge_props
+        assert "orphaned_lineage_prop" not in lineage_props
+
+        # Check that non-orphaned properties are preserved.
+        assert "timepoint" in node_props
+        assert "cell_x" in node_props
+        assert "link_x" in edge_props
+        assert "lineage_ID" in lineage_props
+
+    def test_orphaned_data(self, model_with_orphaned_data):
+        """Test that metadata are unchanged when orphaned data properties are present."""
+        before_node_props = (
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type("node")
+        )
+        before_edge_props = (
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type("edge")
+        )
+        before_lineage_props = (
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+                "lineage"
+            )
+        )
+
+        _remove_orphaned_metadata(model_with_orphaned_data)
+
+        after_node_props = (
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type("node")
+        )
+        after_edge_props = (
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type("edge")
+        )
+        after_lineage_props = (
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+                "lineage"
+            )
+        )
+        assert before_node_props == after_node_props
+        assert before_edge_props == after_edge_props
+        assert before_lineage_props == after_lineage_props
+
+    def test_empty_metadata(self, model):
+        """Test with empty metadata."""
+        model.props_metadata = PropsMetadata()  # set empty metadata
+        _remove_orphaned_metadata(model)
+
+        # Metadata should still be empty.
+        node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
+        edge_props = model.props_metadata._get_prop_dict_from_prop_type("edge")
+        lineage_props = model.props_metadata._get_prop_dict_from_prop_type("lineage")
+        assert len(node_props) == 0
+        assert len(edge_props) == 0
+        assert len(lineage_props) == 0
+
+
+class TestSplitGraphIntoLineages:
+    """Test cases for _split_graph_into_lineages function."""
+
+    def test_split_graph_into_lineages(self, lineage_attrs):
+        """Test splitting graph into lineages."""
+        g1_attr, g2_attr = lineage_attrs
+
+        g = nx.DiGraph()
+        g.add_node(1, lineage_ID=0)
+        g.add_node(2, lineage_ID=0)
+        g.add_edge(1, 2)
+        g.add_node(3, lineage_ID=1)
+        g.add_node(4, lineage_ID=1)
+        g.add_edge(3, 4)
+        obtained = _split_graph_into_lineages(g, [g1_attr, g2_attr])
+
+        g1_exp = CellLineage(g.subgraph([1, 2]))
+        g1_exp.graph["name"] = "blob"
+        g1_exp.graph["lineage_ID"] = 0
+        g2_exp = CellLineage(g.subgraph([3, 4]))
+        g2_exp.graph["name"] = "blub"
+        g2_exp.graph["lineage_ID"] = 1
+
+        assert len(obtained) == 2
+        assert is_equal(obtained[0], g1_exp)
+        assert is_equal(obtained[1], g2_exp)
+
+    def test_different_lin_ID_key(self, lineage_attrs_with_track_id):
+        """Test splitting graph with different lineage ID key."""
+        g1_attr, g2_attr = lineage_attrs_with_track_id
+
+        g = nx.DiGraph()
+        g.add_node(1, TRACK_ID=0)
+        g.add_node(2, TRACK_ID=0)
+        g.add_edge(1, 2)
+        g.add_node(3, TRACK_ID=1)
+        g.add_node(4, TRACK_ID=1)
+        g.add_edge(3, 4)
+        obtained = _split_graph_into_lineages(
+            g, [g1_attr, g2_attr], lineage_ID_key="TRACK_ID"
+        )
+
+        g1_exp = CellLineage(g.subgraph([1, 2]))
+        g1_exp.graph["name"] = "blob"
+        g1_exp.graph["TRACK_ID"] = 0
+        g2_exp = CellLineage(g.subgraph([3, 4]))
+        g2_exp.graph["name"] = "blub"
+        g2_exp.graph["TRACK_ID"] = 1
+
+        assert len(obtained) == 2
+        assert is_equal(obtained[0], g1_exp)
+        assert is_equal(obtained[1], g2_exp)
+
+    def test_no_lin_props(self):
+        """Test splitting graph with no lineage properties."""
+        g = nx.DiGraph()
+        g.add_edges_from([(1, 2), (3, 4)])
+
+        obtained = _split_graph_into_lineages(g)
+
+        g1_exp = CellLineage(g.subgraph([1, 2]))
+        g1_exp.graph["lineage_ID"] = 0
+        g2_exp = CellLineage(g.subgraph([3, 4]))
+        g2_exp.graph["lineage_ID"] = 1
+
+        assert len(obtained) == 2
+        assert is_equal(obtained[0], g1_exp)
+        assert is_equal(obtained[1], g2_exp)
+
+    def test_different_ID(self, lineage_attrs):
+        """Test that different lineage IDs in connected nodes raises error."""
+        g1_attr, g2_attr = lineage_attrs
+
+        g = nx.DiGraph()
+        g.add_node(1, lineage_ID=2)
+        g.add_node(2, lineage_ID=0)
+        g.add_edge(1, 2)
+        g.add_node(3, lineage_ID=1)
+        g.add_node(4, lineage_ID=1)
+        g.add_edge(3, 4)
+
+        with pytest.raises(ValueError):
+            _split_graph_into_lineages(g, [g1_attr, g2_attr])
 
 
 class TestUpdateNodePropKey:
@@ -334,330 +721,3 @@ class TestUpdateLineagesIDsKey:
         assert lin1.graph["lineage_ID"] == 10
         assert lin1.graph["other_attr"] == "value"
         assert "TRACK_ID" not in lin1.graph
-
-
-class TestAddLineagesProps:
-    """Test cases for _add_lineage_props function."""
-
-    def test_add_lineages_props(self, lineage_attrs):
-        """Test adding lineage properties to graphs."""
-        g1_attr, g2_attr = lineage_attrs
-
-        g1_obt = nx.DiGraph()
-        g1_obt.add_node(1, lineage_ID=0)
-        g2_obt = nx.DiGraph()
-        g2_obt.add_node(2, lineage_ID=1)
-        _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr])
-
-        g1_exp = nx.DiGraph()
-        g1_exp.graph["name"] = "blob"
-        g1_exp.graph["lineage_ID"] = 0
-        g1_exp.add_node(1, lineage_ID=0)
-        g2_exp = nx.DiGraph()
-        g2_exp.graph["name"] = "blub"
-        g2_exp.graph["lineage_ID"] = 1
-        g2_exp.add_node(2, lineage_ID=1)
-
-        assert is_equal(g1_obt, g1_exp)
-        assert is_equal(g2_obt, g2_exp)
-
-    def test_different_lin_ID_key(self, lineage_attrs_with_track_id):
-        """Test adding lineage properties with different lineage ID key."""
-        g1_attr, g2_attr = lineage_attrs_with_track_id
-
-        g1_obt = nx.DiGraph()
-        g1_obt.add_node(1, TRACK_ID=0)
-        g2_obt = nx.DiGraph()
-        g2_obt.add_node(2, TRACK_ID=1)
-        _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr], lineage_ID_key="TRACK_ID")
-
-        g1_exp = nx.DiGraph()
-        g1_exp.graph["name"] = "blob"
-        g1_exp.graph["TRACK_ID"] = 0
-        g1_exp.add_node(1, TRACK_ID=0)
-        g2_exp = nx.DiGraph()
-        g2_exp.graph["name"] = "blub"
-        g2_exp.graph["TRACK_ID"] = 1
-        g2_exp.add_node(2, TRACK_ID=1)
-
-        assert is_equal(g1_obt, g1_exp)
-        assert is_equal(g2_obt, g2_exp)
-
-    def test_no_lin_ID_on_all_nodes(self, lineage_attrs):
-        """Test adding lineage properties when no nodes have lineage ID."""
-        g1_attr, g2_attr = lineage_attrs
-
-        g1_obt = nx.DiGraph()
-        g1_obt.add_node(1)
-        g1_obt.add_node(3)
-        g2_obt = nx.DiGraph()
-        g2_obt.add_node(2, lineage_ID=1)
-        _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr], lineage_ID_key="lineage_ID")
-
-        g1_exp = nx.DiGraph()
-        g1_exp.add_node(1)
-        g1_exp.add_node(3)
-        g2_exp = nx.DiGraph()
-        g2_exp.graph["name"] = "blub"
-        g2_exp.graph["lineage_ID"] = 1
-        g2_exp.add_node(2, lineage_ID=1)
-
-        assert is_equal(g1_obt, g1_exp)
-        assert is_equal(g2_obt, g2_exp)
-
-    def test_no_lin_ID_on_one_node(self, lineage_attrs):
-        """Test adding lineage properties when some nodes lack lineage ID."""
-        g1_attr, g2_attr = lineage_attrs
-
-        g1_obt = nx.DiGraph()
-        g1_obt.add_node(1)
-        g1_obt.add_node(3)
-        g1_obt.add_node(4, lineage_ID=0)
-
-        g2_obt = nx.DiGraph()
-        g2_obt.add_node(2, lineage_ID=1)
-        _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr])
-
-        g1_exp = nx.DiGraph()
-        g1_exp.graph["name"] = "blob"
-        g1_exp.graph["lineage_ID"] = 0
-        g1_exp.add_node(1)
-        g1_exp.add_node(3)
-        g1_exp.add_node(4, lineage_ID=0)
-        g2_exp = nx.DiGraph()
-        g2_exp.graph["name"] = "blub"
-        g2_exp.graph["lineage_ID"] = 1
-        g2_exp.add_node(2, lineage_ID=1)
-
-        assert is_equal(g1_obt, g1_exp)
-        assert is_equal(g2_obt, g2_exp)
-
-    def test_different_ID_for_one_track(self, lineage_attrs):
-        """Test that different lineage IDs within one graph raises error."""
-        g1_attr, g2_attr = lineage_attrs
-
-        g1_obt = nx.DiGraph()
-        g1_obt.add_node(1, lineage_ID=0)
-        g1_obt.add_node(3, lineage_ID=2)
-        g1_obt.add_node(4, lineage_ID=0)
-
-        g2_obt = nx.DiGraph()
-        g2_obt.add_node(2, lineage_ID=1)
-        with pytest.raises(ValueError):
-            _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr])
-
-    def test_no_nodes(self, lineage_attrs):
-        """Test adding lineage properties to graph with no nodes."""
-        g1_attr, g2_attr = lineage_attrs
-
-        g1_obt = nx.DiGraph()
-        g2_obt = nx.DiGraph()
-        g2_obt.add_node(2, lineage_ID=1)
-        _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr])
-
-        g1_exp = nx.DiGraph()
-        g2_exp = nx.DiGraph()
-        g2_exp.graph["name"] = "blub"
-        g2_exp.graph["lineage_ID"] = 1
-        g2_exp.add_node(2, lineage_ID=1)
-
-        assert is_equal(g1_obt, g1_exp)
-        assert is_equal(g2_obt, g2_exp)
-
-
-class TestSplitGraphIntoLineages:
-    """Test cases for _split_graph_into_lineages function."""
-
-    def test_split_graph_into_lineages(self, lineage_attrs):
-        """Test splitting graph into lineages."""
-        g1_attr, g2_attr = lineage_attrs
-
-        g = nx.DiGraph()
-        g.add_node(1, lineage_ID=0)
-        g.add_node(2, lineage_ID=0)
-        g.add_edge(1, 2)
-        g.add_node(3, lineage_ID=1)
-        g.add_node(4, lineage_ID=1)
-        g.add_edge(3, 4)
-        obtained = _split_graph_into_lineages(g, [g1_attr, g2_attr])
-
-        g1_exp = CellLineage(g.subgraph([1, 2]))
-        g1_exp.graph["name"] = "blob"
-        g1_exp.graph["lineage_ID"] = 0
-        g2_exp = CellLineage(g.subgraph([3, 4]))
-        g2_exp.graph["name"] = "blub"
-        g2_exp.graph["lineage_ID"] = 1
-
-        assert len(obtained) == 2
-        assert is_equal(obtained[0], g1_exp)
-        assert is_equal(obtained[1], g2_exp)
-
-    def test_different_lin_ID_key(self, lineage_attrs_with_track_id):
-        """Test splitting graph with different lineage ID key."""
-        g1_attr, g2_attr = lineage_attrs_with_track_id
-
-        g = nx.DiGraph()
-        g.add_node(1, TRACK_ID=0)
-        g.add_node(2, TRACK_ID=0)
-        g.add_edge(1, 2)
-        g.add_node(3, TRACK_ID=1)
-        g.add_node(4, TRACK_ID=1)
-        g.add_edge(3, 4)
-        obtained = _split_graph_into_lineages(g, [g1_attr, g2_attr], lineage_ID_key="TRACK_ID")
-
-        g1_exp = CellLineage(g.subgraph([1, 2]))
-        g1_exp.graph["name"] = "blob"
-        g1_exp.graph["TRACK_ID"] = 0
-        g2_exp = CellLineage(g.subgraph([3, 4]))
-        g2_exp.graph["name"] = "blub"
-        g2_exp.graph["TRACK_ID"] = 1
-
-        assert len(obtained) == 2
-        assert is_equal(obtained[0], g1_exp)
-        assert is_equal(obtained[1], g2_exp)
-
-    def test_no_lin_props(self):
-        """Test splitting graph with no lineage properties."""
-        g = nx.DiGraph()
-        g.add_edges_from([(1, 2), (3, 4)])
-
-        obtained = _split_graph_into_lineages(g)
-
-        g1_exp = CellLineage(g.subgraph([1, 2]))
-        g1_exp.graph["lineage_ID"] = 0
-        g2_exp = CellLineage(g.subgraph([3, 4]))
-        g2_exp.graph["lineage_ID"] = 1
-
-        assert len(obtained) == 2
-        assert is_equal(obtained[0], g1_exp)
-        assert is_equal(obtained[1], g2_exp)
-
-    def test_different_ID(self, lineage_attrs):
-        """Test that different lineage IDs in connected nodes raises error."""
-        g1_attr, g2_attr = lineage_attrs
-
-        g = nx.DiGraph()
-        g.add_node(1, lineage_ID=2)
-        g.add_node(2, lineage_ID=0)
-        g.add_edge(1, 2)
-        g.add_node(3, lineage_ID=1)
-        g.add_node(4, lineage_ID=1)
-        g.add_edge(3, 4)
-
-        with pytest.raises(ValueError):
-            _split_graph_into_lineages(g, [g1_attr, g2_attr])
-
-
-class TestGetPropsFromData:
-    """Test cases for _get_props_from_data function."""
-
-    def test_get_props_from_data(self, model):
-        """Test extracting properties from model data."""
-        node_props, edge_props, lineage_props = _get_props_from_data(model)
-
-        assert "timepoint" in node_props
-        assert "cell_x" in node_props
-        assert len(node_props) == 2
-
-        assert "link_x" in edge_props
-        assert len(edge_props) == 1
-
-        assert "lineage_ID" in lineage_props
-        assert len(lineage_props) == 1
-
-    def test_get_props_from_empty_data(self):
-        """Test with empty data."""
-        data = Data({})
-        model = Model(data=data, reference_time_property="timepoint")
-
-        node_props, edge_props, lineage_props = _get_props_from_data(model)
-
-        assert len(node_props) == 0
-        assert len(edge_props) == 0
-        assert len(lineage_props) == 0
-
-
-class TestRemoveOrphanedMetadata:
-    """Test cases for _remove_orphaned_metadata function."""
-
-    def test_no_orphaned_metadata(self, model):
-        """Test when there are no orphaned properties."""
-        before_node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
-        before_edge_props = model.props_metadata._get_prop_dict_from_prop_type("edge")
-        before_lineage_props = model.props_metadata._get_prop_dict_from_prop_type("lineage")
-
-        _remove_orphaned_metadata(model)
-
-        after_node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
-        after_edge_props = model.props_metadata._get_prop_dict_from_prop_type("edge")
-        after_lineage_props = model.props_metadata._get_prop_dict_from_prop_type("lineage")
-        assert before_node_props == after_node_props
-        assert before_edge_props == after_edge_props
-        assert before_lineage_props == after_lineage_props
-
-    def test_remove_orphaned_metadata(self, model_with_orphaned_metadata):
-        """Test removing orphaned properties from metadata."""
-        with pytest.warns(UserWarning, match="Node metadata with no corresponding data"):
-            with pytest.warns(UserWarning, match="Edge metadata with no corresponding data"):
-                with pytest.warns(UserWarning, match="Lineage metadata with no corresponding data"):
-                    _remove_orphaned_metadata(model_with_orphaned_metadata)
-
-        node_props = model_with_orphaned_metadata.props_metadata._get_prop_dict_from_prop_type(
-            "node"
-        )
-        edge_props = model_with_orphaned_metadata.props_metadata._get_prop_dict_from_prop_type(
-            "edge"
-        )
-        lineage_props = model_with_orphaned_metadata.props_metadata._get_prop_dict_from_prop_type(
-            "lineage"
-        )
-        # Check that orphaned properties are removed.
-        assert "orphaned_node_prop" not in node_props
-        assert "orphaned_edge_prop" not in edge_props
-        assert "orphaned_lineage_prop" not in lineage_props
-
-        # Check that non-orphaned properties are preserved.
-        assert "timepoint" in node_props
-        assert "cell_x" in node_props
-        assert "link_x" in edge_props
-        assert "lineage_ID" in lineage_props
-
-    def test_orphaned_data(self, model_with_orphaned_data):
-        """Test that metadata are unchanged when orphaned data properties are present."""
-        before_node_props = model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
-            "node"
-        )
-        before_edge_props = model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
-            "edge"
-        )
-        before_lineage_props = (
-            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type("lineage")
-        )
-
-        _remove_orphaned_metadata(model_with_orphaned_data)
-
-        after_node_props = model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
-            "node"
-        )
-        after_edge_props = model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
-            "edge"
-        )
-        after_lineage_props = model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
-            "lineage"
-        )
-        assert before_node_props == after_node_props
-        assert before_edge_props == after_edge_props
-        assert before_lineage_props == after_lineage_props
-
-    def test_empty_metadata(self, model):
-        """Test with empty metadata."""
-        model.props_metadata = PropsMetadata()  # set empty metadata
-        _remove_orphaned_metadata(model)
-
-        # Metadata should still be empty.
-        node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
-        edge_props = model.props_metadata._get_prop_dict_from_prop_type("edge")
-        lineage_props = model.props_metadata._get_prop_dict_from_prop_type("lineage")
-        assert len(node_props) == 0
-        assert len(edge_props) == 0
-        assert len(lineage_props) == 0

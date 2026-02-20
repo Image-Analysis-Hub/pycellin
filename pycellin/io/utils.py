@@ -202,6 +202,25 @@ def _get_props_from_data(model: Model) -> tuple[set[str], set[str], set[str]]:
 #         )
 
 
+def _graph_has_node_prop(graph: nx.Graph, key: str) -> bool:
+    """
+    Check if all nodes in the graph have a specific property.
+
+    Parameters
+    ----------
+    graph : nx.Graph
+        The graph to check.
+    key : str
+        The name of the property to look for.
+
+    Returns
+    -------
+    bool
+        True if all nodes have the property, False otherwise.
+    """
+    return all(key in graph.nodes[node] for node in graph.nodes)
+
+
 def _remove_orphaned_metadata(model: Model) -> None:
     """
     Remove properties from metadata that are not present in any lineage.
@@ -213,7 +232,9 @@ def _remove_orphaned_metadata(model: Model) -> None:
     """
     node_props_md = model.props_metadata._get_prop_dict_from_prop_type("node").keys()
     edge_props_md = model.props_metadata._get_prop_dict_from_prop_type("edge").keys()
-    lineage_props_md = model.props_metadata._get_prop_dict_from_prop_type("lineage").keys()
+    lineage_props_md = model.props_metadata._get_prop_dict_from_prop_type(
+        "lineage"
+    ).keys()
     node_props_data, edge_props_data, lineage_props_data = _get_props_from_data(model)
 
     orphaned_node_props = list(node_props_md - node_props_data)
@@ -260,7 +281,8 @@ def _split_graph_into_lineages(
     # One subgraph is created per lineage, so each subgraph is
     # a connected component of `graph`.
     lineages = [
-        CellLineage(graph.subgraph(c).copy()) for c in nx.weakly_connected_components(graph)
+        CellLineage(graph.subgraph(c).copy())
+        for c in nx.weakly_connected_components(graph)
     ]
     del graph  # Redondant with the subgraphs.
     if not lin_props:
@@ -321,7 +343,9 @@ def _update_node_prop_key(
             lineage.nodes[node][new_key] = lineage.nodes[node].pop(old_key)
         else:
             if enforce_old_key_existence:
-                raise ValueError(f"Node {node} does not have the required key '{old_key}'.")
+                raise ValueError(
+                    f"Node {node} does not have the required key '{old_key}'."
+                )
             if set_default_if_missing:
                 lineage.nodes[node][new_key] = default_value
 
