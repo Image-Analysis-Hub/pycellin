@@ -143,7 +143,9 @@ def create_lineage_id_property(provenance: str = "pycellin") -> Property:
     )
 
 
-def create_cell_coord_property(unit: str, axis: str, provenance: str = "pycellin") -> Property:
+def create_cell_coord_property(
+    unit: str | None, axis: str, provenance: str = "pycellin"
+) -> Property:
     return Property(
         identifier=f"cell_{axis}",
         name=f"cell {axis}",

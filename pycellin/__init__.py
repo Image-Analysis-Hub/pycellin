@@ -22,6 +22,9 @@ from .io.trackmate.exporter import export_TrackMate_XML
 from .io.trackmate.loader import load_TrackMate_XML
 from .io.trackpy.exporter import export_trackpy_dataframe
 from .io.trackpy.loader import load_trackpy_dataframe
+from .io.geff.exporter import export_GEFF
+from .io.geff.loader import load_GEFF
+
 
 __all__ = [
     "Data",
@@ -43,6 +46,8 @@ __all__ = [
     "export_TrackMate_XML",
     "load_trackpy_dataframe",
     "export_trackpy_dataframe",
+    "load_GEFF",
+    "export_GEFF",
     "get_pycellin_cell_lineage_properties",
     "get_pycellin_cycle_lineage_properties",
 ]

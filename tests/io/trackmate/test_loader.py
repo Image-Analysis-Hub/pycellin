@@ -1,76 +1,18 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """Unit test for TrackMate XML file loader."""
 
-from copy import deepcopy
 import io
+from copy import deepcopy
 from typing import Any
 
-from lxml import etree as ET
 import networkx as nx
-import networkx.algorithms.isomorphism as iso
 import pytest
+from lxml import etree as ET
 
-from pycellin.classes import CellLineage, Property, PropsMetadata
 import pycellin.io.trackmate.loader as tml
-
-
-def is_equal(obt, exp):
-    """Check if two graphs are perfectly identical.
-
-    It checks that the graphs are isomorphic, and that their graph,
-    nodes and edges attributes are all identical.
-
-    Args:
-        obt (nx.DiGraph): The obtained graph, built from XML_reader.py.
-        exp (nx.DiGraph): The expected graph, built from here.
-
-    Returns:
-        bool: True if the graphs are identical, False otherwise.
-    """
-    edges_attr = list(set([k for (n1, n2, d) in exp.edges.data() for k in d]))
-    edges_default = len(edges_attr) * [0]
-    em = iso.categorical_edge_match(edges_attr, edges_default)
-    nodes_attr = list(set([k for (n, d) in exp.nodes.data() for k in d]))
-    nodes_default = len(nodes_attr) * [0]
-    nm = iso.categorical_node_match(nodes_attr, nodes_default)
-
-    if not obt.nodes.data() and not exp.nodes.data():
-        same_nodes = True
-    elif len(obt.nodes.data()) != len(exp.nodes.data()):
-        same_nodes = False
-    else:
-        for data1, data2 in zip(sorted(obt.nodes.data()), sorted(exp.nodes.data())):
-            n1, attr1 = data1
-            n2, attr2 = data2
-            if sorted(attr1) == sorted(attr2) and n1 == n2:
-                same_nodes = True
-            else:
-                same_nodes = False
-
-    if not obt.edges.data() and not exp.edges.data():
-        same_edges = True
-    elif len(obt.edges.data()) != len(exp.edges.data()):
-        same_edges = False
-    else:
-        for data1, data2 in zip(sorted(obt.edges.data()), sorted(exp.edges.data())):
-            n11, n12, attr1 = data1
-            n21, n22, attr2 = data2
-            if sorted(attr1) == sorted(attr2) and sorted((n11, n12)) == sorted((n21, n22)):
-                same_edges = True
-            else:
-                same_edges = False
-
-    if (
-        nx.is_isomorphic(obt, exp, edge_match=em, node_match=nm)
-        and obt.graph == exp.graph
-        and same_nodes
-        and same_edges
-    ):
-        return True
-    else:
-        return False
+from pycellin.classes import CellLineage, Property, PropsMetadata
+from pycellin.utils import is_equal
 
 
 # Fixtures #####################################################################
@@ -569,10 +511,7 @@ def test_convert_ROI_coordinates_2D():
     att_obtained = deepcopy(el_obtained.attrib)
     tml._convert_ROI_coordinates(el_obtained, att_obtained)
 
-    att_expected = {
-        "ROI_N_POINTS": "3",
-        "ROI_coords": [(1.0, 2.0), (-3.0, -4.0), (5.5, 6.0)],
-    }
+    att_expected = {"ROI_coords": [(1.0, 2.0), (-3.0, -4.0), (5.5, 6.0)]}
 
     assert att_obtained == att_expected
 
@@ -584,10 +523,7 @@ def test_convert_ROI_coordinates_3D():
     att_obtained = deepcopy(el_obtained.attrib)
     tml._convert_ROI_coordinates(el_obtained, att_obtained)
 
-    att_expected = {
-        "ROI_N_POINTS": "2",
-        "ROI_coords": [(1.0, 2.0, -3.0), (-4.0, 5.5, 6.0)],
-    }
+    att_expected = {"ROI_coords": [(1.0, 2.0, -3.0), (-4.0, 5.5, 6.0)]}
 
     assert att_obtained == att_expected
 
@@ -607,7 +543,7 @@ def test_convert_ROI_coordinates_no_ROI_txt():
     att_obtained = deepcopy(el_obtained.attrib)
     tml._convert_ROI_coordinates(el_obtained, att_obtained)
 
-    att_expected = {"ROI_N_POINTS": "2", "ROI_coords": None}
+    att_expected = {"ROI_coords": None}
 
     assert att_obtained == att_expected
 
@@ -1128,209 +1064,6 @@ def test_get_filtered_tracks_ID_no_tracks():
     _, element = next(it)
     obtained_ID = tml._get_filtered_tracks_ID(it, element)
     assert not obtained_ID
-
-
-# _add_tracks_info ############################################################
-
-
-def test_add_tracks_info():
-    g1_attr = {"name": "blob", "TRACK_ID": 0}
-    g2_attr = {"name": "blub", "TRACK_ID": 1}
-
-    g1_obt = nx.DiGraph()
-    g1_obt.add_node(1, TRACK_ID=0)
-    g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID=1)
-    tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
-
-    g1_exp = nx.DiGraph()
-    g1_exp.graph["name"] = "blob"
-    g1_exp.graph["TRACK_ID"] = 0
-    g1_exp.add_node(1, TRACK_ID=0)
-    g2_exp = nx.DiGraph()
-    g2_exp.graph["name"] = "blub"
-    g2_exp.graph["TRACK_ID"] = 1
-    g2_exp.add_node(2, TRACK_ID=1)
-
-    assert is_equal(g1_obt, g1_exp)
-    assert is_equal(g2_obt, g2_exp)
-
-
-def test_add_tracks_info_no_track_ID_on_all_nodes():
-    g1_attr = {"name": "blob", "TRACK_ID": 0}
-    g2_attr = {"name": "blub", "TRACK_ID": 1}
-
-    g1_obt = nx.DiGraph()
-    g1_obt.add_node(1)
-    g1_obt.add_node(3)
-    g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID=1)
-    tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
-
-    g1_exp = nx.DiGraph()
-    g1_exp.add_node(1)
-    g1_exp.add_node(3)
-    g2_exp = nx.DiGraph()
-    g2_exp.graph["name"] = "blub"
-    g2_exp.graph["TRACK_ID"] = 1
-    g2_exp.add_node(2, TRACK_ID=1)
-
-    assert is_equal(g1_obt, g1_exp)
-    assert is_equal(g2_obt, g2_exp)
-
-
-def test_add_tracks_info_no_track_ID_on_one_node():
-    g1_attr = {"name": "blob", "TRACK_ID": 0}
-    g2_attr = {"name": "blub", "TRACK_ID": 1}
-
-    g1_obt = nx.DiGraph()
-    g1_obt.add_node(1)
-    g1_obt.add_node(3)
-    g1_obt.add_node(4, TRACK_ID=0)
-
-    g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID=1)
-    tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
-
-    g1_exp = nx.DiGraph()
-    g1_exp.graph["name"] = "blob"
-    g1_exp.graph["TRACK_ID"] = 0
-    g1_exp.add_node(1)
-    g1_exp.add_node(3)
-    g1_exp.add_node(4, TRACK_ID=0)
-    g2_exp = nx.DiGraph()
-    g2_exp.graph["name"] = "blub"
-    g2_exp.graph["TRACK_ID"] = 1
-    g2_exp.add_node(2, TRACK_ID=1)
-
-    assert is_equal(g1_obt, g1_exp)
-    assert is_equal(g2_obt, g2_exp)
-
-
-def test_add_tracks_info_different_ID_for_one_track():
-    g1_attr = {"name": "blob", "TRACK_ID": 0}
-    g2_attr = {"name": "blub", "TRACK_ID": 1}
-
-    g1_obt = nx.DiGraph()
-    g1_obt.add_node(1, TRACK_ID=0)
-    g1_obt.add_node(3, TRACK_ID=2)
-    g1_obt.add_node(4, TRACK_ID=0)
-
-    g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID=1)
-    with pytest.raises(ValueError):
-        tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
-
-
-def test_add_tracks_info_no_nodes():
-    g1_attr = {"name": "blob", "TRACK_ID": 0}
-    g2_attr = {"name": "blub", "TRACK_ID": 1}
-
-    g1_obt = nx.DiGraph()
-    g2_obt = nx.DiGraph()
-    g2_obt.add_node(2, TRACK_ID=1)
-    tml._add_tracks_info([g1_obt, g2_obt], [g1_attr, g2_attr])
-
-    g1_exp = nx.DiGraph()
-    g2_exp = nx.DiGraph()
-    g2_exp.graph["name"] = "blub"
-    g2_exp.graph["TRACK_ID"] = 1
-    g2_exp.add_node(2, TRACK_ID=1)
-
-    assert is_equal(g1_obt, g1_exp)
-    assert is_equal(g2_obt, g2_exp)
-
-
-# _split_graph_into_lineages ##################################################
-
-
-def test_split_graph_into_lineages():
-    g1_attr = {"name": "blob", "TRACK_ID": 1}
-    g2_attr = {"name": "blub", "TRACK_ID": 2}
-
-    g = nx.DiGraph()
-    g.add_node(1, TRACK_ID=1)
-    g.add_node(2, TRACK_ID=1)
-    g.add_edge(1, 2)
-    g.add_node(3, TRACK_ID=2)
-    g.add_node(4, TRACK_ID=2)
-    g.add_edge(3, 4)
-    obtained = tml._split_graph_into_lineages(g, [g1_attr, g2_attr])
-
-    g1_exp = CellLineage(g.subgraph([1, 2]))
-    g1_exp.graph["name"] = "blob"
-    g1_exp.graph["TRACK_ID"] = 1
-    g2_exp = CellLineage(g.subgraph([3, 4]))
-    g2_exp.graph["name"] = "blub"
-    g2_exp.graph["TRACK_ID"] = 2
-
-    assert len(obtained) == 2
-    assert is_equal(obtained[0], g1_exp)
-    assert is_equal(obtained[1], g2_exp)
-
-
-def test_split_graph_into_lineages_different_ID():
-    g1_attr = {"name": "blob", "TRACK_ID": 1}
-    g2_attr = {"name": "blub", "TRACK_ID": 2}
-
-    g = nx.DiGraph()
-    g.add_node(1, TRACK_ID=0)
-    g.add_node(2, TRACK_ID=1)
-    g.add_edge(1, 2)
-    g.add_node(3, TRACK_ID=2)
-    g.add_node(4, TRACK_ID=2)
-    g.add_edge(3, 4)
-
-    with pytest.raises(ValueError):
-        tml._split_graph_into_lineages(g, [g1_attr, g2_attr])
-
-
-# _update_node_prop_key ####################################################
-
-
-def test_update_node_prop_key():
-    lineage = CellLineage()
-    old_key_values = ["value1", "value2", "value3"]
-    lineage.add_node(1, old_key=old_key_values[0])
-    lineage.add_node(2, old_key=old_key_values[1])
-    lineage.add_node(3, old_key=old_key_values[2])
-
-    tml._update_node_prop_key(lineage, "old_key", "new_key")
-
-    for i, node in enumerate(lineage.nodes):
-        assert "new_key" in lineage.nodes[node]
-        assert "old_key" not in lineage.nodes[node]
-        assert lineage.nodes[node]["new_key"] == old_key_values[i]
-
-
-# _update_TRACK_ID ############################################################
-
-
-def test_update_TRACK_ID():
-    lineage = CellLineage()
-    lineage.add_node(1)
-    lineage.graph["TRACK_ID"] = 10
-    tml._update_TRACK_ID(lineage)
-    assert "lineage_ID" in lineage.graph
-    assert lineage.graph["lineage_ID"] == 10
-    assert "lineage_ID" not in lineage.nodes[1]
-
-
-def test_update_TRACK_ID_no_TRACK_ID():
-    lineage = CellLineage()
-    lineage.add_node(1)
-    tml._update_TRACK_ID(lineage)
-    assert "lineage_ID" in lineage.graph
-    assert lineage.graph["lineage_ID"] == -1
-
-
-def test_update_TRACK_ID_several_subgraphs():
-    lineage = CellLineage()
-    lineage.add_node(1)
-    lineage.add_node(2)
-
-    with pytest.raises(AssertionError):
-        tml._update_TRACK_ID(lineage)
 
 
 # _update_location_related_props ###########################################

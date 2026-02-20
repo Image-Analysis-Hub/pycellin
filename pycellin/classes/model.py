@@ -55,11 +55,12 @@ class Model:
             The name of the property to use as the reference for time measurements.
             Needs to be provided if model_metadata is None or does not contain it.
         variable_time_step : bool, optional
-            If True and time_step is not provided in model_metadata, the time step will be
-            computed using the greatest common divisor (GCD) of time differences, which is
-            suitable for irregularly sampled timepoints. If False, the minimum time difference
-            is used instead (default is False). This parameter is only used when time_step
-            needs to be automatically computed from the data.
+            If True and time_step is not provided in model_metadata, the time step
+            will be computed using the greatest common divisor (GCD) of time
+            differences, which is suitable for irregularly sampled timepoints.
+            If False, the minimum time difference is used instead (default is False).
+            This parameter is only used when time_step needs to be automatically
+            computed from the data.
 
         Raises
         ------
@@ -84,7 +85,9 @@ class Model:
             if isinstance(model_metadata, dict):
                 reference_time_property = model_metadata.get("reference_time_property")
             else:
-                reference_time_property = getattr(model_metadata, "reference_time_property", None)
+                reference_time_property = getattr(
+                    model_metadata, "reference_time_property", None
+                )
 
             if not reference_time_property:
                 raise ValueError(
@@ -109,7 +112,9 @@ class Model:
         if time_step is None:
             if self.data.cell_data:
                 # Create temporary metadata for _compute_time_step().
-                temp_metadata = ModelMetadata(reference_time_property=reference_time_property)
+                temp_metadata = ModelMetadata(
+                    reference_time_property=reference_time_property
+                )
                 self.model_metadata = temp_metadata
                 time_step = self._compute_time_step(variable_time_step)
             else:
@@ -194,7 +199,10 @@ class Model:
                     f"Model named '{self.model_metadata.name}' "
                     f"with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
                 )
-            elif hasattr(self.model_metadata, "provenance") and self.model_metadata.provenance:
+            elif (
+                hasattr(self.model_metadata, "provenance")
+                and self.model_metadata.provenance
+            ):
                 txt = (
                     f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}, "
                     f"built from {self.model_metadata.provenance}."
@@ -217,7 +225,10 @@ class Model:
                 )
             elif hasattr(self.model_metadata, "name") and self.model_metadata.name:
                 txt = f"Model named '{self.model_metadata.name}'."
-            elif hasattr(self.model_metadata, "provenance") and self.model_metadata.provenance:
+            elif (
+                hasattr(self.model_metadata, "provenance")
+                and self.model_metadata.provenance
+            ):
                 txt = f"Model built from {self.model_metadata.provenance}."
             else:
                 txt = "Empty model."
@@ -881,16 +892,22 @@ class Model:
 
         if props_to_update is not None:
             missing_props = [
-                prop for prop in props_to_update if not self.props_metadata._has_prop(prop)
+                prop
+                for prop in props_to_update
+                if not self.props_metadata._has_prop(prop)
             ]
             if missing_props:
                 warnings.warn(
                     f"The following properties have not been declared "
                     f"and will be ignored: {', '.join(missing_props)}."
                 )
-                props_to_update = [prop for prop in props_to_update if prop not in missing_props]
+                props_to_update = [
+                    prop for prop in props_to_update if prop not in missing_props
+                ]
                 if not props_to_update:
-                    warnings.warn("No properties to update. The model will not be updated.")
+                    warnings.warn(
+                        "No properties to update. The model will not be updated."
+                    )
                     return
 
         # self.data._freeze_lineage_data()
@@ -1362,8 +1379,8 @@ class Model:
 
         The absolute age of a cell is defined as the time elapsed since
         the beginning of the lineage. Absolute age of the root is 0.
-        By default, it is computed using the reference time property
-        of the model, but a custom time property can be specified.
+        By default, absolute age is given in the time unit of the model,
+        but a custom time property can be specified.
 
         Parameters
         ----------
@@ -1380,11 +1397,15 @@ class Model:
             "Age of the cell since the start of the lineage".
         """
         if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+            time_prop = self.props_metadata.props.get(
+                self.model_metadata.reference_time_property
+            )
         else:
             time_prop = self.props_metadata.props.get(custom_time_property)
         if time_prop is None:
-            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            time_prop = (
+                custom_time_property or self.model_metadata.reference_time_property
+            )
             raise KeyError(f"The time property '{time_prop}' has not been declared.")
 
         prop = tracking.create_absolute_age_property(
@@ -1658,11 +1679,15 @@ class Model:
             "Speed of the cell between two consecutive detections".
         """
         if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+            time_prop = self.props_metadata.props.get(
+                self.model_metadata.reference_time_property
+            )
         else:
             time_prop = self.props_metadata.props.get(custom_time_property)
         if time_prop is None:
-            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            time_prop = (
+                custom_time_property or self.model_metadata.reference_time_property
+            )
             raise KeyError(f"The time property '{time_prop}' has not been declared.")
 
         prop = motion.create_cell_speed_property(
@@ -1714,8 +1739,9 @@ class Model:
         Add the division rate property to the model.
 
         Division rate is defined as the number of divisions per time unit.
-        It is the inverse of the division time. It is given in divisions per frame
-        by default, but can be converted to divisions per time unit of the model if specified.
+        It is the inverse of the division time. By default, division rate
+        is given in the time unit of the model, but a custom time property can be
+        specified.
 
         Parameters
         ----------
@@ -1732,11 +1758,15 @@ class Model:
             "Number of divisions per time unit".
         """
         if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+            time_prop = self.props_metadata.props.get(
+                self.model_metadata.reference_time_property
+            )
         else:
             time_prop = self.props_metadata.props.get(custom_time_property)
         if time_prop is None:
-            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            time_prop = (
+                custom_time_property or self.model_metadata.reference_time_property
+            )
             raise KeyError(f"The time property '{time_prop}' has not been declared.")
 
         prop = tracking.create_division_rate_property(
@@ -1758,8 +1788,8 @@ class Model:
         Add the division time property to the model.
 
         Division time is defined as the time elapsed between two successive divisions.
-        It is given in frames by default, but can be converted to the time unit of the
-        model if specified.
+        By default, division time is given in the time unit of the model,
+        but a custom time property can be specified.
 
         Parameters
         ----------
@@ -1776,11 +1806,15 @@ class Model:
             "Time elapsed between two successive divisions".
         """
         if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+            time_prop = self.props_metadata.props.get(
+                self.model_metadata.reference_time_property
+            )
         else:
             time_prop = self.props_metadata.props.get(custom_time_property)
         if time_prop is None:
-            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            time_prop = (
+                custom_time_property or self.model_metadata.reference_time_property
+            )
             raise KeyError(f"The time property '{time_prop}' has not been declared.")
 
         prop = tracking.create_division_time_property(
@@ -1805,8 +1839,9 @@ class Model:
 
         The relative age of a cell is defined as the time elapsed since the start
         of the cell cycle (i.e. previous division, or beginning of the lineage).
-        Relative age of the first cell of a cell cycle is 0. It is given in frames
-        by default, but can be converted to the time unit of the model if specified.
+        Relative age of the first cell of a cell cycle is 0. By default, relative age
+        is given in the time unit of the model, but a custom time property can be
+        specified.
 
         Parameters
         ----------
@@ -1823,11 +1858,15 @@ class Model:
             "Age of the cell since the start of the current cell cycle".
         """
         if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+            time_prop = self.props_metadata.props.get(
+                self.model_metadata.reference_time_property
+            )
         else:
             time_prop = self.props_metadata.props.get(custom_time_property)
         if time_prop is None:
-            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            time_prop = (
+                custom_time_property or self.model_metadata.reference_time_property
+            )
             raise KeyError(f"The time property '{time_prop}' has not been declared.")
 
         prop = tracking.create_relative_age_property(
@@ -1931,7 +1970,9 @@ class Model:
         cell_lin_props = list(futils.get_pycellin_cell_lineage_properties().keys())
         cycle_lin_props = list(futils.get_pycellin_cycle_lineage_properties().keys())
         if prop_identifier not in cell_lin_props + cycle_lin_props:
-            raise KeyError(f"Property {prop_identifier} is not a predefined property of pycellin.")
+            raise KeyError(
+                f"Property {prop_identifier} is not a predefined property of pycellin."
+            )
         elif prop_identifier in cycle_lin_props and not self.data.cycle_data:
             raise ValueError(
                 f"Property {prop_identifier} is a property of cycle lineages, "
@@ -2024,7 +2065,9 @@ class Model:
         """
         # Preliminary checks.
         if not self.props_metadata._has_prop(prop_identifier):
-            raise ValueError(f"There is no property {prop_identifier} in the declared properties.")
+            raise ValueError(
+                f"There is no property {prop_identifier} in the declared properties."
+            )
         if prop_identifier in self.props_metadata._get_protected_props():
             raise ProtectedPropertyError(prop_identifier)
 
@@ -2101,7 +2144,20 @@ class Model:
         self.data._add_cycle_lineages(time_prop, time_step)
         self.props_metadata._add_cycle_lineage_props(time_unit)
 
-    def _categorize_props(self, props: list[str] | None) -> tuple[list[str], list[str], list[str]]:
+    def has_cycle_data(self) -> bool:
+        """
+        Check if the model has cycle lineages.
+
+        Returns
+        -------
+        bool
+            True if the model has cycle lineages, False otherwise.
+        """
+        return bool(self.data.cycle_data)
+
+    def _categorize_props(
+        self, props: list[str] | None
+    ) -> tuple[list[str], list[str], list[str]]:
         """
         Categorize properties by type (node, edge, lineage).
 
@@ -2123,9 +2179,15 @@ class Model:
         """
         props = self.get_cycle_lineage_properties()
         if props is None:
-            node_props = [prop_id for prop_id, prop in props.items() if prop.prop_type == "node"]
-            edge_props = [prop_id for prop_id, prop in props.items() if prop.prop_type == "edge"]
-            lin_props = [prop_id for prop_id, prop in props.items() if prop.prop_type == "lineage"]
+            node_props = [
+                prop_id for prop_id, prop in props.items() if prop.prop_type == "node"
+            ]
+            edge_props = [
+                prop_id for prop_id, prop in props.items() if prop.prop_type == "edge"
+            ]
+            lin_props = [
+                prop_id for prop_id, prop in props.items() if prop.prop_type == "lineage"
+            ]
         else:
             missing_props = [prop for prop in props if prop not in props]
             if missing_props:
@@ -2349,7 +2411,9 @@ class Model:
             raise err
         columns = ["lineage_ID", time_prop, "cell_ID"] + columns
         df = df[columns]
-        df.sort_values(["lineage_ID", time_prop, "cell_ID"], ignore_index=True, inplace=True)
+        df.sort_values(
+            ["lineage_ID", time_prop, "cell_ID"], ignore_index=True, inplace=True
+        )
 
         return df
 
@@ -2485,7 +2549,9 @@ class Model:
             raise err
         columns = ["lineage_ID", "level", "cycle_ID"] + columns
         df = df[columns]
-        df.sort_values(["lineage_ID", "level", "cycle_ID"], ignore_index=True, inplace=True)
+        df.sort_values(
+            ["lineage_ID", "level", "cycle_ID"], ignore_index=True, inplace=True
+        )
 
         return df
 

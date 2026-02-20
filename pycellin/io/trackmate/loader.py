@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import warnings
 from copy import deepcopy
@@ -18,9 +17,13 @@ from pycellin.classes import (
 )
 from pycellin.custom_types import PropertyType
 from pycellin.graph.properties.core import create_cell_id_property
-
-
-# TODO: convert "POSITION_T" into "time"
+from pycellin.io.utils import (
+    _split_graph_into_lineages,
+    _update_lineage_prop_key,
+    _update_lineages_IDs_key,
+    _update_node_prop_key,
+    check_fusions,
+)
 
 
 def _get_units(
@@ -338,6 +341,7 @@ def _convert_ROI_coordinates(
         raise KeyError(
             f"No key 'ROI_N_POINTS' in the attributes of current element '{element.tag}'."
         )
+
     n_points = int(attribs["ROI_N_POINTS"])
     if element.text:
         points_coordinates = element.text.split()
@@ -348,6 +352,8 @@ def _convert_ROI_coordinates(
         attribs["ROI_coords"] = points_coordinates
     else:
         attribs["ROI_coords"] = None
+
+    del attribs["ROI_N_POINTS"]  # redundant with the new "ROI_coords" attribute
 
 
 def _add_all_nodes(
@@ -619,100 +625,6 @@ def _get_filtered_tracks_ID(
     return filtered_tracks_ID
 
 
-def _add_tracks_info(
-    lineages: list[CellLineage],
-    tracks_attributes: list[dict[str, Any]],
-) -> None:
-    """
-    Update each CellLineage in the list with corresponding track attributes.
-
-    This function iterates over a list of CellLineage objects,
-    attempting to match each lineage with its corresponding track
-    attributes based on the 'TRACK_ID' attribute present in the
-    lineage nodes. It then updates the lineage graph with these
-    attributes.
-
-    Parameters
-    ----------
-    lineages : list[CellLineage]
-        A list of the lineages to update.
-    tracks_attributes : list[dict[str, Any]]
-        A list of dictionaries, where each dictionary contains
-        attributes for a specific track, identified by a 'TRACK_ID' key.
-
-    Raises
-    ------
-    ValueError
-        If a lineage is found to contain nodes with multiple distinct
-        'TRACK_ID' values, indicating an inconsistency in track ID
-        assignment.
-    """
-    for lin in lineages:
-        # Finding the dict of attributes matching the track.
-        tmp = set(t_id for _, t_id in lin.nodes(data="TRACK_ID"))
-
-        if not tmp:
-            # 'tmp' is empty because there's no nodes in the current graph.
-            # Even if it can't be updated, we still want to return this graph.
-            continue
-        elif tmp == {None}:
-            # Happens when all the nodes do not have a TRACK_ID attribute.
-            continue
-        elif None in tmp:
-            # Happens when at least one node does not have a TRACK_ID
-            # attribute, so we clean 'tmp' and carry on.
-            tmp.remove(None)
-        elif len(tmp) != 1:
-            raise ValueError("Impossible state: several IDs for one track.")
-
-        current_track_id = list(tmp)[0]
-        current_track_attr = [
-            d_attr for d_attr in tracks_attributes if d_attr["TRACK_ID"] == current_track_id
-        ][0]
-
-        # Adding the attributes to the lineage.
-        for k, v in current_track_attr.items():
-            lin.graph[k] = v
-
-
-def _split_graph_into_lineages(
-    graph: nx.DiGraph,
-    tracks_attributes: list[dict[str, Any]],
-) -> list[CellLineage]:
-    """
-    Split a graph into several subgraphs, each representing a lineage.
-
-    Parameters
-    ----------
-    lineage : nx.DiGraph
-        The graph to split.
-    tracks_attributes : list[dict[str, Any]]
-        A list of dictionaries, where each dictionary contains TrackMate
-        attributes for a specific track, identified by a 'TRACK_ID' key.
-
-    Returns
-    -------
-    list[CellLineage]
-        A list of subgraphs, each representing a lineage.
-    """
-    # One subgraph is created per lineage, so each subgraph is
-    # a connected component of `graph`.
-    lineages = [
-        CellLineage(graph.subgraph(c).copy()) for c in nx.weakly_connected_components(graph)
-    ]
-    del graph  # Redondant with the subgraphs.
-
-    # Adding TrackMate tracks attributes to each lineage.
-    try:
-        _add_tracks_info(lineages, tracks_attributes)
-    except ValueError as err:
-        print(err)
-        # The program is in an impossible state so we need to stop.
-        raise
-
-    return lineages
-
-
 def _update_props_metadata(
     props_md: PropsMetadata,
     units: dict[str, str],
@@ -738,8 +650,6 @@ def _update_props_metadata(
     for axis in ["x", "y", "z"]:
         props_md._change_prop_identifier(f"POSITION_{axis.upper()}", f"cell_{axis}")
         props_md._change_prop_description(f"cell_{axis}", f"{axis.upper()} coordinate of the cell")
-    props_md._change_prop_identifier("FRAME", "frame")
-    props_md._protect_prop("frame")
     if segmentation:
         roi_coord_prop = Property(
             identifier="ROI_coords",
@@ -779,76 +689,6 @@ def _update_props_metadata(
             props_md._change_prop_identifier(f"TRACK_{axis.upper()}_LOCATION", f"lineage_{axis}")
             desc = f"{axis.upper()} coordinate of the lineage, i.e. mean coordinate of its cells"
             props_md._change_prop_description(f"lineage_{axis}", desc)
-
-
-def _update_node_prop_key(
-    lineage: CellLineage,
-    old_key: str,
-    new_key: str,
-) -> None:
-    """
-    Update the key of a property in all the nodes of a lineage.
-
-    Parameters
-    ----------
-    lineage : CellLineage
-        The lineage to update.
-    old_key : str
-        The old key of the property.
-    new_key : str
-        The new key of the property.
-    """
-    for node in lineage.nodes:
-        if old_key in lineage.nodes[node]:
-            lineage.nodes[node][new_key] = lineage.nodes[node].pop(old_key)
-
-
-def _update_lineage_prop_key(
-    lineage: CellLineage,
-    old_key: str,
-    new_key: str,
-) -> None:
-    """
-    Update the key of a property in the graph of a lineage.
-
-    Parameters
-    ----------
-    lineage : CellLineage
-        The lineage to update.
-    old_key : str
-        The old key of the property.
-    new_key : str
-        The new key of the property.
-    """
-    if old_key in lineage.graph:
-        lineage.graph[new_key] = lineage.graph.pop(old_key)
-
-
-def _update_TRACK_ID(
-    lineage: CellLineage,
-) -> None:
-    """
-    Update the TRACK_ID property in the nodes and in the graph of a lineage.
-
-    In the case of a one-node lineage, TRACK_ID does not exist in the graph
-    nor in the nodes. So we define the lineage_ID as minus the node ID.
-    That way, it is easy to discriminate between one-node lineages
-    (negative IDs) and multi-nodes lineages (positive IDs).
-
-    Parameters
-    ----------
-    lineage : CellLineage
-        The lineage to update.
-    """
-    if "TRACK_ID" in lineage.graph:
-        lineage.graph["lineage_ID"] = lineage.graph.pop("TRACK_ID")
-    else:
-        # One-node graph don't have the TRACK_ID property in the graph
-        # or in the nodes, so we have to create it.
-        # We set the ID of a one-node lineage to the negative of the node ID.
-        assert len(lineage) == 1, "TRACK_ID not found and not a one-node lineage."
-        node = [n for n in lineage.nodes][0]
-        lineage.graph["lineage_ID"] = -node
 
 
 def _update_location_related_props(
@@ -996,21 +836,25 @@ def _parse_model_tag(
 
     # We want one lineage per track, so we need to split the graph
     # into its connected components.
-    lineages = _split_graph_into_lineages(graph, tracks_attributes)
+    lineages = _split_graph_into_lineages(
+        graph,
+        lin_props=tracks_attributes,
+        lineage_ID_key="TRACK_ID",
+    )
 
     # For pycellin compatibility, some TrackMate properties have to be renamed.
     # We only rename properties that are either essential to the functioning of
     # pycellin or confusing (e.g. "name" is a spot and a track property).
     _update_props_metadata(props_md, units, segmentation)
+    _update_lineages_IDs_key(lineages, "TRACK_ID")
     for lin in lineages:
         for key_name, new_key in [
+            ("TRACK_ID", "lineage_ID"),  # mandatory
             ("ID", "cell_ID"),  # mandatory
-            ("FRAME", "frame"),  # mandatory
             ("name", "cell_name"),  # confusing
         ]:
             _update_node_prop_key(lin, key_name, new_key)
         _update_lineage_prop_key(lin, "name", "lineage_name")
-        _update_TRACK_ID(lin)
         _update_location_related_props(lin)
 
         # Adding if each track was present in the 'FilteredTracks' tag
@@ -1195,44 +1039,31 @@ def load_TrackMate_XML(
     pixel_size = _get_pixel_size(dict_tags["Settings"])
     metadata: dict[str, Any] = {}
     metadata["reference_time_property"] = "POSITION_T"
-    # Dimensions info
-    # TODO: currently we can have frame as reference time property but seconds as unit
-    # Maybe remove time_unit and time_step from metadata?
+    # Dimensions info.
     metadata["space_unit"] = units["spatialunits"]
     metadata["time_unit"] = units["timeunits"]
     metadata["time_step"] = _get_time_step(dict_tags["Settings"])
     metadata["pixel_width"] = pixel_size.get("pixel_width")
     metadata["pixel_height"] = pixel_size.get("pixel_height")
     metadata["pixel_depth"] = pixel_size.get("pixel_depth")
-    # Traceability info
+    # Traceability info.
     metadata["name"] = Path(xml_path).stem
     metadata["file_location"] = xml_path
     metadata["provenance"] = "TrackMate"
     metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
-    # The rest of the tags
+    # The rest of the tags.
     for tag_name, tag in dict_tags.items():
         element_string = ET.tostring(tag, encoding="utf-8").decode()
         metadata[tag_name] = element_string
 
     model = Model(metadata, props_md, data)
-
-    # Pycellin DOES NOT support fusion events.
-    all_fusions = model.get_fusions()
-    if all_fusions:
-        # TODO: link toward correct documentation when it is written.
-        fusion_warning = (
-            f"Unsupported data, {len(all_fusions)} cell fusions detected. "
-            "It is advised to deal with them before any other processing, "
-            "especially for tracking related properties. Crashes and incorrect "
-            "results can occur. See documentation for more details."
-        )
-        warnings.warn(fusion_warning)
+    check_fusions(model)  # pycellin DOES NOT support fusion events
 
     return model
 
 
 if __name__ == "__main__":
-    xml = "sample_data/FakeTracks.xml"
+    # xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
     xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
     # xml = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
@@ -1240,12 +1071,13 @@ if __name__ == "__main__":
 
     model = load_TrackMate_XML(xml)  # , keep_all_spots=True, keep_all_tracks=True)
     print(model)
-
     print(model.props_metadata)
     # print(model.model_metadata.pycellin_version)
     # print(model.model_metadata)
     # print(model.props_md.node_props.keys())
     # print(model.data)
+    # for lin in model.get_cell_lineages():
+    #     print(lin)
 
     lineage = model.data.cell_data[0]
     # for n in lineage.nodes(data=True):
