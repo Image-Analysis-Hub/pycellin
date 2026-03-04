@@ -5,9 +5,60 @@ import geff_spec
 import networkx as nx
 import pytest
 
-from pycellin.io.geff.loader import _identify_lin_id_prop
+import geff_spec
+
+import importlib.metadata
+
+from pycellin.io.geff.loader import (
+    _build_generic_metadata,
+    _extract_axes_metadata,
+    _extract_generic_metadata,
+    _get_prop_unit,
+    _identify_lin_id_prop,
+)
 
 # Fixtures ####################################################################
+
+
+@pytest.fixture
+def geff_node_props_md():
+    """Geff node properties metadata where the target prop has a unit."""
+    return {
+        "frame": geff_spec.PropMetadata(identifier="frame", dtype="int", unit=None),
+        "position_x": geff_spec.PropMetadata(
+            identifier="position_x", dtype="float", unit="micrometer"
+        ),
+    }
+
+
+@pytest.fixture
+def geff_axes():
+    """A list of geff axes containing time and space axes."""
+    return [
+        geff_spec.Axis(name="frame", type="time", unit="second"),
+        geff_spec.Axis(name="position_x", type="space", unit="micrometer"),
+        geff_spec.Axis(name="position_y", type="space", unit="micrometer"),
+    ]
+
+
+@pytest.fixture
+def duplicate_time_axes():
+    """A list of geff axes with two matching time entries for the same prop."""
+    return [
+        geff_spec.Axis(name="frame", type="time", unit="second"),
+        geff_spec.Axis(name="frame", type="time", unit="millisecond"),
+    ]
+
+
+@pytest.fixture
+def geff_md(geff_axes, geff_node_props_md):
+    """A minimal GeffMetadata with axes and node properties metadata."""
+    return geff.GeffMetadata(
+        directed=True,
+        axes=geff_axes,
+        node_props_metadata=geff_node_props_md,
+        edge_props_metadata={},
+    )
 
 
 @pytest.fixture
@@ -100,3 +151,248 @@ class TestIdentifySpaceProps:
     """Test cases for _identify_space_props function."""
 
     pass
+
+
+class TestGetPropUnit:
+    """Test cases for _get_prop_unit function."""
+
+    def test_unit_from_node_props_md(self, geff_node_props_md):
+        """When node_props_md contains the prop with a unit, return it directly."""
+        result = _get_prop_unit("position_x", "space", geff_node_props_md, [])
+        assert result == "micrometer"
+
+    def test_node_props_md_unit_takes_priority_over_axes(self, geff_node_props_md):
+        """When the prop is in node_props_md with a unit, axes are not consulted
+        even if the axis lists a different unit for the same prop."""
+        conflicting_axes = [
+            geff_spec.Axis(name="position_x", type="space", unit="millimeter")
+        ]
+        result = _get_prop_unit(
+            "position_x", "space", geff_node_props_md, conflicting_axes
+        )
+        assert result == "micrometer"
+
+    def test_fallback_to_axes_when_prop_unit_is_none(self, geff_node_props_md, geff_axes):
+        """When node_props_md has the prop but unit is None, fall back to axes."""
+        result = _get_prop_unit("frame", "time", geff_node_props_md, geff_axes)
+        assert result == "second"
+
+    def test_fallback_to_axes_when_node_props_md_is_none(self, geff_axes):
+        """When node_props_md is None, fall back to axes."""
+        result = _get_prop_unit("position_x", "space", None, geff_axes)
+        assert result == "micrometer"
+
+    def test_fallback_to_axes_when_prop_not_in_node_props_md(
+        self, geff_node_props_md, geff_axes
+    ):
+        """When prop is absent from node_props_md, fall back to axes."""
+        result = _get_prop_unit("position_y", "space", geff_node_props_md, geff_axes)
+        assert result == "micrometer"
+
+    def test_returns_none_when_no_unit_found_anywhere(self, geff_node_props_md):
+        """When unit is None in node_props_md and the prop has no matching axis, return None."""
+        result = _get_prop_unit("frame", "time", geff_node_props_md, [])
+        assert result is None
+
+    def test_returns_none_when_node_props_md_is_none_and_no_axes(self):
+        """When both node_props_md and axes are empty/None, return None."""
+        result = _get_prop_unit("position_x", "space", None, [])
+        assert result is None
+
+    def test_returns_none_when_axis_type_does_not_match(self, geff_axes):
+        """When the prop exists in axes but with a different type, return None."""
+        result = _get_prop_unit("frame", "space", None, geff_axes)
+        assert result is None
+
+    def test_assertion_error_on_duplicate_axes(self, duplicate_time_axes):
+        """When multiple axes match the prop name and axis type, raise AssertionError."""
+        with pytest.raises(AssertionError):
+            _get_prop_unit("frame", "time", None, duplicate_time_axes)
+
+
+class TestExtractAxesMetadata:
+    """Test cases for _extract_axes_metadata function."""
+
+    def _make_geff_md(
+        self,
+        axes=None,
+        node_props_md=None,
+    ) -> geff.GeffMetadata:
+        """Helper to build a minimal GeffMetadata."""
+        return geff.GeffMetadata(
+            directed=True,
+            axes=axes,
+            node_props_metadata=node_props_md or {},
+            edge_props_metadata={},
+        )
+
+    def test_returns_both_time_and_space_unit(self, geff_axes):
+        """When axes carry time and uniform space units, both are in the result."""
+        geff_md = self._make_geff_md(axes=geff_axes)
+        result = _extract_axes_metadata(
+            geff_md, "frame", "position_x", "position_y", None
+        )
+        assert result["time_unit"] == "second"
+        assert result["space_unit"] == "micrometer"
+
+    def test_no_time_unit_warns_and_absent_from_result(self, geff_axes):
+        """When no unit is found for the time property, warn and omit time_unit."""
+        geff_md = self._make_geff_md(axes=geff_axes)
+        with pytest.warns(UserWarning, match="No unit found for time property"):
+            result = _extract_axes_metadata(
+                geff_md, "unknown_time", "position_x", None, None
+            )
+        assert "time_unit" not in result
+        assert result["space_unit"] == "micrometer"
+
+    def test_all_space_props_none_warns(self, geff_axes):
+        """When all space props are None, warn and omit space_unit."""
+        geff_md = self._make_geff_md(axes=geff_axes)
+        with pytest.warns(UserWarning, match="No coordinate properties found"):
+            result = _extract_axes_metadata(geff_md, "frame", None, None, None)
+        assert result["time_unit"] == "second"
+        assert "space_unit" not in result
+
+    def test_no_space_unit_found_warns(self, geff_axes):
+        """When space props are provided but no unit found, warn and omit space_unit."""
+        geff_md = self._make_geff_md(axes=geff_axes)
+        with pytest.warns(UserWarning, match="No unit found for space properties"):
+            result = _extract_axes_metadata(geff_md, "frame", "unknown_x", None, None)
+        assert "space_unit" not in result
+
+    def test_multiple_space_units_warns(self):
+        """When x and y props have different units, warn and omit space_unit."""
+        mixed_axes = [
+            geff_spec.Axis(name="frame", type="time", unit="second"),
+            geff_spec.Axis(name="position_x", type="space", unit="micrometer"),
+            geff_spec.Axis(name="position_y", type="space", unit="millimeter"),
+        ]
+        geff_md = self._make_geff_md(axes=mixed_axes)
+        with pytest.warns(UserWarning, match="Multiple space units found"):
+            result = _extract_axes_metadata(
+                geff_md, "frame", "position_x", "position_y", None
+            )
+        assert "space_unit" not in result
+
+    def test_partial_space_props_single_unit(self, geff_axes):
+        """When only x_prop is provided and has a unit, space_unit is set."""
+        geff_md = self._make_geff_md(axes=geff_axes)
+        result = _extract_axes_metadata(geff_md, "frame", "position_x", None, None)
+        assert result["space_unit"] == "micrometer"
+
+    def test_space_unit_from_node_props_md(self, geff_node_props_md):
+        """When unit comes from node_props_md (no axes), space_unit is set correctly."""
+        geff_md = self._make_geff_md(axes=None, node_props_md=geff_node_props_md)
+        with pytest.warns(UserWarning, match="No unit found for time property"):
+            result = _extract_axes_metadata(geff_md, "frame", "position_x", None, None)
+        assert result["space_unit"] == "micrometer"
+        assert "time_unit" not in result
+
+
+class TestExtractGenericMetadata:
+    """Test cases for _extract_generic_metadata function."""
+
+    def test_name_is_stem_of_file_path(self, geff_md):
+        """The 'name' key is the stem of the provided file path."""
+        result = _extract_generic_metadata("/some/path/my_tracking.geff", geff_md)
+        assert result["name"] == "my_tracking"
+
+    def test_file_location_matches_input(self, geff_md):
+        """The 'file_location' key equals the geff_file argument exactly."""
+        path = "/some/path/my_tracking.geff"
+        result = _extract_generic_metadata(path, geff_md)
+        assert result["file_location"] == path
+
+    def test_provenance_is_geff(self, geff_md):
+        """The 'provenance' key is always 'geff'."""
+        result = _extract_generic_metadata("/some/tracks.geff", geff_md)
+        assert result["provenance"] == "geff"
+
+    def test_date_is_non_empty_string(self, geff_md):
+        """The 'date' key is a non-empty string."""
+        result = _extract_generic_metadata("/some/tracks.geff", geff_md)
+        assert isinstance(result["date"], str)
+        assert len(result["date"]) > 0
+
+    def test_pycellin_version_matches_installed_package(self, geff_md):
+        """The 'pycellin_version' key matches the installed pycellin version."""
+        expected = importlib.metadata.version("pycellin")
+        result = _extract_generic_metadata("/some/tracks.geff", geff_md)
+        assert result["pycellin_version"] == expected
+
+    def test_geff_version_matches_metadata(self, geff_md):
+        """The 'geff_version' key matches geff_md.geff_version."""
+        result = _extract_generic_metadata("/some/tracks.geff", geff_md)
+        assert result["geff_version"] == geff_md.geff_version
+
+    def test_geff_extra_included_when_extra_has_content(self, geff_node_props_md):
+        """When geff_md.extra has content, 'geff_extra' is included in the result."""
+        geff_md_with_extra = geff.GeffMetadata(
+            directed=True,
+            node_props_metadata=geff_node_props_md,
+            edge_props_metadata={},
+            extra={"custom_key": "custom_value"},
+        )
+        result = _extract_generic_metadata("/some/tracks.geff", geff_md_with_extra)
+        assert result["geff_extra"] == {"custom_key": "custom_value"}
+
+    def test_geff_extra_is_empty_dict_when_no_extra_provided(self, geff_md):
+        """When geff_md.extra is the default empty dict, 'geff_extra' is included but empty."""
+        result = _extract_generic_metadata("/some/tracks.geff", geff_md)
+        assert result["geff_extra"] == {}
+
+
+class TestBuildGenericMetadata:
+    """Test cases for _build_generic_metadata function."""
+
+    def test_reference_time_property_is_set(self, geff_md):
+        """The 'reference_time_property' key equals the time_prop argument."""
+        result = _build_generic_metadata(
+            "/some/tracks.geff", geff_md, "frame", "position_x", None, None
+        )
+        assert result["reference_time_property"] == "frame"
+
+    def test_includes_all_generic_metadata_keys(self, geff_md):
+        """All keys from _extract_generic_metadata are present in the result."""
+        result = _build_generic_metadata(
+            "/some/tracks.geff", geff_md, "frame", "position_x", None, None
+        )
+        for key in (
+            "name",
+            "file_location",
+            "provenance",
+            "date",
+            "pycellin_version",
+            "geff_version",
+        ):
+            assert key in result
+
+    def test_units_merged_from_axes(self, geff_md):
+        """When a unit is found in axes, xxx_unit is merged into the result."""
+        result = _build_generic_metadata(
+            "/some/tracks.geff", geff_md, "frame", "position_x", None, None
+        )
+        assert result["time_unit"] == "second"
+        assert result["space_unit"] == "micrometer"
+
+    def test_missing_units_produce_warnings_and_absent_from_result(self):
+        """When no units are found, appropriate warnings are raised and
+        time_unit / space_unit are absent from the result."""
+        geff_md_no_units = geff.GeffMetadata(
+            directed=True,
+            axes=[],
+            node_props_metadata={},
+            edge_props_metadata={},
+        )
+        with pytest.warns(UserWarning, match="No unit found for time property"):
+            with pytest.warns(UserWarning, match="No unit found for space properties"):
+                result = _build_generic_metadata(
+                    "/some/tracks.geff",
+                    geff_md_no_units,
+                    "frame",
+                    "position_x",
+                    None,
+                    None,
+                )
+        assert "time_unit" not in result
+        assert "space_unit" not in result

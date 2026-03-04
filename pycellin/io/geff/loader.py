@@ -26,7 +26,6 @@ from pycellin.custom_types import PropertyType
 from pycellin.graph.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
-    create_frame_property,
     create_lineage_id_property,
 )
 from pycellin.io.utils import (
@@ -494,61 +493,146 @@ def _build_props_metadata(geff_md: geff.GeffMetadata) -> dict[str, Property]:
     return props_dict
 
 
-def _extract_units_from_axes(geff_md: geff.GeffMetadata) -> dict[str, Any]:
+def _get_prop_unit(
+    prop: str,
+    axis_type: Literal["time", "space"],
+    node_props_md: dict[str, geff_spec.PropMetadata] | None,
+    axes: list[geff_spec.Axis],
+) -> str | None:
     """
-    Extract and validate space and time units from GEFF metadata axes.
+    Retrieve the unit for a property from node properties metadata or axes.
+
+    Node properties metadata is checked first. If the unit is missing, the
+    function falls back to filtering the axes list by name and type.
+
+    Parameters
+    ----------
+    prop : str
+        The property name to look up.
+    axis_type : Literal["time", "space"]
+        The axis type to match when searching the axes list.
+    node_props_md : dict[str, geff_spec.PropMetadata] | None
+        Node properties metadata, keyed by property name.
+    axes : list[geff_spec.Axis]
+        The list of axes from GEFF metadata.
+
+    Returns
+    -------
+    str | None
+        The unit string if found, otherwise None.
+
+    Raises
+    ------
+    AssertionError
+        If more than one axis matches the given property name and axis type.
+    """
+    unit = None
+    if node_props_md is not None and prop in node_props_md:
+        unit = node_props_md[prop].unit
+    if unit is None:
+        matched_axes = [ax for ax in axes if ax.name == prop and ax.type == axis_type]
+        assert len(matched_axes) <= 1, (
+            f"Multiple axes with name '{prop}' and type '{axis_type}' found in "
+            "GEFF metadata."
+        )
+        if matched_axes:
+            unit = matched_axes[0].unit
+    return unit
+
+
+def _extract_axes_metadata(
+    geff_md: geff.GeffMetadata,
+    time_prop: str,
+    cell_x_prop: str | None,
+    cell_y_prop: str | None,
+    cell_z_prop: str | None,
+) -> dict[str, Any]:
+    """
+    Extract space and time units from GEFF metadata.
+
+    Units are extracted from node properties metadata if available,
+    and from axes metadata if not.
 
     Parameters
     ----------
     geff_md : geff.GeffMetadata
         The geff metadata object containing axes information.
+    time_prop : str
+        The time property for the model.
+    cell_x_prop : str | None
+        The x-coordinate property for the model, if any.
+    cell_y_prop : str | None
+        The y-coordinate property for the model, if any.
+    cell_z_prop : str | None
+        The z-coordinate property for the model, if any.
 
     Returns
     -------
     dict[str, Any]
         Dictionary containing space_unit and time_unit keys.
 
-    Raises
-    ------
-    ValueError
-        If multiple space units or time units are found in axes.
+    Warns
+    -----
+    UserWarning
+        If multiple space units are found in the axes, a warning is issued and no
+        space unit is set at the model level.
+    UserWarning
+        If no unit is found for the time property, a warning is issued and no time
+        unit is set at the model level.
+    UserWarning
+        If no unit is found for any space property, a warning is issued and no space
+        unit is set at the model level.
     """
-    units_metadata = {}
-    # TODO:
-    # - raise a warning instead of an error
-    # - don't store this as units of the model unless we are sure that the user
-    # actually wants these properties as reference space and time properties.
+    units_metadata: dict[str, Any] = {}
+    node_props_md = geff_md.node_props_metadata
+    axes = geff_md.axes or []
 
-    if geff_md.axes is not None:
-        # Check unicity of space time unit
-        space_units = {
-            axis.unit
-            for axis in geff_md.axes
-            if axis.type == "space" and axis.unit is not None
-        }
-        if len(space_units) > 1:
-            raise ValueError(
-                f"Multiple space units found in axes: {space_units}. "
-                f"Pycellin assumes a single space unit."
-            )
-        units_metadata["space_unit"] = space_units.pop() if space_units else None
-
-        # Check unicity of time unit
-        time_units = {
-            axis.unit
-            for axis in geff_md.axes
-            if axis.type == "time" and axis.unit is not None
-        }
-        if len(time_units) > 1:
-            raise ValueError(
-                f"Multiple time units found in axes: {time_units}. "
-                f"Pycellin assumes a single time unit."
-            )
-        units_metadata["time_unit"] = time_units.pop() if time_units else None
-
+    # Time unit.
+    time_unit = _get_prop_unit(time_prop, "time", node_props_md, axes)
+    if time_unit is None:
+        warnings.warn(
+            f"No unit found for time property '{time_prop}' in node properties "
+            "or axes. Not setting any time unit at the model level.",
+            stacklevel=3,
+        )
     else:
-        units_metadata["space_unit"] = None
-        units_metadata["time_unit"] = None
+        units_metadata["time_unit"] = time_unit
+
+    # Space units.
+    if cell_x_prop is None and cell_y_prop is None and cell_z_prop is None:
+        warnings.warn(
+            "No coordinate properties found. "
+            "Not setting any space unit at the model level.",
+            stacklevel=3,
+        )
+        return units_metadata
+
+    x_unit = (
+        _get_prop_unit(cell_x_prop, "space", node_props_md, axes) if cell_x_prop else None
+    )
+    y_unit = (
+        _get_prop_unit(cell_y_prop, "space", node_props_md, axes) if cell_y_prop else None
+    )
+    z_unit = (
+        _get_prop_unit(cell_z_prop, "space", node_props_md, axes) if cell_z_prop else None
+    )
+
+    # Check unicity of space unit.
+    space_units = {u for u in [x_unit, y_unit, z_unit] if u is not None}
+    if len(space_units) > 1:
+        warnings.warn(
+            f"Multiple space units found in node properties or axes: {space_units}. "
+            "Not setting any space unit at the model level.",
+            stacklevel=3,
+        )
+    elif len(space_units) == 1:
+        units_metadata["space_unit"] = space_units.pop()
+    else:
+        warnings.warn(
+            "No unit found for space properties in node properties or axes. "
+            "Not setting any space unit at the model level.",
+            stacklevel=3,
+        )
 
     return units_metadata
 
@@ -594,7 +678,12 @@ def _extract_generic_metadata(
 
 
 def _build_generic_metadata(
-    geff_file: Path | str, geff_md: geff.GeffMetadata, time_prop: str
+    geff_file: Path | str,
+    geff_md: geff.GeffMetadata,
+    time_prop: str,
+    cell_x_prop: str | None,
+    cell_y_prop: str | None,
+    cell_z_prop: str | None,
 ) -> dict[str, Any]:
     """
     Build and return a dictionary containing pycellin generic metadata.
@@ -606,7 +695,13 @@ def _build_generic_metadata(
     geff_md : geff.GeffMetadata
         The geff metadata object to read from.
     time_prop : str
-        The identified time property for the model.
+        The time property for the model.
+    cell_x_prop : str | None
+        The x-coordinate property for the model, if any.
+    cell_y_prop : str | None
+        The y-coordinate property for the model, if any.
+    cell_z_prop : str | None
+        The z-coordinate property for the model, if any.
 
     Returns
     -------
@@ -614,7 +709,9 @@ def _build_generic_metadata(
         Dictionary containing generic pycellin metadata.
     """
     metadata = _extract_generic_metadata(geff_file, geff_md)
-    units_metadata = _extract_units_from_axes(geff_md)
+    units_metadata = _extract_axes_metadata(
+        geff_md, time_prop, cell_x_prop, cell_y_prop, cell_z_prop
+    )
     metadata.update(units_metadata)
     metadata["reference_time_property"] = time_prop
 
@@ -634,7 +731,7 @@ def _normalize_properties_data(
     Normalize properties data in lineages to match pycellin conventions.
 
     This function updates the property keys in lineage node data to use
-    standardized pycellin naming conventions (e.g., 'cell_x', 'cell_y', 'frame').
+    standardized pycellin naming conventions (e.g., 'cell_x', 'cell_y').
 
     Parameters
     ----------
@@ -669,9 +766,9 @@ def _normalize_properties_data(
 
 def _normalize_properties_metadata(
     props_md: dict[str, Property],
-    cell_x_key: str | None,
-    cell_y_key: str | None,
-    cell_z_key: str | None,
+    cell_x_prop: str | None,
+    cell_y_prop: str | None,
+    cell_z_prop: str | None,
     space_unit: str | None,
 ) -> None:
     """
@@ -684,28 +781,26 @@ def _normalize_properties_metadata(
     ----------
     props_md : dict[str, Property]
         The properties metadata dictionary to normalize.
-    cell_x_key : str | None
-        The current x-coordinate key name, if any.
-    cell_y_key : str | None
-        The current y-coordinate key name, if any.
-    cell_z_key : str | None
-        The current z-coordinate key name, if any.
+    cell_x_prop : str | None
+        The current x-coordinate property name, if any.
+    cell_y_prop : str | None
+        The current y-coordinate property name, if any.
+    cell_z_prop : str | None
+        The current z-coordinate property name, if any.
     space_unit : str | None
         The space unit to use for coordinate properties.
     """
-    # Ensure standard pycellin properties exist
+    # Ensure standard pycellin properties exist.
     if "cell_ID" not in props_md:
         props_md["cell_ID"] = create_cell_id_property(provenance="geff")
     if "lineage_ID" not in props_md:
         props_md["lineage_ID"] = create_lineage_id_property(provenance="geff")
-    if "frame" not in props_md:
-        props_md["frame"] = create_frame_property(provenance="geff")
 
-    # Create or normalize coordinate property keys
+    # Create or normalize coordinate property keys.
     for axis, geff_key in [
-        ("x", cell_x_key),
-        ("y", cell_y_key),
-        ("z", cell_z_key),
+        ("x", cell_x_prop),
+        ("y", cell_y_prop),
+        ("z", cell_z_prop),
     ]:
         pycellin_key = f"cell_{axis}"
         if geff_key is not None:
@@ -773,6 +868,7 @@ def load_GEFF(
         raise ValueError(
             "The GEFF graph is undirected: pycellin does not support undirected graphs."
         )
+    print(geff_md.node_props_metadata)
 
     # Identify specific properties.
     lineage_id_prop = _identify_lin_id_prop(
@@ -787,20 +883,18 @@ def load_GEFF(
     )
 
     # Extract and dispatch metadata.
-    # TODO: get first time axis as ref time prop if not given.
-    # Generic md should probably be set later, once we have identify time and space properties.
-    generic_md = _build_generic_metadata(geff_file, geff_md, time_prop)
+    generic_md = _build_generic_metadata(
+        geff_file, geff_md, time_prop, cell_x_prop, cell_y_prop, cell_z_prop
+    )
     props_md = _build_props_metadata(geff_md)
 
-    # Split the graph into lineages
+    # Split the graph into lineages.
     lineages = _split_graph_into_lineages(geff_graph, lineage_ID_key=lineage_id_prop)
-
-    # print(f"Number of lineages: {len(lineages)}")
     if lineage_id_prop is None:
         _set_lineage_id(lineages)
         lineage_id_prop = "lineage_ID"
 
-    # Rename properties to match pycellin conventions
+    # Rename properties to match pycellin conventions.
     _normalize_properties_data(
         lineages,
         lineage_id_prop,
@@ -810,11 +904,12 @@ def load_GEFF(
         time_prop,
         cell_id_prop,
     )
+    space_unit = generic_md.get("space_unit")
     _normalize_properties_metadata(
-        props_md, cell_x_prop, cell_y_prop, cell_z_prop, generic_md["space_unit"]
+        props_md, cell_x_prop, cell_y_prop, cell_z_prop, space_unit
     )
 
-    # Create the model
+    # Create the model.
     model = Model(
         model_metadata=generic_md,
         props_metadata=PropsMetadata(props=props_md),
@@ -853,10 +948,10 @@ if __name__ == "__main__":
         geff_file,
         time_prop="FRAME",
     )
-    # print(model)
+    # print(model.model_metadata)
     # print("props_dict", model.props_metadata.props)
-    # for k in model.props_metadata.props.keys():
-    #     print(f"{k}")
+    for k in model.props_metadata.props.keys():
+        print(f"{k}")
     lineages = model.get_cell_lineages()
     # print(f"Number of lineages: {len(lineages)}")
     # for lin in lineages:
@@ -876,9 +971,9 @@ if __name__ == "__main__":
     #     ]
     # )
     # print(lin0.nodes(data=True))
-    # for node in lin0.nodes(data=True):
-    #     print(node)
-    #     break
+    for node, data in lin0.nodes(data=True):
+        print(data.keys())
+        break
     # lin0.plot()
 
     # cell_id_key
