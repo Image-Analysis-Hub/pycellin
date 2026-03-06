@@ -15,6 +15,8 @@ from pycellin.io.geff.loader import (
     _extract_generic_metadata,
     _get_prop_unit,
     _identify_lin_id_prop,
+    _identify_space_props,
+    _identify_time_prop,
 )
 
 # Fixtures ####################################################################
@@ -51,11 +53,43 @@ def duplicate_time_axes():
 
 
 @pytest.fixture
-def geff_md(geff_axes, geff_node_props_md):
-    """A minimal GeffMetadata with axes and node properties metadata."""
+def geff_md_axes(geff_axes, geff_node_props_md):
+    """GeffMetadata with axes and node properties metadata."""
     return geff.GeffMetadata(
         directed=True,
         axes=geff_axes,
+        node_props_metadata=geff_node_props_md,
+        edge_props_metadata={},
+    )
+
+
+@pytest.fixture
+def geff_md_display_hints(geff_node_props_md):
+    """GeffMetadata with display hints pointing to a valid time property."""
+    return geff.GeffMetadata(
+        directed=True,
+        display_hints=geff_spec.DisplayHint(
+            display_horizontal="position_x",
+            display_vertical="position_y",
+            display_depth=None,
+            display_time="frame",
+        ),
+        node_props_metadata=geff_node_props_md,
+        edge_props_metadata={},
+    )
+
+
+@pytest.fixture
+def geff_md_3d_axes(geff_node_props_md):
+    """GeffMetadata with 3D spatial axes."""
+    return geff.GeffMetadata(
+        directed=True,
+        axes=[
+            geff_spec.Axis(name="frame", type="time", unit="second"),
+            geff_spec.Axis(name="position_x", type="space", unit="micrometer"),
+            geff_spec.Axis(name="position_y", type="space", unit="micrometer"),
+            geff_spec.Axis(name="position_z", type="space", unit="micrometer"),
+        ],
         node_props_metadata=geff_node_props_md,
         edge_props_metadata={},
     )
@@ -76,6 +110,24 @@ def graph_no_lin_id():
     graph = nx.Graph()
     graph.add_node(0, frame=0)
     graph.add_node(1, frame=1)
+    return graph
+
+
+@pytest.fixture
+def graph_with_coords():
+    """Graph with 2D spatial coordinate properties."""
+    graph = nx.Graph()
+    graph.add_node(0, frame=0, position_x=1.0, position_y=2.0)
+    graph.add_node(1, frame=1, position_x=3.0, position_y=4.0)
+    return graph
+
+
+@pytest.fixture
+def graph_with_3d_coords():
+    """Graph with 3D spatial coordinate properties."""
+    graph = nx.Graph()
+    graph.add_node(0, frame=0, position_x=1.0, position_y=2.0, position_z=3.0)
+    graph.add_node(1, frame=1, position_x=4.0, position_y=5.0, position_z=6.0)
     return graph
 
 
@@ -144,13 +196,164 @@ class TestIdentifyLinIdProp:
 class TestIdentifyTimeProp:
     """Test cases for _identify_time_prop function."""
 
-    pass
+    def test_provided_key_exists_in_graph(self, graph_lin_id):
+        """When time_key is provided and exists in the graph, return it."""
+        result = _identify_time_prop("frame", None, graph_lin_id)
+        assert result == "frame"
+
+    def test_provided_key_not_in_graph_falls_back_to_display_hints(
+        self, graph_lin_id, geff_md_display_hints
+    ):
+        """When time_key is not in the graph but display hints have a valid time prop,
+        warn twice and return the hint key."""
+        with pytest.warns(UserWarning, match="not present in the graph"):
+            with pytest.warns(UserWarning, match="inferred from display hints"):
+                result = _identify_time_prop(
+                    "missing_key", geff_md_display_hints, graph_lin_id
+                )
+        assert result == "frame"
+
+    def test_provided_key_not_in_graph_falls_back_to_axes(
+        self, graph_lin_id, geff_md_axes
+    ):
+        """When time_key is not in the graph, no display hints are available,
+        and the axes have a matching time prop, warn twice and return the axis key."""
+        with pytest.warns(UserWarning, match="not present in the graph"):
+            with pytest.warns(UserWarning, match="inferred from axes"):
+                result = _identify_time_prop("missing_key", geff_md_axes, graph_lin_id)
+        assert result == "frame"
+
+    def test_provided_key_not_in_graph_no_geff_md_raises(self, graph_lin_id):
+        """When time_key is not in the graph and geff_md is None,
+        warn and raise ValueError."""
+        with pytest.warns(UserWarning, match="not present in the graph"):
+            with pytest.raises(ValueError):
+                _identify_time_prop("missing_key", None, graph_lin_id)
+
+    def test_none_key_inferred_from_display_hints(
+        self, graph_lin_id, geff_md_display_hints
+    ):
+        """When time_key is None and display hints have a valid time prop,
+        warn and return the hint key."""
+        with pytest.warns(UserWarning, match="inferred from display hints"):
+            result = _identify_time_prop(None, geff_md_display_hints, graph_lin_id)
+        assert result == "frame"
+
+    def test_none_key_inferred_from_axes(self, graph_lin_id, geff_md_axes):
+        """When time_key is None, no display hints are available, and the axes
+        have a matching time prop, warn and return the axis key."""
+        with pytest.warns(UserWarning, match="inferred from axes"):
+            result = _identify_time_prop(None, geff_md_axes, graph_lin_id)
+        assert result == "frame"
+
+    def test_none_key_no_geff_md_raises(self, graph_lin_id):
+        """When time_key is None and geff_md is None, raise ValueError."""
+        with pytest.raises(ValueError):
+            _identify_time_prop(None, None, graph_lin_id)
+
+    def test_none_key_no_time_info_in_geff_md_raises(self, graph_lin_id):
+        """When time_key is None and geff_md has no usable time axes or display hints,
+        raise ValueError."""
+        geff_md_no_time = geff.GeffMetadata(
+            directed=True,
+            axes=[],
+            node_props_metadata={},
+            edge_props_metadata={},
+        )
+        with pytest.raises(ValueError):
+            _identify_time_prop(None, geff_md_no_time, graph_lin_id)
 
 
 class TestIdentifySpaceProps:
     """Test cases for _identify_space_props function."""
 
-    pass
+    def test_provided_keys_returned_as_is(self, graph_with_coords):
+        """When provided keys exist in the graph, return them unchanged with no warning."""
+        result = _identify_space_props(
+            "position_x", "position_y", None, None, graph_with_coords
+        )
+        assert result == ("position_x", "position_y", None)
+
+    def test_provided_z_key_returned(self, graph_with_3d_coords):
+        """When all three coordinate keys are provided and in the graph, return all three."""
+        result = _identify_space_props(
+            "position_x", "position_y", "position_z", None, graph_with_3d_coords
+        )
+        assert result == ("position_x", "position_y", "position_z")
+
+    def test_provided_key_not_in_graph_warns_becomes_none(self, graph_with_coords):
+        """When a provided key is absent from the graph, warn and set it to None."""
+        with pytest.warns(UserWarning, match="not present in the graph"):
+            result = _identify_space_props(
+                "missing_x", None, None, None, graph_with_coords
+            )
+        assert result == (None, None, None)
+
+    def test_all_none_no_geff_md_returns_none_tuple(self, graph_with_coords):
+        """When all keys are None and geff_md is None, return (None, None, None) with no warning."""
+        result = _identify_space_props(None, None, None, None, graph_with_coords)
+        assert result == (None, None, None)
+
+    def test_none_keys_inferred_from_display_hints(
+        self, graph_with_coords, geff_md_display_hints
+    ):
+        """When keys are None and display hints have valid space props,
+        infer x and y and warn for each."""
+        with pytest.warns(UserWarning, match="inferred from display hints"):
+            result = _identify_space_props(
+                None, None, None, geff_md_display_hints, graph_with_coords
+            )
+        assert result == ("position_x", "position_y", None)
+
+    def test_none_keys_inferred_from_axes(self, graph_with_coords, geff_md_axes):
+        """When keys are None and axes have space props, infer x and y from axes and warn."""
+        with pytest.warns(UserWarning, match="inferred from axes"):
+            result = _identify_space_props(
+                None, None, None, geff_md_axes, graph_with_coords
+            )
+        assert result == ("position_x", "position_y", None)
+
+    def test_none_keys_all_three_inferred_from_axes(
+        self, graph_with_3d_coords, geff_md_3d_axes
+    ):
+        """When all keys are None and 3D axes are present, infer x, y, and z from axes."""
+        with pytest.warns(UserWarning, match="inferred from axes"):
+            result = _identify_space_props(
+                None, None, None, geff_md_3d_axes, graph_with_3d_coords
+            )
+        assert result == ("position_x", "position_y", "position_z")
+
+    def test_provided_key_not_in_graph_falls_back_to_display_hints(
+        self, graph_with_coords, geff_md_display_hints
+    ):
+        """When x key is absent from the graph, warn and infer it from display hints."""
+        with pytest.warns(UserWarning, match="not present in the graph"):
+            with pytest.warns(UserWarning, match="inferred from display hints"):
+                result = _identify_space_props(
+                    "missing_x", None, None, geff_md_display_hints, graph_with_coords
+                )
+        assert result == ("position_x", "position_y", None)
+
+    def test_provided_key_not_in_graph_falls_back_to_axes(
+        self, graph_with_coords, geff_md_axes
+    ):
+        """When x key is absent from the graph, warn and infer it from axes."""
+        with pytest.warns(UserWarning, match="not present in the graph"):
+            with pytest.warns(UserWarning, match="inferred from axes"):
+                result = _identify_space_props(
+                    "missing_x", None, None, geff_md_axes, graph_with_coords
+                )
+        assert result == ("position_x", "position_y", None)
+
+    def test_display_hint_not_in_graph_silently_stays_none(
+        self, graph_no_lin_id, geff_md_display_hints
+    ):
+        """When display hints point to props absent from the graph (and no axes),
+        the slots stay None without any warning."""
+        result = _identify_space_props(
+            None, None, None, geff_md_display_hints, graph_no_lin_id
+        )
+        assert result == (None, None, None)
 
 
 class TestGetPropUnit:
@@ -292,38 +495,38 @@ class TestExtractAxesMetadata:
 class TestExtractGenericMetadata:
     """Test cases for _extract_generic_metadata function."""
 
-    def test_name_is_stem_of_file_path(self, geff_md):
+    def test_name_is_stem_of_file_path(self, geff_md_axes):
         """The 'name' key is the stem of the provided file path."""
-        result = _extract_generic_metadata("/some/path/my_tracking.geff", geff_md)
+        result = _extract_generic_metadata("/some/path/my_tracking.geff", geff_md_axes)
         assert result["name"] == "my_tracking"
 
-    def test_file_location_matches_input(self, geff_md):
+    def test_file_location_matches_input(self, geff_md_axes):
         """The 'file_location' key equals the geff_file argument exactly."""
         path = "/some/path/my_tracking.geff"
-        result = _extract_generic_metadata(path, geff_md)
+        result = _extract_generic_metadata(path, geff_md_axes)
         assert result["file_location"] == path
 
-    def test_provenance_is_geff(self, geff_md):
+    def test_provenance_is_geff(self, geff_md_axes):
         """The 'provenance' key is always 'geff'."""
-        result = _extract_generic_metadata("/some/tracks.geff", geff_md)
+        result = _extract_generic_metadata("/some/tracks.geff", geff_md_axes)
         assert result["provenance"] == "geff"
 
-    def test_date_is_non_empty_string(self, geff_md):
+    def test_date_is_non_empty_string(self, geff_md_axes):
         """The 'date' key is a non-empty string."""
-        result = _extract_generic_metadata("/some/tracks.geff", geff_md)
+        result = _extract_generic_metadata("/some/tracks.geff", geff_md_axes)
         assert isinstance(result["date"], str)
         assert len(result["date"]) > 0
 
-    def test_pycellin_version_matches_installed_package(self, geff_md):
+    def test_pycellin_version_matches_installed_package(self, geff_md_axes):
         """The 'pycellin_version' key matches the installed pycellin version."""
         expected = importlib.metadata.version("pycellin")
-        result = _extract_generic_metadata("/some/tracks.geff", geff_md)
+        result = _extract_generic_metadata("/some/tracks.geff", geff_md_axes)
         assert result["pycellin_version"] == expected
 
-    def test_geff_version_matches_metadata(self, geff_md):
+    def test_geff_version_matches_metadata(self, geff_md_axes):
         """The 'geff_version' key matches geff_md.geff_version."""
-        result = _extract_generic_metadata("/some/tracks.geff", geff_md)
-        assert result["geff_version"] == geff_md.geff_version
+        result = _extract_generic_metadata("/some/tracks.geff", geff_md_axes)
+        assert result["geff_version"] == geff_md_axes.geff_version
 
     def test_geff_extra_included_when_extra_has_content(self, geff_node_props_md):
         """When geff_md.extra has content, 'geff_extra' is included in the result."""
@@ -336,26 +539,26 @@ class TestExtractGenericMetadata:
         result = _extract_generic_metadata("/some/tracks.geff", geff_md_with_extra)
         assert result["geff_extra"] == {"custom_key": "custom_value"}
 
-    def test_geff_extra_is_empty_dict_when_no_extra_provided(self, geff_md):
+    def test_geff_extra_is_empty_dict_when_no_extra_provided(self, geff_md_axes):
         """When geff_md.extra is the default empty dict, 'geff_extra' is included but empty."""
-        result = _extract_generic_metadata("/some/tracks.geff", geff_md)
+        result = _extract_generic_metadata("/some/tracks.geff", geff_md_axes)
         assert result["geff_extra"] == {}
 
 
 class TestBuildGenericMetadata:
     """Test cases for _build_generic_metadata function."""
 
-    def test_reference_time_property_is_set(self, geff_md):
+    def test_reference_time_property_is_set(self, geff_md_axes):
         """The 'reference_time_property' key equals the time_prop argument."""
         result = _build_generic_metadata(
-            "/some/tracks.geff", geff_md, "frame", "position_x", None, None
+            "/some/tracks.geff", geff_md_axes, "frame", "position_x", None, None
         )
         assert result["reference_time_property"] == "frame"
 
-    def test_includes_all_generic_metadata_keys(self, geff_md):
+    def test_includes_all_generic_metadata_keys(self, geff_md_axes):
         """All keys from _extract_generic_metadata are present in the result."""
         result = _build_generic_metadata(
-            "/some/tracks.geff", geff_md, "frame", "position_x", None, None
+            "/some/tracks.geff", geff_md_axes, "frame", "position_x", None, None
         )
         for key in (
             "name",
@@ -367,10 +570,10 @@ class TestBuildGenericMetadata:
         ):
             assert key in result
 
-    def test_units_merged_from_axes(self, geff_md):
+    def test_units_merged_from_axes(self, geff_md_axes):
         """When a unit is found in axes, xxx_unit is merged into the result."""
         result = _build_generic_metadata(
-            "/some/tracks.geff", geff_md, "frame", "position_x", None, None
+            "/some/tracks.geff", geff_md_axes, "frame", "position_x", None, None
         )
         assert result["time_unit"] == "second"
         assert result["space_unit"] == "micrometer"
