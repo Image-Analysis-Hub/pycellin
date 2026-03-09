@@ -329,6 +329,68 @@ def _identify_space_props(
     return space_keys[0], space_keys[1], space_keys[2]
 
 
+def _resolve_prop_key(
+    new_name: str,
+    fallback: str,
+    props_dict: dict,
+    original_key: str,
+    prop_type: str,
+) -> str:
+    """
+    Resolve a unique property key in props_dict by trying new_name and fallback.
+
+    Parameters
+    ----------
+    new_name : str
+        The primary candidate for the new property key.
+    fallback : str
+        The fallback candidate for the new property key if new_name is already taken.
+    props_dict : dict
+        The dictionary of existing properties to check for key collisions.
+    original_key : str
+        The original property key that is being renamed, used for warning messages.
+    prop_type : str
+        The type of property being renamed (e.g., 'node' or 'edge'),
+        used for warning messages.
+
+    Returns
+    -------
+    str
+        A unique property key to use for the new property.
+
+    Warns
+    -----
+    UserWarning
+        If new_name is not already taken in props_dict, a warning is issued
+        indicating the rename.
+        If new_name is already taken in props_dict, a warning is issued and fallback
+        is returned as the new property key.
+
+    Raises
+    ------
+    KeyError
+        If both new_name and fallback are already taken in props_dict, a KeyError
+        is raised indicating that the property cannot be registered in the metadata.
+    """
+    if new_name not in props_dict:
+        warnings.warn(
+            f"Property '{original_key}' ({prop_type}) has been renamed to '{new_name}'.",
+            stacklevel=4,
+        )
+        return new_name
+    if fallback not in props_dict:
+        warnings.warn(
+            f"Property '{original_key}' ({prop_type}) has been renamed to '{fallback}' "
+            f"('{new_name}' was already taken).",
+            stacklevel=4,
+        )
+        return fallback
+    raise KeyError(
+        f"Cannot register property '{original_key}' ({prop_type}): both "
+        f"'{new_name}' and '{fallback}' already exist in props_dict."
+    )
+
+
 def _extract_props_metadata(
     md: dict[str, geff_spec.PropMetadata],
     props_dict: dict[str, Property],
@@ -352,7 +414,8 @@ def _extract_props_metadata(
         If an unsupported property type is provided.
     KeyError
         If a property identifier already exists in props_dict for the same property
-        type.
+        type, or if both the primary and fallback rename candidates are already taken
+        when resolving a node/edge key collision.
     """
     for key, prop in md.items():
         if key not in props_dict:
@@ -371,17 +434,22 @@ def _extract_props_metadata(
                 # The key must be unique but it already exists for nodes or edges,
                 # so it needs to be renamed.
                 if prop_type == "node":
-                    current_prefix = "cell"
-                    other_prefix = "link"
+                    current_prefix, other_prefix = "cell", "link"
                 elif prop_type == "edge":
-                    current_prefix = "link"
-                    other_prefix = "cell"
+                    current_prefix, other_prefix = "link", "cell"
                 else:
                     raise ValueError(
-                        f"Unsupported property type: {prop_type}. Expected 'node' or 'edge'."
+                        f"Unsupported property type: {prop_type}. Expected 'node' or "
+                        "'edge'."
                     )
-                # Rename the new property to be added.
-                new_key = f"{current_prefix}_{key}"
+                # Resolve a unique name for the new property.
+                new_key = _resolve_prop_key(
+                    f"{current_prefix}_{key}",
+                    f"pycellin_{current_prefix}_{key}",
+                    props_dict,
+                    key,
+                    prop_type,
+                )
                 props_dict[new_key] = Property(
                     identifier=new_key,
                     name=prop.name or key,
@@ -392,14 +460,21 @@ def _extract_props_metadata(
                     dtype=prop.dtype,
                     unit=prop.unit or None,
                 )
-                # Rename the other property as well for clarity.
-                other_key = f"{other_prefix}_{key}"
+                # Resolve a unique name for the existing colliding property.
+                other_prop_type = props_dict[key].prop_type
+                other_key = _resolve_prop_key(
+                    f"{other_prefix}_{key}",
+                    f"pycellin_{other_prefix}_{key}",
+                    props_dict,
+                    key,
+                    other_prop_type,
+                )
                 other_prop = props_dict.pop(key)
                 other_prop.identifier = other_key
                 props_dict[other_key] = other_prop
             else:
-                # GEFF ensure uniqueness of property keys for nodes and edges separately,
-                # so this should never happen.
+                # GEFF ensures uniqueness of property keys for nodes and edges
+                # separately, so this should never happen.
                 raise KeyError(
                     f"Property '{key}' already exists in props_dict for {prop_type}s. "
                     "Please ensure unique property identifiers."
@@ -879,9 +954,6 @@ def load_GEFF(
     )
     print(f"LINEAGE ID PROP: {lineage_id_prop}")
     time_prop = _identify_time_prop(time_prop, geff_md, geff_graph)
-
-    # EVERYTHING BELOW IS NOT DEBUGGED YET
-
     cell_x_prop, cell_y_prop, cell_z_prop = _identify_space_props(
         cell_x_prop, cell_y_prop, cell_z_prop, geff_md, geff_graph
     )
@@ -891,6 +963,8 @@ def load_GEFF(
         geff_file, geff_md, time_prop, cell_x_prop, cell_y_prop, cell_z_prop
     )
     props_md = _build_props_metadata(geff_md)
+
+    # EVERYTHING BELOW IS NOT DEBUGGED YET
 
     # Split the graph into lineages.
     lineages = _split_graph_into_lineages(geff_graph, lineage_ID_key=lineage_id_prop)

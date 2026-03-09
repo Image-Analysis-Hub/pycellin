@@ -1,22 +1,23 @@
 """Unit test for GEFF file loader."""
 
+import importlib.metadata
+
 import geff
 import geff_spec
 import networkx as nx
 import pytest
 
-import geff_spec
-
-import importlib.metadata
-
+from pycellin.classes import Property
 from pycellin.io.geff.loader import (
     _build_generic_metadata,
     _extract_axes_metadata,
     _extract_generic_metadata,
+    _extract_props_metadata,
     _get_prop_unit,
     _identify_lin_id_prop,
     _identify_space_props,
     _identify_time_prop,
+    _resolve_prop_key,
 )
 
 # Fixtures ####################################################################
@@ -28,7 +29,7 @@ def geff_node_props_md():
     return {
         "frame": geff_spec.PropMetadata(identifier="frame", dtype="int", unit=None),
         "position_x": geff_spec.PropMetadata(
-            identifier="position_x", dtype="float", unit="micrometer"
+            identifier="position_x", dtype="float64", unit="micrometer"
         ),
     }
 
@@ -129,6 +130,62 @@ def graph_with_3d_coords():
     graph.add_node(0, frame=0, position_x=1.0, position_y=2.0, position_z=3.0)
     graph.add_node(1, frame=1, position_x=4.0, position_y=5.0, position_z=6.0)
     return graph
+
+
+@pytest.fixture
+def prop_cell_position_x():
+    """A Property for 'cell_position_x' with prop_type='node'."""
+    return Property(
+        identifier="cell_position_x",
+        name="cell_position_x",
+        description="cell_position_x",
+        provenance="test",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float",
+    )
+
+
+@pytest.fixture
+def prop_position_x_node():
+    """A Property for 'position_x' with prop_type='node'."""
+    return Property(
+        identifier="position_x",
+        name="position_x",
+        description="position_x",
+        provenance="test",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float",
+    )
+
+
+@pytest.fixture
+def prop_position_x_edge():
+    """A Property for 'position_x' with prop_type='edge'."""
+    return Property(
+        identifier="position_x",
+        name="position_x",
+        description="position_x",
+        provenance="test",
+        prop_type="edge",
+        lin_type="CellLineage",
+        dtype="float",
+    )
+
+
+@pytest.fixture
+def prop_pycellin_cell_position_x():
+    """A Property for 'pycellin_cell_position_x' with prop_type='node'."""
+    return Property(
+        identifier="pycellin_cell_position_x",
+        name="pycellin_cell_position_x",
+        description="pycellin_cell_position_x",
+        provenance="test",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float",
+    )
 
 
 # Test Classes ################################################################
@@ -354,6 +411,168 @@ class TestIdentifySpaceProps:
             None, None, None, geff_md_display_hints, graph_no_lin_id
         )
         assert result == (None, None, None)
+
+
+class TestResolvePropKey:
+    """Test cases for _resolve_prop_key function."""
+
+    def test_new_name_free(self):
+        """When new_name is not taken, return it and warn."""
+        with pytest.warns(
+            UserWarning, match="'x' \\(node\\) has been renamed to 'cell_x'"
+        ):
+            result = _resolve_prop_key("cell_x", "fallback_x", {}, "x", "node")
+        assert result == "cell_x"
+
+    def test_fallback_free_returns_fallback(self, prop_position_x_edge):
+        """When new_name is taken but fallback is free, return fallback."""
+        props_dict = {"link_x": prop_position_x_edge}
+        with pytest.warns(
+            UserWarning,
+            match="'x' \\(edge\\) has been renamed to 'fallback_x' \\('link_x'",
+        ):
+            result = _resolve_prop_key("link_x", "fallback_x", props_dict, "x", "edge")
+        assert result == "fallback_x"
+
+    def test_both_taken_raises_key_error(
+        self, prop_cell_position_x, prop_pycellin_cell_position_x
+    ):
+        """When both new_name and fallback are taken, raise KeyError."""
+        props_dict = {
+            "cell_x": prop_cell_position_x,
+            "pycellin_cell_x": prop_pycellin_cell_position_x,
+        }
+        with pytest.raises(
+            KeyError,
+            match="property 'x' \\(node\\): both 'cell_x' and 'pycellin_cell_x'",
+        ):
+            _resolve_prop_key("cell_x", "pycellin_cell_x", props_dict, "x", "node")
+
+
+class TestExtractPropsMetadata:
+    """Test cases for _extract_props_metadata function."""
+
+    def test_empty_md_leaves_props_dict_unchanged(
+        self, prop_position_x_node, prop_position_x_edge
+    ):
+        """When md is empty, props_dict is not modified."""
+        props_dict = {
+            "node_prop": prop_position_x_node,
+            "edge_prop": prop_position_x_edge,
+        }
+        _extract_props_metadata({}, props_dict, "node")
+        assert list(props_dict.keys()) == ["node_prop", "edge_prop"]
+
+    def test_new_key_is_all_fields_added(self, geff_node_props_md):
+        """A key not yet in props_dict is added with the given prop_type."""
+        props_dict = {}
+        _extract_props_metadata(geff_node_props_md, props_dict, "node")
+        assert "position_x" in props_dict
+        assert props_dict["position_x"].identifier == "position_x"
+        assert props_dict["position_x"].prop_type == "node"
+        assert props_dict["position_x"].dtype == "float64"
+        assert props_dict["position_x"].unit == "micrometer"
+
+    def test_new_key_name_defaults_to_key_when_prop_name_is_none(
+        self, geff_node_props_md
+    ):
+        """When PropMetadata.name is None, Property.name falls back to the key."""
+        props_dict = {}
+        _extract_props_metadata(geff_node_props_md, props_dict, "node")
+        assert props_dict["frame"].name == "frame"
+
+    def test_new_key_unit_is_none_when_prop_has_no_unit(self, geff_node_props_md):
+        """When PropMetadata.unit is None, Property.unit is also None."""
+        props_dict = {}
+        _extract_props_metadata(geff_node_props_md, props_dict, "node")
+        assert props_dict["frame"].unit is None
+
+    def test_multiple_new_keys_all_added(self, geff_node_props_md):
+        """When md contains multiple new keys, all are added to props_dict."""
+        props_dict = {}
+        _extract_props_metadata(geff_node_props_md, props_dict, "node")
+        assert "frame" in props_dict
+        assert "position_x" in props_dict
+
+    def test_duplicate_key_same_prop_type_raises_key_error(
+        self, geff_node_props_md, prop_cell_position_x
+    ):
+        """When a key already exists in props_dict with the same prop_type,
+        raise KeyError."""
+        props_dict = {"frame": prop_cell_position_x}
+        with pytest.raises(
+            KeyError, match="'frame' already exists in props_dict for nodes"
+        ):
+            _extract_props_metadata(
+                {"frame": geff_node_props_md["frame"]}, props_dict, "node"
+            )
+
+    def test_node_collides_with_existing_edge_renames_both(
+        self, geff_node_props_md, prop_position_x_edge
+    ):
+        """When a node prop collides with an existing edge prop, both are renamed:
+        the new node prop becomes 'cell_<key>' and the edge prop becomes 'link_<key>'."""
+        props_dict = {"position_x": prop_position_x_edge}
+        with pytest.warns(UserWarning):
+            _extract_props_metadata(geff_node_props_md, props_dict, "node")
+        assert "position_x" not in props_dict
+        assert "cell_position_x" in props_dict
+        assert props_dict["cell_position_x"].identifier == "cell_position_x"
+        assert props_dict["cell_position_x"].prop_type == "node"
+        assert "link_position_x" in props_dict
+        assert props_dict["link_position_x"].identifier == "link_position_x"
+        assert props_dict["link_position_x"].prop_type == "edge"
+
+    def test_edge_collides_with_existing_node_renames_both(
+        self, geff_node_props_md, prop_position_x_node
+    ):
+        """When an edge key collides with an existing node prop, both are renamed:
+        the new edge prop becomes 'link_<key>' and the node prop becomes 'cell_<key>'."""
+        props_dict = {"position_x": prop_position_x_node}
+        with pytest.warns(UserWarning):
+            _extract_props_metadata(geff_node_props_md, props_dict, "edge")
+        assert "position_x" not in props_dict
+        assert "link_position_x" in props_dict
+        assert props_dict["link_position_x"].identifier == "link_position_x"
+        assert props_dict["link_position_x"].prop_type == "edge"
+        assert "cell_position_x" in props_dict
+        assert props_dict["cell_position_x"].identifier == "cell_position_x"
+        assert props_dict["cell_position_x"].prop_type == "node"
+
+    def test_node_collision_primary_new_key_taken_uses_fallback(
+        self, geff_node_props_md, prop_position_x_edge, prop_cell_position_x
+    ):
+        """When 'cell_<key>' is already in props_dict, the new node prop falls back
+        to 'pycellin_cell_<key>'."""
+        props_dict = {
+            "position_x": prop_position_x_edge,
+            "cell_position_x": prop_cell_position_x,  # primary rename taken
+        }
+        with pytest.warns(UserWarning):
+            _extract_props_metadata(geff_node_props_md, props_dict, "node")
+        assert "position_x" not in props_dict
+        assert "pycellin_cell_position_x" in props_dict
+        assert props_dict["pycellin_cell_position_x"].prop_type == "node"
+        assert "link_position_x" in props_dict
+        assert props_dict["link_position_x"].prop_type == "edge"
+        assert "cell_position_x" in props_dict  # original unaffected
+
+    def test_both_rename_candidates_taken_raises_key_error(
+        self,
+        geff_node_props_md,
+        prop_position_x_edge,
+        prop_cell_position_x,
+        prop_pycellin_cell_position_x,
+    ):
+        """When both 'cell_<key>' and 'pycellin_cell_<key>' are already in props_dict,
+        raise KeyError."""
+        props_dict = {
+            "position_x": prop_position_x_edge,
+            "cell_position_x": prop_cell_position_x,
+            "pycellin_cell_position_x": prop_pycellin_cell_position_x,
+        }
+        with pytest.raises(KeyError, match="Cannot register property 'position_x'"):
+            _extract_props_metadata(geff_node_props_md, props_dict, "node")
 
 
 class TestGetPropUnit:
