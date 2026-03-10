@@ -12,6 +12,7 @@ from pycellin.io.geff.loader import (
     _build_generic_metadata,
     _extract_axes_metadata,
     _extract_generic_metadata,
+    _extract_lin_props_metadata,
     _extract_props_metadata,
     _get_prop_unit,
     _identify_lin_id_prop,
@@ -147,6 +148,20 @@ def prop_cell_position_x():
 
 
 @pytest.fixture
+def prop_lin_position_x():
+    """A Property for 'lin_position_x' with prop_type='lineage'."""
+    return Property(
+        identifier="lin_position_x",
+        name="lin_position_x",
+        description="lin_position_x",
+        provenance="test",
+        prop_type="lineage",
+        lin_type="CellLineage",
+        dtype="float",
+    )
+
+
+@pytest.fixture
 def prop_position_x_node():
     """A Property for 'position_x' with prop_type='node'."""
     return Property(
@@ -175,6 +190,20 @@ def prop_position_x_edge():
 
 
 @pytest.fixture
+def prop_position_x_lineage():
+    """A Property for 'position_x' with prop_type='lineage'."""
+    return Property(
+        identifier="position_x",
+        name="position_x",
+        description="position_x",
+        provenance="test",
+        prop_type="lineage",
+        lin_type="CellLineage",
+        dtype="float",
+    )
+
+
+@pytest.fixture
 def prop_pycellin_cell_position_x():
     """A Property for 'pycellin_cell_position_x' with prop_type='node'."""
     return Property(
@@ -186,6 +215,33 @@ def prop_pycellin_cell_position_x():
         lin_type="CellLineage",
         dtype="float",
     )
+
+
+@pytest.fixture
+def prop_pycellin_lin_position_x():
+    """A Property for 'pycellin_lin_position_x' with prop_type='lineage'."""
+    return Property(
+        identifier="pycellin_lin_position_x",
+        name="pycellin_lin_position_x",
+        description="pycellin_lin_position_x",
+        provenance="test",
+        prop_type="lineage",
+        lin_type="CellLineage",
+        dtype="float",
+    )
+
+
+@pytest.fixture
+def lin_props_md():
+    """A dict of lineage properties metadata with expected fields."""
+    return {
+        "n_divisions": {"name": None, "dtype": "int", "unit": None},
+        "displacement": {
+            "name": "Lineage displacement",
+            "dtype": "float",
+            "unit": "micrometer",
+        },
+    }
 
 
 # Test Classes ################################################################
@@ -501,7 +557,9 @@ class TestExtractPropsMetadata:
         raise KeyError."""
         props_dict = {"frame": prop_cell_position_x}
         with pytest.raises(
-            KeyError, match="'frame' already exists in props_dict for nodes"
+            KeyError,
+            match="'frame': an identical identifier already exists in properties "
+            "dictionary for nodes",
         ):
             _extract_props_metadata(
                 {"frame": geff_node_props_md["frame"]}, props_dict, "node"
@@ -573,6 +631,114 @@ class TestExtractPropsMetadata:
         }
         with pytest.raises(KeyError, match="Cannot register property 'position_x'"):
             _extract_props_metadata(geff_node_props_md, props_dict, "node")
+
+
+class TestExtractLinPropsMetadata:
+    """Test cases for _extract_lin_props_metadata function."""
+
+    def test_empty_md_leaves_props_dict_unchanged(self, prop_position_x_node):
+        """When md is empty, props_dict is not modified."""
+        props_dict = {"position_x": prop_position_x_node}
+        _extract_lin_props_metadata({}, props_dict)
+        assert list(props_dict.keys()) == ["position_x"]
+
+    def test_new_key_all_fields_added(self, lin_props_md):
+        """A key not yet in props_dict is added with all correct fields."""
+        props_dict = {}
+        _extract_lin_props_metadata(lin_props_md, props_dict)
+        assert "displacement" in props_dict
+        assert props_dict["displacement"].identifier == "displacement"
+        assert props_dict["displacement"].prop_type == "lineage"
+        assert props_dict["displacement"].dtype == "float"
+        assert props_dict["displacement"].unit == "micrometer"
+
+    def test_new_key_name_defaults_to_key_when_name_is_none(self, lin_props_md):
+        """When prop dict has name=None, Property.name falls back to the key."""
+        props_dict = {}
+        _extract_lin_props_metadata(lin_props_md, props_dict)
+        assert props_dict["n_divisions"].name == "n_divisions"
+
+    def test_new_key_unit_is_none_when_not_set(self, lin_props_md):
+        """When prop dict has unit=None, Property.unit is None."""
+        props_dict = {}
+        _extract_lin_props_metadata(lin_props_md, props_dict)
+        assert props_dict["n_divisions"].unit is None
+
+    def test_multiple_new_keys_all_added(self, lin_props_md):
+        """When md contains multiple new keys, all are added to props_dict."""
+        props_dict = {}
+        _extract_lin_props_metadata(lin_props_md, props_dict)
+        assert "n_divisions" in props_dict
+        assert "displacement" in props_dict
+
+    def test_duplicate_key_same_prop_type_raises_key_error(self, prop_position_x_lineage):
+        """When a key already exists in props_dict with prop_type='lineage',
+        raise KeyError."""
+        props_dict = {"position_x": prop_position_x_lineage}
+        with pytest.raises(KeyError, match="Cannot register property 'position_x'"):
+            _extract_lin_props_metadata({"position_x": {"dtype": "float"}}, props_dict)
+
+    def test_lineage_collides_with_existing_node_renames_both(self, prop_position_x_node):
+        """When a lineage prop collides with an existing node prop, both are renamed:
+        the new lineage prop becomes 'lin_<key>' and the node prop becomes 'cell_<key>'."""
+        props_dict = {"position_x": prop_position_x_node}
+        with pytest.warns(UserWarning):
+            _extract_lin_props_metadata({"position_x": {"dtype": "float"}}, props_dict)
+        assert "position_x" not in props_dict
+        assert "lin_position_x" in props_dict
+        assert props_dict["lin_position_x"].identifier == "lin_position_x"
+        assert props_dict["lin_position_x"].prop_type == "lineage"
+        assert "cell_position_x" in props_dict
+        assert props_dict["cell_position_x"].identifier == "cell_position_x"
+        assert props_dict["cell_position_x"].prop_type == "node"
+
+    def test_lineage_collides_with_existing_edge_renames_both(self, prop_position_x_edge):
+        """When a lineage prop collides with an existing edge prop, both are renamed:
+        the new lineage prop becomes 'lin_<key>' and the edge prop becomes 'link_<key>'."""
+        props_dict = {"position_x": prop_position_x_edge}
+        with pytest.warns(UserWarning):
+            _extract_lin_props_metadata({"position_x": {"dtype": "float"}}, props_dict)
+        assert "position_x" not in props_dict
+        assert "lin_position_x" in props_dict
+        assert props_dict["lin_position_x"].identifier == "lin_position_x"
+        assert props_dict["lin_position_x"].prop_type == "lineage"
+        assert "link_position_x" in props_dict
+        assert props_dict["link_position_x"].identifier == "link_position_x"
+        assert props_dict["link_position_x"].prop_type == "edge"
+
+    def test_lineage_collision_primary_new_key_taken_uses_fallback(
+        self, prop_position_x_node, prop_lin_position_x
+    ):
+        """When 'lin_<key>' is already in props_dict, the new lineage prop falls back
+        to 'pycellin_lin_<key>'."""
+        props_dict = {
+            "position_x": prop_position_x_node,
+            "lin_position_x": prop_lin_position_x,  # primary rename taken
+        }
+        with pytest.warns(UserWarning):
+            _extract_lin_props_metadata({"position_x": {"dtype": "float"}}, props_dict)
+        assert "position_x" not in props_dict
+        assert "pycellin_lin_position_x" in props_dict
+        assert props_dict["pycellin_lin_position_x"].prop_type == "lineage"
+        assert "cell_position_x" in props_dict
+        assert props_dict["cell_position_x"].prop_type == "node"
+        assert "lin_position_x" in props_dict  # original unaffected
+
+    def test_both_rename_candidates_taken_raises_key_error(
+        self,
+        prop_position_x_node,
+        prop_lin_position_x,
+        prop_pycellin_lin_position_x,
+    ):
+        """When both 'lin_<key>' and 'pycellin_lin_<key>' are already in props_dict,
+        raise KeyError."""
+        props_dict = {
+            "position_x": prop_position_x_node,
+            "lin_position_x": prop_lin_position_x,
+            "pycellin_lin_position_x": prop_pycellin_lin_position_x,
+        }
+        with pytest.raises(KeyError, match="Cannot register property 'position_x'"):
+            _extract_lin_props_metadata({"position_x": {"dtype": "float"}}, props_dict)
 
 
 class TestGetPropUnit:

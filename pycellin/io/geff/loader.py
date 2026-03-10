@@ -387,7 +387,7 @@ def _resolve_prop_key(
         return fallback
     raise KeyError(
         f"Cannot register property '{original_key}' ({prop_type}): both "
-        f"'{new_name}' and '{fallback}' already exist in props_dict."
+        f"'{new_name}' and '{fallback}' already exist in properties dictionary."
     )
 
 
@@ -476,7 +476,8 @@ def _extract_props_metadata(
                 # GEFF ensures uniqueness of property keys for nodes and edges
                 # separately, so this should never happen.
                 raise KeyError(
-                    f"Property '{key}' already exists in props_dict for {prop_type}s. "
+                    f"Cannot register property '{key}': an identical identifier "
+                    f"already exists in properties dictionary for {prop_type}s. "
                     "Please ensure unique property identifiers."
                 )
 
@@ -514,9 +515,14 @@ def _extract_lin_props_metadata(
             )
         else:
             if props_dict[key].prop_type != "lineage":
-                # The key must be unique but it already exists for nodes or edges,
-                # so it needs to be renamed.
-                new_key = f"lin_{key}"
+                # Resolve a unique name for the new lineage property.
+                new_key = _resolve_prop_key(
+                    f"lin_{key}",
+                    f"pycellin_lin_{key}",
+                    props_dict,
+                    key,
+                    "lineage",
+                )
                 props_dict[new_key] = Property(
                     identifier=new_key,
                     name=prop.get("name") or key,
@@ -527,9 +533,23 @@ def _extract_lin_props_metadata(
                     dtype=prop.get("dtype"),
                     unit=prop.get("unit") or None,
                 )
+                # Resolve a unique name for the existing colliding property.
+                existing_prop_type = props_dict[key].prop_type
+                other_prefix = "cell" if existing_prop_type == "node" else "link"
+                other_key = _resolve_prop_key(
+                    f"{other_prefix}_{key}",
+                    f"pycellin_{other_prefix}_{key}",
+                    props_dict,
+                    key,
+                    existing_prop_type,
+                )
+                other_prop = props_dict.pop(key)
+                other_prop.identifier = other_key
+                props_dict[other_key] = other_prop
             else:
                 raise KeyError(
-                    f"Property '{key}' already exists in props_dict for lineages. "
+                    f"Cannot register property '{key}' (lineage): an identical "
+                    f"identifier already exists in properties dictionary. "
                     "Please ensure unique property identifiers."
                 )
 
