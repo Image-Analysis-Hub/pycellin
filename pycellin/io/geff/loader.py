@@ -31,6 +31,8 @@ from pycellin.graph.properties.core import (
 from pycellin.io.utils import (
     _graph_has_node_prop,
     _split_graph_into_lineages,
+    _update_edge_prop_key,
+    _update_lineage_prop_key,
     _update_lineages_IDs_key,
     _update_node_prop_key,
     check_fusions,
@@ -395,6 +397,7 @@ def _extract_props_metadata(
     md: dict[str, geff_spec.PropMetadata],
     props_dict: dict[str, Property],
     prop_type: PropertyType,
+    rename_map: dict[str, dict[str, str]],
 ) -> None:
     """
     Extract properties metadata from a given dictionary and update the props_dict.
@@ -407,6 +410,11 @@ def _extract_props_metadata(
         The dictionary to update with extracted properties metadata.
     prop_type : PropertyType
         The type of property being extracted ('node' or 'edge').
+    rename_map : dict[str, dict[str, str]]
+        Mutable accumulator mapping property type ('node', 'edge', 'lineage') to
+        a dict of ``{old_key: new_key}`` renames. When a key collision forces a
+        rename, both the new and the existing property's mappings are recorded here
+        so that the graph data can be updated accordingly.
 
     Raises
     ------
@@ -460,6 +468,7 @@ def _extract_props_metadata(
                     dtype=prop.dtype,
                     unit=prop.unit or None,
                 )
+                rename_map[prop_type][key] = new_key
                 # Resolve a unique name for the existing colliding property.
                 other_prop_type = props_dict[key].prop_type
                 other_key = _resolve_prop_key(
@@ -472,6 +481,7 @@ def _extract_props_metadata(
                 other_prop = props_dict.pop(key)
                 other_prop.identifier = other_key
                 props_dict[other_key] = other_prop
+                rename_map[other_prop_type][key] = other_key
             else:
                 # GEFF ensures uniqueness of property keys for nodes and edges
                 # separately, so this should never happen.
@@ -485,6 +495,7 @@ def _extract_props_metadata(
 def _extract_lin_props_metadata(
     md: dict[str, Any],
     props_dict: dict[str, Property],
+    rename_map: dict[str, dict[str, str]],
 ) -> None:
     """
     Extract lineage properties metadata from a given dictionary and update the props_dict.
@@ -495,6 +506,11 @@ def _extract_lin_props_metadata(
         The dictionary containing lineage properties metadata.
     props_dict : dict[str, Property]
         The dictionary to update with extracted lineage properties metadata.
+    rename_map : dict[str, dict[str, str]]
+        Mutable accumulator mapping property type ('node', 'edge', 'lineage') to
+        a dict of ``{old_key: new_key}`` renames. When a key collision forces a
+        rename, both the new lineage property's mapping and the existing property's
+        mapping are recorded here so that the graph data can be updated accordingly.
 
     Raises
     ------
@@ -533,6 +549,7 @@ def _extract_lin_props_metadata(
                     dtype=prop.get("dtype"),
                     unit=prop.get("unit") or None,
                 )
+                rename_map["lineage"][key] = new_key
                 # Resolve a unique name for the existing colliding property.
                 existing_prop_type = props_dict[key].prop_type
                 other_prefix = "cell" if existing_prop_type == "node" else "link"
@@ -546,6 +563,7 @@ def _extract_lin_props_metadata(
                 other_prop = props_dict.pop(key)
                 other_prop.identifier = other_key
                 props_dict[other_key] = other_prop
+                rename_map[existing_prop_type][key] = other_key
             else:
                 raise KeyError(
                     f"Cannot register property '{key}' (lineage): an identical "
@@ -554,7 +572,10 @@ def _extract_lin_props_metadata(
                 )
 
 
-def _build_props_metadata(geff_md: geff.GeffMetadata) -> dict[str, Property]:
+def _build_props_metadata(
+    geff_md: geff.GeffMetadata,
+    rename_map: dict[str, dict[str, str]],
+) -> dict[str, Property]:
     """
     Read and extract properties metadata from geff metadata.
 
@@ -562,6 +583,10 @@ def _build_props_metadata(geff_md: geff.GeffMetadata) -> dict[str, Property]:
     ----------
     geff_md : geff.GeffMetadata
         The geff metadata object containing properties metadata.
+    rename_map : dict[str, dict[str, str]]
+        Mutable accumulator mapping property type ('node', 'edge', 'lineage') to
+        a dict of ``{old_key: new_key}`` renames. Populated in-place whenever a
+        key collision forces a rename during metadata extraction.
 
     Returns
     -------
@@ -570,9 +595,9 @@ def _build_props_metadata(geff_md: geff.GeffMetadata) -> dict[str, Property]:
     """
     props_dict: dict[str, Property] = {}
     if geff_md.node_props_metadata:
-        _extract_props_metadata(geff_md.node_props_metadata, props_dict, "node")
+        _extract_props_metadata(geff_md.node_props_metadata, props_dict, "node", rename_map)
     if geff_md.edge_props_metadata:
-        _extract_props_metadata(geff_md.edge_props_metadata, props_dict, "edge")
+        _extract_props_metadata(geff_md.edge_props_metadata, props_dict, "edge", rename_map)
 
     # TODO: for now lineage properties are not associated to a specific tag but stored
     # somewhere in the "extra" field. We need to check recursively if there is a dict
@@ -585,7 +610,7 @@ def _build_props_metadata(geff_md: geff.GeffMetadata) -> dict[str, Property]:
             geff_md.extra, "lineage_props_metadata"
         )
         if lin_props_metadata is not None:
-            _extract_lin_props_metadata(lin_props_metadata, props_dict)
+            _extract_lin_props_metadata(lin_props_metadata, props_dict, rename_map)
 
     return props_dict
 
@@ -823,12 +848,15 @@ def _normalize_properties_data(
     cell_z_key: str | None,
     time_key: str,
     cell_id_key: str | None,
+    rename_map: dict[str, dict[str, str]],
 ) -> None:
     """
     Normalize properties data in lineages to match pycellin conventions.
 
     This function updates the property keys in lineage node data to use
     standardized pycellin naming conventions (e.g., 'cell_x', 'cell_y').
+    It also applies any key renames recorded in *rename_map* during metadata
+    extraction so that the graph data stays consistent with the metadata.
 
     Parameters
     ----------
@@ -844,6 +872,11 @@ def _normalize_properties_data(
         The current z-coordinate key name, if any.
     cell_id_key : str | None
         The current cell ID key name, if any.
+    rename_map : dict[str, dict[str, str]]
+        Accumulator of ``{old_key: new_key}`` renames per property type
+        ('node', 'edge', 'lineage') collected during metadata extraction.
+        Applied to each lineage's node attributes, edge attributes, and
+        graph-level attributes respectively.
     """
     if lin_id_key != "lineage_ID":
         _update_lineages_IDs_key(lineages, lin_id_key)
@@ -859,6 +892,13 @@ def _normalize_properties_data(
                 lin.nodes[node]["cell_ID"] = node
         elif cell_id_key != "cell_ID":
             _update_node_prop_key(lin, old_key=cell_id_key, new_key="cell_ID")
+        # Apply collision renames recorded during metadata extraction.
+        for old_key, new_key in rename_map["node"].items():
+            _update_node_prop_key(lin, old_key=old_key, new_key=new_key)
+        for old_key, new_key in rename_map["edge"].items():
+            _update_edge_prop_key(lin, old_key=old_key, new_key=new_key)
+        for old_key, new_key in rename_map["lineage"].items():
+            _update_lineage_prop_key(lin, old_key=old_key, new_key=new_key)
 
 
 def _normalize_properties_metadata(
@@ -982,7 +1022,8 @@ def load_GEFF(
     generic_md = _build_generic_metadata(
         geff_file, geff_md, time_prop, cell_x_prop, cell_y_prop, cell_z_prop
     )
-    props_md = _build_props_metadata(geff_md)
+    rename_map: dict[str, dict[str, str]] = {"node": {}, "edge": {}, "lineage": {}}
+    props_md = _build_props_metadata(geff_md, rename_map)
 
     # EVERYTHING BELOW IS NOT DEBUGGED YET
 
@@ -1003,6 +1044,7 @@ def load_GEFF(
         cell_z_prop,
         time_prop,
         cell_id_prop,
+        rename_map,
     )
     space_unit = generic_md.get("space_unit")
     _normalize_properties_metadata(
@@ -1022,7 +1064,8 @@ def load_GEFF(
 
 if __name__ == "__main__":
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
-    geff_file = "B:/Janelia_Cell_Trackathon/anniek_example/exampl_geff.zarr/tracks"
+    # geff_file = "B:/Janelia_Cell_Trackathon/anniek_example/exampl_geff.zarr/tracks"
+    geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/anniek_example/exampl_geff.zarr/tracks"
     # geff_file = "E:/Janelia_Cell_Trackathon/reader_test_graph.geff"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/mouse-20250719.zarr/tracks"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/test.zarr"

@@ -350,6 +350,28 @@ def _update_node_prop_key(
                 lineage.nodes[node][new_key] = default_value
 
 
+def _update_edge_prop_key(
+    lineage: CellLineage,
+    old_key: str,
+    new_key: str,
+) -> None:
+    """
+    Update the key of a property in all the edges of a lineage.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The lineage to update.
+    old_key : str
+        The old key of the property.
+    new_key : str
+        The new key of the property.
+    """
+    for u, v in lineage.edges:
+        if old_key in lineage.edges[u, v]:
+            lineage.edges[u, v][new_key] = lineage.edges[u, v].pop(old_key)
+
+
 def _update_lineage_prop_key(
     lineage: CellLineage,
     old_key: str,

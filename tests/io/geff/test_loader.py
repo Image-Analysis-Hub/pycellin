@@ -270,6 +270,12 @@ def lin_props_md():
     }
 
 
+@pytest.fixture
+def rename_map():
+    """A fresh, empty rename map accumulator for property collision tracking."""
+    return {"node": {}, "edge": {}, "lineage": {}}
+
+
 # Test Classes ################################################################
 
 
@@ -535,49 +541,53 @@ class TestExtractPropsMetadata:
     """Test cases for _extract_props_metadata function."""
 
     def test_empty_md_leaves_props_dict_unchanged(
-        self, prop_position_x_node, prop_position_x_edge
+        self, prop_position_x_node, prop_position_x_edge, rename_map
     ):
         """When md is empty, props_dict is not modified."""
         props_dict = {
             "node_prop": prop_position_x_node,
             "edge_prop": prop_position_x_edge,
         }
-        _extract_props_metadata({}, props_dict, "node")
+        _extract_props_metadata({}, props_dict, "node", rename_map)
         assert list(props_dict.keys()) == ["node_prop", "edge_prop"]
+        assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
 
-    def test_new_key_is_all_fields_added(self, geff_node_props_md):
+    def test_new_key_is_all_fields_added(self, geff_node_props_md, rename_map):
         """A key not yet in props_dict is added with the given prop_type."""
         props_dict = {}
-        _extract_props_metadata(geff_node_props_md, props_dict, "node")
+        _extract_props_metadata(geff_node_props_md, props_dict, "node", rename_map)
         assert "position_x" in props_dict
         assert props_dict["position_x"].identifier == "position_x"
         assert props_dict["position_x"].prop_type == "node"
         assert props_dict["position_x"].dtype == "float64"
         assert props_dict["position_x"].unit == "um"
+        assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
 
     def test_new_key_name_defaults_to_key_when_prop_name_is_none(
-        self, geff_node_props_md
+        self, geff_node_props_md, rename_map
     ):
         """When PropMetadata.name is None, Property.name falls back to the key."""
         props_dict = {}
-        _extract_props_metadata(geff_node_props_md, props_dict, "node")
+        _extract_props_metadata(geff_node_props_md, props_dict, "node", rename_map)
         assert props_dict["frame"].name == "frame"
 
-    def test_new_key_unit_is_none_when_prop_has_no_unit(self, geff_node_props_md):
+    def test_new_key_unit_is_none_when_prop_has_no_unit(
+        self, geff_node_props_md, rename_map
+    ):
         """When PropMetadata.unit is None, Property.unit is also None."""
         props_dict = {}
-        _extract_props_metadata(geff_node_props_md, props_dict, "node")
+        _extract_props_metadata(geff_node_props_md, props_dict, "node", rename_map)
         assert props_dict["frame"].unit is None
 
-    def test_multiple_new_keys_all_added(self, geff_node_props_md):
+    def test_multiple_new_keys_all_added(self, geff_node_props_md, rename_map):
         """When md contains multiple new keys, all are added to props_dict."""
         props_dict = {}
-        _extract_props_metadata(geff_node_props_md, props_dict, "node")
+        _extract_props_metadata(geff_node_props_md, props_dict, "node", rename_map)
         assert "frame" in props_dict
         assert "position_x" in props_dict
 
     def test_duplicate_key_same_prop_type_raises_key_error(
-        self, geff_node_props_md, prop_cell_position_x
+        self, geff_node_props_md, prop_cell_position_x, rename_map
     ):
         """When a key already exists in props_dict with the same prop_type,
         raise KeyError."""
@@ -588,17 +598,17 @@ class TestExtractPropsMetadata:
             "dictionary for nodes",
         ):
             _extract_props_metadata(
-                {"frame": geff_node_props_md["frame"]}, props_dict, "node"
+                {"frame": geff_node_props_md["frame"]}, props_dict, "node", rename_map
             )
 
     def test_node_collides_with_existing_edge_renames_both(
-        self, geff_node_props_md, prop_position_x_edge
+        self, geff_node_props_md, prop_position_x_edge, rename_map
     ):
         """When a node prop collides with an existing edge prop, both are renamed:
         the new node prop becomes 'cell_<key>' and the edge prop becomes 'link_<key>'."""
         props_dict = {"position_x": prop_position_x_edge}
         with pytest.warns(UserWarning):
-            _extract_props_metadata(geff_node_props_md, props_dict, "node")
+            _extract_props_metadata(geff_node_props_md, props_dict, "node", rename_map)
         assert "position_x" not in props_dict
         assert "cell_position_x" in props_dict
         assert props_dict["cell_position_x"].identifier == "cell_position_x"
@@ -606,15 +616,18 @@ class TestExtractPropsMetadata:
         assert "link_position_x" in props_dict
         assert props_dict["link_position_x"].identifier == "link_position_x"
         assert props_dict["link_position_x"].prop_type == "edge"
+        assert rename_map["node"] == {"position_x": "cell_position_x"}
+        assert rename_map["edge"] == {"position_x": "link_position_x"}
+        assert rename_map["lineage"] == {}
 
     def test_edge_collides_with_existing_node_renames_both(
-        self, geff_node_props_md, prop_position_x_node
+        self, geff_node_props_md, prop_position_x_node, rename_map
     ):
         """When an edge key collides with an existing node prop, both are renamed:
         the new edge prop becomes 'link_<key>' and the node prop becomes 'cell_<key>'."""
         props_dict = {"position_x": prop_position_x_node}
         with pytest.warns(UserWarning):
-            _extract_props_metadata(geff_node_props_md, props_dict, "edge")
+            _extract_props_metadata(geff_node_props_md, props_dict, "edge", rename_map)
         assert "position_x" not in props_dict
         assert "link_position_x" in props_dict
         assert props_dict["link_position_x"].identifier == "link_position_x"
@@ -622,9 +635,12 @@ class TestExtractPropsMetadata:
         assert "cell_position_x" in props_dict
         assert props_dict["cell_position_x"].identifier == "cell_position_x"
         assert props_dict["cell_position_x"].prop_type == "node"
+        assert rename_map["edge"] == {"position_x": "link_position_x"}
+        assert rename_map["node"] == {"position_x": "cell_position_x"}
+        assert rename_map["lineage"] == {}
 
     def test_node_collision_primary_new_key_taken_uses_fallback(
-        self, geff_node_props_md, prop_position_x_edge, prop_cell_position_x
+        self, geff_node_props_md, prop_position_x_edge, prop_cell_position_x, rename_map
     ):
         """When 'cell_<key>' is already in props_dict, the new node prop falls back
         to 'pycellin_cell_<key>'."""
@@ -633,13 +649,16 @@ class TestExtractPropsMetadata:
             "cell_position_x": prop_cell_position_x,  # primary rename taken
         }
         with pytest.warns(UserWarning):
-            _extract_props_metadata(geff_node_props_md, props_dict, "node")
+            _extract_props_metadata(geff_node_props_md, props_dict, "node", rename_map)
         assert "position_x" not in props_dict
         assert "pycellin_cell_position_x" in props_dict
         assert props_dict["pycellin_cell_position_x"].prop_type == "node"
         assert "link_position_x" in props_dict
         assert props_dict["link_position_x"].prop_type == "edge"
         assert "cell_position_x" in props_dict  # original unaffected
+        assert rename_map["node"] == {"position_x": "pycellin_cell_position_x"}
+        assert rename_map["edge"] == {"position_x": "link_position_x"}
+        assert rename_map["lineage"] == {}
 
     def test_both_rename_candidates_taken_raises_key_error(
         self,
@@ -647,6 +666,7 @@ class TestExtractPropsMetadata:
         prop_position_x_edge,
         prop_cell_position_x,
         prop_pycellin_cell_position_x,
+        rename_map,
     ):
         """When both 'cell_<key>' and 'pycellin_cell_<key>' are already in props_dict,
         raise KeyError."""
@@ -656,60 +676,71 @@ class TestExtractPropsMetadata:
             "pycellin_cell_position_x": prop_pycellin_cell_position_x,
         }
         with pytest.raises(KeyError, match="Cannot register property 'position_x'"):
-            _extract_props_metadata(geff_node_props_md, props_dict, "node")
+            _extract_props_metadata(geff_node_props_md, props_dict, "node", rename_map)
 
 
 class TestExtractLinPropsMetadata:
     """Test cases for _extract_lin_props_metadata function."""
 
-    def test_empty_md_leaves_props_dict_unchanged(self, prop_position_x_node):
+    def test_empty_md_leaves_props_dict_unchanged(self, prop_position_x_node, rename_map):
         """When md is empty, props_dict is not modified."""
         props_dict = {"position_x": prop_position_x_node}
-        _extract_lin_props_metadata({}, props_dict)
+        _extract_lin_props_metadata({}, props_dict, rename_map)
         assert list(props_dict.keys()) == ["position_x"]
 
-    def test_new_key_all_fields_added(self, lin_props_md):
+    def test_new_key_all_fields_added(self, lin_props_md, rename_map):
         """A key not yet in props_dict is added with all correct fields."""
         props_dict = {}
-        _extract_lin_props_metadata(lin_props_md, props_dict)
+        _extract_lin_props_metadata(lin_props_md, props_dict, rename_map)
         assert "displacement" in props_dict
         assert props_dict["displacement"].identifier == "displacement"
         assert props_dict["displacement"].prop_type == "lineage"
         assert props_dict["displacement"].dtype == "float"
         assert props_dict["displacement"].unit == "um"
+        assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
 
-    def test_new_key_name_defaults_to_key_when_name_is_none(self, lin_props_md):
+    def test_new_key_name_defaults_to_key_when_name_is_none(
+        self, lin_props_md, rename_map
+    ):
         """When prop dict has name=None, Property.name falls back to the key."""
         props_dict = {}
-        _extract_lin_props_metadata(lin_props_md, props_dict)
+        _extract_lin_props_metadata(lin_props_md, props_dict, rename_map)
         assert props_dict["n_divisions"].name == "n_divisions"
 
-    def test_new_key_unit_is_none_when_not_set(self, lin_props_md):
+    def test_new_key_unit_is_none_when_not_set(self, lin_props_md, rename_map):
         """When prop dict has unit=None, Property.unit is None."""
         props_dict = {}
-        _extract_lin_props_metadata(lin_props_md, props_dict)
+        _extract_lin_props_metadata(lin_props_md, props_dict, rename_map)
         assert props_dict["n_divisions"].unit is None
 
-    def test_multiple_new_keys_all_added(self, lin_props_md):
+    def test_multiple_new_keys_all_added(self, lin_props_md, rename_map):
         """When md contains multiple new keys, all are added to props_dict."""
         props_dict = {}
-        _extract_lin_props_metadata(lin_props_md, props_dict)
+        _extract_lin_props_metadata(lin_props_md, props_dict, rename_map)
         assert "n_divisions" in props_dict
         assert "displacement" in props_dict
 
-    def test_duplicate_key_same_prop_type_raises_key_error(self, prop_position_x_lineage):
+    def test_duplicate_key_same_prop_type_raises_key_error(
+        self, prop_position_x_lineage, rename_map
+    ):
         """When a key already exists in props_dict with prop_type='lineage',
         raise KeyError."""
         props_dict = {"position_x": prop_position_x_lineage}
         with pytest.raises(KeyError, match="Cannot register property 'position_x'"):
-            _extract_lin_props_metadata({"position_x": {"dtype": "float"}}, props_dict)
+            _extract_lin_props_metadata(
+                {"position_x": {"dtype": "float"}}, props_dict, rename_map
+            )
 
-    def test_lineage_collides_with_existing_node_renames_both(self, prop_position_x_node):
+    def test_lineage_collides_with_existing_node_renames_both(
+        self, prop_position_x_node, rename_map
+    ):
         """When a lineage prop collides with an existing node prop, both are renamed:
         the new lineage prop becomes 'lin_<key>' and the node prop becomes 'cell_<key>'."""
         props_dict = {"position_x": prop_position_x_node}
         with pytest.warns(UserWarning):
-            _extract_lin_props_metadata({"position_x": {"dtype": "float"}}, props_dict)
+            _extract_lin_props_metadata(
+                {"position_x": {"dtype": "float"}}, props_dict, rename_map
+            )
         assert "position_x" not in props_dict
         assert "lin_position_x" in props_dict
         assert props_dict["lin_position_x"].identifier == "lin_position_x"
@@ -717,13 +748,20 @@ class TestExtractLinPropsMetadata:
         assert "cell_position_x" in props_dict
         assert props_dict["cell_position_x"].identifier == "cell_position_x"
         assert props_dict["cell_position_x"].prop_type == "node"
+        assert rename_map["lineage"] == {"position_x": "lin_position_x"}
+        assert rename_map["node"] == {"position_x": "cell_position_x"}
+        assert rename_map["edge"] == {}
 
-    def test_lineage_collides_with_existing_edge_renames_both(self, prop_position_x_edge):
+    def test_lineage_collides_with_existing_edge_renames_both(
+        self, prop_position_x_edge, rename_map
+    ):
         """When a lineage prop collides with an existing edge prop, both are renamed:
         the new lineage prop becomes 'lin_<key>' and the edge prop becomes 'link_<key>'."""
         props_dict = {"position_x": prop_position_x_edge}
         with pytest.warns(UserWarning):
-            _extract_lin_props_metadata({"position_x": {"dtype": "float"}}, props_dict)
+            _extract_lin_props_metadata(
+                {"position_x": {"dtype": "float"}}, props_dict, rename_map
+            )
         assert "position_x" not in props_dict
         assert "lin_position_x" in props_dict
         assert props_dict["lin_position_x"].identifier == "lin_position_x"
@@ -731,9 +769,12 @@ class TestExtractLinPropsMetadata:
         assert "link_position_x" in props_dict
         assert props_dict["link_position_x"].identifier == "link_position_x"
         assert props_dict["link_position_x"].prop_type == "edge"
+        assert rename_map["lineage"] == {"position_x": "lin_position_x"}
+        assert rename_map["edge"] == {"position_x": "link_position_x"}
+        assert rename_map["node"] == {}
 
     def test_lineage_collision_primary_new_key_taken_uses_fallback(
-        self, prop_position_x_node, prop_lin_position_x
+        self, prop_position_x_node, prop_lin_position_x, rename_map
     ):
         """When 'lin_<key>' is already in props_dict, the new lineage prop falls back
         to 'pycellin_lin_<key>'."""
@@ -742,19 +783,25 @@ class TestExtractLinPropsMetadata:
             "lin_position_x": prop_lin_position_x,  # primary rename taken
         }
         with pytest.warns(UserWarning):
-            _extract_lin_props_metadata({"position_x": {"dtype": "float"}}, props_dict)
+            _extract_lin_props_metadata(
+                {"position_x": {"dtype": "float"}}, props_dict, rename_map
+            )
         assert "position_x" not in props_dict
         assert "pycellin_lin_position_x" in props_dict
         assert props_dict["pycellin_lin_position_x"].prop_type == "lineage"
         assert "cell_position_x" in props_dict
         assert props_dict["cell_position_x"].prop_type == "node"
         assert "lin_position_x" in props_dict  # original unaffected
+        assert rename_map["lineage"] == {"position_x": "pycellin_lin_position_x"}
+        assert rename_map["node"] == {"position_x": "cell_position_x"}
+        assert rename_map["edge"] == {}
 
     def test_both_rename_candidates_taken_raises_key_error(
         self,
         prop_position_x_node,
         prop_lin_position_x,
         prop_pycellin_lin_position_x,
+        rename_map,
     ):
         """When both 'lin_<key>' and 'pycellin_lin_<key>' are already in props_dict,
         raise KeyError."""
@@ -764,22 +811,24 @@ class TestExtractLinPropsMetadata:
             "pycellin_lin_position_x": prop_pycellin_lin_position_x,
         }
         with pytest.raises(KeyError, match="Cannot register property 'position_x'"):
-            _extract_lin_props_metadata({"position_x": {"dtype": "float"}}, props_dict)
+            _extract_lin_props_metadata(
+                {"position_x": {"dtype": "float"}}, props_dict, rename_map
+            )
 
 
 class TestBuildPropsMetadata:
     """Test cases for _build_props_metadata function."""
 
-    def test_empty_node_and_edge_props_returns_empty_dict(self):
+    def test_empty_node_and_edge_props_returns_empty_dict(self, rename_map):
         """When node and edge props metadata are empty dicts and extra is None,
         return an empty props_dict."""
         geff_md = geff.GeffMetadata(
             directed=True, node_props_metadata={}, edge_props_metadata={}
         )
-        result = _build_props_metadata(geff_md)
+        result = _build_props_metadata(geff_md, rename_map)
         assert result == {}
 
-    def test_node_props_only_all_added_as_node(self, geff_node_props_md):
+    def test_node_props_only_all_added_as_node(self, geff_node_props_md, rename_map):
         """When only node_props_metadata is provided, all keys are added with
         prop_type='node'."""
         geff_md = geff.GeffMetadata(
@@ -787,15 +836,16 @@ class TestBuildPropsMetadata:
             node_props_metadata=geff_node_props_md,
             edge_props_metadata={},
         )
-        result = _build_props_metadata(geff_md)
+        result = _build_props_metadata(geff_md, rename_map)
         assert "frame" in result
         assert result["frame"].prop_type == "node"
         assert result["frame"].dtype == "int64"
         assert "position_x" in result
         assert result["position_x"].prop_type == "node"
         assert result["position_x"].unit == "um"
+        assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
 
-    def test_edge_props_only_all_added_as_edge(self, geff_edge_props_md):
+    def test_edge_props_only_all_added_as_edge(self, geff_edge_props_md, rename_map):
         """When only edge_props_metadata is provided, all keys are added with
         prop_type='edge'."""
         geff_md = geff.GeffMetadata(
@@ -803,16 +853,17 @@ class TestBuildPropsMetadata:
             node_props_metadata={},
             edge_props_metadata=geff_edge_props_md,
         )
-        result = _build_props_metadata(geff_md)
+        result = _build_props_metadata(geff_md, rename_map)
         assert "speed" in result
         assert result["speed"].prop_type == "edge"
         assert result["speed"].dtype == "float64"
         assert "cost" in result
         assert result["cost"].prop_type == "edge"
         assert result["cost"].unit is None
+        assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
 
     def test_node_and_edge_props_no_collision_both_added(
-        self, geff_node_props_md, geff_edge_props_md
+        self, geff_node_props_md, geff_edge_props_md, rename_map
     ):
         """When node and edge metadata have different keys, all props are added."""
         geff_md = geff.GeffMetadata(
@@ -820,7 +871,7 @@ class TestBuildPropsMetadata:
             node_props_metadata=geff_node_props_md,
             edge_props_metadata=geff_edge_props_md,
         )
-        result = _build_props_metadata(geff_md)
+        result = _build_props_metadata(geff_md, rename_map)
         assert "frame" in result
         assert result["frame"].prop_type == "node"
         assert "position_x" in result
@@ -829,8 +880,9 @@ class TestBuildPropsMetadata:
         assert result["speed"].prop_type == "edge"
         assert "cost" in result
         assert result["cost"].prop_type == "edge"
+        assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
 
-    def test_node_and_edge_collision_both_renamed(self, geff_node_props_md):
+    def test_node_and_edge_collision_both_renamed(self, geff_node_props_md, rename_map):
         """When a key appears in both node and edge metadata, both props are renamed
         with appropriate prefixes."""
         geff_md = geff.GeffMetadata(
@@ -845,14 +897,17 @@ class TestBuildPropsMetadata:
             },
         )
         with pytest.warns(UserWarning):
-            result = _build_props_metadata(geff_md)
+            result = _build_props_metadata(geff_md, rename_map)
         assert "position_x" not in result
         assert "cell_position_x" in result
         assert result["cell_position_x"].prop_type == "node"
         assert "link_position_x" in result
         assert result["link_position_x"].prop_type == "edge"
+        assert rename_map["node"] == {"position_x": "cell_position_x"}
+        assert rename_map["edge"] == {"position_x": "link_position_x"}
+        assert rename_map["lineage"] == {}
 
-    def test_lineage_props_in_extra_direct_key(self, lin_props_md):
+    def test_lineage_props_in_extra_direct_key(self, lin_props_md, rename_map):
         """When extra contains 'lineage_props_metadata' at the top level, lineage
         props are extracted and added with prop_type='lineage'."""
         geff_md = geff.GeffMetadata(
@@ -861,15 +916,16 @@ class TestBuildPropsMetadata:
             edge_props_metadata={},
             extra={"lineage_props_metadata": lin_props_md},
         )
-        result = _build_props_metadata(geff_md)
+        result = _build_props_metadata(geff_md, rename_map)
         assert "n_divisions" in result
         assert result["n_divisions"].prop_type == "lineage"
         assert result["n_divisions"].dtype == "int"
         assert "displacement" in result
         assert result["displacement"].prop_type == "lineage"
         assert result["displacement"].unit == "um"
+        assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
 
-    def test_lineage_props_nested_in_extra(self, lin_props_md):
+    def test_lineage_props_nested_in_extra(self, lin_props_md, rename_map):
         """When 'lineage_props_metadata' is nested inside extra, it is still found
         and extracted."""
         geff_md = geff.GeffMetadata(
@@ -878,11 +934,11 @@ class TestBuildPropsMetadata:
             edge_props_metadata={},
             extra={"some_section": {"lineage_props_metadata": lin_props_md}},
         )
-        result = _build_props_metadata(geff_md)
+        result = _build_props_metadata(geff_md, rename_map)
         assert result["n_divisions"].prop_type == "lineage"
         assert result["displacement"].prop_type == "lineage"
 
-    def test_extra_without_lineage_props_metadata_no_lineage_added(self):
+    def test_extra_without_lineage_props_metadata_no_lineage_added(self, rename_map):
         """When extra exists but contains no 'lineage_props_metadata' key, no
         lineage props are added."""
         geff_md = geff.GeffMetadata(
@@ -891,11 +947,11 @@ class TestBuildPropsMetadata:
             edge_props_metadata={},
             extra={"some_other_key": {"unrelated": "data"}},
         )
-        result = _build_props_metadata(geff_md)
+        result = _build_props_metadata(geff_md, rename_map)
         assert result == {}
 
     def test_node_edge_and_lineage_props_all_combined(
-        self, geff_node_props_md, geff_edge_props_md, lin_props_md
+        self, geff_node_props_md, geff_edge_props_md, lin_props_md, rename_map
     ):
         """When node, edge, and lineage props are all present without collisions,
         all are added to the result."""
@@ -905,13 +961,14 @@ class TestBuildPropsMetadata:
             edge_props_metadata=geff_edge_props_md,
             extra={"lineage_props_metadata": lin_props_md},
         )
-        result = _build_props_metadata(geff_md)
+        result = _build_props_metadata(geff_md, rename_map)
         assert result["frame"].prop_type == "node"
         assert result["position_x"].prop_type == "node"
         assert result["speed"].prop_type == "edge"
         assert result["cost"].prop_type == "edge"
         assert result["n_divisions"].prop_type == "lineage"
         assert result["displacement"].prop_type == "lineage"
+        assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
 
 
 class TestGetPropUnit:
