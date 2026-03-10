@@ -569,16 +569,16 @@ def _build_props_metadata(geff_md: geff.GeffMetadata) -> dict[str, Property]:
         Dictionary mapping property identifiers to Property objects.
     """
     props_dict: dict[str, Property] = {}
-    if geff_md.node_props_metadata is not None:
+    if geff_md.node_props_metadata:
         _extract_props_metadata(geff_md.node_props_metadata, props_dict, "node")
-    if geff_md.edge_props_metadata is not None:
+    if geff_md.edge_props_metadata:
         _extract_props_metadata(geff_md.edge_props_metadata, props_dict, "edge")
 
     # TODO: for now lineage properties are not associated to a specific tag but stored
     # somewhere in the "extra" field. We need to check recursively if there is a dict
     # key called "lineage_props_metadata" in the "extra" field.
     # For now I keep this, but it should be replaced by geffception at some point.
-    if geff_md.extra is not None:
+    if geff_md.extra:
         # Recursive search for the "lineage_props_metadata" key through the "extra"
         # field dict of dicts of dicts...
         lin_props_metadata = _recursive_dict_search(

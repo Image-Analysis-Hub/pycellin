@@ -10,6 +10,7 @@ import pytest
 from pycellin.classes import Property
 from pycellin.io.geff.loader import (
     _build_generic_metadata,
+    _build_props_metadata,
     _extract_axes_metadata,
     _extract_generic_metadata,
     _extract_lin_props_metadata,
@@ -28,10 +29,21 @@ from pycellin.io.geff.loader import (
 def geff_node_props_md():
     """Geff node properties metadata where the target prop has a unit."""
     return {
-        "frame": geff_spec.PropMetadata(identifier="frame", dtype="int", unit=None),
+        "frame": geff_spec.PropMetadata(identifier="frame", dtype="int64", unit=None),
         "position_x": geff_spec.PropMetadata(
-            identifier="position_x", dtype="float64", unit="micrometer"
+            identifier="position_x", dtype="float64", unit="um"
         ),
+    }
+
+
+@pytest.fixture
+def geff_edge_props_md():
+    """Geff edge properties metadata where the target prop has a unit."""
+    return {
+        "speed": geff_spec.PropMetadata(
+            identifier="speed", dtype="float64", unit="um/second"
+        ),
+        "cost": geff_spec.PropMetadata(identifier="cost", dtype="float64", unit=None),
     }
 
 
@@ -40,8 +52,8 @@ def geff_axes():
     """A list of geff axes containing time and space axes."""
     return [
         geff_spec.Axis(name="frame", type="time", unit="second"),
-        geff_spec.Axis(name="position_x", type="space", unit="micrometer"),
-        geff_spec.Axis(name="position_y", type="space", unit="micrometer"),
+        geff_spec.Axis(name="position_x", type="space", unit="um"),
+        geff_spec.Axis(name="position_y", type="space", unit="um"),
     ]
 
 
@@ -88,9 +100,9 @@ def geff_md_3d_axes(geff_node_props_md):
         directed=True,
         axes=[
             geff_spec.Axis(name="frame", type="time", unit="second"),
-            geff_spec.Axis(name="position_x", type="space", unit="micrometer"),
-            geff_spec.Axis(name="position_y", type="space", unit="micrometer"),
-            geff_spec.Axis(name="position_z", type="space", unit="micrometer"),
+            geff_spec.Axis(name="position_x", type="space", unit="um"),
+            geff_spec.Axis(name="position_y", type="space", unit="um"),
+            geff_spec.Axis(name="position_z", type="space", unit="um"),
         ],
         node_props_metadata=geff_node_props_md,
         edge_props_metadata={},
@@ -232,6 +244,20 @@ def prop_pycellin_lin_position_x():
 
 
 @pytest.fixture
+def prop_speed():
+    """A Property for 'speed' with prop_type='edge'."""
+    return Property(
+        identifier="speed",
+        name="speed",
+        description="speed",
+        provenance="test",
+        prop_type="edge",
+        lin_type="CellLineage",
+        dtype="float",
+    )
+
+
+@pytest.fixture
 def lin_props_md():
     """A dict of lineage properties metadata with expected fields."""
     return {
@@ -239,7 +265,7 @@ def lin_props_md():
         "displacement": {
             "name": "Lineage displacement",
             "dtype": "float",
-            "unit": "micrometer",
+            "unit": "um",
         },
     }
 
@@ -527,7 +553,7 @@ class TestExtractPropsMetadata:
         assert props_dict["position_x"].identifier == "position_x"
         assert props_dict["position_x"].prop_type == "node"
         assert props_dict["position_x"].dtype == "float64"
-        assert props_dict["position_x"].unit == "micrometer"
+        assert props_dict["position_x"].unit == "um"
 
     def test_new_key_name_defaults_to_key_when_prop_name_is_none(
         self, geff_node_props_md
@@ -650,7 +676,7 @@ class TestExtractLinPropsMetadata:
         assert props_dict["displacement"].identifier == "displacement"
         assert props_dict["displacement"].prop_type == "lineage"
         assert props_dict["displacement"].dtype == "float"
-        assert props_dict["displacement"].unit == "micrometer"
+        assert props_dict["displacement"].unit == "um"
 
     def test_new_key_name_defaults_to_key_when_name_is_none(self, lin_props_md):
         """When prop dict has name=None, Property.name falls back to the key."""
@@ -741,13 +767,160 @@ class TestExtractLinPropsMetadata:
             _extract_lin_props_metadata({"position_x": {"dtype": "float"}}, props_dict)
 
 
+class TestBuildPropsMetadata:
+    """Test cases for _build_props_metadata function."""
+
+    def test_empty_node_and_edge_props_returns_empty_dict(self):
+        """When node and edge props metadata are empty dicts and extra is None,
+        return an empty props_dict."""
+        geff_md = geff.GeffMetadata(
+            directed=True, node_props_metadata={}, edge_props_metadata={}
+        )
+        result = _build_props_metadata(geff_md)
+        assert result == {}
+
+    def test_node_props_only_all_added_as_node(self, geff_node_props_md):
+        """When only node_props_metadata is provided, all keys are added with
+        prop_type='node'."""
+        geff_md = geff.GeffMetadata(
+            directed=True,
+            node_props_metadata=geff_node_props_md,
+            edge_props_metadata={},
+        )
+        result = _build_props_metadata(geff_md)
+        assert "frame" in result
+        assert result["frame"].prop_type == "node"
+        assert result["frame"].dtype == "int64"
+        assert "position_x" in result
+        assert result["position_x"].prop_type == "node"
+        assert result["position_x"].unit == "um"
+
+    def test_edge_props_only_all_added_as_edge(self, geff_edge_props_md):
+        """When only edge_props_metadata is provided, all keys are added with
+        prop_type='edge'."""
+        geff_md = geff.GeffMetadata(
+            directed=True,
+            node_props_metadata={},
+            edge_props_metadata=geff_edge_props_md,
+        )
+        result = _build_props_metadata(geff_md)
+        assert "speed" in result
+        assert result["speed"].prop_type == "edge"
+        assert result["speed"].dtype == "float64"
+        assert "cost" in result
+        assert result["cost"].prop_type == "edge"
+        assert result["cost"].unit is None
+
+    def test_node_and_edge_props_no_collision_both_added(
+        self, geff_node_props_md, geff_edge_props_md
+    ):
+        """When node and edge metadata have different keys, all props are added."""
+        geff_md = geff.GeffMetadata(
+            directed=True,
+            node_props_metadata=geff_node_props_md,
+            edge_props_metadata=geff_edge_props_md,
+        )
+        result = _build_props_metadata(geff_md)
+        assert "frame" in result
+        assert result["frame"].prop_type == "node"
+        assert "position_x" in result
+        assert result["position_x"].prop_type == "node"
+        assert "speed" in result
+        assert result["speed"].prop_type == "edge"
+        assert "cost" in result
+        assert result["cost"].prop_type == "edge"
+
+    def test_node_and_edge_collision_both_renamed(self, geff_node_props_md):
+        """When a key appears in both node and edge metadata, both props are renamed
+        with appropriate prefixes."""
+        geff_md = geff.GeffMetadata(
+            directed=True,
+            node_props_metadata=geff_node_props_md,
+            edge_props_metadata={
+                "position_x": geff_spec.PropMetadata(
+                    identifier="position_x",
+                    dtype="float64",
+                    unit="um",
+                )
+            },
+        )
+        with pytest.warns(UserWarning):
+            result = _build_props_metadata(geff_md)
+        assert "position_x" not in result
+        assert "cell_position_x" in result
+        assert result["cell_position_x"].prop_type == "node"
+        assert "link_position_x" in result
+        assert result["link_position_x"].prop_type == "edge"
+
+    def test_lineage_props_in_extra_direct_key(self, lin_props_md):
+        """When extra contains 'lineage_props_metadata' at the top level, lineage
+        props are extracted and added with prop_type='lineage'."""
+        geff_md = geff.GeffMetadata(
+            directed=True,
+            node_props_metadata={},
+            edge_props_metadata={},
+            extra={"lineage_props_metadata": lin_props_md},
+        )
+        result = _build_props_metadata(geff_md)
+        assert "n_divisions" in result
+        assert result["n_divisions"].prop_type == "lineage"
+        assert result["n_divisions"].dtype == "int"
+        assert "displacement" in result
+        assert result["displacement"].prop_type == "lineage"
+        assert result["displacement"].unit == "um"
+
+    def test_lineage_props_nested_in_extra(self, lin_props_md):
+        """When 'lineage_props_metadata' is nested inside extra, it is still found
+        and extracted."""
+        geff_md = geff.GeffMetadata(
+            directed=True,
+            node_props_metadata={},
+            edge_props_metadata={},
+            extra={"some_section": {"lineage_props_metadata": lin_props_md}},
+        )
+        result = _build_props_metadata(geff_md)
+        assert result["n_divisions"].prop_type == "lineage"
+        assert result["displacement"].prop_type == "lineage"
+
+    def test_extra_without_lineage_props_metadata_no_lineage_added(self):
+        """When extra exists but contains no 'lineage_props_metadata' key, no
+        lineage props are added."""
+        geff_md = geff.GeffMetadata(
+            directed=True,
+            node_props_metadata={},
+            edge_props_metadata={},
+            extra={"some_other_key": {"unrelated": "data"}},
+        )
+        result = _build_props_metadata(geff_md)
+        assert result == {}
+
+    def test_node_edge_and_lineage_props_all_combined(
+        self, geff_node_props_md, geff_edge_props_md, lin_props_md
+    ):
+        """When node, edge, and lineage props are all present without collisions,
+        all are added to the result."""
+        geff_md = geff.GeffMetadata(
+            directed=True,
+            node_props_metadata=geff_node_props_md,
+            edge_props_metadata=geff_edge_props_md,
+            extra={"lineage_props_metadata": lin_props_md},
+        )
+        result = _build_props_metadata(geff_md)
+        assert result["frame"].prop_type == "node"
+        assert result["position_x"].prop_type == "node"
+        assert result["speed"].prop_type == "edge"
+        assert result["cost"].prop_type == "edge"
+        assert result["n_divisions"].prop_type == "lineage"
+        assert result["displacement"].prop_type == "lineage"
+
+
 class TestGetPropUnit:
     """Test cases for _get_prop_unit function."""
 
     def test_unit_from_node_props_md(self, geff_node_props_md):
         """When node_props_md contains the prop with a unit, return it directly."""
         result = _get_prop_unit("position_x", "space", geff_node_props_md, [])
-        assert result == "micrometer"
+        assert result == "um"
 
     def test_node_props_md_unit_takes_priority_over_axes(self, geff_node_props_md):
         """When the prop is in node_props_md with a unit, axes are not consulted
@@ -758,7 +931,7 @@ class TestGetPropUnit:
         result = _get_prop_unit(
             "position_x", "space", geff_node_props_md, conflicting_axes
         )
-        assert result == "micrometer"
+        assert result == "um"
 
     def test_fallback_to_axes_when_prop_unit_is_none(self, geff_node_props_md, geff_axes):
         """When node_props_md has the prop but unit is None, fall back to axes."""
@@ -768,14 +941,14 @@ class TestGetPropUnit:
     def test_fallback_to_axes_when_node_props_md_is_none(self, geff_axes):
         """When node_props_md is None, fall back to axes."""
         result = _get_prop_unit("position_x", "space", None, geff_axes)
-        assert result == "micrometer"
+        assert result == "um"
 
     def test_fallback_to_axes_when_prop_not_in_node_props_md(
         self, geff_node_props_md, geff_axes
     ):
         """When prop is absent from node_props_md, fall back to axes."""
         result = _get_prop_unit("position_y", "space", geff_node_props_md, geff_axes)
-        assert result == "micrometer"
+        assert result == "um"
 
     def test_returns_none_when_no_unit_found_anywhere(self, geff_node_props_md):
         """When unit is None in node_props_md and the prop has no matching axis, return None."""
@@ -821,7 +994,7 @@ class TestExtractAxesMetadata:
             geff_md, "frame", "position_x", "position_y", None
         )
         assert result["time_unit"] == "second"
-        assert result["space_unit"] == "micrometer"
+        assert result["space_unit"] == "um"
 
     def test_no_time_unit_warns_and_absent_from_result(self, geff_axes):
         """When no unit is found for the time property, warn and omit time_unit."""
@@ -831,7 +1004,7 @@ class TestExtractAxesMetadata:
                 geff_md, "unknown_time", "position_x", None, None
             )
         assert "time_unit" not in result
-        assert result["space_unit"] == "micrometer"
+        assert result["space_unit"] == "um"
 
     def test_all_space_props_none_warns(self, geff_axes):
         """When all space props are None, warn and omit space_unit."""
@@ -852,7 +1025,7 @@ class TestExtractAxesMetadata:
         """When x and y props have different units, warn and omit space_unit."""
         mixed_axes = [
             geff_spec.Axis(name="frame", type="time", unit="second"),
-            geff_spec.Axis(name="position_x", type="space", unit="micrometer"),
+            geff_spec.Axis(name="position_x", type="space", unit="um"),
             geff_spec.Axis(name="position_y", type="space", unit="millimeter"),
         ]
         geff_md = self._make_geff_md(axes=mixed_axes)
@@ -866,14 +1039,14 @@ class TestExtractAxesMetadata:
         """When only x_prop is provided and has a unit, space_unit is set."""
         geff_md = self._make_geff_md(axes=geff_axes)
         result = _extract_axes_metadata(geff_md, "frame", "position_x", None, None)
-        assert result["space_unit"] == "micrometer"
+        assert result["space_unit"] == "um"
 
     def test_space_unit_from_node_props_md(self, geff_node_props_md):
         """When unit comes from node_props_md (no axes), space_unit is set correctly."""
         geff_md = self._make_geff_md(axes=None, node_props_md=geff_node_props_md)
         with pytest.warns(UserWarning, match="No unit found for time property"):
             result = _extract_axes_metadata(geff_md, "frame", "position_x", None, None)
-        assert result["space_unit"] == "micrometer"
+        assert result["space_unit"] == "um"
         assert "time_unit" not in result
 
 
@@ -961,7 +1134,7 @@ class TestBuildGenericMetadata:
             "/some/tracks.geff", geff_md_axes, "frame", "position_x", None, None
         )
         assert result["time_unit"] == "second"
-        assert result["space_unit"] == "micrometer"
+        assert result["space_unit"] == "um"
 
     def test_missing_units_produce_warnings_and_absent_from_result(self):
         """When no units are found, appropriate warnings are raised and
