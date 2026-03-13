@@ -290,6 +290,33 @@ class TestAddLineagesProps:
         assert is_equal(g1_obt, g1_exp)
         assert is_equal(g2_obt, g2_exp)
 
+    def test_no_matching_lin_ID(self, lineage_attrs):
+        """Test that an unmatched lineage ID raises ValueError."""
+        g1_attr, g2_attr = lineage_attrs
+
+        # Node has lineage_ID=99, which is not present in lin_props (0 and 1).
+        g1_obt = nx.DiGraph()
+        g1_obt.add_node(1, lineage_ID=99)
+        g2_obt = nx.DiGraph()
+        g2_obt.add_node(2, lineage_ID=1)
+
+        with pytest.raises(ValueError, match="No lineage properties found"):
+            _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr])
+
+    def test_none_line_ID_key(self, lineage_attrs):
+        """Test that passing lineage_ID_key=None skips all lineages (no-op)."""
+        g1_attr, g2_attr = lineage_attrs
+
+        g1_obt = nx.DiGraph()
+        g1_obt.add_node(1, lineage_ID=0)
+        g2_obt = nx.DiGraph()
+        g2_obt.add_node(2, lineage_ID=1)
+        _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr], lineage_ID_key=None)
+
+        # No graph-level attributes should have been added.
+        assert len(g1_obt.graph) == 0
+        assert len(g2_obt.graph) == 0
+
 
 class TestGetPropsFromData:
     """Test cases for _get_props_from_data function."""

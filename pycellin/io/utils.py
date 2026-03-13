@@ -60,7 +60,7 @@ def _add_lineage_props(
     ValueError
         If a lineage is found to contain nodes with multiple distinct
         'lineage_ID_key' values, indicating an inconsistency in lineage ID
-        assignment.
+        assignment, or if no lineage properties match the lineage ID.
     """
     for lin in lineages:
         # Finding the dict of properties matching the lineage.
@@ -77,13 +77,23 @@ def _add_lineage_props(
             # Happens when at least one node does not have a 'lineage_ID_key'
             # property, so we clean 'tmp' and carry on.
             tmp.remove(None)
-        elif len(tmp) != 1:
+
+        if len(tmp) != 1:
             raise ValueError("Impossible state: several IDs for one lineage.")
 
         current_lineage_id = list(tmp)[0]
-        current_lineage_attr = [
-            d_attr for d_attr in lin_props if d_attr[lineage_ID_key] == current_lineage_id
-        ][0]
+        current_lineage_attr = next(
+            (
+                d_attr
+                for d_attr in lin_props
+                if d_attr.get(lineage_ID_key) == current_lineage_id
+            ),
+            None,
+        )
+        if current_lineage_attr is None:
+            raise ValueError(
+                f"No lineage properties found for lineage ID {current_lineage_id!r}."
+            )
 
         # Adding the properties to the lineage.
         for k, v in current_lineage_attr.items():
@@ -257,26 +267,44 @@ def _remove_orphaned_metadata(model: Model) -> None:
 
 
 def _split_graph_into_lineages(
-    graph: nx.Graph | nx.DiGraph,
+    graph: nx.DiGraph,
+    lineage_ID_key: str | None,
     lin_props: list[dict[str, Any]] | None = None,
-    lineage_ID_key: str | None = "lineage_ID",
 ) -> list[CellLineage]:
     """
-    Split a graph into several subgraphs, each representing a lineage.
+    Split a graph into subgraphs representing lineages, and ensure consistent lineage ID assignment.
+
+    This function takes a directed graph and splits it into subgraphs,
+    where each subgraph corresponds to a connected component. It also ensures
+    that each lineage and its nodes have a consistent lineage ID,
+    either by using an existing 'lineage_ID_key' property or by creating one
+    if it is not provided. If 'lin_props' is provided, it also adds the
+    corresponding properties to each lineage.
 
     Parameters
     ----------
     lineage : nx.DiGraph
         The graph to split.
+    lineage_ID_key : str | None
+        The key used to identify the lineage in the properties. If None,
+        a "lineage_ID" key will be created and set to the next available lineage ID.
     lin_props : list[dict[str, Any]] | None
-        A list of dictionaries, where each dictionary contains TrackMate
-        attributes for a specific track, identified by a 'TRACK_ID' key.
-        If None, no attributes will be added to the lineages.
+        A list of dictionaries, where each dictionary contains properties
+        for a specific lineage, identified by a 'lineage_ID_key' key.
+        If None, no properties will be added to the lineages.
 
     Returns
     -------
     list[CellLineage]
         A list of subgraphs, each representing a lineage.
+
+    Raises
+    ------
+    ValueError
+        If a lineage is found to contain nodes with multiple distinct
+        'lineage_ID_key' values, indicating an inconsistency in lineage ID
+        assignment, or if no lineage properties match a lineage ID when
+        'lin_props' is provided.
     """
     # One subgraph is created per lineage, so each subgraph is
     # a connected component of `graph`.
@@ -285,18 +313,107 @@ def _split_graph_into_lineages(
         for c in nx.weakly_connected_components(graph)
     ]
     del graph  # Redondant with the subgraphs.
-    if not lin_props:
-        # We need to create and add a lineage_ID key to each lineage.
-        for i, lin in enumerate(lineages):
-            lin.graph["lineage_ID"] = i
+
+    # Ensuring that nodes and lineages have a lineage_ID property,
+    # and that it is consistent between them.
+    if lineage_ID_key is None:
+        # We need to create and add a lineage_ID key to each lineage and
+        # to each node of the lineage.
+        lin_id = 0
+        for lin in lineages:
+            if len(lin) == 1:
+                node = list(lin.nodes)[0]
+                lin.graph["lineage_ID"] = -node
+                lin.nodes[node]["lineage_ID"] = -node
+            else:
+                lin.graph["lineage_ID"] = lin_id
+                for node in lin.nodes:
+                    lin.nodes[node]["lineage_ID"] = lin_id
+                lin_id += 1
     else:
-        # Adding lineage properties to each lineage.
-        try:
-            _add_lineage_props(lineages, lin_props, lineage_ID_key)
-        except ValueError as err:
-            print(err)
-            # The program is in an impossible state so we need to stop.
-            raise
+        used_lin_ids = {
+            lin.graph[lineage_ID_key]
+            for lin in lineages
+            if lineage_ID_key in lin.graph and isinstance(lin.graph[lineage_ID_key], int)
+        }
+        next_lin_id = max(used_lin_ids) + 1 if used_lin_ids else 0
+
+        # Do lineages and nodes have the lineage_ID_key property?
+        for lin in lineages:
+            lin_has_lin_id = (
+                lineage_ID_key in lin.graph and lin.graph[lineage_ID_key] is not None
+            )
+            node_lin_ids = [lin.nodes[node].get(lineage_ID_key) for node in lin.nodes]
+            non_null_node_lin_ids = {
+                lin_id for lin_id in node_lin_ids if lin_id is not None
+            }
+            nodes_have_lin_id = _graph_has_node_prop(lin, lineage_ID_key) and all(
+                lin_id is not None for lin_id in node_lin_ids
+            )
+
+            if not lin_has_lin_id and not nodes_have_lin_id:
+                # No lineage_ID_key property is present, we need to create it
+                # then add it to both nodes and lineages.
+                if len(non_null_node_lin_ids) > 1:
+                    raise ValueError(
+                        "Impossible state: inconsistent lineage ID values between "
+                        "the nodes of a same lineage."
+                    )
+
+                if len(non_null_node_lin_ids) == 1:
+                    # Specific case when some nodes have a lineage ID but not all,
+                    # and agree on a non-null value.
+                    generated_lin_id = list(non_null_node_lin_ids)[0]
+                else:
+                    generated_lin_id = next_lin_id
+                    next_lin_id += 1
+
+                lin.graph[lineage_ID_key] = generated_lin_id
+                for node in lin.nodes:
+                    lin.nodes[node][lineage_ID_key] = generated_lin_id
+
+            elif not lin_has_lin_id and nodes_have_lin_id:
+                # We need to create and add a lineage_ID key to each lineage,
+                # using the node property.
+                tmp_lin_id = set(lin.nodes[node][lineage_ID_key] for node in lin.nodes)
+                if len(tmp_lin_id) != 1:
+                    raise ValueError(
+                        "Impossible state: inconsistent lineage ID values between "
+                        "the nodes of a same lineage."
+                    )
+
+                lin.graph[lineage_ID_key] = list(tmp_lin_id)[0]
+
+            elif lin_has_lin_id and not nodes_have_lin_id:
+                # We need to add the lineage_ID_key property to each node of
+                # the lineage, using the lineage property.
+                if non_null_node_lin_ids and non_null_node_lin_ids != {
+                    lin.graph[lineage_ID_key]
+                }:
+                    raise ValueError(
+                        "Impossible state: inconsistent lineage ID values between "
+                        "the lineage and its nodes."
+                    )
+
+                for node in lin.nodes:
+                    lin.nodes[node][lineage_ID_key] = lin.graph[lineage_ID_key]
+
+            else:
+                if len(non_null_node_lin_ids) != 1:
+                    raise ValueError(
+                        "Impossible state: inconsistent lineage ID values between "
+                        "the nodes of a same lineage."
+                    )
+                if lin.graph[lineage_ID_key] != list(non_null_node_lin_ids)[0]:
+                    raise ValueError(
+                        f"Impossible state: inconsistent lineage ID values between "
+                        f"nodes and lineage of lineage {lin.graph[lineage_ID_key]}."
+                    )
+
+    # Adding lineage properties to lineages.
+    if lin_props is not None:
+        lin_id_key = lineage_ID_key if lineage_ID_key is not None else "lineage_ID"
+        _add_lineage_props(lineages, lin_props, lin_id_key)
 
     return lineages
 
