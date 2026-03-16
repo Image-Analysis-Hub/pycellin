@@ -72,7 +72,7 @@ def _recursive_dict_search(
 def _identify_lin_id_prop(
     lin_id_prop: str | None,
     geff_track_node_props: dict[Literal["lineage", "tracklet"], str] | None,
-    geff_graph: nx.Graph,
+    geff_graph: nx.DiGraph,
 ) -> str | None:
     """
     Identify the lineage ID key from user input or GEFF metadata.
@@ -88,7 +88,7 @@ def _identify_lin_id_prop(
         Name of the property to identify lineages.
     geff_track_node_props : dict[Literal["lineage", "tracklet"], str] | None
         The track_node_props from GEFF metadata.
-    geff_graph : nx.Graph
+    geff_graph : nx.DiGraph
         The GEFF graph.
 
     Returns
@@ -136,7 +136,7 @@ def _identify_lin_id_prop(
 def _identify_time_prop(
     time_key: str | None,
     geff_md: geff.GeffMetadata | None,
-    geff_graph: nx.Graph,
+    geff_graph: nx.DiGraph,
 ) -> str:
     """
     Identify the time property from argument or GEFF metadata.
@@ -154,7 +154,7 @@ def _identify_time_prop(
         The key provided to identify time points.
     geff_md : geff.GeffMetadata | None
         The GEFF metadata.
-    geff_graph : nx.Graph
+    geff_graph : nx.DiGraph
         The GEFF graph.
 
     Returns
@@ -226,7 +226,7 @@ def _identify_space_props(
     cell_y_key: str | None,
     cell_z_key: str | None,
     geff_md: geff.GeffMetadata | None,
-    geff_graph: nx.Graph,
+    geff_graph: nx.DiGraph,
 ) -> tuple[str | None, str | None, str | None]:
     """
     Identify the space properties (x, y, z) from arguments or GEFF metadata.
@@ -245,7 +245,7 @@ def _identify_space_props(
         The key provided by the user to identify the z-coordinate.
     geff_md : geff.GeffMetadata | None
         The metadata from GEFF file.
-    geff_graph : nx.Graph
+    geff_graph : nx.DiGraph
         The geff graph.
 
     Returns
@@ -818,59 +818,143 @@ def _build_generic_metadata(
     return metadata
 
 
-def _normalize_properties_data(
+def _fallback_to_node_keys(geff_graph: nx.DiGraph, reason: str) -> None:
+    """
+    Fallback to using graph node keys as cell IDs, with a warning.
+
+    Parameters
+    ----------
+    geff_graph : nx.DiGraph
+        The GEFF graph to update with fallback cell IDs.
+    reason : str
+        The reason for falling back to node keys, included in the warning message.
+
+    Warns
+    -----
+    UserWarning
+        Indicates that the fallback to node keys is occurring and the reason for it.
+    """
+    warnings.warn(reason, stacklevel=3)
+    for node in geff_graph.nodes:
+        geff_graph.nodes[node]["cell_ID"] = node
+
+
+def _ensure_valid_cell_ID(geff_graph: nx.DiGraph, cell_id_key: str | None) -> str:
+    """
+    Ensure that a valid cell ID property exists and is consistent with graph node IDs.
+
+    If ``cell_id_key`` is None, the function creates a ``cell_ID`` property from
+    the NetworkX node keys. If ``cell_id_key`` is provided, it verifies uniqueness of
+    the property, that it exists on all nodes and is a positive integer. If not,
+    it falls back to creating a ``cell_ID`` property from node keys. If the provided
+    property is valid but its values differ from node keys, the graph node keys are
+    updated to match the provided IDs to avoid later inconsistencies.
+
+    Parameters
+    ----------
+    geff_graph : nx.DiGraph
+        The GEFF graph to validate or update.
+    cell_id_key : str | None
+        Name of the node property that identifies cells, or None to derive IDs
+        from the graph node keys.
+
+    Returns
+    -------
+    str
+        The name of the property used as cell identifier after validation or fallback.
+
+    Warns
+    -----
+    UserWarning
+        If ``cell_id_key`` is provided but missing on some nodes, triggering a
+        fallback to generated ``cell_ID`` values from node keys.
+        If ``cell_id_key`` is provided but contains duplicate values across
+        nodes, triggering a fallback to generated ``cell_ID`` values from node keys.
+    """
+    if cell_id_key is None:
+        _fallback_to_node_keys(
+            geff_graph,
+            "No cell identifier property provided. "
+            "A 'cell_ID' property will be created from node keys instead.",
+        )
+        return "cell_ID"
+
+    if not _graph_has_node_prop(geff_graph, cell_id_key):
+        _fallback_to_node_keys(
+            geff_graph,
+            f"The provided property '{cell_id_key}' is not present on all nodes of "
+            "the GEFF graph. A 'cell_ID' property will be created from node keys instead.",
+        )
+        return "cell_ID"
+
+    cell_ids = [geff_graph.nodes[node][cell_id_key] for node in geff_graph.nodes]
+    if not all(
+        isinstance(cell_id, int) and not isinstance(cell_id, bool) and cell_id >= 0
+        for cell_id in cell_ids
+    ):
+        _fallback_to_node_keys(
+            geff_graph,
+            f"Values in property '{cell_id_key}' are not all positive integers. "
+            "This property cannot be used as cell identifier. "
+            "A 'cell_ID' property will be created from node keys instead.",
+        )
+        return "cell_ID"
+
+    if len(set(cell_ids)) != len(cell_ids):
+        _fallback_to_node_keys(
+            geff_graph,
+            f"Duplicate values found in property '{cell_id_key}' across graph nodes. "
+            "This property cannot be used as cell identifier. "
+            "A 'cell_ID' property will be created from node keys instead.",
+        )
+        return "cell_ID"
+
+    mapping = {node: geff_graph.nodes[node][cell_id_key] for node in geff_graph.nodes}
+    nx.relabel_nodes(geff_graph, mapping, copy=False)
+    return cell_id_key
+
+
+def _standardize_properties_data(
     lineages: list[CellLineage],
     lin_id_key: str,
+    cell_id_key: str,
     cell_x_key: str | None,
     cell_y_key: str | None,
     cell_z_key: str | None,
-    time_key: str,
-    cell_id_key: str | None,
     rename_map: dict[str, dict[str, str]],
 ) -> None:
     """
-    Normalize properties data in lineages to match pycellin conventions.
+    Standardize properties data in lineages to match pycellin conventions.
 
     This function updates the property keys in lineage node data to use
-    standardized pycellin naming conventions (e.g., 'cell_x', 'cell_y').
+    standardized pycellin naming conventions (e.g., 'cell_ID', 'cell_x').
     It also applies any key renames recorded in *rename_map* during metadata
     extraction so that the graph data stays consistent with the metadata.
 
     Parameters
     ----------
     lineages : list[CellLineage]
-        List of CellLineage objects to normalize.
+        List of CellLineage objects to standardize.
     lin_id_key : str
-        The current lineage ID key name.
+        The current lineage ID key name. If not "lineage_ID", this property will be
+        renamed in two places: (1) as a node attribute on all nodes within each
+        lineage, and (2) as a graph attribute for each lineage object.
+    cell_id_key : str
+        The current cell ID key name.
     cell_x_key : str | None
         The current x-coordinate key name, if any.
     cell_y_key : str | None
         The current y-coordinate key name, if any.
     cell_z_key : str | None
         The current z-coordinate key name, if any.
-    cell_id_key : str | None
-        The current cell ID key name, if any.
     rename_map : dict[str, dict[str, str]]
         Accumulator of ``{old_key: new_key}`` renames per property type
         ('node', 'edge', 'lineage') collected during metadata extraction.
         Applied to each lineage's node attributes, edge attributes, and
         graph-level attributes respectively.
     """
-    if lin_id_key != "lineage_ID":
-        _update_lineages_IDs_key(lineages, lin_id_key)
     for lin in lineages:
-        if cell_x_key is not None and cell_x_key != "cell_x":
-            _update_node_prop_key(lin, old_key=cell_x_key, new_key="cell_x")
-        if cell_y_key is not None and cell_y_key != "cell_y":
-            _update_node_prop_key(lin, old_key=cell_y_key, new_key="cell_y")
-        if cell_z_key is not None and cell_z_key != "cell_z":
-            _update_node_prop_key(lin, old_key=cell_z_key, new_key="cell_z")
-        if cell_id_key is None:
-            for node in lin.nodes:
-                lin.nodes[node]["cell_ID"] = node
-        elif cell_id_key != "cell_ID":
-            _update_node_prop_key(lin, old_key=cell_id_key, new_key="cell_ID")
-        # Apply collision renames recorded during metadata extraction.
+        # Collision renames as recorded during metadata extraction.
         for old_key, new_key in rename_map["node"].items():
             _update_node_prop_key(lin, old_key=old_key, new_key=new_key)
         for old_key, new_key in rename_map["edge"].items():
@@ -878,13 +962,29 @@ def _normalize_properties_data(
         for old_key, new_key in rename_map["lineage"].items():
             _update_lineage_prop_key(lin, old_key=old_key, new_key=new_key)
 
+        # Standard pycellin property renames.
+        if lin_id_key != "lineage_ID":
+            _update_node_prop_key(lin, old_key=lin_id_key, new_key="lineage_ID")
+        if cell_id_key != "cell_ID":
+            _update_node_prop_key(lin, old_key=cell_id_key, new_key="cell_ID")
+        if cell_x_key is not None and cell_x_key != "cell_x":
+            _update_node_prop_key(lin, old_key=cell_x_key, new_key="cell_x")
+        if cell_y_key is not None and cell_y_key != "cell_y":
+            _update_node_prop_key(lin, old_key=cell_y_key, new_key="cell_y")
+        if cell_z_key is not None and cell_z_key != "cell_z":
+            _update_node_prop_key(lin, old_key=cell_z_key, new_key="cell_z")
 
-def _normalize_properties_metadata(
+    if lin_id_key != "lineage_ID":
+        _update_lineages_IDs_key(lineages, lin_id_key)
+
+
+def _standardize_props_metadata(
     props_md: dict[str, Property],
     cell_x_prop: str | None,
     cell_y_prop: str | None,
     cell_z_prop: str | None,
     space_unit: str | None,
+    rename_map: dict[str, dict[str, str]],
 ) -> None:
     """
     Normalize properties metadata to match pycellin conventions.
@@ -904,6 +1004,11 @@ def _normalize_properties_metadata(
         The current z-coordinate property name, if any.
     space_unit : str | None
         The space unit to use for coordinate properties.
+    rename_map : dict[str, dict[str, str]]
+        Accumulator of ``{old_key: new_key}`` renames per property type
+        ('node', 'edge', 'lineage') collected during metadata extraction.
+        Applied here to ensure that any standard properties that needed to be renamed
+        during metadata extraction are also renamed in the metadata dictionary.
     """
     # Ensure standard pycellin properties exist.
     if "cell_ID" not in props_md:
@@ -919,6 +1024,7 @@ def _normalize_properties_metadata(
     ]:
         pycellin_key = f"cell_{axis}"
         if geff_key is not None:
+            geff_key = rename_map["node"].get(geff_key, geff_key)
             if geff_key in props_md and geff_key != pycellin_key:
                 props_md[pycellin_key] = props_md.pop(geff_key)
                 props_md[pycellin_key].identifier = pycellin_key
@@ -952,7 +1058,7 @@ def load_GEFF(
     cell_id_prop : str | None, optional
         Name of the property that identifies cells in the GEFF file.
         If None, the default property 'cell_ID' will be created and populated based
-        on the node IDs.
+        on GEFF IDs array (graph node IDs).
     cell_x_prop : str | None, optional
         Name of the property that identifies the x-coordinate of cells in the GEFF file.
     cell_y_prop : str | None, optional
@@ -1004,26 +1110,25 @@ def load_GEFF(
     props_md = _build_props_metadata(geff_md, rename_map)
 
     # Split the graph into lineages.
+    cell_id_prop = _ensure_valid_cell_ID(geff_graph, cell_id_prop)
     lineages = _split_graph_into_lineages(geff_graph, lineage_ID_key=lineage_id_prop)
     if lineage_id_prop is None:
         lineage_id_prop = "lineage_ID"
 
-    # EVERYTHING BELOW IS NOT DEBUGGED YET
-
     # Rename properties to match pycellin conventions.
-    _normalize_properties_data(
+    _standardize_properties_data(
         lineages,
         lineage_id_prop,
+        cell_id_prop,
         cell_x_prop,
         cell_y_prop,
         cell_z_prop,
-        time_prop,
-        cell_id_prop,
         rename_map,
     )
+    # TODO: reread and tests for _standardize_props_metadata()
     space_unit = generic_md.get("space_unit")
-    _normalize_properties_metadata(
-        props_md, cell_x_prop, cell_y_prop, cell_z_prop, space_unit
+    _standardize_props_metadata(
+        props_md, cell_x_prop, cell_y_prop, cell_z_prop, space_unit, rename_map
     )
 
     # Create the model.
@@ -1040,7 +1145,7 @@ def load_GEFF(
 if __name__ == "__main__":
     geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
     # geff_file = "B:/Janelia_Cell_Trackathon/anniek_example/exampl_geff.zarr/tracks"
-    geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/anniek_example/exampl_geff.zarr/tracks"
+    # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/anniek_example/exampl_geff.zarr/tracks"
     # geff_file = "E:/Janelia_Cell_Trackathon/reader_test_graph.geff"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/mouse-20250719.zarr/tracks"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/test.zarr"
@@ -1095,7 +1200,7 @@ if __name__ == "__main__":
     for node, data in lin0.nodes(data=True):
         print(data.keys())
         break
-    lin0.plot(node_hover_props=["lineage_id", "seg_id", "time", "track_id", "cell_ID"])
+    # lin0.plot(node_hover_props=["lineage_ID", "seg_id", "time", "track_id", "cell_ID"])
 
     # cell_id_key
     # lineage_id_key

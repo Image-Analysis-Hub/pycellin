@@ -7,7 +7,7 @@ import geff_spec
 import networkx as nx
 import pytest
 
-from pycellin.classes import Property
+from pycellin.classes import CellLineage, Property
 from pycellin.io.geff.loader import (
     _build_generic_metadata,
     _build_props_metadata,
@@ -15,11 +15,14 @@ from pycellin.io.geff.loader import (
     _extract_generic_metadata,
     _extract_lin_props_metadata,
     _extract_props_metadata,
+    _fallback_to_node_keys,
+    _ensure_valid_cell_ID,
     _get_prop_unit,
     _identify_lin_id_prop,
     _identify_space_props,
     _identify_time_prop,
     _resolve_prop_key,
+    _standardize_properties_data,
 )
 
 # Fixtures ####################################################################
@@ -112,37 +115,37 @@ def geff_md_3d_axes(geff_node_props_md):
 @pytest.fixture
 def graph_lin_id():
     """Graph with standard and custom lineage ID properties."""
-    graph = nx.Graph()
-    graph.add_node(0, frame=0, lineage_ID=0, my_lin_id=0)
-    graph.add_node(1, frame=1, lineage_ID=1, my_lin_id=1)
-    return graph
+    g = nx.Graph()
+    g.add_node(0, frame=0, lineage_ID=0, my_lin_id=0)
+    g.add_node(1, frame=1, lineage_ID=1, my_lin_id=1)
+    return g
 
 
 @pytest.fixture
 def graph_no_lin_id():
-    """Graph with nolineage ID property."""
-    graph = nx.Graph()
-    graph.add_node(0, frame=0)
-    graph.add_node(1, frame=1)
-    return graph
+    """Graph with no lineage ID property."""
+    g = nx.Graph()
+    g.add_node(0, frame=0)
+    g.add_node(1, frame=1)
+    return g
 
 
 @pytest.fixture
 def graph_with_coords():
     """Graph with 2D spatial coordinate properties."""
-    graph = nx.Graph()
-    graph.add_node(0, frame=0, position_x=1.0, position_y=2.0)
-    graph.add_node(1, frame=1, position_x=3.0, position_y=4.0)
-    return graph
+    g = nx.Graph()
+    g.add_node(0, frame=0, position_x=1.0, position_y=2.0)
+    g.add_node(1, frame=1, position_x=3.0, position_y=4.0)
+    return g
 
 
 @pytest.fixture
 def graph_with_3d_coords():
     """Graph with 3D spatial coordinate properties."""
-    graph = nx.Graph()
-    graph.add_node(0, frame=0, position_x=1.0, position_y=2.0, position_z=3.0)
-    graph.add_node(1, frame=1, position_x=4.0, position_y=5.0, position_z=6.0)
-    return graph
+    g = nx.Graph()
+    g.add_node(0, frame=0, position_x=1.0, position_y=2.0, position_z=3.0)
+    g.add_node(1, frame=1, position_x=4.0, position_y=5.0, position_z=6.0)
+    return g
 
 
 @pytest.fixture
@@ -274,6 +277,58 @@ def lin_props_md():
 def rename_map():
     """A fresh, empty rename map accumulator for property collision tracking."""
     return {"node": {}, "edge": {}, "lineage": {}}
+
+
+@pytest.fixture
+def standardize_rename_map():
+    """Rename map containing one key per property type."""
+    return {
+        "node": {"old_node_key": "new_node_key"},
+        "edge": {"old_edge_key": "new_edge_key"},
+        "lineage": {"old_lin_key": "new_lin_key"},
+    }
+
+
+@pytest.fixture
+def lineages_with_nonstandard_keys() -> list[CellLineage]:
+    """Two lineages carrying non-standard node and lineage property keys."""
+    lin_a = CellLineage(nx.DiGraph(), lid=None)
+    lin_a.add_node(
+        0,
+        custom_lin_id=11,
+        custom_cell_id=100,
+        pos_x=1.0,
+        pos_y=2.0,
+        pos_z=3.0,
+        old_node_key="node-a0",
+    )
+    lin_a.add_node(
+        1,
+        custom_lin_id=11,
+        custom_cell_id=101,
+        pos_x=4.0,
+        pos_y=5.0,
+        pos_z=6.0,
+        old_node_key="node-a1",
+    )
+    lin_a.add_edge(0, 1, old_edge_key=0.5)
+    lin_a.graph["custom_lin_id"] = 11
+    lin_a.graph["old_lin_key"] = "lin-a"
+
+    lin_b = CellLineage(nx.DiGraph(), lid=None)
+    lin_b.add_node(
+        2,
+        custom_lin_id=12,
+        custom_cell_id=102,
+        pos_x=7.0,
+        pos_y=8.0,
+        pos_z=9.0,
+        old_node_key="node-b2",
+    )
+    lin_b.graph["custom_lin_id"] = 12
+    lin_b.graph["old_lin_key"] = "lin-b"
+
+    return [lin_a, lin_b]
 
 
 # Test Classes ################################################################
@@ -1214,3 +1269,316 @@ class TestBuildGenericMetadata:
                 )
         assert "time_unit" not in result
         assert "space_unit" not in result
+
+
+class TestFallbackToNodeKeys:
+    """Test cases for _fallback_to_node_keys function."""
+
+    def test_sets_cell_id_from_node_keys(self, graph_no_lin_id):
+        """When falling back, each node gets a cell_ID equal to its node key."""
+        with pytest.warns(UserWarning, match="fallback"):
+            _fallback_to_node_keys(graph_no_lin_id, "fallback reason")
+        assert graph_no_lin_id.nodes[0]["cell_ID"] == 0
+        assert graph_no_lin_id.nodes[1]["cell_ID"] == 1
+        assert graph_no_lin_id.nodes[0]["frame"] == 0
+        assert graph_no_lin_id.nodes[1]["frame"] == 1
+
+
+class TestEnsureValidCellID:
+    """Test cases for _ensure_valid_cell_ID function."""
+
+    def test_none_key_falls_back_to_node_keys(self, graph_no_lin_id):
+        """When cell_id_key is None, create cell_ID from node keys and warn."""
+        with pytest.warns(UserWarning, match="No cell identifier property provided"):
+            result = _ensure_valid_cell_ID(graph_no_lin_id, None)
+        assert result == "cell_ID"
+        assert graph_no_lin_id.nodes[0]["cell_ID"] == 0
+        assert graph_no_lin_id.nodes[1]["cell_ID"] == 1
+        assert graph_no_lin_id.nodes[0]["frame"] == 0
+        assert graph_no_lin_id.nodes[1]["frame"] == 1
+
+    def test_missing_prop_falls_back(self):
+        """When cell_id_key is missing on some nodes, fall back and warn."""
+        g = nx.Graph()
+        g.add_node(0, id=0)
+        g.add_node(1)
+        with pytest.warns(UserWarning, match="not present on all nodes"):
+            result = _ensure_valid_cell_ID(g, "id")
+        assert result == "cell_ID"
+        assert g.nodes[0]["cell_ID"] == 0
+        assert g.nodes[1]["cell_ID"] == 1
+
+    def test_negative_value_fall_back(self):
+        """When cell_id_key has a negative value, fall back and warn."""
+        g = nx.Graph()
+        g.add_node(0, id=0)
+        g.add_node(1, id=-1)
+        with pytest.warns(UserWarning, match="not all positive integers"):
+            result = _ensure_valid_cell_ID(g, "id")
+        assert result == "cell_ID"
+        assert g.nodes[0]["cell_ID"] == 0
+        assert g.nodes[1]["cell_ID"] == 1
+
+    def test_string_value_fall_back(self):
+        """When cell_id_key has a string value, fall back and warn."""
+        g = nx.Graph()
+        g.add_node(0, id=0)
+        g.add_node(1, id="1")
+        with pytest.warns(UserWarning, match="not all positive integers"):
+            result = _ensure_valid_cell_ID(g, "id")
+        assert result == "cell_ID"
+        assert g.nodes[0]["cell_ID"] == 0
+        assert g.nodes[1]["cell_ID"] == 1
+
+    def test_bool_value_fall_back(self):
+        """When cell_id_key has a boolean value, fall back and warn."""
+        g = nx.Graph()
+        g.add_node(0, id=0)
+        g.add_node(1, id=True)
+        with pytest.warns(UserWarning, match="not all positive integers"):
+            result = _ensure_valid_cell_ID(g, "id")
+        assert result == "cell_ID"
+        assert g.nodes[0]["cell_ID"] == 0
+        assert g.nodes[1]["cell_ID"] == 1
+
+    def test_none_value_fall_back(self):
+        """When cell_id_key has a None value, fall back and warn."""
+        g = nx.Graph()
+        g.add_node(0, id=0)
+        g.add_node(1, id=None)
+        with pytest.warns(UserWarning, match="not all positive integers"):
+            result = _ensure_valid_cell_ID(g, "id")
+        assert result == "cell_ID"
+        assert g.nodes[0]["cell_ID"] == 0
+        assert g.nodes[1]["cell_ID"] == 1
+
+    def test_duplicate_prop_values_fall_back(self):
+        """When cell_id_key has duplicate values, fall back and warn."""
+        g = nx.Graph()
+        g.add_node(0, id=1)
+        g.add_node(1, id=1)
+        with pytest.warns(UserWarning, match="Duplicate values found"):
+            result = _ensure_valid_cell_ID(g, "id")
+        assert result == "cell_ID"
+        assert g.nodes[0]["cell_ID"] == 0
+        assert g.nodes[1]["cell_ID"] == 1
+
+    def test_valid_prop_relabels_nodes(self):
+        """When cell_id_key is valid, relabel nodes to match property values."""
+        g = nx.Graph()
+        g.add_node(1, id=10)
+        g.add_node(2, id=11)
+        result = _ensure_valid_cell_ID(g, "id")
+        assert result == "id"
+        assert set(g.nodes) == {10, 11}
+        assert g.nodes[10]["id"] == 10
+        assert g.nodes[11]["id"] == 11
+        assert "cell_ID" not in g.nodes[10]
+        assert "cell_ID" not in g.nodes[11]
+
+    def test_empty_graph(self):
+        """When graph is empty, return the cell_id_key without modification."""
+        g = nx.Graph()
+
+        result = _ensure_valid_cell_ID(g, "id")
+        assert result == "id"
+        assert len(g.nodes) == 0
+
+        result = _ensure_valid_cell_ID(g, None)
+        assert result == "cell_ID"
+        assert len(g.nodes) == 0
+
+
+class TestStandardizePropertiesData:
+    """Test cases for _standardize_properties_data function."""
+
+    def test_applies_collision_renames_and_standard_keys(
+        self, lineages_with_nonstandard_keys, standardize_rename_map
+    ):
+        """Rename-map keys and pycellin standard keys are applied on nodes, edges,
+        and lineage graph attributes."""
+        _standardize_properties_data(
+            lineages_with_nonstandard_keys,
+            lin_id_key="custom_lin_id",
+            cell_id_key="custom_cell_id",
+            cell_x_key="pos_x",
+            cell_y_key="pos_y",
+            cell_z_key="pos_z",
+            rename_map=standardize_rename_map,
+        )
+
+        lin_a, lin_b = lineages_with_nonstandard_keys
+
+        # Node-level updates.
+        for node in lin_a.nodes:
+            data = lin_a.nodes[node]
+            assert "custom_lin_id" not in data
+            assert "custom_cell_id" not in data
+            assert "pos_x" not in data
+            assert "pos_y" not in data
+            assert "pos_z" not in data
+            assert "old_node_key" not in data
+            assert "lineage_ID" in data
+            assert "cell_ID" in data
+            assert "cell_x" in data
+            assert "cell_y" in data
+            assert "cell_z" in data
+            assert "new_node_key" in data
+
+        for node in lin_b.nodes:
+            data = lin_b.nodes[node]
+            assert "custom_lin_id" not in data
+            assert "custom_cell_id" not in data
+            assert "pos_x" not in data
+            assert "pos_y" not in data
+            assert "pos_z" not in data
+            assert "old_node_key" not in data
+            assert "lineage_ID" in data
+            assert "cell_ID" in data
+            assert "cell_x" in data
+            assert "cell_y" in data
+            assert "cell_z" in data
+            assert "new_node_key" in data
+
+        # Edge-level updates.
+        assert "old_edge_key" not in lin_a.edges[(0, 1)]
+        assert lin_a.edges[(0, 1)]["new_edge_key"] == 0.5
+
+        # Lineage-level updates.
+        assert lin_a.graph["lineage_ID"] == 11
+        assert lin_b.graph["lineage_ID"] == 12
+        assert "custom_lin_id" not in lin_a.graph
+        assert "custom_lin_id" not in lin_b.graph
+        assert "old_lin_key" not in lin_a.graph
+        assert "old_lin_key" not in lin_b.graph
+        assert lin_a.graph["new_lin_key"] == "lin-a"
+        assert lin_b.graph["new_lin_key"] == "lin-b"
+
+    def test_skips_optional_coordinate_renames_when_none(
+        self, lineages_with_nonstandard_keys
+    ):
+        """When x/y/z keys are None, coordinate properties are left unchanged."""
+        _standardize_properties_data(
+            lineages_with_nonstandard_keys,
+            lin_id_key="custom_lin_id",
+            cell_id_key="custom_cell_id",
+            cell_x_key=None,
+            cell_y_key=None,
+            cell_z_key=None,
+            rename_map={"node": {}, "edge": {}, "lineage": {}},
+        )
+
+        lin_a, _ = lineages_with_nonstandard_keys
+        assert lin_a.nodes[0]["cell_ID"] == 100
+        assert lin_a.nodes[0]["lineage_ID"] == 11
+        assert "pos_x" in lin_a.nodes[0]
+        assert "pos_y" in lin_a.nodes[0]
+        assert "pos_z" in lin_a.nodes[0]
+        assert "cell_x" not in lin_a.nodes[0]
+        assert "cell_y" not in lin_a.nodes[0]
+        assert "cell_z" not in lin_a.nodes[0]
+
+    def test_keeps_graph_lin_id_when_already_standard(self, standardize_rename_map):
+        """When lin_id_key is already 'lineage_ID', lineage graph IDs are preserved."""
+        lin = CellLineage()
+        lin.add_node(
+            1,
+            lineage_ID=0,
+            custom_cell_id=11,
+            pos_x=2.0,
+            old_node_key="node",
+        )
+        lin.graph["lineage_ID"] = 0
+        lin.graph["old_lin_key"] = "lineage"
+
+        _standardize_properties_data(
+            [lin],
+            lin_id_key="lineage_ID",
+            cell_id_key="custom_cell_id",
+            cell_x_key="pos_x",
+            cell_y_key=None,
+            cell_z_key=None,
+            rename_map=standardize_rename_map,
+        )
+
+        assert lin.graph["lineage_ID"] == 0
+        assert lin.nodes[1]["lineage_ID"] == 0
+
+    def test_skips_standard_cell_id_rename(self):
+        """When cell_id_key is already 'cell_ID', node cell IDs are preserved."""
+        lin = CellLineage()
+        lin.add_node(1, lineage_ID=0, cell_ID=11)
+        lin.graph["lineage_ID"] = 0
+
+        _standardize_properties_data(
+            [lin],
+            lin_id_key="lineage_ID",
+            cell_id_key="cell_ID",
+            cell_x_key=None,
+            cell_y_key=None,
+            cell_z_key=None,
+            rename_map={"node": {}, "edge": {}, "lineage": {}},
+        )
+
+        assert lin.nodes[1]["cell_ID"] == 11
+
+    def test_skips_standard_coordinate_renames(self):
+        """When x/y/z keys are already 'cell_x', 'cell_y', 'cell_z', they are left unchanged."""
+        lin = CellLineage()
+        lin.add_node(1, lineage_ID=0, cell_ID=11, cell_x=1.0, cell_y=2.0, cell_z=3.0)
+        lin.graph["lineage_ID"] = 0
+
+        _standardize_properties_data(
+            [lin],
+            lin_id_key="lineage_ID",
+            cell_id_key="cell_ID",
+            cell_x_key="cell_x",
+            cell_y_key="cell_y",
+            cell_z_key="cell_z",
+            rename_map={"node": {}, "edge": {}, "lineage": {}},
+        )
+
+        assert lin.nodes[1]["cell_x"] == 1.0
+        assert lin.nodes[1]["cell_y"] == 2.0
+        assert lin.nodes[1]["cell_z"] == 3.0
+
+    def test_assigns_fallback_lineage_id_for_single_node_lineage_without_key(self):
+        """When lin_id_key is absent from a single-node lineage graph, -node_id is used."""
+        lin = CellLineage()
+        lin.add_node(1, custom_lin_id=0, custom_cell_id=10)
+
+        _standardize_properties_data(
+            [lin],
+            lin_id_key="custom_lin_id",
+            cell_id_key="custom_cell_id",
+            cell_x_key=None,
+            cell_y_key=None,
+            cell_z_key=None,
+            rename_map={"node": {}, "edge": {}, "lineage": {}},
+        )
+
+        assert lin.graph["lineage_ID"] == -1
+
+    def test_assigns_fallback_lineage_id_for_multi_node_lineage_without_key(self):
+        """When lin_id_key is absent from a multi-node lineage graph, next available id is used."""
+        lin_with_id = CellLineage()
+        lin_with_id.add_node(0, custom_lin_id=10, custom_cell_id=100)
+        lin_with_id.add_node(1, custom_lin_id=10, custom_cell_id=101)
+        lin_with_id.graph["custom_lin_id"] = 10
+
+        lin_without_id = CellLineage()
+        lin_without_id.add_node(2, custom_lin_id=99, custom_cell_id=102)
+        lin_without_id.add_node(3, custom_lin_id=99, custom_cell_id=103)
+
+        _standardize_properties_data(
+            [lin_with_id, lin_without_id],
+            lin_id_key="custom_lin_id",
+            cell_id_key="custom_cell_id",
+            cell_x_key=None,
+            cell_y_key=None,
+            cell_z_key=None,
+            rename_map={"node": {}, "edge": {}, "lineage": {}},
+        )
+
+        assert lin_with_id.graph["lineage_ID"] == 10
+        assert lin_without_id.graph["lineage_ID"] == 11
