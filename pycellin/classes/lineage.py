@@ -23,7 +23,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     Abstract class for a lineage graph.
     """
 
-    def __init__(self, nx_digraph: nx.DiGraph | None = None, lid: int | None = None) -> None:
+    def __init__(
+        self, nx_digraph: nx.DiGraph | None = None, lid: int | None = None
+    ) -> None:
         """
         Initialize a lineage graph.
 
@@ -66,7 +68,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             case "lineage":
                 self.graph.pop(prop_name, None)
             case _:
-                raise ValueError("Invalid prop_type. Must be one of 'node', 'edge', or 'lineage'.")
+                raise ValueError(
+                    "Invalid prop_type. Must be one of 'node', 'edge', or 'lineage'."
+                )
 
     def get_root(self, ignore_lone_nodes: bool = False) -> int | list[int]:
         """
@@ -121,7 +125,11 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The list of leaf nodes in the lineage.
         """
         if ignore_lone_nodes:
-            leaves = [n for n in self.nodes() if self.in_degree(n) != 0 and self.out_degree(n) == 0]
+            leaves = [
+                n
+                for n in self.nodes()
+                if self.in_degree(n) != 0 and self.out_degree(n) == 0
+            ]
         else:
             leaves = [n for n in self.nodes() if self.out_degree(n) == 0]
         return leaves
@@ -379,14 +387,15 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                     for prop in node_hover_props:
                         if prop not in node.attributes():
                             raise KeyError(
-                                f"Property {prop} is not present in the node attributes."
+                                f"Cannot plot: property {prop} is not present in the node attributes."
                             )
                         hover_text = f"{prop}: {node[prop]}<br>"
                         text += hover_text
                     node_hover_text.append(text)
             else:
                 node_hover_text = [
-                    (f"{ID_prop}: {node[ID_prop]}<br>{y_prop}: {node[y_prop]}") for node in G.vs
+                    (f"{ID_prop}: {node[ID_prop]}<br>{y_prop}: {node[y_prop]}")
+                    for node in G.vs
                 ]
             if "lineage_ID" in G.attributes():
                 graph_name = f"lineage_ID: {G['lineage_ID']}"
@@ -404,7 +413,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                     for prop in edge_hover_props:
                         if prop not in edge.attributes():
                             raise KeyError(
-                                f"Property {prop} is not present in the edge attributes."
+                                f"Cannot plot: property {prop} is not present in the edge attributes."
                             )
                         hover_text = f"{prop}: {edge[prop]}<br>"
                         text += hover_text
@@ -1020,7 +1029,11 @@ class CellLineage(Lineage):
                 for child in children:
                     sister_cell_cycle = self.get_cell_cycle(child)
                     sister_cells.extend(
-                        [n for n in sister_cell_cycle if self.nodes[n]["timepoint"] == current_tp]
+                        [
+                            n
+                            for n in sister_cell_cycle
+                            if self.nodes[n]["timepoint"] == current_tp
+                        ]
                     )
             elif len(parents) > 1:
                 lid, _ = CellLineage._get_lineage_ID_and_err_msg(self)
@@ -1254,11 +1267,17 @@ class CycleLineage(Lineage):
                 self.nodes[n]["cycle_length"] = len(cells_in_cycle)
                 # How long does the cycle last?
                 self.nodes[n]["cycle_duration"] = (
-                    (cell_lineage.nodes[last][time_prop] - cell_lineage.nodes[first][time_prop]) + 1
+                    (
+                        cell_lineage.nodes[last][time_prop]
+                        - cell_lineage.nodes[first][time_prop]
+                    )
+                    + 1
                 ) * time_step
                 root = self.get_root()
                 if isinstance(root, list):
-                    raise LineageStructureError("A cycle lineage cannot have multiple roots.")
+                    raise LineageStructureError(
+                        "A cycle lineage cannot have multiple roots."
+                    )
                 self.nodes[n]["level"] = nx.shortest_path_length(self, root, n)
 
     def __str__(self) -> str:
@@ -1331,7 +1350,9 @@ class CycleLineage(Lineage):
         """
         return list(pairwise(self.nodes[ccid]["cells"]))
 
-    def yield_links_within_cycle(self, ccid: int) -> Generator[Tuple[int, int], None, None]:
+    def yield_links_within_cycle(
+        self, ccid: int
+    ) -> Generator[Tuple[int, int], None, None]:
         """
         Yield all the links between the cells of a cell cycle.
 
