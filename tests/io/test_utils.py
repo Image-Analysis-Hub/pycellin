@@ -27,36 +27,135 @@ from pycellin.utils import is_equal
 
 @pytest.fixture
 def graph():
-    graph = nx.DiGraph()
-    graph.add_node(1, all_val=0, one_none_val=None, all_none_val=None, missing_val="a")
-    graph.add_node(2, all_val=1, one_none_val=15.0, all_none_val=None, missing_val="b")
-    graph.add_node(3, all_val=2, one_none_val=20.0, all_none_val=None)
-    return graph
+    g = nx.DiGraph()
+    g.add_node(1, all_val=0, one_none_val=None, all_none_val=None, missing_val="a")
+    g.add_node(2, all_val=1, one_none_val=15.0, all_none_val=None, missing_val="b")
+    g.add_node(3, all_val=2, one_none_val=20.0, all_none_val=None)
+    return g
 
 
 @pytest.fixture
-def lineage_with_old_key():
+def lin_with_old_key():
     """Lineage with nodes that all have old_key property."""
-    lineage = CellLineage()
-    lineage.add_node(1, old_key="value1")
-    lineage.add_node(2, old_key="value2")
-    lineage.add_node(3, old_key="value3")
-    return lineage
+    lin = CellLineage()
+    lin.add_node(1, old_key="value1")
+    lin.add_node(2, old_key="value2")
+    lin.add_node(3, old_key="value3")
+    return lin
 
 
 @pytest.fixture
-def lineage_with_mixed_keys():
+def lin_with_mixed_keys():
     """Lineage with some nodes having old_key and some without."""
-    lineage = CellLineage()
-    lineage.add_node(1, old_key="value1")
-    lineage.add_node(2)  # No old_key
-    lineage.add_node(3, old_key="value3")
-    return lineage
+    lin = CellLineage()
+    lin.add_node(1, old_key="value1")
+    lin.add_node(2)  # No old_key
+    lin.add_node(3, old_key="value3")
+    return lin
 
 
 @pytest.fixture
-def lineage_attrs():
-    """Common lineage attribute dictionaries for testing."""
+def two_lin_graph():
+    """Standard 2-lineage graph: [1-2] and [3-4] with lineage_ID."""
+    g = nx.DiGraph()
+    g.add_node(1, lineage_ID=0)
+    g.add_node(2, lineage_ID=0)
+    g.add_edge(1, 2)
+    g.add_node(3, lineage_ID=1)
+    g.add_node(4, lineage_ID=1)
+    g.add_edge(3, 4)
+    return g
+
+
+@pytest.fixture
+def expected_two_lins():
+    """Expected CellLineages resulting from splitting two_lineage_graph."""
+    lin0 = CellLineage()
+    lin0.add_node(1, lineage_ID=0)
+    lin0.add_node(2, lineage_ID=0)
+    lin0.add_edge(1, 2)
+    lin0.graph["lineage_ID"] = 0
+
+    lin1 = CellLineage()
+    lin1.add_node(3, lineage_ID=1)
+    lin1.add_node(4, lineage_ID=1)
+    lin1.add_edge(3, 4)
+    lin1.graph["lineage_ID"] = 1
+
+    return [lin0, lin1]
+
+
+@pytest.fixture
+def two_lin_graph_with_track_id():
+    """Standard 2-lineage graph using TRACK_ID key instead of lineage_ID."""
+    g = nx.DiGraph()
+    g.add_node(1, TRACK_ID=0)
+    g.add_node(2, TRACK_ID=0)
+    g.add_edge(1, 2)
+    g.add_node(3, TRACK_ID=1)
+    g.add_node(4, TRACK_ID=1)
+    g.add_edge(3, 4)
+    return g
+
+
+@pytest.fixture
+def expected_two_lins_with_track_id():
+    """Expected CellLineages resulting from splitting two_lineage_graph_with_track_id."""
+    lin0 = CellLineage()
+    lin0.add_node(1, TRACK_ID=0)
+    lin0.add_node(2, TRACK_ID=0)
+    lin0.add_edge(1, 2)
+    lin0.graph["TRACK_ID"] = 0
+
+    lin1 = CellLineage()
+    lin1.add_node(3, TRACK_ID=1)
+    lin1.add_node(4, TRACK_ID=1)
+    lin1.add_edge(3, 4)
+    lin1.graph["TRACK_ID"] = 1
+
+    return [lin0, lin1]
+
+
+@pytest.fixture
+def graph_with_props():
+    """2-lineage graph with various node and edge properties including falsy values."""
+    g = nx.DiGraph()
+    # Lineage 0: nodes with various property types
+    g.add_node(1, lineage_ID=0, custom_prop="value1", x=10.5, count=0, flag=False)
+    g.add_node(2, lineage_ID=0, custom_prop="value2", x=20.5, count=5, flag=True)
+    g.add_edge(
+        1, 2, weight=1.5, edge_data="test", empty_str="", empty_list=[], none_val=None
+    )
+    # Lineage 1: nodes with different properties
+    g.add_node(3, lineage_ID=1, custom_prop="value3", x=30.5, count=0)
+    g.add_node(4, lineage_ID=1, custom_prop="value4", x=40.5, count=10)
+    g.add_edge(3, 4, weight=2.5, edge_data="other")
+    return g
+
+
+@pytest.fixture
+def expected_props_lins():
+    """Expected CellLineages resulting from splitting graph_with_properties."""
+    lin0_exp = CellLineage()
+    lin0_exp.add_node(1, lineage_ID=0, custom_prop="value1", x=10.5, count=0, flag=False)
+    lin0_exp.add_node(2, lineage_ID=0, custom_prop="value2", x=20.5, count=5, flag=True)
+    lin0_exp.add_edge(
+        1, 2, weight=1.5, edge_data="test", empty_str="", empty_list=[], none_val=None
+    )
+    lin0_exp.graph["lineage_ID"] = 0
+
+    lin1_exp = CellLineage()
+    lin1_exp.add_node(3, lineage_ID=1, custom_prop="value3", x=30.5, count=0)
+    lin1_exp.add_node(4, lineage_ID=1, custom_prop="value4", x=40.5, count=10)
+    lin1_exp.add_edge(3, 4, weight=2.5, edge_data="other")
+    lin1_exp.graph["lineage_ID"] = 1
+
+    return [lin0_exp, lin1_exp]
+
+
+@pytest.fixture
+def lin_props():
+    """Common lineage property dictionaries for testing."""
     return [
         {"name": "blob", "lineage_ID": 0},
         {"name": "blub", "lineage_ID": 1},
@@ -64,8 +163,8 @@ def lineage_attrs():
 
 
 @pytest.fixture
-def lineage_attrs_with_track_id():
-    """Lineage attribute dictionaries using TRACK_ID."""
+def lin_props_with_track_id():
+    """Lineage property dictionaries using TRACK_ID."""
     return [
         {"name": "blob", "TRACK_ID": 0},
         {"name": "blub", "TRACK_ID": 1},
@@ -161,9 +260,9 @@ def model_with_orphaned_data(model):
 class TestAddLineagesProps:
     """Test cases for _add_lineage_props function."""
 
-    def test_add_lineages_props(self, lineage_attrs):
+    def test_add_lins_props(self, lin_props):
         """Test adding lineage properties to graphs."""
-        g1_attr, g2_attr = lineage_attrs
+        g1_attr, g2_attr = lin_props
 
         g1_obt = nx.DiGraph()
         g1_obt.add_node(1, lineage_ID=0)
@@ -183,9 +282,9 @@ class TestAddLineagesProps:
         assert is_equal(g1_obt, g1_exp)
         assert is_equal(g2_obt, g2_exp)
 
-    def test_different_lin_ID_key(self, lineage_attrs_with_track_id):
+    def test_different_lin_ID_key(self, lin_props_with_track_id):
         """Test adding lineage properties with different lineage ID key."""
-        g1_attr, g2_attr = lineage_attrs_with_track_id
+        g1_attr, g2_attr = lin_props_with_track_id
 
         g1_obt = nx.DiGraph()
         g1_obt.add_node(1, TRACK_ID=0)
@@ -207,9 +306,9 @@ class TestAddLineagesProps:
         assert is_equal(g1_obt, g1_exp)
         assert is_equal(g2_obt, g2_exp)
 
-    def test_no_lin_ID_on_all_nodes(self, lineage_attrs):
+    def test_no_lin_ID_on_all_nodes(self, lin_props):
         """Test adding lineage properties when no nodes have lineage ID."""
-        g1_attr, g2_attr = lineage_attrs
+        g1_attr, g2_attr = lin_props
 
         g1_obt = nx.DiGraph()
         g1_obt.add_node(1)
@@ -231,9 +330,9 @@ class TestAddLineagesProps:
         assert is_equal(g1_obt, g1_exp)
         assert is_equal(g2_obt, g2_exp)
 
-    def test_no_lin_ID_on_one_node(self, lineage_attrs):
+    def test_no_lin_ID_on_one_node(self, lin_props):
         """Test adding lineage properties when some nodes lack lineage ID."""
-        g1_attr, g2_attr = lineage_attrs
+        g1_attr, g2_attr = lin_props
 
         g1_obt = nx.DiGraph()
         g1_obt.add_node(1)
@@ -258,9 +357,9 @@ class TestAddLineagesProps:
         assert is_equal(g1_obt, g1_exp)
         assert is_equal(g2_obt, g2_exp)
 
-    def test_different_ID_for_one_track(self, lineage_attrs):
+    def test_different_ID_for_one_track(self, lin_props):
         """Test that different lineage IDs within one graph raises error."""
-        g1_attr, g2_attr = lineage_attrs
+        g1_attr, g2_attr = lin_props
 
         g1_obt = nx.DiGraph()
         g1_obt.add_node(1, lineage_ID=0)
@@ -272,9 +371,9 @@ class TestAddLineagesProps:
         with pytest.raises(ValueError):
             _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr])
 
-    def test_no_nodes(self, lineage_attrs):
+    def test_no_nodes(self, lin_props):
         """Test adding lineage properties to graph with no nodes."""
-        g1_attr, g2_attr = lineage_attrs
+        g1_attr, g2_attr = lin_props
 
         g1_obt = nx.DiGraph()
         g2_obt = nx.DiGraph()
@@ -290,9 +389,9 @@ class TestAddLineagesProps:
         assert is_equal(g1_obt, g1_exp)
         assert is_equal(g2_obt, g2_exp)
 
-    def test_no_matching_lin_ID(self, lineage_attrs):
+    def test_no_matching_lin_ID(self, lin_props):
         """Test that an unmatched lineage ID raises ValueError."""
-        g1_attr, g2_attr = lineage_attrs
+        g1_attr, g2_attr = lin_props
 
         # Node has lineage_ID=99, which is not present in lin_props (0 and 1).
         g1_obt = nx.DiGraph()
@@ -303,9 +402,9 @@ class TestAddLineagesProps:
         with pytest.raises(ValueError, match="No lineage properties found"):
             _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr])
 
-    def test_none_line_ID_key(self, lineage_attrs):
+    def test_none_line_ID_key(self, lin_props):
         """Test that passing lineage_ID_key=None skips all lineages (no-op)."""
-        g1_attr, g2_attr = lineage_attrs
+        g1_attr, g2_attr = lin_props
 
         g1_obt = nx.DiGraph()
         g1_obt.add_node(1, lineage_ID=0)
@@ -479,166 +578,247 @@ class TestRemoveOrphanedMetadata:
 class TestSplitGraphIntoLineages:
     """Test cases for _split_graph_into_lineages function."""
 
-    def test_split_graph_into_lineages(self, lineage_attrs):
+    def test_split_graph_into_lineages(self, two_lin_graph, lin_props, expected_two_lins):
         """Test splitting graph into lineages."""
-        g1_attr, g2_attr = lineage_attrs
-
-        g = nx.DiGraph()
-        g.add_node(1, lineage_ID=0)
-        g.add_node(2, lineage_ID=0)
-        g.add_edge(1, 2)
-        g.add_node(3, lineage_ID=1)
-        g.add_node(4, lineage_ID=1)
-        g.add_edge(3, 4)
-        obtained = _split_graph_into_lineages(g, [g1_attr, g2_attr])
-
-        g1_exp = CellLineage(g.subgraph([1, 2]))
-        g1_exp.graph["name"] = "blob"
-        g1_exp.graph["lineage_ID"] = 0
-        g2_exp = CellLineage(g.subgraph([3, 4]))
-        g2_exp.graph["name"] = "blub"
-        g2_exp.graph["lineage_ID"] = 1
-
-        assert len(obtained) == 2
-        assert is_equal(obtained[0], g1_exp)
-        assert is_equal(obtained[1], g2_exp)
-
-    def test_different_lin_ID_key(self, lineage_attrs_with_track_id):
-        """Test splitting graph with different lineage ID key."""
-        g1_attr, g2_attr = lineage_attrs_with_track_id
-
-        g = nx.DiGraph()
-        g.add_node(1, TRACK_ID=0)
-        g.add_node(2, TRACK_ID=0)
-        g.add_edge(1, 2)
-        g.add_node(3, TRACK_ID=1)
-        g.add_node(4, TRACK_ID=1)
-        g.add_edge(3, 4)
+        g1_attr, g2_attr = lin_props
         obtained = _split_graph_into_lineages(
-            g, [g1_attr, g2_attr], lineage_ID_key="TRACK_ID"
+            two_lin_graph, lineage_ID_key="lineage_ID", lin_props=[g1_attr, g2_attr]
         )
 
-        g1_exp = CellLineage(g.subgraph([1, 2]))
+        g1_exp, g2_exp = expected_two_lins
         g1_exp.graph["name"] = "blob"
-        g1_exp.graph["TRACK_ID"] = 0
-        g2_exp = CellLineage(g.subgraph([3, 4]))
         g2_exp.graph["name"] = "blub"
-        g2_exp.graph["TRACK_ID"] = 1
 
         assert len(obtained) == 2
         assert is_equal(obtained[0], g1_exp)
         assert is_equal(obtained[1], g2_exp)
 
-    def test_no_lin_props(self):
+    def test_different_lin_ID_key(
+        self,
+        two_lin_graph_with_track_id,
+        lin_props_with_track_id,
+        expected_two_lins_with_track_id,
+    ):
+        """Test splitting graph with different lineage ID key."""
+        g1_attr, g2_attr = lin_props_with_track_id
+        obtained = _split_graph_into_lineages(
+            two_lin_graph_with_track_id,
+            lineage_ID_key="TRACK_ID",
+            lin_props=[g1_attr, g2_attr],
+        )
+
+        g1_exp, g2_exp = expected_two_lins_with_track_id
+        g1_exp.graph["name"] = "blob"
+        g2_exp.graph["name"] = "blub"
+
+        assert len(obtained) == 2
+        assert is_equal(obtained[0], g1_exp)
+        assert is_equal(obtained[1], g2_exp)
+
+    def test_no_lin_props(self, two_lin_graph, expected_two_lins):
         """Test splitting graph with no lineage properties."""
-        g = nx.DiGraph()
-        g.add_edges_from([(1, 2), (3, 4)])
+        obtained = _split_graph_into_lineages(two_lin_graph, lineage_ID_key="lineage_ID")
 
-        obtained = _split_graph_into_lineages(g)
-
-        g1_exp = CellLineage(g.subgraph([1, 2]))
-        g1_exp.graph["lineage_ID"] = 0
-        g2_exp = CellLineage(g.subgraph([3, 4]))
-        g2_exp.graph["lineage_ID"] = 1
+        g1_exp, g2_exp = expected_two_lins
 
         assert len(obtained) == 2
         assert is_equal(obtained[0], g1_exp)
         assert is_equal(obtained[1], g2_exp)
 
-    def test_different_ID(self, lineage_attrs):
-        """Test that different lineage IDs in connected nodes raises error."""
-        g1_attr, g2_attr = lineage_attrs
+    def test_different_ID(self, two_lin_graph, lin_props):
+        """Test that different lineage IDs in nodes raises error."""
+        g1_attr, g2_attr = lin_props
+        g = two_lin_graph
+        g.nodes[1]["lineage_ID"] = 2  # inconsistent with node 2 which has lineage_ID 0
 
+        with pytest.raises(ValueError, match="inconsistent lineage ID values"):
+            _split_graph_into_lineages(
+                g, lineage_ID_key="lineage_ID", lin_props=[g1_attr, g2_attr]
+            )
+
+    def test_auto_generated_ids(self, expected_two_lins):
+        """Test auto-generated IDs for single-node lineages (negative IDs)."""
         g = nx.DiGraph()
-        g.add_node(1, lineage_ID=2)
-        g.add_node(2, lineage_ID=0)
-        g.add_edge(1, 2)
-        g.add_node(3, lineage_ID=1)
-        g.add_node(4, lineage_ID=1)
-        g.add_edge(3, 4)
+        g.add_edges_from([(1, 2), (3, 4)])  # positive IDs
+        g.add_nodes_from([10, 20])  # negative IDs
+        obtained = _split_graph_into_lineages(g, lineage_ID_key=None)
 
-        with pytest.raises(ValueError):
-            _split_graph_into_lineages(g, [g1_attr, g2_attr])
+        lin10_exp = CellLineage()
+        lin10_exp.add_node(10, lineage_ID=-10)
+        lin10_exp.graph["lineage_ID"] = -10
+        lin20_exp = CellLineage()
+        lin20_exp.add_node(20, lineage_ID=-20)
+        lin20_exp.graph["lineage_ID"] = -20
+        expected_two_lins.extend([lin10_exp, lin20_exp])
+
+        assert len(obtained) == 4
+        for g1, g2 in zip(obtained, expected_two_lins):
+            assert is_equal(g1, g2)
+
+    def test_nodes_have_key_lin_dont(self, two_lin_graph, lin_props, expected_two_lins):
+        """Test when all nodes have lineage_ID_key but the graph doesn't."""
+        obtained = _split_graph_into_lineages(
+            two_lin_graph, lineage_ID_key="lineage_ID", lin_props=lin_props
+        )
+
+        expected_two_lins[0].graph["name"] = "blob"
+        expected_two_lins[1].graph["name"] = "blub"
+
+        assert len(obtained) == 2
+        for g1, g2 in zip(obtained, expected_two_lins):
+            assert is_equal(g1, g2)
+
+    def test_lin_has_key_nodes_dont(self):
+        """Test when graph has klineage_ID_key but nodes don't.
+
+        This can only happen when there is only one lineage in the graph.
+        """
+        g = nx.DiGraph()
+        g.add_edges_from([(1, 2), (2, 3), (3, 4)])
+        g.graph["lineage_ID"] = 0
+        obtained = _split_graph_into_lineages(g, lineage_ID_key="lineage_ID")
+
+        expected = CellLineage()
+        expected.add_edges_from([(1, 2), (2, 3), (3, 4)])
+        for node in expected.nodes:
+            expected.nodes[node]["lineage_ID"] = 0
+        expected.graph["lineage_ID"] = 0
+
+        assert len(obtained) == 1
+        assert is_equal(obtained[0], expected)
+
+    def test_partial_nodes_with_agreement(
+        self, two_lin_graph, lin_props, expected_two_lins
+    ):
+        """Test when some (not all) nodes have the ID key with same value."""
+        # Remove lineage_ID from some nodes.
+        two_lin_graph.nodes[1].pop("lineage_ID")
+        two_lin_graph.nodes[2].pop("lineage_ID")
+        obtained = _split_graph_into_lineages(
+            two_lin_graph, lineage_ID_key="lineage_ID", lin_props=lin_props
+        )
+
+        expected_two_lins[0].graph["name"] = "blob"
+        expected_two_lins[1].graph["name"] = "blub"
+
+        assert len(obtained) == 2
+        for g1, g2 in zip(obtained, expected_two_lins):
+            assert is_equal(g1, g2)
+
+    def test_empty_graph_with_lin_key(self):
+        """Test with an empty graph (no nodes)."""
+        g = nx.DiGraph()
+        obt_1 = _split_graph_into_lineages(g, lineage_ID_key="lineage_ID")
+
+        expected = CellLineage()
+        expected.graph["lineage_ID"] = 0
+
+        assert len(obt_1) == 1
+        assert is_equal(obt_1[0], expected)
+
+    def test_empty_graph_without_lin_key(self):
+        """Test with an empty graph (no nodes) and no lineage_ID_key."""
+        g = nx.DiGraph()
+        obt_1 = _split_graph_into_lineages(g)
+
+        expected = CellLineage()
+        expected.graph["lineage_ID"] = 0
+
+        assert len(obt_1) == 1
+        assert is_equal(obt_1[0], expected)
+
+    def test_mismatched_lin_props_error(self, two_lin_graph):
+        """Test that providing lin_props with unmatched lineage ID raises error."""
+        # lin_props with IDs 5 and 6, but graph has 0 and 1
+        lin_props = [
+            {"lineage_ID": 5, "name": "blob"},
+            {"lineage_ID": 6, "name": "blub"},
+        ]
+
+        with pytest.raises(ValueError, match="No lineage properties found"):
+            _split_graph_into_lineages(
+                two_lin_graph, lineage_ID_key="lineage_ID", lin_props=lin_props
+            )
 
 
 class TestUpdateNodePropKey:
     """Test cases for _update_node_prop_key function."""
 
-    def test_update_node_prop_key(self, lineage_with_old_key):
+    def test_update_node_prop_key(self, lin_with_old_key):
         """Test basic update of node property key."""
         old_key_values = ["value1", "value2", "value3"]
-        _update_node_prop_key(lineage_with_old_key, "old_key", "new_key")
+        _update_node_prop_key(lin_with_old_key, "old_key", "new_key")
 
-        for i, node in enumerate(lineage_with_old_key.nodes):
-            assert "new_key" in lineage_with_old_key.nodes[node]
-            assert "old_key" not in lineage_with_old_key.nodes[node]
-            assert lineage_with_old_key.nodes[node]["new_key"] == old_key_values[i]
+        for i, node in enumerate(lin_with_old_key.nodes):
+            assert "new_key" in lin_with_old_key.nodes[node]
+            assert "old_key" not in lin_with_old_key.nodes[node]
+            assert lin_with_old_key.nodes[node]["new_key"] == old_key_values[i]
 
-    def test_missing_old_key_skip(self, lineage_with_mixed_keys):
+    def test_missing_old_key_skip(self, lin_with_mixed_keys):
         """Test that nodes without old_key are skipped when enforce_old_key_existence=False."""
-        _update_node_prop_key(lineage_with_mixed_keys, "old_key", "new_key")
+        _update_node_prop_key(lin_with_mixed_keys, "old_key", "new_key")
 
-        assert lineage_with_mixed_keys.nodes[1]["new_key"] == "value1"
-        assert "old_key" not in lineage_with_mixed_keys.nodes[1]
-        assert "new_key" not in lineage_with_mixed_keys.nodes[2]
-        assert "old_key" not in lineage_with_mixed_keys.nodes[2]
-        assert lineage_with_mixed_keys.nodes[3]["new_key"] == "value3"
-        assert "old_key" not in lineage_with_mixed_keys.nodes[3]
+        assert lin_with_mixed_keys.nodes[1]["new_key"] == "value1"
+        assert "old_key" not in lin_with_mixed_keys.nodes[1]
+        assert "new_key" not in lin_with_mixed_keys.nodes[2]
+        assert "old_key" not in lin_with_mixed_keys.nodes[2]
+        assert lin_with_mixed_keys.nodes[3]["new_key"] == "value3"
+        assert "old_key" not in lin_with_mixed_keys.nodes[3]
 
-    def test_enforce_old_key_existence(self, lineage_with_mixed_keys):
+    def test_enforce_old_key_existence(self, lin_with_mixed_keys):
         """Test that missing old_key raises error when enforce_old_key_existence=True."""
         err_msg = "Node 2 does not have the required key 'old_key'"
         with pytest.raises(ValueError, match=err_msg):
             _update_node_prop_key(
-                lineage_with_mixed_keys,
+                lin_with_mixed_keys,
                 "old_key",
                 "new_key",
                 enforce_old_key_existence=True,
             )
 
-    def test_set_default_if_missing(self, lineage_with_mixed_keys):
+    def test_set_default_if_missing(self, lin_with_mixed_keys):
         """Test setting default value when old_key is missing and set_default_if_missing=True."""
         _update_node_prop_key(
-            lineage_with_mixed_keys,
+            lin_with_mixed_keys,
             "old_key",
             "new_key",
             set_default_if_missing=True,
             default_value="default",
         )
 
-        assert lineage_with_mixed_keys.nodes[1]["new_key"] == "value1"
-        assert "old_key" not in lineage_with_mixed_keys.nodes[1]
-        assert lineage_with_mixed_keys.nodes[2]["new_key"] == "default"
-        assert "old_key" not in lineage_with_mixed_keys.nodes[2]
-        assert lineage_with_mixed_keys.nodes[3]["new_key"] == "value3"
-        assert "old_key" not in lineage_with_mixed_keys.nodes[3]
+        assert lin_with_mixed_keys.nodes[1]["new_key"] == "value1"
+        assert "old_key" not in lin_with_mixed_keys.nodes[1]
+        assert lin_with_mixed_keys.nodes[2]["new_key"] == "default"
+        assert "old_key" not in lin_with_mixed_keys.nodes[2]
+        assert lin_with_mixed_keys.nodes[3]["new_key"] == "value3"
+        assert "old_key" not in lin_with_mixed_keys.nodes[3]
 
-    def test_set_default_none(self, lineage_with_mixed_keys):
+    def test_set_default_none(self, lin_with_mixed_keys):
         """Test setting None as default value when old_key is missing."""
         _update_node_prop_key(
-            lineage_with_mixed_keys, "old_key", "new_key", set_default_if_missing=True
+            lin_with_mixed_keys, "old_key", "new_key", set_default_if_missing=True
         )
 
-        assert lineage_with_mixed_keys.nodes[1]["new_key"] == "value1"
-        assert lineage_with_mixed_keys.nodes[2]["new_key"] is None
+        assert lin_with_mixed_keys.nodes[1]["new_key"] == "value1"
+        assert lin_with_mixed_keys.nodes[2]["new_key"] is None
 
     def test_empty_lineage(self):
         """Test function with empty lineage (no nodes)."""
-        lineage = CellLineage()
+        lin = CellLineage()
         # Should not raise an error and do nothing
-        _update_node_prop_key(lineage, "old_key", "new_key")
-        assert len(lineage.nodes) == 0
+        _update_node_prop_key(lin, "old_key", "new_key")
+        assert len(lin.nodes) == 0
 
     def test_same_key_name(self):
         """Test updating a key to itself (should work without issues)."""
-        lineage = CellLineage()
-        lineage.add_node(1, test_key="value1")
-        lineage.add_node(2, test_key="value2")
+        lin = CellLineage()
+        lin.add_node(1, test_key="value1")
+        lin.add_node(2, test_key="value2")
 
-        _update_node_prop_key(lineage, "test_key", "test_key")
+        _update_node_prop_key(lin, "test_key", "test_key")
 
-        assert lineage.nodes[1]["test_key"] == "value1"
-        assert lineage.nodes[2]["test_key"] == "value2"
+        assert lin.nodes[1]["test_key"] == "value1"
+        assert lin.nodes[2]["test_key"] == "value2"
 
 
 class TestUpdateLineagePropKey:
@@ -646,13 +826,13 @@ class TestUpdateLineagePropKey:
 
     def test_update_lineage_prop_key(self):
         """Test updating a lineage property key."""
-        lineage = CellLineage()
-        lineage.graph["old_key"] = "old_value"
-        _update_lineage_prop_key(lineage, "old_key", "new_key")
+        lin = CellLineage()
+        lin.graph["old_key"] = "old_value"
+        _update_lineage_prop_key(lin, "old_key", "new_key")
 
-        assert "new_key" in lineage.graph
-        assert lineage.graph["new_key"] == "old_value"
-        assert "old_key" not in lineage.graph
+        assert "new_key" in lin.graph
+        assert lin.graph["new_key"] == "old_value"
+        assert "old_key" not in lin.graph
 
 
 class TestUpdateLineagesIDsKey:
@@ -694,6 +874,7 @@ class TestUpdateLineagesIDsKey:
         lin2 = CellLineage()
         lin2.add_nodes_from([4, 5])
         lin2.graph["TRACK_ID"] = 20
+        
         _update_lineages_IDs_key([lin1, lin2], "TRACK_ID")
         assert lin1.graph["lineage_ID"] == -1
         assert lin2.graph["lineage_ID"] == 20

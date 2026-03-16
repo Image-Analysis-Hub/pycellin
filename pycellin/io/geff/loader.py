@@ -1003,12 +1003,12 @@ def load_GEFF(
     rename_map: dict[str, dict[str, str]] = {"node": {}, "edge": {}, "lineage": {}}
     props_md = _build_props_metadata(geff_md, rename_map)
 
-    # EVERYTHING BELOW IS NOT DEBUGGED YET
-
     # Split the graph into lineages.
     lineages = _split_graph_into_lineages(geff_graph, lineage_ID_key=lineage_id_prop)
     if lineage_id_prop is None:
         lineage_id_prop = "lineage_ID"
+
+    # EVERYTHING BELOW IS NOT DEBUGGED YET
 
     # Rename properties to match pycellin conventions.
     _normalize_properties_data(
@@ -1038,7 +1038,7 @@ def load_GEFF(
 
 
 if __name__ == "__main__":
-    # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
+    geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
     # geff_file = "B:/Janelia_Cell_Trackathon/anniek_example/exampl_geff.zarr/tracks"
     geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/anniek_example/exampl_geff.zarr/tracks"
     # geff_file = "E:/Janelia_Cell_Trackathon/reader_test_graph.geff"

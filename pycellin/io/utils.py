@@ -268,7 +268,7 @@ def _remove_orphaned_metadata(model: Model) -> None:
 
 def _split_graph_into_lineages(
     graph: nx.DiGraph,
-    lineage_ID_key: str | None,
+    lineage_ID_key: str | None = None,
     lin_props: list[dict[str, Any]] | None = None,
 ) -> list[CellLineage]:
     """
@@ -285,10 +285,10 @@ def _split_graph_into_lineages(
     ----------
     lineage : nx.DiGraph
         The graph to split.
-    lineage_ID_key : str | None
+    lineage_ID_key : str | None, optional
         The key used to identify the lineage in the properties. If None,
         a "lineage_ID" key will be created and set to the next available lineage ID.
-    lin_props : list[dict[str, Any]] | None
+    lin_props : list[dict[str, Any]] | None, optional
         A list of dictionaries, where each dictionary contains properties
         for a specific lineage, identified by a 'lineage_ID_key' key.
         If None, no properties will be added to the lineages.
@@ -312,7 +312,12 @@ def _split_graph_into_lineages(
         CellLineage(graph.subgraph(c).copy())
         for c in nx.weakly_connected_components(graph)
     ]
-    del graph  # Redondant with the subgraphs.
+    if len(lineages) == 0:
+        empty_lin = CellLineage(nx.DiGraph())
+        for k, v in graph.graph.items():
+            empty_lin.graph[k] = v  # copying graph properties to the empty lineage
+        lineages = [empty_lin]
+    del graph  # don't need it anymore
 
     # Ensuring that nodes and lineages have a lineage_ID property,
     # and that it is consistent between them.
@@ -376,13 +381,15 @@ def _split_graph_into_lineages(
                 # We need to create and add a lineage_ID key to each lineage,
                 # using the node property.
                 tmp_lin_id = set(lin.nodes[node][lineage_ID_key] for node in lin.nodes)
-                if len(tmp_lin_id) != 1:
+                if len(tmp_lin_id) > 1:
                     raise ValueError(
                         "Impossible state: inconsistent lineage ID values between "
                         "the nodes of a same lineage."
                     )
-
-                lin.graph[lineage_ID_key] = list(tmp_lin_id)[0]
+                elif len(tmp_lin_id) == 0:
+                    lin.graph[lineage_ID_key] = 0
+                else:
+                    lin.graph[lineage_ID_key] = list(tmp_lin_id)[0]
 
             elif lin_has_lin_id and not nodes_have_lin_id:
                 # We need to add the lineage_ID_key property to each node of
