@@ -8,6 +8,11 @@ import networkx as nx
 import pytest
 
 from pycellin.classes import CellLineage, Property
+from pycellin.graph.properties.core import (
+    create_cell_coord_property,
+    create_cell_id_property,
+    create_lineage_id_property,
+)
 from pycellin.io.geff.loader import (
     _build_generic_metadata,
     _build_props_metadata,
@@ -23,6 +28,7 @@ from pycellin.io.geff.loader import (
     _identify_time_prop,
     _resolve_prop_key,
     _standardize_properties_data,
+    _standardize_props_metadata,
 )
 
 # Fixtures ####################################################################
@@ -187,6 +193,7 @@ def prop_position_x_node():
         prop_type="node",
         lin_type="CellLineage",
         dtype="float",
+        unit="um",
     )
 
 
@@ -258,6 +265,44 @@ def prop_speed():
         lin_type="CellLineage",
         dtype="float",
     )
+
+
+@pytest.fixture
+def pycellin_standard_md():
+    """"""
+    props_md = {
+        "lineage_ID": create_lineage_id_property(provenance="test"),
+        "cell_ID": create_cell_id_property(provenance="test"),
+        "cell_x": create_cell_coord_property(unit="um", axis="x", provenance="test"),
+    }
+    return props_md
+
+
+@pytest.fixture
+def pycellin_non_standard_md(prop_position_x_node):
+    """"""
+    props_md = {
+        "track_id": Property(
+            identifier="track_id",
+            name="track ID",
+            description="Unique identifier of the track",
+            provenance="test",
+            prop_type="lineage",
+            lin_type="Lineage",
+            dtype="int",
+        ),
+        "node_id": Property(
+            identifier="node_id",
+            name="cell ID",
+            description="Unique identifier of the cell",
+            provenance="test",
+            prop_type="node",
+            lin_type="CellLineage",
+            dtype="int",
+        ),
+        "position_x": prop_position_x_node,
+    }
+    return props_md
 
 
 @pytest.fixture
@@ -1582,3 +1627,258 @@ class TestStandardizePropertiesData:
 
         assert lin_with_id.graph["lineage_ID"] == 10
         assert lin_without_id.graph["lineage_ID"] == 11
+
+
+class TestStandardizePropsMetadata:
+    """Test cases for _standardize_props_metadata function."""
+
+    def test_lin_id_standard_key_preserved(self, pycellin_standard_md, rename_map):
+        """When lineage_id_key is already 'lineage_ID', key and metadata are preserved."""
+        nb_props = len(pycellin_standard_md)
+        _standardize_props_metadata(
+            pycellin_standard_md,
+            lin_id_key="lineage_ID",
+            cell_id_key=None,
+            cell_x_key=None,
+            cell_y_key=None,
+            cell_z_key=None,
+            space_unit=None,
+            rename_map=rename_map,
+        )
+        assert len(pycellin_standard_md) == nb_props
+        assert "lineage_ID" in pycellin_standard_md
+        assert pycellin_standard_md["lineage_ID"].identifier == "lineage_ID"
+        assert pycellin_standard_md["lineage_ID"].provenance == "test"
+
+    def test_lin_id_nonstandard_renamed(self, pycellin_non_standard_md, rename_map):
+        """When lineage_id_key is present but not 'lineage_ID', it is renamed to 'lineage_ID',
+        and its identifier is updated but metadata is preserved."""
+        _standardize_props_metadata(
+            pycellin_non_standard_md,
+            lin_id_key="track_id",
+            cell_id_key=None,
+            cell_x_key=None,
+            cell_y_key=None,
+            cell_z_key=None,
+            space_unit=None,
+            rename_map=rename_map,
+        )
+        assert "track_id" not in pycellin_non_standard_md
+        assert "lineage_ID" in pycellin_non_standard_md
+        assert pycellin_non_standard_md["lineage_ID"].identifier == "lineage_ID"
+        assert pycellin_non_standard_md["lineage_ID"].provenance == "test"
+
+    def test_lin_id_absent_creates_default(self, rename_map):
+        """When lineage_id_key is None, a default 'lineage_ID' property with provenance
+        'geff' is created."""
+        props_md = {}
+        _standardize_props_metadata(
+            props_md,
+            lin_id_key=None,
+            cell_id_key=None,
+            cell_x_key=None,
+            cell_y_key=None,
+            cell_z_key=None,
+            space_unit=None,
+            rename_map=rename_map,
+        )
+        assert "lineage_ID" in props_md
+        assert props_md["lineage_ID"].identifier == "lineage_ID"
+        assert props_md["lineage_ID"].provenance == "geff"
+
+    def test_cell_id_standard_key_preserved(self, pycellin_standard_md, rename_map):
+        """When cell_id_key is already 'cell_ID', key and metadata are preserved."""
+        nb_props = len(pycellin_standard_md)
+        _standardize_props_metadata(
+            pycellin_standard_md,
+            lin_id_key=None,
+            cell_id_key="cell_ID",
+            cell_x_key=None,
+            cell_y_key=None,
+            cell_z_key=None,
+            space_unit=None,
+            rename_map=rename_map,
+        )
+        assert len(pycellin_standard_md) == nb_props
+        assert "cell_ID" in pycellin_standard_md
+        assert pycellin_standard_md["cell_ID"].identifier == "cell_ID"
+        assert pycellin_standard_md["cell_ID"].provenance == "test"
+
+    def test_cell_id_nonstandard_renamed(self, pycellin_non_standard_md, rename_map):
+        """When cell_id_key is present but not 'cell_ID', it is renamed to 'cell_ID',
+        and its identifier is updated but metadata is preserved."""
+        _standardize_props_metadata(
+            pycellin_non_standard_md,
+            lin_id_key=None,
+            cell_id_key="node_id",
+            cell_x_key=None,
+            cell_y_key=None,
+            cell_z_key=None,
+            space_unit=None,
+            rename_map=rename_map,
+        )
+        assert "node_id" not in pycellin_non_standard_md
+        assert "cell_ID" in pycellin_non_standard_md
+        assert pycellin_non_standard_md["cell_ID"].identifier == "cell_ID"
+        assert pycellin_non_standard_md["cell_ID"].provenance == "test"
+
+    def test_cell_id_absent_creates_default(self, rename_map):
+        """When cell_id_key is None, a default 'cell_ID' property with provenance
+        'geff' is created."""
+        props_md = {}
+        _standardize_props_metadata(
+            props_md,
+            lin_id_key=None,
+            cell_id_key=None,
+            cell_x_key=None,
+            cell_y_key=None,
+            cell_z_key=None,
+            space_unit=None,
+            rename_map=rename_map,
+        )
+        assert "cell_ID" in props_md
+        assert props_md["cell_ID"].identifier == "cell_ID"
+        assert props_md["cell_ID"].provenance == "geff"
+
+    def test_coord_none_skips_all_coord_keys(self, rename_map):
+        """When all coord props are None, no standard coordinate key is added to props_md."""
+        props_md = {}
+        _standardize_props_metadata(
+            props_md,
+            lin_id_key=None,
+            cell_id_key=None,
+            cell_x_key=None,
+            cell_y_key=None,
+            cell_z_key=None,
+            space_unit=None,
+            rename_map=rename_map,
+        )
+        assert "cell_x" not in props_md
+        assert "cell_y" not in props_md
+        assert "cell_z" not in props_md
+
+    def test_coord_standard_key_preserved(self, pycellin_standard_md, rename_map):
+        """When a coord prop is already standard, key and metadata are preserved."""
+        nb_props = len(pycellin_standard_md)
+        _standardize_props_metadata(
+            pycellin_standard_md,
+            lin_id_key=None,
+            cell_id_key=None,
+            cell_x_key="cell_x",
+            cell_y_key=None,
+            cell_z_key=None,
+            space_unit="mm",
+            rename_map=rename_map,
+        )
+        assert len(pycellin_standard_md) == nb_props
+        assert "cell_x" in pycellin_standard_md
+        assert pycellin_standard_md["cell_x"].identifier == "cell_x"
+        assert pycellin_standard_md["cell_x"].unit == "um"
+        assert pycellin_standard_md["cell_x"].provenance == "test"
+
+    def test_coord_nonstandard_renamed(self, pycellin_non_standard_md, rename_map):
+        """When a coord prop key differs from the pycellin convention, it is renamed
+        and its identifier is updated but metadata is preserved."""
+        _standardize_props_metadata(
+            pycellin_non_standard_md,
+            lin_id_key=None,
+            cell_id_key=None,
+            cell_x_key="position_x",
+            cell_y_key=None,
+            cell_z_key=None,
+            space_unit=None,
+            rename_map=rename_map,
+        )
+        assert "position_x" not in pycellin_non_standard_md
+        assert "cell_x" in pycellin_non_standard_md
+        assert pycellin_non_standard_md["cell_x"].identifier == "cell_x"
+        assert pycellin_non_standard_md["cell_x"].unit == "um"
+        assert pycellin_non_standard_md["cell_x"].provenance == "test"
+
+    def test_coord_absent_creates_default_with_unit(self, rename_map):
+        """When the coord key is not in props_md, a default property is created
+        using space_unit."""
+        props_md = {}
+        _standardize_props_metadata(
+            props_md,
+            lin_id_key=None,
+            cell_id_key=None,
+            cell_x_key="position_x",
+            cell_y_key=None,
+            cell_z_key=None,
+            space_unit="um",
+            rename_map=rename_map,
+        )
+        assert "cell_x" in props_md
+        assert props_md["cell_x"].identifier == "cell_x"
+        assert props_md["cell_x"].unit == "um"
+        assert props_md["cell_x"].provenance == "geff"
+
+    def test_lin_id_not_none_but_not_in_props_md_creates_default(self, rename_map):
+        """When lin_id_key is provided but not in props_md, a default should be created
+        (since it was not in metadata)."""
+        props_md = {}
+        _standardize_props_metadata(
+            props_md,
+            lin_id_key="custom_lineage_id",
+            cell_id_key=None,
+            cell_x_key=None,
+            cell_y_key=None,
+            cell_z_key=None,
+            space_unit=None,
+            rename_map=rename_map,
+        )
+        assert "custom_lineage_id" not in props_md
+        assert "lineage_ID" in props_md
+        assert props_md["lineage_ID"].identifier == "lineage_ID"
+        assert props_md["lineage_ID"].provenance == "geff"
+
+    def test_cell_id_not_none_but_not_in_props_md_creates_default(self, rename_map):
+        """When cell_id_key is provided but not in props_md, a default should be created
+        (since it was not in metadata)."""
+        props_md = {}
+        _standardize_props_metadata(
+            props_md,
+            lin_id_key=None,
+            cell_id_key="custom_cell_id",
+            cell_x_key=None,
+            cell_y_key=None,
+            cell_z_key=None,
+            space_unit=None,
+            rename_map=rename_map,
+        )
+        assert "custom_cell_id" not in props_md
+        assert "cell_ID" in props_md
+        assert props_md["cell_ID"].identifier == "cell_ID"
+        assert props_md["cell_ID"].provenance == "geff"
+
+    def test_coord_with_rename_map_transformation(self, prop_position_x_node, rename_map):
+        """When a coordinate key is transformed by rename_map, the transformed key
+        is looked up in props_md, renamed to pycellin convention, and identifier updated."""
+        props_md = {"old_pos_x": prop_position_x_node}
+        rename_map["node"]["old_pos_x"] = "position_x"
+        props_md["position_x"] = Property(
+            identifier="position_x",
+            name="position_x",
+            description="position_x",
+            provenance="test",
+            prop_type="node",
+            lin_type="CellLineage",
+            dtype="float",
+            unit="um",
+        )
+        _standardize_props_metadata(
+            props_md,
+            lin_id_key=None,
+            cell_id_key=None,
+            cell_x_key="old_pos_x",
+            cell_y_key=None,
+            cell_z_key=None,
+            space_unit=None,
+            rename_map=rename_map,
+        )
+        assert "position_x" not in props_md
+        assert "old_pos_x" not in props_md
+        assert "cell_x" in props_md
+        assert props_md["cell_x"].identifier == "cell_x"
+        assert props_md["cell_x"].unit == "um"
