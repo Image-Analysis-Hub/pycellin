@@ -1102,22 +1102,17 @@ def load_GEFF(
     ValueError
         If the GEFF graph is undirected, as pycellin does not support undirected graphs.
     """
-
     # Read the GEFF file.
     geff_graph, geff_md = geff.read(geff_file, structure_validation=structure_validation)
     if not geff_md.directed:
         raise ValueError(
             "The GEFF graph is undirected: pycellin does not support undirected graphs."
         )
-    # print(geff_md)
-    geff_node_md = geff_md.node_props_metadata
-    geff_edge_md = geff_md.edge_props_metadata
 
     # Identify specific properties.
     lineage_id_prop = _identify_lin_id_prop(
         lineage_id_prop, geff_md.track_node_props, geff_graph
     )
-    # print(f"LINEAGE ID PROP: {lineage_id_prop}")
     time_prop = _identify_time_prop(time_prop, geff_md, geff_graph)
     cell_x_prop, cell_y_prop, cell_z_prop = _identify_space_props(
         cell_x_prop, cell_y_prop, cell_z_prop, geff_md, geff_graph
@@ -1165,29 +1160,13 @@ def load_GEFF(
     )
     check_fusions(model)  # pycellin DOES NOT support fusion events
 
-    print("GEFF NODE PROPS")
-    for prop in geff_node_md:
-        print(f"\t{prop}")
-
-    print("NODE PROPS")
-    for prop in model.get_node_properties():
-        print(f"\t{prop}")
-
-    # print("GEFF EDGE PROPS")
-    # for prop in geff_edge_md:
-    #     print(f"\t{prop}")
-
-    # print("EDGE PROPS")
-    # for prop in model.get_edge_properties():
-    #     print(f"\t{prop}")
-
     return model
 
 
 if __name__ == "__main__":
     geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
     # geff_file = "B:/Janelia_Cell_Trackathon/anniek_example/exampl_geff.zarr/tracks"
-    geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/anniek_example/exampl_geff.zarr/tracks"
+    # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/anniek_example/exampl_geff.zarr/tracks"
     # geff_file = "E:/Janelia_Cell_Trackathon/reader_test_graph.geff"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/mouse-20250719.zarr/tracks"
     # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/test.zarr"
