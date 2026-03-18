@@ -1,0 +1,480 @@
+{
+  "geff": {
+    "geff_version": "1.1",
+    "directed": true,
+    "axes": [
+      {
+        "name": "POSITION_X",
+        "type": "space",
+        "unit": "micrometer",
+        "min": 0.2904346030225421,
+        "max": 36.42466626033906,
+        "scale": null,
+        "scaled_unit": null,
+        "offset": null
+      },
+      {
+        "name": "POSITION_Y",
+        "type": "space",
+        "unit": "micrometer",
+        "min": 7.788749143373155,
+        "max": 50.48997820615323,
+        "scale": null,
+        "scaled_unit": null,
+        "offset": null
+      },
+      {
+        "name": "POSITION_Z",
+        "type": "space",
+        "unit": "micrometer",
+        "min": 0.0,
+        "max": 0.0,
+        "scale": null,
+        "scaled_unit": null,
+        "offset": null
+      },
+      {
+        "name": "POSITION_T",
+        "type": "time",
+        "unit": "minute",
+        "min": 0.0,
+        "max": 110.0,
+        "scale": null,
+        "scaled_unit": null,
+        "offset": null
+      }
+    ],
+    "node_props_metadata": {
+      "QUALITY": {
+        "identifier": "QUALITY",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Quality",
+        "description": null
+      },
+      "POSITION_X": {
+        "identifier": "POSITION_X",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "micrometer",
+        "name": "X",
+        "description": null
+      },
+      "POSITION_Y": {
+        "identifier": "POSITION_Y",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "micrometer",
+        "name": "Y",
+        "description": null
+      },
+      "POSITION_Z": {
+        "identifier": "POSITION_Z",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "micrometer",
+        "name": "Z",
+        "description": null
+      },
+      "POSITION_T": {
+        "identifier": "POSITION_T",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "minute",
+        "name": "T",
+        "description": null
+      },
+      "FRAME": {
+        "identifier": "FRAME",
+        "dtype": "int64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Frame",
+        "description": null
+      },
+      "RADIUS": {
+        "identifier": "RADIUS",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "micrometer",
+        "name": "Radius",
+        "description": null
+      },
+      "VISIBILITY": {
+        "identifier": "VISIBILITY",
+        "dtype": "int64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Visibility",
+        "description": null
+      },
+      "MEAN_INTENSITY_CH1": {
+        "identifier": "MEAN_INTENSITY_CH1",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Mean intensity ch1",
+        "description": null
+      },
+      "MEDIAN_INTENSITY_CH1": {
+        "identifier": "MEDIAN_INTENSITY_CH1",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Median intensity ch1",
+        "description": null
+      },
+      "MIN_INTENSITY_CH1": {
+        "identifier": "MIN_INTENSITY_CH1",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Min intensity ch1",
+        "description": null
+      },
+      "MAX_INTENSITY_CH1": {
+        "identifier": "MAX_INTENSITY_CH1",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Max intensity ch1",
+        "description": null
+      },
+      "TOTAL_INTENSITY_CH1": {
+        "identifier": "TOTAL_INTENSITY_CH1",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Sum intensity ch1",
+        "description": null
+      },
+      "STD_INTENSITY_CH1": {
+        "identifier": "STD_INTENSITY_CH1",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Std intensity ch1",
+        "description": null
+      },
+      "MEAN_INTENSITY_CH2": {
+        "identifier": "MEAN_INTENSITY_CH2",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Mean intensity ch2",
+        "description": null
+      },
+      "MEDIAN_INTENSITY_CH2": {
+        "identifier": "MEDIAN_INTENSITY_CH2",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Median intensity ch2",
+        "description": null
+      },
+      "MIN_INTENSITY_CH2": {
+        "identifier": "MIN_INTENSITY_CH2",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Min intensity ch2",
+        "description": null
+      },
+      "MAX_INTENSITY_CH2": {
+        "identifier": "MAX_INTENSITY_CH2",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Max intensity ch2",
+        "description": null
+      },
+      "TOTAL_INTENSITY_CH2": {
+        "identifier": "TOTAL_INTENSITY_CH2",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Sum intensity ch2",
+        "description": null
+      },
+      "STD_INTENSITY_CH2": {
+        "identifier": "STD_INTENSITY_CH2",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Std intensity ch2",
+        "description": null
+      },
+      "CONTRAST_CH1": {
+        "identifier": "CONTRAST_CH1",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Contrast ch1",
+        "description": null
+      },
+      "SNR_CH1": {
+        "identifier": "SNR_CH1",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Signal/Noise ratio ch1",
+        "description": null
+      },
+      "CONTRAST_CH2": {
+        "identifier": "CONTRAST_CH2",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Contrast ch2",
+        "description": null
+      },
+      "SNR_CH2": {
+        "identifier": "SNR_CH2",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Signal/Noise ratio ch2",
+        "description": null
+      },
+      "ELLIPSE_X0": {
+        "identifier": "ELLIPSE_X0",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "micrometer",
+        "name": "Ellipse center x0",
+        "description": null
+      },
+      "ELLIPSE_Y0": {
+        "identifier": "ELLIPSE_Y0",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "micrometer",
+        "name": "Ellipse center y0",
+        "description": null
+      },
+      "ELLIPSE_MAJOR": {
+        "identifier": "ELLIPSE_MAJOR",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "micrometer",
+        "name": "Ellipse long axis",
+        "description": null
+      },
+      "ELLIPSE_MINOR": {
+        "identifier": "ELLIPSE_MINOR",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "micrometer",
+        "name": "Ellipse short axis",
+        "description": null
+      },
+      "ELLIPSE_THETA": {
+        "identifier": "ELLIPSE_THETA",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "radian",
+        "name": "Ellipse angle",
+        "description": null
+      },
+      "ELLIPSE_ASPECTRATIO": {
+        "identifier": "ELLIPSE_ASPECTRATIO",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "None",
+        "name": "Ellipse aspect ratio",
+        "description": null
+      },
+      "AREA": {
+        "identifier": "AREA",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": "micrometer^2",
+        "name": "Area",
+        "description": null
+      },
+      "ROI_N_POINTS": {
+        "identifier": "ROI_N_POINTS",
+        "dtype": "int64",
+        "varlength": false,
+        "unit": null,
+        "name": "ROI number of points",
+        "description": "Number of points defining the spot ROI."
+      },
+      "ROI_coords": {
+        "identifier": "ROI_coords",
+        "dtype": "float64",
+        "varlength": true,
+        "unit": "micrometer",
+        "name": "ROI coordinates",
+        "description": "List of coordinates of the spot ROI relative to the spot center."
+      },
+      "SHAPE_INDEX": {
+        "identifier": "SHAPE_INDEX",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "ID": {
+        "identifier": "ID",
+        "dtype": "int64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "TRACK_ID": {
+        "identifier": "TRACK_ID",
+        "dtype": "int64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "name": {
+        "identifier": "name",
+        "dtype": "str",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "CIRCULARITY": {
+        "identifier": "CIRCULARITY",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "SOLIDITY": {
+        "identifier": "SOLIDITY",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "PERIMETER": {
+        "identifier": "PERIMETER",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      }
+    },
+    "edge_props_metadata": {
+      "EDGE_TIME": {
+        "identifier": "EDGE_TIME",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "EDGE_Y_LOCATION": {
+        "identifier": "EDGE_Y_LOCATION",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "EDGE_Z_LOCATION": {
+        "identifier": "EDGE_Z_LOCATION",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "DISPLACEMENT": {
+        "identifier": "DISPLACEMENT",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "LINK_COST": {
+        "identifier": "LINK_COST",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "SPOT_SOURCE_ID": {
+        "identifier": "SPOT_SOURCE_ID",
+        "dtype": "int64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "DIRECTIONAL_CHANGE_RATE": {
+        "identifier": "DIRECTIONAL_CHANGE_RATE",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "SPEED": {
+        "identifier": "SPEED",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "SPOT_TARGET_ID": {
+        "identifier": "SPOT_TARGET_ID",
+        "dtype": "int64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      },
+      "EDGE_X_LOCATION": {
+        "identifier": "EDGE_X_LOCATION",
+        "dtype": "float64",
+        "varlength": false,
+        "unit": null,
+        "name": null,
+        "description": null
+      }
+    },
+    "sphere": null,
+    "ellipsoid": null,
+    "track_node_props": {
+      "lineage": "TRACK_ID"
+    },
+    "related_objects": [
+      {
+        "type": "image",
+        "path": "D:\\Laura_DATA\\AgarPad_Ec\\230413\\230413_Stage10_Frame1-23_merge_FINAL.tif",
+        "label_prop": null
+      }
+    ],
+    "display_hints": {
+      "display_horizontal": "POSITION_X",
+      "display_vertical": "POSITION_Y",
+      "display_depth": "POSITION_Z",
+      "display_time": "POSITION_T"
+    },
+    "extra": {
+      "other_trackmate_metadata": {
+        "trackmate_version": "7.10.2",
+        "lineage_props_metadata": {},
+        "log": "<Log>aura_DATA\\AgarPad_Ec\\230413\\\r\r\nGeometry:\r\r\n  X =    0 -  659, dx = 0,0658700\r\r\n  Y =    0 -  959, dy = 0,0658700\r\r\n  Z =    0 -    0, dz = 0,0658700\r\r\n  T =    0 -   22, dt = 5,00000\r\r\n\r\r\nConfigured detector Label image detector with settings:\r\r\n  - target channel: 1\r\r\n  - simplify contours: true\r\r\n\r\r\nStarting detection process using 8 threads.\r\r\nDetection processes 8 frames simultaneously and allocates 1 thread per frame.\r\r\nFound 526 spots.\r\r\nDetection done in 0,2 s.\r\r\n\r\r\nComputing spot quality histogram...\r\r\nInitial thresholding with a quality threshold above 0,4 ...\r\r\nStarting initial filtering process.\r\r\nRetained 526 spots out of 526.\r\r\n\r\r\nAdding morphology analyzers...\r\r\n - Spot fit 2D ellipse provides: El. x0, El. y0, El. long axis, El. sh. axis, El. angle, El. a.r.\r\r\n - Spot 2D shape descriptors provides: Area, Perim., Circ., Solidity, Shape index.\r\r\n\r\r\nCalculating spot features...\r\r\nCalculating features done in 1,9 s.\r\r\n\r\r\nPerforming spot filtering on the following features:\r\r\n  - on Area below 20,8\r\r\n  - on Area above 0,1\r\r\nKept 526 spots out of 526.\r\r\n\r\r\nConfigured tracker Overlap tracker with settings:\r\r\n  - iou calculation: PRECISE\r\r\n  - scale factor: 1.3\r\r\n  - min iou: 0.1\r\r\n\r\r\nStarting tracking process.\r\r\nTracking done in 0,1 s.\r\r\nFound 15 tracks.\r\r\n  - avg size: 34,9 spots.\r\r\n  - min size: 2 spots.\r\r\n  - max size: 175 spots.\r\r\n\r\r\nCalculating features done in 0,1 s.\r\r\nSaving data...\r\r\nComputing edge features:\r\r\n  - Directional change in 1 ms.\r\r\n  - Edge speed in 2 ms.\r\r\n  - Edge target in 1 ms.\r\r\n  - Edge location in 2 ms.\r\r\nComputation done in 6 ms.\r\r\nComputing track features:\r\r\n  - Cell division rate analyzer in 2 ms.\r\r\n  - Branching analyzer in 1 ms.\r\r\n  - Track duration in 2 ms.\r\r\n  - Track index in 0 ms.\r\r\n  - Track location in 2 ms.\r\r\n  - Track speed in 2 ms.\r\r\n  - Track quality in 2 ms.\r\r\n  - Track motility analysis in 1 ms.\r\r\nComputation done in 14 ms.\r\n--------------------\r\nFile loaded on jeu., 20 avr. 2023 10:16:38\r\nTrackMate v7.10.2\r\nPlease note that TrackMate is available through Fiji, and is based on a publication. If you use it successfully for your research please be so kind to cite our work:\r\nErshov, D., Phan, MS., Pylv\u00e4n\u00e4inen, J.W., Rigaud S.U., et al. TrackMate 7: integrating state-of-the-art segmentation algorithms into tracking pipelines. Nat Methods (2022). https://doi.org/10.1038/s41592-022-01507-1\r\nhttps://doi.org/10.1038/s41592-022-01507-1\r\nand / or:\r\nTinevez, JY.; Perry, N. &amp; Schindelin, J. et al. (2017), 'TrackMate: An open and extensible platform for single-particle tracking.', Methods 115: 80-90, PMID 27713081.\r\nhttps://www.sciencedirect.com/science/article/pii/S1046202316303346\r\n\r\nPerforming track filtering on the following features:\r\nNo feature threshold set, kept the 15 tracks.\r\nSaving data...\r\nComputing edge features:\r\n  - Directional change in 10 ms.\r\n  - Edge speed in 2 ms.\r\n  - Edge target in 3 ms.\r\n  - Edge location in 3 ms.\r\nComputation done in 18 ms.\r\nComputing track features:\r\n  - Cell division rate analyzer in 3 ms.\r\n  - Branching analyzer in 2 ms.\r\n  - Track duration in 2 ms.\r\n  - Track index in 1 ms.\r\n  - Track location in 1 ms.\r\n  - Track speed in 5 ms.\r\n  - Track quality in 2 ms.\r\n  - Track motility analysis in 2 ms.\r\nComputation done in 18 ms.\r\n  Added log.\r\n  Added spot, edge and track feature declarations.\r\n  Added 526 spots.\r\n  Added tracks.\r\n  Added filtered tracks.\r\n  Added image information.\r\n  Added crop settings.\r\n  Added detector settings.\r\n  Added initial spot filter.\r\n  Added spot feature filters.\r\n  Added tracker settings.\r\n  Added track feature filters.\r\n  Added spot, edge and track analyzers.\r\n  Added GUI current state.\r\n  Added display settings.\r\n  Writing to file.\r\nData saved to: D:\\Laura_DATA\\AgarPad_Ec\\230413\\230413_Stage10_Frame1-23_merge_FINAL1.xml\r\nSaving data...\r\nComputing edge features:\r\n  - Directional change in 2 ms.\r\n  - Edge speed in 2 ms.\r\n  - Edge target in 3 ms.\r\n  - Edge location in 2 ms.\r\nComputation done in 9 ms.\r\nComputing track features:\r\n  - Cell division rate analyzer in 3 ms.\r\n  - Branching analyzer in 2 ms.\r\n  - Track duration in 2 ms.\r\n  - Track index in 0 ms.\r\n  - Track location in 1 ms.\r\n  - Track speed in 2 ms.\r\n  - Track quality in 1 ms.\r\n  - Track motility analysis in 2 ms.\r\nComputation done in 14 ms.\r\n  Added log.\r\n  Added spot, edge and track feature declarations.\r\n  Added 526 spots.\r\n  Added tracks.\r\n  Added filtered tracks.\r\n  Added image information.\r\n  Added crop settings.\r\n  Added detector settings.\r\n  Added initial spot filter.\r\n  Added spot feature filters.\r\n  Added tracker settings.\r\n  Added track feature filters.\r\n  Added spot, edge and track analyzers.\r\n  Added GUI current state.\r\n  Added display settings.\r\n  Writing to file.\r\nData saved to: D:\\Laura_DATA\\AgarPad_Ec\\230413\\230413_Stage10_Frame1-23_merge_FINAL2.xml\r\nSaving data...\r\nComputing edge features:\r\n  - Directional change in 1 ms.\r\n  - Edge speed in 2 ms.\r\n  - Edge target in 1 ms.\r\n  - Edge location in 3 ms.\r\nComputation done in 8 ms.\r\nComputing track features:\r\n  - Cell division rate analyzer in 3 ms.\r\n  - Branching analyzer in 1 ms.\r\n  - Track duration in 2 ms.\r\n  - Track index in 0 ms.\r\n  - Track location in 2 ms.\r\n  - Track speed in 1 ms.\r\n  - Track quality in 1 ms.\r\n  - Track motility analysis in 2 ms.\r\nComputation done in 13 ms.\r\n  Added log.\r\n  Added spot, edge and track feature declarations.\r\n  Added 526 spots.\r\n  Added tracks.\r\n  Added filtered tracks.\r\n  Added image information.\r\n  Added crop settings.\r\n  Added detector settings.\r\n  Added initial spot filter.\r\n  Added spot feature filters.\r\n  Added tracker settings.\r\n  Added track feature filters.\r\n  Added spot, edge and track analyzers.\r\n  Added GUI current state.\r\n  Added display settings.\r\n  Writing to file.\r\nData saved to: D:\\Laura_DATA\\AgarPad_Ec\\230413\\230413_Stage10_Frame1-23_merge_FINAL3.xml\r\nSaving data...\r\nComputing edge features:\r\n  - Directional change in 3 ms.\r\n  - Edge speed in 1 ms.\r\n  - Edge target in 2 ms.\r\n  - Edge location in 2 ms.\r\nComputation done in 8 ms.\r\nComputing track features:\r\n  - Cell division rate analyzer in 3 ms.\r\n  - Branching analyzer in 1 ms.\r\n  - Track duration in 1 ms.\r\n  - Track index in 0 ms.\r\n  - Track location in 1 ms.\r\n  - Track speed in 1 ms.\r\n  - Track quality in 5 ms.\r\n  - Track motility analysis in 2 ms.\r\nComputation done in 14 ms.\r\n  Added log.\r\n  Added spot, edge and track feature declarations.\r\n  Added 526 spots.\r\n  Added tracks.\r\n  Added filtered tracks.\r\n  Added image information.\r\n  Added crop settings.\r\n  Added detector settings.\r\n  Added initial spot filter.\r\n  Added spot feature filters.\r\n  Added tracker settings.\r\n  Added track feature filters.\r\n  Added spot, edge and track analyzers.\r\n  Added GUI current state.\r\n  Added display settings.\r\n  Writing to file.\r\nData saved to: D:\\Laura_DATA\\AgarPad_Ec\\230413\\230413_Stage10_Frame1-23_merge_FINAL4.xml\r\nSaving data...\r\nComputing edge features:\r\n  - Directional change in 2 ms.\r\n  - Edge speed in 2 ms.\r\n  - Edge target in 2 ms.\r\n  - Edge location in 2 ms.\r\nComputation done in 8 ms.\r\nComputing track features:\r\n  - Cell division rate analyzer in 4 ms.\r\n  - Branching analyzer in 3 ms.\r\n  - Track duration in 2 ms.\r\n  - Track index in 0 ms.\r\n  - Track location in 1 ms.\r\n  - Track speed in 1 ms.\r\n  - Track quality in 2 ms.\r\n  - Track motility analysis in 1 ms.\r\nComputation done in 14 ms.\r\n  Added log.\r\n  Added spot, edge and track feature declarations.\r\n  Added 526 spots.\r\n  Added tracks.\r\n  Added filtered tracks.\r\n  Added image information.\r\n  Added crop settings.\r\n  Added detector settings.\r\n  Added initial spot filter.\r\n  Added spot feature filters.\r\n  Added tracker settings.\r\n  Added track feature filters.\r\n  Added spot, edge and track analyzers.\r\n  Added GUI current state.\r\n  Added display settings.\r\n  Writing to file.\r\nData saved to: D:\\Laura_DATA\\AgarPad_Ec\\230413\\230413_Stage10_Frame1-23_merge_FINAL5.xml\r\nSaving data...\r\nComputing edge features:\r\n  - Directional change in 1 ms.\r\n  - Edge speed in 2 ms.\r\n  - Edge target in 1 ms.\r\n  - Edge location in 2 ms.\r\nComputation done in 6 ms.\r\nComputing track features:\r\n  - Cell division rate analyzer in 2 ms.\r\n  - Branching analyzer in 1 ms.\r\n  - Track duration in 1 ms.\r\n  - Track index in 0 ms.\r\n  - Track location in 1 ms.\r\n  - Track speed in 1 ms.\r\n  - Track quality in 1 ms.\r\n  - Track motility analysis in 2 ms.\r\nComputation done in 9 ms.\r\n  Added log.\r\n  Added spot, edge and track feature declarations.\r\n  Added 526 spots.\r\n  Added tracks.\r\n  Added filtered tracks.\r\n  Added image information.\r\n  Added crop settings.\r\n  Added detector settings.\r\n  Added initial spot filter.\r\n  Added spot feature filters.\r\n  Added tracker settings.\r\n  Added track feature filters.\r\n  Added spot, edge and track analyzers.\r\n  Added GUI current state.\r\n  Added display settings.\r\n  Writing to file.\r\nData saved to: D:\\Laura_DATA\\AgarPad_Ec\\230413\\230413_Stage10_Frame1-23_merge_FINAL6.xml\r\nSaving data...\r\nComputing edge features:\r\n  - Directional change in 1 ms.\r\n  - Edge speed in 2 ms.\r\n  - Edge target in 1 ms.\r\n  - Edge location in 4 ms.\r\nComputation done in 8 ms.\r\nComputing track features:\r\n  - Cell division rate analyzer in 2 ms.\r\n  - Branching analyzer in 1 ms.\r\n  - Track duration in 0 ms.\r\n  - Track index in 0 ms.\r\n  - Track location in 1 ms.\r\n  - Track speed in 0 ms.\r\n  - Track quality in 2 ms.\r\n  - Track motility analysis in 0 ms.\r\nComputation done in 6 ms.\r\n  Added log.\r\n  Added spot, edge and track feature declarations.\r\n  Added 526 spots.\r\n  Added tracks.\r\n  Added filtered tracks.\r\n  Added image information.\r\n  Added crop settings.\r\n  Added detector settings.\r\n  Added initial spot filter.\r\n  Added spot feature filters.\r\n  Added tracker settings.\r\n  Added track feature filters.\r\n  Added spot, edge and track analyzers.\r\n  Added GUI current state.\r\n  Added display settings.\r\n  Writing to file.\r\nData saved to: D:\\Laura_DATA\\AgarPad_Ec\\230413\\230413_Stage10_Frame1-23_merge_FINAL7.xml\r\nSaving data...\r\nComputing edge features:\r\n  - Directional change in 1 ms.\r\n  - Edge speed in 2 ms.\r\n  - Edge target in 1 ms.\r\n  - Edge location in 2 ms.\r\nComputation done in 6 ms.\r\nComputing track features:\r\n  - Cell division rate analyzer in 2 ms.\r\n  - Branching analyzer in 1 ms.\r\n  - Track duration in 0 ms.\r\n  - Track index in 0 ms.\r\n  - Track location in 0 ms.\r\n  - Track speed in 1 ms.\r\n  - Track quality in 0 ms.\r\n  - Track motility analysis in 1 ms.\r\nComputation done in 6 ms.</Log>\n  ",
+        "settings": "<Settings>\n    <ImageData filename=\"230413_Stage10_Frame1-23_merge_FINAL.tif\" folder=\"D:\\Laura_DATA\\AgarPad_Ec\\230413\\\" width=\"660\" height=\"960\" nslices=\"1\" nframes=\"23\" pixelwidth=\"0.06587\" pixelheight=\"0.06587\" voxeldepth=\"0.06587\" timeinterval=\"5.0\" />\n    <BasicSettings xstart=\"0\" xend=\"659\" ystart=\"0\" yend=\"959\" zstart=\"0\" zend=\"0\" tstart=\"0\" tend=\"22\" />\n    <DetectorSettings DETECTOR_NAME=\"LABEL_IMAGE_DETECTOR\" TARGET_CHANNEL=\"1\" SIMPLIFY_CONTOURS=\"true\" />\n    <InitialSpotFilter feature=\"QUALITY\" value=\"0.44648147070849387\" isabove=\"true\" />\n    <SpotFilterCollection>\n      <Filter feature=\"AREA\" value=\"20.777286367206063\" isabove=\"false\" />\n      <Filter feature=\"AREA\" value=\"0.05\" isabove=\"true\" />\n    </SpotFilterCollection>\n    <TrackerSettings TRACKER_NAME=\"OVERLAP_TRACKER\" SCALE_FACTOR=\"1.3\" MIN_IOU=\"0.1\" IOU_CALCULATION=\"PRECISE\" />\n    <TrackFilterCollection />\n    <AnalyzerCollection>\n      <SpotAnalyzers>\n        <Analyzer key=\"Manual spot color\" />\n        <Analyzer key=\"Spot intensity\" />\n        <Analyzer key=\"Spot contrast and SNR\" />\n        <Analyzer key=\"Spot fit 2D ellipse\" />\n        <Analyzer key=\"Spot 2D shape descriptors\" />\n      </SpotAnalyzers>\n      <EdgeAnalyzers>\n        <Analyzer key=\"Directional change\" />\n        <Analyzer key=\"Edge speed\" />\n        <Analyzer key=\"Edge target\" />\n        <Analyzer key=\"Edge location\" />\n        <Analyzer key=\"Manual edge color\" />\n      </EdgeAnalyzers>\n      <TrackAnalyzers>\n        <Analyzer key=\"Branching analyzer\" />\n        <Analyzer key=\"Track duration\" />\n        <Analyzer key=\"Track index\" />\n        <Analyzer key=\"Track location\" />\n        <Analyzer key=\"Track speed\" />\n        <Analyzer key=\"Track quality\" />\n        <Analyzer key=\"Track motility analysis\" />\n      </TrackAnalyzers>\n    </AnalyzerCollection>\n  </Settings>\n  ",
+        "gui_state": "<GUIState state=\"ConfigureViews\" />\n  ",
+        "display_settings": "<DisplaySettings>{\n  \"name\": \"CurrentDisplaySettings\",\n  \"spotUniformColor\": \"204, 51, 204, 255\",\n  \"spotColorByType\": \"TRACKS\",\n  \"spotColorByFeature\": \"TRACK_INDEX\",\n  \"spotDisplayRadius\": 1.0,\n  \"spotDisplayedAsRoi\": true,\n  \"spotMin\": 0.0,\n  \"spotMax\": 10.0,\n  \"spotShowName\": false,\n  \"trackMin\": 0.0,\n  \"trackMax\": 10.0,\n  \"trackColorByType\": \"TRACKS\",\n  \"trackColorByFeature\": \"TRACK_INDEX\",\n  \"trackUniformColor\": \"204, 204, 51, 255\",\n  \"undefinedValueColor\": \"0, 0, 0, 255\",\n  \"missingValueColor\": \"89, 89, 89, 255\",\n  \"highlightColor\": \"51, 230, 51, 255\",\n  \"trackDisplayMode\": \"FULL\",\n  \"colormap\": \"Jet\",\n  \"limitZDrawingDepth\": false,\n  \"drawingZDepth\": 10.0,\n  \"fadeTracks\": true,\n  \"fadeTrackRange\": 30,\n  \"useAntialiasing\": true,\n  \"spotVisible\": true,\n  \"trackVisible\": false,\n  \"font\": {\n    \"name\": \"Arial\",\n    \"style\": 1,\n    \"size\": 12,\n    \"pointSize\": 12.0,\n    \"fontSerializedDataVersion\": 1\n  },\n  \"lineThickness\": 1.0,\n  \"selectionLineThickness\": 4.0,\n  \"trackschemeBackgroundColor1\": \"128, 128, 128, 255\",\n  \"trackschemeBackgroundColor2\": \"192, 192, 192, 255\",\n  \"trackschemeForegroundColor\": \"0, 0, 0, 255\",\n  \"trackschemeDecorationColor\": \"0, 0, 0, 255\",\n  \"trackschemeFillBox\": false,\n  \"spotFilled\": true,\n  \"spotTransparencyAlpha\": 0.7000000000000001\n}</DisplaySettings>\n"
+      }
+    }
+  }
+}
