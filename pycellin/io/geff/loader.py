@@ -415,14 +415,14 @@ def _extract_props_metadata(
             if props_dict[key].prop_type != prop_type:
                 # The key must be unique but it already exists for nodes or edges,
                 # so it needs to be renamed.
-                if prop_type == "node":
+                if prop_type == PropertyType.NODE:
                     current_prefix, other_prefix = "cell", "link"
-                elif prop_type == "edge":
+                elif prop_type == PropertyType.EDGE:
                     current_prefix, other_prefix = "link", "cell"
                 else:
                     raise ValueError(
-                        f"Unsupported property type: {prop_type}. Expected 'node' or "
-                        "'edge'."
+                        f"Unsupported property type: {prop_type}. Expected PropertyType.NODE or "
+                        "PropertyType.EDGE."
                     )
                 # Resolve a unique name for the new property.
                 new_key = _resolve_prop_key(
@@ -526,7 +526,7 @@ def _extract_lin_props_metadata(
                 rename_map["lineage"][key] = new_key
                 # Resolve a unique name for the existing colliding property.
                 existing_prop_type = props_dict[key].prop_type
-                other_prefix = "cell" if existing_prop_type == "node" else "link"
+                other_prefix = "cell" if PropertyType.NODE in existing_prop_type else "link"
                 other_key = _resolve_prop_key(
                     f"{other_prefix}_{key}",
                     f"pycellin_{other_prefix}_{key}",

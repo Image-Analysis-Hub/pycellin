@@ -137,7 +137,7 @@ def create_lineage_id_property(provenance: str = "pycellin") -> Property:
         name="lineage ID",
         description="Unique identifier of the lineage",
         provenance=provenance,
-        prop_type="lineage",
+        prop_type=["node", "lineage"],
         lin_type="Lineage",
         dtype="int",
     )
@@ -172,7 +172,9 @@ def _create_generic_cell_coord_property() -> Property:
     )
 
 
-def create_link_coord_property(unit: str, axis: str, provenance: str = "pycellin") -> Property:
+def create_link_coord_property(
+    unit: str, axis: str, provenance: str = "pycellin"
+) -> Property:
     return Property(
         identifier=f"link_{axis}",
         name=f"link {axis}",
@@ -201,7 +203,9 @@ def _create_generic_link_coord_property() -> Property:
     )
 
 
-def create_lineage_coord_property(unit: str, axis: str, provenance: str = "pycellin") -> Property:
+def create_lineage_coord_property(
+    unit: str, axis: str, provenance: str = "pycellin"
+) -> Property:
     return Property(
         identifier=f"lineage_{axis}",
         name=f"lineage {axis}",
@@ -268,7 +272,9 @@ def create_cycle_length_property(provenance: str = "pycellin") -> Property:
     )
 
 
-def create_cycle_duration_property(time_unit: str | None, provenance: str = "pycellin") -> Property:
+def create_cycle_duration_property(
+    time_unit: str | None, provenance: str = "pycellin"
+) -> Property:
     return Property(
         identifier="cycle_duration",
         name="cycle duration",

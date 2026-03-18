@@ -16,6 +16,7 @@ from pycellin.classes.exceptions import (
     TimeFlowError,
     LineageStructureError,
 )
+from pycellin.custom_types import PropertyType
 
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
@@ -42,7 +43,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             assert isinstance(lid, int), "The lineage ID must be an integer."
             self.graph["lineage_ID"] = lid
 
-    def _remove_prop(self, prop_name: str, prop_type: str) -> None:
+    def _remove_prop(self, prop_name: str, prop_type: PropertyType | None = None) -> None:
         """
         Remove a property from the lineage graph based on the property type.
 
@@ -50,27 +51,47 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ----------
         prop_name : str
             The name of the property to remove.
-        prop_type : str
-            The type of property to remove. Must be one of `node`, `edge`, or `lineage`.
+        prop_type : PropertyType, optional
+            The type of the property to remove. If None, the property is removed
+            from all locations (nodes, edges, and graphs). If a PropertyType Flag is
+            provided, the property is removed only from the specified type(s).
 
         Raises
         ------
         ValueError
-            If the prop_type is not one of `node`, `edge`, or `lineage`.
+            If prop_type is provided but is not a valid PropertyType Flag.
+
+        Examples
+        --------
+        >>> # Remove from all locations.
+        >>> lineage._remove_prop("some_property")
+        >>> # Remove only from nodes.
+        >>> lineage._remove_prop("node_property", PropertyType.NODE)
+        >>> # Remove from both nodes and lineages.
+        >>> lineage._remove_prop("multi_property", PropertyType.NODE | PropertyType.LINEAGE)
         """
-        match prop_type:
-            case "node":
-                for _, data in self.nodes(data=True):
-                    data.pop(prop_name, None)
-            case "edge":
-                for _, _, data in self.edges(data=True):
-                    data.pop(prop_name, None)
-            case "lineage":
-                self.graph.pop(prop_name, None)
-            case _:
-                raise ValueError(
-                    "Invalid prop_type. Must be one of 'node', 'edge', or 'lineage'."
-                )
+        # If no prop_type specified, remove from all locations.
+        if prop_type is None:
+            for _, data in self.nodes(data=True):
+                data.pop(prop_name, None)
+            for _, _, data in self.edges(data=True):
+                data.pop(prop_name, None)
+            self.graph.pop(prop_name, None)
+            return
+
+        # Validate prop_type.
+        if not isinstance(prop_type, PropertyType):
+            raise ValueError("Invalid prop_type. Must be a PropertyType Flag or None.")
+
+        # Remove from specified type(s) only.
+        if PropertyType.NODE in prop_type:
+            for _, data in self.nodes(data=True):
+                data.pop(prop_name, None)
+        if PropertyType.EDGE in prop_type:
+            for _, _, data in self.edges(data=True):
+                data.pop(prop_name, None)
+        if PropertyType.LINEAGE in prop_type:
+            self.graph.pop(prop_name, None)
 
     def get_root(self, ignore_lone_nodes: bool = False) -> int | list[int]:
         """

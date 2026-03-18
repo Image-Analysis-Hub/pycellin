@@ -8,6 +8,7 @@ import networkx as nx
 import pytest
 
 from pycellin.classes import CellLineage, Property
+from pycellin.custom_types import PropertyType
 from pycellin.graph.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
@@ -658,7 +659,7 @@ class TestExtractPropsMetadata:
         _extract_props_metadata(geff_node_props_md, props_dict, "node", rename_map)
         assert "position_x" in props_dict
         assert props_dict["position_x"].identifier == "position_x"
-        assert props_dict["position_x"].prop_type == "node"
+        assert props_dict["position_x"].prop_type == PropertyType.NODE
         assert props_dict["position_x"].dtype == "float64"
         assert props_dict["position_x"].unit == "um"
         assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
@@ -712,10 +713,10 @@ class TestExtractPropsMetadata:
         assert "position_x" not in props_dict
         assert "cell_position_x" in props_dict
         assert props_dict["cell_position_x"].identifier == "cell_position_x"
-        assert props_dict["cell_position_x"].prop_type == "node"
+        assert props_dict["cell_position_x"].prop_type == PropertyType.NODE
         assert "link_position_x" in props_dict
         assert props_dict["link_position_x"].identifier == "link_position_x"
-        assert props_dict["link_position_x"].prop_type == "edge"
+        assert props_dict["link_position_x"].prop_type == PropertyType.EDGE
         assert rename_map["node"] == {"position_x": "cell_position_x"}
         assert rename_map["edge"] == {"position_x": "link_position_x"}
         assert rename_map["lineage"] == {}
@@ -731,10 +732,10 @@ class TestExtractPropsMetadata:
         assert "position_x" not in props_dict
         assert "link_position_x" in props_dict
         assert props_dict["link_position_x"].identifier == "link_position_x"
-        assert props_dict["link_position_x"].prop_type == "edge"
+        assert props_dict["link_position_x"].prop_type == PropertyType.EDGE
         assert "cell_position_x" in props_dict
         assert props_dict["cell_position_x"].identifier == "cell_position_x"
-        assert props_dict["cell_position_x"].prop_type == "node"
+        assert props_dict["cell_position_x"].prop_type == PropertyType.NODE
         assert rename_map["edge"] == {"position_x": "link_position_x"}
         assert rename_map["node"] == {"position_x": "cell_position_x"}
         assert rename_map["lineage"] == {}
@@ -752,9 +753,9 @@ class TestExtractPropsMetadata:
             _extract_props_metadata(geff_node_props_md, props_dict, "node", rename_map)
         assert "position_x" not in props_dict
         assert "pycellin_cell_position_x" in props_dict
-        assert props_dict["pycellin_cell_position_x"].prop_type == "node"
+        assert props_dict["pycellin_cell_position_x"].prop_type == PropertyType.NODE
         assert "link_position_x" in props_dict
-        assert props_dict["link_position_x"].prop_type == "edge"
+        assert props_dict["link_position_x"].prop_type == PropertyType.EDGE
         assert "cell_position_x" in props_dict  # original unaffected
         assert rename_map["node"] == {"position_x": "pycellin_cell_position_x"}
         assert rename_map["edge"] == {"position_x": "link_position_x"}
@@ -794,7 +795,7 @@ class TestExtractLinPropsMetadata:
         _extract_lin_props_metadata(lin_props_md, props_dict, rename_map)
         assert "displacement" in props_dict
         assert props_dict["displacement"].identifier == "displacement"
-        assert props_dict["displacement"].prop_type == "lineage"
+        assert props_dict["displacement"].prop_type == PropertyType.LINEAGE
         assert props_dict["displacement"].dtype == "float"
         assert props_dict["displacement"].unit == "um"
         assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
@@ -844,10 +845,10 @@ class TestExtractLinPropsMetadata:
         assert "position_x" not in props_dict
         assert "lin_position_x" in props_dict
         assert props_dict["lin_position_x"].identifier == "lin_position_x"
-        assert props_dict["lin_position_x"].prop_type == "lineage"
+        assert props_dict["lin_position_x"].prop_type == PropertyType.LINEAGE
         assert "cell_position_x" in props_dict
         assert props_dict["cell_position_x"].identifier == "cell_position_x"
-        assert props_dict["cell_position_x"].prop_type == "node"
+        assert props_dict["cell_position_x"].prop_type == PropertyType.NODE
         assert rename_map["lineage"] == {"position_x": "lin_position_x"}
         assert rename_map["node"] == {"position_x": "cell_position_x"}
         assert rename_map["edge"] == {}
@@ -865,10 +866,10 @@ class TestExtractLinPropsMetadata:
         assert "position_x" not in props_dict
         assert "lin_position_x" in props_dict
         assert props_dict["lin_position_x"].identifier == "lin_position_x"
-        assert props_dict["lin_position_x"].prop_type == "lineage"
+        assert props_dict["lin_position_x"].prop_type == PropertyType.LINEAGE
         assert "link_position_x" in props_dict
         assert props_dict["link_position_x"].identifier == "link_position_x"
-        assert props_dict["link_position_x"].prop_type == "edge"
+        assert props_dict["link_position_x"].prop_type == PropertyType.EDGE
         assert rename_map["lineage"] == {"position_x": "lin_position_x"}
         assert rename_map["edge"] == {"position_x": "link_position_x"}
         assert rename_map["node"] == {}
@@ -888,9 +889,9 @@ class TestExtractLinPropsMetadata:
             )
         assert "position_x" not in props_dict
         assert "pycellin_lin_position_x" in props_dict
-        assert props_dict["pycellin_lin_position_x"].prop_type == "lineage"
+        assert props_dict["pycellin_lin_position_x"].prop_type == PropertyType.LINEAGE
         assert "cell_position_x" in props_dict
-        assert props_dict["cell_position_x"].prop_type == "node"
+        assert props_dict["cell_position_x"].prop_type == PropertyType.NODE
         assert "lin_position_x" in props_dict  # original unaffected
         assert rename_map["lineage"] == {"position_x": "pycellin_lin_position_x"}
         assert rename_map["node"] == {"position_x": "cell_position_x"}
@@ -938,10 +939,10 @@ class TestBuildPropsMetadata:
         )
         result = _build_props_metadata(geff_md, rename_map)
         assert "frame" in result
-        assert result["frame"].prop_type == "node"
+        assert result["frame"].prop_type == PropertyType.NODE
         assert result["frame"].dtype == "int64"
         assert "position_x" in result
-        assert result["position_x"].prop_type == "node"
+        assert result["position_x"].prop_type == PropertyType.NODE
         assert result["position_x"].unit == "um"
         assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
 
@@ -955,10 +956,10 @@ class TestBuildPropsMetadata:
         )
         result = _build_props_metadata(geff_md, rename_map)
         assert "speed" in result
-        assert result["speed"].prop_type == "edge"
+        assert result["speed"].prop_type == PropertyType.EDGE
         assert result["speed"].dtype == "float64"
         assert "cost" in result
-        assert result["cost"].prop_type == "edge"
+        assert result["cost"].prop_type == PropertyType.EDGE
         assert result["cost"].unit is None
         assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
 
@@ -973,13 +974,13 @@ class TestBuildPropsMetadata:
         )
         result = _build_props_metadata(geff_md, rename_map)
         assert "frame" in result
-        assert result["frame"].prop_type == "node"
+        assert result["frame"].prop_type == PropertyType.NODE
         assert "position_x" in result
-        assert result["position_x"].prop_type == "node"
+        assert result["position_x"].prop_type == PropertyType.NODE
         assert "speed" in result
-        assert result["speed"].prop_type == "edge"
+        assert result["speed"].prop_type == PropertyType.EDGE
         assert "cost" in result
-        assert result["cost"].prop_type == "edge"
+        assert result["cost"].prop_type == PropertyType.EDGE
         assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
 
     def test_node_and_edge_collision_both_renamed(self, geff_node_props_md, rename_map):
@@ -1000,9 +1001,9 @@ class TestBuildPropsMetadata:
             result = _build_props_metadata(geff_md, rename_map)
         assert "position_x" not in result
         assert "cell_position_x" in result
-        assert result["cell_position_x"].prop_type == "node"
+        assert result["cell_position_x"].prop_type == PropertyType.NODE
         assert "link_position_x" in result
-        assert result["link_position_x"].prop_type == "edge"
+        assert result["link_position_x"].prop_type == PropertyType.EDGE
         assert rename_map["node"] == {"position_x": "cell_position_x"}
         assert rename_map["edge"] == {"position_x": "link_position_x"}
         assert rename_map["lineage"] == {}
@@ -1018,10 +1019,10 @@ class TestBuildPropsMetadata:
         )
         result = _build_props_metadata(geff_md, rename_map)
         assert "n_divisions" in result
-        assert result["n_divisions"].prop_type == "lineage"
+        assert result["n_divisions"].prop_type == PropertyType.LINEAGE
         assert result["n_divisions"].dtype == "int"
         assert "displacement" in result
-        assert result["displacement"].prop_type == "lineage"
+        assert result["displacement"].prop_type == PropertyType.LINEAGE
         assert result["displacement"].unit == "um"
         assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
 
@@ -1035,8 +1036,8 @@ class TestBuildPropsMetadata:
             extra={"some_section": {"lineage_props_metadata": lin_props_md}},
         )
         result = _build_props_metadata(geff_md, rename_map)
-        assert result["n_divisions"].prop_type == "lineage"
-        assert result["displacement"].prop_type == "lineage"
+        assert result["n_divisions"].prop_type == PropertyType.LINEAGE
+        assert result["displacement"].prop_type == PropertyType.LINEAGE
 
     def test_extra_without_lineage_props_metadata_no_lineage_added(self, rename_map):
         """When extra exists but contains no 'lineage_props_metadata' key, no
@@ -1062,12 +1063,12 @@ class TestBuildPropsMetadata:
             extra={"lineage_props_metadata": lin_props_md},
         )
         result = _build_props_metadata(geff_md, rename_map)
-        assert result["frame"].prop_type == "node"
-        assert result["position_x"].prop_type == "node"
-        assert result["speed"].prop_type == "edge"
-        assert result["cost"].prop_type == "edge"
-        assert result["n_divisions"].prop_type == "lineage"
-        assert result["displacement"].prop_type == "lineage"
+        assert result["frame"].prop_type == PropertyType.NODE
+        assert result["position_x"].prop_type == PropertyType.NODE
+        assert result["speed"].prop_type == PropertyType.EDGE
+        assert result["cost"].prop_type == PropertyType.EDGE
+        assert result["n_divisions"].prop_type == PropertyType.LINEAGE
+        assert result["displacement"].prop_type == PropertyType.LINEAGE
         assert rename_map == {"node": {}, "edge": {}, "lineage": {}}
 
 

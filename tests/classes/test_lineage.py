@@ -13,6 +13,7 @@ from pycellin.classes.exceptions import (
     TimeFlowError,
     LineageStructureError,
 )
+from pycellin.custom_types import PropertyType
 
 
 # CellLineage fixtures ########################################################
@@ -39,27 +40,29 @@ def cell_lin():
     lineage = CellLineage()
     lineage.add_edges_from(
         [
-            (1, 2, {"name": "1 -> 2"}),
-            (2, 3, {"name": "2 -> 3"}),
-            (3, 4, {"name": "3 -> 4"}),
-            (4, 5, {"name": "4 -> 5"}),
-            (5, 6, {"name": "5 -> 6"}),
-            (4, 7, {"name": "4 -> 7"}),
-            (7, 8, {"name": "7 -> 8"}),
-            (8, 9, {"name": "8 -> 9"}),
-            (8, 10, {"name": "8 -> 10"}),
-            (2, 11, {"name": "2 -> 11"}),
-            (11, 12, {"name": "11 -> 12"}),
-            (12, 13, {"name": "12 -> 13"}),
-            (13, 14, {"name": "13 -> 14"}),
-            (14, 15, {"name": "14 -> 15"}),
-            (14, 16, {"name": "14 -> 16"}),
+            (1, 2, {"name": "1 -> 2", "multitype_prop": "value"}),
+            (2, 3, {"name": "2 -> 3", "multitype_prop": "value"}),
+            (3, 4, {"name": "3 -> 4", "multitype_prop": "value"}),
+            (4, 5, {"name": "4 -> 5", "multitype_prop": "value"}),
+            (5, 6, {"name": "5 -> 6", "multitype_prop": "value"}),
+            (4, 7, {"name": "4 -> 7", "multitype_prop": "value"}),
+            (7, 8, {"name": "7 -> 8", "multitype_prop": "value"}),
+            (8, 9, {"name": "8 -> 9", "multitype_prop": "value"}),
+            (8, 10, {"name": "8 -> 10", "multitype_prop": "value"}),
+            (2, 11, {"name": "2 -> 11", "multitype_prop": "value"}),
+            (11, 12, {"name": "11 -> 12", "multitype_prop": "value"}),
+            (12, 13, {"name": "12 -> 13", "multitype_prop": "value"}),
+            (13, 14, {"name": "13 -> 14", "multitype_prop": "value"}),
+            (14, 15, {"name": "14 -> 15", "multitype_prop": "value"}),
+            (14, 16, {"name": "14 -> 16", "multitype_prop": "value"}),
         ]
     )
     for n in lineage.nodes:
         lineage.nodes[n]["timepoint"] = nx.shortest_path_length(lineage, 1, n)
         lineage.nodes[n]["cell_ID"] = n
+        lineage.nodes[n]["multitype_prop"] = "value"
     lineage.graph["lineage_ID"] = 1
+    lineage.graph["multitype_prop"] = "value"
     return lineage
 
 
@@ -194,41 +197,68 @@ class TestLineageRemoveProp:
     """Test cases for Lineage._remove_prop method."""
 
     def test_node_property_removal(self, cell_lin):
-        """Test removing property from all nodes."""
-        cell_lin._remove_prop("timepoint", "node")
+        """Test removing property from nodes only."""
+        cell_lin._remove_prop("timepoint", PropertyType.NODE)
         for node in cell_lin.nodes:
             assert "timepoint" not in cell_lin.nodes[node]
 
     def test_edge_property_removal(self, cell_lin):
-        """Test removing property from all edges."""
-        cell_lin._remove_prop("name", "edge")
+        """Test removing property from edges only."""
+        cell_lin._remove_prop("name", PropertyType.EDGE)
         for edge in cell_lin.edges:
             assert "name" not in cell_lin.edges[edge]
 
     def test_lineage_property_removal(self, cell_lin):
-        """Test removing property from lineage graph."""
-        cell_lin._remove_prop("lineage_ID", "lineage")
+        """Test removing property from lineage graph only."""
+        cell_lin._remove_prop("lineage_ID", PropertyType.LINEAGE)
         assert "lineage_ID" not in cell_lin.graph
+
+    def test_remove_from_all_locations_when_no_type_specified(self, cell_lin):
+        """Test that property is removed from all locations when prop_type is None."""
+        cell_lin._remove_prop("multitype_prop", None)
+        for node in cell_lin.nodes:
+            assert "multitype_prop" not in cell_lin.nodes[node]
+        for edge in cell_lin.edges:
+            assert "multitype_prop" not in cell_lin.edges[edge]
+        assert "multitype_prop" not in cell_lin.graph
+
+    def test_multi_type_removal(self, cell_lin):
+        """Test removing property from multiple types at once."""
+        cell_lin._remove_prop("multitype_prop", PropertyType.NODE | PropertyType.LINEAGE)
+        for node in cell_lin.nodes:
+            assert "multitype_prop" not in cell_lin.nodes[node]
+        assert "multitype_prop" not in cell_lin.graph
+        for edge in cell_lin.edges:
+            assert "multitype_prop" in cell_lin.edges[edge]
 
     def test_unknown_property_removal(self, cell_lin):
         """Test that removing non-existent property does not raise error."""
-        cell_lin._remove_prop("unknown_property", "node")
-        cell_lin._remove_prop("unknown_property", "edge")
-        cell_lin._remove_prop("unknown_property", "lineage")
+        cell_lin._remove_prop("unknown_property", PropertyType.NODE)
+        cell_lin._remove_prop("unknown_property", PropertyType.EDGE)
+        cell_lin._remove_prop("unknown_property", PropertyType.LINEAGE)
+        cell_lin._remove_prop("unknown_property")
 
     def test_missing_property_removal(self, cell_lin):
         """Test removing property not present in some elements does not raise error."""
         cell_lin.add_edge(16, 17)
-        cell_lin._remove_prop("timepoint", "node")
-        cell_lin._remove_prop("name", "edge")
+        cell_lin._remove_prop("timepoint", PropertyType.NODE)
+        cell_lin._remove_prop("name", PropertyType.EDGE)
 
     def test_invalid_type_raises_error(self, cell_lin):
         """Test that invalid prop_type raises ValueError."""
         with pytest.raises(
             ValueError,
-            match="Invalid prop_type. Must be one of 'node', 'edge', or 'lineage'.",
+            match="Invalid prop_type. Must be a PropertyType Flag",
         ):
             cell_lin._remove_prop("custom_property", "invalid_type")
+
+    def test_invalid_type_object_raises_error(self, cell_lin):
+        """Test that passing non-PropertyType object raises ValueError."""
+        with pytest.raises(
+            ValueError,
+            match="Invalid prop_type. Must be a PropertyType Flag",
+        ):
+            cell_lin._remove_prop("custom_property", 123)
 
 
 class TestLineageGetRoot:
@@ -1236,9 +1266,7 @@ class TestCellLineageSplitFromCell:
 
     def test_downstream_unconnected_component(self, cell_lin_unconnected_component):
         """Test split downstream from a node in an unconnected component."""
-        new_lin = cell_lin_unconnected_component._split_from_cell(
-            17, split="downstream"
-        )
+        new_lin = cell_lin_unconnected_component._split_from_cell(17, split="downstream")
         assert sorted(new_lin.nodes()) == [18]
         assert sorted(cell_lin_unconnected_component.nodes()) == list(range(1, 18))
 

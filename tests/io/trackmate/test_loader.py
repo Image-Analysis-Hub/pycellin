@@ -12,6 +12,7 @@ from lxml import etree as ET
 
 import pycellin.io.trackmate.loader as tml
 from pycellin.classes import CellLineage, Property, PropsMetadata
+from pycellin.custom_types import PropertyType
 from pycellin.utils import is_equal
 
 
@@ -495,7 +496,7 @@ def test_convert_attributes_missing_prop():
     assert props["prop_int"].name == "prop_int"
     assert props["prop_int"].description == "unknown"
     assert props["prop_int"].provenance == "unknown"
-    assert props["prop_int"].prop_type == "node"
+    assert props["prop_int"].prop_type == PropertyType.NODE
     assert props["prop_int"].lin_type == "CellLineage"
     assert props["prop_int"].dtype == "unknown"
     assert props["prop_int"].unit == "unknown"

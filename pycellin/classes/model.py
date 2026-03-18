@@ -23,7 +23,7 @@ from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.classes.updater import ModelUpdater
-from pycellin.custom_types import Cell, Link
+from pycellin.custom_types import Cell, Link, PropertyType
 from pycellin.graph.properties.core import Timepoint, create_timepoint_property
 
 L = TypeVar("L", bound="Lineage")
@@ -609,38 +609,74 @@ class Model:
             props.update(self.props_metadata._get_prop_dict_from_lin_type("Lineage"))
         return props
 
-    def get_node_properties(self) -> dict[str, Property]:
+    def get_node_properties(self, single_type: bool = False) -> dict[str, Property]:
         """
         Return the node properties present in the model.
+
+        Parameters
+        ----------
+        single_type : bool, optional
+            True to only return single-type node properties (i.e., those with
+            exactly the "node" flag).False to return all properties with the
+            "node" flag regardless of other flags (default is False).
 
         Returns
         -------
         dict[str, Property]
             Dictionary of the node properties present in the model.
         """
-        return self.props_metadata._get_prop_dict_from_prop_type("node")
+        if single_type:
+            return self.props_metadata._get_prop_dict_from_prop_type(
+                "node", exact_match=True
+            )
+        else:
+            return self.props_metadata._get_prop_dict_from_prop_type("node")
 
-    def get_edge_properties(self) -> dict[str, Property]:
+    def get_edge_properties(self, single_type: bool = False) -> dict[str, Property]:
         """
         Return the edge properties present in the model.
+
+        Parameters
+        ----------
+        single_type : bool, optional
+            True to only return single-type node properties (i.e., those with
+            exactly the "node" flag).False to return all properties with the
+            "node" flag regardless of other flags (default is False).
 
         Returns
         -------
         dict[str, Property]
             Dictionary of the edge properties present in the model.
         """
-        return self.props_metadata._get_prop_dict_from_prop_type("edge")
+        if single_type:
+            return self.props_metadata._get_prop_dict_from_prop_type(
+                "edge", exact_match=True
+            )
+        else:
+            return self.props_metadata._get_prop_dict_from_prop_type("edge")
 
-    def get_lineage_properties(self) -> dict[str, Property]:
+    def get_lineage_properties(self, single_type: bool = False) -> dict[str, Property]:
         """
         Return the lineage properties present in the model.
+
+        Parameters
+        ----------
+        single_type : bool, optional
+            True to only return single-type lineage properties (i.e., those with
+            exactly the "lineage" flag).False to return all properties with the
+            "lineage" flag regardless of other flags (default is False).
 
         Returns
         -------
         dict[str, Property]
             Dictionary of the lineage properties present in the model.
         """
-        return self.props_metadata._get_prop_dict_from_prop_type("lineage")
+        if single_type:
+            return self.props_metadata._get_prop_dict_from_prop_type(
+                "lineage", exact_match=True
+            )
+        else:
+            return self.props_metadata._get_prop_dict_from_prop_type("lineage")
 
     def get_cell_lineages(self) -> list[CellLineage]:
         """
@@ -2180,13 +2216,19 @@ class Model:
         props = self.get_cycle_lineage_properties()
         if props is None:
             node_props = [
-                prop_id for prop_id, prop in props.items() if prop.prop_type == "node"
+                prop_id
+                for prop_id, prop in props.items()
+                if PropertyType.NODE in prop.prop_type
             ]
             edge_props = [
-                prop_id for prop_id, prop in props.items() if prop.prop_type == "edge"
+                prop_id
+                for prop_id, prop in props.items()
+                if PropertyType.EDGE in prop.prop_type
             ]
             lin_props = [
-                prop_id for prop_id, prop in props.items() if prop.prop_type == "lineage"
+                prop_id
+                for prop_id, prop in props.items()
+                if PropertyType.LINEAGE in prop.prop_type
             ]
         else:
             missing_props = [prop for prop in props if prop not in props]

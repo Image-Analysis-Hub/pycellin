@@ -22,6 +22,7 @@ from pycellin.classes.lineage import CellLineage
 from pycellin.classes.model import Model
 from pycellin.classes.property import Property
 from pycellin.classes.props_metadata import PropsMetadata
+from pycellin.custom_types import PropertyType
 from pycellin.io.trackmate.loader import load_TrackMate_XML
 
 
@@ -895,7 +896,7 @@ def _prepare_model_for_export(
     # TrackMate requires a FRAME property. If the model does not have a frame-like
     # property ("FRAME", "frame"...), pycellin fallbacks to "timepoint".
     frame_prop = None
-    for prop in model.props_metadata._get_prop_dict_from_prop_type("node").values():
+    for prop in model.props_metadata._get_prop_dict_from_prop_type(PropertyType.NODE).values():
         if prop.identifier.lower() == "frame":
             frame_prop = prop.identifier
             break

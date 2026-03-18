@@ -15,7 +15,7 @@ from pycellin.classes import (
     Property,
     PropsMetadata,
 )
-from pycellin.custom_types import PropertyType
+from pycellin.custom_types import PropertyType, property_type_to_strings
 from pycellin.graph.properties.core import create_cell_id_property
 from pycellin.io.utils import (
     _split_graph_into_lineages,
@@ -301,7 +301,8 @@ def _convert_attributes(
             # attribute) and will be converted later, in _add_ROI_coordinates().
             pass
         else:
-            msg = f"{prop_type.capitalize()} property {key} not found in the properties metadata."
+            prop_type_str = "/".join(property_type_to_strings(prop_type))
+            msg = f"{prop_type_str.capitalize()} property {key} not found in the properties metadata."
             warnings.warn(msg)
             # In that case we add a stub version of the property to the properties
             # declaration. The user will need to manually update the property later on.
@@ -649,7 +650,9 @@ def _update_props_metadata(
     props_md._protect_prop("cell_ID")
     for axis in ["x", "y", "z"]:
         props_md._change_prop_identifier(f"POSITION_{axis.upper()}", f"cell_{axis}")
-        props_md._change_prop_description(f"cell_{axis}", f"{axis.upper()} coordinate of the cell")
+        props_md._change_prop_description(
+            f"cell_{axis}", f"{axis.upper()} coordinate of the cell"
+        )
     if segmentation:
         roi_coord_prop = Property(
             identifier="ROI_coords",
@@ -666,13 +669,16 @@ def _update_props_metadata(
     # Edge properties.
     if "EDGE_X_LOCATION" in props_md.props:
         for axis in ["x", "y", "z"]:
-            props_md._change_prop_identifier(f"EDGE_{axis.upper()}_LOCATION", f"link_{axis}")
+            props_md._change_prop_identifier(
+                f"EDGE_{axis.upper()}_LOCATION", f"link_{axis}"
+            )
             desc = f"{axis.upper()} coordinate of the link, i.e. mean coordinate of its two cells"
             props_md._change_prop_description(f"link_{axis}", desc)
 
     # Lineage properties.
     props_md._change_prop_identifier("TRACK_ID", "lineage_ID")
     props_md._change_prop_description("lineage_ID", "Unique identifier of the lineage")
+    props_md.props["lineage_ID"].prop_type = PropertyType.NODE | PropertyType.LINEAGE
     props_md._protect_prop("lineage_ID")
     prop_filtered_track = Property(
         identifier="FilteredTrack",
@@ -686,7 +692,9 @@ def _update_props_metadata(
     props_md._add_prop(prop_filtered_track)
     if "TRACK_X_LOCATION" in props_md.props:
         for axis in ["x", "y", "z"]:
-            props_md._change_prop_identifier(f"TRACK_{axis.upper()}_LOCATION", f"lineage_{axis}")
+            props_md._change_prop_identifier(
+                f"TRACK_{axis.upper()}_LOCATION", f"lineage_{axis}"
+            )
             desc = f"{axis.upper()} coordinate of the lineage, i.e. mean coordinate of its cells"
             props_md._change_prop_description(f"lineage_{axis}", desc)
 
@@ -828,7 +836,9 @@ def _parse_model_tag(
             # Removal of filtered tracks.
             id_to_keep = _get_filtered_tracks_ID(it, element)
             if not keep_all_tracks:
-                to_remove = [n for n, t in graph.nodes(data="TRACK_ID") if t not in id_to_keep]
+                to_remove = [
+                    n for n, t in graph.nodes(data="TRACK_ID") if t not in id_to_keep
+                ]
                 graph.remove_nodes_from(to_remove)
 
         if element.tag == "Model" and event == "end":
@@ -952,7 +962,9 @@ def _get_time_step(settings: ET._Element) -> float:
         try:
             return float(element.attrib["timeinterval"])
         except KeyError:
-            raise KeyError("The 'timeinterval' attribute is missing in the 'ImageData' element.")
+            raise KeyError(
+                "The 'timeinterval' attribute is missing in the 'ImageData' element."
+            )
         except ValueError:
             raise ValueError("The 'timeinterval' attribute cannot be converted to float.")
 
@@ -991,7 +1003,9 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
             try:
                 pixel_size[key_pycellin] = float(element.attrib[key_TM])
             except KeyError:
-                raise KeyError(f"The {key_TM} attribute is missing in the 'ImageData' element.")
+                raise KeyError(
+                    f"The {key_TM} attribute is missing in the 'ImageData' element."
+                )
             except ValueError:
                 raise ValueError(f"The {key_TM} attribute cannot be converted to float.")
         return pixel_size
@@ -1035,7 +1049,9 @@ def load_TrackMate_XML(
 
     # Add in the metadata all the TrackMate info that was not in the
     # TrackMate XML `Model` tag.
-    dict_tags = _get_specific_tags(xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"])
+    dict_tags = _get_specific_tags(
+        xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
+    )
     pixel_size = _get_pixel_size(dict_tags["Settings"])
     metadata: dict[str, Any] = {}
     metadata["reference_time_property"] = "POSITION_T"
@@ -1074,7 +1090,7 @@ if __name__ == "__main__":
     print(model.props_metadata)
     # print(model.model_metadata.pycellin_version)
     # print(model.model_metadata)
-    # print(model.props_md.node_props.keys())
+    print(model.props_metadata.props["lineage_ID"])
     # print(model.data)
     # for lin in model.get_cell_lineages():
     #     print(lin)

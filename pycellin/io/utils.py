@@ -4,6 +4,7 @@ from typing import Any
 import networkx as nx
 
 from pycellin.classes import CellLineage, Model
+from pycellin.custom_types import PropertyType
 
 
 def check_fusions(model: Model) -> None:
@@ -240,10 +241,10 @@ def _remove_orphaned_metadata(model: Model) -> None:
     model : Model
         The pycellin model to update.
     """
-    node_props_md = model.props_metadata._get_prop_dict_from_prop_type("node").keys()
-    edge_props_md = model.props_metadata._get_prop_dict_from_prop_type("edge").keys()
+    node_props_md = model.props_metadata._get_prop_dict_from_prop_type(PropertyType.NODE).keys()
+    edge_props_md = model.props_metadata._get_prop_dict_from_prop_type(PropertyType.EDGE).keys()
     lineage_props_md = model.props_metadata._get_prop_dict_from_prop_type(
-        "lineage"
+        PropertyType.LINEAGE
     ).keys()
     node_props_data, edge_props_data, lineage_props_data = _get_props_from_data(model)
 

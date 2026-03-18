@@ -6,7 +6,7 @@ import warnings
 from typing import get_args
 
 from pycellin.classes.property import Property
-from pycellin.custom_types import LineageType, PropertyType
+from pycellin.custom_types import LineageType, PropertyType, property_type_from_string
 from pycellin.graph.properties.core import (
     create_cells_property,
     create_cycle_duration_property,
@@ -98,9 +98,9 @@ class PropsMetadata:
         str
             A human-readable string representation of the PropsMetadata object.
         """
-        node_props = ", ".join(self._get_prop_dict_from_prop_type("node").keys())
-        edge_props = ", ".join(self._get_prop_dict_from_prop_type("edge").keys())
-        lin_props = ", ".join(self._get_prop_dict_from_prop_type("lineage").keys())
+        node_props = ", ".join(self._get_prop_dict_from_prop_type(PropertyType.NODE).keys())
+        edge_props = ", ".join(self._get_prop_dict_from_prop_type(PropertyType.EDGE).keys())
+        lin_props = ", ".join(self._get_prop_dict_from_prop_type(PropertyType.LINEAGE).keys())
         return (
             f"Node properties: {node_props}\n"
             f"Edge properties: {edge_props}\n"
@@ -129,14 +129,28 @@ class PropsMetadata:
         else:
             return False
 
-    def _get_prop_dict_from_prop_type(self, prop_type: PropertyType) -> dict:
+    def _get_prop_dict_from_prop_type(
+        self,
+        prop_type: PropertyType | str | list[str],
+        exact_match: bool = False,
+    ) -> dict:
         """
         Return the dictionary of properties corresponding to the specified type.
 
+        By default, uses "has-flag" semantics: returns properties that have ANY of
+        the specified flags set. For example, searching for NODE will return
+        properties with NODE, NODE|LINEAGE, etc.
+
         Parameters
         ----------
-        prop_type : PropertyType
-            The type of the properties to return (node, edge, or lineage).
+        prop_type : PropertyType or str or list[str]
+            The type of the properties to return. Can be:
+            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE
+            - String: "node", "edge", or "lineage"
+            - List of strings: ["node", "lineage"] for multi-type search
+        exact_match : bool, default False
+            If False (default), returns properties that have ANY of the specified flags.
+            If True, returns only properties that exactly match the specified flags.
 
         Returns
         -------
@@ -147,10 +161,32 @@ class PropsMetadata:
         ------
         ValueError
             If the property type is invalid.
+
+        Examples
+        --------
+        >>> # Get all node properties (including multi-type properties with NODE flag)
+        >>> props = metadata._get_prop_dict_from_prop_type("node")
+        >>> # Get properties that are ONLY node type
+        >>> props = metadata._get_prop_dict_from_prop_type("node", exact_match=True)
         """
-        if not check_literal_type(prop_type, PropertyType):
-            raise ValueError(f"Property type must be one of {', '.join(get_args(PropertyType))}.")
-        props = {k: v for k, v in self.props.items() if prop_type == v.prop_type}
+        # Convert string/list to PropertyType Flag if needed.
+        if isinstance(prop_type, (str, list)):
+            prop_type = property_type_from_string(prop_type)
+
+        # Validate PropertyType.
+        if not isinstance(prop_type, PropertyType) or prop_type == PropertyType(0):
+            raise ValueError(
+                "Property type must be a valid PropertyType Flag with at least one flag set. "
+                "Valid types: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE, "
+                "or strings/lists: 'node', 'edge', 'lineage', ['node', 'lineage']."
+            )
+
+        # Filter properties based on match type.
+        if exact_match:
+            props = {k: v for k, v in self.props.items() if v.prop_type == prop_type}
+        else:
+            props = {k: v for k, v in self.props.items() if v.prop_type & prop_type}
+
         return props
 
     def _get_prop_dict_from_lin_type(self, lin_type: LineageType) -> dict:
