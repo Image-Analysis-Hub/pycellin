@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# from __future__ import annotations
 
 from typing import get_args
 
 from pycellin.custom_types import (
-    PropertyType,
     LineageType,
+    PropertyType,
     property_type_from_string,
     property_type_to_strings,
 )
@@ -72,7 +71,8 @@ class Property:
             raise ValueError(
                 "Property type must be a valid PropertyType Flag with at least one flag set. "
                 "Valid types: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE, "
-                "or strings/lists: 'node', 'edge', 'lineage', ['node', 'lineage']."
+                "or combinations like PropertyType.NODE | PropertyType.EDGE, and "
+                "strings/lists: 'node', 'edge', 'lineage', ['node', 'lineage']."
             )
         self.prop_type = prop_type
 

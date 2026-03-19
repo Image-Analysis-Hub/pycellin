@@ -60,8 +60,8 @@ def property_type_from_string(value: str | list[str]) -> PropertyType:
     elif isinstance(value, list):
         if not value:
             raise ValueError("Property type list cannot be empty.")
-        result = PropertyType(0)
-        for v in value:
+        result = mapping[value[0]]
+        for v in value[1:]:
             result |= mapping[v]
         return result
     else:
@@ -100,7 +100,6 @@ def property_type_to_strings(value: PropertyType) -> str | list[str]:
     }
     strings = [mapping[flag] for flag in PropertyType if flag in value]
 
-    # Return string for monotype, list for multitype
     if len(strings) == 1:
         return strings[0]
     else:
