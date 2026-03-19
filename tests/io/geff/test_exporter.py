@@ -144,14 +144,14 @@ def var_length_prop():
 def simple_model():
     """Create a simple model for testing."""
     lin1 = CellLineage()
-    lin1.add_node(1, timepoint=0, cell_x=10.0)
-    lin1.add_node(2, timepoint=1, cell_x=12.0)
+    lin1.add_node(1, timepoint=0, cell_x=10.0, lineage_ID=0)
+    lin1.add_node(2, timepoint=1, cell_x=12.0, lineage_ID=0)
     lin1.add_edge(1, 2, link_x=2.0)
     lin1.graph["lineage_ID"] = 0
 
     lin2 = CellLineage()
-    lin2.add_node(3, timepoint=0, cell_x=20.0)
-    lin2.add_node(4, timepoint=1, cell_x=22.0)
+    lin2.add_node(3, timepoint=0, cell_x=20.0, lineage_ID=1)
+    lin2.add_node(4, timepoint=1, cell_x=22.0, lineage_ID=1)
     lin2.add_edge(3, 4, link_x=2.0)
     lin2.graph["lineage_ID"] = 1
 
@@ -663,13 +663,19 @@ class TestExportGEFF:
         assert exported_model is not simple_model
 
     def test_export_cleans_metadata(self, simple_model, tmp_path):
-        """Test that export_GEFF cleans metadata by removing orphaned properties."""
+        """Test that export_GEFF cleans metadata by removing orphaned properties.
+
+        Also validates that multi-type properties (like lineage_ID with NODE | LINEAGE)
+        are preserved when they have actual data in the lineages.
+        """
         geff_out = str(tmp_path / "test.geff")
         simple_model.props_metadata._add_prop(
             create_absolute_age_property(unit="timepoint")
         )
         exported_model = export_GEFF(simple_model, geff_out)
 
+        # The absolute_age property is orphaned (no data in lineages), so it's removed.
+        # All other properties are preserved, including multi-type ones (lineage_ID).
         expected_props = {
             k: v for k, v in simple_model.get_properties().items() if k != "absolute_age"
         }

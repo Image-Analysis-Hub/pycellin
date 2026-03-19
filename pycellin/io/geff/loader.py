@@ -22,7 +22,7 @@ import geff_spec
 import networkx as nx
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
-from pycellin.custom_types import PropertyType
+from pycellin.custom_types import PropertyType, property_type_to_strings
 from pycellin.graph.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
@@ -310,7 +310,7 @@ def _resolve_prop_key(
     fallback: str,
     props_dict: dict,
     original_key: str,
-    prop_type: str,
+    prop_type: PropertyType,
 ) -> str:
     """
     Resolve a unique property key in props_dict by trying new_name and fallback.
@@ -325,7 +325,7 @@ def _resolve_prop_key(
         The dictionary of existing properties to check for key collisions.
     original_key : str
         The original property key that is being renamed, used for warning messages.
-    prop_type : str
+    prop_type : PropertyType
         The type of property being renamed (e.g., 'node' or 'edge'),
         used for warning messages.
 
@@ -348,21 +348,22 @@ def _resolve_prop_key(
         If both new_name and fallback are already taken in props_dict, a KeyError
         is raised indicating that the property cannot be registered in the metadata.
     """
+    prop_type_str = property_type_to_strings(prop_type)
     if new_name not in props_dict:
         warnings.warn(
-            f"Property '{original_key}' ({prop_type}) has been renamed to '{new_name}'.",
+            f"Property '{original_key}' ({prop_type_str}) has been renamed to '{new_name}'.",
             stacklevel=4,
         )
         return new_name
     if fallback not in props_dict:
         warnings.warn(
-            f"Property '{original_key}' ({prop_type}) has been renamed to '{fallback}' "
+            f"Property '{original_key}' ({prop_type_str}) has been renamed to '{fallback}' "
             f"('{new_name}' was already taken).",
             stacklevel=4,
         )
         return fallback
     raise KeyError(
-        f"Cannot register property '{original_key}' ({prop_type}): both "
+        f"Cannot register property '{original_key}' ({prop_type_str}): both "
         f"'{new_name}' and '{fallback}' already exist in properties dictionary."
     )
 
@@ -371,7 +372,7 @@ def _extract_props_metadata(
     md: dict[str, geff_spec.PropMetadata],
     props_dict: dict[str, Property],
     prop_type: PropertyType,
-    rename_map: dict[str, dict[str, str]],
+    rename_map: dict[PropertyType, dict[str, str]],
 ) -> None:
     """
     Extract properties metadata from a given dictionary and update the props_dict.
@@ -384,11 +385,11 @@ def _extract_props_metadata(
         The dictionary to update with extracted properties metadata.
     prop_type : PropertyType
         The type of property being extracted ('node' or 'edge').
-    rename_map : dict[str, dict[str, str]]
-        Mutable accumulator mapping property type ('node', 'edge', 'lineage') to
-        a dict of ``{old_key: new_key}`` renames. When a key collision forces a
-        rename, both the new and the existing property's mappings are recorded here
-        so that the graph data can be updated accordingly.
+    rename_map : dict[PropertyType, dict[str, str]]
+        Mutable accumulator mapping property type to a dict of ``{old_key: new_key}``
+        renames. When a key collision forces a rename, both the new and the existing
+        property's mappings are recorded here so that the graph data can be updated
+        accordingly.
 
     Raises
     ------
@@ -421,8 +422,8 @@ def _extract_props_metadata(
                     current_prefix, other_prefix = "link", "cell"
                 else:
                     raise ValueError(
-                        f"Unsupported property type: {prop_type}. Expected PropertyType.NODE or "
-                        "PropertyType.EDGE."
+                        f"Unsupported property type: {property_type_to_strings(prop_type)}. "
+                        "Expected PropertyType.NODE or PropertyType.EDGE."
                     )
                 # Resolve a unique name for the new property.
                 new_key = _resolve_prop_key(
@@ -461,7 +462,8 @@ def _extract_props_metadata(
                 # separately, so this should never happen.
                 raise KeyError(
                     f"Cannot register property '{key}': an identical identifier "
-                    f"already exists in properties dictionary for {prop_type}s. "
+                    f"already exists in properties dictionary for "
+                    f"{property_type_to_strings(prop_type)}s. "
                     "Please ensure unique property identifiers."
                 )
 
@@ -469,7 +471,7 @@ def _extract_props_metadata(
 def _extract_lin_props_metadata(
     md: dict[str, Any],
     props_dict: dict[str, Property],
-    rename_map: dict[str, dict[str, str]],
+    rename_map: dict[PropertyType, dict[str, str]],
 ) -> None:
     """
     Extract lineage properties metadata from a given dictionary and update the props_dict.
@@ -480,11 +482,11 @@ def _extract_lin_props_metadata(
         The dictionary containing lineage properties metadata.
     props_dict : dict[str, Property]
         The dictionary to update with extracted lineage properties metadata.
-    rename_map : dict[str, dict[str, str]]
-        Mutable accumulator mapping property type ('node', 'edge', 'lineage') to
-        a dict of ``{old_key: new_key}`` renames. When a key collision forces a
-        rename, both the new lineage property's mapping and the existing property's
-        mapping are recorded here so that the graph data can be updated accordingly.
+    rename_map : dict[PropertyType, dict[str, str]]
+        Mutable accumulator mapping property type to a dict of ``{old_key: new_key}``
+        renames. When a key collision forces a rename, both the new lineage property's
+        mapping and the existing property's mapping are recorded here so that the graph
+        data can be updated accordingly.
 
     Raises
     ------
@@ -498,35 +500,37 @@ def _extract_lin_props_metadata(
                 name=prop.get("name") or key,
                 description=prop.get("description") or prop.get("name") or key,
                 provenance="geff",
-                prop_type="lineage",
+                prop_type=PropertyType.LINEAGE,
                 lin_type="CellLineage",
                 dtype=prop.get("dtype"),
                 unit=prop.get("unit") or None,
             )
         else:
-            if props_dict[key].prop_type != "lineage":
+            if props_dict[key].prop_type != PropertyType.LINEAGE:
                 # Resolve a unique name for the new lineage property.
                 new_key = _resolve_prop_key(
                     f"lin_{key}",
                     f"pycellin_lin_{key}",
                     props_dict,
                     key,
-                    "lineage",
+                    PropertyType.LINEAGE,
                 )
                 props_dict[new_key] = Property(
                     identifier=new_key,
                     name=prop.get("name") or key,
                     description=prop.get("description") or prop.get("name") or key,
                     provenance="geff",
-                    prop_type="lineage",
+                    prop_type=PropertyType.LINEAGE,
                     lin_type="CellLineage",
                     dtype=prop.get("dtype"),
                     unit=prop.get("unit") or None,
                 )
-                rename_map["lineage"][key] = new_key
+                rename_map[PropertyType.LINEAGE][key] = new_key
                 # Resolve a unique name for the existing colliding property.
                 existing_prop_type = props_dict[key].prop_type
-                other_prefix = "cell" if PropertyType.NODE in existing_prop_type else "link"
+                other_prefix = (
+                    "cell" if PropertyType.NODE in existing_prop_type else "link"
+                )
                 other_key = _resolve_prop_key(
                     f"{other_prefix}_{key}",
                     f"pycellin_{other_prefix}_{key}",
@@ -548,7 +552,7 @@ def _extract_lin_props_metadata(
 
 def _build_props_metadata(
     geff_md: geff.GeffMetadata,
-    rename_map: dict[str, dict[str, str]],
+    rename_map: dict[PropertyType, dict[str, str]],
 ) -> dict[str, Property]:
     """
     Read and extract properties metadata from geff metadata.
@@ -557,10 +561,10 @@ def _build_props_metadata(
     ----------
     geff_md : geff.GeffMetadata
         The geff metadata object containing properties metadata.
-    rename_map : dict[str, dict[str, str]]
-        Mutable accumulator mapping property type ('node', 'edge', 'lineage') to
-        a dict of ``{old_key: new_key}`` renames. Populated in-place whenever a
-        key collision forces a rename during metadata extraction.
+    rename_map : dict[PropertyType, dict[str, str]]
+        Mutable accumulator mapping property type to a dict of ``{old_key: new_key}``
+        renames. Populated in-place whenever a key collision forces a rename during
+        metadata extraction.
 
     Returns
     -------
@@ -570,11 +574,11 @@ def _build_props_metadata(
     props_dict: dict[str, Property] = {}
     if geff_md.node_props_metadata:
         _extract_props_metadata(
-            geff_md.node_props_metadata, props_dict, "node", rename_map
+            geff_md.node_props_metadata, props_dict, PropertyType.NODE, rename_map
         )
     if geff_md.edge_props_metadata:
         _extract_props_metadata(
-            geff_md.edge_props_metadata, props_dict, "edge", rename_map
+            geff_md.edge_props_metadata, props_dict, PropertyType.EDGE, rename_map
         )
 
     # TODO: for now lineage properties are not associated to a specific tag but stored
@@ -921,7 +925,7 @@ def _standardize_properties_data(
     cell_x_key: str | None,
     cell_y_key: str | None,
     cell_z_key: str | None,
-    rename_map: dict[str, dict[str, str]],
+    rename_map: dict[PropertyType, dict[str, str]],
 ) -> None:
     """
     Standardize properties data in lineages to match pycellin conventions.
@@ -947,19 +951,19 @@ def _standardize_properties_data(
         The current y-coordinate key name, if any.
     cell_z_key : str | None
         The current z-coordinate key name, if any.
-    rename_map : dict[str, dict[str, str]]
+    rename_map : dict[PropertyType, dict[str, str]]
         Accumulator of ``{old_key: new_key}`` renames per property type
-        ('node', 'edge', 'lineage') collected during metadata extraction.
+        (NODE, EDGE, LINEAGE) collected during metadata extraction.
         Applied to each lineage's node attributes, edge attributes, and
         graph-level attributes respectively.
     """
     for lin in lineages:
         # Collision renames as recorded during metadata extraction.
-        for old_key, new_key in rename_map["node"].items():
+        for old_key, new_key in rename_map[PropertyType.NODE].items():
             _update_node_prop_key(lin, old_key=old_key, new_key=new_key)
-        for old_key, new_key in rename_map["edge"].items():
+        for old_key, new_key in rename_map[PropertyType.EDGE].items():
             _update_edge_prop_key(lin, old_key=old_key, new_key=new_key)
-        for old_key, new_key in rename_map["lineage"].items():
+        for old_key, new_key in rename_map[PropertyType.LINEAGE].items():
             _update_lineage_prop_key(lin, old_key=old_key, new_key=new_key)
 
         # Standard pycellin property renames.
@@ -986,7 +990,7 @@ def _standardize_props_metadata(
     cell_y_key: str | None,
     cell_z_key: str | None,
     space_unit: str | None,
-    rename_map: dict[str, dict[str, str]],
+    rename_map: dict[PropertyType, dict[str, str]],
 ) -> None:
     """
     Normalize properties metadata to match pycellin conventions.
@@ -1010,11 +1014,11 @@ def _standardize_props_metadata(
         The current z-coordinate property name, if any.
     space_unit : str | None
         The space unit to use for coordinate properties.
-    rename_map : dict[str, dict[str, str]]
-        Accumulator of ``{old_key: new_key}`` renames per property type
-        ('node', 'edge', 'lineage') collected during metadata extraction.
-        Applied here to ensure that any standard properties that needed to be renamed
-        during metadata extraction are also renamed in the metadata dictionary.
+    rename_map : dict[PropertyType, dict[str, str]]
+        Accumulator of ``{old_key: new_key}`` renames per property type collected
+        during metadata extraction. Applied here to ensure that any standard
+        properties that needed to be renamed during metadata extraction are also
+        renamed in the metadata dictionary.
     """
     # Ensure standard pycellin properties exist and are properly named.
     if lin_id_key in props_md:
@@ -1040,7 +1044,7 @@ def _standardize_props_metadata(
         pycellin_key = f"cell_{axis}"
         if geff_key is not None:
             original_key = geff_key
-            geff_key = rename_map["node"].get(geff_key, geff_key)
+            geff_key = rename_map[PropertyType.NODE].get(geff_key, geff_key)
             # Remove the original key if it was renamed to a different key.
             if original_key in props_md and original_key != geff_key:
                 props_md.pop(original_key)
@@ -1122,7 +1126,11 @@ def load_GEFF(
     generic_md = _build_generic_metadata(
         geff_file, geff_md, time_prop, cell_x_prop, cell_y_prop, cell_z_prop
     )
-    rename_map: dict[str, dict[str, str]] = {"node": {}, "edge": {}, "lineage": {}}
+    rename_map: dict[PropertyType, dict[str, str]] = {
+        PropertyType.NODE: {},
+        PropertyType.EDGE: {},
+        PropertyType.LINEAGE: {},
+    }
     props_md = _build_props_metadata(geff_md, rename_map)
 
     # Split the graph into lineages.

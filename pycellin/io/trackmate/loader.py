@@ -1014,7 +1014,7 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
 
 
 def load_TrackMate_XML(
-    xml_path: str,
+    xml_path: str | Path,
     keep_all_spots: bool = False,
     keep_all_tracks: bool = False,
 ) -> Model:
@@ -1031,7 +1031,7 @@ def load_TrackMate_XML(
 
     Parameters
     ----------
-    xml_path : str
+    xml_path : str | Path
         Path of the XML file to process.
     keep_all_spots : bool, optional
         True to keep the spots filtered out in TrackMate, False otherwise.
@@ -1079,9 +1079,9 @@ def load_TrackMate_XML(
 
 
 if __name__ == "__main__":
-    # xml = "sample_data/FakeTracks.xml"
+    xml = "sample_data/FakeTracks.xml"
     # xml = "sample_data/FakeTracks_no_tracks.xml"
-    xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    # xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
     # xml = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
     # xml = "sample_data/Celegans-5pc-17timepoints.xml"
 
@@ -1090,7 +1090,7 @@ if __name__ == "__main__":
     print(model.props_metadata)
     # print(model.model_metadata.pycellin_version)
     # print(model.model_metadata)
-    print(model.props_metadata.props["lineage_ID"])
+    print(model.props_metadata.props["cell_ID"])
     # print(model.data)
     # for lin in model.get_cell_lineages():
     #     print(lin)

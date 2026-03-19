@@ -4,7 +4,7 @@ from typing import Any
 import networkx as nx
 
 from pycellin.classes import CellLineage, Model
-from pycellin.custom_types import PropertyType
+from pycellin.custom_types import PropertyType, property_type_from_string
 
 
 def check_fusions(model: Model) -> None:
@@ -35,7 +35,7 @@ def check_fusions(model: Model) -> None:
 def _add_lineage_props(
     lineages: list[CellLineage],
     lin_props: list[dict[str, Any]],
-    lineage_ID_key: str | None = "lineage_ID",
+    lineage_ID_key: str = "lineage_ID",
 ) -> None:
     """
     Update each CellLineage in the list with corresponding lineage properties.
@@ -53,16 +53,26 @@ def _add_lineage_props(
     lin_props : list[dict[str, Any]]
         A list of dictionaries, where each dictionary contains properties
         for a specific lineage, identified by a the given 'lineage_ID_key' key.
-    lineage_ID_key : str | None, optional
+    lineage_ID_key : str, optional
         The key used to identify the lineage in the attributes.
+        Defaults to "lineage_ID".
 
     Raises
     ------
     ValueError
         If a lineage is found to contain nodes with multiple distinct
         'lineage_ID_key' values, indicating an inconsistency in lineage ID
-        assignment, or if no lineage properties match the lineage ID.
+        assignment.
+
+    Warns
+    -----
+    UserWarning
+        If no lineage properties match a lineage ID, the lineage is skipped
+        and a warning is issued. This commonly occurs for single-node tracks
+        in TrackMate XML files, which don't have Track elements.
     """
+    missing_lineage_ids = []
+
     for lin in lineages:
         # Finding the dict of properties matching the lineage.
         tmp = set(t_id for _, t_id in lin.nodes(data=lineage_ID_key))
@@ -92,13 +102,22 @@ def _add_lineage_props(
             None,
         )
         if current_lineage_attr is None:
-            raise ValueError(
-                f"No lineage properties found for lineage ID {current_lineage_id!r}."
-            )
+            missing_lineage_ids.append((current_lineage_id, len(lin)))
+            continue
 
         # Adding the properties to the lineage.
         for k, v in current_lineage_attr.items():
             lin.graph[k] = v
+
+    if missing_lineage_ids:
+        details = "; ".join(
+            f"lineage ID {lin_id!r} ({num_nodes} node{'' if num_nodes == 1 else 's'})"
+            for lin_id, num_nodes in missing_lineage_ids
+        )
+        warnings.warn(
+            f"No lineage properties found for: {details}. "
+            f"These lineages will be skipped from lineage property assignment."
+        )
 
 
 def _get_props_from_data(model: Model) -> tuple[set[str], set[str], set[str]]:
@@ -236,13 +255,22 @@ def _remove_orphaned_metadata(model: Model) -> None:
     """
     Remove properties from metadata that are not present in any lineage.
 
+    If a multitype property has some of its types with no corresponding data,
+    only the types with no data will be removed from the property. If all types
+    of a property have no corresponding data, the property will be removed entirely
+    from the metadata.
+
     Parameters
     ----------
     model : Model
         The pycellin model to update.
     """
-    node_props_md = model.props_metadata._get_prop_dict_from_prop_type(PropertyType.NODE).keys()
-    edge_props_md = model.props_metadata._get_prop_dict_from_prop_type(PropertyType.EDGE).keys()
+    node_props_md = model.props_metadata._get_prop_dict_from_prop_type(
+        PropertyType.NODE
+    ).keys()
+    edge_props_md = model.props_metadata._get_prop_dict_from_prop_type(
+        PropertyType.EDGE
+    ).keys()
     lineage_props_md = model.props_metadata._get_prop_dict_from_prop_type(
         PropertyType.LINEAGE
     ).keys()
@@ -257,14 +285,15 @@ def _remove_orphaned_metadata(model: Model) -> None:
         "edge": orphaned_edge_props,
         "lineage": orphaned_lineage_props,
     }
-    for prop_type, orphaned_props in mapping.items():
+    for prop_type_str, orphaned_props in mapping.items():
         if orphaned_props:
             warnings.warn(
-                f"{prop_type.capitalize()} metadata with no corresponding data: "
+                f"{prop_type_str.capitalize()} metadata with no corresponding data: "
                 f"{orphaned_props}. They will be removed from the model metadata.",
                 stacklevel=2,
             )
-            model.props_metadata._remove_props(orphaned_props)
+            prop_type = property_type_from_string(prop_type_str)
+            model.props_metadata._remove_props(orphaned_props, prop_type=prop_type)
 
 
 def _split_graph_into_lineages(

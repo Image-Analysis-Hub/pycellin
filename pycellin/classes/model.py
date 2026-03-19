@@ -23,7 +23,7 @@ from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.classes.updater import ModelUpdater
-from pycellin.custom_types import Cell, Link, PropertyType
+from pycellin.custom_types import Cell, Link, PropertyType, property_type_from_string
 from pycellin.graph.properties.core import Timepoint, create_timepoint_property
 
 L = TypeVar("L", bound="Lineage")
@@ -617,7 +617,7 @@ class Model:
         ----------
         single_type : bool, optional
             True to only return single-type node properties (i.e., those with
-            exactly the "node" flag).False to return all properties with the
+            exactly the "node" flag). False to return all properties with the
             "node" flag regardless of other flags (default is False).
 
         Returns
@@ -640,7 +640,7 @@ class Model:
         ----------
         single_type : bool, optional
             True to only return single-type node properties (i.e., those with
-            exactly the "node" flag).False to return all properties with the
+            exactly the "node" flag). False to return all properties with the
             "node" flag regardless of other flags (default is False).
 
         Returns
@@ -663,7 +663,7 @@ class Model:
         ----------
         single_type : bool, optional
             True to only return single-type lineage properties (i.e., those with
-            exactly the "lineage" flag).False to return all properties with the
+            exactly the "lineage" flag). False to return all properties with the
             "lineage" flag regardless of other flags (default is False).
 
         Returns
@@ -2080,24 +2080,52 @@ class Model:
     def remove_property(
         self,
         prop_identifier: str,
+        prop_type: PropertyType | str | list[str] | None = None,
     ) -> None:
         """
         Remove the specified property from the model.
 
-        This updates the PropsMetadata, remove the property values
-        for all lineages, and notify the updater to unregister the calculator.
+        This updates the PropsMetadata, removes the property values
+        for all lineages, and notifies the updater to unregister the calculator.
+
+        For multi-type properties, can either remove entirely or just remove
+        specific types.
 
         Parameters
         ----------
         prop_identifier : str
             Identifier of the property to remove.
+        prop_type : PropertyType | str | list[str], optional
+            If specified, only remove the property for the specified type. Can be:
+            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE
+            - String: "node", "edge", or "lineage"
+            - List of strings: ["node", "lineage"] for removing multiple types
+            For multi-type properties (e.g., NODE|LINEAGE), this allows converting
+            to single-type by removing one flag. If None (default), the property is
+            removed entirely.
 
         Raises
         ------
         ValueError
-            If the property does not exist.
+            If the property does not exist or if prop_type is specified but the
+            property doesn't have those flags.
         ProtectedPropertyError
             If the property is a protected property.
+        KeyError
+            If an invalid property type string is provided.
+
+        Examples
+        --------
+        >>> # Remove property entirely
+        >>> model.remove_property("my_property")
+        >>> # Remove only NODE type from a NODE|LINEAGE property using PropertyType
+        >>> model.remove_property("my_property", PropertyType.NODE)
+        >>> # Remove multiple types at once using flag
+        >>> model.remove_property("my_property", PropertyType.NODE | PropertyType.EDGE)
+        >>> # Remove only NODE type using string
+        >>> model.remove_property("my_property", "node")
+        >>> # Remove multiple types at once using list
+        >>> model.remove_property("my_property", ["node", "edge"])
         """
         # Preliminary checks.
         if not self.props_metadata._has_prop(prop_identifier):
@@ -2107,38 +2135,65 @@ class Model:
         if prop_identifier in self.props_metadata._get_protected_props():
             raise ProtectedPropertyError(prop_identifier)
 
-        # First we update the PropsMetadata...
-        prop_type = self.props_metadata.props[prop_identifier].prop_type
-        lin_type = self.props_metadata.props[prop_identifier].lin_type
-        self.props_metadata.props.pop(prop_identifier)
+        # Convert string/list to PropertyType if needed.
+        prop_type_flag: PropertyType | None
+        if prop_type is None:
+            prop_type_flag = None
+        elif isinstance(prop_type, (str, list)):
+            prop_type_flag = property_type_from_string(prop_type)
+        else:
+            prop_type_flag = prop_type
 
-        # ... we remove the property values...
+        # Get current property info before any modifications.
+        prop = self.props_metadata.props[prop_identifier]
+        current_prop_type = prop.prop_type
+        lin_type = prop.lin_type
+
+        # Determine which types to remove.
+        if prop_type_flag is None:
+            types_to_remove = current_prop_type
+            delete_calculator = True
+        else:
+            if not (current_prop_type & prop_type_flag):
+                raise ValueError(
+                    f"Property '{prop_identifier}' does not have type(s) {prop_type_flag}. "
+                    f"Current type: {current_prop_type}"
+                )
+            types_to_remove = prop_type_flag
+            new_prop_type = current_prop_type & ~prop_type_flag
+            delete_calculator = new_prop_type == PropertyType(0)
+
+        # Update the metadata.
+        self.props_metadata._remove_prop(prop_identifier, prop_type_flag)
+
+        # Update the data.
         match lin_type:
             case "CellLineage":
                 for lin in self.data.cell_data.values():
-                    lin._remove_prop(prop_identifier, prop_type)
+                    lin._remove_prop(prop_identifier, types_to_remove)
             case "CycleLineage" if self.data.cycle_data:
                 for clin in self.data.cycle_data.values():
-                    clin._remove_prop(prop_identifier, prop_type)
+                    clin._remove_prop(prop_identifier, types_to_remove)
             case "Lineage":
                 for lin in self.data.cell_data.values():
-                    lin._remove_prop(prop_identifier, prop_type)
+                    lin._remove_prop(prop_identifier, types_to_remove)
                 if self.data.cycle_data:
                     for clin in self.data.cycle_data.values():
-                        clin._remove_prop(prop_identifier, prop_type)
+                        clin._remove_prop(prop_identifier, types_to_remove)
             case _:
                 raise ValueError(
                     "Lineage type not recognized. Must be 'CellLineage', 'CycleLineage'"
                     "or 'Lineage'."
                 )
 
-        # ... and finally we update the updater.
-        try:
-            self._updater.delete_calculator(prop_identifier)
-        except KeyError:
-            # No calculator doesn't mean there is something wrong,
-            # maybe it's just an imported property.
-            pass
+        # Update the updater only if property was completely removed.
+        if delete_calculator:
+            try:
+                self._updater.delete_calculator(prop_identifier)
+            except KeyError:
+                # No calculator doesn't mean there is something wrong,
+                # maybe it's just an imported property.
+                pass
 
     # TODO: add a method to remove several properties at the same time?
     # When no argument is provided, remove all properties?

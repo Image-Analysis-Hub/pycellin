@@ -12,6 +12,7 @@ import math
 import numbers
 import re
 import warnings
+from pathlib import Path
 from typing import Any
 
 import networkx as nx
@@ -405,7 +406,11 @@ def _create_Spot(
         The newly created Spot Element.
     """
     exluded_keys = ["TRACK_ID", "ROI_coords"]
-    n_attr = {k: _value_to_str(v) for k, v in lineage.nodes[node].items() if k not in exluded_keys}
+    n_attr = {
+        k: _value_to_str(v)
+        for k, v in lineage.nodes[node].items()
+        if k not in exluded_keys
+    }
     if "ROI_coords" in lineage.nodes[node]:
         n_attr["ROI_N_POINTS"] = str(len(lineage.nodes[node]["ROI_coords"]))
         # The text of a Spot is the coordinates of its ROI points, in a flattened list.
@@ -484,7 +489,9 @@ def _write_AllTracks(
             xf.write(f"\n{' ' * 6}")
             exluded_keys = ["Model", "FilteredTrack"]
             t_attr = {
-                k: _value_to_str(v) for k, v in lineage.graph.items() if k not in exluded_keys
+                k: _value_to_str(v)
+                for k, v in lineage.graph.items()
+                if k not in exluded_keys
             }
             with xf.element("Track", t_attr):
                 # Edge tags.
@@ -853,11 +860,15 @@ def _update_location_props(props_md: PropsMetadata) -> None:
                     )
                 )
         try:
-            props_md._change_prop_identifier(f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION")
+            props_md._change_prop_identifier(
+                f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION"
+            )
         except KeyError:
             pass  # Not a mandatory property.
         try:
-            props_md._change_prop_identifier(f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION")
+            props_md._change_prop_identifier(
+                f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION"
+            )
         except KeyError:
             pass  # Not a mandatory property.
 
@@ -896,7 +907,9 @@ def _prepare_model_for_export(
     # TrackMate requires a FRAME property. If the model does not have a frame-like
     # property ("FRAME", "frame"...), pycellin fallbacks to "timepoint".
     frame_prop = None
-    for prop in model.props_metadata._get_prop_dict_from_prop_type(PropertyType.NODE).values():
+    for prop in model.props_metadata._get_prop_dict_from_prop_type(
+        PropertyType.NODE
+    ).values():
         if prop.identifier.lower() == "frame":
             frame_prop = prop.identifier
             break
@@ -969,7 +982,7 @@ def _ask_units(
 
 def export_TrackMate_XML(
     model: Model,
-    xml_path: str,
+    xml_path: str | Path,
     units: dict[str, str] | None = None,
     propagate_cycle_props: bool = False,
 ) -> Model:
@@ -980,7 +993,7 @@ def export_TrackMate_XML(
     ----------
     model : Model
         pycellin model containing the data to write.
-    xml_path : str
+    xml_path : str | Path
         Path of the XML file to write.
     units : dict[str, str], optional
         Dictionary containing the spatial and temporal units of the model.
@@ -1069,6 +1082,8 @@ if __name__ == "__main__":
     #     edge_hover_props=["link_x", "link_y", "link_z"],
     # )
     # print(model.props_metadata)
-    export_TrackMate_XML(model, xml_out, {"spatialunits": "pixel", "temporalunits": "sec"})
+    export_TrackMate_XML(
+        model, xml_out, {"spatialunits": "pixel", "temporalunits": "sec"}
+    )
     # print()
     # print(model.props_metadata)

@@ -21,6 +21,7 @@ import geff_spec
 import networkx as nx
 
 from pycellin.classes import CellLineage, Model, Property
+from pycellin.custom_types import PropertyType
 from pycellin.io.utils import _remove_orphaned_metadata
 
 # TODO: geffception for cycle and lineage props
@@ -247,11 +248,6 @@ def _build_props_metadata(
         A tuple containing two dictionaries:
         - node properties metadata
         - edge properties metadata
-
-    Raises
-    ------
-    ValueError
-        If an unknown property type is encountered.
     """
     node_props_md: dict[str, geff_spec.PropMetadata] = {}
     edge_props_md: dict[str, geff_spec.PropMetadata] = {}
@@ -270,15 +266,14 @@ def _build_props_metadata(
             name=prop.name,
             description=prop.description,
         )
-        match prop.prop_type:
-            case "node":
-                node_props_md[prop_id] = prop_md
-            case "edge":
-                edge_props_md[prop_id] = prop_md
-            case "lineage":
-                pass  # need geffception for lineage and cycle props
-            case _:
-                raise ValueError(f"Unknown property type: {prop.prop_type}")
+
+        if prop.prop_type & PropertyType.LINEAGE:
+            # Not implemented yet, need geffception for lineage and cycle props
+            continue
+        if prop.prop_type & PropertyType.NODE:
+            node_props_md[prop_id] = prop_md
+        if prop.prop_type & PropertyType.EDGE:
+            edge_props_md[prop_id] = prop_md
 
     return node_props_md, edge_props_md
 
@@ -365,7 +360,7 @@ def _build_geff_metadata(
 
 def export_GEFF(
     model: Model,
-    geff_out: str,
+    geff_out: str | Path,
     time_axes: str | list[str] | None = None,
     space_axes: list[str] | None = None,
     channel_axes: list[str] | None = None,
@@ -379,7 +374,7 @@ def export_GEFF(
     ----------
     model : Model
         The pycellin model to export.
-    geff_out : str
+    geff_out : str | Path
         Path to the output GEFF file.
     time_axes : str | list[str] | None, optional
         List of property names that Geff will consider as time axes.
