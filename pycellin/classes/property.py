@@ -41,7 +41,8 @@ class Property:
             The provenance of the property (TrackMate, CTC, pycellin, custom...).
         prop_type : PropertyType or str or list[str]
             The type of the property. Can be:
-            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE
+            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE,
+            or combinations like PropertyType.NODE | PropertyType.EDGE.
             - String: "node", "edge", or "lineage"
             - List of strings: ["node", "lineage"] for multi-type properties
         lin_type : LineageType

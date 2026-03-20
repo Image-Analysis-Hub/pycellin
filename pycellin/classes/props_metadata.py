@@ -152,10 +152,11 @@ class PropsMetadata:
         Parameters
         ----------
         prop_type : PropertyType or str or list[str]
-            The type of the properties to return. Can be:
-            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE
+            The type of the property. Can be:
+            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE,
+            or combinations like PropertyType.NODE | PropertyType.EDGE.
             - String: "node", "edge", or "lineage"
-            - List of strings: ["node", "lineage"] for multi-type search
+            - List of strings: ["node", "lineage"] for multi-type properties
         exact_match : bool, default False
             If False (default), returns properties that have ANY of the specified flags.
             If True, returns only properties that exactly match the specified flags.
@@ -169,13 +170,6 @@ class PropsMetadata:
         ------
         ValueError
             If the property type is invalid.
-
-        Examples
-        --------
-        >>> # Get all node properties (including multi-type properties with NODE flag)
-        >>> props = metadata._get_prop_dict_from_prop_type("node")
-        >>> # Get properties that are ONLY node type
-        >>> props = metadata._get_prop_dict_from_prop_type("node", exact_match=True)
         """
         # Convert string/list to PropertyType Flag if needed.
         if isinstance(prop_type, (str, list)):
@@ -554,7 +548,7 @@ class PropsMetadata:
             and the values are lists of property identifiers. For example:
             {'unit1': ['property1', 'property2'], 'unit2': ['property3'], None: ['property4']}.
         """
-        units = {}  # type: dict[str | None, list[str]]
+        units: dict[str | None, list[str]] = {}
         for prop in self.props.values():
             if prop.unit in units:
                 units[prop.unit].append(prop.identifier)
