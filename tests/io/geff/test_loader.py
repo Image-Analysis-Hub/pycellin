@@ -415,8 +415,9 @@ class TestIdentifyLinIdProp:
 
     def test_none_prop_with_track_node_props_lineage(self, graph_lin_id):
         """When lin_id_prop is None and geff_track_node_props has 'lineage',
-        return the value from track_node_props."""
-        result = _identify_lin_id_prop(None, {"lineage": "my_lin_id"}, graph_lin_id)
+        return the value from track_node_props and warn."""
+        with pytest.warns(UserWarning, match="inferred from GEFF track_node_props"):
+            result = _identify_lin_id_prop(None, {"lineage": "my_lin_id"}, graph_lin_id)
         assert result == "my_lin_id"
 
     def test_none_prop_with_track_node_props_no_lineage_key(self, graph_lin_id):
@@ -427,8 +428,9 @@ class TestIdentifyLinIdProp:
 
     def test_none_prop_no_track_node_props_graph_has_lineage_id(self, graph_lin_id):
         """When lin_id_prop is None, geff_track_node_props is None,
-        and graph has 'lineage_ID', return 'lineage_ID'."""
-        result = _identify_lin_id_prop(None, None, graph_lin_id)
+        and graph has 'lineage_ID', return 'lineage_ID' and warn."""
+        with pytest.warns(UserWarning, match="inferred from existing graph property"):
+            result = _identify_lin_id_prop(None, None, graph_lin_id)
         assert result == "lineage_ID"
 
     def test_none_prop_no_track_node_props_no_lineage_id_in_graph(self, graph_no_lin_id):

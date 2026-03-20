@@ -24,7 +24,6 @@ from pycellin.classes.model import Model
 from pycellin.classes.property import Property
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.custom_types import PropertyType
-from pycellin.io.trackmate.loader import load_TrackMate_XML
 
 
 def _unit_to_dimension(
@@ -667,6 +666,51 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
         _update_lineages(lin)
 
 
+def _is_numeric_dtype(dtype: str | None) -> bool:
+    """
+    Check if a dtype string represents a numeric type.
+
+    Parameters
+    ----------
+    dtype : str | None
+        The dtype string to check.
+
+    Returns
+    -------
+    bool
+        True if the dtype represents a numeric type, False otherwise.
+    """
+    if dtype is None:
+        return False
+    dtype_lower = dtype.lower()
+    numeric_keywords = [
+        # Basic numeric types.
+        "int",
+        "integer",
+        "float",
+        "complex",
+        "bool",
+        "boolean",
+        "fraction",
+        "decimal",
+        "number",
+        "numeric",
+        "real",
+        "rational",
+        # Numpy-style dtypes.
+        "uint",
+        "int8",
+        "int16",
+        "int32",
+        "int64",
+        "float16",
+        "float32",
+        "float64",
+        "float128",
+    ]
+    return any(keyword in dtype_lower for keyword in numeric_keywords)
+
+
 def _remove_non_numeric_props(model: Model) -> None:
     """
     Completely remove non-numeric properties from the model.
@@ -689,24 +733,10 @@ def _remove_non_numeric_props(model: Model) -> None:
     Boolean features are considered numeric and are converted to integers
     (1 for True, 0 for False).
     """
-    valid_dtype = [
-        "int",
-        "integer",
-        "float",
-        "complex",
-        "bool",
-        "boolean",
-        "fraction",
-        "decimal",
-        "number",
-        "numeric",
-        "real",
-        "rational",
-    ]
     to_remove = [
         name
         for name, prop in model.get_properties().items()
-        if prop.provenance != "TrackMate" and prop.dtype.lower() not in valid_dtype
+        if prop.provenance != "TrackMate" and not _is_numeric_dtype(prop.dtype)
     ]
     if to_remove:
         for name in to_remove:
@@ -1058,32 +1088,32 @@ def export_TrackMate_XML(
 
 
 if __name__ == "__main__":
-    xml_in = "sample_data/FakeTracks.xml"
-    # xml_out = "sample_data/results/FakeTracks_TMtoTM.xml"
-    xml_out = "sample_data/results/FakeTracks_exported_TM.xml"
-    # xml_in = "sample_data/Celegans-5pc-17timepoints.xml"
-    # xml_out = "sample_data/Celegans-5pc-17timepoints_exported_TM.xml"
+    """
+    Quick demo with sample data.
+    """
+    import tempfile
 
-    model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
-    # print(model.props_metadata)
-    # model.remove_property("VISIBILITY")
+    from pycellin.io.geff.loader import load_GEFF
 
-    model.add_cycle_data()
-    model.propagate_cycle_properties(
-        props=["cells"],
+    geff_in = "sample_data/Ecoli_growth_on_agar_pad.geff"
+    model = load_GEFF(
+        geff_in,
+        lineage_id_prop="TRACK_ID",
+        cell_id_prop="ID",
+        time_prop="POSITION_T",
     )
-    # model.add_absolute_age()
-    # model.add_relative_age(in_time_unit=True)
-    # model.add_cell_displacement()
-    # model.update()
-    # lin0 = model.data.cell_data[0]
-    # lin0.plot(
-    #     node_hover_props=["cell_ID", "cell_x", "cell_y", "cell_z"],
-    #     edge_hover_props=["link_x", "link_y", "link_z"],
-    # )
-    # print(model.props_metadata)
-    export_TrackMate_XML(
-        model, xml_out, {"spatialunits": "pixel", "temporalunits": "sec"}
-    )
-    # print()
-    # print(model.props_metadata)
+
+    print(model)
+    print("Model metadata:")
+    print(model.model_metadata)
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        xml_out = Path(tmp_dir) / "output.xml"
+        export_TrackMate_XML(
+            model,
+            xml_out,
+            units={
+                "spatialunits": model.get_space_unit(),
+                "temporalunits": model.get_time_unit(),
+            },
+        )

@@ -1079,26 +1079,21 @@ def load_TrackMate_XML(
 
 
 if __name__ == "__main__":
-    xml = "sample_data/FakeTracks.xml"
-    # xml = "sample_data/FakeTracks_no_tracks.xml"
-    # xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
-    # xml = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
-    # xml = "sample_data/Celegans-5pc-17timepoints.xml"
+    """
+    Quick demo with sample data.
+    """
+    xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    model = load_TrackMate_XML(
+        xml,
+        keep_all_spots=True,
+        keep_all_tracks=True,
+    )
 
-    model = load_TrackMate_XML(xml)  # , keep_all_spots=True, keep_all_tracks=True)
     print(model)
-    print(model.props_metadata)
-    # print(model.model_metadata.pycellin_version)
-    # print(model.model_metadata)
-    print(model.props_metadata.props["cell_ID"])
-    # print(model.data)
-    # for lin in model.get_cell_lineages():
-    #     print(lin)
-
-    lineage = model.data.cell_data[0]
-    # for n in lineage.nodes(data=True):
-    #     print(n)
-    # lineage.plot(node_hover_props=["cell_ID", "cell_name"])
-
-    # lineage = model.data.cell_data[0]
-    # lineage.plot(node_hover_props=["cell_ID", "cell_name"])
+    for lin in model.get_cell_lineages():
+        print(lin)
+    print("\nModel metadata:")
+    print(model.model_metadata)
+    print("\nProperties and their types:")
+    for prop_id, prop in model.props_metadata.props.items():
+        print(f"  - {prop_id}  -> {prop.prop_type}")

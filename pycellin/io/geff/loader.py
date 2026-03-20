@@ -119,9 +119,19 @@ def _identify_lin_id_prop(
     if lin_id_key is None:
         if geff_track_node_props is not None:
             valid_lin_id_key = geff_track_node_props.get("lineage")
+            warnings.warn(
+                f"Lineage identifier inferred from GEFF track_node_props: "
+                f"'{valid_lin_id_key}'.",
+                stacklevel=error_stack_level,
+            )
         else:
             if _graph_has_node_prop(geff_graph, "lineage_ID"):
                 valid_lin_id_key = "lineage_ID"
+                warnings.warn(
+                    "Lineage identifier inferred from existing graph property: "
+                    "'lineage_ID'.",
+                    stacklevel=error_stack_level,
+                )
             else:
                 warnings.warn(
                     "No lineage identifier found in GEFF metadata. "
@@ -1025,6 +1035,7 @@ def _standardize_props_metadata(
         if lin_id_key != "lineage_ID":
             props_md["lineage_ID"] = props_md.pop(lin_id_key)
         props_md["lineage_ID"].identifier = "lineage_ID"
+        props_md["lineage_ID"].prop_type = PropertyType.NODE | PropertyType.LINEAGE
     else:
         props_md["lineage_ID"] = create_lineage_id_property(provenance="geff")
 
@@ -1172,93 +1183,19 @@ def load_GEFF(
 
 
 if __name__ == "__main__":
-    geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
-    # geff_file = "B:/Janelia_Cell_Trackathon/anniek_example/exampl_geff.zarr/tracks"
-    # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/anniek_example/exampl_geff.zarr/tracks"
-    # geff_file = "E:/Janelia_Cell_Trackathon/reader_test_graph.geff"
-    # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/mouse-20250719.zarr/tracks"
-    # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/test.zarr"
-    # geff_file = (
-    #     "/media/lxenard/data/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
-    # )
-    # geff_file = "E:/Janelia_Cell_Trackathon/test_pycellin_geff/pycellin_to_geff.geff"
-    # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/test_trackmate_to_geff/FakeTracks.geff"
-    # geff_file = "E:/Janelia_Cell_Trackathon/test_trackmate_to_geff/FakeTracks.geff"
-
-    # Yohsuke's file for geffception
-    # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/cell_segmentation.zarr/tree.geff"
-    # geff_file = "E:/Janelia_Cell_Trackathon/cell_segmentation.zarr/tree.geff"
-    # geff_file = "/media/lxenard/data/Janelia_Cell_Trackathon/cell_segmentation.zarr/tree.geff/linage_tree.geff"
-    # geff_file = "E:/Janelia_Cell_Trackathon/cell_segmentation.zarr/tree.geff/linage_tree.geff"
-
-    import plotly.io as pio
-
-    # Plotly: set the default renderer to browser so I can visualize plots
-    pio.renderers.default = "browser"
-
+    """
+    Quick demo with sample data.
+    """
+    geff_in = "sample_data/Ecoli_growth_on_agar_pad.geff"
     model = load_GEFF(
-        geff_file,
-        lineage_id_prop="lineage_id",
-        time_prop="time",
+        geff_in, lineage_id_prop="TRACK_ID", cell_id_prop="ID", time_prop="POSITION_T"
     )
+
     print(model)
+    for lin in model.get_cell_lineages():
+        print(lin)
+    print("\nModel metadata:")
     print(model.model_metadata)
-    # print("props_dict", model.props_metadata.props)
-    print("props_dict keys:")
-    for k in model.props_metadata.props.keys():
-        print(f"\t{k}")
-    lineages = model.get_cell_lineages()
-    # print(f"Number of lineages: {len(lineages)}")
-    # for lin in lineages:
-    #     print(lin)
-    lin0 = lineages[0]
-    # lin7 = model.get_cell_lineage_from_ID(7)
-    # lin7.plot(
-    #     node_hover_props=[
-    #         "cell_ID",
-    #         "lineage_ID",
-    #         "frame",
-    #         "cell_x",
-    #         "cell_y",
-    #         "track_id",
-    #         "seg_id",
-    #         "tree_id",
-    #     ]
-    # )
-    # print(lin0.nodes(data=True))
-    for node, data in lin0.nodes(data=True):
-        print(data.keys())
-        break
-    # lin0.plot(node_hover_props=["lineage_ID", "seg_id", "time", "track_id", "cell_ID"])
-
-    # cell_id_key
-    # lineage_id_key
-    # time_key
-    # cell_x_key
-    # cell_y_key
-    # cell_z_key
-
-    # geff_graph, geff_md = geff.read_nx(geff_file, validate=True)
-    # print(geff_graph)
-    # # Check how many weakly connected components there are.
-    # print(
-    #     f"Number of weakly connected components: {len(list(nx.weakly_connected_components(geff_graph)))}"
-    # )
-    # for k, v in geff_graph.graph.items():
-    #     print(f"{k}: {v}")
-    # # print(graph.graph["axes"][0].unit)
-
-    # if geff_md.directed:
-    #     print("The graph is directed.")
-
-    # metadata = {}  # type: dict[str, Any]
-    # metadata["name"] = Path(geff_file).stem
-    # metadata["file_location"] = geff_file
-    # metadata["provenance"] = "geff"
-    # metadata["date"] = str(datetime.now())
-    # # metadata["space_unit"] =
-    # # metadata["time_unit"] =
-    # metadata["pycellin_version"] = version("pycellin")
-    # metadata["geff_version"] = geff_md.geff_version
-    # for md in geff_md:
-    #     print(md)
+    print("\nProperties and their types:")
+    for prop_id, prop in model.props_metadata.props.items():
+        print(f"  - {prop_id}  -> {prop.prop_type}")
