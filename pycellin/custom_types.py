@@ -21,6 +21,13 @@ class PropertyType(Flag):
     EDGE = auto()
     LINEAGE = auto()
 
+    def __str__(self) -> str:
+        """Return a string representation of the PropertyType."""
+        result = property_type_to_strings(self)
+        if isinstance(result, list):
+            return " | ".join(result)
+        return result
+
 
 def property_type_from_string(value: str | list[str]) -> PropertyType:
     """
