@@ -42,16 +42,17 @@ from pycellin.classes.property_calculator import NodeGlobalPropCalculator
 
 
 def create_absolute_age_property(
-    custom_identifier: str | None,
-    custom_name: str | None,
-    custom_description: str | None,
-    dtype: str,
-    unit: str | None,
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    dtype: str = "float",
+    unit: str | None = None,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "absolute_age",
         name=custom_name or "Absolute age",
-        description=custom_description or "Age of the cell since the start of the lineage",
+        description=custom_description
+        or "Age of the cell since the start of the lineage",
         provenance="pycellin",
         prop_type="node",
         lin_type="CellLineage",
@@ -111,16 +112,19 @@ class AbsoluteAge(NodeGlobalPropCalculator):
         if nid not in lineage.nodes:
             raise KeyError(f"Cell {nid} not in the lineage.")
         root = lineage.get_root()
-        age = lineage.nodes[nid][self.time_prop_name] - lineage.nodes[root][self.time_prop_name]
+        age = (
+            lineage.nodes[nid][self.time_prop_name]
+            - lineage.nodes[root][self.time_prop_name]
+        )
         return age
 
 
 def create_relative_age_property(
-    custom_identifier: str | None,
-    custom_name: str | None,
-    custom_description: str | None,
-    dtype: str,
-    unit: str | None,
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    dtype: str = "float",
+    unit: str | None = None,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "relative_age",
@@ -187,15 +191,16 @@ class RelativeAge(NodeGlobalPropCalculator):
             raise KeyError(f"Cell {nid} not in the lineage.")
         first_cell = lineage.get_cell_cycle(nid)[0]
         age = (
-            lineage.nodes[nid][self.time_prop_name] - lineage.nodes[first_cell][self.time_prop_name]
+            lineage.nodes[nid][self.time_prop_name]
+            - lineage.nodes[first_cell][self.time_prop_name]
         )
         return age
 
 
 def create_cycle_completeness_property(
-    custom_identifier: str | None,
-    custom_name: str | None,
-    custom_description: str | None,
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "cycle_completeness",
@@ -352,11 +357,11 @@ def _get_cycle_lin_timepoints(
 
 
 def create_division_time_property(
-    custom_identifier: str | None,
-    custom_name: str | None,
-    custom_description: str | None,
-    dtype: str,
-    unit: str | None,
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    dtype: str = "float",
+    unit: str | None = None,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "division_time",
@@ -435,10 +440,10 @@ class DivisionTime(NodeGlobalPropCalculator):
 
 
 def create_division_rate_property(
-    custom_identifier: str | None,
-    custom_name: str | None,
-    custom_description: str | None,
-    unit: str | None,
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    unit: str | None = None,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "division_rate",
@@ -462,7 +467,9 @@ class DivisionRate(NodeGlobalPropCalculator):
     (e.g. "frame", "time", etc.).
     """
 
-    def __init__(self, property: Property, time_prop_name: str, use_div_time: bool = False):
+    def __init__(
+        self, property: Property, time_prop_name: str, use_div_time: bool = False
+    ):
         """
         Parameters
         ----------

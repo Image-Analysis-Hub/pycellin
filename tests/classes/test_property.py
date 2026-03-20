@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Unit test for Property and PropsMetadata classes from property.py module."""
+"""Unit test for Property class from property.py module."""
 
 import pytest
 
-from pycellin.classes import Property, PropsMetadata
-
-
-# Property fixtures ###############################################################
+from pycellin.classes import Property
+from pycellin.custom_types import PropertyType
 
 
 @pytest.fixture()
@@ -80,42 +78,24 @@ def prop4():
     )
 
 
-# PropsMetadata fixtures #######
+class TestPropertyConstructor:
+    """Test cases for Property constructor."""
 
-
-@pytest.fixture()
-def pmd1():
-    return PropsMetadata(1)
-
-
-@pytest.fixture()
-def pmd1_bis():
-    return PropsMetadata(1)
-
-
-@pytest.fixture()
-def pmd2():
-    return PropsMetadata({})
-
-
-@pytest.fixture()
-def pmd2_bis():
-    return PropsMetadata({})
-
-
-@pytest.fixture()
-def pmd3():
-    return PropsMetadata(2)
-
-
-@pytest.fixture()
-def pmd4():
-    return PropsMetadata({"a": "a"})
-
-
-# Test classes ###############################################################
-
-# Property tests
+    def test_empty_property_type_raises_error(self):
+        """Test that PropertyType with no flags cannot be used to create a Property."""
+        empty_flag = PropertyType(0)
+        with pytest.raises(
+            ValueError, match="Property type must be a valid PropertyType Flag"
+        ):
+            Property(
+                identifier="test",
+                name="test",
+                description="test",
+                provenance="test",
+                prop_type=empty_flag,
+                lin_type="CellLineage",
+                dtype="int",
+            )
 
 
 class TestPropertyEq:
@@ -173,10 +153,24 @@ class TestPropertyChangeDescription:
 
     # TODO: maybe it should be a TypeError instead?
     # Same for _change_name() above and _change_provenance() below
-    def test_invalid__description_raises_error(self, prop1):
-        """Test that invalid name raises ValueError."""
+    def test_invalid_description_raises_error(self, prop1):
+        """Test that invalid description raises ValueError."""
         with pytest.raises(ValueError):
             prop1._change_description(42)
+
+
+class TestPropertyChangeIdentifier:
+    """Test cases for Property._change_identifier() method."""
+
+    def test_normal(self, prop1):
+        """Test normal behavior."""
+        prop1._change_identifier("new_id")
+        assert prop1.identifier == "new_id"
+
+    def test_invalid_identifier_raises_error(self, prop1):
+        """Test that invalid identifier raises ValueError."""
+        with pytest.raises(ValueError):
+            prop1._change_identifier(42)
 
 
 class TestPropertyChangeName:
@@ -202,28 +196,159 @@ class TestPropertyChangeProvenance:
         assert prop1.provenance == "new_prov"
 
     def test_invalid_provenance_raises_error(self, prop1):
-        """Test that invalid name raises ValueError."""
+        """Test that invalid provenance raises ValueError."""
         with pytest.raises(ValueError):
             prop1._change_provenance(42)
 
 
-# PropsMetadata tests
+class TestPropertyConstructorConversion:
+    """Test cases for Property constructor with string/list conversion."""
+
+    def test_constructor_with_string_prop_type(self):
+        """Test constructor accepts string prop_type and converts it."""
+        prop = Property(
+            identifier="test",
+            name="test",
+            description="test",
+            provenance="test",
+            prop_type="node",
+            lin_type="CellLineage",
+            dtype="int",
+        )
+        assert prop.prop_type == PropertyType.NODE
+
+    def test_constructor_with_list_prop_type_single(self):
+        """Test constructor converts single-item list to PropertyType."""
+        prop = Property(
+            identifier="test",
+            name="test",
+            description="test",
+            provenance="test",
+            prop_type=["edge"],
+            lin_type="CellLineage",
+            dtype="int",
+        )
+        assert prop.prop_type == PropertyType.EDGE
+
+    def test_constructor_with_list_prop_type_multi(self):
+        """Test constructor converts multi-item list to combined PropertyType."""
+        prop = Property(
+            identifier="test",
+            name="test",
+            description="test",
+            provenance="test",
+            prop_type=["node", "edge"],
+            lin_type="CellLineage",
+            dtype="int",
+        )
+        assert prop.prop_type == (PropertyType.NODE | PropertyType.EDGE)
+
+    def test_constructor_with_property_type_flag(self):
+        """Test constructor accepts PropertyType Flag directly."""
+        prop = Property(
+            identifier="test",
+            name="test",
+            description="test",
+            provenance="test",
+            prop_type=PropertyType.LINEAGE,
+            lin_type="CellLineage",
+            dtype="int",
+        )
+        assert prop.prop_type == PropertyType.LINEAGE
 
 
-class TestPropsMetadataEq:
-    """Test cases for Property.is_equal() method."""
+class TestPropertyConstructorAttributes:
+    """Test cases for Property constructor attribute assignment."""
 
-    def test_equality(self, prop1, prop1_bis, pmd1, pmd1_bis, pmd2, pmd2_bis):
-        """Test PropsMetadata equality."""
-        pmd = PropsMetadata({"prop1": prop1})
-        pmd_bis = PropsMetadata({"prop1": prop1_bis})
-        assert pmd == pmd_bis
-        assert pmd1 == pmd1_bis
-        assert pmd2 == pmd2_bis
+    def test_all_attributes_assigned(self, prop1):
+        """Test that all attributes are correctly assigned in constructor."""
+        assert prop1.identifier == "name1"
+        assert prop1.name == "name1"
+        assert prop1.description == "desc1"
+        assert prop1.provenance == "prov1"
+        assert prop1.prop_type == PropertyType.NODE
+        assert prop1.lin_type == "CellLineage"
+        assert prop1.dtype == "type1"
+        assert prop1.unit == "unit1"
 
-    def test_inequality(self, pmd1, pmd2, pmd3, pmd4):
-        """Test PropsMetadata equality."""
-        assert pmd1 != pmd2
-        assert pmd1 != pmd3
-        assert pmd1 != pmd4
-        assert pmd1 != "not a PropsMetadata"
+    def test_unit_optional(self, prop3):
+        """Test that unit parameter is optional and can be None."""
+        assert prop3.unit is None
+
+    def test_invalid_lineage_type(self):
+        """Test that invalid lin_type raises ValueError."""
+        with pytest.raises(ValueError, match="Lineage type must be one of"):
+            Property(
+                identifier="test",
+                name="test",
+                description="test",
+                provenance="test",
+                prop_type="node",
+                lin_type="InvalidType",
+                dtype="int",
+            )
+
+    def test_different_lineage_types(self):
+        """Test constructor with different valid lineage types."""
+        for lin_type in ["CellLineage", "CycleLineage", "Lineage"]:
+            prop = Property(
+                identifier="test",
+                name="test",
+                description="test",
+                provenance="test",
+                prop_type="node",
+                lin_type=lin_type,
+                dtype="int",
+            )
+            assert prop.lin_type == lin_type
+
+
+class TestPropertyRepr:
+    """Test cases for Property.__repr__() method."""
+
+    def test_repr_format(self, prop1):
+        """Test that __repr__() returns a valid representation."""
+        repr_str = repr(prop1)
+        assert "Property(" in repr_str
+        assert "identifier='name1'" in repr_str
+        assert "name='name1'" in repr_str
+        assert "dtype='type1'" in repr_str
+
+    def test_repr_contains_all_fields(self, prop1):
+        """Test that __repr__() includes all attribute fields."""
+        repr_str = repr(prop1)
+        assert "identifier=" in repr_str
+        assert "name=" in repr_str
+        assert "description=" in repr_str
+        assert "provenance=" in repr_str
+        assert "prop_type=" in repr_str
+        assert "lin_type=" in repr_str
+        assert "dtype=" in repr_str
+        assert "unit=" in repr_str
+
+
+class TestPropertyStr:
+    """Test cases for Property.__str__() method."""
+
+    def test_str_format(self, prop1):
+        """Test that __str__() returns a human-readable string."""
+        str_repr = str(prop1)
+        assert "Property 'name1'" in str_repr
+        assert "Name: name1" in str_repr
+        assert "Description: desc1" in str_repr
+
+    def test_str_contains_all_fields(self, prop1):
+        """Test that __str__() includes all attribute fields."""
+        str_repr = str(prop1)
+        assert "Name:" in str_repr
+        assert "Description:" in str_repr
+        assert "Provenance:" in str_repr
+        assert "Type:" in str_repr
+        assert "Lineage type:" in str_repr
+        assert "Data type:" in str_repr
+        assert "Unit:" in str_repr
+
+    def test_str_with_no_unit(self, prop3):
+        """Test __str__() when unit is None."""
+        str_repr = str(prop3)
+        assert "Unit: None" in str_repr

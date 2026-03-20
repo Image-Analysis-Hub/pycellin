@@ -16,6 +16,7 @@ from pycellin.classes.exceptions import (
     TimeFlowError,
     LineageStructureError,
 )
+from pycellin.custom_types import PropertyType
 
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
@@ -23,7 +24,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     Abstract class for a lineage graph.
     """
 
-    def __init__(self, nx_digraph: nx.DiGraph | None = None, lid: int | None = None) -> None:
+    def __init__(
+        self, nx_digraph: nx.DiGraph | None = None, lid: int | None = None
+    ) -> None:
         """
         Initialize a lineage graph.
 
@@ -40,7 +43,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             assert isinstance(lid, int), "The lineage ID must be an integer."
             self.graph["lineage_ID"] = lid
 
-    def _remove_prop(self, prop_name: str, prop_type: str) -> None:
+    def _remove_prop(self, prop_name: str, prop_type: PropertyType | None = None) -> None:
         """
         Remove a property from the lineage graph based on the property type.
 
@@ -48,25 +51,47 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ----------
         prop_name : str
             The name of the property to remove.
-        prop_type : str
-            The type of property to remove. Must be one of `node`, `edge`, or `lineage`.
+        prop_type : PropertyType, optional
+            The type of the property to remove. If None, the property is removed
+            from all locations (nodes, edges, and graphs). If a PropertyType Flag is
+            provided, the property is removed only from the specified type(s).
 
         Raises
         ------
         ValueError
-            If the prop_type is not one of `node`, `edge`, or `lineage`.
+            If prop_type is provided but is not a valid PropertyType Flag.
+
+        Examples
+        --------
+        >>> # Remove from all locations.
+        >>> lineage._remove_prop("some_property")
+        >>> # Remove only from nodes.
+        >>> lineage._remove_prop("node_property", PropertyType.NODE)
+        >>> # Remove from both nodes and lineages.
+        >>> lineage._remove_prop("multi_property", PropertyType.NODE | PropertyType.LINEAGE)
         """
-        match prop_type:
-            case "node":
-                for _, data in self.nodes(data=True):
-                    data.pop(prop_name, None)
-            case "edge":
-                for _, _, data in self.edges(data=True):
-                    data.pop(prop_name, None)
-            case "lineage":
-                self.graph.pop(prop_name, None)
-            case _:
-                raise ValueError("Invalid prop_type. Must be one of 'node', 'edge', or 'lineage'.")
+        # If no prop_type specified, remove from all locations.
+        if prop_type is None:
+            for _, data in self.nodes(data=True):
+                data.pop(prop_name, None)
+            for _, _, data in self.edges(data=True):
+                data.pop(prop_name, None)
+            self.graph.pop(prop_name, None)
+            return
+
+        # Validate prop_type.
+        if not isinstance(prop_type, PropertyType):
+            raise ValueError("Invalid prop_type. Must be a PropertyType Flag or None.")
+
+        # Remove from specified type(s) only.
+        if PropertyType.NODE in prop_type:
+            for _, data in self.nodes(data=True):
+                data.pop(prop_name, None)
+        if PropertyType.EDGE in prop_type:
+            for _, _, data in self.edges(data=True):
+                data.pop(prop_name, None)
+        if PropertyType.LINEAGE in prop_type:
+            self.graph.pop(prop_name, None)
 
     def get_root(self, ignore_lone_nodes: bool = False) -> int | list[int]:
         """
@@ -121,7 +146,11 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The list of leaf nodes in the lineage.
         """
         if ignore_lone_nodes:
-            leaves = [n for n in self.nodes() if self.in_degree(n) != 0 and self.out_degree(n) == 0]
+            leaves = [
+                n
+                for n in self.nodes()
+                if self.in_degree(n) != 0 and self.out_degree(n) == 0
+            ]
         else:
             leaves = [n for n in self.nodes() if self.out_degree(n) == 0]
         return leaves
@@ -379,14 +408,15 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                     for prop in node_hover_props:
                         if prop not in node.attributes():
                             raise KeyError(
-                                f"Property {prop} is not present in the node attributes."
+                                f"Cannot plot: property {prop} is not present in the node attributes."
                             )
                         hover_text = f"{prop}: {node[prop]}<br>"
                         text += hover_text
                     node_hover_text.append(text)
             else:
                 node_hover_text = [
-                    (f"{ID_prop}: {node[ID_prop]}<br>{y_prop}: {node[y_prop]}") for node in G.vs
+                    (f"{ID_prop}: {node[ID_prop]}<br>{y_prop}: {node[y_prop]}")
+                    for node in G.vs
                 ]
             if "lineage_ID" in G.attributes():
                 graph_name = f"lineage_ID: {G['lineage_ID']}"
@@ -404,7 +434,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                     for prop in edge_hover_props:
                         if prop not in edge.attributes():
                             raise KeyError(
-                                f"Property {prop} is not present in the edge attributes."
+                                f"Cannot plot: property {prop} is not present in the edge attributes."
                             )
                         hover_text = f"{prop}: {edge[prop]}<br>"
                         text += hover_text
@@ -1020,7 +1050,11 @@ class CellLineage(Lineage):
                 for child in children:
                     sister_cell_cycle = self.get_cell_cycle(child)
                     sister_cells.extend(
-                        [n for n in sister_cell_cycle if self.nodes[n]["timepoint"] == current_tp]
+                        [
+                            n
+                            for n in sister_cell_cycle
+                            if self.nodes[n]["timepoint"] == current_tp
+                        ]
                     )
             elif len(parents) > 1:
                 lid, _ = CellLineage._get_lineage_ID_and_err_msg(self)
@@ -1254,11 +1288,17 @@ class CycleLineage(Lineage):
                 self.nodes[n]["cycle_length"] = len(cells_in_cycle)
                 # How long does the cycle last?
                 self.nodes[n]["cycle_duration"] = (
-                    (cell_lineage.nodes[last][time_prop] - cell_lineage.nodes[first][time_prop]) + 1
+                    (
+                        cell_lineage.nodes[last][time_prop]
+                        - cell_lineage.nodes[first][time_prop]
+                    )
+                    + 1
                 ) * time_step
                 root = self.get_root()
                 if isinstance(root, list):
-                    raise LineageStructureError("A cycle lineage cannot have multiple roots.")
+                    raise LineageStructureError(
+                        "A cycle lineage cannot have multiple roots."
+                    )
                 self.nodes[n]["level"] = nx.shortest_path_length(self, root, n)
 
     def __str__(self) -> str:
@@ -1331,7 +1371,9 @@ class CycleLineage(Lineage):
         """
         return list(pairwise(self.nodes[ccid]["cells"]))
 
-    def yield_links_within_cycle(self, ccid: int) -> Generator[Tuple[int, int], None, None]:
+    def yield_links_within_cycle(
+        self, ccid: int
+    ) -> Generator[Tuple[int, int], None, None]:
         """
         Yield all the links between the cells of a cell cycle.
 

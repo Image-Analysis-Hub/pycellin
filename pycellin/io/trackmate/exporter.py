@@ -12,6 +12,7 @@ import math
 import numbers
 import re
 import warnings
+from pathlib import Path
 from typing import Any
 
 import networkx as nx
@@ -22,7 +23,8 @@ from pycellin.classes.lineage import CellLineage
 from pycellin.classes.model import Model
 from pycellin.classes.property import Property
 from pycellin.classes.props_metadata import PropsMetadata
-from pycellin.io.trackmate.loader import load_TrackMate_XML
+from pycellin.custom_types import PropertyType
+from pycellin.io.utils import _graph_has_node_prop
 
 
 def _unit_to_dimension(
@@ -404,7 +406,11 @@ def _create_Spot(
         The newly created Spot Element.
     """
     exluded_keys = ["TRACK_ID", "ROI_coords"]
-    n_attr = {k: _value_to_str(v) for k, v in lineage.nodes[node].items() if k not in exluded_keys}
+    n_attr = {
+        k: _value_to_str(v)
+        for k, v in lineage.nodes[node].items()
+        if k not in exluded_keys
+    }
     if "ROI_coords" in lineage.nodes[node]:
         n_attr["ROI_N_POINTS"] = str(len(lineage.nodes[node]["ROI_coords"]))
         # The text of a Spot is the coordinates of its ROI points, in a flattened list.
@@ -483,7 +489,9 @@ def _write_AllTracks(
             xf.write(f"\n{' ' * 6}")
             exluded_keys = ["Model", "FilteredTrack"]
             t_attr = {
-                k: _value_to_str(v) for k, v in lineage.graph.items() if k not in exluded_keys
+                k: _value_to_str(v)
+                for k, v in lineage.graph.items()
+                if k not in exluded_keys
             }
             with xf.element("Track", t_attr):
                 # Edge tags.
@@ -559,7 +567,7 @@ def _write_FilteredTracks(
     xf.write(f"\n{' ' * 2}")
 
 
-def _update_nodes(lin: CellLineage) -> None:
+def _update_nodes(lin: CellLineage, frame_prop: str) -> set[int]:
     """
     Update the node properties in the lineage to match TrackMate requirements.
 
@@ -567,29 +575,42 @@ def _update_nodes(lin: CellLineage) -> None:
     ----------
     lin : CellLineage
         Lineage whose nodes to update.
+    frame_prop : str
+        Name of the property corresponding to the frame/timepoint.
+
+    Returns
+    -------
+    set[int]
+        Set of node IDs that are missing POSITION_X or POSITION_Y.
     """
-    for _, data in lin.nodes(data=True):
+    nodes_with_missing_pos = set()
+
+    for node, data in lin.nodes(data=True):
         data["ID"] = data.pop("cell_ID")
-        data["FRAME"] = data.pop("frame")
+        data["FRAME"] = data.pop(frame_prop)
         data["VISIBILITY"] = 1
         try:
             data["name"] = data.pop("cell_name")
         except KeyError:
             pass  # Not a mandatory property.
         # Position properties.
+        has_missing_pos = False
         for axis in ["X", "Y", "Z"]:
             try:
                 data[f"POSITION_{axis}"] = data.pop(f"cell_{axis.lower()}")
             except KeyError:
                 # This POSITION_ is mandatory in TrackMate for x, y and z dimensions.
                 if axis in ["X", "Y"]:
-                    raise KeyError(
-                        f"Missing property: cell_{axis}. Cannot build "
-                        f"TrackMate feature POSITION_{axis}."
-                    )
+                    has_missing_pos = True
+                    data[f"POSITION_{axis}"] = None
                 else:
                     # We add the missing z dimension.
                     data[f"POSITION_{axis}"] = 0.0
+
+        if has_missing_pos:
+            nodes_with_missing_pos.add(node)
+
+    return nodes_with_missing_pos
 
 
 def _update_edges(lin: CellLineage) -> None:
@@ -638,7 +659,7 @@ def _update_lineages(lin: CellLineage) -> None:
             pass  # Not a mandatory property.
 
 
-def _update_model_data(model: Model) -> None:
+def _update_model_data(model: Model, frame_prop: str) -> None:
     """
     Update the data in the model to match TrackMate requirements.
 
@@ -646,11 +667,77 @@ def _update_model_data(model: Model) -> None:
     ----------
     model : Model
         Model whose data to update.
+    frame_prop : str
+        Name of the property corresponding to the frame/timepoint.
     """
+    # Track cells with missing position properties: {lineage_ID: set of node IDs}.
+    missing_positions = {}
+
     for lin in model.data.cell_data.values():
-        _update_nodes(lin)
+        nodes_with_missing_pos = _update_nodes(lin, frame_prop)
+        if nodes_with_missing_pos:
+            missing_positions[lin.graph["lineage_ID"]] = nodes_with_missing_pos
         _update_edges(lin)
         _update_lineages(lin)
+
+    # Show a single summary warning at the end if any positions are missing.
+    if missing_positions:
+        msg_parts = []
+        for lineage_id, node_ids in missing_positions.items():
+            nodes_str = ", ".join(str(n) for n in sorted(node_ids))
+            msg_parts.append(f"lineage {lineage_id}: cells {nodes_str}")
+
+        msg = (
+            f"Missing POSITION_X or POSITION_Y properties for the following cells:\n"
+            f"{'; '.join(msg_parts)}.\n"
+            f"TrackMate will ignore these cells."
+        )
+        warnings.warn(msg)
+
+
+def _is_numeric_dtype(dtype: str | None) -> bool:
+    """
+    Check if a dtype string represents a numeric type.
+
+    Parameters
+    ----------
+    dtype : str | None
+        The dtype string to check.
+
+    Returns
+    -------
+    bool
+        True if the dtype represents a numeric type, False otherwise.
+    """
+    if dtype is None:
+        return False
+    dtype_lower = dtype.lower()
+    numeric_keywords = [
+        # Basic numeric types.
+        "int",
+        "integer",
+        "float",
+        "complex",
+        "bool",
+        "boolean",
+        "fraction",
+        "decimal",
+        "number",
+        "numeric",
+        "real",
+        "rational",
+        # Numpy-style dtypes.
+        "uint",
+        "int8",
+        "int16",
+        "int32",
+        "int64",
+        "float16",
+        "float32",
+        "float64",
+        "float128",
+    ]
+    return any(keyword in dtype_lower for keyword in numeric_keywords)
 
 
 def _remove_non_numeric_props(model: Model) -> None:
@@ -675,24 +762,10 @@ def _remove_non_numeric_props(model: Model) -> None:
     Boolean features are considered numeric and are converted to integers
     (1 for True, 0 for False).
     """
-    valid_dtype = [
-        "int",
-        "integer",
-        "float",
-        "complex",
-        "bool",
-        "boolean",
-        "fraction",
-        "decimal",
-        "number",
-        "numeric",
-        "real",
-        "rational",
-    ]
     to_remove = [
         name
         for name, prop in model.get_properties().items()
-        if prop.provenance != "TrackMate" and prop.dtype.lower() not in valid_dtype
+        if prop.provenance != "TrackMate" and not _is_numeric_dtype(prop.dtype)
     ]
     if to_remove:
         for name in to_remove:
@@ -710,20 +783,23 @@ def _remove_non_numeric_props(model: Model) -> None:
         warnings.warn(msg)
 
 
-def _rename_props(props_md: PropsMetadata) -> None:
+def _rename_props(props_md: PropsMetadata, frame_prop: str) -> None:
     """
     Rename some properties in the properties metadata to match TrackMate requirements.
 
-    Parameters
     ----------
     props_md : PropsMetadata
         Properties metadata to modify.
+    frame_prop : str
+        Name of the property corresponding to the frame/timepoint.
     """
     props_md._unprotect_prop("lineage_ID")
     props_md._change_prop_identifier("lineage_ID", "TRACK_ID")
     props_md._change_prop_description("TRACK_ID", "Track ID")
-    props_md._unprotect_prop("frame")
-    props_md._change_prop_identifier("frame", "FRAME")
+
+    if frame_prop != "FRAME":
+        props_md._unprotect_prop(frame_prop)
+        props_md._change_prop_identifier(frame_prop, "FRAME")
 
 
 def _remove_props(props_md: PropsMetadata) -> None:
@@ -843,16 +919,20 @@ def _update_location_props(props_md: PropsMetadata) -> None:
                     )
                 )
         try:
-            props_md._change_prop_identifier(f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION")
+            props_md._change_prop_identifier(
+                f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION"
+            )
         except KeyError:
             pass  # Not a mandatory property.
         try:
-            props_md._change_prop_identifier(f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION")
+            props_md._change_prop_identifier(
+                f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION"
+            )
         except KeyError:
             pass  # Not a mandatory property.
 
 
-def _update_props_metadata(model: Model) -> None:
+def _update_props_metadata(model: Model, frame_prop: str) -> None:
     """
     Update the properties metadata in the model to match TrackMate requirements.
 
@@ -860,12 +940,13 @@ def _update_props_metadata(model: Model) -> None:
     ----------
     model : Model
         Model whose metadata to update.
+    frame_prop : str
+        Name of the property corresponding to the frame/timepoint.
     """
-    props_md = model.props_metadata
-    _rename_props(props_md)
-    _remove_props(props_md)
-    _add_mandatory_props(props_md)
-    _update_location_props(props_md)
+    _rename_props(model.props_metadata, frame_prop)
+    _remove_props(model.props_metadata)
+    _add_mandatory_props(model.props_metadata)
+    _update_location_props(model.props_metadata)
 
 
 def _prepare_model_for_export(
@@ -881,9 +962,56 @@ def _prepare_model_for_export(
     ----------
     model : Model
         Model to prepare for export.
+
+    Raises
+    ------
+    KeyError
+        If neither a frame-like property nor 'timepoint' is present on all nodes.
     """
-    _update_props_metadata(model)
-    _update_model_data(model)
+    # TrackMate requires a FRAME property.
+    # First, collect all frame-like properties from the metadata.
+    candidates = []
+    for prop in model.props_metadata._get_prop_dict_from_prop_type(
+        PropertyType.NODE
+    ).values():
+        if prop.identifier.lower() == "frame":
+            candidates.append(prop.identifier)
+
+    # Check each candidate to see if it exists on all nodes in all lineages.
+    frame_prop = None
+    for candidate in candidates:
+        has_prop = True
+        for lin in model.data.cell_data.values():
+            has_prop = _graph_has_node_prop(lin, candidate) and has_prop
+
+        if has_prop:
+            frame_prop = candidate
+            break
+        else:
+            warnings.warn(
+                f"Property '{candidate}' found in metadata but not present on all nodes. "
+                f"Trying next candidate or falling back to 'timepoint'."
+            )
+
+    # If no valid frame property found, fallback to "timepoint".
+    if frame_prop is None:
+        frame_prop = "timepoint"
+        has_prop = True
+        for lin in model.data.cell_data.values():
+            has_prop = _graph_has_node_prop(lin, frame_prop) and has_prop
+
+        if has_prop:
+            warnings.warn(
+                f"No valid frame-like property found. Falling back to '{frame_prop}'."
+            )
+        else:
+            raise KeyError(
+                f"No valid frame-like property found. Tried candidates: {candidates} and "
+                f"fallback 'timepoint'. "
+            )
+
+    _update_props_metadata(model, frame_prop)
+    _update_model_data(model, frame_prop)
     _remove_non_numeric_props(model)
 
 
@@ -948,7 +1076,7 @@ def _ask_units(
 
 def export_TrackMate_XML(
     model: Model,
-    xml_path: str,
+    xml_path: str | Path,
     units: dict[str, str] | None = None,
     propagate_cycle_props: bool = False,
 ) -> Model:
@@ -959,7 +1087,7 @@ def export_TrackMate_XML(
     ----------
     model : Model
         pycellin model containing the data to write.
-    xml_path : str
+    xml_path : str | Path
         Path of the XML file to write.
     units : dict[str, str], optional
         Dictionary containing the spatial and temporal units of the model.
@@ -1024,30 +1152,32 @@ def export_TrackMate_XML(
 
 
 if __name__ == "__main__":
-    xml_in = "sample_data/FakeTracks.xml"
-    # xml_out = "sample_data/results/FakeTracks_TMtoTM.xml"
-    xml_out = "sample_data/results/FakeTracks_exported_TM.xml"
-    # xml_in = "sample_data/Celegans-5pc-17timepoints.xml"
-    # xml_out = "sample_data/Celegans-5pc-17timepoints_exported_TM.xml"
+    """
+    Quick demo with sample data.
+    """
+    import tempfile
 
-    model = load_TrackMate_XML(xml_in, keep_all_spots=True, keep_all_tracks=True)
-    # print(model.props_metadata)
-    # model.remove_property("VISIBILITY")
+    from pycellin.io.geff.loader import load_GEFF
 
-    model.add_cycle_data()
-    model.propagate_cycle_properties(
-        props=["cells"],
+    geff_in = "sample_data/Ecoli_growth_on_agar_pad.geff"
+    model = load_GEFF(
+        geff_in,
+        lineage_id_prop="TRACK_ID",
+        cell_id_prop="ID",
+        time_prop="POSITION_T",
     )
-    # model.add_absolute_age()
-    # model.add_relative_age(in_time_unit=True)
-    # model.add_cell_displacement()
-    # model.update()
-    # lin0 = model.data.cell_data[0]
-    # lin0.plot(
-    #     node_hover_props=["cell_ID", "cell_x", "cell_y", "cell_z"],
-    #     edge_hover_props=["link_x", "link_y", "link_z"],
-    # )
-    # print(model.props_metadata)
-    export_TrackMate_XML(model, xml_out, {"spatialunits": "pixel", "temporalunits": "sec"})
-    # print()
-    # print(model.props_metadata)
+
+    print(model)
+    print("Model metadata:")
+    print(model.model_metadata)
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        xml_out = Path(tmp_dir) / "output.xml"
+        export_TrackMate_XML(
+            model,
+            xml_out,
+            units={
+                "spatialunits": model.get_space_unit(),
+                "temporalunits": model.get_time_unit(),
+            },
+        )

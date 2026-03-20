@@ -6,7 +6,7 @@ import warnings
 from typing import get_args
 
 from pycellin.classes.property import Property
-from pycellin.custom_types import LineageType, PropertyType
+from pycellin.custom_types import LineageType, PropertyType, property_type_from_string
 from pycellin.graph.properties.core import (
     create_cells_property,
     create_cycle_duration_property,
@@ -69,7 +69,9 @@ class PropsMetadata:
             A deep copy of the PropsMetadata object with all properties and
             protected properties lists independently copied.
         """
-        props_copy = {prop_id: copy.deepcopy(prop, memo) for prop_id, prop in self.props.items()}
+        props_copy = {
+            prop_id: copy.deepcopy(prop, memo) for prop_id, prop in self.props.items()
+        }
         protected_props_copy = copy.deepcopy(self._protected_props, memo)
         return PropsMetadata(props=props_copy, protected_props=protected_props_copy)
 
@@ -98,9 +100,15 @@ class PropsMetadata:
         str
             A human-readable string representation of the PropsMetadata object.
         """
-        node_props = ", ".join(self._get_prop_dict_from_prop_type("node").keys())
-        edge_props = ", ".join(self._get_prop_dict_from_prop_type("edge").keys())
-        lin_props = ", ".join(self._get_prop_dict_from_prop_type("lineage").keys())
+        node_props = ", ".join(
+            self._get_prop_dict_from_prop_type(PropertyType.NODE).keys()
+        )
+        edge_props = ", ".join(
+            self._get_prop_dict_from_prop_type(PropertyType.EDGE).keys()
+        )
+        lin_props = ", ".join(
+            self._get_prop_dict_from_prop_type(PropertyType.LINEAGE).keys()
+        )
         return (
             f"Node properties: {node_props}\n"
             f"Edge properties: {edge_props}\n"
@@ -129,14 +137,29 @@ class PropsMetadata:
         else:
             return False
 
-    def _get_prop_dict_from_prop_type(self, prop_type: PropertyType) -> dict:
+    def _get_prop_dict_from_prop_type(
+        self,
+        prop_type: PropertyType | str | list[str],
+        exact_match: bool = False,
+    ) -> dict:
         """
         Return the dictionary of properties corresponding to the specified type.
 
+        By default, uses "has-flag" semantics: returns properties that have ANY of
+        the specified flags set. For example, searching for NODE will return
+        properties with NODE, NODE|LINEAGE, etc.
+
         Parameters
         ----------
-        prop_type : PropertyType
-            The type of the properties to return (node, edge, or lineage).
+        prop_type : PropertyType or str or list[str]
+            The type of the property. Can be:
+            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE,
+            or combinations like PropertyType.NODE | PropertyType.EDGE.
+            - String: "node", "edge", or "lineage"
+            - List of strings: ["node", "lineage"] for multi-type properties
+        exact_match : bool, default False
+            If False (default), returns properties that have ANY of the specified flags.
+            If True, returns only properties that exactly match the specified flags.
 
         Returns
         -------
@@ -148,9 +171,24 @@ class PropsMetadata:
         ValueError
             If the property type is invalid.
         """
-        if not check_literal_type(prop_type, PropertyType):
-            raise ValueError(f"Property type must be one of {', '.join(get_args(PropertyType))}.")
-        props = {k: v for k, v in self.props.items() if prop_type == v.prop_type}
+        # Convert string/list to PropertyType Flag if needed.
+        if isinstance(prop_type, (str, list)):
+            prop_type = property_type_from_string(prop_type)
+
+        # Validate PropertyType.
+        if not isinstance(prop_type, PropertyType) or prop_type == PropertyType(0):
+            raise ValueError(
+                "Property type must be a valid PropertyType Flag with at least one flag set. "
+                "Valid types: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE, "
+                "or strings/lists: 'node', 'edge', 'lineage', ['node', 'lineage']."
+            )
+
+        # Filter properties based on match type.
+        if exact_match:
+            props = {k: v for k, v in self.props.items() if v.prop_type == prop_type}
+        else:
+            props = {k: v for k, v in self.props.items() if v.prop_type & prop_type}
+
         return props
 
     def _get_prop_dict_from_lin_type(self, lin_type: LineageType) -> dict:
@@ -174,7 +212,9 @@ class PropsMetadata:
             If the lineage type is invalid.
         """
         if not check_literal_type(lin_type, LineageType):
-            raise ValueError(f"Lineage type must be one of {', '.join(get_args(LineageType))}.")
+            raise ValueError(
+                f"Lineage type must be one of {', '.join(get_args(LineageType))}."
+            )
         props = {k: v for k, v in self.props.items() if lin_type == v.lin_type}
         return props
 
@@ -270,36 +310,71 @@ class PropsMetadata:
     def _remove_prop(
         self,
         prop_id: str,
+        prop_type: PropertyType | None = None,
     ) -> None:
         """
         Remove the specified property from the PropsMetadata.
+
+        For multi-type properties, can either remove entirely or just remove
+        specific types.
 
         Parameters
         ----------
         prop_id : str
             The identifier of the property to remove.
+        prop_type : PropertyType, optional
+            If specified, only remove the property for the specified type. For multi-type
+            properties (e.g., NODE|LINEAGE), this allows converting to single-type
+            by removing one flag. If None (default), the property is removed entirely.
+
+        Warns
+        -----
+        UserWarning
+            If the property is protected and cannot be removed.
 
         Raises
         ------
+        KeyError
+            If the property does not exist.
         ValueError
-            If the property type is invalid.
-        UserWarning
-            If the property is protected and cannot be removed.
+            If prop_type is specified but the property doesn't have those flags.
         """
         if prop_id not in self.props:
-            raise KeyError(f"Property '{prop_id}' does not exist in the declared properties.")
+            raise KeyError(
+                f"Property '{prop_id}' does not exist in the declared properties."
+            )
         if prop_id in self._protected_props:
             msg = (
                 f"Property '{prop_id}' is protected and cannot be removed. "
                 "Unprotect the property before modifying it."
             )
             warnings.warn(msg)
-        else:
+            return
+
+        # If no prop_type specified, remove entirely.
+        if prop_type is None:
             del self.props[prop_id]
+            return
+
+        # Determine new type for the property.
+        current_prop_type = self.props[prop_id].prop_type
+        if not (current_prop_type & prop_type):
+            raise ValueError(
+                f"Property '{prop_id}' does not have type(s) {prop_type}. "
+                f"Current type: {current_prop_type}"
+            )
+        new_prop_type = current_prop_type & ~prop_type
+
+        # Update or remove the property.
+        if new_prop_type == PropertyType(0):
+            del self.props[prop_id]
+        else:
+            self.props[prop_id].prop_type = new_prop_type
 
     def _remove_props(
         self,
         prop_ids: list[str],
+        prop_type: PropertyType | None = None,
     ) -> None:
         """
         Remove the specified properties from the PropsMetadata.
@@ -308,9 +383,12 @@ class PropsMetadata:
         ----------
         prop_ids : list[str]
             The identifiers of the properties to remove.
+        prop_type : PropertyType, optional
+            If specified, only remove the properties for the specified type.
+            If None (default), properties are removed entirely.
         """
         for prop_id in prop_ids:
-            self._remove_prop(prop_id)
+            self._remove_prop(prop_id, prop_type)
 
     def _change_prop_identifier(
         self,
@@ -335,7 +413,9 @@ class PropsMetadata:
             If the property is protected and cannot be modified.
         """
         if prop_id not in self.props:
-            raise KeyError(f"Property '{prop_id}' does not exist in the declared properties.")
+            raise KeyError(
+                f"Property '{prop_id}' does not exist in the declared properties."
+            )
         if prop_id in self._protected_props:
             msg = (
                 f"Property '{prop_id}' is protected and cannot be modified. "
@@ -358,7 +438,9 @@ class PropsMetadata:
             The new name for the property.
         """
         if prop_id not in self.props:
-            raise KeyError(f"Property '{prop_id}' does not exist in the declared properties.")
+            raise KeyError(
+                f"Property '{prop_id}' does not exist in the declared properties."
+            )
         if prop_id in self._protected_props:
             msg = (
                 f"Property '{prop_id}' is protected and cannot be modified. "
@@ -392,7 +474,9 @@ class PropsMetadata:
             (i.e. it is in the list of protected properties).
         """
         if prop_id not in self.props:
-            raise KeyError(f"Property '{prop_id}' does not exist in the declared properties.")
+            raise KeyError(
+                f"Property '{prop_id}' does not exist in the declared properties."
+            )
         if prop_id in self._protected_props:
             msg = (
                 f"Property '{prop_id}' is protected and cannot be modified. "
@@ -464,7 +548,7 @@ class PropsMetadata:
             and the values are lists of property identifiers. For example:
             {'unit1': ['property1', 'property2'], 'unit2': ['property3'], None: ['property4']}.
         """
-        units = {}  # type: dict[str | None, list[str]]
+        units: dict[str | None, list[str]] = {}
         for prop in self.props.values():
             if prop.unit in units:
                 units[prop.unit].append(prop.identifier)

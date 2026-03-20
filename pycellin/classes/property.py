@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# from __future__ import annotations
 
 from typing import get_args
 
-from pycellin.custom_types import PropertyType, LineageType
+from pycellin.custom_types import (
+    LineageType,
+    PropertyType,
+    property_type_from_string,
+    property_type_to_strings,
+)
 from pycellin.utils import check_literal_type
 
 
@@ -17,7 +21,7 @@ class Property:
         name: str,
         description: str,
         provenance: str,
-        prop_type: PropertyType,
+        prop_type: PropertyType | str | list[str],
         lin_type: LineageType,
         dtype: str,
         unit: str | None = None,
@@ -35,8 +39,12 @@ class Property:
             A description of the property.
         provenance : str
             The provenance of the property (TrackMate, CTC, pycellin, custom...).
-        prop_type : PropertyType
-            The type of the property: `node`, `edge` or `lineage.
+        prop_type : PropertyType or str or list[str]
+            The type of the property. Can be:
+            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE,
+            or combinations like PropertyType.NODE | PropertyType.EDGE.
+            - String: "node", "edge", or "lineage"
+            - List of strings: ["node", "lineage"] for multi-type properties
         lin_type : LineageType
             The type of lineage the property is associated with: `CellLineage`,
             `CycleLineage`, or `Lineage` for both.
@@ -54,11 +62,25 @@ class Property:
         self.name = name
         self.description = description
         self.provenance = provenance
-        if not check_literal_type(prop_type, PropertyType):
-            raise ValueError(f"Property type must be one of {', '.join(get_args(PropertyType))}.")
+
+        # Convert string/list to PropertyType Flag if needed.
+        if isinstance(prop_type, (str, list)):
+            prop_type = property_type_from_string(prop_type)
+
+        # Validate PropertyType.
+        if not isinstance(prop_type, PropertyType) or prop_type == PropertyType(0):
+            raise ValueError(
+                "Property type must be a valid PropertyType Flag with at least one flag set. "
+                "Valid types: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE, "
+                "or combinations like PropertyType.NODE | PropertyType.EDGE, and "
+                "strings/lists: 'node', 'edge', 'lineage', ['node', 'lineage']."
+            )
         self.prop_type = prop_type
+
         if not check_literal_type(lin_type, LineageType):
-            raise ValueError(f"Lineage type must be one of {', '.join(get_args(LineageType))}.")
+            raise ValueError(
+                f"Lineage type must be one of {', '.join(get_args(LineageType))}."
+            )
         self.lin_type = lin_type
         self.dtype = dtype
         self.unit = unit
@@ -107,7 +129,7 @@ class Property:
             f"  Name: {self.name}\n"
             f"  Description: {self.description}\n"
             f"  Provenance: {self.provenance}\n"
-            f"  Type: {self.prop_type}\n"
+            f"  Type: {property_type_to_strings(self.prop_type)}\n"
             f"  Lineage type: {self.lin_type}\n"
             f"  Data type: {self.dtype}\n"
             f"  Unit: {self.unit}"

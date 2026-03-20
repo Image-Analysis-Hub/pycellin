@@ -26,26 +26,26 @@ from pycellin.classes.lineage import CellLineage
 # the CTC file creation if we know it will fail.
 
 
-def _sort_nodes_by_frame(
+def _sort_nodes_by_timepoint(
     lineage: CellLineage,
     nodes: list[int],
 ) -> list[int]:
     """
-    Sort the nodes by ascending frame.
+    Sort the nodes by ascending timepoint.
 
     Parameters
     ----------
     lineage : CellLineage
         The lineage object to which the nodes belongs.
     nodes : list[int]
-        A list of nodes ID to order by ascending frame.
+        A list of nodes ID to order by ascending timepoint.
 
     Returns
     -------
     list[int]
-        A list of nodes ID, ordered by ascending frame.
+        A list of nodes ID, ordered by ascending timepoint.
     """
-    sorted_list = [(node, lineage.nodes[node]["frame"]) for node in nodes]
+    sorted_list = [(node, lineage.nodes[node]["timepoint"]) for node in nodes]
     sorted_list.sort(key=lambda x: x[1])
     return [node for node, _ in sorted_list]
 
@@ -62,7 +62,7 @@ def _find_gaps(
     lineage : CellLineage
         The lineage object to which the nodes belongs.
     sorted_nodes : list[int]
-        A list of nodes ID, ordered by ascending frame.
+        A list of nodes ID, ordered by ascending timepoint.
 
     Returns
     -------
@@ -72,9 +72,9 @@ def _find_gaps(
     """
     gap_nodes = []
     for i in range(len(sorted_nodes) - 1):
-        frame = lineage.nodes[sorted_nodes[i]]["frame"]
-        next_frame = lineage.nodes[sorted_nodes[i + 1]]["frame"]
-        if next_frame - frame > 1:
+        timepoint = lineage.nodes[sorted_nodes[i]]["timepoint"]
+        next_timepoint = lineage.nodes[sorted_nodes[i + 1]]["timepoint"]
+        if next_timepoint - timepoint > 1:
             gap_nodes.append((sorted_nodes[i], sorted_nodes[i + 1]))
 
     return gap_nodes
@@ -95,7 +95,7 @@ def _add_track(
     lineage : CellLineage
         The lineage object to which the nodes belongs.
     sorted_nodes : list[int]
-        A list of nodes ID, ordered by ascending frame.
+        A list of nodes ID, ordered by ascending timepoint.
     ctc_tracks : dict[int, dict[str, int]]
         A dictionary containing the CTC tracks of the lineage.
     node_to_parent_track : dict[int, int]
@@ -109,8 +109,8 @@ def _add_track(
         The updated current track label.
     """
     track = {
-        "B": lineage.nodes[sorted_nodes[0]]["frame"],
-        "E": lineage.nodes[sorted_nodes[-1]]["frame"],
+        "B": lineage.nodes[sorted_nodes[0]]["timepoint"],
+        "E": lineage.nodes[sorted_nodes[-1]]["timepoint"],
         "B_node": sorted_nodes[0],
         "E_node": sorted_nodes[-1],
     }
@@ -167,7 +167,7 @@ def _build_CTC_tracks(
                 f"CTC do not support fusion events. {err.message}",
             ) from err
         for cc in cell_cycles:
-            sorted_nodes = _sort_nodes_by_frame(lineage, cc)
+            sorted_nodes = _sort_nodes_by_timepoint(lineage, cc)
             gaps = _find_gaps(lineage, sorted_nodes)
             if gaps:
                 track_start_i = 0

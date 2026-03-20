@@ -23,7 +23,7 @@ from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.classes.updater import ModelUpdater
-from pycellin.custom_types import Cell, Link
+from pycellin.custom_types import Cell, Link, PropertyType, property_type_from_string
 from pycellin.graph.properties.core import Timepoint, create_timepoint_property
 
 L = TypeVar("L", bound="Lineage")
@@ -55,11 +55,12 @@ class Model:
             The name of the property to use as the reference for time measurements.
             Needs to be provided if model_metadata is None or does not contain it.
         variable_time_step : bool, optional
-            If True and time_step is not provided in model_metadata, the time step will be
-            computed using the greatest common divisor (GCD) of time differences, which is
-            suitable for irregularly sampled timepoints. If False, the minimum time difference
-            is used instead (default is False). This parameter is only used when time_step
-            needs to be automatically computed from the data.
+            If True and time_step is not provided in model_metadata, the time step
+            will be computed using the greatest common divisor (GCD) of time
+            differences, which is suitable for irregularly sampled timepoints.
+            If False, the minimum time difference is used instead (default is False).
+            This parameter is only used when time_step needs to be automatically
+            computed from the data.
 
         Raises
         ------
@@ -84,7 +85,9 @@ class Model:
             if isinstance(model_metadata, dict):
                 reference_time_property = model_metadata.get("reference_time_property")
             else:
-                reference_time_property = getattr(model_metadata, "reference_time_property", None)
+                reference_time_property = getattr(
+                    model_metadata, "reference_time_property", None
+                )
 
             if not reference_time_property:
                 raise ValueError(
@@ -109,7 +112,9 @@ class Model:
         if time_step is None:
             if self.data.cell_data:
                 # Create temporary metadata for _compute_time_step().
-                temp_metadata = ModelMetadata(reference_time_property=reference_time_property)
+                temp_metadata = ModelMetadata(
+                    reference_time_property=reference_time_property
+                )
                 self.model_metadata = temp_metadata
                 time_step = self._compute_time_step(variable_time_step)
             else:
@@ -194,7 +199,10 @@ class Model:
                     f"Model named '{self.model_metadata.name}' "
                     f"with {nb_lin} lineage{'s' if nb_lin > 1 else ''}."
                 )
-            elif hasattr(self.model_metadata, "provenance") and self.model_metadata.provenance:
+            elif (
+                hasattr(self.model_metadata, "provenance")
+                and self.model_metadata.provenance
+            ):
                 txt = (
                     f"Model with {nb_lin} lineage{'s' if nb_lin > 1 else ''}, "
                     f"built from {self.model_metadata.provenance}."
@@ -217,7 +225,10 @@ class Model:
                 )
             elif hasattr(self.model_metadata, "name") and self.model_metadata.name:
                 txt = f"Model named '{self.model_metadata.name}'."
-            elif hasattr(self.model_metadata, "provenance") and self.model_metadata.provenance:
+            elif (
+                hasattr(self.model_metadata, "provenance")
+                and self.model_metadata.provenance
+            ):
                 txt = f"Model built from {self.model_metadata.provenance}."
             else:
                 txt = "Empty model."
@@ -598,38 +609,74 @@ class Model:
             props.update(self.props_metadata._get_prop_dict_from_lin_type("Lineage"))
         return props
 
-    def get_node_properties(self) -> dict[str, Property]:
+    def get_node_properties(self, single_type: bool = False) -> dict[str, Property]:
         """
         Return the node properties present in the model.
+
+        Parameters
+        ----------
+        single_type : bool, optional
+            True to only return single-type node properties (i.e., those with
+            exactly the "node" flag). False to return all properties with the
+            "node" flag regardless of other flags (default is False).
 
         Returns
         -------
         dict[str, Property]
             Dictionary of the node properties present in the model.
         """
-        return self.props_metadata._get_prop_dict_from_prop_type("node")
+        if single_type:
+            return self.props_metadata._get_prop_dict_from_prop_type(
+                "node", exact_match=True
+            )
+        else:
+            return self.props_metadata._get_prop_dict_from_prop_type("node")
 
-    def get_edge_properties(self) -> dict[str, Property]:
+    def get_edge_properties(self, single_type: bool = False) -> dict[str, Property]:
         """
         Return the edge properties present in the model.
+
+        Parameters
+        ----------
+        single_type : bool, optional
+            True to only return single-type node properties (i.e., those with
+            exactly the "node" flag). False to return all properties with the
+            "node" flag regardless of other flags (default is False).
 
         Returns
         -------
         dict[str, Property]
             Dictionary of the edge properties present in the model.
         """
-        return self.props_metadata._get_prop_dict_from_prop_type("edge")
+        if single_type:
+            return self.props_metadata._get_prop_dict_from_prop_type(
+                "edge", exact_match=True
+            )
+        else:
+            return self.props_metadata._get_prop_dict_from_prop_type("edge")
 
-    def get_lineage_properties(self) -> dict[str, Property]:
+    def get_lineage_properties(self, single_type: bool = False) -> dict[str, Property]:
         """
         Return the lineage properties present in the model.
+
+        Parameters
+        ----------
+        single_type : bool, optional
+            True to only return single-type lineage properties (i.e., those with
+            exactly the "lineage" flag). False to return all properties with the
+            "lineage" flag regardless of other flags (default is False).
 
         Returns
         -------
         dict[str, Property]
             Dictionary of the lineage properties present in the model.
         """
-        return self.props_metadata._get_prop_dict_from_prop_type("lineage")
+        if single_type:
+            return self.props_metadata._get_prop_dict_from_prop_type(
+                "lineage", exact_match=True
+            )
+        else:
+            return self.props_metadata._get_prop_dict_from_prop_type("lineage")
 
     def get_cell_lineages(self) -> list[CellLineage]:
         """
@@ -881,16 +928,22 @@ class Model:
 
         if props_to_update is not None:
             missing_props = [
-                prop for prop in props_to_update if not self.props_metadata._has_prop(prop)
+                prop
+                for prop in props_to_update
+                if not self.props_metadata._has_prop(prop)
             ]
             if missing_props:
                 warnings.warn(
                     f"The following properties have not been declared "
                     f"and will be ignored: {', '.join(missing_props)}."
                 )
-                props_to_update = [prop for prop in props_to_update if prop not in missing_props]
+                props_to_update = [
+                    prop for prop in props_to_update if prop not in missing_props
+                ]
                 if not props_to_update:
-                    warnings.warn("No properties to update. The model will not be updated.")
+                    warnings.warn(
+                        "No properties to update. The model will not be updated."
+                    )
                     return
 
         # self.data._freeze_lineage_data()
@@ -1362,8 +1415,8 @@ class Model:
 
         The absolute age of a cell is defined as the time elapsed since
         the beginning of the lineage. Absolute age of the root is 0.
-        By default, it is computed using the reference time property
-        of the model, but a custom time property can be specified.
+        By default, absolute age is given in the time unit of the model,
+        but a custom time property can be specified.
 
         Parameters
         ----------
@@ -1380,11 +1433,15 @@ class Model:
             "Age of the cell since the start of the lineage".
         """
         if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+            time_prop = self.props_metadata.props.get(
+                self.model_metadata.reference_time_property
+            )
         else:
             time_prop = self.props_metadata.props.get(custom_time_property)
         if time_prop is None:
-            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            time_prop = (
+                custom_time_property or self.model_metadata.reference_time_property
+            )
             raise KeyError(f"The time property '{time_prop}' has not been declared.")
 
         prop = tracking.create_absolute_age_property(
@@ -1658,11 +1715,15 @@ class Model:
             "Speed of the cell between two consecutive detections".
         """
         if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+            time_prop = self.props_metadata.props.get(
+                self.model_metadata.reference_time_property
+            )
         else:
             time_prop = self.props_metadata.props.get(custom_time_property)
         if time_prop is None:
-            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            time_prop = (
+                custom_time_property or self.model_metadata.reference_time_property
+            )
             raise KeyError(f"The time property '{time_prop}' has not been declared.")
 
         prop = motion.create_cell_speed_property(
@@ -1714,8 +1775,9 @@ class Model:
         Add the division rate property to the model.
 
         Division rate is defined as the number of divisions per time unit.
-        It is the inverse of the division time. It is given in divisions per frame
-        by default, but can be converted to divisions per time unit of the model if specified.
+        It is the inverse of the division time. By default, division rate
+        is given in the time unit of the model, but a custom time property can be
+        specified.
 
         Parameters
         ----------
@@ -1732,11 +1794,15 @@ class Model:
             "Number of divisions per time unit".
         """
         if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+            time_prop = self.props_metadata.props.get(
+                self.model_metadata.reference_time_property
+            )
         else:
             time_prop = self.props_metadata.props.get(custom_time_property)
         if time_prop is None:
-            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            time_prop = (
+                custom_time_property or self.model_metadata.reference_time_property
+            )
             raise KeyError(f"The time property '{time_prop}' has not been declared.")
 
         prop = tracking.create_division_rate_property(
@@ -1758,8 +1824,8 @@ class Model:
         Add the division time property to the model.
 
         Division time is defined as the time elapsed between two successive divisions.
-        It is given in frames by default, but can be converted to the time unit of the
-        model if specified.
+        By default, division time is given in the time unit of the model,
+        but a custom time property can be specified.
 
         Parameters
         ----------
@@ -1776,11 +1842,15 @@ class Model:
             "Time elapsed between two successive divisions".
         """
         if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+            time_prop = self.props_metadata.props.get(
+                self.model_metadata.reference_time_property
+            )
         else:
             time_prop = self.props_metadata.props.get(custom_time_property)
         if time_prop is None:
-            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            time_prop = (
+                custom_time_property or self.model_metadata.reference_time_property
+            )
             raise KeyError(f"The time property '{time_prop}' has not been declared.")
 
         prop = tracking.create_division_time_property(
@@ -1805,8 +1875,9 @@ class Model:
 
         The relative age of a cell is defined as the time elapsed since the start
         of the cell cycle (i.e. previous division, or beginning of the lineage).
-        Relative age of the first cell of a cell cycle is 0. It is given in frames
-        by default, but can be converted to the time unit of the model if specified.
+        Relative age of the first cell of a cell cycle is 0. By default, relative age
+        is given in the time unit of the model, but a custom time property can be
+        specified.
 
         Parameters
         ----------
@@ -1823,11 +1894,15 @@ class Model:
             "Age of the cell since the start of the current cell cycle".
         """
         if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(self.model_metadata.reference_time_property)
+            time_prop = self.props_metadata.props.get(
+                self.model_metadata.reference_time_property
+            )
         else:
             time_prop = self.props_metadata.props.get(custom_time_property)
         if time_prop is None:
-            time_prop = custom_time_property or self.model_metadata.reference_time_property
+            time_prop = (
+                custom_time_property or self.model_metadata.reference_time_property
+            )
             raise KeyError(f"The time property '{time_prop}' has not been declared.")
 
         prop = tracking.create_relative_age_property(
@@ -1931,7 +2006,9 @@ class Model:
         cell_lin_props = list(futils.get_pycellin_cell_lineage_properties().keys())
         cycle_lin_props = list(futils.get_pycellin_cycle_lineage_properties().keys())
         if prop_identifier not in cell_lin_props + cycle_lin_props:
-            raise KeyError(f"Property {prop_identifier} is not a predefined property of pycellin.")
+            raise KeyError(
+                f"Property {prop_identifier} is not a predefined property of pycellin."
+            )
         elif prop_identifier in cycle_lin_props and not self.data.cycle_data:
             raise ValueError(
                 f"Property {prop_identifier} is a property of cycle lineages, "
@@ -2003,63 +2080,120 @@ class Model:
     def remove_property(
         self,
         prop_identifier: str,
+        prop_type: PropertyType | str | list[str] | None = None,
     ) -> None:
         """
         Remove the specified property from the model.
 
-        This updates the PropsMetadata, remove the property values
-        for all lineages, and notify the updater to unregister the calculator.
+        This updates the PropsMetadata, removes the property values
+        for all lineages, and notifies the updater to unregister the calculator.
+
+        For multi-type properties, can either remove entirely or just remove
+        specific types.
 
         Parameters
         ----------
         prop_identifier : str
             Identifier of the property to remove.
+        prop_type : PropertyType | str | list[str], optional
+            If specified, only remove the property for the specified type. Can be:
+            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE
+            - String: "node", "edge", or "lineage"
+            - List of strings: ["node", "lineage"] for removing multiple types
+            For multi-type properties (e.g., NODE|LINEAGE), this allows converting
+            to single-type by removing one flag. If None (default), the property is
+            removed entirely.
 
         Raises
         ------
         ValueError
-            If the property does not exist.
+            If the property does not exist or if prop_type is specified but the
+            property doesn't have those flags.
         ProtectedPropertyError
             If the property is a protected property.
+        KeyError
+            If an invalid property type string is provided.
+
+        Examples
+        --------
+        >>> # Remove property entirely
+        >>> model.remove_property("my_property")
+        >>> # Remove only NODE type from a NODE|LINEAGE property using PropertyType
+        >>> model.remove_property("my_property", PropertyType.NODE)
+        >>> # Remove multiple types at once using flag
+        >>> model.remove_property("my_property", PropertyType.NODE | PropertyType.EDGE)
+        >>> # Remove only NODE type using string
+        >>> model.remove_property("my_property", "node")
+        >>> # Remove multiple types at once using list
+        >>> model.remove_property("my_property", ["node", "edge"])
         """
         # Preliminary checks.
         if not self.props_metadata._has_prop(prop_identifier):
-            raise ValueError(f"There is no property {prop_identifier} in the declared properties.")
+            raise ValueError(
+                f"There is no property {prop_identifier} in the declared properties."
+            )
         if prop_identifier in self.props_metadata._get_protected_props():
             raise ProtectedPropertyError(prop_identifier)
 
-        # First we update the PropsMetadata...
-        prop_type = self.props_metadata.props[prop_identifier].prop_type
-        lin_type = self.props_metadata.props[prop_identifier].lin_type
-        self.props_metadata.props.pop(prop_identifier)
+        # Convert string/list to PropertyType if needed.
+        prop_type_flag: PropertyType | None
+        if prop_type is None:
+            prop_type_flag = None
+        elif isinstance(prop_type, (str, list)):
+            prop_type_flag = property_type_from_string(prop_type)
+        else:
+            prop_type_flag = prop_type
 
-        # ... we remove the property values...
+        # Get current property info before any modifications.
+        prop = self.props_metadata.props[prop_identifier]
+        current_prop_type = prop.prop_type
+        lin_type = prop.lin_type
+
+        # Determine which types to remove.
+        if prop_type_flag is None:
+            types_to_remove = current_prop_type
+            delete_calculator = True
+        else:
+            if not (current_prop_type & prop_type_flag):
+                raise ValueError(
+                    f"Property '{prop_identifier}' does not have type(s) {prop_type_flag}. "
+                    f"Current type: {current_prop_type}"
+                )
+            types_to_remove = prop_type_flag
+            new_prop_type = current_prop_type & ~prop_type_flag
+            delete_calculator = new_prop_type == PropertyType(0)
+
+        # Update the metadata.
+        self.props_metadata._remove_prop(prop_identifier, prop_type_flag)
+
+        # Update the data.
         match lin_type:
             case "CellLineage":
                 for lin in self.data.cell_data.values():
-                    lin._remove_prop(prop_identifier, prop_type)
+                    lin._remove_prop(prop_identifier, types_to_remove)
             case "CycleLineage" if self.data.cycle_data:
                 for clin in self.data.cycle_data.values():
-                    clin._remove_prop(prop_identifier, prop_type)
+                    clin._remove_prop(prop_identifier, types_to_remove)
             case "Lineage":
                 for lin in self.data.cell_data.values():
-                    lin._remove_prop(prop_identifier, prop_type)
+                    lin._remove_prop(prop_identifier, types_to_remove)
                 if self.data.cycle_data:
                     for clin in self.data.cycle_data.values():
-                        clin._remove_prop(prop_identifier, prop_type)
+                        clin._remove_prop(prop_identifier, types_to_remove)
             case _:
                 raise ValueError(
                     "Lineage type not recognized. Must be 'CellLineage', 'CycleLineage'"
                     "or 'Lineage'."
                 )
 
-        # ... and finally we update the updater.
-        try:
-            self._updater.delete_calculator(prop_identifier)
-        except KeyError:
-            # No calculator doesn't mean there is something wrong,
-            # maybe it's just an imported property.
-            pass
+        # Update the updater only if property was completely removed.
+        if delete_calculator:
+            try:
+                self._updater.delete_calculator(prop_identifier)
+            except KeyError:
+                # No calculator doesn't mean there is something wrong,
+                # maybe it's just an imported property.
+                pass
 
     # TODO: add a method to remove several properties at the same time?
     # When no argument is provided, remove all properties?
@@ -2101,7 +2235,20 @@ class Model:
         self.data._add_cycle_lineages(time_prop, time_step)
         self.props_metadata._add_cycle_lineage_props(time_unit)
 
-    def _categorize_props(self, props: list[str] | None) -> tuple[list[str], list[str], list[str]]:
+    def has_cycle_data(self) -> bool:
+        """
+        Check if the model has cycle lineages.
+
+        Returns
+        -------
+        bool
+            True if the model has cycle lineages, False otherwise.
+        """
+        return bool(self.data.cycle_data)
+
+    def _categorize_props(
+        self, props: list[str] | None
+    ) -> tuple[list[str], list[str], list[str]]:
         """
         Categorize properties by type (node, edge, lineage).
 
@@ -2121,13 +2268,28 @@ class Model:
         ValueError
             If a property is not a cycle lineage property or not declared in the model.
         """
-        props = self.get_cycle_lineage_properties()
+        available_props = self.get_cycle_lineage_properties()
+
         if props is None:
-            node_props = [prop_id for prop_id, prop in props.items() if prop.prop_type == "node"]
-            edge_props = [prop_id for prop_id, prop in props.items() if prop.prop_type == "edge"]
-            lin_props = [prop_id for prop_id, prop in props.items() if prop.prop_type == "lineage"]
+            # If no specific props provided, categorize all available properties.
+            node_props = [
+                prop_id
+                for prop_id, prop in available_props.items()
+                if PropertyType.NODE in prop.prop_type
+            ]
+            edge_props = [
+                prop_id
+                for prop_id, prop in available_props.items()
+                if PropertyType.EDGE in prop.prop_type
+            ]
+            lin_props = [
+                prop_id
+                for prop_id, prop in available_props.items()
+                if PropertyType.LINEAGE in prop.prop_type
+            ]
         else:
-            missing_props = [prop for prop in props if prop not in props]
+            # If specific props provided, validate them against available properties.
+            missing_props = [prop for prop in props if prop not in available_props]
             if missing_props:
                 missing_str = ", ".join(repr(f) for f in missing_props)
                 plural = len(missing_props) > 1
@@ -2137,6 +2299,7 @@ class Model:
                     f"cycle lineage propert{'ies' if plural else 'y'} or not declared "
                     f"in the model."
                 )
+            # Categorize only the requested props.
             node_props = [f for f in props if f in self.get_node_properties()]
             edge_props = [f for f in props if f in self.get_edge_properties()]
             lin_props = [f for f in props if f in self.get_lineage_properties()]
@@ -2148,7 +2311,7 @@ class Model:
         node_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
-    ) -> None:
+    ) -> set[str]:
         """
         Propagate node properties from cycle lineage to cell lineage.
 
@@ -2160,22 +2323,30 @@ class Model:
             Source cycle lineage.
         lin : CellLineage
             Target cell lineage.
+
+        Returns
+        -------
+        set[str]
+            Set of properties that were actually propagated.
         """
+        propagated = set()
         for cycle, cells in clin.nodes(data="cells"):
             for cell in cells:
                 for prop in node_props:
                     try:
                         lin.nodes[cell][prop] = clin.nodes[cycle][prop]
+                        propagated.add(prop)
                     except KeyError:
                         # If the property is not present, we skip it.
                         continue
+        return propagated
 
     @staticmethod
     def _propagate_edge_props(
         edge_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
-    ) -> None:
+    ) -> set[str]:
         """
         Propagate edge properties from cycle lineage to cell lineage.
 
@@ -2188,11 +2359,17 @@ class Model:
         lin : CellLineage
             Target cell lineage.
 
+        Returns
+        -------
+        set[str]
+            Set of properties that were actually propagated.
+
         Raises
         ------
         FusionError
             If a cell has more than one incoming edge, indicating fusion.
         """
+        propagated = set()
         for edge in clin.edges:
             cycle = clin.nodes[edge[1]]["cycle_ID"]
             cells = clin.nodes[cycle]["cells"]
@@ -2202,28 +2379,31 @@ class Model:
                 for prop in edge_props:
                     try:
                         lin.edges[link][prop] = clin.edges[edge][prop]
+                        propagated.add(prop)
                     except KeyError:
                         # If the property is not present, we skip it.
                         continue
 
             # Intercycle edge.
             incoming_edges = list(lin.in_edges(cells[0]))
-            # TODO: check this, prop just below is unbound
             if len(incoming_edges) > 1:
                 raise FusionError(cells[0], lin.graph["lineage_ID"])
-            try:
-                lin.edges[incoming_edges[0]][prop] = clin.edges[edge][prop]
-            except (IndexError, KeyError):
-                # Either the cell is a root or the property is not present.
-                # In both cases, we skip it.
-                continue
+            for prop in edge_props:
+                try:
+                    lin.edges[incoming_edges[0]][prop] = clin.edges[edge][prop]
+                    propagated.add(prop)
+                except (IndexError, KeyError):
+                    # Either the cell is a root or the property is not present.
+                    # In both cases, we skip it.
+                    continue
+        return propagated
 
     @staticmethod
     def _propagate_lineage_props(
         lin_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
-    ) -> None:
+    ) -> set[str]:
         """
         Propagate lineage properties from cycle lineage to cell lineage.
 
@@ -2235,12 +2415,20 @@ class Model:
             Source cycle lineage.
         lin : CellLineage
             Target cell lineage.
+
+        Returns
+        -------
+        set[str]
+            Set of properties that were actually propagated.
         """
+        propagated = set()
         for prop in lin_props:
             try:
                 lin.graph[prop] = clin.graph[prop]
+                propagated.add(prop)
             except KeyError:
                 continue
+        return propagated
 
     def propagate_cycle_properties(
         self, props: list[str] | None = None, update: bool = True
@@ -2289,22 +2477,32 @@ class Model:
             self.update()
         node_props, edge_props, lin_props = self._categorize_props(props)
 
-        # Update the properties declaration: now the property type is `Lineage`
-        # instead of just `CycleLineage` since the properties are now present on cycle
-        # AND cell lineages.
-        for prop in node_props + edge_props + lin_props:
-            self.props_metadata.props[prop].lin_type = "Lineage"
+        propagated_props = (
+            set()
+        )  # to keep track of which properties were actually propagated
 
-        # Actual propagation.
+        # Propagation.
         for lin_ID in self.data.cell_data:
             lin = self.data.cell_data[lin_ID]
             clin = self.data.cycle_data[lin_ID]
             if node_props:
-                Model._propagate_node_props(node_props, clin, lin)
+                propagated_props.update(
+                    Model._propagate_node_props(node_props, clin, lin)
+                )
             if edge_props:
-                Model._propagate_edge_props(edge_props, clin, lin)
+                propagated_props.update(
+                    Model._propagate_edge_props(edge_props, clin, lin)
+                )
             if lin_props:
-                Model._propagate_lineage_props(lin_props, clin, lin)
+                propagated_props.update(
+                    Model._propagate_lineage_props(lin_props, clin, lin)
+                )
+
+        # Update the properties declaration: now the property type is `Lineage`
+        # instead of just `CycleLineage` since the properties are now present on cycle
+        # AND cell lineages.
+        for prop in propagated_props:
+            self.props_metadata.props[prop].lin_type = "Lineage"
 
     def to_cell_dataframe(self, lids: list[int] | None = None) -> pd.DataFrame:
         """
@@ -2349,7 +2547,9 @@ class Model:
             raise err
         columns = ["lineage_ID", time_prop, "cell_ID"] + columns
         df = df[columns]
-        df.sort_values(["lineage_ID", time_prop, "cell_ID"], ignore_index=True, inplace=True)
+        df.sort_values(
+            ["lineage_ID", time_prop, "cell_ID"], ignore_index=True, inplace=True
+        )
 
         return df
 
@@ -2485,7 +2685,9 @@ class Model:
             raise err
         columns = ["lineage_ID", "level", "cycle_ID"] + columns
         df = df[columns]
-        df.sort_values(["lineage_ID", "level", "cycle_ID"], ignore_index=True, inplace=True)
+        df.sort_values(
+            ["lineage_ID", "level", "cycle_ID"], ignore_index=True, inplace=True
+        )
 
         return df
 

@@ -57,9 +57,14 @@ def _get_branch_edge_property_values(
     lin_ID = lineage.graph["lineage_ID"]
     cell_lin = data.cell_data[lin_ID]
     try:
-        values = [cell_lin.edges[edge][prop_name] for edge in lineage.yield_links_within_cycle(nid)]
+        values = [
+            cell_lin.edges[edge][prop_name]
+            for edge in lineage.yield_links_within_cycle(nid)
+        ]
     except KeyError:
-        raise KeyError(f"Property '{prop_name}' does not exist in the cell lineage '{lin_ID}'.")
+        raise KeyError(
+            f"Property '{prop_name}' does not exist in the cell lineage '{lin_ID}'."
+        )
 
     if include_incoming_edge:
         first_cell = lineage.nodes[nid]["cells"][0]
@@ -74,10 +79,10 @@ def _get_branch_edge_property_values(
 
 
 def create_cell_displacement_property(
-    custom_identifier: str | None,
-    custom_name: str | None,
-    custom_description: str | None,
-    unit: str,
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    unit: str | None = None,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "cell_displacement",
@@ -135,15 +140,16 @@ class CellDisplacement(EdgeLocalPropCalculator):
 
 
 def create_branch_total_displacement_property(
-    custom_identifier: str | None,
-    custom_name: str | None,
-    custom_description: str | None,
-    unit: str,
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    unit: str | None = None,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "branch_total_displacement",
         name=custom_name or "Branch total displacement",
-        description=custom_description or "Displacement of the cell during the cell cycle",
+        description=custom_description
+        or "Displacement of the cell during the cell cycle",
         provenance="pycellin",
         prop_type="node",
         lin_type="CycleLineage",
@@ -200,15 +206,16 @@ class BranchTotalDisplacement(NodeGlobalPropCalculator):
 
 
 def create_branch_mean_displacement_property(
-    custom_identifier: str | None,
-    custom_name: str | None,
-    custom_description: str | None,
-    unit: str,
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    unit: str | None = None,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "branch_mean_displacement",
         name=custom_name or "Branch mean displacement",
-        description=custom_description or "Mean displacement of the cell during the cell cycle",
+        description=custom_description
+        or "Mean displacement of the cell during the cell cycle",
         provenance="pycellin",
         prop_type="node",
         lin_type="CycleLineage",
@@ -265,15 +272,16 @@ class BranchMeanDisplacement(NodeGlobalPropCalculator):
 
 
 def create_cell_speed_property(
-    custom_identifier: str | None,
-    custom_name: str | None,
-    custom_description: str | None,
-    unit: str | None,
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    unit: str | None = None,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "cell_speed",
         name=custom_name or "Cell speed",
-        description=custom_description or "Speed of the cell between two consecutive detections",
+        description=custom_description
+        or "Speed of the cell between two consecutive detections",
         provenance="pycellin",
         prop_type="edge",
         lin_type="CellLineage",
@@ -335,10 +343,10 @@ class CellSpeed(EdgeLocalPropCalculator):
 
 
 def create_branch_mean_speed_property(
-    custom_identifier: str | None,
-    custom_name: str | None,
-    custom_description: str | None,
-    unit: str,
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    unit: str | None = None,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "branch_mean_speed",
@@ -400,7 +408,7 @@ class BranchMeanSpeed(NodeGlobalPropCalculator):
 
 
 def create_straightness_property(
-    custom_identifier: str | None,
+    custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
@@ -510,10 +518,10 @@ class Straightness(NodeGlobalPropCalculator):
 
 
 def create_angle_property(
-    custom_identifier: str | None,
-    custom_name: str | None,
-    custom_description: str | None,
-    unit: Literal["radian", "degree"],
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    unit: Literal["radian", "degree"] = "radian",
 ) -> Property:
     return Property(
         identifier=custom_identifier or "angle",
@@ -606,4 +614,6 @@ class Angle(NodeGlobalPropCalculator):
         elif self.unit == "degree":
             return math.degrees(angle)
         else:
-            raise ValueError(f"Unknown unit: {self.unit}. Valid units are 'radian' and 'degree'.")
+            raise ValueError(
+                f"Unknown unit: {self.unit}. Valid units are 'radian' and 'degree'."
+            )
