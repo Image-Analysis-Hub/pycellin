@@ -567,7 +567,7 @@ def _write_FilteredTracks(
     xf.write(f"\n{' ' * 2}")
 
 
-def _update_nodes(lin: CellLineage, frame_prop: str) -> None:
+def _update_nodes(lin: CellLineage, frame_prop: str) -> set[int]:
     """
     Update the node properties in the lineage to match TrackMate requirements.
 
@@ -577,10 +577,15 @@ def _update_nodes(lin: CellLineage, frame_prop: str) -> None:
         Lineage whose nodes to update.
     frame_prop : str
         Name of the property corresponding to the frame/timepoint.
-    lin : CellLineage
-        Lineage whose nodes to update.
+
+    Returns
+    -------
+    set[int]
+        Set of node IDs that are missing POSITION_X or POSITION_Y.
     """
-    for _, data in lin.nodes(data=True):
+    nodes_with_missing_pos = set()
+
+    for node, data in lin.nodes(data=True):
         data["ID"] = data.pop("cell_ID")
         data["FRAME"] = data.pop(frame_prop)
         data["VISIBILITY"] = 1
@@ -589,19 +594,23 @@ def _update_nodes(lin: CellLineage, frame_prop: str) -> None:
         except KeyError:
             pass  # Not a mandatory property.
         # Position properties.
+        has_missing_pos = False
         for axis in ["X", "Y", "Z"]:
             try:
                 data[f"POSITION_{axis}"] = data.pop(f"cell_{axis.lower()}")
             except KeyError:
                 # This POSITION_ is mandatory in TrackMate for x, y and z dimensions.
                 if axis in ["X", "Y"]:
-                    raise KeyError(
-                        f"Missing property: cell_{axis}. Cannot build "
-                        f"TrackMate feature POSITION_{axis}."
-                    )
+                    has_missing_pos = True
+                    data[f"POSITION_{axis}"] = None
                 else:
                     # We add the missing z dimension.
                     data[f"POSITION_{axis}"] = 0.0
+
+        if has_missing_pos:
+            nodes_with_missing_pos.add(node)
+
+    return nodes_with_missing_pos
 
 
 def _update_edges(lin: CellLineage) -> None:
@@ -661,10 +670,29 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
     frame_prop : str
         Name of the property corresponding to the frame/timepoint.
     """
+    # Track cells with missing position properties: {lineage_ID: set of node IDs}.
+    missing_positions = {}
+
     for lin in model.data.cell_data.values():
-        _update_nodes(lin, frame_prop)
+        nodes_with_missing_pos = _update_nodes(lin, frame_prop)
+        if nodes_with_missing_pos:
+            missing_positions[lin.graph["lineage_ID"]] = nodes_with_missing_pos
         _update_edges(lin)
         _update_lineages(lin)
+
+    # Show a single summary warning at the end if any positions are missing.
+    if missing_positions:
+        msg_parts = []
+        for lineage_id, node_ids in missing_positions.items():
+            nodes_str = ", ".join(str(n) for n in sorted(node_ids))
+            msg_parts.append(f"lineage {lineage_id}: cells {nodes_str}")
+
+        msg = (
+            f"Missing POSITION_X or POSITION_Y properties for the following cells:\n"
+            f"{'; '.join(msg_parts)}.\n"
+            f"TrackMate will ignore these cells."
+        )
+        warnings.warn(msg)
 
 
 def _is_numeric_dtype(dtype: str | None) -> bool:
