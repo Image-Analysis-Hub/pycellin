@@ -18,15 +18,14 @@ Pycellin is a graph-based Python framework to easily manipulate and extract info
 Pycellin provides predefined properties related to cell morphology, cell motion and tracking that can be automatically added to enrich lineages. More predefined properties will be implemented in the future. The framework also facilitates the creation of new properties defined by the user to accommodate the wide variety of experiments and biological questions.
 
 Pycellin can read from and write to:
-- [TrackMate](https://imagej.net/plugins/trackmate/) XMLs,
 - [Cell Tracking Challenge](https://celltrackingchallenge.net/) text files,
+- [GEFF](https://liveimagetrackingtools.org/geff/latest/) (Graph Exchange File Format,)
 - [trackpy](https://github.com/soft-matter/trackpy) DataFrames.
+- [TrackMate](https://imagej.net/plugins/trackmate/) XMLs,
 
 More tracking formats will progressively be supported.
 
-While pycellin has been designed with bacteria / cell lineages in mind, it could be used with more diverse tracking data provided the few conditions below are enforced:
-- the tracking data can be modeled by directed rooted trees, meaning no merging event
-- gaps between detection are allowed but the time step must consistent.
+Although pycellin was designed with bacteria / cell lineages in mind, it can be used with more diverse tracking data. The main requirement is that the data can be modeled by directed rooted trees, meaning no merging event.
 
 
 ## Installation
@@ -86,15 +85,35 @@ model.add_pycellin_properties([
     "branch_mean_speed",
     "relative_age",
     "division_time", 
-    "cell_cycle_completeness",
+    "cycle_completeness",
     ])
 model.update()
 
-# Export the enriched data as dataframes.
+# Export the enriched data as dataframes...
 cell_df = model.to_cell_dataframe()
 link_df = model.to_link_dataframe()
 cycle_df = model.to_cycle_dataframe()
 lineage_df = model.to_lineage_dataframe()
+
+# ... or export back to TrackMate...
+pycellin.export_TrackMate_XML(
+    model,
+    "sample_data/Ecoli_growth_on_agar_pad_enriched.xml",
+    units={
+        "spatialunits": model.get_space_unit(),
+        "temporalunits": model.get_time_unit(),
+    },
+    propagate_cycle_props=True,
+)
+
+# ... or to another file format.
+pycellin.export_GEFF(
+    model,
+    "sample_data/Ecoli_growth_on_agar_pad_enriched.geff",
+    time_axes=["POSITION_T"],
+    space_axes=["cell_x", "cell_y", "cell_z"],
+    variable_length_props=["ROI_coords"],
+) 
 ```
 
 
