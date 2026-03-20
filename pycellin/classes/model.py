@@ -2268,25 +2268,28 @@ class Model:
         ValueError
             If a property is not a cycle lineage property or not declared in the model.
         """
-        props = self.get_cycle_lineage_properties()
+        available_props = self.get_cycle_lineage_properties()
+
         if props is None:
+            # If no specific props provided, categorize all available properties.
             node_props = [
                 prop_id
-                for prop_id, prop in props.items()
+                for prop_id, prop in available_props.items()
                 if PropertyType.NODE in prop.prop_type
             ]
             edge_props = [
                 prop_id
-                for prop_id, prop in props.items()
+                for prop_id, prop in available_props.items()
                 if PropertyType.EDGE in prop.prop_type
             ]
             lin_props = [
                 prop_id
-                for prop_id, prop in props.items()
+                for prop_id, prop in available_props.items()
                 if PropertyType.LINEAGE in prop.prop_type
             ]
         else:
-            missing_props = [prop for prop in props if prop not in props]
+            # If specific props provided, validate them against available properties.
+            missing_props = [prop for prop in props if prop not in available_props]
             if missing_props:
                 missing_str = ", ".join(repr(f) for f in missing_props)
                 plural = len(missing_props) > 1
@@ -2296,6 +2299,7 @@ class Model:
                     f"cycle lineage propert{'ies' if plural else 'y'} or not declared "
                     f"in the model."
                 )
+            # Categorize only the requested props.
             node_props = [f for f in props if f in self.get_node_properties()]
             edge_props = [f for f in props if f in self.get_edge_properties()]
             lin_props = [f for f in props if f in self.get_lineage_properties()]
