@@ -2311,7 +2311,7 @@ class Model:
         node_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
-    ) -> None:
+    ) -> set[str]:
         """
         Propagate node properties from cycle lineage to cell lineage.
 
@@ -2323,22 +2323,30 @@ class Model:
             Source cycle lineage.
         lin : CellLineage
             Target cell lineage.
+
+        Returns
+        -------
+        set[str]
+            Set of properties that were actually propagated.
         """
+        propagated = set()
         for cycle, cells in clin.nodes(data="cells"):
             for cell in cells:
                 for prop in node_props:
                     try:
                         lin.nodes[cell][prop] = clin.nodes[cycle][prop]
+                        propagated.add(prop)
                     except KeyError:
                         # If the property is not present, we skip it.
                         continue
+        return propagated
 
     @staticmethod
     def _propagate_edge_props(
         edge_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
-    ) -> None:
+    ) -> set[str]:
         """
         Propagate edge properties from cycle lineage to cell lineage.
 
@@ -2351,11 +2359,17 @@ class Model:
         lin : CellLineage
             Target cell lineage.
 
+        Returns
+        -------
+        set[str]
+            Set of properties that were actually propagated.
+
         Raises
         ------
         FusionError
             If a cell has more than one incoming edge, indicating fusion.
         """
+        propagated = set()
         for edge in clin.edges:
             cycle = clin.nodes[edge[1]]["cycle_ID"]
             cells = clin.nodes[cycle]["cells"]
@@ -2365,28 +2379,31 @@ class Model:
                 for prop in edge_props:
                     try:
                         lin.edges[link][prop] = clin.edges[edge][prop]
+                        propagated.add(prop)
                     except KeyError:
                         # If the property is not present, we skip it.
                         continue
 
             # Intercycle edge.
             incoming_edges = list(lin.in_edges(cells[0]))
-            # TODO: check this, prop just below is unbound
             if len(incoming_edges) > 1:
                 raise FusionError(cells[0], lin.graph["lineage_ID"])
-            try:
-                lin.edges[incoming_edges[0]][prop] = clin.edges[edge][prop]
-            except (IndexError, KeyError):
-                # Either the cell is a root or the property is not present.
-                # In both cases, we skip it.
-                continue
+            for prop in edge_props:
+                try:
+                    lin.edges[incoming_edges[0]][prop] = clin.edges[edge][prop]
+                    propagated.add(prop)
+                except (IndexError, KeyError):
+                    # Either the cell is a root or the property is not present.
+                    # In both cases, we skip it.
+                    continue
+        return propagated
 
     @staticmethod
     def _propagate_lineage_props(
         lin_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
-    ) -> None:
+    ) -> set[str]:
         """
         Propagate lineage properties from cycle lineage to cell lineage.
 
@@ -2398,12 +2415,20 @@ class Model:
             Source cycle lineage.
         lin : CellLineage
             Target cell lineage.
+
+        Returns
+        -------
+        set[str]
+            Set of properties that were actually propagated.
         """
+        propagated = set()
         for prop in lin_props:
             try:
                 lin.graph[prop] = clin.graph[prop]
+                propagated.add(prop)
             except KeyError:
                 continue
+        return propagated
 
     def propagate_cycle_properties(
         self, props: list[str] | None = None, update: bool = True
@@ -2452,22 +2477,32 @@ class Model:
             self.update()
         node_props, edge_props, lin_props = self._categorize_props(props)
 
-        # Update the properties declaration: now the property type is `Lineage`
-        # instead of just `CycleLineage` since the properties are now present on cycle
-        # AND cell lineages.
-        for prop in node_props + edge_props + lin_props:
-            self.props_metadata.props[prop].lin_type = "Lineage"
+        propagated_props = (
+            set()
+        )  # to keep track of which properties were actually propagated
 
-        # Actual propagation.
+        # Propagation.
         for lin_ID in self.data.cell_data:
             lin = self.data.cell_data[lin_ID]
             clin = self.data.cycle_data[lin_ID]
             if node_props:
-                Model._propagate_node_props(node_props, clin, lin)
+                propagated_props.update(
+                    Model._propagate_node_props(node_props, clin, lin)
+                )
             if edge_props:
-                Model._propagate_edge_props(edge_props, clin, lin)
+                propagated_props.update(
+                    Model._propagate_edge_props(edge_props, clin, lin)
+                )
             if lin_props:
-                Model._propagate_lineage_props(lin_props, clin, lin)
+                propagated_props.update(
+                    Model._propagate_lineage_props(lin_props, clin, lin)
+                )
+
+        # Update the properties declaration: now the property type is `Lineage`
+        # instead of just `CycleLineage` since the properties are now present on cycle
+        # AND cell lineages.
+        for prop in propagated_props:
+            self.props_metadata.props[prop].lin_type = "Lineage"
 
     def to_cell_dataframe(self, lids: list[int] | None = None) -> pd.DataFrame:
         """
