@@ -30,7 +30,7 @@ Although pycellin was designed with bacteria / cell lineages in mind, it can be 
 
 ## Installation
 
-Pycellin supports Python 3.10 and above. It is tested with Python 3.10 and 3.13 on the latest versions of Ubuntu, Windows and MacOS. Please let me know if you encounter any compatibility issue with a different combination.
+Pycellin supports Python 3.10 and above. It is tested with Python 3.10 and 3.14 on the latest versions of Ubuntu, Windows and MacOS. Please let me know if you encounter any compatibility issue with a different combination.
 
 It is recommended to install pycellin in a conda or mamba environment. 
 
