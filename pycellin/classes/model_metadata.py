@@ -14,15 +14,15 @@ class ModelMetadata:
     Metadata for a pycellin Model.
 
     This class holds metadata information for a pycellin model, including
-    spatial and temporal context, as well as user-defined fields.
+    spatial and temporal context, as well as custom fields.
 
     Parameters
     ----------
     reference_time_property : str
         Name of the property used as the reference for time measurements.
         Common choices are "frame" for frame number or "time" for actual time.
-        All time-related operations will use this property so it must be present
-        across all cells.
+        By default, all time-related operations will use this property so it must
+        be present across all cells.
     time_step : int | float | None
         Time interval between consecutive time points in time_unit.
         If None, will be set depending on reference_time_property and props_metadata.
@@ -74,10 +74,10 @@ class ModelMetadata:
     >>> restored_metadata = ModelMetadata.from_dict(data_dict)
     """
 
-    # Mandatory field
+    # Mandatory field.
     reference_time_property: str
 
-    # Semi-required fields, used to define the model's spatial and temporal context
+    # Semi-required fields, used to define the model's spatial and temporal context.
     time_step: int | float | None = None
     time_unit: str | None = None
     pixel_width: float | None = None
@@ -85,7 +85,7 @@ class ModelMetadata:
     pixel_depth: float | None = None
     space_unit: str | None = None
 
-    # Standard optional fields, for traceability
+    # Standard optional fields, for traceability.
     pycellin_version: str = field(default_factory=get_pycellin_version)
     creation_timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     name: str | None = None
@@ -98,7 +98,12 @@ class ModelMetadata:
 
         Handles any additional metadata validation.
         """
-        # Validate that reference_time_property is not an empty string.
+        # reference_time_property validation.
+        if not isinstance(self.reference_time_property, str):
+            raise TypeError(
+                f"reference_time_property must be a string, got "
+                f"{type(self.reference_time_property).__name__}"
+            )
         if not self.reference_time_property:
             raise ValueError("reference_time_property cannot be an empty string.")
 
@@ -112,7 +117,7 @@ class ModelMetadata:
 
     def __delattr__(self, name: str) -> None:
         """
-        Prevent deletion of dataclass fields, allow deletion of user-defined fields.
+        Prevent deletion of dataclass fields, allow deletion of dynamically added fields.
 
         Parameters
         ----------
@@ -126,65 +131,53 @@ class ModelMetadata:
         """
         if name in self.__dataclass_fields__:
             raise AttributeError(f"Cannot delete dataclass field '{name}'")
-        super().__delattr__(name)
+        object.__delattr__(self, name)
 
-    def get_user_defined_metadata(self) -> dict[str, Any]:
+    def get_custom_metadata(self) -> dict[str, Any]:
         """
-        Return a dictionary of all user-defined metadata (non-dataclass fields).
+        Return a dictionary of the custom metadata (dynamically added fields).
 
         Returns
         -------
         dict[str, Any]
             Dictionary containing only the dynamically added fields.
-            Private attributes (starting with '_') are excluded.
         """
         dataclass_fields = set(self.__dataclass_fields__.keys())
-        return {
-            k: v
-            for k, v in self.__dict__.items()
-            if k not in dataclass_fields and not k.startswith("_")
-        }
+        return {k: v for k, v in self.__dict__.items() if k not in dataclass_fields}
 
-    def get_dataclass_metadata(self) -> dict[str, Any]:
+    def get_standard_metadata(self) -> dict[str, Any]:
         """
-        Return a dictionary of all dataclass metadata with their current values.
+        Return a dictionary of the standard metadata (predefined dataclass fields).
 
         Returns
         -------
         dict[str, Any]
-            Dictionary containing only the predefined dataclass fields and their values.
+            Dictionary containing only the predefined dataclass fields.
         """
         return {name: getattr(self, name) for name in self.__dataclass_fields__}
 
     def get_all_metadata(self) -> dict[str, Any]:
         """
-        Return a dictionary of all metadata (both dataclass and user-defined fields).
+        Return a dictionary of all metadata (both predefined and dynamically added fields).
 
         Returns
         -------
         dict[str, Any]
-            Dictionary containing all fields except private attributes.
+            Dictionary containing all metadatafields.
         """
-        return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
+        return dict(self.__dict__)
 
     def to_dict(self) -> dict[str, Any]:
         """
-        Convert to dictionary for serialization.
+        Convert to dictionary for serialization (alias for get_all_metadata).
 
-        Returns all fields (both dataclass and user-defined) in a single dictionary
-        suitable for JSON serialization, database storage, etc.
+        Returns all fields (both predefined and dynamically added) in a single
+        dictionary suitable for JSON serialization, database storage, etc.
 
         Returns
         -------
         dict[str, Any]
             Dictionary containing all metadata fields.
-
-        Examples
-        --------
-        >>> metadata = ModelMetadata(space_unit="μm", time_unit="s")
-        >>> metadata.experiment_id = "EXP-001"
-        >>> data = metadata.to_dict()
-        >>> json_string = json.dumps(data)
         """
         return self.get_all_metadata()
 
@@ -193,40 +186,52 @@ class ModelMetadata:
         """
         Create ModelMetadata instance from dictionary.
 
-        Handles both dataclass fields and user-defined fields properly.
+        Handles both predefined fields and dynamically added fields properly.
         Unknown fields are added as dynamic attributes.
 
         Parameters
         ----------
         data : dict[str, Any]
             Dictionary containing metadata fields. Can include both predefined
-            dataclass fields and arbitrary user-defined fields.
+            dataclass fields and arbitrary fields.
 
         Returns
         -------
         ModelMetadata
             New instance with all fields restored from the dictionary.
 
-        Examples
-        --------
-        >>> data = {
-        ...     'space_unit': 'μm',
-        ...     'time_unit': 's',
-        ...     'experiment_id': 'EXP-001',
-        ...     'researcher': 'John Doe'
-        ... }
-        >>> metadata = ModelMetadata.from_dict(data)
-        >>> print(metadata.experiment_id)  # 'EXP-001'
+        Raises
+        ------
+        TypeError
+            If data is not a dictionary.
+        ValueError
+            If required fields are missing from the dictionary.
         """
-        dataclass_fields = set(cls.__dataclass_fields__.keys())
+        # Validate input type.
+        if not isinstance(data, dict):
+            raise TypeError(f"data must be a dictionary, got {type(data).__name__}")
 
-        # Create instance with dataclass fields
+        dataclass_fields = set(cls.__dataclass_fields__.keys())
+        required_fields = {
+            name
+            for name, field_obj in cls.__dataclass_fields__.items()
+            if field_obj.default is field_obj.default_factory is None  # no default value
+        }
+
+        # Check for missing required fields.
+        missing_fields = required_fields - set(data.keys())
+        if missing_fields:
+            raise ValueError(
+                f"Missing required fields: {', '.join(sorted(missing_fields))}"
+            )
+
+        # Create instance with dataclass fields.
         init_kwargs = {k: v for k, v in data.items() if k in dataclass_fields}
         instance = cls(**init_kwargs)
 
-        # Add user-defined fields as dynamic attributes
-        user_fields = {k: v for k, v in data.items() if k not in dataclass_fields}
-        for key, value in user_fields.items():
+        # Add custom fields as dynamic attributes.
+        custom_fields = {k: v for k, v in data.items() if k not in dataclass_fields}
+        for key, value in custom_fields.items():
             setattr(instance, key, value)
 
         return instance
