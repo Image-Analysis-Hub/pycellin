@@ -394,7 +394,24 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             # TODO: add colorbar units, but the info is stored in the model
             # FIXME: the colorbar is partially hiding the traces names
             assert node_marker_style is not None
-            node_marker_style["color"] = G.vs[node_colormap_prop]
+            color_values = G.vs[node_colormap_prop]
+
+            if not color_values:
+                raise ValueError(
+                    f"Cannot color map: property '{node_colormap_prop}' has no values."
+                )
+            if not all(isinstance(val, (int, float)) for val in color_values):
+                raise ValueError(
+                    f"Cannot color map: property '{node_colormap_prop}' contains "
+                    "non-numeric values. Please use a numeric or boolean property."
+                )
+
+            if any(isinstance(val, bool) for val in color_values):
+                color_values = [
+                    int(val) if isinstance(val, bool) else val for val in color_values
+                ]
+
+            node_marker_style["color"] = color_values
             node_marker_style["colorscale"] = node_color_scale
             node_marker_style["colorbar"] = dict(title=node_colormap_prop)
 
