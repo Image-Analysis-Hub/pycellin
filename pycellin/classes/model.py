@@ -24,7 +24,12 @@ from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.classes.updater import ModelUpdater
 from pycellin.custom_types import Cell, Link, PropertyType, property_type_from_string
-from pycellin.graph.properties.core import Timepoint, create_timepoint_property
+from pycellin.graph.properties.core import (
+    Timepoint,
+    create_timepoint_property,
+    IsDivision,
+    create_is_division_property,
+)
 
 L = TypeVar("L", bound="Lineage")
 
@@ -1862,6 +1867,37 @@ class Model:
         )
 
         self.add_custom_property(tracking.DivisionTime(prop, time_prop.identifier))
+
+    def add_is_division(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the is_division property to the model.
+
+        The is_division property is a boolean property that indicates whether the cell
+        is a division event, i.e. has more than one daughter cell.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "is_division".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "is division".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Whether the cell is a division event (i.e. has more than one daughter cell)".
+        """
+        prop = create_is_division_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(IsDivision(prop))
 
     def add_relative_age(
         self,

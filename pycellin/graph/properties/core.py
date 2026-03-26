@@ -300,3 +300,43 @@ def create_level_property(provenance: str = "pycellin") -> Property:
         lin_type="CycleLineage",
         dtype="int",
     )
+
+
+def create_is_division_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    desc = "Whether the cell is a division event (i.e. has more than one daughter cell)"
+    return Property(
+        identifier=custom_identifier or "is_division",
+        name=custom_name or "is division",
+        description=custom_description or desc,
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="bool",
+    )
+
+
+class IsDivision(NodeLocalPropCalculator):
+    """Calculator for the is_division property."""
+
+    def compute(self, lineage, nid: int) -> bool:
+        """
+        Compute whether a given node is a division event.
+
+        Parameters
+        ----------
+        lineage : Lineage
+            Lineage graph containing the node of interest.
+        nid : int
+            Node ID (cell_ID) of the cell of interest.
+
+        Returns
+        -------
+        bool
+            True if the cell is a division event (i.e. has more than one daughter cell),
+            False otherwise.
+        """
+        return lineage.is_division(nid)  # type: ignore
