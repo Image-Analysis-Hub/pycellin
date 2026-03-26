@@ -307,11 +307,11 @@ def create_is_division_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
-    desc = "Whether the cell is a division event (i.e. has more than one daughter cell)"
     return Property(
         identifier=custom_identifier or "is_division",
         name=custom_name or "is division",
-        description=custom_description or desc,
+        description=custom_description
+        or "Whether the cell is a division event (i.e. has more than one daughter cell)",
         provenance="pycellin",
         prop_type="node",
         lin_type="CellLineage",
