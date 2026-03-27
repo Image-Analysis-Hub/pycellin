@@ -29,6 +29,10 @@ from pycellin.graph.properties.core import (
     create_timepoint_property,
     IsDivision,
     create_is_division_property,
+    IsLeaf,
+    create_is_leaf_property,
+    IsRoot,
+    create_is_root_property,
 )
 
 L = TypeVar("L", bound="Lineage")
@@ -1898,6 +1902,68 @@ class Model:
         )
 
         self.add_custom_property(IsDivision(prop))
+
+    def add_is_leaf(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the is_leaf property to the model.
+
+        The is_leaf property is a boolean property that indicates whether the cell
+        is a leaf cell, i.e. has no daughter cells.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "is_leaf".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "is leaf".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Whether the cell is a leaf cell (i.e. has no daughter cells)".
+        """
+        prop = create_is_leaf_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(IsLeaf(prop))
+
+    def add_is_root(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the is_root property to the model.
+
+        The is_root property is a boolean property that indicates whether the cell
+        is a root cell, i.e. has no parent cell.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "is_root".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "is root".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Whether the cell is a root cell (i.e. has no parent cell)".
+        """
+        prop = create_is_root_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(IsRoot(prop))
 
     def add_relative_age(
         self,
