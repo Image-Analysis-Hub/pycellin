@@ -135,7 +135,9 @@ class ModelUpdater:
         # TODO: refactor, this method is too long and does too many things.
 
         # Remove empty lineages.
-        for lin_ID in (self._added_lineages | self._modified_lineages) - self._removed_lineages:
+        for lin_ID in (
+            self._added_lineages | self._modified_lineages
+        ) - self._removed_lineages:
             if len(data.cell_data[lin_ID]) == 0:
                 del data.cell_data[lin_ID]
                 self._removed_lineages.add(lin_ID)
@@ -148,7 +150,8 @@ class ModelUpdater:
         lineages = list(data.cell_data.values())
         for lin in lineages:
             splitted_lins = [
-                CellLineage(lin.subgraph(c).copy()) for c in nx.weakly_connected_components(lin)
+                CellLineage(lin.subgraph(c).copy())
+                for c in nx.weakly_connected_components(lin)
             ]
             if len(splitted_lins) == 1:
                 continue
@@ -191,7 +194,9 @@ class ModelUpdater:
                         self._removed_cells.add(
                             Cell(cell_ID=original_cell_id, lineage_ID=original_lin_id)
                         )
-                        self._added_cells.add(Cell(cell_ID=new_cell_ID, lineage_ID=-new_cell_ID))
+                        self._added_cells.add(
+                            Cell(cell_ID=new_cell_ID, lineage_ID=-new_cell_ID)
+                        )
                         split_lin.graph["lineage_ID"] = -new_cell_ID
                         data.cell_data[-new_cell_ID] = split_lin
                         self._added_lineages.add(-new_cell_ID)
@@ -200,7 +205,9 @@ class ModelUpdater:
                         self._removed_cells.add(
                             Cell(cell_ID=original_cell_id, lineage_ID=original_lin_id)
                         )
-                        self._added_cells.add(Cell(cell_ID=original_cell_id, lineage_ID=new_lin_ID))
+                        self._added_cells.add(
+                            Cell(cell_ID=original_cell_id, lineage_ID=new_lin_ID)
+                        )
                         split_lin.graph["lineage_ID"] = new_lin_ID
                         data.cell_data[new_lin_ID] = split_lin
                         self._added_lineages.add(new_lin_ID)
@@ -208,8 +215,12 @@ class ModelUpdater:
                     new_lin_ID = data._get_next_available_lineage_ID(positive=True)
                     # Track all cells moving to the new lineage.
                     for cell_id in split_lin.nodes():
-                        self._removed_cells.add(Cell(cell_ID=cell_id, lineage_ID=original_lin_id))
-                        self._added_cells.add(Cell(cell_ID=cell_id, lineage_ID=new_lin_ID))
+                        self._removed_cells.add(
+                            Cell(cell_ID=cell_id, lineage_ID=original_lin_id)
+                        )
+                        self._added_cells.add(
+                            Cell(cell_ID=cell_id, lineage_ID=new_lin_ID)
+                        )
                     # Track all edges moving to the new lineage.
                     for source, target in split_lin.edges():
                         self._removed_links.add(
@@ -234,7 +245,9 @@ class ModelUpdater:
         # TODO: Deal with property dependencies. See comments in __init__.
         if props_to_update is None:
             cell_calculators = [
-                calc for calc in self._calculators.values() if calc.prop.lin_type == "CellLineage"
+                calc
+                for calc in self._calculators.values()
+                if calc.prop.lin_type == "CellLineage"
             ]
         else:
             cell_calculators = [
@@ -243,7 +256,9 @@ class ModelUpdater:
                 if self._calculators[prop].prop.lin_type == "CellLineage"
             ]
 
-        lins_to_process = (self._added_lineages | self._modified_lineages) - self._removed_lineages
+        lins_to_process = (
+            self._added_lineages | self._modified_lineages
+        ) - self._removed_lineages
 
         # Prepare the list of nodes to process.
         nodes_to_process = [
@@ -267,7 +282,9 @@ class ModelUpdater:
         for lin_ID in self._modified_lineages - self._removed_lineages:
             if lin_ID in data.cell_data:
                 for source, target in data.cell_data[lin_ID].edges():
-                    link = Link(source_cell_ID=source, target_cell_ID=target, lineage_ID=lin_ID)
+                    link = Link(
+                        source_cell_ID=source, target_cell_ID=target, lineage_ID=lin_ID
+                    )
                     if link not in self._removed_links:
                         edges_to_process.append(link)
         # Remove duplicates.
@@ -295,7 +312,9 @@ class ModelUpdater:
                 #     data.cycle_data.update({lin_ID: new_cycle_data})
                 # else:
                 #     data.cycle_data[lin_ID] = new_cycle_data
-                data.cycle_data[lin_ID] = data._compute_cycle_lineage(time_prop, time_step, lin_ID)
+                data.cycle_data[lin_ID] = data._compute_cycle_lineage(
+                    time_prop, time_step, lin_ID
+                )
         # Remove cycle lineages whose cell lineage has been removed.
         for lin_ID in self._removed_lineages:
             if data.cycle_data is not None and lin_ID in data.cycle_data:
@@ -306,13 +325,14 @@ class ModelUpdater:
                 cycle_calculators = [
                     calc
                     for calc in self._calculators.values()
-                    if calc.prop.lin_type == "CycleLineage"
+                    if calc.prop.lin_type in ("CycleLineage", "Lineage")
                 ]
             else:
                 cycle_calculators = [
                     self._calculators[prop]
                     for prop in props_to_update
-                    if self._calculators[prop].prop.lin_type == "CycleLineage"
+                    if self._calculators[prop].prop.lin_type
+                    in ("CycleLineage", "Lineage")
                 ]
             # Since cycle lineages are recreated at each update, every element
             # of the lineages need to be updated with its properties.

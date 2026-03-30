@@ -19,7 +19,7 @@ def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Line
         Data object containing the lineages.
     lineage_type : str
         Type of lineage to extract from the data object.
-        Can be "CellLineage" or "CycleLineage".
+        Can be "CellLineage", "CycleLineage", or "Lineage" (applies to both).
 
     Returns
     -------
@@ -31,6 +31,8 @@ def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Line
         return data.cell_data
     elif lineage_type == "CycleLineage":
         return data.cycle_data
+    elif lineage_type == "Lineage":
+        return {**data.cell_data, **data.cycle_data}
     else:
         raise ValueError("Invalid lineage type.")
 
@@ -163,7 +165,9 @@ class NodeLocalPropCalculator(LocalPropCalculator):
         """
         pass
 
-    def enrich(self, data: Data, nodes_to_enrich: list[tuple[int, int]], **kwargs) -> None:
+    def enrich(
+        self, data: Data, nodes_to_enrich: list[tuple[int, int]], **kwargs
+    ) -> None:
         """
         Enrich the data with the value of a local property for a list of nodes.
 
@@ -204,7 +208,9 @@ class EdgeLocalPropCalculator(LocalPropCalculator):
         """
         pass
 
-    def enrich(self, data: Data, edges_to_enrich: list[tuple[int, int, int]], **kwargs) -> None:
+    def enrich(
+        self, data: Data, edges_to_enrich: list[tuple[int, int, int]], **kwargs
+    ) -> None:
         """
         Enrich the data with the value of a local property for a list of edges.
 
