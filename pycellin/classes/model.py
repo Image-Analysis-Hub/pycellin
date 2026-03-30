@@ -27,6 +27,8 @@ from pycellin.custom_types import Cell, Link, PropertyType, property_type_from_s
 from pycellin.graph.properties.core import (
     Timepoint,
     create_timepoint_property,
+)
+from pycellin.graph.properties.topology import (
     IsDivision,
     create_is_division_property,
     IsLeaf,
@@ -1893,7 +1895,7 @@ class Model:
             New name for the property. If None, the name will be "is division".
         custom_description : str, optional
             New description for the property. If None, the description will be
-            "Whether the cell is a division event (i.e. has more than one daughter cell)".
+            "Whether the cell is a division event, i.e. has more than one daughter cell".
         """
         prop = create_is_division_property(
             custom_identifier=custom_identifier,
@@ -1924,7 +1926,7 @@ class Model:
             New name for the property. If None, the name will be "is leaf".
         custom_description : str, optional
             New description for the property. If None, the description will be
-            "Whether the cell is a leaf cell (i.e. has no daughter cells)".
+            "Whether the cell is a leaf cell, i.e. has no daughter cells".
         """
         prop = create_is_leaf_property(
             custom_identifier=custom_identifier,
@@ -1955,7 +1957,7 @@ class Model:
             New name for the property. If None, the name will be "is root".
         custom_description : str, optional
             New description for the property. If None, the description will be
-            "Whether the cell is a root cell (i.e. has no parent cell)".
+            "Whether the cell is a root cell, i.e. has no parent cell".
         """
         prop = create_is_root_property(
             custom_identifier=custom_identifier,
