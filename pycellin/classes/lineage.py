@@ -248,7 +248,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         return [n for n in self.nodes() if self.in_degree(n) > 1]  # type: ignore
 
     @abstractmethod
-    def plot(
+    def get_tree_figure(
         self,
         ID_prop: str,
         y_prop: str,
@@ -267,9 +267,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
-    ) -> None:
+    ) -> go.Figure:
         """
-        Plot the lineage as a tree using Plotly.
+        Generate a tree figure representing the lineage using Plotly.
 
         Heavily based on the code from https://plotly.com/python/tree-plots/
 
@@ -319,6 +319,11 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+            The generated Plotly figure object.
 
         Warnings
         --------
@@ -528,6 +533,104 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             showgrid=show_horizontal_grid,
             zeroline=show_horizontal_grid,
             title=y_legend,
+        )
+        return fig
+
+    @abstractmethod
+    def plot(
+        self,
+        ID_prop: str,
+        y_prop: str,
+        y_legend: str,
+        title: str | None = None,
+        node_text: str | None = None,
+        node_text_font: dict[str, Any] | None = None,
+        node_marker_style: dict[str, Any] | None = None,
+        node_colormap_prop: str | None = None,
+        node_color_scale: str | None = None,
+        node_hover_props: list[str] | None = None,
+        edge_line_style: dict[str, Any] | None = None,
+        edge_hover_props: list[str] | None = None,
+        plot_bgcolor: str | None = None,
+        show_horizontal_grid: bool = True,
+        showlegend: bool = True,
+        width: int | None = None,
+        height: int | None = None,
+    ) -> None:
+        """
+        Plot the lineage as a tree using Plotly.
+
+        This method generates a tree figure and displays it.
+
+        Parameters
+        ----------
+        ID_prop : str
+            The property of the nodes to use as identifier.
+        y_prop : str
+            The property of the nodes to use for the y-axis.
+        y_legend : str
+            The label of the y-axis.
+        title : str, optional
+            The title of the plot. If None, no title is displayed.
+        node_text : str, optional
+            The property of the nodes to display as text inside the nodes
+            of the plot. If None, no text is displayed. None by default.
+        node_text_font : dict, optional
+            The font style of the text inside the nodes (size, color, etc).
+            If None, defaults to current Plotly template.
+        node_marker_style : dict, optional
+            The style of the markers representing the nodes in the plot
+            (symbol, size, color, line, etc). If None, defaults to
+            current Plotly template.
+        node_colormap_prop : str, optional
+            The property of the nodes to use for coloring the nodes.
+            If None, no color mapping is applied.
+        node_color_scale : str, optional
+            The color scale to use for coloring the nodes. If None,
+            defaults to current Plotly template.
+        node_hover_props : list[str], optional
+            The hover template for the nodes. If None, defaults to
+            displaying `cell_ID` and the value of the y_prop.
+        edge_line_style : dict, optional
+            The style of the lines representing the edges in the plot
+            (color, width, etc). If None, defaults to current Plotly template.
+        edge_hover_props : list[str], optional
+            The hover template for the edges. If None, defaults to
+            displaying the source and target nodes.
+        plot_bgcolor : str, optional
+            The background color of the plot. If None, defaults to current
+            Plotly template.
+        show_horizontal_grid : bool, optional
+            True to display the horizontal grid, False otherwise. True by default.
+        showlegend : bool, optional
+            True to display the legend, False otherwise. True by default.
+        width : int, optional
+            The width of the plot. If None, defaults to current Plotly template.
+        height : int, optional
+            The height of the plot. If None, defaults to current Plotly template.
+
+        See Also
+        --------
+        get_tree_figure : Generate the figure without displaying it.
+        """
+        fig = self.get_tree_figure(
+            ID_prop=ID_prop,
+            y_prop=y_prop,
+            y_legend=y_legend,
+            title=title,
+            node_text=node_text,
+            node_text_font=node_text_font,
+            node_marker_style=node_marker_style,
+            node_colormap_prop=node_colormap_prop,
+            node_color_scale=node_color_scale,
+            node_hover_props=node_hover_props,
+            edge_line_style=edge_line_style,
+            edge_hover_props=edge_hover_props,
+            plot_bgcolor=plot_bgcolor,
+            show_horizontal_grid=show_horizontal_grid,
+            showlegend=showlegend,
+            width=width,
+            height=height,
         )
         fig.show()
 
@@ -1131,6 +1234,107 @@ class CellLineage(Lineage):
     #     # for div in ancestor_divs:
     #     #     pass
 
+    def get_tree_figure(
+        self,
+        ID_prop: str = "cell_ID",
+        y_prop: str = "timepoint",
+        y_legend: str = "Time (timepoints)",
+        title: str | None = None,
+        node_text: str | None = None,
+        node_text_font: dict[str, Any] | None = None,
+        node_marker_style: dict[str, Any] | None = None,
+        node_colormap_prop: str | None = None,
+        node_color_scale: str | None = None,
+        node_hover_props: list[str] | None = None,
+        edge_line_style: dict[str, Any] | None = None,
+        edge_hover_props: list[str] | None = None,
+        plot_bgcolor: str | None = None,
+        show_horizontal_grid: bool = True,
+        showlegend: bool = True,
+        width: int | None = None,
+        height: int | None = None,
+    ) -> go.Figure:
+        """
+        Generate a tree figure representing the cell lineage using Plotly.
+
+        Parameters
+        ----------
+        ID_prop : str, optional
+            The property of the nodes to use as the node ID. "cell_ID" by default.
+        y_prop : str, optional
+            The property of the nodes to use as the y-axis. "timepoint" by default.
+        y_legend : str, optional
+            The label of the y-axis. "Time (timepoints)" by default.
+        title : str, optional
+            The title of the plot. If None, no title is displayed.
+        node_text : str, optional
+            The property of the nodes to display as text inside the nodes
+            of the plot. If None, no text is displayed. None by default.
+        node_text_font : dict, optional
+            The font style of the text inside the nodes (size, color, etc).
+            If None, defaults to current Plotly template.
+        node_marker_style : dict, optional
+            The style of the markers representing the nodes in the plot
+            (symbol, size, color, line, etc). If None, defaults to
+            current Plotly template.
+        node_colormap_prop : str, optional
+            The property of the nodes to use for coloring the nodes.
+            If None, no color mapping is applied.
+        node_color_scale : str, optional
+            The color scale to use for coloring the nodes. If None,
+            defaults to current Plotly template.
+        node_hover_props : list[str], optional
+            The hover template for the nodes. If None, defaults to
+            displaying `cell_ID` and the value of the y_prop.
+        edge_line_style : dict, optional
+            The style of the lines representing the edges in the plot
+            (color, width, etc). If None, defaults to current Plotly template.
+        edge_hover_props : list[str], optional
+            The hover template for the edges. If None, defaults to
+            displaying the source and target nodes.
+        plot_bgcolor : str, optional
+            The background color of the plot. If None, defaults to current
+            Plotly template.
+        show_horizontal_grid : bool, optional
+            True to display the horizontal grid, False otherwise. True by default.
+        showlegend : bool, optional
+            True to display the legend, False otherwise. True by default.
+        width : int, optional
+            The width of the plot. If None, defaults to current Plotly template.
+        height : int, optional
+            The height of the plot. If None, defaults to current Plotly template.
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+            The generated Plotly figure object.
+
+        Warnings
+        --------
+        In case of cell divisions, the hover text of the edges between the parent
+        and child cells will be displayed only for one child cell.
+        This cannot easily be corrected.
+        """
+        return super().get_tree_figure(
+            ID_prop=ID_prop,
+            y_prop=y_prop,
+            y_legend=y_legend,
+            title=title,
+            node_text=node_text,
+            node_text_font=node_text_font,
+            node_marker_style=node_marker_style,
+            node_colormap_prop=node_colormap_prop,
+            node_color_scale=node_color_scale,
+            node_hover_props=node_hover_props,
+            edge_line_style=edge_line_style,
+            edge_hover_props=edge_hover_props,
+            plot_bgcolor=plot_bgcolor,
+            show_horizontal_grid=show_horizontal_grid,
+            showlegend=showlegend,
+            width=width,
+            height=height,
+        )
+
     def plot(
         self,
         ID_prop: str = "cell_ID",
@@ -1222,9 +1426,13 @@ class CellLineage(Lineage):
             color="white",
             line=dict(color="black", width=1),
         )
+
+        See Also
+        --------
+        get_tree_figure : Generate the figure without displaying it.
         """
         # TODO: and if we want to plot in time units instead of frames?
-        super().plot(
+        fig = self.get_tree_figure(
             ID_prop=ID_prop,
             y_prop=y_prop,
             y_legend=y_legend,
@@ -1243,6 +1451,7 @@ class CellLineage(Lineage):
             width=width,
             height=height,
         )
+        fig.show()
 
     @staticmethod
     # TODO: I don't think this function is good design, even if it factorises code.
@@ -1409,6 +1618,107 @@ class CycleLineage(Lineage):
         for edge in pairwise(self.nodes[ccid]["cells"]):
             yield edge
 
+    def get_tree_figure(
+        self,
+        ID_prop: str = "cycle_ID",
+        y_prop: str = "level",
+        y_legend: str = "Cell cycle level",
+        title: str | None = None,
+        node_text: str | None = None,
+        node_text_font: dict[str, Any] | None = None,
+        node_marker_style: dict[str, Any] | None = None,
+        node_colormap_prop: str | None = None,
+        node_color_scale: str | None = None,
+        node_hover_props: list[str] | None = None,
+        edge_line_style: dict[str, Any] | None = None,
+        edge_hover_props: list[str] | None = None,
+        plot_bgcolor: str | None = None,
+        show_horizontal_grid: bool = True,
+        showlegend: bool = True,
+        width: int | None = None,
+        height: int | None = None,
+    ) -> go.Figure:
+        """
+        Generate a tree figure representing the cell cycle lineage using Plotly.
+
+        Parameters
+        ----------
+        ID_prop : str, optional
+            The property of the nodes to use as the node ID. "cycle_ID" by default.
+        y_prop : str, optional
+            The property of the nodes to use as the y-axis. "level" by default.
+        y_legend : str, optional
+            The label of the y-axis. "Cell cycle level" by default.
+        title : str, optional
+            The title of the plot. If None, no title is displayed.
+        node_text : str, optional
+            The property of the nodes to display as text inside the nodes
+            of the plot. If None, no text is displayed. None by default.
+        node_text_font : dict, optional
+            The font style of the text inside the nodes (size, color, etc).
+            If None, defaults to current Plotly template.
+        node_marker_style : dict, optional
+            The style of the markers representing the nodes in the plot
+            (symbol, size, color, line, etc). If None, defaults to
+            current Plotly template.
+        node_colormap_prop : str, optional
+            The property of the nodes to use for coloring the nodes.
+            If None, no color mapping is applied.
+        node_color_scale : str, optional
+            The color scale to use for coloring the nodes. If None,
+            defaults to current Plotly template.
+        node_hover_props : list[str], optional
+            The hover template for the nodes. If None, defaults to
+            displaying `cell_ID` and the value of the y_prop.
+        edge_line_style : dict, optional
+            The style of the lines representing the edges in the plot
+            (color, width, etc). If None, defaults to current Plotly template.
+        edge_hover_props : list[str], optional
+            The hover template for the edges. If None, defaults to
+            displaying the source and target nodes.
+        plot_bgcolor : str, optional
+            The background color of the plot. If None, defaults to current
+            Plotly template.
+        show_horizontal_grid : bool, optional
+            True to display the horizontal grid, False otherwise. True by default.
+        showlegend : bool, optional
+            True to display the legend, False otherwise. True by default.
+        width : int, optional
+            The width of the plot. If None, defaults to current Plotly template.
+        height : int, optional
+            The height of the plot. If None, defaults to current Plotly template.
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+            The generated Plotly figure object.
+
+        Warnings
+        --------
+        In case of cell divisions, the hover text of the edges between the parent
+        and child cells will be displayed only for one child cell.
+        This cannot easily be corrected.
+        """
+        return super().get_tree_figure(
+            ID_prop=ID_prop,
+            y_prop=y_prop,
+            y_legend=y_legend,
+            title=title,
+            node_text=node_text,
+            node_text_font=node_text_font,
+            node_marker_style=node_marker_style,
+            node_colormap_prop=node_colormap_prop,
+            node_color_scale=node_color_scale,
+            node_hover_props=node_hover_props,
+            edge_line_style=edge_line_style,
+            edge_hover_props=edge_hover_props,
+            plot_bgcolor=plot_bgcolor,
+            show_horizontal_grid=show_horizontal_grid,
+            showlegend=showlegend,
+            width=width,
+            height=height,
+        )
+
     def plot(
         self,
         ID_prop: str = "cycle_ID",
@@ -1500,8 +1810,12 @@ class CycleLineage(Lineage):
             color="white",
             line=dict(color="black", width=1),
         )
+
+        See Also
+        --------
+        get_tree_figure : Generate the figure without displaying it.
         """
-        super().plot(
+        fig = self.get_tree_figure(
             ID_prop=ID_prop,
             y_prop=y_prop,
             y_legend=y_legend,
@@ -1520,3 +1834,4 @@ class CycleLineage(Lineage):
             width=width,
             height=height,
         )
+        fig.show()
