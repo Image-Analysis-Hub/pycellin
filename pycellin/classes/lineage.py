@@ -2,21 +2,24 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import warnings
 from abc import ABCMeta, abstractmethod
 from itertools import pairwise
 from typing import Any, Generator, Literal, Tuple
-import warnings
 
-from igraph import Graph
 import networkx as nx
 import plotly.graph_objects as go
+import plotly.io as pio
+from igraph import Graph
 
 from pycellin.classes.exceptions import (
     FusionError,
-    TimeFlowError,
     LineageStructureError,
+    TimeFlowError,
 )
 from pycellin.custom_types import PropertyType
+
+pio.templates.default = "plotly_white"
 
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
