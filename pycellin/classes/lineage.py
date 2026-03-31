@@ -263,6 +263,124 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             y_edges += [positions[edge[0]][1], positions[edge[1]][1], None]
         return x_edges, y_edges
 
+    def _create_deterministic_igraph(
+        self,
+    ) -> tuple[Graph, dict[int, int]]:
+        """
+        Create an igraph with deterministic node ordering for RT layout.
+
+        This method creates an igraph where nodes are assigned IDs in a
+        deterministic order using depth-first traversal with children sorted
+        by minimum leaf ID. This ensures igraph's RT layout produces
+        consistent, deterministic positioning.
+
+        Returns
+        -------
+        tuple[Graph, dict[int, int]]
+            The igraph and a mapping from igraph vertex index to networkx node ID.
+        """
+        leaf_descendants: dict[int, int] = {}
+
+        def get_min_leaf_id(node_id):
+            """Get minimum leaf ID in subtree rooted at node_id."""
+            if node_id in leaf_descendants:
+                return leaf_descendants[node_id]
+
+            successors = list(self.successors(node_id))
+            if not successors:
+                leaf_descendants[node_id] = node_id
+                return node_id
+
+            min_leaf = min(get_min_leaf_id(child) for child in successors)
+            leaf_descendants[node_id] = min_leaf
+            return min_leaf
+
+        # Compute leaf descendants for all nodes.
+        for node_id in self.nodes():
+            get_min_leaf_id(node_id)
+
+        # Get roots (but usually there should be only one).
+        root = self.get_root(ignore_lone_nodes=True)
+        if isinstance(root, list):
+            roots = sorted(root)
+        else:
+            roots = [root]
+
+        # Create deterministic node ordering using DFS with sorted children.
+        node_order: list[int] = []
+        nx_id_to_igraph_id = {}
+
+        def dfs(node_id):
+            """DFS traversal with children visited in sorted order."""
+            if node_id in nx_id_to_igraph_id:
+                return
+
+            # Assign igraph ID for this node.
+            igraph_id = len(node_order)
+            node_order.append(node_id)
+            nx_id_to_igraph_id[node_id] = igraph_id
+
+            # Visit children in sorted order.
+            children = list(self.successors(node_id))
+            if children:
+                children = sorted(children, key=lambda c: leaf_descendants[c])
+                for child in children:
+                    dfs(child)
+
+        # Perform DFS from all roots in sorted order.
+        for root in roots:
+            dfs(root)
+
+        # Create igraph with nodes in deterministic order.
+        G = Graph(directed=True)
+        G.add_vertices(len(node_order))
+
+        # Copy graph attributes (like lineage_ID) from nx to igraph.
+        for attr, value in self.graph.items():
+            G[attr] = value
+
+        # Copy node attributes from nx to igraph nodes.
+        for igraph_id, nx_id in enumerate(node_order):
+            for attr, value in self.nodes[nx_id].items():
+                G.vs[igraph_id][attr] = value
+            # Store nx ID for mapping back.
+            G.vs[igraph_id]["_nx_name"] = nx_id
+
+        # Add edges in the same DFS order.
+        edges = []
+        for nx_id in node_order:
+            parent_igraph_id = nx_id_to_igraph_id[nx_id]
+            children = list(self.successors(nx_id))
+
+            if children:
+                # Sort children by minimum leaf ID.
+                children = sorted(children, key=lambda c: leaf_descendants[c])
+                for child_nx_id in children:
+                    child_igraph_id = nx_id_to_igraph_id[child_nx_id]
+                    edges.append((parent_igraph_id, child_igraph_id))
+
+        G.add_edges(edges)
+
+        # Copy edge attributes.
+        edge_idx = 0
+        for nx_id in node_order:
+            parent_igraph_id = nx_id_to_igraph_id[nx_id]
+            children = list(self.successors(nx_id))
+
+            if children:
+                # Sort children by minimum leaf ID.
+                children = sorted(children, key=lambda c: leaf_descendants[c])
+                for child_nx_id in children:
+                    # Copy edge attributes.
+                    for attr, value in self.edges[nx_id, child_nx_id].items():
+                        G.es[edge_idx][attr] = value
+                    edge_idx += 1
+
+        # Create index_to_nx_id mapping.
+        index_to_nx_id = {igraph_id: nx_id for igraph_id, nx_id in enumerate(node_order)}
+
+        return G, index_to_nx_id
+
     def _build_node_text_annotations(
         self,
         G: Graph,
@@ -391,8 +509,11 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         height: int | None = None,
     ) -> go.Figure:
         """
-        Generate a tree figure representing the lineage using Plotly.
+        Generate a Plotly figure of the lineage tree.
 
+        This method generates a tree figure with Reingold-Tilford layout and returns
+        it as a Plotly Figure object. The figure can then be updated or displayed using
+        `fig.show()`.
         Heavily based on the code from https://plotly.com/python/tree-plots/
 
         Parameters
@@ -484,12 +605,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # - axes
         # - color mapping node/edge attributes?     OK nodes
 
-        # Conversion of the networkx lineage graph to igraph.
-        G = Graph.from_networkx(self)
-        # Create a mapping from networkx node names to igraph vertex indices
-        index_to_nx_id = {idx: nx_id for idx, nx_id in enumerate(G.vs["_nx_name"])}
+        G, index_to_nx_id = self._create_deterministic_igraph()
         nodes_count = G.vcount()
-        layout = G.layout("rt")  # Basic tree layout.
+        layout = G.layout("rt")  # Reingold-Tilford layout
         # Updating the layout so the y position of the nodes is given
         # by the value of y_prop.
         layout = [(layout[k][0], G.vs[y_prop][k]) for k in range(nodes_count)]
@@ -509,7 +627,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             else:
                 node_marker_style.update(color_map_style)
 
-        # Set default colors if not already specified
+        # Set default colors if not already specified.
         if node_marker_style is None:
             node_marker_style = {"color": "darkviolet"}
         elif "color" not in node_marker_style:
@@ -558,8 +676,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 marker=node_marker_style,
                 hoverinfo="text",
                 hovertemplate="%{text}",
-                text=node_hover_text,  # Used in hoverinfo not for the nodes text.
-                name=graph_name,
+                text=node_hover_text,  # used in hoverinfo not for the nodes text
+                name=graph_name if graph_name else "Nodes",
             )
         )
 
@@ -568,7 +686,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             annotations=node_annotations,
             showlegend=showlegend,
             plot_bgcolor=plot_bgcolor,
-            hovermode="closest",  # Not ideal but the other modes are far worse.
+            hovermode="closest",  # not ideal but the other modes are worse
             width=width,
             height=height,
         )
@@ -605,7 +723,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         Plot the lineage as a tree using Plotly.
 
-        This method generates a tree figure and displays it.
+        This method generates a tree figure with Reingold-Tilford layout and displays it.
 
         Parameters
         ----------
@@ -1300,7 +1418,12 @@ class CellLineage(Lineage):
         height: int | None = None,
     ) -> go.Figure:
         """
-        Generate a tree figure representing the cell lineage using Plotly.
+        Generate a Plotly figure of the cell lineage tree.
+
+        This method generates a tree figure with Reingold-Tilford layout and returns
+        it as a Plotly Figure object. The figure can then be updated or displayed using
+        `fig.show()`.
+        Heavily based on the code from https://plotly.com/python/tree-plots/
 
         Parameters
         ----------
@@ -1684,7 +1807,12 @@ class CycleLineage(Lineage):
         height: int | None = None,
     ) -> go.Figure:
         """
-        Generate a tree figure representing the cell cycle lineage using Plotly.
+        Generate a Plotly figure of the cell cycle lineage tree.
+
+        This method generates a tree figure with Reingold-Tilford layout and returns
+        it as a Plotly Figure object. The figure can then be updated or displayed using
+        `fig.show()`.
+        Heavily based on the code from https://plotly.com/python/tree-plots/
 
         Parameters
         ----------
