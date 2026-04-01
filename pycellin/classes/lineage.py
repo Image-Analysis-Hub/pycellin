@@ -9,7 +9,6 @@ from typing import Any, Generator, Literal, Tuple
 
 import networkx as nx
 import plotly.graph_objects as go
-import plotly.io as pio
 from igraph import Graph
 
 from pycellin.classes.exceptions import (
@@ -18,8 +17,6 @@ from pycellin.classes.exceptions import (
     TimeFlowError,
 )
 from pycellin.custom_types import PropertyType
-
-pio.templates.default = "plotly_white"
 
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
@@ -510,6 +507,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
+        template: str | None = None,
     ) -> go.Figure:
         """
         Generate a Plotly figure of the lineage tree.
@@ -565,6 +563,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
+        template : str, optional
+            The Plotly template to use for the figure. If None, defaults to Plotly's
+            default template. Examples: "plotly", "plotly_white", "plotly_dark".
 
         Returns
         -------
@@ -692,6 +693,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             hovermode="closest",  # not ideal but the other modes are worse
             width=width,
             height=height,
+            template=template,
         )
         fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
         fig.update_yaxes(
@@ -722,6 +724,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
+        template: str | None = None,
     ) -> None:
         """
         Plot the lineage as a tree using Plotly.
@@ -774,6 +777,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
+        template : str, optional
+            The Plotly template to use for the figure. If None, defaults to Plotly's
+            default template. Examples: "plotly", "plotly_white", "plotly_dark".
 
         See Also
         --------
@@ -797,6 +803,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             showlegend=showlegend,
             width=width,
             height=height,
+            template=template,
         )
         fig.show()
 
@@ -1419,6 +1426,7 @@ class CellLineage(Lineage):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
+        template: str | None = None,
     ) -> go.Figure:
         """
         Generate a Plotly figure of the cell lineage tree.
@@ -1474,6 +1482,9 @@ class CellLineage(Lineage):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
+        template : str, optional
+            The Plotly template to use for the figure. If None, defaults to Plotly's
+            default template. Examples: "plotly", "plotly_white", "plotly_dark".
 
         Returns
         -------
@@ -1504,6 +1515,7 @@ class CellLineage(Lineage):
             showlegend=showlegend,
             width=width,
             height=height,
+            template=template,
         )
 
     def plot(
@@ -1525,6 +1537,7 @@ class CellLineage(Lineage):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
+        template: str | None = None,
     ) -> None:
         """
         Plot the cell lineage as a tree using Plotly.
@@ -1575,7 +1588,9 @@ class CellLineage(Lineage):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
-
+        template : str, optional
+            The Plotly template to use for the figure. If None, defaults to Plotly's
+            default template. Examples: "plotly", "plotly_white", "plotly_dark".
         Warnings
         --------
         In case of cell divisions, the hover text of the edges between the parent
@@ -1621,6 +1636,7 @@ class CellLineage(Lineage):
             showlegend=showlegend,
             width=width,
             height=height,
+            template=template,
         )
         fig.show()
 
@@ -1808,6 +1824,7 @@ class CycleLineage(Lineage):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
+        template: str | None = None,
     ) -> go.Figure:
         """
         Generate a Plotly figure of the cell cycle lineage tree.
@@ -1863,6 +1880,9 @@ class CycleLineage(Lineage):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
+        template : str, optional
+            The Plotly template to use for the figure. If None, defaults to Plotly's
+            default template. Examples: "plotly", "plotly_white", "plotly_dark".
 
         Returns
         -------
@@ -1893,6 +1913,7 @@ class CycleLineage(Lineage):
             showlegend=showlegend,
             width=width,
             height=height,
+            template=template,
         )
 
     def plot(
@@ -1914,6 +1935,7 @@ class CycleLineage(Lineage):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
+        template: str | None = None,
     ) -> None:
         """
         Plot the cell cycle lineage as a tree using Plotly.
@@ -1964,6 +1986,9 @@ class CycleLineage(Lineage):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
+        template : str, optional
+            The Plotly template to use for the figure. If None, defaults to Plotly's
+            default template. Examples: "plotly", "plotly_white", "plotly_dark".
 
         Warnings
         --------
@@ -2009,5 +2034,6 @@ class CycleLineage(Lineage):
             showlegend=showlegend,
             width=width,
             height=height,
+            template=template,
         )
         fig.show()
