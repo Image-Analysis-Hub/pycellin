@@ -16,7 +16,9 @@ from pycellin.classes.exceptions import (
     LineageStructureError,
     TimeFlowError,
 )
+from pycellin.classes.property import Property
 from pycellin.custom_types import PropertyType
+from pycellin.graph.properties.core import create_level_property
 
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
@@ -439,7 +441,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         }
 
     def _build_node_hover_text(
-        self, G: Graph, ID_prop: str, y_prop: str, node_hover_props: list[str] | None
+        self, G: Graph, ID_prop: str, y_prop: Property, node_hover_props: list[str] | None
     ) -> list[str]:
         """Build hover text for nodes."""
         if node_hover_props:
@@ -456,7 +458,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 node_hover_text.append(text)
         else:
             node_hover_text = [
-                (f"{ID_prop}: {node[ID_prop]}<br>{y_prop}: {node[y_prop]}")
+                (
+                    f"{ID_prop}: {node[ID_prop]}<br>{y_prop.name}: {node[y_prop.identifier]}"
+                )
                 for node in G.vs
             ]
         return node_hover_text
@@ -466,6 +470,11 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         if "lineage_ID" in G.attributes():
             return f"lineage_ID: {G['lineage_ID']}"
         return ""
+
+    def _construct_y_legend(self, y_prop: Property) -> str:
+        if y_prop.unit:
+            return f"{y_prop.name} ({y_prop.unit})"
+        return y_prop.name
 
     def _build_edge_hover_text(
         self, G: Graph, index_to_nx_id: dict, edge_hover_props: list[str] | None
@@ -491,8 +500,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     def get_tree_figure(
         self,
         ID_prop: str,
-        y_prop: str,
-        y_legend: str,
+        y_prop: Property,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -521,10 +529,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ----------
         ID_prop : str
             The property of the nodes to use as identifier.
-        y_prop : str
-            The property of the nodes to use for the y-axis.
-        y_legend : str
-            The label of the y-axis.
+        y_prop : Property
+            The Property to use for the y-axis. The legend is automatically
+            constructed from Property.name and Property.unit.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -614,7 +621,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         layout = G.layout("rt")  # Reingold-Tilford layout
         # Updating the layout so the y position of the nodes is given
         # by the value of y_prop.
-        layout = [(layout[k][0], G.vs[y_prop][k]) for k in range(nodes_count)]
+        layout = [(layout[k][0], G.vs[y_prop.identifier][k]) for k in range(nodes_count)]
 
         # Computing the exact positions of nodes and edges.
         positions = {k: layout[k] for k in range(nodes_count)}
@@ -700,7 +707,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             autorange="reversed",
             showgrid=show_horizontal_grid,
             zeroline=show_horizontal_grid,
-            title=y_legend,
+            title=self._construct_y_legend(y_prop),
         )
         return fig
 
@@ -708,8 +715,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     def plot(
         self,
         ID_prop: str,
-        y_prop: str,
-        y_legend: str,
+        y_prop: Property,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -735,10 +741,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ----------
         ID_prop : str
             The property of the nodes to use as identifier.
-        y_prop : str
-            The property of the nodes to use for the y-axis.
-        y_legend : str
-            The label of the y-axis.
+        y_prop : Property
+            The Property to use for the y-axis. The legend is automatically
+            constructed from Property.name and Property.unit.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -788,7 +793,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         fig = self.get_tree_figure(
             ID_prop=ID_prop,
             y_prop=y_prop,
-            y_legend=y_legend,
             title=title,
             node_text=node_text,
             node_text_font=node_text_font,
@@ -1410,8 +1414,7 @@ class CellLineage(Lineage):
     def get_tree_figure(
         self,
         ID_prop: str = "cell_ID",
-        y_prop: str = "timepoint",
-        y_legend: str = "Time (timepoints)",
+        y_prop: Property | None = None,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -1440,10 +1443,10 @@ class CellLineage(Lineage):
         ----------
         ID_prop : str, optional
             The property of the nodes to use as the node ID. "cell_ID" by default.
-        y_prop : str, optional
-            The property of the nodes to use as the y-axis. "timepoint" by default.
-        y_legend : str, optional
-            The label of the y-axis. "Time (timepoints)" by default.
+        y_prop : Property, optional
+            The Property to use for the y-axis. If None, defaults to
+            "timepoint" property. The legend is automatically constructed from
+            Property.name and Property.unit.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -1497,10 +1500,12 @@ class CellLineage(Lineage):
         and child cells will be displayed only for one child cell.
         This cannot easily be corrected.
         """
+        if y_prop is None:
+            y_prop = create_timepoint_property()
+
         return super().get_tree_figure(
             ID_prop=ID_prop,
             y_prop=y_prop,
-            y_legend=y_legend,
             title=title,
             node_text=node_text,
             node_text_font=node_text_font,
@@ -1521,8 +1526,7 @@ class CellLineage(Lineage):
     def plot(
         self,
         ID_prop: str = "cell_ID",
-        y_prop: str = "timepoint",
-        y_legend: str = "Time (timepoints)",
+        y_prop: Property | None = None,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -1546,10 +1550,10 @@ class CellLineage(Lineage):
         ----------
         ID_prop : str, optional
             The property of the nodes to use as the node ID. "cell_ID" by default.
-        y_prop : str, optional
-            The property of the nodes to use as the y-axis. "timepoint" by default.
-        y_legend : str, optional
-            The label of the y-axis. "Time (timepoints)" by default.
+        y_prop : Property, optional
+            The Property to use for the y-axis. If None, defaults to
+            "timepoint" property. The legend is automatically constructed from
+            Property.name and Property.unit.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -1617,11 +1621,9 @@ class CellLineage(Lineage):
         --------
         get_tree_figure : Generate the figure without displaying it.
         """
-        # TODO: and if we want to plot in time units instead of frames?
         fig = self.get_tree_figure(
             ID_prop=ID_prop,
             y_prop=y_prop,
-            y_legend=y_legend,
             title=title,
             node_text=node_text,
             node_text_font=node_text_font,
@@ -1808,8 +1810,7 @@ class CycleLineage(Lineage):
     def get_tree_figure(
         self,
         ID_prop: str = "cycle_ID",
-        y_prop: str = "level",
-        y_legend: str = "Cell cycle level",
+        y_prop: Property | None = None,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -1838,10 +1839,10 @@ class CycleLineage(Lineage):
         ----------
         ID_prop : str, optional
             The property of the nodes to use as the node ID. "cycle_ID" by default.
-        y_prop : str, optional
-            The property of the nodes to use as the y-axis. "level" by default.
-        y_legend : str, optional
-            The label of the y-axis. "Cell cycle level" by default.
+        y_prop : Property, optional
+            The Property to use for the y-axis. If None, defaults to
+            "level" property. The legend is automatically constructed from
+            Property.name and Property.unit.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -1895,10 +1896,12 @@ class CycleLineage(Lineage):
         and child cells will be displayed only for one child cell.
         This cannot easily be corrected.
         """
+        if y_prop is None:
+            y_prop = create_level_property()
+
         return super().get_tree_figure(
             ID_prop=ID_prop,
             y_prop=y_prop,
-            y_legend=y_legend,
             title=title,
             node_text=node_text,
             node_text_font=node_text_font,
@@ -1919,8 +1922,7 @@ class CycleLineage(Lineage):
     def plot(
         self,
         ID_prop: str = "cycle_ID",
-        y_prop: str = "level",
-        y_legend: str = "Cell cycle level",
+        y_prop: Property | None = None,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -1944,10 +1946,10 @@ class CycleLineage(Lineage):
         ----------
         ID_prop : str, optional
             The property of the nodes to use as the node ID. "cycle_ID" by default.
-        y_prop : str, optional
-            The property of the nodes to use as the y-axis. "level" by default.
-        y_legend : str, optional
-            The label of the y-axis. "Cell cycle level" by default.
+        y_prop : Property, optional
+            The Property to use for the y-axis. If None, defaults to
+            "level" property. The legend is automatically constructed from
+            Property.name and Property.unit.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -2019,7 +2021,6 @@ class CycleLineage(Lineage):
         fig = self.get_tree_figure(
             ID_prop=ID_prop,
             y_prop=y_prop,
-            y_legend=y_legend,
             title=title,
             node_text=node_text,
             node_text_font=node_text_font,
