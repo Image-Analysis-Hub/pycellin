@@ -3,6 +3,8 @@
 
 """Core property functions to create standard Property instances."""
 
+import math
+
 from pycellin.classes.data import Data
 from pycellin.classes.exceptions import UpdateRequiredError
 from pycellin.classes.property import Property
@@ -107,14 +109,15 @@ class Timepoint(NodeLocalPropCalculator):
         time = lineage.nodes[nid][self.ref_time_prop]
         timepoint = (time - self.min_time) / self.time_step
 
-        if not timepoint.is_integer():
+        rounded_timepoint = round(timepoint)
+        if not math.isclose(timepoint, rounded_timepoint, rel_tol=1e-9, abs_tol=1e-9):
             raise ValueError(
                 f"Computed timepoint {timepoint} for node {nid} "
-                f"of lineage {lineage.graph['lineage_ID']} is not an integer. "
-                f"Check time_step and reference time values."
+                f"of lineage {lineage.graph['lineage_ID']} is not close to an integer. "
+                f"Check time step and reference time values."
             )
 
-        return int(timepoint)
+        return rounded_timepoint
 
 
 def create_cell_id_property(provenance: str = "pycellin") -> Property:
