@@ -112,7 +112,7 @@ class Timepoint(NodeLocalPropCalculator):
         if not timepoint.is_integer():
             raise ValueError(
                 f"Computed timepoint {timepoint} for node {nid} "
-                f"of lineage {lineage.graph['lineage_ID']}is not an integer. "
+                f"of lineage {lineage.graph['lineage_ID']} is not an integer. "
                 f"Check time_step and reference time values."
             )
 
