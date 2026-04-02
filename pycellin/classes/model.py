@@ -105,7 +105,7 @@ class Model:
                     "`reference_time_property` must be provided in model_metadata "
                     "or as an explicit argument."
                 )
-        self.reference_time_property = reference_time_property
+        self._reference_time_property = reference_time_property
 
         # Initialize data early since _compute_time_step() needs it.
         self.data = data.copy() if data is not None else Data(dict())
@@ -260,7 +260,6 @@ class Model:
             State dictionary for pickling.
         """
         state = self.__dict__.copy()
-        # Convert ModelMetadata to dict for pickling
         if hasattr(self, "model_metadata") and self.model_metadata is not None:
             state["model_metadata"] = self.model_metadata.to_dict()
         return state
@@ -277,10 +276,70 @@ class Model:
         state : dict[str, Any]
             State dictionary from pickling.
         """
-        # Restore ModelMetadata from dict
         if "model_metadata" in state and isinstance(state["model_metadata"], dict):
             state["model_metadata"] = ModelMetadata.from_dict(state["model_metadata"])
         self.__dict__.update(state)
+
+    def set_reference_time_property(self, prop_id: str) -> None:
+        """
+        Set the reference time property of the model.
+
+        This method updates the reference time property and ensures that it is protected.
+        The previous reference time property is unprotected if it is not "timepoint"
+        (which is a special property that should always be protected).
+
+        Parameters
+        ----------
+        prop_id : str
+            The identifier of the property to set as the reference time property.
+
+        Raises
+        ------
+        ValueError
+            If the specified property is not found in the model's node properties.
+        """
+        node_props = self.get_node_properties()
+        if prop_id not in node_props:
+            raise ValueError(
+                f"Cannot set reference time property: '{prop_id}' not found in model's node properties."
+            )
+
+        old_ref_time_prop = self._reference_time_property
+        self._reference_time_property = prop_id
+        self.model_metadata.reference_time_property = prop_id
+
+        self.props_metadata._protect_prop(prop_id)
+        if old_ref_time_prop != "timepoint":
+            self.props_metadata._unprotect_prop(old_ref_time_prop)
+
+    @property
+    def reference_time_property(self) -> str:
+        """
+        Get the reference time property of the model.
+
+        Returns
+        -------
+        str
+            The identifier of the reference time property.
+        """
+        return self._reference_time_property
+
+    @reference_time_property.setter
+    def reference_time_property(self, value: str) -> None:
+        """
+        Prevent direct assignment to reference_time_property.
+
+        Users must use the set_reference_time_property() method instead.
+
+        Raises
+        ------
+        AttributeError
+            Always raised to prevent direct assignment.
+        """
+        raise AttributeError(
+            "Cannot assign directly to 'reference_time_property'. "
+            "Use the 'set_reference_time_property()' method instead."
+        )
 
     def _compute_time_step(self, variable_time_step: bool = False) -> int | float:
         """
