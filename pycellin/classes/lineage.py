@@ -18,7 +18,6 @@ from pycellin.classes.exceptions import (
 )
 from pycellin.classes.property import Property
 from pycellin.custom_types import PropertyType
-from pycellin.graph.properties.core import create_level_property
 
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
@@ -1501,6 +1500,8 @@ class CellLineage(Lineage):
         This cannot easily be corrected.
         """
         if y_prop is None:
+            from pycellin.graph.properties.core import create_timepoint_property
+
             y_prop = create_timepoint_property()
 
         return super().get_tree_figure(
@@ -1897,6 +1898,8 @@ class CycleLineage(Lineage):
         This cannot easily be corrected.
         """
         if y_prop is None:
+            from pycellin.graph.properties.core import create_level_property
+
             y_prop = create_level_property()
 
         return super().get_tree_figure(
