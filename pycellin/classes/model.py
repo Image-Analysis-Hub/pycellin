@@ -280,38 +280,6 @@ class Model:
             state["model_metadata"] = ModelMetadata.from_dict(state["model_metadata"])
         self.__dict__.update(state)
 
-    def set_reference_time_property(self, prop_id: str) -> None:
-        """
-        Set the reference time property of the model.
-
-        This method updates the reference time property and ensures that it is protected.
-        The previous reference time property is unprotected if it is not "timepoint"
-        (which is a special property that should always be protected).
-
-        Parameters
-        ----------
-        prop_id : str
-            The identifier of the property to set as the reference time property.
-
-        Raises
-        ------
-        ValueError
-            If the specified property is not found in the model's node properties.
-        """
-        node_props = self.get_node_properties()
-        if prop_id not in node_props:
-            raise ValueError(
-                f"Cannot set reference time property: '{prop_id}' not found in model's node properties."
-            )
-
-        old_ref_time_prop = self._reference_time_property
-        self._reference_time_property = prop_id
-        self.model_metadata.reference_time_property = prop_id
-
-        self.props_metadata._protect_prop(prop_id)
-        if old_ref_time_prop != "timepoint":
-            self.props_metadata._unprotect_prop(old_ref_time_prop)
-
     @property
     def reference_time_property(self) -> str:
         """
@@ -340,6 +308,44 @@ class Model:
             "Cannot assign directly to 'reference_time_property'. "
             "Use the 'set_reference_time_property()' method instead."
         )
+
+    def set_reference_time_property(self, prop_id: str) -> None:
+        """
+        Set the reference time property of the model.
+
+        On top of updating the reference time property, this method:
+        - protects the new reference time property
+        - unprotects the previous reference time property if it is not "timepoint"
+        (which is a special property that should always be protected)
+        - updates the time step and time unit of the model based on the new
+        reference time property
+
+        Parameters
+        ----------
+        prop_id : str
+            The identifier of the property to set as the reference time property.
+
+        Raises
+        ------
+        ValueError
+            If the specified property is not found in the model's node properties.
+        """
+        node_props = self.get_node_properties()
+        if prop_id not in node_props:
+            raise ValueError(
+                f"Cannot set reference time property: '{prop_id}' not found in model's node properties."
+            )
+
+        old_ref_time_prop = self._reference_time_property
+        self._reference_time_property = prop_id
+        self.model_metadata.reference_time_property = prop_id
+
+        self.props_metadata._protect_prop(prop_id)
+        if old_ref_time_prop != "timepoint":
+            self.props_metadata._unprotect_prop(old_ref_time_prop)
+
+        self.set_time_step()
+        self.model_metadata.time_unit = node_props[prop_id].unit
 
     def _compute_time_step(self, variable_time_step: bool = False) -> int | float:
         """
