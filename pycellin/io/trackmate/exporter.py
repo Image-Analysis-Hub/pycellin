@@ -1068,8 +1068,8 @@ def _ask_units(
     for unit, props in model_units.items():
         print(f"{unit}: {props}")
     trackmate_units = {}
-    trackmate_units["spatialunits"] = input("Please type the spatial unit: ")
-    trackmate_units["temporalunits"] = input("Please type the temporal unit: ")
+    trackmate_units["space"] = input("Please type the spatial unit: ")
+    trackmate_units["time"] = input("Please type the temporal unit: ")
     print(f"Using the following units for TrackMate export: {trackmate_units}")
     return trackmate_units
 
@@ -1092,8 +1092,8 @@ def export_TrackMate_XML(
     units : dict[str, str], optional
         Dictionary containing the spatial and temporal units of the model.
         If not specified, the user will be asked to provide them. Format is:
-        {"spatialunits": "your_unit", "temporalunits": "your_unit"}, e.g.
-        {"spatialunits": "pixel", "temporalunits": "sec"}.
+        {"space": "your_unit", "time": "your_unit"}, e.g.
+        {"space": "pixel", "time": "sec"}.
     propagate_cycle_props : bool, optional
         If True, cycle properties will be propagated to cell lineages before export.
         Useful if you want to export the cycle properties to TrackMate
@@ -1123,6 +1123,7 @@ def export_TrackMate_XML(
 
     if not units:
         units = _ask_units(model_copy.props_metadata)
+    tm_units = {"spatialunits": units["space"], "timeunits": units["time"]}
     if hasattr(model_copy.model_metadata, "TrackMate_version"):
         tm_version = model_copy.model_metadata.TrackMate_version
     else:
@@ -1136,7 +1137,7 @@ def export_TrackMate_XML(
             xf.write("\n  ")
             _write_metadata_tag(xf, model_copy.model_metadata.to_dict(), "Log")
             xf.write("\n  ")
-            with xf.element("Model", units):
+            with xf.element("Model", tm_units):
                 _write_FeatureDeclarations(xf, model_copy)
                 _write_AllSpots(xf, model_copy.data.cell_data)
                 _write_AllTracks(xf, model_copy.data.cell_data)
@@ -1177,7 +1178,7 @@ if __name__ == "__main__":
             model,
             xml_out,
             units={
-                "spatialunits": model.get_space_unit(),
-                "temporalunits": model.get_time_unit(),
+                "space": model.get_space_unit() or "pixel",
+                "time": model.get_time_unit() or "frame",
             },
         )
