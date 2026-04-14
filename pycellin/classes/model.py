@@ -319,6 +319,7 @@ class Model:
         (which is a special property that should always be protected)
         - updates the time step and time unit of the model based on the new
         reference time property
+        - updates the timepoint calculator property to use the new reference time property
 
         Parameters
         ----------
@@ -346,6 +347,14 @@ class Model:
 
         self.set_time_step()
         self.model_metadata.time_unit = node_props[prop_id].unit
+
+        calc = Timepoint(
+            property=create_timepoint_property(),
+            data=self.data,
+            time_step=self.model_metadata.time_step,
+            reference_time_property=self.model_metadata.reference_time_property,
+        )
+        self._updater.register_calculator(calc)
 
     def _compute_time_step(self, variable_time_step: bool = False) -> int | float:
         """
