@@ -546,11 +546,6 @@ def _write_FilteredTracks(
         Cell lineages containing the data to write.
     has_FilteredTracks : bool
         Flag indicating if the model contains filtered tracks.
-
-    Raises
-    ------
-    KeyError
-        If the lineage does not have a TRACK_IDif lineage.graph["TRACK_ID"] < 0: attribute.
     """
     xf.write(f"\n{' ' * 4}")
     with xf.element("FilteredTracks"):
@@ -589,6 +584,7 @@ def _update_nodes(lin: CellLineage, frame_prop: str) -> set[int]:
         data["ID"] = data.pop("cell_ID")
         data["FRAME"] = data.pop(frame_prop)
         data["VISIBILITY"] = 1
+        data.pop("lineage_ID")  # TM doesn't use this on the spots.
         try:
             data["name"] = data.pop("cell_name")
         except KeyError:
