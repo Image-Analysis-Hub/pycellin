@@ -941,6 +941,10 @@ def _update_props_metadata(model: Model, frame_prop: str) -> None:
     """
     _rename_props(model.props_metadata, frame_prop)
     _remove_props(model.props_metadata)
+    # TRACK_ID comes from lineage_ID which is stored both as a node property
+    # and a lineage property. TrackMate only needs it on the lineages so we update
+    # the property type.
+    model.props_metadata.props["TRACK_ID"].prop_type = PropertyType.LINEAGE
     _add_mandatory_props(model.props_metadata)
     _update_location_props(model.props_metadata)
 
