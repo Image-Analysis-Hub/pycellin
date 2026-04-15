@@ -491,7 +491,7 @@ def test_convert_attributes_missing_prop():
     attributes = {"prop_float": "30", "prop_int": "20"}
 
     with pytest.warns(UserWarning):
-        tml._convert_attributes(attributes, props, PropertyType.NODE)
+        tml._convert_attributes(attributes, props, "node")
     assert props["prop_int"].identifier == "prop_int"
     assert props["prop_int"].name == "prop_int"
     assert props["prop_int"].description == "unknown"
