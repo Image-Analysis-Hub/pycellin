@@ -250,7 +250,7 @@ def _add_all_props(
 def _convert_attributes(
     attributes: dict[str, str],
     props: dict[str, Property],
-    prop_type: PropertyType,
+    prop_type: str,
 ) -> None:
     """
     Convert the values of `attributes` from string to the correct data type.
@@ -265,7 +265,7 @@ def _convert_attributes(
     props : dict[str, Property]
         The dictionary of properties that contains the information on how to convert
         the values of `attributes`.
-    prop_type : PropertyType
+    prop_type : str
         The type of the property to convert (node, edge, or lineage).
 
     Raises
@@ -301,8 +301,7 @@ def _convert_attributes(
             # attribute) and will be converted later, in _add_ROI_coordinates().
             pass
         else:
-            prop_type_str = "/".join(property_type_to_strings(prop_type))
-            msg = f"{prop_type_str.capitalize()} property {key} not found in the properties metadata."
+            msg = f"{prop_type.capitalize()} property {key} not found in the properties metadata."
             warnings.warn(msg)
             # In that case we add a stub version of the property to the properties
             # declaration. The user will need to manually update the property later on.
