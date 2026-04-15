@@ -584,7 +584,8 @@ def _update_nodes(lin: CellLineage, frame_prop: str) -> set[int]:
         data["ID"] = data.pop("cell_ID")
         data["FRAME"] = data.pop(frame_prop)
         data["VISIBILITY"] = 1
-        data.pop("lineage_ID")  # TM doesn't use this on the spots.
+        data.pop("timepoint")  # internal pycellin property
+        data.pop("lineage_ID")  # TM needs it only on the tracks, not on the spots
         try:
             data["name"] = data.pop("cell_name")
         except KeyError:
@@ -815,6 +816,8 @@ def _remove_props(props_md: PropsMetadata) -> None:
     """
     props_md._unprotect_prop("cell_ID")
     props_md._remove_prop("cell_ID")
+    props_md._unprotect_prop("timepoint")
+    props_md._remove_prop("timepoint")
     for prop in ["cell_name", "lineage_name", "FilteredTrack", "ROI_coords"]:
         try:
             props_md._remove_prop(prop)
