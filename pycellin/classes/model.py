@@ -1251,9 +1251,10 @@ class Model:
                     raise KeyError(f"The property {prop} has not been declared.")
         else:
             prop_values = dict()
+        prop_values["lineage_ID"] = lid
 
         time_step = self.model_metadata.time_step
-        timepoint = None
+        timepoint: int | None = None
         if time_step is not None:
             # Is the time value consistent with the time step of the model?
             if time_value % time_step != 0:
@@ -1263,7 +1264,7 @@ class Model:
                     f"compute a new time step compatible with all time values."
                 )
             # Timepoint value computation.
-            timepoint = time_value // time_step
+            timepoint = int(time_value // time_step)
 
         cid = lineage._add_cell(
             cid,
