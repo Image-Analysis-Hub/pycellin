@@ -584,12 +584,20 @@ def _update_nodes(lin: CellLineage, frame_prop: str) -> set[int]:
         data["ID"] = data.pop("cell_ID")
         data["FRAME"] = data.pop(frame_prop)
         data["VISIBILITY"] = 1
-        data.pop("timepoint")  # internal pycellin property
-        data.pop("lineage_ID")  # TM needs it only on the tracks, not on the spots
+        try:
+            data.pop("lineage_ID")  # TM needs it only on the tracks, not on the spots
+        except KeyError:
+            pass  # lineage_ID should be present, but better be safe than sorry
+        try:
+            data.pop("timepoint")  # internal pycellin property
+        except KeyError:
+            # If frame_prop is timepoint, it has already been popped
+            # and we can ignore the KeyError.
+            pass
         try:
             data["name"] = data.pop("cell_name")
         except KeyError:
-            pass  # Not a mandatory property.
+            pass  # not a mandatory property
         # Position properties.
         has_missing_pos = False
         for axis in ["X", "Y", "Z"]:
@@ -816,8 +824,14 @@ def _remove_props(props_md: PropsMetadata) -> None:
     """
     props_md._unprotect_prop("cell_ID")
     props_md._remove_prop("cell_ID")
-    props_md._unprotect_prop("timepoint")
-    props_md._remove_prop("timepoint")
+    try:
+        props_md._unprotect_prop("timepoint")
+        props_md._remove_prop("timepoint")
+    except KeyError:
+        # If no frame-like properties were found in _rename_props(), the timepoint
+        # property is used and renamed to FRAME. So attempting to remove it
+        # will raise a KeyError.
+        pass
     for prop in ["cell_name", "lineage_name", "FilteredTrack", "ROI_coords"]:
         try:
             props_md._remove_prop(prop)
