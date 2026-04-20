@@ -466,6 +466,7 @@ class Straightness(NodeGlobalPropCalculator):
         -------
         float
             Straightness of the displacement.
+            Returns NaN if the total distance traveled is null.
         """
         lin_ID = cycle_lin.graph["lineage_ID"]
         cell_lin = data.cell_data[lin_ID]
@@ -485,6 +486,7 @@ class Straightness(NodeGlobalPropCalculator):
             )
             for (n1, n2) in pairwise(cells)
         ]
+
         if self.include_incoming_edge:
             first_cell = cells[0]
             preds = list(cell_lin.predecessors(first_cell))
@@ -504,6 +506,10 @@ class Straightness(NodeGlobalPropCalculator):
                 distances.append(dist)
             elif len(preds) > 1:
                 raise FusionError(first_cell, lin_ID)
+        
+        if sum(distances) == 0:
+            return math.nan
+
         first_cell_loc = (
             cell_lin.nodes[cells[0]]["cell_x"],
             cell_lin.nodes[cells[0]]["cell_y"],
