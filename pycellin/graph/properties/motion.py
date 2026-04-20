@@ -527,7 +527,7 @@ def create_angle_property(
         identifier=custom_identifier or "angle",
         name=custom_name or "Angle",
         description=custom_description
-        or "Angle of the cell trajectory between two consecutive detections",
+        or "Angle of the cell trajectory between two consecutive displacements",
         provenance="pycellin",
         prop_type="edge",
         lin_type="CellLineage",
@@ -538,10 +538,12 @@ def create_angle_property(
 
 class Angle(NodeGlobalPropCalculator):
     """
-    Calculator to compute the angle between two consecutive detections of a cell.
+    Calculator to compute the angle between two consecutive displacement vectors of a cell.
 
-    The angle is defined as the angle between the vectors representing the displacement
-    of the cell at two consecutive detections.
+    The angle requires three consecutive detections of the cell. It is computed
+    at a given cell detection as the angle between:
+        - the displacement vector from its predecessor to itself
+        - the displacement vector from itself to its successor
     """
 
     def __init__(self, property: Property, unit: Literal["radian", "degree"] = "radian"):
@@ -560,7 +562,7 @@ class Angle(NodeGlobalPropCalculator):
         self, data: Data, lineage: CellLineage, nid: int
     ) -> float:
         """
-        Compute the angle between two consecutive detections of a cell.
+        Compute the angle between two consecutive displacement vectors at a cell detection.
 
         Parameters
         ----------
@@ -574,7 +576,9 @@ class Angle(NodeGlobalPropCalculator):
         Returns
         -------
         float
-            Angle between the two consecutive displacements.
+            Angle between the two consecutive displacement vectors.
+            Returns NaN if the angle is not defined (first or last node in lineage,
+            or dividing cell).
         """
         # Find the incoming and outgoing edges of the node of interest.
         predecessors = list(lineage.predecessors(nid))
