@@ -1895,7 +1895,7 @@ class Model:
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=time_prop.unit,
+            unit=f"1/{time_prop.unit}",
         )
         self.add_custom_property(tracking.DivisionRate(prop, time_prop.identifier))
 
