@@ -716,33 +716,44 @@ def _is_numeric_dtype(dtype: str | None) -> bool:
     """
     if dtype is None:
         return False
+
     dtype_lower = dtype.lower()
-    numeric_keywords = [
-        # Basic numeric types.
-        "int",
-        "integer",
-        "float",
-        "complex",
-        "bool",
-        "boolean",
-        "fraction",
-        "decimal",
-        "number",
-        "numeric",
-        "real",
-        "rational",
-        # Numpy-style dtypes.
-        "uint",
-        "int8",
-        "int16",
-        "int32",
-        "int64",
-        "float16",
-        "float32",
-        "float64",
-        "float128",
+
+    # Reject collection and container types that are not numeric.
+    non_numeric_keywords = [
+        "array",
+        "bytes",
+        "dict",
+        "dictionary",
+        "iterable",
+        "list",
+        "matrix",
+        "object",
+        "sequence",
+        "set",
+        "str",
+        "string",
+        "tuple",
     ]
-    return any(keyword in dtype_lower for keyword in numeric_keywords)
+    if any(keyword in dtype_lower for keyword in non_numeric_keywords):
+        return False
+
+    # Check for numeric types using regex with word boundaries
+    # to avoid false positives (e.g., "point" containing "int").
+    numeric_pattern = (
+        r"\b(?:"
+        r"int|integer|"
+        r"uint|uint8|uint16|uint32|uint64|"
+        r"int8|int16|int32|int64|"
+        r"float|double|float16|float32|float64|float128|"
+        r"complex|"
+        r"bool|bool_|boolean|"
+        r"fraction|decimal|"
+        r"number|numeric|"
+        r"real|rational|"
+        r")\b"
+    )
+    return bool(re.search(numeric_pattern, dtype_lower))
 
 
 def _remove_non_numeric_props(model: Model) -> None:
