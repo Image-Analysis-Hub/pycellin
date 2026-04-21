@@ -165,6 +165,7 @@ class Model:
             props_metadata.copy() if props_metadata is not None else PropsMetadata()
         )
         self._updater = ModelUpdater()
+        self.variable_time_step = variable_time_step
 
         # Update to actually compute the "timepoint" property.
         if self.data.cell_data and "timepoint" not in self.get_node_properties():
