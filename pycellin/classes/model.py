@@ -1802,22 +1802,18 @@ class Model:
             "Speed of the cell between two consecutive detections".
         """
         if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(
-                self.model_metadata.reference_time_property
-            )
+            time_prop = self.get_properties().get(self.reference_time_property)
         else:
-            time_prop = self.props_metadata.props.get(custom_time_property)
+            time_prop = self.get_properties().get(custom_time_property)
         if time_prop is None:
-            time_prop = (
-                custom_time_property or self.model_metadata.reference_time_property
-            )
-            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+            time_prop_id = custom_time_property or self.reference_time_property
+            raise KeyError(f"The time property '{time_prop_id}' has not been declared.")
 
         prop = motion.create_cell_speed_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=time_prop.unit,
+            unit=f"{self.get_space_unit()}/{time_prop.unit}",
         )
         self.add_custom_property(motion.CellSpeed(prop, time_prop.identifier))
 
