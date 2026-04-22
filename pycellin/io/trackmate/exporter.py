@@ -146,9 +146,9 @@ def _unit_to_dimension(
         "branch_total_displacement": "LENGTH",
         "branch_mean_displacement": "LENGTH",
         "branch_mean_speed": "VELOCITY",
-        "cells": "NONE",
+        "cells": "NONE",  # not float nor int so won't be exported to TM anyway
         "cycle_completeness": "NONE",
-        "cycle_duration": "NONE",
+        "cycle_duration": "TIME",
         "cycle_ID": "NONE",
         "cycle_length": "NONE",
         "division_time": "TIME",
