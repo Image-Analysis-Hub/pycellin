@@ -122,15 +122,17 @@ def _unit_to_dimension(
         "CONFINEMENT_RATIO": "NONE",
     }
     # Channel dependent features.
+    # Depending on the TrackMate, we can have MEAN_INTENSITY or MEAN_INTENSITY_CH1
+    # when there is only one channel.
     channel_props = {
-        "MEAN_INTENSITY_CH": "INTENSITY",
-        "MEDIAN_INTENSITY_CH": "INTENSITY",
-        "MIN_INTENSITY_CH": "INTENSITY",
-        "MAX_INTENSITY_CH": "INTENSITY",
-        "TOTAL_INTENSITY_CH": "INTENSITY",
-        "STD_INTENSITY_CH": "INTENSITY",
-        "CONTRAST_CH": "NONE",
-        "SNR_CH": "NONE",
+        "MEAN_INTENSITY": "INTENSITY",
+        "MEDIAN_INTENSITY": "INTENSITY",
+        "MIN_INTENSITY": "INTENSITY",
+        "MAX_INTENSITY": "INTENSITY",
+        "TOTAL_INTENSITY": "INTENSITY",
+        "STD_INTENSITY": "INTENSITY",
+        "CONTRAST": "NONE",
+        "SNR": "NONE",
     }
 
     # Pycellin features.
