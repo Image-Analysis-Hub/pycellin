@@ -902,6 +902,33 @@ class Model:
             list(self.data.cycle_data.values()), lin_prop, lin_prop_value
         )
 
+    def get_cell_lineage_IDs(self) -> list[int]:
+        """
+        Return the IDs of the cell lineages present in the model.
+
+        Returns
+        -------
+        list[int]
+            List of the IDs of the cell lineages present in the model.
+        """
+        return list(self.data.cell_data.keys())
+
+    get_lineage_IDs = get_cell_lineage_IDs
+    get_lineage_IDs.__doc__ = "Alias for get_cell_lineage_IDs"
+
+    def get_cycle_lineage_IDs(self) -> list[int]:
+        """
+        Return the IDs of the cycle lineages present in the model.
+
+        Returns
+        -------
+        list[int]
+            List of the IDs of the cycle lineages present in the model.
+        """
+        if self.data.cycle_data is None:
+            return []
+        return list(self.data.cycle_data.keys())
+
     def get_next_available_lineage_ID(self, positive: bool = True) -> int:
         """
         Return the next available lineage ID, positive by default.
