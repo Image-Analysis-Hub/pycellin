@@ -1048,6 +1048,52 @@ def _prepare_model_for_export(
     _remove_non_numeric_props(model)
 
 
+def _write_Settings(
+    xf: ET.xmlfile,
+    model: Model,
+) -> None:
+    """
+    Write the Settings XML tag into a TrackMate XML file.
+
+    Parameters
+    ----------
+    xf : ET.xmlfile
+        Context manager for the XML file to write.
+    model : Model
+        Model containing the data to write.
+    """
+    metadata = model.model_metadata.to_dict()
+    if "Settings" in metadata:
+        xml_element = ET.fromstring(metadata["Settings"])
+        xf.write(xml_element)
+    else:
+        with xf.element("Settings"):
+            xf.write("\n    ")
+            img_data = ET.Element(
+                "ImageData",
+                {
+                    "filename": "",
+                    "folder": "",
+                    "width": "0",
+                    "height": "0",
+                    "nslices": "0",
+                    "nframes": "0",
+                    "pixelwidth": "1.0",
+                    "pixelheight": "1.0",
+                    "voxeldepth": "1.0",
+                    "timeinterval": "1.0",
+                },
+            )
+            xf.write(img_data)
+            xf.write("\n    ")
+            xf.write(ET.Element("InitialSpotFilter"))
+            xf.write("\n    ")
+            xf.write(ET.Element("SpotFilterCollection"))
+            xf.write("\n    ")
+            xf.write(ET.Element("TrackFilterCollection"))
+            xf.write("\n  ")
+
+
 def _write_metadata_tag(
     xf: ET.xmlfile,
     metadata: dict[str, Any],
@@ -1176,7 +1222,10 @@ def export_TrackMate_XML(
                 _write_AllTracks(xf, model_copy.data.cell_data)
                 _write_FilteredTracks(xf, model_copy.data.cell_data, has_FilteredTrack)
             xf.write("\n  ")
-            for tag in ["Settings", "GUIState", "DisplaySettings"]:
+            _write_Settings(xf, model_copy)
+
+            xf.write("\n  ")
+            for tag in ["GUIState", "DisplaySettings"]:
                 _write_metadata_tag(xf, model_copy.model_metadata.to_dict(), tag)
                 if tag == "DisplaySettings":
                     xf.write("\n")
