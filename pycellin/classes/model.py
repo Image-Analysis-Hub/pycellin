@@ -1482,6 +1482,41 @@ class Model:
                 fusions.extend([Cell(cell_ID, lin_ID) for cell_ID in tmp])
         return fusions
 
+    def get_divisions(self, lids: list[int] | None = None) -> list[Cell]:
+        """
+        Return division cells, i.e. cells with more than one child.
+
+        Parameters
+        ----------
+        lids : list[int], optional
+            List of lineage IDs to check for divisions.
+            If not specified, all lineages will be checked (default is None).
+
+        Returns
+        -------
+        list[Cell]
+            List of the division cells. Each cell is a named tuple:
+            (cell_ID, lineage_ID).
+
+        Raises
+        ------
+        KeyError
+            If a lineage with the specified ID does not exist in the model.
+        """
+        divisions = []
+        if lids is None:
+            lids = list(self.data.cell_data.keys())
+        for lin_ID in lids:
+            try:
+                lineage = self.data.cell_data[lin_ID]
+            except KeyError as err:
+                msg = f"Lineage with ID {lin_ID} does not exist."
+                raise KeyError(msg) from err
+            tmp = lineage.get_divisions()
+            if tmp:
+                divisions.extend([Cell(cell_ID, lin_ID) for cell_ID in tmp])
+        return divisions
+
     def add_custom_property(
         self,
         calculator: PropertyCalculator,
