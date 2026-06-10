@@ -24,7 +24,7 @@ from pycellin.classes.model import Model
 from pycellin.classes.property import Property
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.custom_types import PropertyType
-from pycellin.io.utils import _graph_has_node_prop
+from pycellin.io.utils import _graph_has_node_prop, _update_node_prop_key
 
 
 def _unit_to_dimension(
@@ -122,8 +122,8 @@ def _unit_to_dimension(
         "CONFINEMENT_RATIO": "NONE",
     }
     # Channel dependent features.
-    # Depending on the TrackMate, we can have MEAN_INTENSITY or MEAN_INTENSITY_CH1
-    # when there is only one channel.
+    # Depending on the TrackMate version, we can have MEAN_INTENSITY or
+    # MEAN_INTENSITY_CH1 when there is only one channel.
     channel_props = {
         "MEAN_INTENSITY": "INTENSITY",
         "MEDIAN_INTENSITY": "INTENSITY",
@@ -982,6 +982,61 @@ def _update_props_metadata(model: Model, frame_prop: str) -> None:
     _update_location_props(model.props_metadata)
 
 
+def _add_radius_prop(model: Model) -> None:
+    """
+    Add a radius property to the model if it does not exist.
+
+    This is necessary because TrackMate requires a radius feature for the spots
+    in order to be able to draw them as circles.
+    If the radius property is not present, we add it with a default value of 1.0
+    for all nodes.
+
+    Parameters
+    ----------
+    model : Model
+        Model to modify.
+    """
+    # Check if there is already a radius property in the registered properties.
+    props = model.get_properties()
+    radius_prop_name = None
+    for prop_name, prop in props.items():
+        if prop_name.lower() == "radius" and prop.prop_type == PropertyType.NODE:
+            radius_prop_name = prop_name
+            break
+
+    # If yes, rename it to RADIUS if necessary, in both metadata and data.
+    if radius_prop_name is not None:
+        if radius_prop_name != "RADIUS":
+            model.props_metadata._change_prop_identifier(radius_prop_name, "RADIUS")
+            for lin in model.data.cell_data.values():
+                _update_node_prop_key(
+                    lin,
+                    old_key=radius_prop_name,
+                    new_key="RADIUS",
+                    set_default_if_missing=True,
+                    default_value=1.0,
+                )
+    else:
+        # If not, create the RADIUS property in the metadata.
+        radius_prop = Property(
+            identifier="RADIUS",
+            name="Radius",
+            description="Radius",
+            provenance="TrackMate",
+            prop_type="node",
+            lin_type="CellLineage",
+            dtype="float",
+            unit=model.get_space_unit(),
+        )
+        model.props_metadata._add_prop(radius_prop)
+
+    # Ensure all nodes have the RADIUS property set to 1.0 if missing.
+    for lin in model.data.cell_data.values():
+        for node in lin.nodes():
+            if "RADIUS" not in lin.nodes[node]:
+                lin.nodes[node]["RADIUS"] = 1.0
+
+
 def _prepare_model_for_export(
     model: Model,
 ) -> None:
@@ -1043,6 +1098,7 @@ def _prepare_model_for_export(
                 f"fallback 'timepoint'. "
             )
 
+    _add_radius_prop(model)
     _update_props_metadata(model, frame_prop)
     _update_model_data(model, frame_prop)
     _remove_non_numeric_props(model)
