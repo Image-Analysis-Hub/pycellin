@@ -24,6 +24,7 @@ from pycellin.classes.model import Model
 from pycellin.classes.property import Property
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.custom_types import PropertyType
+from pycellin.io.trackmate.loader import load_TrackMate_XML
 from pycellin.io.utils import _graph_has_node_prop, _update_node_prop_key
 
 
@@ -172,10 +173,16 @@ def _unit_to_dimension(
         else:
             pycellin_props["relative_age"] = "TIME"
 
+    dimension = None
     if name in trackmate_props:
         dimension = trackmate_props[name]
+    if dimension is None:
+        for key, dim in channel_props.items():
+            if name.startswith(key):
+                dimension = dim
+                break
 
-    elif provenance == "TrackMate":
+    if dimension is None and provenance == "TrackMate":
         if name in trackmate_props:
             dimension = trackmate_props[name]
         else:
@@ -196,7 +203,7 @@ def _unit_to_dimension(
                 # but it's a dimension not recognized by TM and it crashes.
                 dimension = "NONE"
 
-    elif provenance == "pycellin":
+    if dimension is None and provenance == "pycellin":
         try:
             dimension = pycellin_props[name]
         except KeyError:
@@ -211,7 +218,7 @@ def _unit_to_dimension(
                 warnings.warn(msg)
                 dimension = "NONE"
 
-    else:
+    if dimension is None:
         match unit:
             case "pixel":
                 if name.lower() in ["x", "y", "z"]:
@@ -1304,8 +1311,8 @@ if __name__ == "__main__":
     geff_in = "sample_data/Ecoli_growth_on_agar_pad.geff"
     model = load_GEFF(
         geff_in,
-        lineage_id_prop="TRACK_ID",
-        cell_id_prop="ID",
+        lineage_id_prop="lineage_ID",
+        cell_id_prop="cell_ID",
         time_prop="POSITION_T",
     )
 
