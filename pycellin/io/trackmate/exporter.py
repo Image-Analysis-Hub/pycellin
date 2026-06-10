@@ -788,6 +788,9 @@ def _remove_non_numeric_props(model: Model) -> None:
         for name, prop in model.get_properties().items()
         if prop.provenance != "TrackMate" and not _is_numeric_dtype(prop.dtype)
     ]
+    # The only exception is 'name' which is a string property that TrackMate can handle
+    # as the display name of a spot or a track.
+    to_remove = [name for name in to_remove if name != "name"]
     if to_remove:
         for name in to_remove:
             try:

@@ -475,6 +475,6 @@ if __name__ == "__main__":
         export_GEFF(
             model,
             geff_out,
-            space_axes=["cell_x", "cell_y"],
+            space_axes=["cell_x", "cell_y", "cell_z"],
             variable_length_props=["ROI_coords"],
         )
