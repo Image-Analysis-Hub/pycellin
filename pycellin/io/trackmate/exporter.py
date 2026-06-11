@@ -850,14 +850,11 @@ def _remove_props(props_md: PropsMetadata) -> None:
     """
     props_md._unprotect_prop("cell_ID")
     props_md._remove_prop("cell_ID")
-    try:
+    if props_md._has_prop("timepoint"):
+        # If no frame-like properties were found in _rename_props(), the timepoint
+        # property is used and renamed to FRAME. So no need to remove it in this case.
         props_md._unprotect_prop("timepoint")
         props_md._remove_prop("timepoint")
-    except KeyError:
-        # If no frame-like properties were found in _rename_props(), the timepoint
-        # property is used and renamed to FRAME. So attempting to remove it
-        # will raise a KeyError.
-        pass
     for prop in ["cell_name", "lineage_name", "FilteredTrack", "ROI_coords"]:
         try:
             props_md._remove_prop(prop)
@@ -1308,7 +1305,7 @@ if __name__ == "__main__":
 
     from pycellin.io.geff.loader import load_GEFF
 
-    geff_in = "sample_data/Ecoli_growth_on_agar_pad.geff"
+    geff_in = "pycellin/sample_data/Ecoli_growth_on_agar_pad.geff"
     model = load_GEFF(
         geff_in,
         lineage_id_prop="lineage_ID",
