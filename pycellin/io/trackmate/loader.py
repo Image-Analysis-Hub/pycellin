@@ -1081,7 +1081,7 @@ if __name__ == "__main__":
     """
     Quick demo with sample data.
     """
-    xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    xml = "pycellin/sample_data/Ecoli_growth_on_agar_pad.xml"
     model = load_TrackMate_XML(
         xml,
         keep_all_spots=True,

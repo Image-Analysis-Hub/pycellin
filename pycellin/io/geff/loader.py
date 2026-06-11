@@ -1186,9 +1186,12 @@ if __name__ == "__main__":
     """
     Quick demo with sample data.
     """
-    geff_in = "sample_data/Ecoli_growth_on_agar_pad.geff"
+    geff_in = "pycellin/sample_data/Ecoli_growth_on_agar_pad.geff"
     model = load_GEFF(
-        geff_in, lineage_id_prop="TRACK_ID", cell_id_prop="ID", time_prop="POSITION_T"
+        geff_in,
+        lineage_id_prop="lineage_ID",
+        cell_id_prop="cell_ID",
+        time_prop="POSITION_T",
     )
 
     print(model)

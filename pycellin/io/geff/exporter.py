@@ -463,7 +463,7 @@ if __name__ == "__main__":
 
     from pycellin.io.trackmate.loader import load_TrackMate_XML
 
-    xml_in = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    xml_in = "pycellin/sample_data/Ecoli_growth_on_agar_pad.xml"
     model = load_TrackMate_XML(xml_in)
 
     print(model)
