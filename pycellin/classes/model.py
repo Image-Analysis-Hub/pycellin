@@ -173,8 +173,8 @@ class Model:
                 Timepoint(
                     property=create_timepoint_property(),
                     data=self.data,
-                    time_step=self.model_metadata.time_step,
-                    reference_time_property=self.model_metadata.reference_time_property,
+                    time_step=self.get_time_step(),
+                    reference_time_property=self.reference_time_property,
                 )
             )
             self.props_metadata._protect_prop("timepoint")
