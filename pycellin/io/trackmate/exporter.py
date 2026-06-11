@@ -1114,6 +1114,10 @@ def _prepare_model_for_export(
 def _write_Settings(
     xf: ET.xmlfile,
     model: Model,
+    img_path: str | Path | None = None,
+    img_path_field: str | None = None,
+    img_shape: tuple[int, int, int, int, int] | None = None,
+    img_shape_field: str | None = None,
 ) -> None:
     """
     Write the Settings XML tag into a TrackMate XML file.
@@ -1124,37 +1128,79 @@ def _write_Settings(
         Context manager for the XML file to write.
     model : Model
         Model containing the data to write.
+    img_path : str | Path | None, optional
+        Path to the image file associated with the model. Default is None.
+        If provided, will be used instead of `img_path_field`.
+    img_path_field : str | None, optional
+        Name of the model metadata field that contains the image path. Default is None.
+        Not needed if `img_path` is provided.
+    img_shape : tuple[int, int, int, int, int] | None, optional
+        Shape of the image associated with the model, in the format (T, C, Z, Y, X).
+        Default is None. If provided, will be used instead of `img_shape_field`.
+    img_shape_field : str | None, optional
+        Name of the model metadata field that contains the image shape. Default is None.
+        Not needed if `img_shape` is provided.
     """
     metadata = model.model_metadata.to_dict()
     if "Settings" in metadata:
         xml_element = ET.fromstring(metadata["Settings"])
         xf.write(xml_element)
+        return
+
+    if img_path is None:
+        if img_path_field is None:
+            img_path = ""
+        else:
+            img_path = metadata.get(img_path_field, "")
+    if not img_path:
+        filename = ""
+        folder = ""
     else:
-        with xf.element("Settings"):
-            xf.write("\n    ")
-            img_data = ET.Element(
-                "ImageData",
-                {
-                    "filename": "",
-                    "folder": "",
-                    "width": "0",
-                    "height": "0",
-                    "nslices": "0",
-                    "nframes": "0",
-                    "pixelwidth": "1.0",
-                    "pixelheight": "1.0",
-                    "voxeldepth": "1.0",
-                    "timeinterval": "1.0",
-                },
-            )
-            xf.write(img_data)
-            xf.write("\n    ")
-            xf.write(ET.Element("InitialSpotFilter"))
-            xf.write("\n    ")
-            xf.write(ET.Element("SpotFilterCollection"))
-            xf.write("\n    ")
-            xf.write(ET.Element("TrackFilterCollection"))
-            xf.write("\n  ")
+        filename = str(Path(img_path).name)
+        folder = str(Path(img_path).parent)
+
+    if img_shape is None:
+        if img_shape_field is None:
+            img_shape = (0, 0, 0, 0, 0)
+        else:
+            img_shape = metadata.get(img_shape_field, (0, 0, 0, 0, 0))
+    if not img_shape:
+        n_frames = "0"  # T
+        # TrackMate doesn't need the number of channels.
+        n_slices = "0"  # Z
+        height = "0"  # Y
+        width = "0"  # X
+    else:
+        n_frames = str(img_shape[0])
+        n_slices = str(img_shape[2])
+        height = str(img_shape[3])
+        width = str(img_shape[4])
+
+    with xf.element("Settings"):
+        xf.write("\n    ")
+        img_data = ET.Element(
+            "ImageData",
+            {
+                "filename": filename,
+                "folder": folder,
+                "width": width,
+                "height": height,
+                "nslices": n_slices,
+                "nframes": n_frames,
+                "pixelwidth": str(metadata.get("pixel_width", 1.0) or 1.0),
+                "pixelheight": str(metadata.get("pixel_height", 1.0) or 1.0),
+                "voxeldepth": str(metadata.get("pixel_depth", 1.0) or 1.0),
+                "timeinterval": str(metadata.get("time_step", 1.0) or 1.0),
+            },
+        )
+        xf.write(img_data)
+        xf.write("\n    ")
+        xf.write(ET.Element("InitialSpotFilter"))
+        xf.write("\n    ")
+        xf.write(ET.Element("SpotFilterCollection"))
+        xf.write("\n    ")
+        xf.write(ET.Element("TrackFilterCollection"))
+        xf.write("\n  ")
 
 
 def _write_metadata_tag(
@@ -1220,6 +1266,10 @@ def export_TrackMate_XML(
     model: Model,
     xml_path: str | Path,
     units: dict[str, str] | None = None,
+    img_path: str | Path | None = None,
+    img_path_field: str | None = None,
+    img_shape: tuple[int, int, int, int, int] | None = None,
+    img_shape_field: str | None = None,
     propagate_cycle_props: bool = False,
 ) -> Model:
     """
@@ -1236,6 +1286,18 @@ def export_TrackMate_XML(
         If not specified, the user will be asked to provide them. Format is:
         {"space": "your_unit", "time": "your_unit"}, e.g.
         {"space": "pixel", "time": "sec"}.
+    img_path : str | Path | None, optional
+        Path to the image file associated with the model. Default is None.
+        If provided, will be used instead of `img_path_field`.
+    img_path_field : str | None, optional
+        Name of the model metadata field that contains the image path. Default is None.
+        Not needed if `img_path` is provided.
+    img_shape : tuple[int, int, int, int, int] | None, optional
+        Shape of the image associated with the model, in the format (T, C, Z, Y, X).
+        Default is None. If provided, will be used instead of `img_shape_field`.
+    img_shape_field : str | None, optional
+        Name of the model metadata field that contains the image shape. Default is None.
+        Not needed if `img_shape` is provided.
     propagate_cycle_props : bool, optional
         If True, cycle properties will be propagated to cell lineages before export.
         Useful if you want to export the cycle properties to TrackMate
@@ -1285,7 +1347,9 @@ def export_TrackMate_XML(
                 _write_AllTracks(xf, model_copy.data.cell_data)
                 _write_FilteredTracks(xf, model_copy.data.cell_data, has_FilteredTrack)
             xf.write("\n  ")
-            _write_Settings(xf, model_copy)
+            _write_Settings(
+                xf, model_copy, img_path, img_path_field, img_shape, img_shape_field
+            )
 
             xf.write("\n  ")
             for tag in ["GUIState", "DisplaySettings"]:
@@ -1305,7 +1369,7 @@ if __name__ == "__main__":
 
     from pycellin.io.geff.loader import load_GEFF
 
-    geff_in = "pycellin/sample_data/Ecoli_growth_on_agar_pad.geff"
+    geff_in = "./sample_data/Ecoli_growth_on_agar_pad.geff"
     model = load_GEFF(
         geff_in,
         lineage_id_prop="lineage_ID",
