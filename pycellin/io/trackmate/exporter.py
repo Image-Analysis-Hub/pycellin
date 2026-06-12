@@ -1044,8 +1044,54 @@ def _add_radius_prop(model: Model) -> None:
                 lin.nodes[node]["RADIUS"] = 1.0
 
 
+def _relabel_nodes(model) -> None:
+    """
+    Relabel the nodes in the model to ensure unique IDs.
+
+    This is necessary because TrackMate requires unique spot IDs across all lineages.
+    If the model has non-unique node IDs, we relabel them in place to ensure uniqueness.
+
+    Parameters
+    ----------
+    model : Model
+        Model whose nodes to relabel.
+    """
+    # Collect all existing node IDs across all lineages.
+    existing_ids = set()
+    for lin in model.data.cell_data.values():
+        existing_ids.update(lin.nodes())
+
+    if len(existing_ids) == sum(len(lin) for lin in model.data.cell_data.values()):
+        # All node IDs are unique, no need to relabel.
+        return
+
+    # We relabel the nodes.
+    new_id = 0
+    for lin in model.data.cell_data.values():
+        mapping = {}
+        for node in lin.nodes():
+            mapping[node] = new_id
+            new_id += 1
+        nx.relabel_nodes(lin, mapping, copy=False)
+
+        # Update edge attributes that reference node IDs.
+        for source_node, target_node, data in lin.edges(data=True):
+            data["SPOT_SOURCE_ID"] = source_node
+            data["SPOT_TARGET_ID"] = target_node
+
+        # The relabeling must be propagated to the cell_ID node attribute.
+        for node in lin.nodes():
+            lin.nodes[node]["pycellin_cell_ID"] = lin.nodes[node]["cell_ID"]
+            lin.nodes[node]["cell_ID"] = node
+
+    # And we need to update the model in case some other properties refer
+    # to the node IDs (for example cycle_IDs).
+    model.update()
+
+
 def _prepare_model_for_export(
     model: Model,
+    propagate: bool,
 ) -> None:
     """
     Prepare a pycellin model for export to TrackMate format.
@@ -1057,12 +1103,20 @@ def _prepare_model_for_export(
     ----------
     model : Model
         Model to prepare for export.
+    propagate : bool
+        Whether to propagate the cycle properties before preparing the model.
 
     Raises
     ------
     KeyError
         If neither a frame-like property nor 'timepoint' is present on all nodes.
     """
+    _relabel_nodes(model)  # TrackMate needs unique spot IDs across all lineages
+    if propagate:
+        model.propagate_cycle_properties()
+
+    # TODO: refactor the next section into a separate function.
+
     # TrackMate requires a FRAME property.
     # First, collect all frame-like properties from the metadata.
     candidates = []
@@ -1322,8 +1376,6 @@ def export_TrackMate_XML(
     """
     # We don't want to modify the original model.
     model_copy = copy.deepcopy(model)
-    if propagate_cycle_props:
-        model_copy.propagate_cycle_properties()
 
     if not units:
         units = _ask_units(model_copy.props_metadata)
@@ -1333,7 +1385,7 @@ def export_TrackMate_XML(
     else:
         tm_version = "unknown"
     has_FilteredTrack = model_copy.has_property("FilteredTrack")
-    _prepare_model_for_export(model_copy)
+    _prepare_model_for_export(model_copy, propagate_cycle_props)
 
     with ET.xmlfile(xml_path, encoding="utf-8", close=True) as xf:
         xf.write_declaration()
@@ -1369,7 +1421,7 @@ if __name__ == "__main__":
 
     from pycellin.io.geff.loader import load_GEFF
 
-    geff_in = "./sample_data/Ecoli_growth_on_agar_pad.geff"
+    geff_in = "pycellin/sample_data/Ecoli_growth_on_agar_pad.geff"
     model = load_GEFF(
         geff_in,
         lineage_id_prop="lineage_ID",
