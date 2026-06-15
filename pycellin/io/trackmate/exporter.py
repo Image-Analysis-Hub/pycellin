@@ -1095,6 +1095,7 @@ def _relabel_nodes(model) -> None:
 
     # And we need to update the model in case some other properties refer
     # to the node IDs (for example cycle_IDs).
+    model.prepare_full_data_update()
     model.update()
 
 
