@@ -1349,9 +1349,12 @@ def export_TrackMate_XML(
     img_shape : tuple[int, int, int, int, int] | None, optional
         Shape of the image associated with the model, in the format (T, C, Z, Y, X).
         Default is None. If provided, will be used instead of `img_shape_field`.
+        Not needed to open the XML in TrackMate, but useful for MATLAB scripting
+        and the like.
     img_shape_field : str | None, optional
         Name of the model metadata field that contains the image shape. Default is None.
-        Not needed if `img_shape` is provided.
+        Not needed if `img_shape` is provided. Not needed to open the XML in TrackMate,
+        but useful for MATLAB scripting and the like.
     propagate_cycle_props : bool, optional
         If True, cycle properties will be propagated to cell lineages before export.
         Useful if you want to export the cycle properties to TrackMate
