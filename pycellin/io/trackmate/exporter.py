@@ -24,8 +24,10 @@ from pycellin.classes.model import Model
 from pycellin.classes.property import Property
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.custom_types import PropertyType
-from pycellin.io.trackmate.loader import load_TrackMate_XML
-from pycellin.io.utils import _graph_has_node_prop, _update_node_prop_key
+from pycellin.io.utils import (
+    _identify_frame_prop,
+    _update_node_prop_key,
+)
 
 
 def _unit_to_dimension(
@@ -36,8 +38,8 @@ def _unit_to_dimension(
 
     Parameters
     ----------
-    unit : str
-        Unit to convert.
+    prop : Property
+        The property for which to convert the unit.
 
     Returns
     -------
@@ -332,6 +334,11 @@ def _write_FeatureDeclarations(
         Context manager for the XML file to write.
     model : Model
         Model containing the data to write.
+
+    Raises
+    ------
+    ValueError
+        If the feature type is unknown.
     """
     xf.write(f"\n{' ' * 4}")
     with xf.element("FeatureDeclarations"):
@@ -347,6 +354,8 @@ def _write_FeatureDeclarations(
                         props = model.get_edge_properties()
                     case "TrackFeatures":
                         props = model.get_lineage_properties()
+                    case _:
+                        raise ValueError(f"Unknown feature type: {f_type}")
                 first_feat_written = False
                 for prop in props.values():
                     trackmate_feat = _convert_prop_to_feat(prop)
@@ -1115,50 +1124,7 @@ def _prepare_model_for_export(
     if propagate:
         model.propagate_cycle_properties()
 
-    # TODO: refactor the next section into a separate function.
-
-    # TrackMate requires a FRAME property.
-    # First, collect all frame-like properties from the metadata.
-    candidates = []
-    for prop in model.props_metadata._get_prop_dict_from_prop_type(
-        PropertyType.NODE
-    ).values():
-        if prop.identifier.lower() == "frame":
-            candidates.append(prop.identifier)
-
-    # Check each candidate to see if it exists on all nodes in all lineages.
-    frame_prop = None
-    for candidate in candidates:
-        has_prop = True
-        for lin in model.data.cell_data.values():
-            has_prop = _graph_has_node_prop(lin, candidate) and has_prop
-
-        if has_prop:
-            frame_prop = candidate
-            break
-        else:
-            warnings.warn(
-                f"Property '{candidate}' found in metadata but not present on all nodes. "
-                f"Trying next candidate or falling back to 'timepoint'."
-            )
-
-    # If no valid frame property found, fallback to "timepoint".
-    if frame_prop is None:
-        frame_prop = "timepoint"
-        has_prop = True
-        for lin in model.data.cell_data.values():
-            has_prop = _graph_has_node_prop(lin, frame_prop) and has_prop
-
-        if has_prop:
-            warnings.warn(
-                f"No valid frame-like property found. Falling back to '{frame_prop}'."
-            )
-        else:
-            raise KeyError(
-                f"No valid frame-like property found. Tried candidates: {candidates} and "
-                f"fallback 'timepoint'. "
-            )
-
+    frame_prop = _identify_frame_prop(model)
     _add_radius_prop(model)
     _update_props_metadata(model, frame_prop)
     _update_model_data(model, frame_prop)

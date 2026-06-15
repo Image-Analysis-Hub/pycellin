@@ -120,6 +120,67 @@ def _add_lineage_props(
         )
 
 
+def _identify_frame_prop(model: Model) -> str:
+    """
+    Identify a frame-like property in the model.
+
+    This function checks if there is a frame-like property in the model's metadata.
+    If not, it falls back to the 'timepoint' property.
+
+    Parameters
+    ----------
+    model : Model
+        The pycellin model to check for a frame-like property.
+
+    Raises
+    ------
+    KeyError
+        If neither a frame-like property nor 'timepoint' is present on all nodes.
+    """
+    # First, collect all frame-like properties from the metadata.
+    candidates = []
+    for prop in model.props_metadata._get_prop_dict_from_prop_type(
+        PropertyType.NODE
+    ).values():
+        if prop.identifier.lower() == "frame":
+            candidates.append(prop.identifier)
+
+    # Check each candidate to see if it exists on all nodes in all lineages.
+    frame_prop = None
+    for candidate in candidates:
+        has_prop = True
+        for lin in model.data.cell_data.values():
+            has_prop = _graph_has_node_prop(lin, candidate) and has_prop
+
+        if has_prop:
+            frame_prop = candidate
+            break
+        else:
+            warnings.warn(
+                f"Property '{candidate}' found in metadata but not present on all nodes. "
+                f"Trying next candidate or falling back to 'timepoint'."
+            )
+
+    # If no valid frame property found, fallback to "timepoint".
+    if frame_prop is None:
+        frame_prop = "timepoint"
+        has_prop = True
+        for lin in model.data.cell_data.values():
+            has_prop = _graph_has_node_prop(lin, frame_prop) and has_prop
+
+        if has_prop:
+            warnings.warn(
+                f"No valid frame-like property found. Falling back to '{frame_prop}'."
+            )
+        else:
+            raise KeyError(
+                f"No valid frame-like property found. Tried candidates: {candidates} and "
+                f"fallback 'timepoint'. "
+            )
+
+    return frame_prop
+
+
 def _get_props_from_data(model: Model) -> tuple[set[str], set[str], set[str]]:
     """
     Collect all property keys present in the model's data.

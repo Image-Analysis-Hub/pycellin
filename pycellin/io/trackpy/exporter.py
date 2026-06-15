@@ -21,6 +21,7 @@ import copy
 import pandas as pd
 
 from pycellin.classes.model import Model
+from pycellin.io.utils import _identify_frame_prop
 
 
 def safekeep_original_lineage_IDs(model: Model) -> None:
@@ -117,7 +118,7 @@ def drop_columns_if_exist(df, columns):
             df.drop(columns=[column], inplace=True)
 
 
-def format_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+def format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
     """
     Format the DataFrame to be compatible with trackpy.
 
@@ -125,6 +126,8 @@ def format_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     ----------
     df : pd.DataFrame
         The DataFrame to format.
+    frame_prop : str
+        The property to use as the frame identifier.
 
     Returns
     -------
@@ -145,7 +148,7 @@ def format_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             "cell_y": "y",
             "cell_z": "z",
             "lineage_ID": "particle",
-            # "frame": frame_prop,
+            frame_prop: "frame",
         },
     )
 
@@ -186,11 +189,11 @@ def export_trackpy_dataframe(model: Model) -> pd.DataFrame:
     safekeep_original_lineage_IDs(model_copy)
     remove_division_events(model_copy)  # Trackpy does not support division events.
     renumber_negative_lineage_IDs(model_copy)
-    # Identify which property is used as frame in the model.
 
     # Creation of the trackpy DataFrame.
     df = model_copy.to_cell_dataframe()
-    df = format_dataframe(df)
+    frame_prop = _identify_frame_prop(model_copy)
+    df = format_dataframe(df, frame_prop)
 
     return df
 
