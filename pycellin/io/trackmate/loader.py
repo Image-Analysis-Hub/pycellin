@@ -759,7 +759,7 @@ def _update_location_related_props(
 
 
 def _parse_model_tag(
-    xml_path: str,
+    xml_path: str | Path,
     keep_all_spots: bool,
     keep_all_tracks: bool,
 ) -> tuple[dict[str, str], PropsMetadata, Data]:
@@ -773,7 +773,7 @@ def _parse_model_tag(
 
     Parameters
     ----------
-    xml_path : str
+    xml_path : str | Path
         Path of the XML file to process.
     keep_all_spots : bool
         True to keep the spots filtered out in TrackMate, False otherwise.

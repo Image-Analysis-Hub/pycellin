@@ -201,7 +201,7 @@ if __name__ == "__main__":
     """
     from pathlib import Path
 
-    from pycellin import load_TrackMate_XML
+    from pycellin.io.trackmate.loader import load_TrackMate_XML
 
     xml = (
         Path(__file__).resolve().parents[3]
