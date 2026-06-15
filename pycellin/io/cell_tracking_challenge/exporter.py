@@ -16,6 +16,8 @@ References:
 https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content%20conventions.pdf
 """
 
+from pathlib import Path
+
 from pycellin.classes.exceptions import FusionError
 from pycellin.classes.model import Model
 from pycellin.classes.lineage import CellLineage
@@ -232,7 +234,7 @@ def _add_parent_track(
 
 def export_CTC_file(
     model: Model,
-    ctc_file_out: str,
+    ctc_file_out: str | Path,
 ) -> None:
     """
     Export lineage data from a Model to CTC tracking file format.
@@ -244,7 +246,7 @@ def export_CTC_file(
     ----------
     model : Model
         The model from which we want to export the CTC file.
-    ctc_file_out : str
+    ctc_file_out : str | Path
         The path to the CTC file to write.
     -----
     """
@@ -252,17 +254,14 @@ def export_CTC_file(
     current_track_label = 1  # 0 is kept for no parent track
     tracks_to_write = []
     for lin in lineages:
-        ctc_tracks = {}
-        node_to_parent_track = {}
+        ctc_tracks: dict[int, dict[str, int]] = {}
+        node_to_parent_track: dict[int, int] = {}
         current_track_label = _build_CTC_tracks(
             lin, ctc_tracks, node_to_parent_track, current_track_label
         )
         for track_label, track_info in ctc_tracks.items():
             _add_parent_track(lin, track_info, node_to_parent_track)
-            txt = (
-                f"{track_label} {track_info['B']} "
-                f"{track_info['E']} {track_info['P']}\n"
-            )
+            txt = f"{track_label} {track_info['B']} {track_info['E']} {track_info['P']}\n"
             tracks_to_write.append(txt)
 
     with open(ctc_file_out, "w") as file:
@@ -270,17 +269,16 @@ def export_CTC_file(
 
 
 if __name__ == "__main__":
-
-    xml_in = "sample_data/FakeTracks.xml"
-    # xml_in = "sample_data/Ecoli_growth_on_agar_pad_with_fusions.xml"
-    ctc_in = "sample_data/FakeTracks_TMtoCTC.txt"
-    ctc_out = "sample_data/results/FakeTracks_exported_CTC_from_CTC.txt"
+    """
+    Quick demo with sample data.
+    """
+    import tempfile
 
     from pycellin.io.trackmate.loader import load_TrackMate_XML
 
+    xml_in = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
     model = load_TrackMate_XML(xml_in)
 
-    # from pycellin.io.cell_tracking_challenge.loader import load_CTC_file
-    # model = load_CTC_file(ctc_in)
-
-    export_CTC_file(model, ctc_out)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        ctc_out = Path(tmp_dir) / "output.xml"
+        export_CTC_file(model, ctc_out)

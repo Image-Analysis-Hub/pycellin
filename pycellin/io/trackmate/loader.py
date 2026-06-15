@@ -878,7 +878,7 @@ def _parse_model_tag(
 
 
 def _get_specific_tags(
-    xml_path: str,
+    xml_path: str | Path,
     tag_names: list[str],
 ) -> dict[str, ET._Element]:
     """
@@ -892,7 +892,7 @@ def _get_specific_tags(
 
     Parameters
     ----------
-    xml_path : str
+    xml_path : str | Path
         The file path of the XML file to be parsed.
     tag_names : list[str]
         A list of tag names to search for in the XML file.
@@ -913,14 +913,14 @@ def _get_specific_tags(
 
 
 def _get_trackmate_version(
-    xml_path: str,
+    xml_path: str | Path,
 ) -> str:
     """
     Extract the version of TrackMate used to generate the XML file.
 
     Parameters
     ----------
-    xml_path : str
+    xml_path : str | Path
         The file path of the XML file to be parsed.
 
     Returns
@@ -1081,7 +1081,11 @@ if __name__ == "__main__":
     """
     Quick demo with sample data.
     """
-    xml = "pycellin/sample_data/Ecoli_growth_on_agar_pad.xml"
+    xml = (
+        Path(__file__).resolve().parents[3]
+        / "sample_data"
+        / "Ecoli_growth_on_agar_pad.xml"
+    )
     model = load_TrackMate_XML(
         xml,
         keep_all_spots=True,

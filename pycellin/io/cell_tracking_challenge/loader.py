@@ -457,8 +457,8 @@ def _integrate_seg_data(
 
 
 def load_CTC_file(
-    res_file_path: str,
-    labels_path: str | None = None,
+    ctc_path: str | Path,
+    labels_path: str | Path | None = None,
     space_unit: str | None = None,
     pixel_width: float | None = None,
     pixel_height: float | None = None,
@@ -471,7 +471,7 @@ def load_CTC_file(
 
     The CTC tracking format does not support fusion events and does not allow
     gaps right after division events.
-    If only 'res_file_path' is given, only track topology is read. To load
+    If only 'ctc_path' is given, only track topology is read. To load
     cell positions into the model, 'labels_path' must also be given.
     The label images must be in the same format as the CTC format,
     i.e. a single image per frame with a single label per cell.
@@ -483,9 +483,9 @@ def load_CTC_file(
 
     Parameters
     ----------
-    res_file_path : str
+    ctc_path : str | Path
         The path to the CTC text file that contains the tracking data.
-    labels_path : str, optional
+    labels_path : str | Path, optional
         The path to the label images, if any. If not provided, only the
         track topology will be read. If image metadata is not directly provided
         by the user, the metadata will be extracted from the label images.
@@ -516,7 +516,7 @@ def load_CTC_file(
     """
     graph = nx.DiGraph()
     current_node_id = 0
-    with open(res_file_path) as file:
+    with open(ctc_path) as file:
         nodes_from_tracks = []
         # The lines in the file are read sequentially to create the nodes.
         # However, nothing ensures that parent nodes are created before
@@ -553,7 +553,8 @@ def load_CTC_file(
 
     # We want one lineage per connected component of the graph.
     lineages = [
-        CellLineage(graph.subgraph(c).copy()) for c in nx.weakly_connected_components(graph)
+        CellLineage(graph.subgraph(c).copy())
+        for c in nx.weakly_connected_components(graph)
     ]
 
     # Adding a unique lineage_ID to each lineage and their nodes.
@@ -574,7 +575,7 @@ def load_CTC_file(
             data[lin_ID] = lin
 
     md = _create_metadata(
-        res_file_path,
+        ctc_path,
         labels_path=labels_path,
         space_unit=space_unit,
         pixel_width=pixel_width,
@@ -594,29 +595,23 @@ def load_CTC_file(
 
 
 if __name__ == "__main__":
-    ctc_file = "sample_data/FakeTracks_TMtoCTC.txt"
-    ctc_file = "sample_data/Ecoli_growth_on_agar_pad_TMtoCTC.txt"
+    """
+    Quick demo with sample data.
+    """
+    # TODO: add a test with segmentation data (labels_path)
+    ctc_file = (
+        Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks_TMtoCTC.txt"
+    )
     # ctc_file = (
-    #     "/mnt/data/Films_Laure/Benchmarks/CTC/"
-    #     "EvaluationSoftware/testing_dataset/03_RES/res_track.txt"
+    #     Path(__file__).resolve().parents[3]
+    #     / "sample_data"
+    #     / "Ecoli_growth_on_agar_pad_TMtoCTC.txt"
     # )
-
-    # ctc_file = "/mnt/data/Code/pycellin/TrackMate/01_RES/res_track.txt"
-    labels_path = "/mnt/data/Code/pycellin/TrackMate/01_RES"
-    # labels_path = "/mnt/data/Benchmarks/Segmentation/03_RES"
-
     model = load_CTC_file(ctc_file)  # , labels_path)
+
     print(model)
+    print("\nModel metadata:")
     print(model.model_metadata)
-    print(model.props_metadata)
-    print(model.data)
-
-    # for lin_id, lin in model.data.cell_data.items():
-    #     print(f"{lin_id} - {lin}")
-    #     lin.plot()
-
-    # model.add_cycle_data()
-    # for lin_id, lin in model.data.cycle_data.items():
-    #     lin.plot()
-
-    # print(model.data.cell_data[1].nodes(data=True))
+    print("\nProperties and their types:")
+    for prop_id, prop in model.props_metadata.props.items():
+        print(f"  - {prop_id}  -> {prop.prop_type}")

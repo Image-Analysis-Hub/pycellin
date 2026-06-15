@@ -1421,7 +1421,11 @@ if __name__ == "__main__":
 
     from pycellin.io.geff.loader import load_GEFF
 
-    geff_in = "pycellin/sample_data/Ecoli_growth_on_agar_pad.geff"
+    geff_in = (
+        Path(__file__).resolve().parents[3]
+        / "sample_data"
+        / "Ecoli_growth_on_agar_pad.geff"
+    )
     model = load_GEFF(
         geff_in,
         lineage_id_prop="lineage_ID",
