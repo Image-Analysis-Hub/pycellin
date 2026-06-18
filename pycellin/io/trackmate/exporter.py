@@ -823,7 +823,7 @@ def _remove_non_numeric_props(model: Model) -> None:
                 model.remove_property(name)
         plural = True if len(to_remove) > 1 else False
         msg = (
-            f"Ignoring property{'s' if plural else ''}: "
+            f"Ignoring propert{'ies' if plural else 'y'}: "
             f"{', '.join(to_remove)}. {'They are' if plural else 'It is'} "
             f"not numeric and won't be supported by TrackMate."
         )
