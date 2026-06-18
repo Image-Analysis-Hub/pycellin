@@ -8,10 +8,10 @@ I've tested quickly and it doesn't seem to be a problem for TrackMate.
 """
 
 import copy
+import logging
 import math
 import numbers
 import re
-import warnings
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +28,8 @@ from pycellin.io.utils import (
     _identify_frame_prop,
     _update_node_prop_key,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _unit_to_dimension(
@@ -199,7 +201,7 @@ def _unit_to_dimension(
                     f" but it is not a known property of TrackMate. Dimension is set"
                     f" to NONE."
                 )
-                warnings.warn(msg)
+                logger.warning(msg)
                 # I'm using NONE here, which is already used in TM, for example
                 # with the FRAME or VISIBILITY features. I tried to use UNKNOWN
                 # but it's a dimension not recognized by TM and it crashes.
@@ -217,7 +219,7 @@ def _unit_to_dimension(
                     f" but it is not a known property of either pycellin or TrackMate. "
                     f" Dimension is set to NONE."
                 )
-                warnings.warn(msg)
+                logger.warning(msg)
                 dimension = "NONE"
 
     if dimension is None:
@@ -233,7 +235,7 @@ def _unit_to_dimension(
         # Is it even possible? Maybe I could ask the user for a file with
         # a property-dimension mapping. For now, I just set the dimension to NONE.
         msg = f"Cannot infer dimension for property '{name}'. Dimension is set to NONE."
-        warnings.warn(msg)
+        logger.warning(msg)
         dimension = "NONE"
 
     assert dimension is not None
@@ -718,7 +720,7 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
             f"{'; '.join(msg_parts)}.\n"
             f"TrackMate will ignore these cells."
         )
-        warnings.warn(msg)
+        logger.warning(msg)
 
 
 def _is_numeric_dtype(dtype: str | None) -> bool:
@@ -820,7 +822,7 @@ def _remove_non_numeric_props(model: Model) -> None:
             f"{', '.join(to_remove)}. {'They are' if plural else 'It is'} "
             f"not numeric and won't be supported by TrackMate."
         )
-        warnings.warn(msg)
+        logger.warning(msg)
 
 
 def _rename_props(props_md: PropsMetadata, frame_prop: str) -> None:
@@ -1075,6 +1077,10 @@ def _relabel_nodes(model) -> None:
         return
 
     # We relabel the nodes.
+    logger.info(
+        "Relabeling nodes to ensure unique IDs across all lineages export. "
+        "Non-unique IDs will be preserved in 'pycellin_cell_ID' for reference."
+    )
     new_id = 0
     for lin in model.data.cell_data.values():
         mapping = {}
@@ -1279,7 +1285,7 @@ def _ask_units(
     trackmate_units = {}
     trackmate_units["space"] = input("Please type the spatial unit: ")
     trackmate_units["time"] = input("Please type the temporal unit: ")
-    print(f"Using the following units for TrackMate export: {trackmate_units}")
+    logger.info(f"Using the following units for TrackMate export: {trackmate_units}")
     return trackmate_units
 
 

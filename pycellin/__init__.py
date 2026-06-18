@@ -1,3 +1,5 @@
+import logging
+
 from .classes.data import Data
 from .classes.lineage import CellLineage, CycleLineage
 from .classes.model import Model
@@ -51,3 +53,5 @@ __all__ = [
     "get_pycellin_cell_lineage_properties",
     "get_pycellin_cycle_lineage_properties",
 ]
+
+logging.getLogger(__name__).addHandler(logging.NullHandler())

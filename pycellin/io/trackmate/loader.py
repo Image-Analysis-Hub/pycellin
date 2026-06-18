@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-
-import warnings
+import logging
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -15,7 +14,7 @@ from pycellin.classes import (
     Property,
     PropsMetadata,
 )
-from pycellin.custom_types import PropertyType, property_type_to_strings
+from pycellin.custom_types import PropertyType
 from pycellin.graph.properties.core import create_cell_id_property
 from pycellin.io.utils import (
     _split_graph_into_lineages,
@@ -24,6 +23,8 @@ from pycellin.io.utils import (
     _update_node_prop_key,
     check_fusions,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _get_units(
@@ -50,13 +51,17 @@ def _get_units(
     if element.attrib:
         units = deepcopy(element.attrib)
     if "spatialunits" not in units:
-        units["spatialunits"] = "pixel"  # TrackMate default value.
-        msg = "WARNING: No spatial units found in the XML file. Setting to 'pixel'."
-        warnings.warn(msg)
+        units["spatialunits"] = "pixel"
+        logger.warning(
+            "No spatial units found in the XML file. Setting to TrackMate "
+            "default value 'pixel'."
+        )
     if "timeunits" not in units:
-        units["timeunits"] = "frame"  # TrackMate default value.
-        msg = "WARNING: No time units found in the XML file. Setting to 'frame'."
-        warnings.warn(msg)
+        units["timeunits"] = "frame"
+        logger.warning(
+            "No time units found in the XML file. Setting to TrackMate "
+            "default value 'frame'."
+        )
     element.clear()  # We won't need it anymore so we free up some memory.
     # .clear() does not delete the element: it only removes all subelements
     # and clears or sets to `None` all attributes.
@@ -301,8 +306,12 @@ def _convert_attributes(
             # attribute) and will be converted later, in _add_ROI_coordinates().
             pass
         else:
-            msg = f"{prop_type.capitalize()} property {key} not found in the properties metadata."
-            warnings.warn(msg)
+            msg = (
+                f"{prop_type.capitalize()} property {key} not found in the properties "
+                "metadata. A stub version of the property metadata has been added "
+                "instead. You can manually update the metadata later on."
+            )
+            logger.warning(msg)
             # In that case we add a stub version of the property to the properties
             # declaration. The user will need to manually update the property later on.
             missing_prop = Property(
@@ -430,7 +439,7 @@ def _add_all_nodes(
                     f"No key {err} in the attributes of current element "
                     f"'{element.tag}'. Not adding this node to the graph."
                 )
-                warnings.warn(msg)
+                logger.warning(msg)
             finally:
                 element.clear()
 
@@ -485,7 +494,7 @@ def _add_edge(
             f"No key {err} in the attributes of current element '{element.tag}'. "
             f"Not adding this edge to the graph."
         )
-        warnings.warn(msg)
+        logger.warning(msg)
     else:
         graph.add_edge(entry_node_id, exit_node_id)
         nx.set_edge_attributes(graph, {(entry_node_id, exit_node_id): attribs})
@@ -607,7 +616,7 @@ def _get_filtered_tracks_ID(
             f"No key {err} in the attributes of current element "
             f"'{element.tag}'. Ignoring this track."
         )
-        warnings.warn(msg)
+        logger.warning(msg)
 
     while (event, element) != ("end", ancestor):
         event, element = next(iterator)
@@ -620,7 +629,7 @@ def _get_filtered_tracks_ID(
                     f"No key {err} in the attributes of current element "
                     f"'{element.tag}'. Ignoring this track."
                 )
-                warnings.warn(msg)
+                logger.warning(msg)
 
     return filtered_tracks_ID
 
