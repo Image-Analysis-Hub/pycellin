@@ -1,6 +1,7 @@
 """Unit test for GEFF file loader."""
 
 import importlib.metadata
+import logging
 
 import geff
 import geff_spec
@@ -388,36 +389,62 @@ class TestIdentifyLinIdProp:
         result = _identify_lin_id_prop("my_lin_id", None, graph_lin_id)
         assert result == "my_lin_id"
 
-    def test_provided_key_not_in_graph_falls_back_to_track_node_props(self, graph_lin_id):
+    def test_provided_key_not_in_graph_falls_back_to_track_node_props(
+        self, caplog, graph_lin_id
+    ):
         """When lin_id_prop is not in graph but geff_track_node_props has 'lineage',
         return the value from track_node_props and warn."""
-        with pytest.warns(UserWarning, match="not present in the graph"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop(
                 "missing_key",
                 {"lineage": "track_id"},
                 graph_lin_id,
             )
+        assert len(caplog.records) == 2
+        assert caplog.records[0].levelname == "INFO"
+        assert "infered from GEFF metadata" in caplog.records[0].message
+        assert caplog.records[1].levelname == "INFO"
+        assert "inferred from GEFF track_node_props" in caplog.records[1].message
+
         assert result == "track_id"
 
-    def test_provided_key_not_in_graph_falls_back_to_lineage_id(self, graph_lin_id):
+    def test_provided_key_not_in_graph_falls_back_to_lineage_id(
+        self, caplog, graph_lin_id
+    ):
         """When lin_id_prop is not in graph and geff_track_node_props is None,
         fall back to 'lineage_ID' if present in graph and warn."""
-        with pytest.warns(UserWarning, match="not present in the graph"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop("missing_key", None, graph_lin_id)
+        assert len(caplog.records) == 2
+        assert caplog.records[0].levelname == "INFO"
+        assert "infered from GEFF metadata" in caplog.records[0].message
+        assert caplog.records[1].levelname == "INFO"
+        assert "inferred from existing graph property" in caplog.records[1].message
+
         assert result == "lineage_ID"
 
-    def test_provided_key_not_in_graph_no_fallback(self, graph_no_lin_id):
+    def test_provided_key_not_in_graph_no_fallback(self, caplog, graph_no_lin_id):
         """When lin_id_prop is not in graph, geff_track_node_props is None,
         and graph has no 'lineage_ID', warn twice and return None."""
-        with pytest.warns(UserWarning):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop("missing_key", None, graph_no_lin_id)
+        assert len(caplog.records) == 2
+        assert caplog.records[0].levelname == "INFO"
+        assert "infered from GEFF metadata" in caplog.records[0].message
+        assert caplog.records[1].levelname == "WARNING"
+        assert "No lineage identifier found" in caplog.records[1].message
+
         assert result is None
 
-    def test_none_prop_with_track_node_props_lineage(self, graph_lin_id):
+    def test_none_prop_with_track_node_props_lineage(self, caplog, graph_lin_id):
         """When lin_id_prop is None and geff_track_node_props has 'lineage',
         return the value from track_node_props and warn."""
-        with pytest.warns(UserWarning, match="inferred from GEFF track_node_props"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop(None, {"lineage": "my_lin_id"}, graph_lin_id)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "INFO"
+        assert "inferred from GEFF track_node_props" in caplog.records[0].message
+
         assert result == "my_lin_id"
 
     def test_none_prop_with_track_node_props_no_lineage_key(self, graph_lin_id):
@@ -426,18 +453,30 @@ class TestIdentifyLinIdProp:
         result = _identify_lin_id_prop(None, {"tracklet": "tracklet_id"}, graph_lin_id)
         assert result is None
 
-    def test_none_prop_no_track_node_props_graph_has_lineage_id(self, graph_lin_id):
+    def test_none_prop_no_track_node_props_graph_has_lineage_id(
+        self, caplog, graph_lin_id
+    ):
         """When lin_id_prop is None, geff_track_node_props is None,
         and graph has 'lineage_ID', return 'lineage_ID' and warn."""
-        with pytest.warns(UserWarning, match="inferred from existing graph property"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop(None, None, graph_lin_id)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "INFO"
+        assert "inferred from existing graph property" in caplog.records[0].message
+
         assert result == "lineage_ID"
 
-    def test_none_prop_no_track_node_props_no_lineage_id_in_graph(self, graph_no_lin_id):
+    def test_none_prop_no_track_node_props_no_lineage_id_in_graph(
+        self, caplog, graph_no_lin_id
+    ):
         """When lin_id_prop is None, geff_track_node_props is None,
         and graph has no 'lineage_ID', warn and return None."""
-        with pytest.warns(UserWarning, match="No lineage identifier found"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop(None, None, graph_no_lin_id)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "No lineage identifier found" in caplog.records[0].message
+
         assert result is None
 
 
@@ -622,7 +661,9 @@ class TestResolvePropKey:
             UserWarning,
             match="'x' \\(edge\\) has been renamed to 'fallback_x' \\('link_x'",
         ):
-            result = _resolve_prop_key("link_x", "fallback_x", props_dict, "x", PropertyType.EDGE)
+            result = _resolve_prop_key(
+                "link_x", "fallback_x", props_dict, "x", PropertyType.EDGE
+            )
         assert result == "fallback_x"
 
     def test_both_taken_raises_key_error(
@@ -637,7 +678,9 @@ class TestResolvePropKey:
             KeyError,
             match="property 'x' \\(node\\): both 'cell_x' and 'pycellin_cell_x'",
         ):
-            _resolve_prop_key("cell_x", "pycellin_cell_x", props_dict, "x", PropertyType.NODE)
+            _resolve_prop_key(
+                "cell_x", "pycellin_cell_x", props_dict, "x", PropertyType.NODE
+            )
 
 
 class TestExtractPropsMetadata:
@@ -653,18 +696,28 @@ class TestExtractPropsMetadata:
         }
         _extract_props_metadata({}, props_dict, PropertyType.NODE, rename_map)
         assert list(props_dict.keys()) == ["node_prop", "edge_prop"]
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
     def test_new_key_is_all_fields_added(self, geff_node_props_md, rename_map):
         """A key not yet in props_dict is added with the given prop_type."""
         props_dict = {}
-        _extract_props_metadata(geff_node_props_md, props_dict, PropertyType.NODE, rename_map)
+        _extract_props_metadata(
+            geff_node_props_md, props_dict, PropertyType.NODE, rename_map
+        )
         assert "position_x" in props_dict
         assert props_dict["position_x"].identifier == "position_x"
         assert props_dict["position_x"].prop_type == PropertyType.NODE
         assert props_dict["position_x"].dtype == "float64"
         assert props_dict["position_x"].unit == "um"
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
     def test_new_key_name_defaults_to_key_when_prop_name_is_none(
         self, geff_node_props_md, rename_map
@@ -701,7 +754,10 @@ class TestExtractPropsMetadata:
             "dictionary for nodes",
         ):
             _extract_props_metadata(
-                {"frame": geff_node_props_md["frame"]}, props_dict, PropertyType.NODE, rename_map
+                {"frame": geff_node_props_md["frame"]},
+                props_dict,
+                PropertyType.NODE,
+                rename_map,
             )
 
     def test_node_collides_with_existing_edge_renames_both(
@@ -711,7 +767,9 @@ class TestExtractPropsMetadata:
         the new node prop becomes 'cell_<key>' and the edge prop becomes 'link_<key>'."""
         props_dict = {"position_x": prop_position_x_edge}
         with pytest.warns(UserWarning):
-            _extract_props_metadata(geff_node_props_md, props_dict, PropertyType.NODE, rename_map)
+            _extract_props_metadata(
+                geff_node_props_md, props_dict, PropertyType.NODE, rename_map
+            )
         assert "position_x" not in props_dict
         assert "cell_position_x" in props_dict
         assert props_dict["cell_position_x"].identifier == "cell_position_x"
@@ -730,7 +788,9 @@ class TestExtractPropsMetadata:
         the new edge prop becomes 'link_<key>' and the node prop becomes 'cell_<key>'."""
         props_dict = {"position_x": prop_position_x_node}
         with pytest.warns(UserWarning):
-            _extract_props_metadata(geff_node_props_md, props_dict, PropertyType.EDGE, rename_map)
+            _extract_props_metadata(
+                geff_node_props_md, props_dict, PropertyType.EDGE, rename_map
+            )
         assert "position_x" not in props_dict
         assert "link_position_x" in props_dict
         assert props_dict["link_position_x"].identifier == "link_position_x"
@@ -752,7 +812,9 @@ class TestExtractPropsMetadata:
             "cell_position_x": prop_cell_position_x,  # primary rename taken
         }
         with pytest.warns(UserWarning):
-            _extract_props_metadata(geff_node_props_md, props_dict, PropertyType.NODE, rename_map)
+            _extract_props_metadata(
+                geff_node_props_md, props_dict, PropertyType.NODE, rename_map
+            )
         assert "position_x" not in props_dict
         assert "pycellin_cell_position_x" in props_dict
         assert props_dict["pycellin_cell_position_x"].prop_type == PropertyType.NODE
@@ -779,7 +841,9 @@ class TestExtractPropsMetadata:
             "pycellin_cell_position_x": prop_pycellin_cell_position_x,
         }
         with pytest.raises(KeyError, match="Cannot register property 'position_x'"):
-            _extract_props_metadata(geff_node_props_md, props_dict, PropertyType.NODE, rename_map)
+            _extract_props_metadata(
+                geff_node_props_md, props_dict, PropertyType.NODE, rename_map
+            )
 
 
 class TestExtractLinPropsMetadata:
@@ -800,7 +864,11 @@ class TestExtractLinPropsMetadata:
         assert props_dict["displacement"].prop_type == PropertyType.LINEAGE
         assert props_dict["displacement"].dtype == "float"
         assert props_dict["displacement"].unit == "um"
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
     def test_new_key_name_defaults_to_key_when_name_is_none(
         self, lin_props_md, rename_map
@@ -895,7 +963,9 @@ class TestExtractLinPropsMetadata:
         assert "cell_position_x" in props_dict
         assert props_dict["cell_position_x"].prop_type == PropertyType.NODE
         assert "lin_position_x" in props_dict  # original unaffected
-        assert rename_map[PropertyType.LINEAGE] == {"position_x": "pycellin_lin_position_x"}
+        assert rename_map[PropertyType.LINEAGE] == {
+            "position_x": "pycellin_lin_position_x"
+        }
         assert rename_map[PropertyType.NODE] == {"position_x": "cell_position_x"}
         assert rename_map[PropertyType.EDGE] == {}
 
@@ -946,7 +1016,11 @@ class TestBuildPropsMetadata:
         assert "position_x" in result
         assert result["position_x"].prop_type == PropertyType.NODE
         assert result["position_x"].unit == "um"
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
     def test_edge_props_only_all_added_as_edge(self, geff_edge_props_md, rename_map):
         """When only edge_props_metadata is provided, all keys are added with
@@ -963,7 +1037,11 @@ class TestBuildPropsMetadata:
         assert "cost" in result
         assert result["cost"].prop_type == PropertyType.EDGE
         assert result["cost"].unit is None
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
     def test_node_and_edge_props_no_collision_both_added(
         self, geff_node_props_md, geff_edge_props_md, rename_map
@@ -983,7 +1061,11 @@ class TestBuildPropsMetadata:
         assert result["speed"].prop_type == PropertyType.EDGE
         assert "cost" in result
         assert result["cost"].prop_type == PropertyType.EDGE
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
     def test_node_and_edge_collision_both_renamed(self, geff_node_props_md, rename_map):
         """When a key appears in both node and edge metadata, both props are renamed
@@ -1026,7 +1108,11 @@ class TestBuildPropsMetadata:
         assert "displacement" in result
         assert result["displacement"].prop_type == PropertyType.LINEAGE
         assert result["displacement"].unit == "um"
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
     def test_lineage_props_nested_in_extra(self, lin_props_md, rename_map):
         """When 'lineage_props_metadata' is nested inside extra, it is still found
@@ -1071,7 +1157,11 @@ class TestBuildPropsMetadata:
         assert result["cost"].prop_type == PropertyType.EDGE
         assert result["n_divisions"].prop_type == PropertyType.LINEAGE
         assert result["displacement"].prop_type == PropertyType.LINEAGE
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
 
 class TestGetPropUnit:
@@ -1513,7 +1603,11 @@ class TestStandardizePropertiesData:
             cell_x_key=None,
             cell_y_key=None,
             cell_z_key=None,
-            rename_map={PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}},
+            rename_map={
+                PropertyType.NODE: {},
+                PropertyType.EDGE: {},
+                PropertyType.LINEAGE: {},
+            },
         )
 
         lin_a, _ = lineages_with_nonstandard_keys
@@ -1565,7 +1659,11 @@ class TestStandardizePropertiesData:
             cell_x_key=None,
             cell_y_key=None,
             cell_z_key=None,
-            rename_map={PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}},
+            rename_map={
+                PropertyType.NODE: {},
+                PropertyType.EDGE: {},
+                PropertyType.LINEAGE: {},
+            },
         )
 
         assert lin.nodes[1]["cell_ID"] == 11
@@ -1583,7 +1681,11 @@ class TestStandardizePropertiesData:
             cell_x_key="cell_x",
             cell_y_key="cell_y",
             cell_z_key="cell_z",
-            rename_map={PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}},
+            rename_map={
+                PropertyType.NODE: {},
+                PropertyType.EDGE: {},
+                PropertyType.LINEAGE: {},
+            },
         )
 
         assert lin.nodes[1]["cell_x"] == 1.0
@@ -1602,7 +1704,11 @@ class TestStandardizePropertiesData:
             cell_x_key=None,
             cell_y_key=None,
             cell_z_key=None,
-            rename_map={PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}},
+            rename_map={
+                PropertyType.NODE: {},
+                PropertyType.EDGE: {},
+                PropertyType.LINEAGE: {},
+            },
         )
 
         assert lin.graph["lineage_ID"] == -1
@@ -1625,7 +1731,11 @@ class TestStandardizePropertiesData:
             cell_x_key=None,
             cell_y_key=None,
             cell_z_key=None,
-            rename_map={PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}},
+            rename_map={
+                PropertyType.NODE: {},
+                PropertyType.EDGE: {},
+                PropertyType.LINEAGE: {},
+            },
         )
 
         assert lin_with_id.graph["lineage_ID"] == 10

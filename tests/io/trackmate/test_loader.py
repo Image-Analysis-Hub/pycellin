@@ -4,6 +4,7 @@
 
 import io
 from copy import deepcopy
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -483,7 +484,7 @@ def test_convert_attributes_ValueError():
         tml._convert_attributes(attributes, props, "node")
 
 
-def test_convert_attributes_missing_prop():
+def test_convert_attributes_missing_prop(caplog):
     props = {
         "prop_float": Property(
             identifier="prop_float",
@@ -497,8 +498,12 @@ def test_convert_attributes_missing_prop():
     }
     attributes = {"prop_float": "30", "prop_int": "20"}
 
-    with pytest.warns(UserWarning):
+    with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.loader"):
         tml._convert_attributes(attributes, props, "node")
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelname == "WARNING"
+    assert "not found in the properties metadata" in caplog.records[0].message
+
     assert props["prop_int"].identifier == "prop_int"
     assert props["prop_int"].name == "prop_int"
     assert props["prop_int"].description == "unknown"

@@ -2,6 +2,8 @@
 
 """Unit test for TrackMate XML file exporter."""
 
+import logging
+
 import pytest
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
@@ -346,13 +348,18 @@ class TestRemoveNonNumericProps:
 
         assert "metadata" not in simple_model.get_properties()
 
-    def test_warns_about_removed_properties(self, simple_model, string_prop, list_prop):
+    def test_warns_about_removed_properties(
+        self, caplog, simple_model, string_prop, list_prop
+    ):
         """Test that warnings are issued for removed properties."""
         simple_model.props_metadata._add_prop(string_prop)
         simple_model.props_metadata._add_prop(list_prop)
 
-        with pytest.warns(UserWarning, match="Ignoring propertys: label, tags"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.exporter"):
             _remove_non_numeric_props(simple_model)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "Ignoring properties: label, tags" in caplog.records[0].message
 
     def test_bool_dtype_preserved(self, simple_model, bool_prop):
         """Test that boolean dtypes are preserved as numeric."""
