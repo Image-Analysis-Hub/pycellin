@@ -7,6 +7,7 @@ directly from TrackMate.
 I've tested quickly and it doesn't seem to be a problem for TrackMate.
 """
 
+from collections import Counter
 import copy
 import logging
 import math
@@ -50,8 +51,7 @@ def _unit_to_dimension(
 
     Warns
     -----
-    UserWarning
-        If the unit is not recognized or if the property is not recognized.
+    If the dimension cannot be determined, in which the default dimension NONE is used.
     """
     # TODO: finish this function and try to make it less nightmarish
     unit = prop.unit
@@ -149,6 +149,7 @@ def _unit_to_dimension(
         "is_division": "NONE",
         "is_leaf": "NONE",
         "is_root": "NONE",
+        "pycellin_cell_ID": "NONE",
         "rod_length": "LENGTH",
         "rod_width": "LENGTH",
         "timepoint": "NONE",
@@ -661,7 +662,7 @@ def _update_edges(lin: CellLineage) -> None:
             try:
                 data[f"EDGE_{axis}_LOCATION"] = data.pop(f"link_{axis.lower()}")
             except KeyError:
-                pass  # Not a mandatory property.
+                pass  # not mandatory
 
 
 def _update_lineages(lin: CellLineage) -> None:
@@ -675,16 +676,17 @@ def _update_lineages(lin: CellLineage) -> None:
     """
     # Mandatory TrackMate property.
     lin.graph["TRACK_ID"] = lin.graph.pop("lineage_ID")
+
     try:
         lin.graph["name"] = lin.graph.pop("lineage_name")
     except KeyError:
-        pass  # Not a mandatory property.
+        pass  # not mandatory
     # Position properties.
     for axis in ["X", "Y", "Z"]:
         try:
             lin.graph[f"TRACK_{axis}_LOCATION"] = lin.graph.pop(f"lineage_{axis.lower()}")
         except KeyError:
-            pass  # Not a mandatory property.
+            pass  # not mandatory
 
 
 def _update_model_data(model: Model, frame_prop: str) -> None:
@@ -697,6 +699,11 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
         Model whose data to update.
     frame_prop : str
         Name of the property corresponding to the frame/timepoint.
+
+    Warns
+    -----
+    If some cells are missing POSITION_X or POSITION_Y properties, in which case
+    TrackMate will ignore these cells.
     """
     # Track cells with missing position properties: {lineage_ID: set of node IDs}.
     missing_positions = {}
@@ -716,9 +723,8 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
             msg_parts.append(f"lineage {lineage_id}: cells {nodes_str}")
 
         msg = (
-            f"Missing POSITION_X or POSITION_Y properties for the following cells:\n"
+            f"Missing POSITION_X or POSITION_Y properties, TrackMate will ignore these cells:\n"
             f"{'; '.join(msg_parts)}.\n"
-            f"TrackMate will ignore these cells."
         )
         logger.warning(msg)
 
@@ -790,10 +796,9 @@ def _remove_non_numeric_props(model: Model) -> None:
 
     Warns
     -----
-    UserWarning
-        If some properties are not numeric and will not be exported to TrackMate.
-        This is the case for properties with string, list, or other non-numeric
-        values that TrackMate cannot handle.
+    If some properties are not numeric and will not be exported to TrackMate.
+    This is the case for properties with string, list, or other non-numeric
+    values that TrackMate cannot handle.
 
     Notes
     -----
@@ -970,13 +975,13 @@ def _update_location_props(props_md: PropsMetadata) -> None:
                 f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION"
             )
         except KeyError:
-            pass  # Not a mandatory property.
+            pass  # not mandatory
         try:
             props_md._change_prop_identifier(
                 f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION"
             )
         except KeyError:
-            pass  # Not a mandatory property.
+            pass  # not mandatory
 
 
 def _update_props_metadata(model: Model, frame_prop: str) -> None:
@@ -1066,20 +1071,27 @@ def _relabel_nodes(model) -> None:
     ----------
     model : Model
         Model whose nodes to relabel.
-    """
-    # Collect all existing node IDs across all lineages.
-    existing_ids = set()
-    for lin in model.data.cell_data.values():
-        existing_ids.update(lin.nodes())
 
-    if len(existing_ids) == sum(len(lin) for lin in model.data.cell_data.values()):
+    Warns
+    -----
+    If duplicate node IDs are found, in which case all nodes will be relabeled
+    to ensure uniqueness.
+    """
+    # Count the occurrences of each node ID in the data.
+    count_ids: Counter[int] = Counter()
+    for lin in model.data.cell_data.values():
+        count_ids.update(list(lin.nodes()))
+    dupes = [item for item, count in count_ids.items() if count > 1]
+
+    if not dupes:
         # All node IDs are unique, no need to relabel.
         return
 
-    # We relabel the nodes.
-    logger.info(
+    # Relabel the nodes.
+    logger.debug(f"Duplicate node IDs found: {dupes}")
+    logger.warning(
         "Relabeling nodes to ensure unique IDs across all lineages export. "
-        "Non-unique IDs will be preserved in 'pycellin_cell_ID' for reference."
+        "Previous IDs are preserved in 'pycellin_cell_ID' for reference."
     )
     new_id = 0
     for lin in model.data.cell_data.values():
@@ -1101,6 +1113,16 @@ def _relabel_nodes(model) -> None:
 
     # And we need to update the model in case some other properties refer
     # to the node IDs (for example cycle_IDs).
+    prop = Property(
+        identifier="pycellin_cell_ID",
+        name="Pycellin cell ID",
+        description="Original cell ID before relabeling for TrackMate export",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="int",
+    )
+    model.props_metadata._add_prop(prop)
     model.prepare_full_data_update()
     model.update()
 
