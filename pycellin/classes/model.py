@@ -638,6 +638,22 @@ class Model:
         """
         return self.props_metadata._get_units_per_props()
 
+    def get_property(self, prop_identifier: str) -> Property | None:
+        """
+        Return the property with the specified identifier.
+
+        Parameters
+        ----------
+        prop_identifier : str
+            The identifier of the property to return.
+
+        Returns
+        -------
+        Property | None
+            The property with the specified identifier, or None if not found.
+        """
+        return self.props_metadata.props.get(prop_identifier)
+
     def get_properties(self) -> dict[str, Property]:
         """
         Return the properties present in the model.
