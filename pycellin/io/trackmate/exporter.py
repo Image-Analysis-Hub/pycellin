@@ -653,10 +653,9 @@ def _update_edges(lin: CellLineage) -> None:
     """
     for source_node, target_node, data in lin.edges(data=True):
         # Mandatory TrackMate properties.
-        if "SPOT_SOURCE_ID" not in data:
-            data["SPOT_SOURCE_ID"] = source_node
-        if "SPOT_TARGET_ID" not in data:
-            data["SPOT_TARGET_ID"] = target_node
+        # Create if they don't exist. Update if they exist, for consistency.
+        data["SPOT_SOURCE_ID"] = source_node
+        data["SPOT_TARGET_ID"] = target_node
         # Position properties.
         for axis in ["X", "Y", "Z"]:
             try:
@@ -1060,9 +1059,9 @@ def _add_radius_prop(model: Model) -> None:
                 lin.nodes[node]["RADIUS"] = 1.0
 
 
-def _relabel_nodes(model) -> None:
+def _relabel_nodes(model) -> dict[int, dict[int, int]]:
     """
-    Relabel the nodes in the model to ensure unique IDs.
+    Relabel the nodes and return a mapping of old node IDs to new node IDs for each lineage.
 
     This is necessary because TrackMate requires unique spot IDs across all lineages.
     If the model has non-unique node IDs, we relabel them in place to ensure uniqueness.
@@ -1071,6 +1070,13 @@ def _relabel_nodes(model) -> None:
     ----------
     model : Model
         Model whose nodes to relabel.
+
+    Returns
+    -------
+    dict[int, dict[int, int]]
+        A mapping of old node IDs to new node IDs for each lineage.
+        The outer dictionary keys are the lineage IDs, and the inner dictionaries
+        map old node IDs to new node IDs.
 
     Warns
     -----
@@ -1085,33 +1091,44 @@ def _relabel_nodes(model) -> None:
 
     if not dupes:
         # All node IDs are unique, no need to relabel.
-        return
+        return {}
 
     # Relabel the nodes.
+    full_mapping: dict[int, dict[int, int]] = {}  # {lin_id: {old_node_id: new_node_id}}
+    new_id = 0
     logger.debug(f"Duplicate node IDs found: {dupes}")
     logger.warning(
         "Relabeling nodes to ensure unique IDs across all lineages export. "
         "Previous IDs are preserved in 'pycellin_cell_ID' for reference."
     )
-    new_id = 0
-    for lin in model.data.cell_data.values():
-        mapping = {}
+    for lin_id, lin in model.data.cell_data.items():
+        mapping: dict[int, int] = {}  # {old_node_id: new_node_id}
+        full_mapping[lin_id] = mapping
         for node in lin.nodes():
             mapping[node] = new_id
             new_id += 1
         nx.relabel_nodes(lin, mapping, copy=False)
 
-        # Update edge attributes that reference node IDs.
-        for source_node, target_node, data in lin.edges(data=True):
-            data["SPOT_SOURCE_ID"] = source_node
-            data["SPOT_TARGET_ID"] = target_node
-
-        # The relabeling must be propagated to the cell_ID node attribute.
+        # The relabeling must be propagated to the cell_ID property.
         for node in lin.nodes():
             lin.nodes[node]["pycellin_cell_ID"] = lin.nodes[node]["cell_ID"]
             lin.nodes[node]["cell_ID"] = node
 
-    # And we need to update the model in case some other properties refer
+        # SPOT_SOURCE_ID and SPOT_TARGET_ID are updated / created later
+        # in _update_edges().
+
+    # Manual update of the specific node property cell_name
+    # when it has a TrackMate syntax: "ID{cell_name}"".
+    if model.has_property("cell_name"):
+        for lin_id, lin in model.data.cell_data.items():
+            for node in lin.nodes():
+                if "cell_name" in lin.nodes[node]:
+                    old_id = lin.nodes[node]["pycellin_cell_ID"]
+                    new_id = lin.nodes[node]["cell_ID"]
+                    if lin.nodes[node]["cell_name"] == f"ID{old_id}":
+                        lin.nodes[node]["cell_name"] = f"ID{new_id}"
+
+    # Update of the model in case some other properties refer
     # to the node IDs (for example cycle_IDs).
     prop = Property(
         identifier="pycellin_cell_ID",
@@ -1125,6 +1142,8 @@ def _relabel_nodes(model) -> None:
     model.props_metadata._add_prop(prop)
     model.prepare_full_data_update()
     model.update()
+
+    return full_mapping
 
 
 def _prepare_model_for_export(

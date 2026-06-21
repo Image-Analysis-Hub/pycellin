@@ -90,6 +90,19 @@ def model_non_unique_ids(simple_model):
     )
     lin.graph["lineage_ID"] = 1
     simple_model.data.cell_data[1] = lin
+
+    cell_name_prop = Property(
+        identifier="cell_name",
+        name="Cell name",
+        description="Cell name from TrackMate",
+        provenance="TrackMate",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="str",
+        unit=None,
+    )
+    simple_model.props_metadata._add_prop(cell_name_prop)
+
     return simple_model
 
 
@@ -432,15 +445,6 @@ class TestRelabelNodes:
             for node in lin.nodes():
                 assert lin.nodes[node]["cell_ID"] == node
 
-    def test_edge_ids_updated(self, model_non_unique_ids):
-        """Test that SPOT_SOURCE_ID and SPOT_TARGET_ID are updated after relabeling."""
-        _relabel_nodes(model_non_unique_ids)
-
-        for lin in model_non_unique_ids.data.cell_data.values():
-            for u, v, data in lin.edges(data=True):
-                assert data["SPOT_SOURCE_ID"] == u
-                assert data["SPOT_TARGET_ID"] == v
-
     def test_with_cycle_lins(self, model_non_unique_ids):
         """Test that cycle lineage nodes are also relabeled.."""
         model_non_unique_ids.add_cycle_data()
@@ -457,3 +461,39 @@ class TestRelabelNodes:
         assert len(original_ids) != len(set(original_ids))
         assert len(original_ids) == len(new_ids)
         assert len(new_ids) == len(set(new_ids))
+
+    def test_cell_name_updated(self, model_non_unique_ids):
+        """Test that cell_name property is updated to "ID{node}"."""
+        for lin in model_non_unique_ids.data.cell_data.values():
+            for node in lin.nodes():
+                lin.nodes[node]["cell_name"] = f"ID{node}"
+
+        _relabel_nodes(model_non_unique_ids)
+
+        for lin in model_non_unique_ids.data.cell_data.values():
+            for node in lin.nodes():
+                assert "cell_name" in lin.nodes[node]
+                assert lin.nodes[node]["cell_name"] == f"ID{node}"
+
+    def test_cell_name_partially_updated(self, model_non_unique_ids):
+        """Test that cell_name property is updated only for nodes with TrackMate syntax."""
+        for lin in model_non_unique_ids.data.cell_data.values():
+            for node in lin.nodes():
+                if node % 2 == 0:
+                    lin.nodes[node]["cell_name"] = f"ID{node}"  # TrackMate syntax
+                else:
+                    lin.nodes[node]["cell_name"] = f"Cell{node}"  # non-TrackMate syntax
+
+        mapping = _relabel_nodes(model_non_unique_ids)
+        inv_mapping = {
+            new_id: old_id
+            for nodes in mapping.values()
+            for old_id, new_id in nodes.items()
+        }
+
+        for lin in model_non_unique_ids.data.cell_data.values():
+            for node in lin.nodes():
+                if "ID" in lin.nodes[node]["cell_name"]:
+                    assert lin.nodes[node]["cell_name"] == f"ID{node}"
+                else:
+                    assert lin.nodes[node]["cell_name"] == f"Cell{inv_mapping[node]}"
