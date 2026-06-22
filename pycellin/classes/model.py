@@ -1252,6 +1252,7 @@ class Model:
         self,
         lid: int,
         cid: int | None = None,
+        global_cid: bool = False,
         time_value: int | float = 0,
         prop_values: dict[str, Any] | None = None,
     ) -> int:
@@ -1264,6 +1265,10 @@ class Model:
             The ID of the lineage to which the cell belongs.
         cid : int, optional
             The ID of the cell to add (default is None).
+        global_cid : bool, optional
+            If True, the cell ID will be unique across all lineages in the model.
+            If False, the cell ID will only be unique within the specified lineage
+            (default is False).
         time_value : int | float, optional
             The value of the reference time property for the cell to add (default is 0).
         prop_values : dict, optional
@@ -1309,6 +1314,21 @@ class Model:
                 )
             # Timepoint value computation.
             timepoint = int(time_value // time_step)
+
+        if global_cid is True:
+            if cid is None:
+                # Determine the next available global cell_ID.
+                next_cids = [
+                    lin._get_next_available_node_ID() for lin in self.get_cell_lineages()
+                ]
+                cid = max(next_cids)
+            else:
+                # Check if the specified cell_ID is already used in the model.
+                for lin in self.get_cell_lineages():
+                    if cid in lin.nodes:
+                        raise ValueError(
+                            f"Cell ID {cid} is already used in lineage {lin.graph['lineage_ID']}."
+                        )
 
         cid = lineage._add_cell(
             cid,
