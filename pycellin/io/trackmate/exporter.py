@@ -631,7 +631,8 @@ def _update_nodes(lin: CellLineage, frame_prop: str) -> set[int]:
                 # This POSITION_ is mandatory in TrackMate for x, y and z dimensions.
                 if axis in ["X", "Y"]:
                     has_missing_pos = True
-                    data[f"POSITION_{axis}"] = None
+                    # We set a default value, otherwise TrackMate will crash.
+                    data[f"POSITION_{axis}"] = 0.0
                 else:
                     # We add the missing z dimension.
                     data[f"POSITION_{axis}"] = 0.0
@@ -701,8 +702,8 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
 
     Warns
     -----
-    If some cells are missing POSITION_X or POSITION_Y properties, in which case
-    TrackMate will ignore these cells.
+    If some cells are missing x and/or y coordinates, in which case they are set
+    to 0.0 by default.
     """
     # Track cells with missing position properties: {lineage_ID: set of node IDs}.
     missing_positions = {}
@@ -719,11 +720,10 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
         msg_parts = []
         for lineage_id, node_ids in missing_positions.items():
             nodes_str = ", ".join(str(n) for n in sorted(node_ids))
-            msg_parts.append(f"lineage {lineage_id}: cells {nodes_str}")
-
+            msg_parts.append(f"  lineage {lineage_id}: cells {nodes_str}")
         msg = (
-            f"Missing POSITION_X or POSITION_Y properties, TrackMate will ignore these cells:\n"
-            f"{'; '.join(msg_parts)}.\n"
+            "Missing mandatory x and/or y coordinates, defaulting to 0.0 for:\n"
+            + "\n".join(msg_parts)
         )
         logger.warning(msg)
 
