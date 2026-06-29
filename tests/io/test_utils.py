@@ -1,5 +1,7 @@
 """Unit test for IO utilities functions."""
 
+import logging
+
 import networkx as nx
 import pytest
 
@@ -446,7 +448,7 @@ class TestAddLineagesProps:
         assert is_equal(g1_obt, g1_exp)
         assert is_equal(g2_obt, g2_exp)
 
-    def test_no_matching_lin_ID(self, lin_props):
+    def test_no_matching_lin_ID(self, caplog, lin_props):
         """Test that an unmatched lineage ID issues a warning and skips."""
         g1_attr, g2_attr = lin_props
 
@@ -456,12 +458,15 @@ class TestAddLineagesProps:
         g2_obt = nx.DiGraph()
         g2_obt.add_node(2, lineage_ID=1)
 
-        with pytest.warns(UserWarning, match="No lineage properties found"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.utils"):
             _add_lineage_props([g1_obt, g2_obt], [g1_attr, g2_attr])
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "INFO"
+        assert "No lineage properties found" in caplog.records[0].message
 
-        # g1_obt should not have graph-level properties added (skipped with warning)
+        # g1_obt should not have graph-level properties added (skipped with warning).
         assert len(g1_obt.graph) == 0
-        # g2_obt should have properties added normally
+        # g2_obt should have properties added normally.
         assert g2_obt.graph["name"] == "blub"
         assert g2_obt.graph["lineage_ID"] == 1
 
@@ -542,16 +547,18 @@ class TestRemoveOrphanedMetadata:
         assert before_edge_props == after_edge_props
         assert before_lineage_props == after_lineage_props
 
-    def test_remove_orphaned_metadata(self, model_with_orphaned_metadata):
+    def test_remove_orphaned_metadata(self, caplog, model_with_orphaned_metadata):
         """Test removing orphaned properties from metadata."""
-        with pytest.warns(UserWarning, match="Node metadata with no corresponding data"):
-            with pytest.warns(
-                UserWarning, match="Edge metadata with no corresponding data"
-            ):
-                with pytest.warns(
-                    UserWarning, match="Lineage metadata with no corresponding data"
-                ):
-                    _remove_orphaned_metadata(model_with_orphaned_metadata)
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
+            _remove_orphaned_metadata(model_with_orphaned_metadata)
+        assert len(caplog.records) == 3
+        assert caplog.records[0].levelname == "WARNING"
+        assert "Node metadata with no corresponding data" in caplog.records[0].message
+        assert caplog.records[1].levelname == "WARNING"
+        assert "Edge metadata with no corresponding data" in caplog.records[1].message
+        assert caplog.records[2].levelname == "WARNING"
+        assert "Lineage metadata with no corresponding data" in caplog.records[2].message
+
         node_props = (
             model_with_orphaned_metadata.props_metadata._get_prop_dict_from_prop_type(
                 "node"
@@ -642,7 +649,7 @@ class TestRemoveOrphanedMetadata:
         assert len(before_lineage_props) == len(after_lineage_props)
 
     def test_multitype_property_missing_from_nodes_but_in_lineage(
-        self, model_with_lineage_id_config
+        self, caplog, model_with_lineage_id_config
     ):
         """Test multi-type property missing from nodes but present in lineage."""
         model = model_with_lineage_id_config(
@@ -651,8 +658,11 @@ class TestRemoveOrphanedMetadata:
             lin2_node_lin_id=False,
             lin2_graph_lin_id=True,
         )
-        with pytest.warns(UserWarning, match="Node metadata with no corresponding data"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
             _remove_orphaned_metadata(model)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "Node metadata with no corresponding data" in caplog.records[0].message
 
         node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
         lineage_props = model.props_metadata._get_prop_dict_from_prop_type("lineage")
@@ -661,7 +671,7 @@ class TestRemoveOrphanedMetadata:
         assert "lineage_ID" in lineage_props
 
     def test_multitype_property_missing_from_lineage_but_in_nodes(
-        self, model_with_lineage_id_config
+        self, caplog, model_with_lineage_id_config
     ):
         """Test multi-type property missing from lineage but present in nodes."""
         model = model_with_lineage_id_config(
@@ -671,10 +681,11 @@ class TestRemoveOrphanedMetadata:
             lin2_graph_lin_id=False,
         )
 
-        with pytest.warns(
-            UserWarning, match="Lineage metadata with no corresponding data"
-        ):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
             _remove_orphaned_metadata(model)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "Lineage metadata with no corresponding data" in caplog.records[0].message
 
         node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
         lineage_props = model.props_metadata._get_prop_dict_from_prop_type("lineage")
@@ -682,7 +693,9 @@ class TestRemoveOrphanedMetadata:
         assert "lineage_ID" in node_props
         assert "lineage_ID" not in lineage_props
 
-    def test_multitype_property_missing_from_both(self, model_with_lineage_id_config):
+    def test_multitype_property_missing_from_both(
+        self, caplog, model_with_lineage_id_config
+    ):
         """Test multi-type property missing from both nodes and lineage graph."""
         model = model_with_lineage_id_config(
             lin1_node_lin_id=False,
@@ -690,9 +703,13 @@ class TestRemoveOrphanedMetadata:
             lin2_node_lin_id=False,
             lin2_graph_lin_id=False,
         )
-        with pytest.warns(UserWarning, match="Node metadata with no corresponding data"):
-            with pytest.warns(UserWarning, match="Lineage metadata with no corresponding data"):
-                _remove_orphaned_metadata(model)
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
+            _remove_orphaned_metadata(model)
+        assert len(caplog.records) == 2
+        assert caplog.records[0].levelname == "WARNING"
+        assert "Node metadata with no corresponding data" in caplog.records[0].message
+        assert caplog.records[1].levelname == "WARNING"
+        assert "Lineage metadata with no corresponding data" in caplog.records[1].message
 
 
 class TestSplitGraphIntoLineages:
@@ -847,24 +864,58 @@ class TestSplitGraphIntoLineages:
         assert len(obt_1) == 1
         assert is_equal(obt_1[0], expected)
 
-    def test_mismatched_lin_props_warning(self, two_lin_graph):
-        """Test that providing lin_props with unmatched lineage IDs issues warnings."""
-        # lin_props with IDs 5 and 6, but graph has 0 and 1
-        lin_props = [
-            {"lineage_ID": 5, "name": "blob"},
-            {"lineage_ID": 6, "name": "blub"},
-        ]
+    def test_inconsistent_node_ids_some_missing_key(self):
+        """Test ValueError when some nodes lack the key and those that have it disagree."""
+        g = nx.DiGraph()
+        g.add_edges_from([(1, 2), (2, 3)])
+        g.nodes[1]["lineage_ID"] = 0
+        # Node 2 has no lineage_ID.
+        g.nodes[3]["lineage_ID"] = 1  # different value from node 1
 
-        with pytest.warns(UserWarning, match="No lineage properties found"):
-            result = _split_graph_into_lineages(
-                two_lin_graph, lineage_ID_key="lineage_ID", lin_props=lin_props
-            )
+        with pytest.raises(
+            ValueError, match="inconsistent lineage ID values between the nodes"
+        ):
+            _split_graph_into_lineages(g, lineage_ID_key="lineage_ID")
 
-        # Lineages should still be created, just without the extra properties
-        assert len(result) == 2
-        for lin in result:
-            # Graph-level properties should not be added (except lineage_ID from nodes)
-            assert "name" not in lin.graph
+    def test_node_ids_disagree_with_graph_id(self):
+        """Test ValueError when graph has a lin ID but some nodes have a different one."""
+        g = nx.DiGraph()
+        g.add_edges_from([(1, 2)])
+        g.graph["lineage_ID"] = 0
+        g.nodes[1]["lineage_ID"] = 5  # disagrees with graph
+        # Node 2 has no lineage_ID.
+
+        with pytest.raises(
+            ValueError,
+            match="inconsistent lineage ID values between the lineage and its nodes",
+        ):
+            _split_graph_into_lineages(g, lineage_ID_key="lineage_ID")
+
+    def test_nodes_all_have_key_but_disagree_with_each_other(self):
+        """Test ValueError when all nodes and graph have the key but nodes have different values."""
+        g = nx.DiGraph()
+        g.add_edges_from([(1, 2)])
+        g.graph["lineage_ID"] = 0
+        g.nodes[1]["lineage_ID"] = 0
+        g.nodes[2]["lineage_ID"] = 1  # different from node 1
+
+        with pytest.raises(
+            ValueError, match="inconsistent lineage ID values between the nodes"
+        ):
+            _split_graph_into_lineages(g, lineage_ID_key="lineage_ID")
+
+    def test_nodes_agree_but_differ_from_graph(self):
+        """Test ValueError when nodes are consistent with each other but differ from lin ID."""
+        g = nx.DiGraph()
+        g.add_edges_from([(1, 2)])
+        g.graph["lineage_ID"] = 0
+        g.nodes[1]["lineage_ID"] = 1  # consistent among nodes but differs from graph
+        g.nodes[2]["lineage_ID"] = 1
+
+        with pytest.raises(
+            ValueError, match="inconsistent lineage ID values between nodes and lineage"
+        ):
+            _split_graph_into_lineages(g, lineage_ID_key="lineage_ID")
 
 
 class TestUpdateNodePropKey:

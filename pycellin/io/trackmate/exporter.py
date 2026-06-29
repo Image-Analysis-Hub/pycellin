@@ -7,11 +7,12 @@ directly from TrackMate.
 I've tested quickly and it doesn't seem to be a problem for TrackMate.
 """
 
+from collections import Counter
 import copy
+import logging
 import math
 import numbers
 import re
-import warnings
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +25,12 @@ from pycellin.classes.model import Model
 from pycellin.classes.property import Property
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.custom_types import PropertyType
-from pycellin.io.utils import _graph_has_node_prop
+from pycellin.io.utils import (
+    _identify_frame_prop,
+    _update_node_prop_key,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def _unit_to_dimension(
@@ -35,8 +41,8 @@ def _unit_to_dimension(
 
     Parameters
     ----------
-    unit : str
-        Unit to convert.
+    prop : Property
+        The property for which to convert the unit.
 
     Returns
     -------
@@ -45,8 +51,7 @@ def _unit_to_dimension(
 
     Warns
     -----
-    UserWarning
-        If the unit is not recognized or if the property is not recognized.
+    If the dimension cannot be determined, in which the default dimension NONE is used.
     """
     # TODO: finish this function and try to make it less nightmarish
     unit = prop.unit
@@ -122,15 +127,17 @@ def _unit_to_dimension(
         "CONFINEMENT_RATIO": "NONE",
     }
     # Channel dependent features.
+    # Depending on the TrackMate version, we can have MEAN_INTENSITY or
+    # MEAN_INTENSITY_CH1 when there is only one channel.
     channel_props = {
-        "MEAN_INTENSITY_CH": "INTENSITY",
-        "MEDIAN_INTENSITY_CH": "INTENSITY",
-        "MIN_INTENSITY_CH": "INTENSITY",
-        "MAX_INTENSITY_CH": "INTENSITY",
-        "TOTAL_INTENSITY_CH": "INTENSITY",
-        "STD_INTENSITY_CH": "INTENSITY",
-        "CONTRAST_CH": "NONE",
-        "SNR_CH": "NONE",
+        "MEAN_INTENSITY": "INTENSITY",
+        "MEDIAN_INTENSITY": "INTENSITY",
+        "MIN_INTENSITY": "INTENSITY",
+        "MAX_INTENSITY": "INTENSITY",
+        "TOTAL_INTENSITY": "INTENSITY",
+        "STD_INTENSITY": "INTENSITY",
+        "CONTRAST": "NONE",
+        "SNR": "NONE",
     }
 
     # Pycellin features.
@@ -139,6 +146,10 @@ def _unit_to_dimension(
         "angle": "ANGLE",
         "cell_displacement": "LENGTH",
         "cell_speed": "VELOCITY",
+        "is_division": "NONE",
+        "is_leaf": "NONE",
+        "is_root": "NONE",
+        "pycellin_cell_ID": "NONE",
         "rod_length": "LENGTH",
         "rod_width": "LENGTH",
         "timepoint": "NONE",
@@ -146,9 +157,9 @@ def _unit_to_dimension(
         "branch_total_displacement": "LENGTH",
         "branch_mean_displacement": "LENGTH",
         "branch_mean_speed": "VELOCITY",
-        "cells": "NONE",
+        "cells": "NONE",  # not float nor int so won't be exported to TM anyway
         "cycle_completeness": "NONE",
-        "cycle_duration": "NONE",
+        "cycle_duration": "TIME",
         "cycle_ID": "NONE",
         "cycle_length": "NONE",
         "division_time": "TIME",
@@ -167,10 +178,16 @@ def _unit_to_dimension(
         else:
             pycellin_props["relative_age"] = "TIME"
 
+    dimension = None
     if name in trackmate_props:
         dimension = trackmate_props[name]
+    if dimension is None:
+        for key, dim in channel_props.items():
+            if name.startswith(key):
+                dimension = dim
+                break
 
-    elif provenance == "TrackMate":
+    if dimension is None and provenance == "TrackMate":
         if name in trackmate_props:
             dimension = trackmate_props[name]
         else:
@@ -185,13 +202,13 @@ def _unit_to_dimension(
                     f" but it is not a known property of TrackMate. Dimension is set"
                     f" to NONE."
                 )
-                warnings.warn(msg)
+                logger.warning(msg)
                 # I'm using NONE here, which is already used in TM, for example
                 # with the FRAME or VISIBILITY features. I tried to use UNKNOWN
                 # but it's a dimension not recognized by TM and it crashes.
                 dimension = "NONE"
 
-    elif provenance == "pycellin":
+    if dimension is None and provenance == "pycellin":
         try:
             dimension = pycellin_props[name]
         except KeyError:
@@ -203,10 +220,10 @@ def _unit_to_dimension(
                     f" but it is not a known property of either pycellin or TrackMate. "
                     f" Dimension is set to NONE."
                 )
-                warnings.warn(msg)
+                logger.warning(msg)
                 dimension = "NONE"
 
-    else:
+    if dimension is None:
         match unit:
             case "pixel":
                 if name.lower() in ["x", "y", "z"]:
@@ -219,7 +236,7 @@ def _unit_to_dimension(
         # Is it even possible? Maybe I could ask the user for a file with
         # a property-dimension mapping. For now, I just set the dimension to NONE.
         msg = f"Cannot infer dimension for property '{name}'. Dimension is set to NONE."
-        warnings.warn(msg)
+        logger.warning(msg)
         dimension = "NONE"
 
     assert dimension is not None
@@ -320,6 +337,11 @@ def _write_FeatureDeclarations(
         Context manager for the XML file to write.
     model : Model
         Model containing the data to write.
+
+    Raises
+    ------
+    ValueError
+        If the feature type is unknown.
     """
     xf.write(f"\n{' ' * 4}")
     with xf.element("FeatureDeclarations"):
@@ -335,6 +357,8 @@ def _write_FeatureDeclarations(
                         props = model.get_edge_properties()
                     case "TrackFeatures":
                         props = model.get_lineage_properties()
+                    case _:
+                        raise ValueError(f"Unknown feature type: {f_type}")
                 first_feat_written = False
                 for prop in props.values():
                     trackmate_feat = _convert_prop_to_feat(prop)
@@ -546,11 +570,6 @@ def _write_FilteredTracks(
         Cell lineages containing the data to write.
     has_FilteredTracks : bool
         Flag indicating if the model contains filtered tracks.
-
-    Raises
-    ------
-    KeyError
-        If the lineage does not have a TRACK_IDif lineage.graph["TRACK_ID"] < 0: attribute.
     """
     xf.write(f"\n{' ' * 4}")
     with xf.element("FilteredTracks"):
@@ -590,9 +609,19 @@ def _update_nodes(lin: CellLineage, frame_prop: str) -> set[int]:
         data["FRAME"] = data.pop(frame_prop)
         data["VISIBILITY"] = 1
         try:
+            data.pop("lineage_ID")  # TM needs it only on the tracks, not on the spots
+        except KeyError:
+            pass  # lineage_ID should be present, but better be safe than sorry
+        try:
+            data.pop("timepoint")  # internal pycellin property
+        except KeyError:
+            # If frame_prop is timepoint, it has already been popped
+            # and we can ignore the KeyError.
+            pass
+        try:
             data["name"] = data.pop("cell_name")
         except KeyError:
-            pass  # Not a mandatory property.
+            pass  # not a mandatory property
         # Position properties.
         has_missing_pos = False
         for axis in ["X", "Y", "Z"]:
@@ -602,7 +631,8 @@ def _update_nodes(lin: CellLineage, frame_prop: str) -> set[int]:
                 # This POSITION_ is mandatory in TrackMate for x, y and z dimensions.
                 if axis in ["X", "Y"]:
                     has_missing_pos = True
-                    data[f"POSITION_{axis}"] = None
+                    # We set a default value, otherwise TrackMate will crash.
+                    data[f"POSITION_{axis}"] = 0.0
                 else:
                     # We add the missing z dimension.
                     data[f"POSITION_{axis}"] = 0.0
@@ -624,16 +654,15 @@ def _update_edges(lin: CellLineage) -> None:
     """
     for source_node, target_node, data in lin.edges(data=True):
         # Mandatory TrackMate properties.
-        if "SPOT_SOURCE_ID" not in data:
-            data["SPOT_SOURCE_ID"] = source_node
-        if "SPOT_TARGET_ID" not in data:
-            data["SPOT_TARGET_ID"] = target_node
+        # Create if they don't exist. Update if they exist, for consistency.
+        data["SPOT_SOURCE_ID"] = source_node
+        data["SPOT_TARGET_ID"] = target_node
         # Position properties.
         for axis in ["X", "Y", "Z"]:
             try:
                 data[f"EDGE_{axis}_LOCATION"] = data.pop(f"link_{axis.lower()}")
             except KeyError:
-                pass  # Not a mandatory property.
+                pass  # not mandatory
 
 
 def _update_lineages(lin: CellLineage) -> None:
@@ -647,16 +676,17 @@ def _update_lineages(lin: CellLineage) -> None:
     """
     # Mandatory TrackMate property.
     lin.graph["TRACK_ID"] = lin.graph.pop("lineage_ID")
+
     try:
         lin.graph["name"] = lin.graph.pop("lineage_name")
     except KeyError:
-        pass  # Not a mandatory property.
+        pass  # not mandatory
     # Position properties.
     for axis in ["X", "Y", "Z"]:
         try:
             lin.graph[f"TRACK_{axis}_LOCATION"] = lin.graph.pop(f"lineage_{axis.lower()}")
         except KeyError:
-            pass  # Not a mandatory property.
+            pass  # not mandatory
 
 
 def _update_model_data(model: Model, frame_prop: str) -> None:
@@ -669,6 +699,11 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
         Model whose data to update.
     frame_prop : str
         Name of the property corresponding to the frame/timepoint.
+
+    Warns
+    -----
+    If some cells are missing x and/or y coordinates, in which case they are set
+    to 0.0 by default.
     """
     # Track cells with missing position properties: {lineage_ID: set of node IDs}.
     missing_positions = {}
@@ -685,14 +720,12 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
         msg_parts = []
         for lineage_id, node_ids in missing_positions.items():
             nodes_str = ", ".join(str(n) for n in sorted(node_ids))
-            msg_parts.append(f"lineage {lineage_id}: cells {nodes_str}")
-
+            msg_parts.append(f"  lineage {lineage_id}: cells {nodes_str}")
         msg = (
-            f"Missing POSITION_X or POSITION_Y properties for the following cells:\n"
-            f"{'; '.join(msg_parts)}.\n"
-            f"TrackMate will ignore these cells."
+            "Missing mandatory x and/or y coordinates, defaulting to 0.0 for:\n"
+            + "\n".join(msg_parts)
         )
-        warnings.warn(msg)
+        logger.warning(msg)
 
 
 def _is_numeric_dtype(dtype: str | None) -> bool:
@@ -711,33 +744,44 @@ def _is_numeric_dtype(dtype: str | None) -> bool:
     """
     if dtype is None:
         return False
+
     dtype_lower = dtype.lower()
-    numeric_keywords = [
-        # Basic numeric types.
-        "int",
-        "integer",
-        "float",
-        "complex",
-        "bool",
-        "boolean",
-        "fraction",
-        "decimal",
-        "number",
-        "numeric",
-        "real",
-        "rational",
-        # Numpy-style dtypes.
-        "uint",
-        "int8",
-        "int16",
-        "int32",
-        "int64",
-        "float16",
-        "float32",
-        "float64",
-        "float128",
+
+    # Reject collection and container types that are not numeric.
+    non_numeric_keywords = [
+        "array",
+        "bytes",
+        "dict",
+        "dictionary",
+        "iterable",
+        "list",
+        "matrix",
+        "object",
+        "sequence",
+        "set",
+        "str",
+        "string",
+        "tuple",
     ]
-    return any(keyword in dtype_lower for keyword in numeric_keywords)
+    if any(keyword in dtype_lower for keyword in non_numeric_keywords):
+        return False
+
+    # Check for numeric types using regex with word boundaries
+    # to avoid false positives (e.g., "point" containing "int").
+    numeric_pattern = (
+        r"\b(?:"
+        r"int|integer|"
+        r"uint|uint8|uint16|uint32|uint64|"
+        r"int8|int16|int32|int64|"
+        r"float|double|float16|float32|float64|float128|"
+        r"complex|"
+        r"bool|bool_|boolean|"
+        r"fraction|decimal|"
+        r"number|numeric|"
+        r"real|rational|"
+        r")\b"
+    )
+    return bool(re.search(numeric_pattern, dtype_lower))
 
 
 def _remove_non_numeric_props(model: Model) -> None:
@@ -751,10 +795,9 @@ def _remove_non_numeric_props(model: Model) -> None:
 
     Warns
     -----
-    UserWarning
-        If some properties are not numeric and will not be exported to TrackMate.
-        This is the case for properties with string, list, or other non-numeric
-        values that TrackMate cannot handle.
+    If some properties are not numeric and will not be exported to TrackMate.
+    This is the case for properties with string, list, or other non-numeric
+    values that TrackMate cannot handle.
 
     Notes
     -----
@@ -767,6 +810,9 @@ def _remove_non_numeric_props(model: Model) -> None:
         for name, prop in model.get_properties().items()
         if prop.provenance != "TrackMate" and not _is_numeric_dtype(prop.dtype)
     ]
+    # The only exception is 'name' which is a string property that TrackMate can handle
+    # as the display name of a spot or a track.
+    to_remove = [name for name in to_remove if name != "name"]
     if to_remove:
         for name in to_remove:
             try:
@@ -776,11 +822,11 @@ def _remove_non_numeric_props(model: Model) -> None:
                 model.remove_property(name)
         plural = True if len(to_remove) > 1 else False
         msg = (
-            f"Ignoring property{'s' if plural else ''}: "
+            f"Ignoring propert{'ies' if plural else 'y'}: "
             f"{', '.join(to_remove)}. {'They are' if plural else 'It is'} "
             f"not numeric and won't be supported by TrackMate."
         )
-        warnings.warn(msg)
+        logger.warning(msg)
 
 
 def _rename_props(props_md: PropsMetadata, frame_prop: str) -> None:
@@ -819,6 +865,11 @@ def _remove_props(props_md: PropsMetadata) -> None:
     """
     props_md._unprotect_prop("cell_ID")
     props_md._remove_prop("cell_ID")
+    if props_md._has_prop("timepoint"):
+        # If no frame-like properties were found in _rename_props(), the timepoint
+        # property is used and renamed to FRAME. So no need to remove it in this case.
+        props_md._unprotect_prop("timepoint")
+        props_md._remove_prop("timepoint")
     for prop in ["cell_name", "lineage_name", "FilteredTrack", "ROI_coords"]:
         try:
             props_md._remove_prop(prop)
@@ -923,13 +974,13 @@ def _update_location_props(props_md: PropsMetadata) -> None:
                 f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION"
             )
         except KeyError:
-            pass  # Not a mandatory property.
+            pass  # not mandatory
         try:
             props_md._change_prop_identifier(
                 f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION"
             )
         except KeyError:
-            pass  # Not a mandatory property.
+            pass  # not mandatory
 
 
 def _update_props_metadata(model: Model, frame_prop: str) -> None:
@@ -945,12 +996,159 @@ def _update_props_metadata(model: Model, frame_prop: str) -> None:
     """
     _rename_props(model.props_metadata, frame_prop)
     _remove_props(model.props_metadata)
+    # TRACK_ID comes from lineage_ID which is stored both as a node property
+    # and a lineage property. TrackMate only needs it on the lineages so we update
+    # the property type.
+    model.props_metadata.props["TRACK_ID"].prop_type = PropertyType.LINEAGE
     _add_mandatory_props(model.props_metadata)
     _update_location_props(model.props_metadata)
 
 
+def _add_radius_prop(model: Model) -> None:
+    """
+    Add a radius property to the model if it does not exist.
+
+    This is necessary because TrackMate requires a radius feature for the spots
+    in order to be able to draw them as circles.
+    If the radius property is not present, we add it with a default value of 1.0
+    for all nodes.
+
+    Parameters
+    ----------
+    model : Model
+        Model to modify.
+    """
+    # Check if there is already a radius property in the registered properties.
+    props = model.get_properties()
+    radius_prop_name = None
+    for prop_name, prop in props.items():
+        if prop_name.lower() == "radius" and prop.prop_type == PropertyType.NODE:
+            radius_prop_name = prop_name
+            break
+
+    # If yes, rename it to RADIUS if necessary, in both metadata and data.
+    if radius_prop_name is not None:
+        if radius_prop_name != "RADIUS":
+            model.props_metadata._change_prop_identifier(radius_prop_name, "RADIUS")
+            for lin in model.data.cell_data.values():
+                _update_node_prop_key(
+                    lin,
+                    old_key=radius_prop_name,
+                    new_key="RADIUS",
+                    set_default_if_missing=True,
+                    default_value=1.0,
+                )
+    else:
+        # If not, create the RADIUS property in the metadata.
+        radius_prop = Property(
+            identifier="RADIUS",
+            name="Radius",
+            description="Radius",
+            provenance="TrackMate",
+            prop_type="node",
+            lin_type="CellLineage",
+            dtype="float",
+            unit=model.get_space_unit(),
+        )
+        model.props_metadata._add_prop(radius_prop)
+
+    # Ensure all nodes have the RADIUS property set to 1.0 if missing.
+    for lin in model.data.cell_data.values():
+        for node in lin.nodes():
+            if "RADIUS" not in lin.nodes[node]:
+                lin.nodes[node]["RADIUS"] = 1.0
+
+
+def _relabel_nodes(model) -> dict[int, dict[int, int]]:
+    """
+    Relabel the nodes and return a mapping of old node IDs to new node IDs for each lineage.
+
+    This is necessary because TrackMate requires unique spot IDs across all lineages.
+    If the model has non-unique node IDs, we relabel them in place to ensure uniqueness.
+
+    Parameters
+    ----------
+    model : Model
+        Model whose nodes to relabel.
+
+    Returns
+    -------
+    dict[int, dict[int, int]]
+        A mapping of old node IDs to new node IDs for each lineage.
+        The outer dictionary keys are the lineage IDs, and the inner dictionaries
+        map old node IDs to new node IDs.
+
+    Warns
+    -----
+    If duplicate node IDs are found, in which case all nodes will be relabeled
+    to ensure uniqueness.
+    """
+    # Count the occurrences of each node ID in the data.
+    count_ids: Counter[int] = Counter()
+    for lin in model.data.cell_data.values():
+        count_ids.update(list(lin.nodes()))
+    dupes = [item for item, count in count_ids.items() if count > 1]
+
+    if not dupes:
+        # All node IDs are unique, no need to relabel.
+        return {}
+
+    # Relabel the nodes.
+    full_mapping: dict[int, dict[int, int]] = {}  # {lin_id: {old_node_id: new_node_id}}
+    new_id = 0
+    logger.debug(f"Duplicate node IDs found: {dupes}")
+    logger.warning(
+        "Relabeling nodes to ensure unique IDs across all lineages export. "
+        "Previous IDs are preserved in 'pycellin_cell_ID' for reference."
+    )
+    for lin_id, lin in model.data.cell_data.items():
+        mapping: dict[int, int] = {}  # {old_node_id: new_node_id}
+        full_mapping[lin_id] = mapping
+        for node in lin.nodes():
+            mapping[node] = new_id
+            new_id += 1
+        nx.relabel_nodes(lin, mapping, copy=False)
+
+        # The relabeling must be propagated to the cell_ID property.
+        for node in lin.nodes():
+            lin.nodes[node]["pycellin_cell_ID"] = lin.nodes[node]["cell_ID"]
+            lin.nodes[node]["cell_ID"] = node
+
+        # SPOT_SOURCE_ID and SPOT_TARGET_ID are updated / created later
+        # in _update_edges().
+
+    # Manual update of the specific node property cell_name
+    # when it has a TrackMate syntax: "ID{cell_name}"".
+    if model.has_property("cell_name"):
+        for lin_id, lin in model.data.cell_data.items():
+            for node in lin.nodes():
+                if "cell_name" in lin.nodes[node]:
+                    old_id = lin.nodes[node]["pycellin_cell_ID"]
+                    new_id = lin.nodes[node]["cell_ID"]
+                    if lin.nodes[node]["cell_name"] == f"ID{old_id}":
+                        lin.nodes[node]["cell_name"] = f"ID{new_id}"
+
+    # Update of the model in case some other properties refer
+    # to the node IDs (for example cycle_IDs).
+    prop = Property(
+        identifier="pycellin_cell_ID",
+        name="Pycellin cell ID",
+        description="Original cell ID before relabeling for TrackMate export",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="int",
+    )
+    model.props_metadata._add_prop(prop)
+    model.prepare_full_data_update()
+    model.update()
+
+    return full_mapping
+
+
 def _prepare_model_for_export(
     model: Model,
+    propagate: bool,
 ) -> None:
     """
     Prepare a pycellin model for export to TrackMate format.
@@ -962,57 +1160,115 @@ def _prepare_model_for_export(
     ----------
     model : Model
         Model to prepare for export.
+    propagate : bool
+        Whether to propagate the cycle properties before preparing the model.
 
     Raises
     ------
     KeyError
         If neither a frame-like property nor 'timepoint' is present on all nodes.
     """
-    # TrackMate requires a FRAME property.
-    # First, collect all frame-like properties from the metadata.
-    candidates = []
-    for prop in model.props_metadata._get_prop_dict_from_prop_type(
-        PropertyType.NODE
-    ).values():
-        if prop.identifier.lower() == "frame":
-            candidates.append(prop.identifier)
+    _relabel_nodes(model)  # TrackMate needs unique spot IDs across all lineages
+    if propagate:
+        model.propagate_cycle_properties()
 
-    # Check each candidate to see if it exists on all nodes in all lineages.
-    frame_prop = None
-    for candidate in candidates:
-        has_prop = True
-        for lin in model.data.cell_data.values():
-            has_prop = _graph_has_node_prop(lin, candidate) and has_prop
-
-        if has_prop:
-            frame_prop = candidate
-            break
-        else:
-            warnings.warn(
-                f"Property '{candidate}' found in metadata but not present on all nodes. "
-                f"Trying next candidate or falling back to 'timepoint'."
-            )
-
-    # If no valid frame property found, fallback to "timepoint".
-    if frame_prop is None:
-        frame_prop = "timepoint"
-        has_prop = True
-        for lin in model.data.cell_data.values():
-            has_prop = _graph_has_node_prop(lin, frame_prop) and has_prop
-
-        if has_prop:
-            warnings.warn(
-                f"No valid frame-like property found. Falling back to '{frame_prop}'."
-            )
-        else:
-            raise KeyError(
-                f"No valid frame-like property found. Tried candidates: {candidates} and "
-                f"fallback 'timepoint'. "
-            )
-
+    frame_prop = _identify_frame_prop(model)
+    _add_radius_prop(model)
     _update_props_metadata(model, frame_prop)
     _update_model_data(model, frame_prop)
     _remove_non_numeric_props(model)
+
+
+def _write_Settings(
+    xf: ET.xmlfile,
+    model: Model,
+    img_path: str | Path | None = None,
+    img_path_field: str | None = None,
+    img_shape: tuple[int, int, int, int, int] | None = None,
+    img_shape_field: str | None = None,
+) -> None:
+    """
+    Write the Settings XML tag into a TrackMate XML file.
+
+    Parameters
+    ----------
+    xf : ET.xmlfile
+        Context manager for the XML file to write.
+    model : Model
+        Model containing the data to write.
+    img_path : str | Path | None, optional
+        Path to the image file associated with the model. Default is None.
+        If provided, will be used instead of `img_path_field`.
+    img_path_field : str | None, optional
+        Name of the model metadata field that contains the image path. Default is None.
+        Not needed if `img_path` is provided.
+    img_shape : tuple[int, int, int, int, int] | None, optional
+        Shape of the image associated with the model, in the format (T, C, Z, Y, X).
+        Default is None. If provided, will be used instead of `img_shape_field`.
+    img_shape_field : str | None, optional
+        Name of the model metadata field that contains the image shape. Default is None.
+        Not needed if `img_shape` is provided.
+    """
+    metadata = model.model_metadata.to_dict()
+    if "Settings" in metadata:
+        xml_element = ET.fromstring(metadata["Settings"])
+        xf.write(xml_element)
+        return
+
+    if img_path is None:
+        if img_path_field is None:
+            img_path = ""
+        else:
+            img_path = metadata.get(img_path_field, "")
+    if not img_path:
+        filename = ""
+        folder = ""
+    else:
+        filename = str(Path(img_path).name)
+        folder = str(Path(img_path).parent)
+
+    if img_shape is None:
+        if img_shape_field is None:
+            img_shape = (0, 0, 0, 0, 0)
+        else:
+            img_shape = metadata.get(img_shape_field, (0, 0, 0, 0, 0))
+    if not img_shape:
+        n_frames = "0"  # T
+        # TrackMate doesn't need the number of channels.
+        n_slices = "0"  # Z
+        height = "0"  # Y
+        width = "0"  # X
+    else:
+        n_frames = str(img_shape[0])
+        n_slices = str(img_shape[2])
+        height = str(img_shape[3])
+        width = str(img_shape[4])
+
+    with xf.element("Settings"):
+        xf.write("\n    ")
+        img_data = ET.Element(
+            "ImageData",
+            {
+                "filename": filename,
+                "folder": folder,
+                "width": width,
+                "height": height,
+                "nslices": n_slices,
+                "nframes": n_frames,
+                "pixelwidth": str(metadata.get("pixel_width", 1.0) or 1.0),
+                "pixelheight": str(metadata.get("pixel_height", 1.0) or 1.0),
+                "voxeldepth": str(metadata.get("pixel_depth", 1.0) or 1.0),
+                "timeinterval": str(metadata.get("time_step", 1.0) or 1.0),
+            },
+        )
+        xf.write(img_data)
+        xf.write("\n    ")
+        xf.write(ET.Element("InitialSpotFilter"))
+        xf.write("\n    ")
+        xf.write(ET.Element("SpotFilterCollection"))
+        xf.write("\n    ")
+        xf.write(ET.Element("TrackFilterCollection"))
+        xf.write("\n  ")
 
 
 def _write_metadata_tag(
@@ -1068,9 +1324,9 @@ def _ask_units(
     for unit, props in model_units.items():
         print(f"{unit}: {props}")
     trackmate_units = {}
-    trackmate_units["spatialunits"] = input("Please type the spatial unit: ")
-    trackmate_units["temporalunits"] = input("Please type the temporal unit: ")
-    print(f"Using the following units for TrackMate export: {trackmate_units}")
+    trackmate_units["space"] = input("Please type the spatial unit: ")
+    trackmate_units["time"] = input("Please type the temporal unit: ")
+    logger.info(f"Using the following units for TrackMate export: {trackmate_units}")
     return trackmate_units
 
 
@@ -1078,6 +1334,10 @@ def export_TrackMate_XML(
     model: Model,
     xml_path: str | Path,
     units: dict[str, str] | None = None,
+    img_path: str | Path | None = None,
+    img_path_field: str | None = None,
+    img_shape: tuple[int, int, int, int, int] | None = None,
+    img_shape_field: str | None = None,
     propagate_cycle_props: bool = False,
 ) -> Model:
     """
@@ -1092,8 +1352,23 @@ def export_TrackMate_XML(
     units : dict[str, str], optional
         Dictionary containing the spatial and temporal units of the model.
         If not specified, the user will be asked to provide them. Format is:
-        {"spatialunits": "your_unit", "temporalunits": "your_unit"}, e.g.
-        {"spatialunits": "pixel", "temporalunits": "sec"}.
+        {"space": "your_unit", "time": "your_unit"}, e.g.
+        {"space": "pixel", "time": "sec"}.
+    img_path : str | Path | None, optional
+        Path to the image file associated with the model. Default is None.
+        If provided, will be used instead of `img_path_field`.
+    img_path_field : str | None, optional
+        Name of the model metadata field that contains the image path. Default is None.
+        Not needed if `img_path` is provided.
+    img_shape : tuple[int, int, int, int, int] | None, optional
+        Shape of the image associated with the model, in the format (T, C, Z, Y, X).
+        Default is None. If provided, will be used instead of `img_shape_field`.
+        Not needed to open the XML in TrackMate, but useful for MATLAB scripting
+        and the like.
+    img_shape_field : str | None, optional
+        Name of the model metadata field that contains the image shape. Default is None.
+        Not needed if `img_shape` is provided. Not needed to open the XML in TrackMate,
+        but useful for MATLAB scripting and the like.
     propagate_cycle_props : bool, optional
         If True, cycle properties will be propagated to cell lineages before export.
         Useful if you want to export the cycle properties to TrackMate
@@ -1118,17 +1393,16 @@ def export_TrackMate_XML(
     """
     # We don't want to modify the original model.
     model_copy = copy.deepcopy(model)
-    if propagate_cycle_props:
-        model_copy.propagate_cycle_properties()
 
     if not units:
         units = _ask_units(model_copy.props_metadata)
+    tm_units = {"spatialunits": units["space"], "timeunits": units["time"]}
     if hasattr(model_copy.model_metadata, "TrackMate_version"):
         tm_version = model_copy.model_metadata.TrackMate_version
     else:
         tm_version = "unknown"
     has_FilteredTrack = model_copy.has_property("FilteredTrack")
-    _prepare_model_for_export(model_copy)
+    _prepare_model_for_export(model_copy, propagate_cycle_props)
 
     with ET.xmlfile(xml_path, encoding="utf-8", close=True) as xf:
         xf.write_declaration()
@@ -1136,13 +1410,18 @@ def export_TrackMate_XML(
             xf.write("\n  ")
             _write_metadata_tag(xf, model_copy.model_metadata.to_dict(), "Log")
             xf.write("\n  ")
-            with xf.element("Model", units):
+            with xf.element("Model", tm_units):
                 _write_FeatureDeclarations(xf, model_copy)
                 _write_AllSpots(xf, model_copy.data.cell_data)
                 _write_AllTracks(xf, model_copy.data.cell_data)
                 _write_FilteredTracks(xf, model_copy.data.cell_data, has_FilteredTrack)
             xf.write("\n  ")
-            for tag in ["Settings", "GUIState", "DisplaySettings"]:
+            _write_Settings(
+                xf, model_copy, img_path, img_path_field, img_shape, img_shape_field
+            )
+
+            xf.write("\n  ")
+            for tag in ["GUIState", "DisplaySettings"]:
                 _write_metadata_tag(xf, model_copy.model_metadata.to_dict(), tag)
                 if tag == "DisplaySettings":
                     xf.write("\n")
@@ -1159,11 +1438,15 @@ if __name__ == "__main__":
 
     from pycellin.io.geff.loader import load_GEFF
 
-    geff_in = "sample_data/Ecoli_growth_on_agar_pad.geff"
+    geff_in = (
+        Path(__file__).resolve().parents[3]
+        / "sample_data"
+        / "Ecoli_growth_on_agar_pad.geff"
+    )
     model = load_GEFF(
         geff_in,
-        lineage_id_prop="TRACK_ID",
-        cell_id_prop="ID",
+        lineage_id_prop="lineage_ID",
+        cell_id_prop="cell_ID",
         time_prop="POSITION_T",
     )
 
@@ -1177,7 +1460,7 @@ if __name__ == "__main__":
             model,
             xml_out,
             units={
-                "spatialunits": model.get_space_unit(),
-                "temporalunits": model.get_time_unit(),
+                "space": model.get_space_unit() or "pixel",
+                "time": model.get_time_unit() or "frame",
             },
         )

@@ -21,6 +21,7 @@ import copy
 import pandas as pd
 
 from pycellin.classes.model import Model
+from pycellin.io.utils import _identify_frame_prop
 
 
 def safekeep_original_lineage_IDs(model: Model) -> None:
@@ -70,7 +71,9 @@ def renumber_negative_lineage_IDs(model: Model) -> None:
         The pycellin model to modify.
     """
     one_node_lin_IDs = [
-        lin.graph["lineage_ID"] for lin in model.get_cell_lineages() if lin.graph["lineage_ID"] < 0
+        lin.graph["lineage_ID"]
+        for lin in model.get_cell_lineages()
+        if lin.graph["lineage_ID"] < 0
     ]
     for lin_ID in one_node_lin_IDs:
         lin = model.get_cell_lineage_from_ID(lin_ID)
@@ -115,7 +118,7 @@ def drop_columns_if_exist(df, columns):
             df.drop(columns=[column], inplace=True)
 
 
-def format_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+def format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
     """
     Format the DataFrame to be compatible with trackpy.
 
@@ -123,6 +126,8 @@ def format_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     ----------
     df : pd.DataFrame
         The DataFrame to format.
+    frame_prop : str
+        The property to use as the frame identifier.
 
     Returns
     -------
@@ -143,6 +148,7 @@ def format_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             "cell_y": "y",
             "cell_z": "z",
             "lineage_ID": "particle",
+            frame_prop: "frame",
         },
     )
 
@@ -165,7 +171,7 @@ def export_trackpy_dataframe(model: Model) -> pd.DataFrame:
     Export a pycellin model to a trackpy DataFrame.
 
     Trackpy does not support division events. They will be removed for
-    the export so each cell cycle will be reprensented by a single
+    the export so each cell cycle will be represented by a single
     trackpy track in the dataframe.
 
     Parameters
@@ -186,39 +192,30 @@ def export_trackpy_dataframe(model: Model) -> pd.DataFrame:
 
     # Creation of the trackpy DataFrame.
     df = model_copy.to_cell_dataframe()
-    df = format_dataframe(df)
+    frame_prop = _identify_frame_prop(model_copy)
+    df = format_dataframe(df, frame_prop)
 
     return df
 
 
 if __name__ == "__main__":
-    # # Test with a sample TrackMate XML file.
-    # from pycellin import load_TrackMate_XML
+    """
+    Quick demo with sample data.
+    """
+    from pathlib import Path
 
-    # xml = "sample_data/Ecoli_growth_on_agar_pad.xml"
+    from pycellin.io.trackmate.loader import load_TrackMate_XML
 
-    # model = load_TrackMate_XML(xml)
-    # for lin in model.get_cell_lineages():
-    #     print(lin)
-
-    # df = export_trackpy_dataframe(model)
-    # print(df.head())
-
-    # Test with a sample trackpy DataFrame.
-    from pycellin import load_trackpy_dataframe
-
-    folder = "/mnt/data/Code/trackpy-examples-master/sample_data/"
-    tracks = "FakeTracks_trackpy.pkl"
-
-    df = pd.read_pickle(folder + tracks)
-    print(df.head())
-    print(df.shape)
-
-    model = load_trackpy_dataframe(df)
-    for lin in model.get_cell_lineages():
-        print(lin)
-    model.add_link(source_cid=8, source_lid=0, target_cid=10, target_lid=1)
-    model.update()
+    xml = (
+        Path(__file__).resolve().parents[3]
+        / "sample_data"
+        / "Ecoli_growth_on_agar_pad.xml"
+    )
+    model = load_TrackMate_XML(
+        xml,
+        keep_all_spots=True,
+        keep_all_tracks=True,
+    )
 
     df = export_trackpy_dataframe(model)
     print(df.head())

@@ -1,10 +1,12 @@
-import warnings
+import logging
 from typing import Any
 
 import networkx as nx
 
 from pycellin.classes import CellLineage, Model
 from pycellin.custom_types import PropertyType, property_type_from_string
+
+logger = logging.getLogger(__name__)
 
 
 def check_fusions(model: Model) -> None:
@@ -29,7 +31,7 @@ def check_fusions(model: Model) -> None:
             "especially for tracking related properties. Crashes and incorrect "
             "results can occur. See documentation for more details."
         )
-        warnings.warn(fusion_warning)
+        logger.warning(fusion_warning)
 
 
 def _add_lineage_props(
@@ -114,10 +116,71 @@ def _add_lineage_props(
             f"lineage ID {lin_id!r} ({num_nodes} node{'' if num_nodes == 1 else 's'})"
             for lin_id, num_nodes in missing_lineage_ids
         )
-        warnings.warn(
+        logger.info(
             f"No lineage properties found for: {details}. "
             f"These lineages will be skipped from lineage property assignment."
         )
+
+
+def _identify_frame_prop(model: Model) -> str:
+    """
+    Identify a frame-like property in the model.
+
+    This function checks if there is a frame-like property in the model's metadata.
+    If not, it falls back to the 'timepoint' property.
+
+    Parameters
+    ----------
+    model : Model
+        The pycellin model to check for a frame-like property.
+
+    Raises
+    ------
+    KeyError
+        If neither a frame-like property nor 'timepoint' is present on all nodes.
+    """
+    # First, collect all frame-like properties from the metadata.
+    candidates = []
+    for prop in model.props_metadata._get_prop_dict_from_prop_type(
+        PropertyType.NODE
+    ).values():
+        if prop.identifier.lower() == "frame":
+            candidates.append(prop.identifier)
+
+    # Check each candidate to see if it exists on all nodes in all lineages.
+    frame_prop = None
+    for candidate in candidates:
+        has_prop = True
+        for lin in model.data.cell_data.values():
+            has_prop = _graph_has_node_prop(lin, candidate) and has_prop
+
+        if has_prop:
+            frame_prop = candidate
+            break
+        else:
+            logger.info(
+                f"Property '{candidate}' found in metadata but not present on all nodes. "
+                f"Trying next candidate or falling back to 'timepoint'."
+            )
+
+    # If no valid frame property found, fallback to "timepoint".
+    if frame_prop is None:
+        frame_prop = "timepoint"
+        has_prop = True
+        for lin in model.data.cell_data.values():
+            has_prop = _graph_has_node_prop(lin, frame_prop) and has_prop
+
+        if has_prop:
+            logger.info(
+                f"No valid frame-like property found. Falling back to '{frame_prop}'."
+            )
+        else:
+            raise KeyError(
+                f"No valid frame-like property found. Tried candidates: {candidates} and "
+                f"fallback 'timepoint'. "
+            )
+
+    return frame_prop
 
 
 def _get_props_from_data(model: Model) -> tuple[set[str], set[str], set[str]]:
@@ -287,7 +350,7 @@ def _remove_orphaned_metadata(model: Model) -> None:
     }
     for prop_type_str, orphaned_props in mapping.items():
         if orphaned_props:
-            warnings.warn(
+            logger.warning(
                 f"{prop_type_str.capitalize()} metadata with no corresponding data: "
                 f"{orphaned_props}. They will be removed from the model metadata.",
                 stacklevel=2,

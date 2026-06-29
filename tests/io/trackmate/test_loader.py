@@ -4,6 +4,8 @@
 
 import io
 from copy import deepcopy
+import logging
+from pathlib import Path
 from typing import Any
 
 import networkx as nx
@@ -146,7 +148,9 @@ def prop_track_name():
 
 
 @pytest.fixture(scope="module")
-def track_props(prop_TRACK_INDEX: Property, prop_NUMBER_SPOTS: Property, prop_track_name: Property):
+def track_props(
+    prop_TRACK_INDEX: Property, prop_NUMBER_SPOTS: Property, prop_track_name: Property
+):
     return {
         "TRACK_INDEX": prop_TRACK_INDEX,
         "NUMBER_SPOTS": prop_NUMBER_SPOTS,
@@ -262,7 +266,9 @@ def test_convert_and_add_prop_spot_feature(units: dict[str, str], prop_QUALITY: 
     assert obtained == expected
 
 
-def test_convert_and_add_prop_edge_feature(units: dict[str, str], prop_SPOT_SOURCE_ID: Property):
+def test_convert_and_add_prop_edge_feature(
+    units: dict[str, str], prop_SPOT_SOURCE_ID: Property
+):
     trackmate_feature = {
         "feature": "SPOT_SOURCE_ID",
         "name": "Source spot ID",
@@ -278,7 +284,9 @@ def test_convert_and_add_prop_edge_feature(units: dict[str, str], prop_SPOT_SOUR
     assert obtained == expected
 
 
-def test_convert_and_add_prop_track_feature(units: dict[str, str], prop_TRACK_INDEX: Property):
+def test_convert_and_add_prop_track_feature(
+    units: dict[str, str], prop_TRACK_INDEX: Property
+):
     trackmate_feature = {
         "feature": "TRACK_INDEX",
         "name": "Track index",
@@ -476,7 +484,7 @@ def test_convert_attributes_ValueError():
         tml._convert_attributes(attributes, props, "node")
 
 
-def test_convert_attributes_missing_prop():
+def test_convert_attributes_missing_prop(caplog):
     props = {
         "prop_float": Property(
             identifier="prop_float",
@@ -490,8 +498,12 @@ def test_convert_attributes_missing_prop():
     }
     attributes = {"prop_float": "30", "prop_int": "20"}
 
-    with pytest.warns(UserWarning):
-        tml._convert_attributes(attributes, props, PropertyType.NODE)
+    with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.loader"):
+        tml._convert_attributes(attributes, props, "node")
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelname == "WARNING"
+    assert "not found in the properties metadata" in caplog.records[0].message
+
     assert props["prop_int"].identifier == "prop_int"
     assert props["prop_int"].name == "prop_int"
     assert props["prop_int"].description == "unknown"
@@ -600,9 +612,7 @@ def test_add_all_nodes_several_attributes():
 
 
 def test_add_all_nodes_only_ID_attribute():
-    xml_data = (
-        '<data>   <frame>       <Spot ID="1000" />       <Spot ID="1001" />   </frame></data>'
-    )
+    xml_data = '<data>   <frame>       <Spot ID="1000" />       <Spot ID="1001" />   </frame></data>'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
@@ -616,7 +626,9 @@ def test_add_all_nodes_only_ID_attribute():
 
 
 def test_add_all_nodes_no_node_attributes():
-    xml_data = '<data>   <frame>       <Spot />       <Spot ID="1001" />   </frame></data>'
+    xml_data = (
+        '<data>   <frame>       <Spot />       <Spot ID="1001" />   </frame></data>'
+    )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
@@ -942,9 +954,7 @@ def test_build_tracks_no_nodes_ID():
 
 
 def test_build_tracks_no_edges():
-    xml_data = (
-        '<data>   <Track TRACK_ID="1" name="blob" />   <Track TRACK_ID="2" name="blub" /></data>'
-    )
+    xml_data = '<data>   <Track TRACK_ID="1" name="blob" />   <Track TRACK_ID="2" name="blub" /></data>'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     track_props = {
@@ -1110,7 +1120,7 @@ def test_update_location_related_props_one_node():
 
 
 def test_get_specific_tags():
-    xml_path = "sample_data/FakeTracks.xml"
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
     tag_names = ["GUIState", "FeaturePenalties", "FilteredTracks"]
     obtained = tml._get_specific_tags(xml_path, tag_names)
 
@@ -1134,7 +1144,7 @@ def test_get_specific_tags():
 
 
 def test_get_trackmate_version():
-    xml_path = "sample_data/FakeTracks.xml"
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
     obtained = tml._get_trackmate_version(xml_path)
 
     assert obtained == "8.0.0-SNAPSHOT-f411154ed1a4b9de350bbfe91c230cf3ae7639a3"
@@ -1207,12 +1217,16 @@ def test_get_pixel_size_invalid_attribute():
     image_data.attrib["pixelheight"] = "2.0"
     image_data.attrib["voxeldepth"] = "invalid"
 
-    with pytest.raises(ValueError, match="The voxeldepth attribute cannot be converted to float."):
+    with pytest.raises(
+        ValueError, match="The voxeldepth attribute cannot be converted to float."
+    ):
         tml._get_pixel_size(settings)
 
 
 def test_get_pixel_size_missing_image_data():
     settings = ET.Element("Settings")
 
-    with pytest.raises(KeyError, match="The 'ImageData' element is not found in the settings."):
+    with pytest.raises(
+        KeyError, match="The 'ImageData' element is not found in the settings."
+    ):
         tml._get_pixel_size(settings)

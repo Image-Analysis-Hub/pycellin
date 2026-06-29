@@ -100,7 +100,8 @@ def _split_into_lineages(graph: nx.DiGraph) -> dict[int, CellLineage]:
     """
     # We want one lineage per connected component of the graph.
     lineages = [
-        CellLineage(graph.subgraph(c).copy()) for c in nx.weakly_connected_components(graph)
+        CellLineage(graph.subgraph(c).copy())
+        for c in nx.weakly_connected_components(graph)
     ]
     data = {}
     current_node_id = 0
@@ -148,7 +149,7 @@ def _create_metadata(
     dict[str, Any]
         A dictionary containing the generated metadata.
     """
-    metadata = {}  # type: dict[str, Any]
+    metadata: dict[str, Any] = {}
     metadata["provenance"] = "trackpy"
     metadata["date"] = str(datetime.now())
     try:
@@ -158,31 +159,12 @@ def _create_metadata(
     metadata["Pycellin_version"] = version
 
     # Units.
-    if space_unit is not None:
-        metadata["space_unit"] = space_unit
-    else:
-        metadata["space_unit"] = "pixel"
-    metadata["pixel_size"] = {}
-    if pixel_width is not None:
-        metadata["pixel_size"]["width"] = pixel_width
-    else:
-        metadata["pixel_size"]["width"] = 1.0
-    if pixel_height is not None:
-        metadata["pixel_size"]["height"] = pixel_height
-    else:
-        metadata["pixel_size"]["height"] = 1.0
-    if pixel_depth is not None:
-        metadata["pixel_size"]["depth"] = pixel_depth
-    else:
-        metadata["pixel_size"]["depth"] = 1.0
-    if time_unit is not None:
-        metadata["time_unit"] = time_unit
-    else:
-        metadata["time_unit"] = "frame"
-    if time_step is not None:
-        metadata["time_step"] = time_step
-    else:
-        metadata["time_step"] = 1.0
+    metadata["space_unit"] = space_unit if space_unit is not None else "pixel"
+    metadata["pixel_width"] = pixel_width if pixel_width is not None else 1.0
+    metadata["pixel_height"] = pixel_height if pixel_height is not None else 1.0
+    metadata["pixel_depth"] = pixel_depth if pixel_depth is not None else 1.0
+    metadata["time_unit"] = time_unit if time_unit is not None else "frame"
+    metadata["time_step"] = time_step if time_step is not None else 1.0
 
     return metadata
 
@@ -211,7 +193,7 @@ def _create_PropsMetadata(props: list[str], metadata: dict[str, Any]) -> PropsMe
     lin_ID_prop = create_lineage_id_property()
     for prop in [cell_ID_prop, frame_prop, lin_ID_prop]:
         props_md._add_prop(prop)
-        props_md._protect_prop([prop.identifier])
+        props_md._protect_prop(prop.identifier)
 
     # Trackpy properties.
     for axis in ["x", "y", "z"]:
@@ -259,22 +241,32 @@ def load_trackpy_dataframe(
     del graph  # # Redondant with the subgraphs.
 
     # Create a pycellin model.
-    md = _create_metadata(space_unit, pixel_width, pixel_height, pixel_depth, time_unit, time_step)
-    fd = _create_PropsMetadata(props, md)
-    model = Model(md, fd, Data(data))
+    md = _create_metadata(
+        space_unit, pixel_width, pixel_height, pixel_depth, time_unit, time_step
+    )
+    props_md = _create_PropsMetadata(props, md)
+    model = Model(md, props_md, Data(data), "frame")
 
     return model
 
 
 if __name__ == "__main__":
-    folder = "E:/Pasteur/Code/trackpy-examples-master/sample_data/"
-    tracks = "FakeTracks_trackpy.pkl"
+    """
+    Quick demo with sample data.
+    """
+    from pathlib import Path
 
-    df = pd.read_pickle(folder + tracks)
+    trackpy_file = (
+        Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks_trackpy.pkl"
+    )
+    df = pd.read_pickle(trackpy_file)
     print(df.shape)
-    print(df.head())
+    print(df.head(), "\n")
 
     model = load_trackpy_dataframe(df)
+    print(model)
+    print("\nModel metadata:")
     print(model.model_metadata)
-    # for lin in model.get_cell_lineages():
-    #     lin.plot(node_hover_props=["cell_ID", "frame", "particle"])
+    print("\nProperties and their types:")
+    for prop_id, prop in model.props_metadata.props.items():
+        print(f"  - {prop_id}  -> {prop.prop_type}")

@@ -3,18 +3,18 @@
 
 """Core property functions to create standard Property instances."""
 
+import math
+
 from pycellin.classes.data import Data
 from pycellin.classes.exceptions import UpdateRequiredError
 from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import NodeLocalPropCalculator
 
-# TODO: capitalize property names in the code
-
 
 def create_frame_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="frame",
-        name="frame",
+        name="Frame",
         description="Frame number of the cell",
         provenance=provenance,
         prop_type="node",
@@ -27,7 +27,7 @@ def create_frame_property(provenance: str = "pycellin") -> Property:
 def create_timepoint_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="timepoint",
-        name="timepoint",
+        name="Timepoint",
         description="Timepoint of the detection",
         provenance=provenance,
         prop_type="node",
@@ -109,20 +109,21 @@ class Timepoint(NodeLocalPropCalculator):
         time = lineage.nodes[nid][self.ref_time_prop]
         timepoint = (time - self.min_time) / self.time_step
 
-        if not timepoint.is_integer():
+        rounded_timepoint = round(timepoint)
+        if not math.isclose(timepoint, rounded_timepoint, rel_tol=1e-9, abs_tol=1e-9):
             raise ValueError(
                 f"Computed timepoint {timepoint} for node {nid} "
-                f"of lineage {lineage.graph['lineage_ID']}is not an integer. "
-                f"Check time_step and reference time values."
+                f"of lineage {lineage.graph['lineage_ID']} is not close to an integer. "
+                f"Check time step and reference time values."
             )
 
-        return int(timepoint)
+        return rounded_timepoint
 
 
 def create_cell_id_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cell_ID",
-        name="cell ID",
+        name="Cell ID",
         description="Unique identifier of the cell",
         provenance=provenance,
         prop_type="node",
@@ -134,7 +135,7 @@ def create_cell_id_property(provenance: str = "pycellin") -> Property:
 def create_lineage_id_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="lineage_ID",
-        name="lineage ID",
+        name="Lineage ID",
         description="Unique identifier of the lineage",
         provenance=provenance,
         prop_type=["node", "lineage"],
@@ -148,7 +149,7 @@ def create_cell_coord_property(
 ) -> Property:
     return Property(
         identifier=f"cell_{axis}",
-        name=f"cell {axis}",
+        name=f"Cell {axis}",
         description=f"{axis.upper()} coordinate of the cell",
         provenance=provenance,
         prop_type="node",
@@ -162,7 +163,7 @@ def _create_generic_cell_coord_property() -> Property:
     """Fake property for AST discovery of cell coordinates properties."""
     return Property(
         identifier="cell_{axis}",
-        name="cell {axis}",
+        name="Cell {axis}",
         description="{axis} coordinate of the cell",
         provenance="pycellin",
         prop_type="node",
@@ -177,7 +178,7 @@ def create_link_coord_property(
 ) -> Property:
     return Property(
         identifier=f"link_{axis}",
-        name=f"link {axis}",
+        name=f"Link {axis}",
         description=(
             f"{axis.upper()} coordinate of the link, i.e. mean coordinate of its two cells"
         ),
@@ -193,7 +194,7 @@ def _create_generic_link_coord_property() -> Property:
     """Fake property for AST discovery of link coordinates properties."""
     return Property(
         identifier="link_{axis}",
-        name="link {axis}",
+        name="Link {axis}",
         description="{axis} coordinate of the link, i.e. mean coordinate of its two cells",
         provenance="pycellin",
         prop_type="edge",
@@ -208,7 +209,7 @@ def create_lineage_coord_property(
 ) -> Property:
     return Property(
         identifier=f"lineage_{axis}",
-        name=f"lineage {axis}",
+        name=f"Lineage {axis}",
         description=(
             f"{axis.upper()} coordinate of the lineage, i.e. mean coordinate of its cells"
         ),
@@ -224,7 +225,7 @@ def _create_generic_lineage_coord_property() -> Property:
     """Fake property for AST discovery of lineage coordinates properties."""
     return Property(
         identifier="lineage_{axis}",
-        name="lineage {axis}",
+        name="Lineage {axis}",
         description="{axis} coordinate of the lineage, i.e. mean coordinate of its cells",
         provenance="pycellin",
         prop_type="lineage",
@@ -237,7 +238,7 @@ def _create_generic_lineage_coord_property() -> Property:
 def create_cycle_id_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cycle_ID",
-        name="cycle ID",
+        name="Cycle ID",
         description=(
             "Unique identifier of the cell cycle, i.e. cell_ID of the last cell in the cell cycle"
         ),
@@ -251,7 +252,7 @@ def create_cycle_id_property(provenance: str = "pycellin") -> Property:
 def create_cells_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cells",
-        name="cells",
+        name="Cells",
         description="cell_IDs of the cells in the cell cycle, in chronological order",
         provenance=provenance,
         prop_type="node",
@@ -263,7 +264,7 @@ def create_cells_property(provenance: str = "pycellin") -> Property:
 def create_cycle_length_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cycle_length",
-        name="cycle length",
+        name="Cycle length",
         description="Number of cells in the cell cycle, minding gaps",
         provenance=provenance,
         prop_type="node",
@@ -277,7 +278,7 @@ def create_cycle_duration_property(
 ) -> Property:
     return Property(
         identifier="cycle_duration",
-        name="cycle duration",
+        name="Cycle duration",
         description="Duration of the cell cycle, regardless of gaps",
         provenance=provenance,
         prop_type="node",
@@ -290,7 +291,7 @@ def create_cycle_duration_property(
 def create_level_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="level",
-        name="level",
+        name="Level",
         description=(
             "Level of the cell cycle in the lineage, "
             "i.e. number of cell cycles upstream of the current one"

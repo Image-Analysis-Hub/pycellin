@@ -180,7 +180,9 @@ def get_pycellin_cell_lineage_properties(
         Dictionary of properties of the cell lineages,
         with properties name as keys and properties description as values.
     """
-    lin_types = ["CellLineage", "Lineage"] if include_Lineage_properties else ["CellLineage"]
+    lin_types = (
+        ["CellLineage", "Lineage"] if include_Lineage_properties else ["CellLineage"]
+    )
     props = _get_pycellin_props_by_lin_type(include_core_properties, lin_types)
     return props
 
@@ -208,5 +210,7 @@ def get_pycellin_cycle_lineage_properties(
         Dictionary of properties of the cycle lineages,
         with properties name as keys and properties description as values.
     """
-    lin_types = ["CycleLineage", "Lineage"] if include_Lineage_properties else ["CycleLineage"]
+    lin_types = (
+        ["CycleLineage", "Lineage"] if include_Lineage_properties else ["CycleLineage"]
+    )
     return _get_pycellin_props_by_lin_type(include_core_properties, lin_types)

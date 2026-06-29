@@ -2,20 +2,21 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import warnings
 from abc import ABCMeta, abstractmethod
 from itertools import pairwise
 from typing import Any, Generator, Literal, Tuple
-import warnings
 
-from igraph import Graph
 import networkx as nx
 import plotly.graph_objects as go
+from igraph import Graph
 
 from pycellin.classes.exceptions import (
     FusionError,
-    TimeFlowError,
     LineageStructureError,
+    TimeFlowError,
 )
+from pycellin.classes.property import Property
 from pycellin.custom_types import PropertyType
 
 
@@ -247,12 +248,258 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         return [n for n in self.nodes() if self.in_degree(n) > 1]  # type: ignore
 
+    def _get_nodes_position(self, positions: dict) -> tuple[list, list]:
+        """Extract x and y coordinates from positions dict."""
+        x_nodes = [x for (x, _) in positions.values()]
+        y_nodes = [y for (_, y) in positions.values()]
+        return x_nodes, y_nodes
+
+    def _get_edges_position(self, G: Graph, positions: dict) -> tuple[list, list]:
+        """Extract x and y coordinates for edges from igraph object and positions."""
+        edges = [edge.tuple for edge in G.es]
+        x_edges = []
+        y_edges = []
+        for edge in edges:
+            x_edges += [positions[edge[0]][0], positions[edge[1]][0], None]
+            y_edges += [positions[edge[0]][1], positions[edge[1]][1], None]
+        return x_edges, y_edges
+
+    def _create_deterministic_igraph(
+        self,
+    ) -> tuple[Graph, dict[int, int]]:
+        """
+        Create an igraph with deterministic node ordering for RT layout.
+
+        This method creates an igraph where nodes are assigned IDs in a
+        deterministic order using depth-first traversal with children sorted
+        by minimum leaf ID. This ensures igraph's RT layout produces
+        consistent, deterministic positioning.
+
+        Returns
+        -------
+        tuple[Graph, dict[int, int]]
+            The igraph and a mapping from igraph vertex index to networkx node ID.
+        """
+        leaf_descendants: dict[int, int] = {}
+
+        def get_min_leaf_id(node_id):
+            """Get minimum leaf ID in subtree rooted at node_id."""
+            if node_id in leaf_descendants:
+                return leaf_descendants[node_id]
+
+            successors = list(self.successors(node_id))
+            if not successors:
+                leaf_descendants[node_id] = node_id
+                return node_id
+
+            min_leaf = min(get_min_leaf_id(child) for child in successors)
+            leaf_descendants[node_id] = min_leaf
+            return min_leaf
+
+        # Compute leaf descendants for all nodes.
+        for node_id in self.nodes():
+            get_min_leaf_id(node_id)
+
+        # Get roots (but usually there should be only one).
+        root = self.get_root(ignore_lone_nodes=True)
+        if isinstance(root, list):
+            roots = sorted(root)
+        else:
+            roots = [root]
+
+        # Create deterministic node ordering using DFS with sorted children.
+        node_order: list[int] = []
+        nx_id_to_igraph_id = {}
+
+        def dfs(node_id):
+            """DFS traversal with children visited in sorted order."""
+            if node_id in nx_id_to_igraph_id:
+                return
+
+            # Assign igraph ID for this node.
+            igraph_id = len(node_order)
+            node_order.append(node_id)
+            nx_id_to_igraph_id[node_id] = igraph_id
+
+            # Visit children in sorted order.
+            children = list(self.successors(node_id))
+            if children:
+                children = sorted(children, key=lambda c: leaf_descendants[c])
+                for child in children:
+                    dfs(child)
+
+        # Perform DFS from all roots in sorted order.
+        for root in roots:
+            dfs(root)
+
+        # Create igraph with nodes in deterministic order.
+        G = Graph(directed=True)
+        G.add_vertices(len(node_order))
+
+        # Copy graph attributes (like lineage_ID) from nx to igraph.
+        for attr, value in self.graph.items():
+            G[attr] = value
+
+        # Copy node attributes from nx to igraph nodes.
+        for igraph_id, nx_id in enumerate(node_order):
+            for attr, value in self.nodes[nx_id].items():
+                G.vs[igraph_id][attr] = value
+            # Store nx ID for mapping back.
+            G.vs[igraph_id]["_nx_name"] = nx_id
+
+        # Add edges in the same DFS order.
+        edges = []
+        for nx_id in node_order:
+            parent_igraph_id = nx_id_to_igraph_id[nx_id]
+            children = list(self.successors(nx_id))
+
+            if children:
+                # Sort children by minimum leaf ID.
+                children = sorted(children, key=lambda c: leaf_descendants[c])
+                for child_nx_id in children:
+                    child_igraph_id = nx_id_to_igraph_id[child_nx_id]
+                    edges.append((parent_igraph_id, child_igraph_id))
+
+        G.add_edges(edges)
+
+        # Copy edge attributes.
+        edge_idx = 0
+        for nx_id in node_order:
+            parent_igraph_id = nx_id_to_igraph_id[nx_id]
+            children = list(self.successors(nx_id))
+
+            if children:
+                # Sort children by minimum leaf ID.
+                children = sorted(children, key=lambda c: leaf_descendants[c])
+                for child_nx_id in children:
+                    # Copy edge attributes.
+                    for attr, value in self.edges[nx_id, child_nx_id].items():
+                        G.es[edge_idx][attr] = value
+                    edge_idx += 1
+
+        # Create index_to_nx_id mapping.
+        index_to_nx_id = {igraph_id: nx_id for igraph_id, nx_id in enumerate(node_order)}
+
+        return G, index_to_nx_id
+
+    def _build_node_text_annotations(
+        self,
+        G: Graph,
+        positions: dict,
+        nodes_count: int,
+        node_text: str,
+        node_text_font: dict[str, Any] | None,
+    ) -> list[dict]:
+        """Build annotation objects for text displayed inside nodes."""
+        node_labels = G.vs[node_text]
+        if len(node_labels) != nodes_count:
+            raise ValueError("The lists pos and text must have the same length.")
+        annotations = []
+        for k in range(nodes_count):
+            annotations.append(
+                dict(
+                    text=node_labels[k],
+                    x=positions[k][0],
+                    y=positions[k][1],
+                    xref="x1",
+                    yref="y1",
+                    font=node_text_font,
+                    showarrow=False,
+                )
+            )
+        return annotations
+
+    def _apply_node_color_mapping(
+        self, G: Graph, node_colormap_prop: str, node_color_scale: str | None
+    ) -> dict:
+        """Apply color mapping to node marker style based on a node property.
+
+        Returns a dict with color, colorscale, and colorbar settings.
+        """
+        color_values = G.vs[node_colormap_prop]
+
+        if not color_values:
+            raise ValueError(
+                f"Cannot color map: property '{node_colormap_prop}' has no values."
+            )
+        if not all(isinstance(val, (int, float)) for val in color_values):
+            raise ValueError(
+                f"Cannot color map: property '{node_colormap_prop}' contains "
+                "non-numeric values. Please use a numeric or boolean property."
+            )
+
+        if any(isinstance(val, bool) for val in color_values):
+            color_values = [
+                int(val) if isinstance(val, bool) else val for val in color_values
+            ]
+
+        return {
+            "color": color_values,
+            "colorscale": node_color_scale,
+            "colorbar": dict(title=node_colormap_prop),
+        }
+
+    def _build_node_hover_text(
+        self, G: Graph, ID_prop: str, y_prop: Property, node_hover_props: list[str] | None
+    ) -> list[str]:
+        """Build hover text for nodes."""
+        if node_hover_props:
+            node_hover_text = []
+            for node in G.vs:
+                text = ""
+                for prop in node_hover_props:
+                    if prop not in node.attributes():
+                        raise KeyError(
+                            f"Cannot plot: property {prop} is not present in the node attributes."
+                        )
+                    hover_text = f"{prop}: {node[prop]}<br>"
+                    text += hover_text
+                node_hover_text.append(text)
+        else:
+            node_hover_text = [
+                (
+                    f"{ID_prop}: {node[ID_prop]}<br>{y_prop.name}: {node[y_prop.identifier]}"
+                )
+                for node in G.vs
+            ]
+        return node_hover_text
+
+    def _get_graph_name(self, G: Graph) -> str:
+        """Extract graph name from lineage ID if available."""
+        if "lineage_ID" in G.attributes():
+            return f"lineage_ID: {G['lineage_ID']}"
+        return ""
+
+    def _construct_y_legend(self, y_prop: Property) -> str:
+        if y_prop.unit:
+            return f"{y_prop.name} ({y_prop.unit})"
+        return y_prop.name
+
+    def _build_edge_hover_text(
+        self, G: Graph, index_to_nx_id: dict, edge_hover_props: list[str] | None
+    ) -> list[str]:
+        """Build hover text for edges."""
+        edge_hover_text = []
+        for edge in G.es:
+            source_id = index_to_nx_id[edge.source]
+            target_id = index_to_nx_id[edge.target]
+            text = f"Source cell_ID: {source_id}<br>Target cell_ID: {target_id}<br>"
+            if edge_hover_props:
+                for prop in edge_hover_props:
+                    if prop not in edge.attributes():
+                        raise KeyError(
+                            f"Cannot plot: property {prop} is not present in the edge attributes."
+                        )
+                    hover_text = f"{prop}: {edge[prop]}<br>"
+                    text += hover_text
+                edge_hover_text += [text, text, text]
+        return edge_hover_text
+
     @abstractmethod
-    def plot(
+    def get_tree_figure(
         self,
         ID_prop: str,
-        y_prop: str,
-        y_legend: str,
+        y_prop: Property,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -267,20 +514,23 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
-    ) -> None:
+        template: str | None = None,
+    ) -> go.Figure:
         """
-        Plot the lineage as a tree using Plotly.
+        Generate a Plotly figure of the lineage tree.
 
+        This method generates a tree figure with Reingold-Tilford layout and returns
+        it as a Plotly Figure object. The figure can then be updated or displayed using
+        `fig.show()`.
         Heavily based on the code from https://plotly.com/python/tree-plots/
 
         Parameters
         ----------
         ID_prop : str
             The property of the nodes to use as identifier.
-        y_prop : str
-            The property of the nodes to use for the y-axis.
-        y_legend : str
-            The label of the y-axis.
+        y_prop : Property
+            The Property to use for the y-axis. The legend is automatically
+            constructed from Property.name and Property.unit.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -319,6 +569,14 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
+        template : str, optional
+            The Plotly template to use for the figure. If None, defaults to Plotly's
+            default template. Examples: "plotly", "plotly_white", "plotly_dark".
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+            The generated Plotly figure object.
 
         Warnings
         --------
@@ -357,117 +615,54 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # - axes
         # - color mapping node/edge attributes?     OK nodes
 
-        def get_nodes_position():
-            x_nodes = [x for (x, _) in positions.values()]
-            y_nodes = [y for (_, y) in positions.values()]
-            return x_nodes, y_nodes
-
-        def get_edges_position():
-            edges = [edge.tuple for edge in G.es]
-            x_edges = []
-            y_edges = []
-            for edge in edges:
-                x_edges += [positions[edge[0]][0], positions[edge[1]][0], None]
-                y_edges += [positions[edge[0]][1], positions[edge[1]][1], None]
-            return x_edges, y_edges
-
-        def node_text_annotations():
-            node_labels = G.vs[node_text]
-            if len(node_labels) != nodes_count:
-                raise ValueError("The lists pos and text must have the same length.")
-            annotations = []
-            for k in range(nodes_count):
-                annotations.append(
-                    dict(
-                        text=node_labels[k],
-                        x=positions[k][0],
-                        y=positions[k][1],
-                        xref="x1",
-                        yref="y1",
-                        font=node_text_font,
-                        showarrow=False,
-                    )
-                )
-            return annotations
-
-        def node_prop_color_mapping():
-            # TODO: add colorbar units, but the info is stored in the model
-            # FIXME: the colorbar is partially hiding the traces names
-            assert node_marker_style is not None
-            node_marker_style["color"] = G.vs[node_colormap_prop]
-            node_marker_style["colorscale"] = node_color_scale
-            node_marker_style["colorbar"] = dict(title=node_colormap_prop)
-
-        def node_hovertemplate():
-            # TODO: when property is float, display only 2 decimals
-            # or give control to the user.
-            if node_hover_props:
-                node_hover_text = []
-                for node in G.vs:
-                    text = ""
-                    for prop in node_hover_props:
-                        if prop not in node.attributes():
-                            raise KeyError(
-                                f"Cannot plot: property {prop} is not present in the node attributes."
-                            )
-                        hover_text = f"{prop}: {node[prop]}<br>"
-                        text += hover_text
-                    node_hover_text.append(text)
-            else:
-                node_hover_text = [
-                    (f"{ID_prop}: {node[ID_prop]}<br>{y_prop}: {node[y_prop]}")
-                    for node in G.vs
-                ]
-            if "lineage_ID" in G.attributes():
-                graph_name = f"lineage_ID: {G['lineage_ID']}"
-            else:
-                graph_name = ""
-            return node_hover_text, graph_name
-
-        def edge_hover_template():
-            edge_hover_text = []
-            for edge in G.es:
-                source_id = index_to_nx_id[edge.source]
-                target_id = index_to_nx_id[edge.target]
-                text = f"Source cell_ID: {source_id}<br>Target cell_ID: {target_id}<br>"
-                if edge_hover_props:
-                    for prop in edge_hover_props:
-                        if prop not in edge.attributes():
-                            raise KeyError(
-                                f"Cannot plot: property {prop} is not present in the edge attributes."
-                            )
-                        hover_text = f"{prop}: {edge[prop]}<br>"
-                        text += hover_text
-                    edge_hover_text += [text, text, text]
-            return edge_hover_text
-
-        # Conversion of the networkx lineage graph to igraph.
-        G = Graph.from_networkx(self)
-        # Create a mapping from networkx node names to igraph vertex indices
-        index_to_nx_id = {idx: nx_id for idx, nx_id in enumerate(G.vs["_nx_name"])}
+        G, index_to_nx_id = self._create_deterministic_igraph()
         nodes_count = G.vcount()
-        layout = G.layout("rt")  # Basic tree layout.
+        layout = G.layout("rt")  # Reingold-Tilford layout
         # Updating the layout so the y position of the nodes is given
         # by the value of y_prop.
-        layout = [(layout[k][0], G.vs[y_prop][k]) for k in range(nodes_count)]
+        layout = [(layout[k][0], G.vs[y_prop.identifier][k]) for k in range(nodes_count)]
 
         # Computing the exact positions of nodes and edges.
         positions = {k: layout[k] for k in range(nodes_count)}
-        x_nodes, y_nodes = get_nodes_position()
-        x_edges, y_edges = get_edges_position()
+        x_nodes, y_nodes = self._get_nodes_position(positions)
+        x_edges, y_edges = self._get_edges_position(G, positions)
 
         # Color mapping the nodes to a node property.
         if node_colormap_prop:
-            if not node_marker_style:
-                node_marker_style = dict()
-            node_prop_color_mapping()
+            color_map_style = self._apply_node_color_mapping(
+                G, node_colormap_prop, node_color_scale
+            )
+            if node_marker_style is None:
+                node_marker_style = color_map_style
+            else:
+                node_marker_style.update(color_map_style)
+
+        # Set default colors if not already specified.
+        if node_marker_style is None:
+            node_marker_style = {"color": "darkviolet"}
+        elif "color" not in node_marker_style:
+            node_marker_style["color"] = "darkviolet"
+
+        if edge_line_style is None:
+            edge_line_style = {"color": "dimgrey"}
+        elif "color" not in edge_line_style:
+            edge_line_style["color"] = "dimgrey"
 
         # Text in the nodes.
-        node_annotations = node_text_annotations() if node_text else None
+        node_annotations = (
+            self._build_node_text_annotations(
+                G, positions, nodes_count, node_text, node_text_font
+            )
+            if node_text
+            else None
+        )
         # TODO: see if it's better to use a background behind the text
         # https://plotly.com/python/text-and-annotations/#styling-and-coloring-annotations
         # Text when hovering on a node.
-        node_hover_text, graph_name = node_hovertemplate()
+        node_hover_text = self._build_node_hover_text(
+            G, ID_prop, y_prop, node_hover_props
+        )
+        graph_name = self._get_graph_name(G)
 
         # Plot edges.
         fig = go.Figure()
@@ -478,7 +673,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 mode="lines",
                 line=edge_line_style,
                 # hovertemplate="%{text}",
-                text=edge_hover_template(),
+                text=self._build_edge_hover_text(G, index_to_nx_id, edge_hover_props),
                 name="Edges",
             )
         )
@@ -491,8 +686,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 marker=node_marker_style,
                 hoverinfo="text",
                 hovertemplate="%{text}",
-                text=node_hover_text,  # Used in hoverinfo not for the nodes text.
-                name=graph_name,
+                text=node_hover_text,  # used in hoverinfo not for the nodes text
+                name=graph_name if graph_name else "Nodes",
             )
         )
 
@@ -501,16 +696,117 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             annotations=node_annotations,
             showlegend=showlegend,
             plot_bgcolor=plot_bgcolor,
-            hovermode="closest",  # Not ideal but the other modes are far worse.
+            hovermode="closest",  # not ideal but the other modes are worse
             width=width,
             height=height,
+            template=template,
         )
         fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
         fig.update_yaxes(
             autorange="reversed",
             showgrid=show_horizontal_grid,
             zeroline=show_horizontal_grid,
-            title=y_legend,
+            title=self._construct_y_legend(y_prop),
+        )
+        return fig
+
+    @abstractmethod
+    def plot(
+        self,
+        ID_prop: str,
+        y_prop: Property,
+        title: str | None = None,
+        node_text: str | None = None,
+        node_text_font: dict[str, Any] | None = None,
+        node_marker_style: dict[str, Any] | None = None,
+        node_colormap_prop: str | None = None,
+        node_color_scale: str | None = None,
+        node_hover_props: list[str] | None = None,
+        edge_line_style: dict[str, Any] | None = None,
+        edge_hover_props: list[str] | None = None,
+        plot_bgcolor: str | None = None,
+        show_horizontal_grid: bool = True,
+        showlegend: bool = True,
+        width: int | None = None,
+        height: int | None = None,
+        template: str | None = None,
+    ) -> None:
+        """
+        Plot the lineage as a tree using Plotly.
+
+        This method generates a tree figure with Reingold-Tilford layout and displays it.
+
+        Parameters
+        ----------
+        ID_prop : str
+            The property of the nodes to use as identifier.
+        y_prop : Property
+            The Property to use for the y-axis. The legend is automatically
+            constructed from Property.name and Property.unit.
+        title : str, optional
+            The title of the plot. If None, no title is displayed.
+        node_text : str, optional
+            The property of the nodes to display as text inside the nodes
+            of the plot. If None, no text is displayed. None by default.
+        node_text_font : dict, optional
+            The font style of the text inside the nodes (size, color, etc).
+            If None, defaults to current Plotly template.
+        node_marker_style : dict, optional
+            The style of the markers representing the nodes in the plot
+            (symbol, size, color, line, etc). If None, defaults to
+            current Plotly template.
+        node_colormap_prop : str, optional
+            The property of the nodes to use for coloring the nodes.
+            If None, no color mapping is applied.
+        node_color_scale : str, optional
+            The color scale to use for coloring the nodes. If None,
+            defaults to current Plotly template.
+        node_hover_props : list[str], optional
+            The hover template for the nodes. If None, defaults to
+            displaying `cell_ID` and the value of the y_prop.
+        edge_line_style : dict, optional
+            The style of the lines representing the edges in the plot
+            (color, width, etc). If None, defaults to current Plotly template.
+        edge_hover_props : list[str], optional
+            The hover template for the edges. If None, defaults to
+            displaying the source and target nodes.
+        plot_bgcolor : str, optional
+            The background color of the plot. If None, defaults to current
+            Plotly template.
+        show_horizontal_grid : bool, optional
+            True to display the horizontal grid, False otherwise. True by default.
+        showlegend : bool, optional
+            True to display the legend, False otherwise. True by default.
+        width : int, optional
+            The width of the plot. If None, defaults to current Plotly template.
+        height : int, optional
+            The height of the plot. If None, defaults to current Plotly template.
+        template : str, optional
+            The Plotly template to use for the figure. If None, defaults to Plotly's
+            default template. Examples: "plotly", "plotly_white", "plotly_dark".
+
+        See Also
+        --------
+        get_tree_figure : Generate the figure without displaying it.
+        """
+        fig = self.get_tree_figure(
+            ID_prop=ID_prop,
+            y_prop=y_prop,
+            title=title,
+            node_text=node_text,
+            node_text_font=node_text_font,
+            node_marker_style=node_marker_style,
+            node_colormap_prop=node_colormap_prop,
+            node_color_scale=node_color_scale,
+            node_hover_props=node_hover_props,
+            edge_line_style=edge_line_style,
+            edge_hover_props=edge_hover_props,
+            plot_bgcolor=plot_bgcolor,
+            show_horizontal_grid=show_horizontal_grid,
+            showlegend=showlegend,
+            width=width,
+            height=height,
+            template=template,
         )
         fig.show()
 
@@ -1114,11 +1410,10 @@ class CellLineage(Lineage):
     #     # for div in ancestor_divs:
     #     #     pass
 
-    def plot(
+    def get_tree_figure(
         self,
         ID_prop: str = "cell_ID",
-        y_prop: str = "timepoint",
-        y_legend: str = "Time (timepoints)",
+        y_prop: Property | None = None,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -1133,18 +1428,24 @@ class CellLineage(Lineage):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
-    ) -> None:
+        template: str | None = None,
+    ) -> go.Figure:
         """
-        Plot the cell lineage as a tree using Plotly.
+        Generate a Plotly figure of the cell lineage tree.
+
+        This method generates a tree figure with Reingold-Tilford layout and returns
+        it as a Plotly Figure object. The figure can then be updated or displayed using
+        `fig.show()`.
+        Heavily based on the code from https://plotly.com/python/tree-plots/
 
         Parameters
         ----------
         ID_prop : str, optional
             The property of the nodes to use as the node ID. "cell_ID" by default.
-        y_prop : str, optional
-            The property of the nodes to use as the y-axis. "timepoint" by default.
-        y_legend : str, optional
-            The label of the y-axis. "Time (timepoints)" by default.
+        y_prop : Property, optional
+            The Property to use for the y-axis. If None, defaults to
+            "timepoint" property. The legend is automatically constructed from
+            Property.name and Property.unit.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -1183,7 +1484,118 @@ class CellLineage(Lineage):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
+        template : str, optional
+            The Plotly template to use for the figure. If None, defaults to Plotly's
+            default template. Examples: "plotly", "plotly_white", "plotly_dark".
 
+        Returns
+        -------
+        plotly.graph_objects.Figure
+            The generated Plotly figure object.
+
+        Warnings
+        --------
+        In case of cell divisions, the hover text of the edges between the parent
+        and child cells will be displayed only for one child cell.
+        This cannot easily be corrected.
+        """
+        if y_prop is None:
+            from pycellin.graph.properties.core import create_timepoint_property
+
+            y_prop = create_timepoint_property()
+
+        return super().get_tree_figure(
+            ID_prop=ID_prop,
+            y_prop=y_prop,
+            title=title,
+            node_text=node_text,
+            node_text_font=node_text_font,
+            node_marker_style=node_marker_style,
+            node_colormap_prop=node_colormap_prop,
+            node_color_scale=node_color_scale,
+            node_hover_props=node_hover_props,
+            edge_line_style=edge_line_style,
+            edge_hover_props=edge_hover_props,
+            plot_bgcolor=plot_bgcolor,
+            show_horizontal_grid=show_horizontal_grid,
+            showlegend=showlegend,
+            width=width,
+            height=height,
+            template=template,
+        )
+
+    def plot(
+        self,
+        ID_prop: str = "cell_ID",
+        y_prop: Property | None = None,
+        title: str | None = None,
+        node_text: str | None = None,
+        node_text_font: dict[str, Any] | None = None,
+        node_marker_style: dict[str, Any] | None = None,
+        node_colormap_prop: str | None = None,
+        node_color_scale: str | None = None,
+        node_hover_props: list[str] | None = None,
+        edge_line_style: dict[str, Any] | None = None,
+        edge_hover_props: list[str] | None = None,
+        plot_bgcolor: str | None = None,
+        show_horizontal_grid: bool = True,
+        showlegend: bool = True,
+        width: int | None = None,
+        height: int | None = None,
+        template: str | None = None,
+    ) -> None:
+        """
+        Plot the cell lineage as a tree using Plotly.
+
+        Parameters
+        ----------
+        ID_prop : str, optional
+            The property of the nodes to use as the node ID. "cell_ID" by default.
+        y_prop : Property, optional
+            The Property to use for the y-axis. If None, defaults to
+            "timepoint" property. The legend is automatically constructed from
+            Property.name and Property.unit.
+        title : str, optional
+            The title of the plot. If None, no title is displayed.
+        node_text : str, optional
+            The property of the nodes to display as text inside the nodes
+            of the plot. If None, no text is displayed. None by default.
+        node_text_font : dict, optional
+            The font style of the text inside the nodes (size, color, etc).
+            If None, defaults to current Plotly template.
+        node_marker_style : dict, optional
+            The style of the markers representing the nodes in the plot
+            (symbol, size, color, line, etc). If None, defaults to
+            current Plotly template.
+        node_colormap_prop : str, optional
+            The property of the nodes to use for coloring the nodes.
+            If None, no color mapping is applied.
+        node_color_scale : str, optional
+            The color scale to use for coloring the nodes. If None,
+            defaults to current Plotly template.
+        node_hover_props : list[str], optional
+            The hover template for the nodes. If None, defaults to
+            displaying `cell_ID` and the value of the y_prop.
+        edge_line_style : dict, optional
+            The style of the lines representing the edges in the plot
+            (color, width, etc). If None, defaults to current Plotly template.
+        edge_hover_props : list[str], optional
+            The hover template for the edges. If None, defaults to
+            displaying the source and target nodes.
+        plot_bgcolor : str, optional
+            The background color of the plot. If None, defaults to current
+            Plotly template.
+        show_horizontal_grid : bool, optional
+            True to display the horizontal grid, False otherwise. True by default.
+        showlegend : bool, optional
+            True to display the legend, False otherwise. True by default.
+        width : int, optional
+            The width of the plot. If None, defaults to current Plotly template.
+        height : int, optional
+            The height of the plot. If None, defaults to current Plotly template.
+        template : str, optional
+            The Plotly template to use for the figure. If None, defaults to Plotly's
+            default template. Examples: "plotly", "plotly_white", "plotly_dark".
         Warnings
         --------
         In case of cell divisions, the hover text of the edges between the parent
@@ -1205,12 +1617,14 @@ class CellLineage(Lineage):
             color="white",
             line=dict(color="black", width=1),
         )
+
+        See Also
+        --------
+        get_tree_figure : Generate the figure without displaying it.
         """
-        # TODO: and if we want to plot in time units instead of frames?
-        super().plot(
+        fig = self.get_tree_figure(
             ID_prop=ID_prop,
             y_prop=y_prop,
-            y_legend=y_legend,
             title=title,
             node_text=node_text,
             node_text_font=node_text_font,
@@ -1225,7 +1639,9 @@ class CellLineage(Lineage):
             showlegend=showlegend,
             width=width,
             height=height,
+            template=template,
         )
+        fig.show()
 
     @staticmethod
     # TODO: I don't think this function is good design, even if it factorises code.
@@ -1392,11 +1808,10 @@ class CycleLineage(Lineage):
         for edge in pairwise(self.nodes[ccid]["cells"]):
             yield edge
 
-    def plot(
+    def get_tree_figure(
         self,
         ID_prop: str = "cycle_ID",
-        y_prop: str = "level",
-        y_legend: str = "Cell cycle level",
+        y_prop: Property | None = None,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -1411,18 +1826,24 @@ class CycleLineage(Lineage):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
-    ) -> None:
+        template: str | None = None,
+    ) -> go.Figure:
         """
-        Plot the cell cycle lineage as a tree using Plotly.
+        Generate a Plotly figure of the cell cycle lineage tree.
+
+        This method generates a tree figure with Reingold-Tilford layout and returns
+        it as a Plotly Figure object. The figure can then be updated or displayed using
+        `fig.show()`.
+        Heavily based on the code from https://plotly.com/python/tree-plots/
 
         Parameters
         ----------
         ID_prop : str, optional
             The property of the nodes to use as the node ID. "cycle_ID" by default.
-        y_prop : str, optional
-            The property of the nodes to use as the y-axis. "level" by default.
-        y_legend : str, optional
-            The label of the y-axis. "Cell cycle level" by default.
+        y_prop : Property, optional
+            The Property to use for the y-axis. If None, defaults to
+            "level" property. The legend is automatically constructed from
+            Property.name and Property.unit.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -1461,6 +1882,118 @@ class CycleLineage(Lineage):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
+        template : str, optional
+            The Plotly template to use for the figure. If None, defaults to Plotly's
+            default template. Examples: "plotly", "plotly_white", "plotly_dark".
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+            The generated Plotly figure object.
+
+        Warnings
+        --------
+        In case of cell divisions, the hover text of the edges between the parent
+        and child cells will be displayed only for one child cell.
+        This cannot easily be corrected.
+        """
+        if y_prop is None:
+            from pycellin.graph.properties.core import create_level_property
+
+            y_prop = create_level_property()
+
+        return super().get_tree_figure(
+            ID_prop=ID_prop,
+            y_prop=y_prop,
+            title=title,
+            node_text=node_text,
+            node_text_font=node_text_font,
+            node_marker_style=node_marker_style,
+            node_colormap_prop=node_colormap_prop,
+            node_color_scale=node_color_scale,
+            node_hover_props=node_hover_props,
+            edge_line_style=edge_line_style,
+            edge_hover_props=edge_hover_props,
+            plot_bgcolor=plot_bgcolor,
+            show_horizontal_grid=show_horizontal_grid,
+            showlegend=showlegend,
+            width=width,
+            height=height,
+            template=template,
+        )
+
+    def plot(
+        self,
+        ID_prop: str = "cycle_ID",
+        y_prop: Property | None = None,
+        title: str | None = None,
+        node_text: str | None = None,
+        node_text_font: dict[str, Any] | None = None,
+        node_marker_style: dict[str, Any] | None = None,
+        node_colormap_prop: str | None = None,
+        node_color_scale: str | None = None,
+        node_hover_props: list[str] | None = None,
+        edge_line_style: dict[str, Any] | None = None,
+        edge_hover_props: list[str] | None = None,
+        plot_bgcolor: str | None = None,
+        show_horizontal_grid: bool = True,
+        showlegend: bool = True,
+        width: int | None = None,
+        height: int | None = None,
+        template: str | None = None,
+    ) -> None:
+        """
+        Plot the cell cycle lineage as a tree using Plotly.
+
+        Parameters
+        ----------
+        ID_prop : str, optional
+            The property of the nodes to use as the node ID. "cycle_ID" by default.
+        y_prop : Property, optional
+            The Property to use for the y-axis. If None, defaults to
+            "level" property. The legend is automatically constructed from
+            Property.name and Property.unit.
+        title : str, optional
+            The title of the plot. If None, no title is displayed.
+        node_text : str, optional
+            The property of the nodes to display as text inside the nodes
+            of the plot. If None, no text is displayed. None by default.
+        node_text_font : dict, optional
+            The font style of the text inside the nodes (size, color, etc).
+            If None, defaults to current Plotly template.
+        node_marker_style : dict, optional
+            The style of the markers representing the nodes in the plot
+            (symbol, size, color, line, etc). If None, defaults to
+            current Plotly template.
+        node_colormap_prop : str, optional
+            The property of the nodes to use for coloring the nodes.
+            If None, no color mapping is applied.
+        node_color_scale : str, optional
+            The color scale to use for coloring the nodes. If None,
+            defaults to current Plotly template.
+        node_hover_props : list[str], optional
+            The hover template for the nodes. If None, defaults to
+            displaying `cell_ID` and the value of the y_prop.
+        edge_line_style : dict, optional
+            The style of the lines representing the edges in the plot
+            (color, width, etc). If None, defaults to current Plotly template.
+        edge_hover_props : list[str], optional
+            The hover template for the edges. If None, defaults to
+            displaying the source and target nodes.
+        plot_bgcolor : str, optional
+            The background color of the plot. If None, defaults to current
+            Plotly template.
+        show_horizontal_grid : bool, optional
+            True to display the horizontal grid, False otherwise. True by default.
+        showlegend : bool, optional
+            True to display the legend, False otherwise. True by default.
+        width : int, optional
+            The width of the plot. If None, defaults to current Plotly template.
+        height : int, optional
+            The height of the plot. If None, defaults to current Plotly template.
+        template : str, optional
+            The Plotly template to use for the figure. If None, defaults to Plotly's
+            default template. Examples: "plotly", "plotly_white", "plotly_dark".
 
         Warnings
         --------
@@ -1483,11 +2016,14 @@ class CycleLineage(Lineage):
             color="white",
             line=dict(color="black", width=1),
         )
+
+        See Also
+        --------
+        get_tree_figure : Generate the figure without displaying it.
         """
-        super().plot(
+        fig = self.get_tree_figure(
             ID_prop=ID_prop,
             y_prop=y_prop,
-            y_legend=y_legend,
             title=title,
             node_text=node_text,
             node_text_font=node_text_font,
@@ -1502,4 +2038,6 @@ class CycleLineage(Lineage):
             showlegend=showlegend,
             width=width,
             height=height,
+            template=template,
         )
+        fig.show()

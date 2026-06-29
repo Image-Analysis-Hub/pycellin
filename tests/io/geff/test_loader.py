@@ -1,6 +1,7 @@
 """Unit test for GEFF file loader."""
 
 import importlib.metadata
+import logging
 
 import geff
 import geff_spec
@@ -17,12 +18,12 @@ from pycellin.graph.properties.core import (
 from pycellin.io.geff.loader import (
     _build_generic_metadata,
     _build_props_metadata,
+    _ensure_valid_cell_ID,
     _extract_axes_metadata,
     _extract_generic_metadata,
     _extract_lin_props_metadata,
     _extract_props_metadata,
     _fallback_to_node_keys,
-    _ensure_valid_cell_ID,
     _get_prop_unit,
     _identify_lin_id_prop,
     _identify_space_props,
@@ -388,36 +389,62 @@ class TestIdentifyLinIdProp:
         result = _identify_lin_id_prop("my_lin_id", None, graph_lin_id)
         assert result == "my_lin_id"
 
-    def test_provided_key_not_in_graph_falls_back_to_track_node_props(self, graph_lin_id):
+    def test_provided_key_not_in_graph_falls_back_to_track_node_props(
+        self, caplog, graph_lin_id
+    ):
         """When lin_id_prop is not in graph but geff_track_node_props has 'lineage',
-        return the value from track_node_props and warn."""
-        with pytest.warns(UserWarning, match="not present in the graph"):
+        return the value from track_node_props and log."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop(
                 "missing_key",
                 {"lineage": "track_id"},
                 graph_lin_id,
             )
+        assert len(caplog.records) == 2
+        assert caplog.records[0].levelname == "INFO"
+        assert "infered from GEFF metadata" in caplog.records[0].message
+        assert caplog.records[1].levelname == "INFO"
+        assert "inferred from GEFF track_node_props" in caplog.records[1].message
+
         assert result == "track_id"
 
-    def test_provided_key_not_in_graph_falls_back_to_lineage_id(self, graph_lin_id):
+    def test_provided_key_not_in_graph_falls_back_to_lineage_id(
+        self, caplog, graph_lin_id
+    ):
         """When lin_id_prop is not in graph and geff_track_node_props is None,
-        fall back to 'lineage_ID' if present in graph and warn."""
-        with pytest.warns(UserWarning, match="not present in the graph"):
+        fall back to 'lineage_ID' if present in graph and log."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop("missing_key", None, graph_lin_id)
+        assert len(caplog.records) == 2
+        assert caplog.records[0].levelname == "INFO"
+        assert "infered from GEFF metadata" in caplog.records[0].message
+        assert caplog.records[1].levelname == "INFO"
+        assert "inferred from existing graph property" in caplog.records[1].message
+
         assert result == "lineage_ID"
 
-    def test_provided_key_not_in_graph_no_fallback(self, graph_no_lin_id):
+    def test_provided_key_not_in_graph_no_fallback(self, caplog, graph_no_lin_id):
         """When lin_id_prop is not in graph, geff_track_node_props is None,
-        and graph has no 'lineage_ID', warn twice and return None."""
-        with pytest.warns(UserWarning):
+        and graph has no 'lineage_ID', log and return None."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop("missing_key", None, graph_no_lin_id)
+        assert len(caplog.records) == 2
+        assert caplog.records[0].levelname == "INFO"
+        assert "infered from GEFF metadata" in caplog.records[0].message
+        assert caplog.records[1].levelname == "WARNING"
+        assert "No lineage identifier found" in caplog.records[1].message
+
         assert result is None
 
-    def test_none_prop_with_track_node_props_lineage(self, graph_lin_id):
+    def test_none_prop_with_track_node_props_lineage(self, caplog, graph_lin_id):
         """When lin_id_prop is None and geff_track_node_props has 'lineage',
-        return the value from track_node_props and warn."""
-        with pytest.warns(UserWarning, match="inferred from GEFF track_node_props"):
+        return the value from track_node_props and log."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop(None, {"lineage": "my_lin_id"}, graph_lin_id)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "INFO"
+        assert "inferred from GEFF track_node_props" in caplog.records[0].message
+
         assert result == "my_lin_id"
 
     def test_none_prop_with_track_node_props_no_lineage_key(self, graph_lin_id):
@@ -426,18 +453,30 @@ class TestIdentifyLinIdProp:
         result = _identify_lin_id_prop(None, {"tracklet": "tracklet_id"}, graph_lin_id)
         assert result is None
 
-    def test_none_prop_no_track_node_props_graph_has_lineage_id(self, graph_lin_id):
+    def test_none_prop_no_track_node_props_graph_has_lineage_id(
+        self, caplog, graph_lin_id
+    ):
         """When lin_id_prop is None, geff_track_node_props is None,
-        and graph has 'lineage_ID', return 'lineage_ID' and warn."""
-        with pytest.warns(UserWarning, match="inferred from existing graph property"):
+        and graph has 'lineage_ID', return 'lineage_ID' and log."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop(None, None, graph_lin_id)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "INFO"
+        assert "inferred from existing graph property" in caplog.records[0].message
+
         assert result == "lineage_ID"
 
-    def test_none_prop_no_track_node_props_no_lineage_id_in_graph(self, graph_no_lin_id):
+    def test_none_prop_no_track_node_props_no_lineage_id_in_graph(
+        self, caplog, graph_no_lin_id
+    ):
         """When lin_id_prop is None, geff_track_node_props is None,
-        and graph has no 'lineage_ID', warn and return None."""
-        with pytest.warns(UserWarning, match="No lineage identifier found"):
+        and graph has no 'lineage_ID', log and return None."""
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop(None, None, graph_no_lin_id)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "No lineage identifier found" in caplog.records[0].message
+
         assert result is None
 
 
@@ -450,48 +489,69 @@ class TestIdentifyTimeProp:
         assert result == "frame"
 
     def test_provided_key_not_in_graph_falls_back_to_display_hints(
-        self, graph_lin_id, geff_md_display_hints
+        self, caplog, graph_lin_id, geff_md_display_hints
     ):
         """When time_key is not in the graph but display hints have a valid time prop,
-        warn twice and return the hint key."""
-        with pytest.warns(UserWarning, match="not present in the graph"):
-            with pytest.warns(UserWarning, match="inferred from display hints"):
-                result = _identify_time_prop(
-                    "missing_key", geff_md_display_hints, graph_lin_id
-                )
+        log and return the hint key."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
+            result = _identify_time_prop(
+                "missing_key", geff_md_display_hints, graph_lin_id
+            )
+        assert len(caplog.records) == 2
+        assert caplog.records[0].levelname == "INFO"
+        assert "not present in the graph" in caplog.records[0].message
+        assert caplog.records[1].levelname == "INFO"
+        assert "inferred from display hints" in caplog.records[1].message
+
         assert result == "frame"
 
     def test_provided_key_not_in_graph_falls_back_to_axes(
-        self, graph_lin_id, geff_md_axes
+        self, caplog, graph_lin_id, geff_md_axes
     ):
         """When time_key is not in the graph, no display hints are available,
-        and the axes have a matching time prop, warn twice and return the axis key."""
-        with pytest.warns(UserWarning, match="not present in the graph"):
-            with pytest.warns(UserWarning, match="inferred from axes"):
-                result = _identify_time_prop("missing_key", geff_md_axes, graph_lin_id)
+        and the axes have a matching time prop, log and return the axis key."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
+            result = _identify_time_prop("missing_key", geff_md_axes, graph_lin_id)
+        assert len(caplog.records) == 2
+        assert caplog.records[0].levelname == "INFO"
+        assert "not present in the graph" in caplog.records[0].message
+        assert caplog.records[1].levelname == "INFO"
+        assert "inferred from axes" in caplog.records[1].message
+
         assert result == "frame"
 
-    def test_provided_key_not_in_graph_no_geff_md_raises(self, graph_lin_id):
+    def test_provided_key_not_in_graph_no_geff_md_raises(self, caplog, graph_lin_id):
         """When time_key is not in the graph and geff_md is None,
-        warn and raise ValueError."""
-        with pytest.warns(UserWarning, match="not present in the graph"):
+        log and raise ValueError."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             with pytest.raises(ValueError):
                 _identify_time_prop("missing_key", None, graph_lin_id)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "INFO"
+        assert "not present in the graph" in caplog.records[0].message
 
     def test_none_key_inferred_from_display_hints(
-        self, graph_lin_id, geff_md_display_hints
+        self, caplog, graph_lin_id, geff_md_display_hints
     ):
         """When time_key is None and display hints have a valid time prop,
-        warn and return the hint key."""
-        with pytest.warns(UserWarning, match="inferred from display hints"):
+        log and return the hint key."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_time_prop(None, geff_md_display_hints, graph_lin_id)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "INFO"
+        assert "inferred from display hints" in caplog.records[0].message
+
         assert result == "frame"
 
-    def test_none_key_inferred_from_axes(self, graph_lin_id, geff_md_axes):
+    def test_none_key_inferred_from_axes(self, caplog, graph_lin_id, geff_md_axes):
         """When time_key is None, no display hints are available, and the axes
-        have a matching time prop, warn and return the axis key."""
-        with pytest.warns(UserWarning, match="inferred from axes"):
+        have a matching time prop, log and return the axis key."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_time_prop(None, geff_md_axes, graph_lin_id)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "INFO"
+        assert "inferred from axes" in caplog.records[0].message
+
         assert result == "frame"
 
     def test_none_key_no_geff_md_raises(self, graph_lin_id):
@@ -516,7 +576,7 @@ class TestIdentifySpaceProps:
     """Test cases for _identify_space_props function."""
 
     def test_provided_keys_returned_as_is(self, graph_with_coords):
-        """When provided keys exist in the graph, return them unchanged with no warning."""
+        """When provided keys exist in the graph, return them unchanged with no logging."""
         result = _identify_space_props(
             "position_x", "position_y", None, None, graph_with_coords
         )
@@ -529,75 +589,103 @@ class TestIdentifySpaceProps:
         )
         assert result == ("position_x", "position_y", "position_z")
 
-    def test_provided_key_not_in_graph_warns_becomes_none(self, graph_with_coords):
-        """When a provided key is absent from the graph, warn and set it to None."""
-        with pytest.warns(UserWarning, match="not present in the graph"):
+    def test_provided_key_not_in_graph_logs_becomes_none(self, caplog, graph_with_coords):
+        """When a provided key is absent from the graph, log and set it to None."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_space_props(
                 "missing_x", None, None, None, graph_with_coords
             )
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "INFO"
+        assert "not present in the graph" in caplog.records[0].message
+
         assert result == (None, None, None)
 
     def test_all_none_no_geff_md_returns_none_tuple(self, graph_with_coords):
-        """When all keys are None and geff_md is None, return (None, None, None) with no warning."""
+        """When all keys are None and geff_md is None, return (None, None, None) with no logging."""
         result = _identify_space_props(None, None, None, None, graph_with_coords)
         assert result == (None, None, None)
 
     def test_none_keys_inferred_from_display_hints(
-        self, graph_with_coords, geff_md_display_hints
+        self, caplog, graph_with_coords, geff_md_display_hints
     ):
         """When keys are None and display hints have valid space props,
-        infer x and y and warn for each."""
-        with pytest.warns(UserWarning, match="inferred from display hints"):
+        infer x and y and log for each."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_space_props(
                 None, None, None, geff_md_display_hints, graph_with_coords
             )
+        assert len(caplog.records) == 2
+        assert all(record.levelname == "INFO" for record in caplog.records)
+        assert all(
+            "inferred from display hints" in record.message for record in caplog.records
+        )
+
         assert result == ("position_x", "position_y", None)
 
-    def test_none_keys_inferred_from_axes(self, graph_with_coords, geff_md_axes):
-        """When keys are None and axes have space props, infer x and y from axes and warn."""
-        with pytest.warns(UserWarning, match="inferred from axes"):
+    def test_none_keys_inferred_from_axes(self, caplog, graph_with_coords, geff_md_axes):
+        """When keys are None and axes have space props, infer x and y from axes and log."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_space_props(
                 None, None, None, geff_md_axes, graph_with_coords
             )
+        assert len(caplog.records) == 2
+        assert all(record.levelname == "INFO" for record in caplog.records)
+        assert all("inferred from axes" in record.message for record in caplog.records)
+
         assert result == ("position_x", "position_y", None)
 
     def test_none_keys_all_three_inferred_from_axes(
-        self, graph_with_3d_coords, geff_md_3d_axes
+        self, caplog, graph_with_3d_coords, geff_md_3d_axes
     ):
         """When all keys are None and 3D axes are present, infer x, y, and z from axes."""
-        with pytest.warns(UserWarning, match="inferred from axes"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_space_props(
                 None, None, None, geff_md_3d_axes, graph_with_3d_coords
             )
+        assert len(caplog.records) == 3
+        assert all(record.levelname == "INFO" for record in caplog.records)
+        assert all("inferred from axes" in record.message for record in caplog.records)
+
         assert result == ("position_x", "position_y", "position_z")
 
     def test_provided_key_not_in_graph_falls_back_to_display_hints(
-        self, graph_with_coords, geff_md_display_hints
+        self, caplog, graph_with_coords, geff_md_display_hints
     ):
-        """When x key is absent from the graph, warn and infer it from display hints."""
-        with pytest.warns(UserWarning, match="not present in the graph"):
-            with pytest.warns(UserWarning, match="inferred from display hints"):
-                result = _identify_space_props(
-                    "missing_x", None, None, geff_md_display_hints, graph_with_coords
-                )
+        """When x key is absent from the graph, log and infer it from display hints."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
+            result = _identify_space_props(
+                "missing_x", None, None, geff_md_display_hints, graph_with_coords
+            )
+        assert len(caplog.records) == 3
+        assert caplog.records[0].levelname == "INFO"
+        assert "not present in the graph" in caplog.records[0].message
+        assert "inferred from display hints" in caplog.records[1].message
+        assert "inferred from display hints" in caplog.records[2].message
+
         assert result == ("position_x", "position_y", None)
 
     def test_provided_key_not_in_graph_falls_back_to_axes(
-        self, graph_with_coords, geff_md_axes
+        self, caplog, graph_with_coords, geff_md_axes
     ):
-        """When x key is absent from the graph, warn and infer it from axes."""
-        with pytest.warns(UserWarning, match="not present in the graph"):
-            with pytest.warns(UserWarning, match="inferred from axes"):
-                result = _identify_space_props(
-                    "missing_x", None, None, geff_md_axes, graph_with_coords
-                )
+        """When x key is absent from the graph, log and infer it from axes."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
+            result = _identify_space_props(
+                "missing_x", None, None, geff_md_axes, graph_with_coords
+            )
+        assert len(caplog.records) == 3
+        assert caplog.records[0].levelname == "INFO"
+        assert "not present in the graph" in caplog.records[0].message
+        assert "inferred from axes" in caplog.records[1].message
+        assert "inferred from axes" in caplog.records[2].message
+
         assert result == ("position_x", "position_y", None)
 
     def test_display_hint_not_in_graph_silently_stays_none(
         self, graph_no_lin_id, geff_md_display_hints
     ):
         """When display hints point to props absent from the graph (and no axes),
-        the slots stay None without any warning."""
+        the slots stay None without any logging."""
         result = _identify_space_props(
             None, None, None, geff_md_display_hints, graph_no_lin_id
         )
@@ -607,22 +695,28 @@ class TestIdentifySpaceProps:
 class TestResolvePropKey:
     """Test cases for _resolve_prop_key function."""
 
-    def test_new_name_free(self):
-        """When new_name is not taken, return it and warn."""
-        with pytest.warns(
-            UserWarning, match="'x' \\(node\\) has been renamed to 'cell_x'"
-        ):
+    def test_new_name_free(self, caplog):
+        """When new_name is not taken, return it and log."""
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _resolve_prop_key("cell_x", "fallback_x", {}, "x", PropertyType.NODE)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "'x' (node) has been renamed to 'cell_x'" in caplog.records[0].message
+
         assert result == "cell_x"
 
-    def test_fallback_free_returns_fallback(self, prop_position_x_edge):
+    def test_fallback_free_returns_fallback(self, caplog, prop_position_x_edge):
         """When new_name is taken but fallback is free, return fallback."""
         props_dict = {"link_x": prop_position_x_edge}
-        with pytest.warns(
-            UserWarning,
-            match="'x' \\(edge\\) has been renamed to 'fallback_x' \\('link_x'",
-        ):
-            result = _resolve_prop_key("link_x", "fallback_x", props_dict, "x", PropertyType.EDGE)
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
+            result = _resolve_prop_key(
+                "link_x", "fallback_x", props_dict, "x", PropertyType.EDGE
+            )
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "'x' (edge) has been renamed to 'fallback_x'" in caplog.records[0].message
+        assert "'link_x' was already taken" in caplog.records[0].message
+
         assert result == "fallback_x"
 
     def test_both_taken_raises_key_error(
@@ -637,7 +731,9 @@ class TestResolvePropKey:
             KeyError,
             match="property 'x' \\(node\\): both 'cell_x' and 'pycellin_cell_x'",
         ):
-            _resolve_prop_key("cell_x", "pycellin_cell_x", props_dict, "x", PropertyType.NODE)
+            _resolve_prop_key(
+                "cell_x", "pycellin_cell_x", props_dict, "x", PropertyType.NODE
+            )
 
 
 class TestExtractPropsMetadata:
@@ -653,18 +749,28 @@ class TestExtractPropsMetadata:
         }
         _extract_props_metadata({}, props_dict, PropertyType.NODE, rename_map)
         assert list(props_dict.keys()) == ["node_prop", "edge_prop"]
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
     def test_new_key_is_all_fields_added(self, geff_node_props_md, rename_map):
         """A key not yet in props_dict is added with the given prop_type."""
         props_dict = {}
-        _extract_props_metadata(geff_node_props_md, props_dict, PropertyType.NODE, rename_map)
+        _extract_props_metadata(
+            geff_node_props_md, props_dict, PropertyType.NODE, rename_map
+        )
         assert "position_x" in props_dict
         assert props_dict["position_x"].identifier == "position_x"
         assert props_dict["position_x"].prop_type == PropertyType.NODE
         assert props_dict["position_x"].dtype == "float64"
         assert props_dict["position_x"].unit == "um"
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
     def test_new_key_name_defaults_to_key_when_prop_name_is_none(
         self, geff_node_props_md, rename_map
@@ -701,17 +807,27 @@ class TestExtractPropsMetadata:
             "dictionary for nodes",
         ):
             _extract_props_metadata(
-                {"frame": geff_node_props_md["frame"]}, props_dict, PropertyType.NODE, rename_map
+                {"frame": geff_node_props_md["frame"]},
+                props_dict,
+                PropertyType.NODE,
+                rename_map,
             )
 
     def test_node_collides_with_existing_edge_renames_both(
-        self, geff_node_props_md, prop_position_x_edge, rename_map
+        self, caplog, geff_node_props_md, prop_position_x_edge, rename_map
     ):
         """When a node prop collides with an existing edge prop, both are renamed:
         the new node prop becomes 'cell_<key>' and the edge prop becomes 'link_<key>'."""
         props_dict = {"position_x": prop_position_x_edge}
-        with pytest.warns(UserWarning):
-            _extract_props_metadata(geff_node_props_md, props_dict, PropertyType.NODE, rename_map)
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
+            _extract_props_metadata(
+                geff_node_props_md, props_dict, PropertyType.NODE, rename_map
+            )
+        assert len(caplog.records) == 2
+        assert all(record.levelname == "WARNING" for record in caplog.records)
+        assert "renamed to 'cell_position_x'" in caplog.records[0].message
+        assert "renamed to 'link_position_x'" in caplog.records[1].message
+
         assert "position_x" not in props_dict
         assert "cell_position_x" in props_dict
         assert props_dict["cell_position_x"].identifier == "cell_position_x"
@@ -724,13 +840,20 @@ class TestExtractPropsMetadata:
         assert rename_map[PropertyType.LINEAGE] == {}
 
     def test_edge_collides_with_existing_node_renames_both(
-        self, geff_node_props_md, prop_position_x_node, rename_map
+        self, caplog, geff_node_props_md, prop_position_x_node, rename_map
     ):
         """When an edge key collides with an existing node prop, both are renamed:
         the new edge prop becomes 'link_<key>' and the node prop becomes 'cell_<key>'."""
         props_dict = {"position_x": prop_position_x_node}
-        with pytest.warns(UserWarning):
-            _extract_props_metadata(geff_node_props_md, props_dict, PropertyType.EDGE, rename_map)
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
+            _extract_props_metadata(
+                geff_node_props_md, props_dict, PropertyType.EDGE, rename_map
+            )
+        assert len(caplog.records) == 2
+        assert all(record.levelname == "WARNING" for record in caplog.records)
+        assert "renamed to 'link_position_x'" in caplog.records[0].message
+        assert "renamed to 'cell_position_x'" in caplog.records[1].message
+
         assert "position_x" not in props_dict
         assert "link_position_x" in props_dict
         assert props_dict["link_position_x"].identifier == "link_position_x"
@@ -743,7 +866,12 @@ class TestExtractPropsMetadata:
         assert rename_map[PropertyType.LINEAGE] == {}
 
     def test_node_collision_primary_new_key_taken_uses_fallback(
-        self, geff_node_props_md, prop_position_x_edge, prop_cell_position_x, rename_map
+        self,
+        caplog,
+        geff_node_props_md,
+        prop_position_x_edge,
+        prop_cell_position_x,
+        rename_map,
     ):
         """When 'cell_<key>' is already in props_dict, the new node prop falls back
         to 'pycellin_cell_<key>'."""
@@ -751,8 +879,15 @@ class TestExtractPropsMetadata:
             "position_x": prop_position_x_edge,
             "cell_position_x": prop_cell_position_x,  # primary rename taken
         }
-        with pytest.warns(UserWarning):
-            _extract_props_metadata(geff_node_props_md, props_dict, PropertyType.NODE, rename_map)
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
+            _extract_props_metadata(
+                geff_node_props_md, props_dict, PropertyType.NODE, rename_map
+            )
+        assert len(caplog.records) == 2
+        assert all(record.levelname == "WARNING" for record in caplog.records)
+        assert "renamed to 'pycellin_cell_position_x'" in caplog.records[0].message
+        assert "renamed to 'link_position_x'" in caplog.records[1].message
+
         assert "position_x" not in props_dict
         assert "pycellin_cell_position_x" in props_dict
         assert props_dict["pycellin_cell_position_x"].prop_type == PropertyType.NODE
@@ -779,7 +914,9 @@ class TestExtractPropsMetadata:
             "pycellin_cell_position_x": prop_pycellin_cell_position_x,
         }
         with pytest.raises(KeyError, match="Cannot register property 'position_x'"):
-            _extract_props_metadata(geff_node_props_md, props_dict, PropertyType.NODE, rename_map)
+            _extract_props_metadata(
+                geff_node_props_md, props_dict, PropertyType.NODE, rename_map
+            )
 
 
 class TestExtractLinPropsMetadata:
@@ -800,7 +937,11 @@ class TestExtractLinPropsMetadata:
         assert props_dict["displacement"].prop_type == PropertyType.LINEAGE
         assert props_dict["displacement"].dtype == "float"
         assert props_dict["displacement"].unit == "um"
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
     def test_new_key_name_defaults_to_key_when_name_is_none(
         self, lin_props_md, rename_map
@@ -835,15 +976,20 @@ class TestExtractLinPropsMetadata:
             )
 
     def test_lineage_collides_with_existing_node_renames_both(
-        self, prop_position_x_node, rename_map
+        self, caplog, prop_position_x_node, rename_map
     ):
         """When a lineage prop collides with an existing node prop, both are renamed:
         the new lineage prop becomes 'lin_<key>' and the node prop becomes 'cell_<key>'."""
         props_dict = {"position_x": prop_position_x_node}
-        with pytest.warns(UserWarning):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             _extract_lin_props_metadata(
                 {"position_x": {"dtype": "float"}}, props_dict, rename_map
             )
+        assert len(caplog.records) == 2
+        assert all(record.levelname == "WARNING" for record in caplog.records)
+        assert "renamed to 'lin_position_x'" in caplog.records[0].message
+        assert "renamed to 'cell_position_x'" in caplog.records[1].message
+
         assert "position_x" not in props_dict
         assert "lin_position_x" in props_dict
         assert props_dict["lin_position_x"].identifier == "lin_position_x"
@@ -856,15 +1002,20 @@ class TestExtractLinPropsMetadata:
         assert rename_map[PropertyType.EDGE] == {}
 
     def test_lineage_collides_with_existing_edge_renames_both(
-        self, prop_position_x_edge, rename_map
+        self, caplog, prop_position_x_edge, rename_map
     ):
         """When a lineage prop collides with an existing edge prop, both are renamed:
         the new lineage prop becomes 'lin_<key>' and the edge prop becomes 'link_<key>'."""
         props_dict = {"position_x": prop_position_x_edge}
-        with pytest.warns(UserWarning):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             _extract_lin_props_metadata(
                 {"position_x": {"dtype": "float"}}, props_dict, rename_map
             )
+        assert len(caplog.records) == 2
+        assert all(record.levelname == "WARNING" for record in caplog.records)
+        assert "renamed to 'lin_position_x'" in caplog.records[0].message
+        assert "renamed to 'link_position_x'" in caplog.records[1].message
+
         assert "position_x" not in props_dict
         assert "lin_position_x" in props_dict
         assert props_dict["lin_position_x"].identifier == "lin_position_x"
@@ -877,7 +1028,7 @@ class TestExtractLinPropsMetadata:
         assert rename_map[PropertyType.NODE] == {}
 
     def test_lineage_collision_primary_new_key_taken_uses_fallback(
-        self, prop_position_x_node, prop_lin_position_x, rename_map
+        self, caplog, prop_position_x_node, prop_lin_position_x, rename_map
     ):
         """When 'lin_<key>' is already in props_dict, the new lineage prop falls back
         to 'pycellin_lin_<key>'."""
@@ -885,17 +1036,24 @@ class TestExtractLinPropsMetadata:
             "position_x": prop_position_x_node,
             "lin_position_x": prop_lin_position_x,  # primary rename taken
         }
-        with pytest.warns(UserWarning):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             _extract_lin_props_metadata(
                 {"position_x": {"dtype": "float"}}, props_dict, rename_map
             )
+        assert len(caplog.records) == 2
+        assert all(record.levelname == "WARNING" for record in caplog.records)
+        assert "renamed to 'pycellin_lin_position_x'" in caplog.records[0].message
+        assert "renamed to 'cell_position_x'" in caplog.records[1].message
+
         assert "position_x" not in props_dict
         assert "pycellin_lin_position_x" in props_dict
         assert props_dict["pycellin_lin_position_x"].prop_type == PropertyType.LINEAGE
         assert "cell_position_x" in props_dict
         assert props_dict["cell_position_x"].prop_type == PropertyType.NODE
         assert "lin_position_x" in props_dict  # original unaffected
-        assert rename_map[PropertyType.LINEAGE] == {"position_x": "pycellin_lin_position_x"}
+        assert rename_map[PropertyType.LINEAGE] == {
+            "position_x": "pycellin_lin_position_x"
+        }
         assert rename_map[PropertyType.NODE] == {"position_x": "cell_position_x"}
         assert rename_map[PropertyType.EDGE] == {}
 
@@ -946,7 +1104,11 @@ class TestBuildPropsMetadata:
         assert "position_x" in result
         assert result["position_x"].prop_type == PropertyType.NODE
         assert result["position_x"].unit == "um"
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
     def test_edge_props_only_all_added_as_edge(self, geff_edge_props_md, rename_map):
         """When only edge_props_metadata is provided, all keys are added with
@@ -963,7 +1125,11 @@ class TestBuildPropsMetadata:
         assert "cost" in result
         assert result["cost"].prop_type == PropertyType.EDGE
         assert result["cost"].unit is None
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
     def test_node_and_edge_props_no_collision_both_added(
         self, geff_node_props_md, geff_edge_props_md, rename_map
@@ -983,9 +1149,15 @@ class TestBuildPropsMetadata:
         assert result["speed"].prop_type == PropertyType.EDGE
         assert "cost" in result
         assert result["cost"].prop_type == PropertyType.EDGE
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
-    def test_node_and_edge_collision_both_renamed(self, geff_node_props_md, rename_map):
+    def test_node_and_edge_collision_both_renamed(
+        self, caplog, geff_node_props_md, rename_map
+    ):
         """When a key appears in both node and edge metadata, both props are renamed
         with appropriate prefixes."""
         geff_md = geff.GeffMetadata(
@@ -999,8 +1171,13 @@ class TestBuildPropsMetadata:
                 )
             },
         )
-        with pytest.warns(UserWarning):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _build_props_metadata(geff_md, rename_map)
+        assert len(caplog.records) == 2
+        assert all(record.levelname == "WARNING" for record in caplog.records)
+        assert "renamed to 'link_position_x'" in caplog.records[0].message
+        assert "renamed to 'cell_position_x'" in caplog.records[1].message
+
         assert "position_x" not in result
         assert "cell_position_x" in result
         assert result["cell_position_x"].prop_type == PropertyType.NODE
@@ -1026,7 +1203,11 @@ class TestBuildPropsMetadata:
         assert "displacement" in result
         assert result["displacement"].prop_type == PropertyType.LINEAGE
         assert result["displacement"].unit == "um"
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
     def test_lineage_props_nested_in_extra(self, lin_props_md, rename_map):
         """When 'lineage_props_metadata' is nested inside extra, it is still found
@@ -1071,7 +1252,11 @@ class TestBuildPropsMetadata:
         assert result["cost"].prop_type == PropertyType.EDGE
         assert result["n_divisions"].prop_type == PropertyType.LINEAGE
         assert result["displacement"].prop_type == PropertyType.LINEAGE
-        assert rename_map == {PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}}
+        assert rename_map == {
+            PropertyType.NODE: {},
+            PropertyType.EDGE: {},
+            PropertyType.LINEAGE: {},
+        }
 
 
 class TestGetPropUnit:
@@ -1156,43 +1341,59 @@ class TestExtractAxesMetadata:
         assert result["time_unit"] == "second"
         assert result["space_unit"] == "um"
 
-    def test_no_time_unit_warns_and_absent_from_result(self, geff_axes):
-        """When no unit is found for the time property, warn and omit time_unit."""
+    def test_no_time_unit_warns_and_absent_from_result(self, caplog, geff_axes):
+        """When no unit is found for the time property, log and omit time_unit."""
         geff_md = self._make_geff_md(axes=geff_axes)
-        with pytest.warns(UserWarning, match="No unit found for time property"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _extract_axes_metadata(
                 geff_md, "unknown_time", "position_x", None, None
             )
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "No unit found for time property" in caplog.records[0].message
+
         assert "time_unit" not in result
         assert result["space_unit"] == "um"
 
-    def test_all_space_props_none_warns(self, geff_axes):
-        """When all space props are None, warn and omit space_unit."""
+    def test_all_space_props_none_warns(self, caplog, geff_axes):
+        """When all space props are None, log and omit space_unit."""
         geff_md = self._make_geff_md(axes=geff_axes)
-        with pytest.warns(UserWarning, match="No coordinate properties found"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _extract_axes_metadata(geff_md, "frame", None, None, None)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "No coordinate properties found" in caplog.records[0].message
+
         assert result["time_unit"] == "second"
         assert "space_unit" not in result
 
-    def test_no_space_unit_found_warns(self, geff_axes):
-        """When space props are provided but no unit found, warn and omit space_unit."""
+    def test_no_space_unit_found_warns(self, caplog, geff_axes):
+        """When space props are provided but no unit found, log and omit space_unit."""
         geff_md = self._make_geff_md(axes=geff_axes)
-        with pytest.warns(UserWarning, match="No unit found for space properties"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _extract_axes_metadata(geff_md, "frame", "unknown_x", None, None)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "No unit found for space properties" in caplog.records[0].message
+
         assert "space_unit" not in result
 
-    def test_multiple_space_units_warns(self):
-        """When x and y props have different units, warn and omit space_unit."""
+    def test_multiple_space_units_warns(self, caplog):
+        """When x and y props have different units, log and omit space_unit."""
         mixed_axes = [
             geff_spec.Axis(name="frame", type="time", unit="second"),
             geff_spec.Axis(name="position_x", type="space", unit="um"),
             geff_spec.Axis(name="position_y", type="space", unit="millimeter"),
         ]
         geff_md = self._make_geff_md(axes=mixed_axes)
-        with pytest.warns(UserWarning, match="Multiple space units found"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _extract_axes_metadata(
                 geff_md, "frame", "position_x", "position_y", None
             )
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "Multiple space units found" in caplog.records[0].message
+
         assert "space_unit" not in result
 
     def test_partial_space_props_single_unit(self, geff_axes):
@@ -1201,11 +1402,15 @@ class TestExtractAxesMetadata:
         result = _extract_axes_metadata(geff_md, "frame", "position_x", None, None)
         assert result["space_unit"] == "um"
 
-    def test_space_unit_from_node_props_md(self, geff_node_props_md):
+    def test_space_unit_from_node_props_md(self, caplog, geff_node_props_md):
         """When unit comes from node_props_md (no axes), space_unit is set correctly."""
         geff_md = self._make_geff_md(axes=None, node_props_md=geff_node_props_md)
-        with pytest.warns(UserWarning, match="No unit found for time property"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _extract_axes_metadata(geff_md, "frame", "position_x", None, None)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "No unit found for time property" in caplog.records[0].message
+
         assert result["space_unit"] == "um"
         assert "time_unit" not in result
 
@@ -1296,8 +1501,8 @@ class TestBuildGenericMetadata:
         assert result["time_unit"] == "second"
         assert result["space_unit"] == "um"
 
-    def test_missing_units_produce_warnings_and_absent_from_result(self):
-        """When no units are found, appropriate warnings are raised and
+    def test_missing_units_produce_logs_and_absent_from_result(self, caplog):
+        """When no units are found, appropriate logs are created and
         time_unit / space_unit are absent from the result."""
         geff_md_no_units = geff.GeffMetadata(
             directed=True,
@@ -1305,16 +1510,20 @@ class TestBuildGenericMetadata:
             node_props_metadata={},
             edge_props_metadata={},
         )
-        with pytest.warns(UserWarning, match="No unit found for time property"):
-            with pytest.warns(UserWarning, match="No unit found for space properties"):
-                result = _build_generic_metadata(
-                    "/some/tracks.geff",
-                    geff_md_no_units,
-                    "frame",
-                    "position_x",
-                    None,
-                    None,
-                )
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
+            result = _build_generic_metadata(
+                "/some/tracks.geff",
+                geff_md_no_units,
+                "frame",
+                "position_x",
+                None,
+                None,
+            )
+        assert len(caplog.records) == 2
+        assert all(record.levelname == "WARNING" for record in caplog.records)
+        assert "No unit found for time property 'frame'" in caplog.records[0].message
+        assert "No unit found for space properties" in caplog.records[1].message
+
         assert "time_unit" not in result
         assert "space_unit" not in result
 
@@ -1322,10 +1531,14 @@ class TestBuildGenericMetadata:
 class TestFallbackToNodeKeys:
     """Test cases for _fallback_to_node_keys function."""
 
-    def test_sets_cell_id_from_node_keys(self, graph_no_lin_id):
+    def test_sets_cell_id_from_node_keys(self, caplog, graph_no_lin_id):
         """When falling back, each node gets a cell_ID equal to its node key."""
-        with pytest.warns(UserWarning, match="fallback"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             _fallback_to_node_keys(graph_no_lin_id, "fallback reason")
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "fallback" in caplog.records[0].message
+
         assert graph_no_lin_id.nodes[0]["cell_ID"] == 0
         assert graph_no_lin_id.nodes[1]["cell_ID"] == 1
         assert graph_no_lin_id.nodes[0]["frame"] == 0
@@ -1335,78 +1548,106 @@ class TestFallbackToNodeKeys:
 class TestEnsureValidCellID:
     """Test cases for _ensure_valid_cell_ID function."""
 
-    def test_none_key_falls_back_to_node_keys(self, graph_no_lin_id):
-        """When cell_id_key is None, create cell_ID from node keys and warn."""
-        with pytest.warns(UserWarning, match="No cell identifier property provided"):
+    def test_none_key_falls_back_to_node_keys(self, caplog, graph_no_lin_id):
+        """When cell_id_key is None, create cell_ID from node keys and log."""
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _ensure_valid_cell_ID(graph_no_lin_id, None)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "No cell identifier property provided" in caplog.records[0].message
+
         assert result == "cell_ID"
         assert graph_no_lin_id.nodes[0]["cell_ID"] == 0
         assert graph_no_lin_id.nodes[1]["cell_ID"] == 1
         assert graph_no_lin_id.nodes[0]["frame"] == 0
         assert graph_no_lin_id.nodes[1]["frame"] == 1
 
-    def test_missing_prop_falls_back(self):
-        """When cell_id_key is missing on some nodes, fall back and warn."""
+    def test_missing_prop_falls_back(self, caplog):
+        """When cell_id_key is missing on some nodes, fall back and log."""
         g = nx.Graph()
         g.add_node(0, id=0)
         g.add_node(1)
-        with pytest.warns(UserWarning, match="not present on all nodes"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _ensure_valid_cell_ID(g, "id")
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "not present on all nodes" in caplog.records[0].message
+
         assert result == "cell_ID"
         assert g.nodes[0]["cell_ID"] == 0
         assert g.nodes[1]["cell_ID"] == 1
 
-    def test_negative_value_fall_back(self):
-        """When cell_id_key has a negative value, fall back and warn."""
+    def test_negative_value_fall_back(self, caplog):
+        """When cell_id_key has a negative value, fall back and log."""
         g = nx.Graph()
         g.add_node(0, id=0)
         g.add_node(1, id=-1)
-        with pytest.warns(UserWarning, match="not all positive integers"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _ensure_valid_cell_ID(g, "id")
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "not all positive integers" in caplog.records[0].message
+
         assert result == "cell_ID"
         assert g.nodes[0]["cell_ID"] == 0
         assert g.nodes[1]["cell_ID"] == 1
 
-    def test_string_value_fall_back(self):
-        """When cell_id_key has a string value, fall back and warn."""
+    def test_string_value_fall_back(self, caplog):
+        """When cell_id_key has a string value, fall back and log."""
         g = nx.Graph()
         g.add_node(0, id=0)
         g.add_node(1, id="1")
-        with pytest.warns(UserWarning, match="not all positive integers"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _ensure_valid_cell_ID(g, "id")
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "not all positive integers" in caplog.records[0].message
+
         assert result == "cell_ID"
         assert g.nodes[0]["cell_ID"] == 0
         assert g.nodes[1]["cell_ID"] == 1
 
-    def test_bool_value_fall_back(self):
-        """When cell_id_key has a boolean value, fall back and warn."""
+    def test_bool_value_fall_back(self, caplog):
+        """When cell_id_key has a boolean value, fall back and log."""
         g = nx.Graph()
         g.add_node(0, id=0)
         g.add_node(1, id=True)
-        with pytest.warns(UserWarning, match="not all positive integers"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _ensure_valid_cell_ID(g, "id")
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "not all positive integers" in caplog.records[0].message
+
         assert result == "cell_ID"
         assert g.nodes[0]["cell_ID"] == 0
         assert g.nodes[1]["cell_ID"] == 1
 
-    def test_none_value_fall_back(self):
-        """When cell_id_key has a None value, fall back and warn."""
+    def test_none_value_fall_back(self, caplog):
+        """When cell_id_key has a None value, fall back and log."""
         g = nx.Graph()
         g.add_node(0, id=0)
         g.add_node(1, id=None)
-        with pytest.warns(UserWarning, match="not all positive integers"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _ensure_valid_cell_ID(g, "id")
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "not all positive integers" in caplog.records[0].message
+
         assert result == "cell_ID"
         assert g.nodes[0]["cell_ID"] == 0
         assert g.nodes[1]["cell_ID"] == 1
 
-    def test_duplicate_prop_values_fall_back(self):
-        """When cell_id_key has duplicate values, fall back and warn."""
+    def test_duplicate_prop_values_fall_back(self, caplog):
+        """When cell_id_key has duplicate values, fall back and log."""
         g = nx.Graph()
         g.add_node(0, id=1)
         g.add_node(1, id=1)
-        with pytest.warns(UserWarning, match="Duplicate values found"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _ensure_valid_cell_ID(g, "id")
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "Duplicate values found" in caplog.records[0].message
+
         assert result == "cell_ID"
         assert g.nodes[0]["cell_ID"] == 0
         assert g.nodes[1]["cell_ID"] == 1
@@ -1513,7 +1754,11 @@ class TestStandardizePropertiesData:
             cell_x_key=None,
             cell_y_key=None,
             cell_z_key=None,
-            rename_map={PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}},
+            rename_map={
+                PropertyType.NODE: {},
+                PropertyType.EDGE: {},
+                PropertyType.LINEAGE: {},
+            },
         )
 
         lin_a, _ = lineages_with_nonstandard_keys
@@ -1565,7 +1810,11 @@ class TestStandardizePropertiesData:
             cell_x_key=None,
             cell_y_key=None,
             cell_z_key=None,
-            rename_map={PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}},
+            rename_map={
+                PropertyType.NODE: {},
+                PropertyType.EDGE: {},
+                PropertyType.LINEAGE: {},
+            },
         )
 
         assert lin.nodes[1]["cell_ID"] == 11
@@ -1583,7 +1832,11 @@ class TestStandardizePropertiesData:
             cell_x_key="cell_x",
             cell_y_key="cell_y",
             cell_z_key="cell_z",
-            rename_map={PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}},
+            rename_map={
+                PropertyType.NODE: {},
+                PropertyType.EDGE: {},
+                PropertyType.LINEAGE: {},
+            },
         )
 
         assert lin.nodes[1]["cell_x"] == 1.0
@@ -1602,7 +1855,11 @@ class TestStandardizePropertiesData:
             cell_x_key=None,
             cell_y_key=None,
             cell_z_key=None,
-            rename_map={PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}},
+            rename_map={
+                PropertyType.NODE: {},
+                PropertyType.EDGE: {},
+                PropertyType.LINEAGE: {},
+            },
         )
 
         assert lin.graph["lineage_ID"] == -1
@@ -1625,7 +1882,11 @@ class TestStandardizePropertiesData:
             cell_x_key=None,
             cell_y_key=None,
             cell_z_key=None,
-            rename_map={PropertyType.NODE: {}, PropertyType.EDGE: {}, PropertyType.LINEAGE: {}},
+            rename_map={
+                PropertyType.NODE: {},
+                PropertyType.EDGE: {},
+                PropertyType.LINEAGE: {},
+            },
         )
 
         assert lin_with_id.graph["lineage_ID"] == 10

@@ -24,7 +24,18 @@ from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.classes.updater import ModelUpdater
 from pycellin.custom_types import Cell, Link, PropertyType, property_type_from_string
-from pycellin.graph.properties.core import Timepoint, create_timepoint_property
+from pycellin.graph.properties.core import (
+    Timepoint,
+    create_timepoint_property,
+)
+from pycellin.graph.properties.topology import (
+    IsDivision,
+    create_is_division_property,
+    IsLeaf,
+    create_is_leaf_property,
+    IsRoot,
+    create_is_root_property,
+)
 
 L = TypeVar("L", bound="Lineage")
 
@@ -94,7 +105,7 @@ class Model:
                     "`reference_time_property` must be provided in model_metadata "
                     "or as an explicit argument."
                 )
-        self.reference_time_property = reference_time_property
+        self._reference_time_property = reference_time_property
 
         # Initialize data early since _compute_time_step() needs it.
         self.data = data.copy() if data is not None else Data(dict())
@@ -154,6 +165,7 @@ class Model:
             props_metadata.copy() if props_metadata is not None else PropsMetadata()
         )
         self._updater = ModelUpdater()
+        self.variable_time_step = variable_time_step
 
         # Update to actually compute the "timepoint" property.
         if self.data.cell_data and "timepoint" not in self.get_node_properties():
@@ -161,8 +173,8 @@ class Model:
                 Timepoint(
                     property=create_timepoint_property(),
                     data=self.data,
-                    time_step=self.model_metadata.time_step,
-                    reference_time_property=self.model_metadata.reference_time_property,
+                    time_step=self.get_time_step(),
+                    reference_time_property=self.reference_time_property,
                 )
             )
             self.props_metadata._protect_prop("timepoint")
@@ -249,7 +261,6 @@ class Model:
             State dictionary for pickling.
         """
         state = self.__dict__.copy()
-        # Convert ModelMetadata to dict for pickling
         if hasattr(self, "model_metadata") and self.model_metadata is not None:
             state["model_metadata"] = self.model_metadata.to_dict()
         return state
@@ -266,10 +277,85 @@ class Model:
         state : dict[str, Any]
             State dictionary from pickling.
         """
-        # Restore ModelMetadata from dict
         if "model_metadata" in state and isinstance(state["model_metadata"], dict):
             state["model_metadata"] = ModelMetadata.from_dict(state["model_metadata"])
         self.__dict__.update(state)
+
+    @property
+    def reference_time_property(self) -> str:
+        """
+        Get the reference time property of the model.
+
+        Returns
+        -------
+        str
+            The identifier of the reference time property.
+        """
+        return self._reference_time_property
+
+    @reference_time_property.setter
+    def reference_time_property(self, value: str) -> None:
+        """
+        Prevent direct assignment to reference_time_property.
+
+        Users must use the set_reference_time_property() method instead.
+
+        Raises
+        ------
+        AttributeError
+            Always raised to prevent direct assignment.
+        """
+        raise AttributeError(
+            "Cannot assign directly to 'reference_time_property'. "
+            "Use the 'set_reference_time_property()' method instead."
+        )
+
+    def set_reference_time_property(self, prop_id: str) -> None:
+        """
+        Set the reference time property of the model.
+
+        On top of updating the reference time property, this method:
+        - protects the new reference time property
+        - unprotects the previous reference time property if it is not "timepoint"
+        (which is a special property that should always be protected)
+        - updates the time step and time unit of the model based on the new
+        reference time property
+        - updates the timepoint calculator property to use the new reference time property
+
+        Parameters
+        ----------
+        prop_id : str
+            The identifier of the property to set as the reference time property.
+
+        Raises
+        ------
+        ValueError
+            If the specified property is not found in the model's node properties.
+        """
+        node_props = self.get_node_properties()
+        if prop_id not in node_props:
+            raise ValueError(
+                f"Cannot set reference time property: '{prop_id}' not found in model's node properties."
+            )
+
+        old_ref_time_prop = self._reference_time_property
+        self._reference_time_property = prop_id
+        self.model_metadata.reference_time_property = prop_id
+
+        self.props_metadata._protect_prop(prop_id)
+        if old_ref_time_prop != "timepoint":
+            self.props_metadata._unprotect_prop(old_ref_time_prop)
+
+        self.set_time_step()
+        self.model_metadata.time_unit = node_props[prop_id].unit
+
+        calc = Timepoint(
+            property=create_timepoint_property(),
+            data=self.data,
+            time_step=self.model_metadata.time_step,
+            reference_time_property=self.model_metadata.reference_time_property,
+        )
+        self._updater.register_calculator(calc)
 
     def _compute_time_step(self, variable_time_step: bool = False) -> int | float:
         """
@@ -552,6 +638,22 @@ class Model:
         """
         return self.props_metadata._get_units_per_props()
 
+    def get_property(self, prop_identifier: str) -> Property | None:
+        """
+        Return the property with the specified identifier.
+
+        Parameters
+        ----------
+        prop_identifier : str
+            The identifier of the property to return.
+
+        Returns
+        -------
+        Property | None
+            The property with the specified identifier, or None if not found.
+        """
+        return self.props_metadata.props.get(prop_identifier)
+
     def get_properties(self) -> dict[str, Property]:
         """
         Return the properties present in the model.
@@ -815,6 +917,33 @@ class Model:
         return self._get_lineages_from_lin_prop(
             list(self.data.cycle_data.values()), lin_prop, lin_prop_value
         )
+
+    def get_cell_lineage_IDs(self) -> list[int]:
+        """
+        Return the IDs of the cell lineages present in the model.
+
+        Returns
+        -------
+        list[int]
+            List of the IDs of the cell lineages present in the model.
+        """
+        return list(self.data.cell_data.keys())
+
+    get_lineage_IDs = get_cell_lineage_IDs
+    get_lineage_IDs.__doc__ = "Alias for get_cell_lineage_IDs"
+
+    def get_cycle_lineage_IDs(self) -> list[int]:
+        """
+        Return the IDs of the cycle lineages present in the model.
+
+        Returns
+        -------
+        list[int]
+            List of the IDs of the cycle lineages present in the model.
+        """
+        if self.data.cycle_data is None:
+            return []
+        return list(self.data.cycle_data.keys())
 
     def get_next_available_lineage_ID(self, positive: bool = True) -> int:
         """
@@ -1123,6 +1252,7 @@ class Model:
         self,
         lid: int,
         cid: int | None = None,
+        global_cid: bool = False,
         time_value: int | float = 0,
         prop_values: dict[str, Any] | None = None,
     ) -> int:
@@ -1135,6 +1265,10 @@ class Model:
             The ID of the lineage to which the cell belongs.
         cid : int, optional
             The ID of the cell to add (default is None).
+        global_cid : bool, optional
+            If True, the cell ID will be unique across all lineages in the model.
+            If False, the cell ID will only be unique within the specified lineage
+            (default is False).
         time_value : int | float, optional
             The value of the reference time property for the cell to add (default is 0).
         prop_values : dict, optional
@@ -1166,9 +1300,10 @@ class Model:
                     raise KeyError(f"The property {prop} has not been declared.")
         else:
             prop_values = dict()
+        prop_values["lineage_ID"] = lid
 
         time_step = self.model_metadata.time_step
-        timepoint = None
+        timepoint: int | None = None
         if time_step is not None:
             # Is the time value consistent with the time step of the model?
             if time_value % time_step != 0:
@@ -1178,7 +1313,22 @@ class Model:
                     f"compute a new time step compatible with all time values."
                 )
             # Timepoint value computation.
-            timepoint = time_value // time_step
+            timepoint = int(time_value // time_step)
+
+        if global_cid is True:
+            if cid is None:
+                # Determine the next available global cell_ID.
+                next_cids = [
+                    lin._get_next_available_node_ID() for lin in self.get_cell_lineages()
+                ]
+                cid = max(next_cids)
+            else:
+                # Check if the specified cell_ID is already used in the model.
+                for lin in self.get_cell_lineages():
+                    if cid in lin.nodes:
+                        raise ValueError(
+                            f"Cell ID {cid} is already used in lineage {lin.graph['lineage_ID']}."
+                        )
 
         cid = lineage._add_cell(
             cid,
@@ -1367,6 +1517,41 @@ class Model:
             if tmp:
                 fusions.extend([Cell(cell_ID, lin_ID) for cell_ID in tmp])
         return fusions
+
+    def get_divisions(self, lids: list[int] | None = None) -> list[Cell]:
+        """
+        Return division cells, i.e. cells with more than one child.
+
+        Parameters
+        ----------
+        lids : list[int], optional
+            List of lineage IDs to check for divisions.
+            If not specified, all lineages will be checked (default is None).
+
+        Returns
+        -------
+        list[Cell]
+            List of the division cells. Each cell is a named tuple:
+            (cell_ID, lineage_ID).
+
+        Raises
+        ------
+        KeyError
+            If a lineage with the specified ID does not exist in the model.
+        """
+        divisions = []
+        if lids is None:
+            lids = list(self.data.cell_data.keys())
+        for lin_ID in lids:
+            try:
+                lineage = self.data.cell_data[lin_ID]
+            except KeyError as err:
+                msg = f"Lineage with ID {lin_ID} does not exist."
+                raise KeyError(msg) from err
+            tmp = lineage.get_divisions()
+            if tmp:
+                divisions.extend([Cell(cell_ID, lin_ID) for cell_ID in tmp])
+        return divisions
 
     def add_custom_property(
         self,
@@ -1715,22 +1900,18 @@ class Model:
             "Speed of the cell between two consecutive detections".
         """
         if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(
-                self.model_metadata.reference_time_property
-            )
+            time_prop = self.get_properties().get(self.reference_time_property)
         else:
-            time_prop = self.props_metadata.props.get(custom_time_property)
+            time_prop = self.get_properties().get(custom_time_property)
         if time_prop is None:
-            time_prop = (
-                custom_time_property or self.model_metadata.reference_time_property
-            )
-            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+            time_prop_id = custom_time_property or self.reference_time_property
+            raise KeyError(f"The time property '{time_prop_id}' has not been declared.")
 
         prop = motion.create_cell_speed_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=time_prop.unit,
+            unit=f"{self.get_space_unit()}/{time_prop.unit}",
         )
         self.add_custom_property(motion.CellSpeed(prop, time_prop.identifier))
 
@@ -1809,7 +1990,7 @@ class Model:
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=time_prop.unit,
+            unit=f"1/{time_prop.unit}",
         )
         self.add_custom_property(tracking.DivisionRate(prop, time_prop.identifier))
 
@@ -1862,6 +2043,99 @@ class Model:
         )
 
         self.add_custom_property(tracking.DivisionTime(prop, time_prop.identifier))
+
+    def add_is_division(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the is_division property to the model.
+
+        The is_division property is a boolean property that indicates whether the cell
+        is a division event, i.e. has more than one daughter cell.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "is_division".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "is division".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Whether the cell is a division event, i.e. has more than one daughter cell".
+        """
+        prop = create_is_division_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(IsDivision(prop))
+
+    def add_is_leaf(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the is_leaf property to the model.
+
+        The is_leaf property is a boolean property that indicates whether the cell
+        is a leaf cell, i.e. has no daughter cells.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "is_leaf".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "is leaf".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Whether the cell is a leaf cell, i.e. has no daughter cells".
+        """
+        prop = create_is_leaf_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(IsLeaf(prop))
+
+    def add_is_root(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the is_root property to the model.
+
+        The is_root property is a boolean property that indicates whether the cell
+        is a root cell, i.e. has no parent cell.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "is_root".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "is root".
+        custom_description : str, optional
+            New description for the property. If None, the description will be
+            "Whether the cell is a root cell, i.e. has no parent cell".
+        """
+        prop = create_is_root_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(IsRoot(prop))
 
     def add_relative_age(
         self,
