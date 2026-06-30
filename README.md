@@ -19,9 +19,9 @@ Pycellin provides predefined properties related to cell morphology, cell motion 
 
 Pycellin can read from and write to:
 - [Cell Tracking Challenge](https://celltrackingchallenge.net/) text files,
-- [GEFF](https://liveimagetrackingtools.org/geff/latest/) (Graph Exchange File Format,)
-- [trackpy](https://github.com/soft-matter/trackpy) DataFrames.
-- [TrackMate](https://imagej.net/plugins/trackmate/) XMLs,
+- [GEFF](https://liveimagetrackingtools.org/geff/latest/) (Graph Exchange File Format),
+- [trackpy](https://github.com/soft-matter/trackpy) DataFrames,
+- [TrackMate](https://imagej.net/plugins/trackmate/) XMLs.
 
 More tracking formats will progressively be supported.
 
@@ -100,8 +100,8 @@ pycellin.export_TrackMate_XML(
     model,
     "sample_data/Ecoli_growth_on_agar_pad_enriched.xml",
     units={
-        "spatialunits": model.get_space_unit(),
-        "temporalunits": model.get_time_unit(),
+        "space": model.get_space_unit(),
+        "time": model.get_time_unit(),
     },
     propagate_cycle_props=True,
 )
