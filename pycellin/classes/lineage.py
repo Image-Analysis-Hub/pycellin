@@ -8,6 +8,7 @@ from itertools import pairwise
 from typing import Any, Generator, Literal, Tuple
 
 import networkx as nx
+import plotly.express as px # import Plotly colormaps
 import plotly.graph_objects as go
 from igraph import Graph
 
@@ -18,6 +19,17 @@ from pycellin.classes.exceptions import (
 )
 from pycellin.classes.property import Property
 from pycellin.custom_types import PropertyType
+
+UNSELECTED_HIGHLIGHT_COLOR = "lightgray"
+PYCELLIN_PURPLE = "#981cfd"
+HIGHLIGHT_COLORS = [PYCELLIN_PURPLE] + px.colors.qualitative.Safe # 12 Total IDs: 1 purple + 11 from Safe palette
+
+
+def get_highlight_color(group: int) -> str:
+    if group <= 0:
+        return UNSELECTED_HIGHLIGHT_COLOR
+
+    return HIGHLIGHT_COLORS[(group - 1) % len(HIGHLIGHT_COLORS)]
 
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
@@ -1193,7 +1205,10 @@ class CellLineage(Lineage):
         return ancestors
 
     def get_single_cell_lineage(
-        self, cid: int, generations: int | None = None
+        self,
+        cid: int,
+        generations: int | None = None,
+        start_cell: int | None = None,
     ) -> CellLineage:
         """
         Return the single-cell branch ending at the given cell.
@@ -1211,6 +1226,10 @@ class CellLineage(Lineage):
             return the path from the root to `cid`. If 1, return the current
             generation from the closest upstream division or root to `cid`.
             Higher values include more upstream division generations.
+        start_cell : int, optional
+            ID of the cell where the branch should start. If given, return the
+            path from `start_cell` to `cid`. Cannot be used together with
+            `generations`.
 
         Returns
         -------
@@ -1222,16 +1241,33 @@ class CellLineage(Lineage):
         KeyError
             If the cell does not exist in the lineage.
         ValueError
-            If generations is not a positive integer or None.
+            If generations is not a positive integer or None, if generations
+            and start_cell are both given, or if start_cell is not upstream of
+            cid.
         """
+        if generations is not None and start_cell is not None:
+            raise ValueError("generations and start_cell cannot both be specified.")
         if generations is not None and generations <= 0:
             raise ValueError("generations must be a positive integer or None.")
 
+        # Work on the direct ancestor path only: root/ancestor cells first,
+        # target cell last. The returned branch is a slice of this path.
         path = self.get_ancestors(cid) + [cid]
 
-        if generations is None:
+        if start_cell is not None:
+            # Explicit start-cell mode: keep the path from start_cell to cid.
+            try:
+                start_idx = path.index(start_cell)
+            except ValueError as err:
+                raise ValueError(
+                    f"Cell {start_cell} is not upstream of target cell {cid}."
+                ) from err
+        elif generations is None:
             start_idx = 0
         else:
+            # Generation mode: division/root cells mark where generations begin.
+            # Pick the requested upstream boundary, or the earliest one if the
+            # requested number of generations is larger than the path contains.
             boundary_indices = [
                 i
                 for i, node in enumerate(path[:-1])
@@ -1245,6 +1281,8 @@ class CellLineage(Lineage):
                 start_idx = boundary_indices[-generations]
 
         selected_path = path[start_idx:]
+        # Copy only the selected path into a new lineage so the original graph
+        # and unrelated branches are left untouched.
         branch = CellLineage()
         branch.graph.update(self.graph)
         for node in selected_path:
@@ -1254,28 +1292,38 @@ class CellLineage(Lineage):
         branch.graph["source_lineage_ID"] = self.graph.get("lineage_ID")
         branch.graph["target_cell_ID"] = cid
         branch.graph["included_generations"] = generations
+        branch.graph["start_cell_ID"] = start_cell
         return branch
 
     def get_single_cell_lineage_highlight(
         self,
-        cid: int,
+        cid: int | list[int],
         generations: int | None = None,
         highlight_prop: str = "selected_branch",
+        start_cell: int | list[int] | None = None,
     ) -> CellLineage:
         """
-        Return a copy of the full lineage with one single-cell branch marked.
+        Return a copy of the full lineage with single-cell branches marked.
 
         The returned lineage contains all cells from the original lineage, with
-        an extra node property set to 1 for cells in the selected branch and 0
+        an extra node property set to 1 for cells in the selected branches and 0
         for all other cells. The original lineage is not modified.
 
         Parameters
         ----------
-        cid : int
-            ID of the target cell.
+        cid : int or list[int]
+            ID of the target cell, or IDs of several target cells. If several
+            cells are passed, the highlighted nodes are the union of their
+            single-cell branches.
         generations : int, optional
             Number of upstream division generations to include. If None,
-            highlight the path from the root to `cid`.
+            highlight the path from the root to each target cell.
+        start_cell : int or list[int], optional
+            ID of the cell where each highlighted branch should start. If a
+            single ID is passed, it is used for every target cell. If a list is
+            passed, it must have the same length as `cid`, and starts are
+            paired with targets by position. Cannot be used together with
+            `generations`.
         highlight_prop : str, optional
             Name of the node property used to mark the selected branch.
             "selected_branch" by default.
@@ -1283,17 +1331,62 @@ class CellLineage(Lineage):
         Returns
         -------
         CellLineage
-            A copy of the full lineage with the selected branch marked.
+            A copy of the full lineage with the selected branches marked.
         """
-        branch_nodes = set(self.get_single_cell_lineage(cid, generations).nodes())
+        is_single_target, target_cids, start_cells = (
+            self._normalize_single_cell_lineage_inputs(cid, start_cell, "cid")
+        )
+
+        # Each set contains the cells in one selected single-cell lineage branch.
+        branch_node_sets = [
+            set(
+                self.get_single_cell_lineage(
+                    target_cid, generations, start_cell=target_start_cell
+                ).nodes()
+            )
+            for target_cid, target_start_cell in zip(target_cids, start_cells)
+        ]
+
+        # If selected branches touch or converge, they form one connected group
+        # and therefore get the same highlight value/color.
+        branch_nodes = set().union(*branch_node_sets)
+        selected_components = list(
+            nx.connected_components(self.subgraph(branch_nodes).to_undirected())
+        )
+        # Keep colors stable by ordering groups according to target_cids order.
+        selected_components.sort(
+            key=lambda component: min(
+                index
+                for index, branch_node_set in enumerate(branch_node_sets)
+                if component & branch_node_set
+            )
+        )
+        # Group 0 is reserved for unselected cells; selected groups start at 1.
+        highlight_values = {
+            node: value
+            for value, component in enumerate(selected_components, start=1)
+            for node in component
+        }
+
         highlighted_lineage = self.copy()
+        # First mark every cell as unselected, then overwrite the selected cells.
+        nx.set_node_attributes(highlighted_lineage, 0, highlight_prop)
+        nx.set_node_attributes(highlighted_lineage, highlight_values, highlight_prop)
 
-        for node in highlighted_lineage.nodes():
-            highlighted_lineage.nodes[node][highlight_prop] = int(node in branch_nodes)
+        if is_single_target:
+            highlighted_lineage.graph["target_cell_ID"] = cid
+        else:
+            highlighted_lineage.graph["target_cell_IDs"] = list(cid)
 
-        highlighted_lineage.graph["target_cell_ID"] = cid
         highlighted_lineage.graph["included_generations"] = generations
+
+        if isinstance(start_cell, list):
+            highlighted_lineage.graph["start_cell_IDs"] = list(start_cell)
+        else:
+            highlighted_lineage.graph["start_cell_ID"] = start_cell
+
         highlighted_lineage.graph["highlight_prop"] = highlight_prop
+        highlighted_lineage.graph["highlight_group_count"] = len(selected_components)
         return highlighted_lineage
 
     def get_divisions(self, cids: list[int] | None = None) -> list[int]:
@@ -1633,8 +1726,9 @@ class CellLineage(Lineage):
         ID_prop: str = "cell_ID",
         y_prop: Property | None = None,
         title: str | None = None,
-        single_cell_lineage: int | None = None,
+        single_cell_lineage: int | list[int] | None = None,
         generations: int | None = None,
+        start_cell: int | list[int] | None = None,
         highlight_prop: str = "selected_branch",
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -1664,13 +1758,20 @@ class CellLineage(Lineage):
             Property.name and Property.unit.
         title : str, optional
             The title of the plot. If None, no title is displayed.
-        single_cell_lineage : int, optional
-            ID of the target cell for plotting a single-cell branch. If None,
-            plot the whole lineage normally.
+        single_cell_lineage : int or list[int], optional
+            ID of the target cell, or IDs of several target cells, for plotting
+            highlighted single-cell branches. If None, plot the whole lineage
+            normally.
         generations : int, optional
             Number of upstream division generations to include when
             `single_cell_lineage` is set. If None, use the path from the root
-            to the target cell.
+            to each target cell.
+        start_cell : int or list[int], optional
+            ID of the cell where the highlighted branch should start. If a
+            single ID is passed, it is used for every target cell. If a list is
+            passed, it must have the same length as `single_cell_lineage`, and
+            starts are paired with targets by position. Cannot be used together
+            with `generations`.
         highlight_prop : str, optional
             Name of the temporary node property used for highlighting.
             "selected_branch" by default.
@@ -1741,18 +1842,29 @@ class CellLineage(Lineage):
         """
         lineage_to_plot = self
         if single_cell_lineage is not None:
+            # Keep using the tree plotting path, but first make a copy of the
+            # lineage where the selected single-cell branch(es) are marked.
             lineage_to_plot = self.get_single_cell_lineage_highlight(
-                single_cell_lineage, generations, highlight_prop
+                single_cell_lineage,
+                generations=generations,
+                highlight_prop=highlight_prop,
+                start_cell=start_cell,
             )
-            if node_colormap_prop is None:
-                node_colormap_prop = highlight_prop
-            if node_color_scale is None:
-                node_color_scale = [
-                    [0.0, "lightgray"],
-                    [0.49, "lightgray"],
-                    [0.5, "crimson"],
-                    [1.0, "crimson"],
+            # When the user did not request another color mapping, turn the
+            # highlight groups into explicit marker colors. This avoids treating
+            # the discrete branch labels as a continuous Plotly colorscale.
+            if node_colormap_prop is None or node_colormap_prop == highlight_prop:
+                _, index_to_nx_id = lineage_to_plot._create_deterministic_igraph()
+                groups = [
+                    lineage_to_plot.nodes[index_to_nx_id[k]][highlight_prop]
+                    for k in range(len(index_to_nx_id))
                 ]
+                marker_colors = [get_highlight_color(group) for group in groups]
+                node_marker_style = (
+                    {} if node_marker_style is None else dict(node_marker_style)
+                )
+                node_marker_style.setdefault("color", marker_colors)
+                node_colormap_prop = None
 
         fig = lineage_to_plot.get_tree_figure(
             ID_prop=ID_prop,
@@ -1777,22 +1889,23 @@ class CellLineage(Lineage):
 
     def plot_single_cell_property(
         self,
-        single_cell_lineage: int,
+        single_cell_lineage: int | list[int],
         y_prop: str | Property,
         x_prop: str | Property = "timepoint",
         generations: int | None = None,
-        title: str | None = None,
-        node_hover_props: list[str] | None = None,
-        node_marker_style: dict[str, Any] | None = None,
-        node_colormap_prop: str | None = None,
-        node_color_scale: Any | None = None,
-        width: int | None = None,
-        height: int | None = None,
-        showlegend: bool = False,
-        template: str | None = None,
-    ) -> None:
+        start_cell: int | list[int] | None = None,
+    ) -> go.Figure:
         """
-        Plot one node property over another for a single-cell lineage branch.
+        Plot one node property over another for single-cell lineage branches.
+
+        The method keeps Plotly styling intentionally minimal. It returns the
+        figure so callers can customize it with Plotly's own methods.
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+            The generated figure. Use Plotly's figure methods to customize or
+            display it.
         """
 
         def _prop_info(prop: str | Property) -> tuple[str, str]:
@@ -1803,15 +1916,31 @@ class CellLineage(Lineage):
                 return prop.identifier, label
             return prop, prop
 
+        # Accept either property identifiers or Property objects, but use plain
+        # identifiers for data access and readable labels for axes/hover text.
         x_prop_id, x_label = _prop_info(x_prop)
         y_prop_id, y_label = _prop_info(y_prop)
-        lineage = self.get_single_cell_lineage(single_cell_lineage, generations)
-        nodes = list(lineage.nodes())
 
-        x_nodes = [lineage.nodes[node][x_prop_id] for node in nodes]
-        y_nodes = [lineage.nodes[node][y_prop_id] for node in nodes]
+        # Treat a single target and several targets the same while plotting:
+        # each target cell becomes one trace, paired with one start cell.
+        _, target_cids, start_cells = self._normalize_single_cell_lineage_inputs(
+            single_cell_lineage, start_cell, "single_cell_lineage"
+        )
 
-        if node_hover_props is None:
+        fig = go.Figure()
+        for index, (target_cid, target_start_cell) in enumerate(
+            zip(target_cids, start_cells)
+        ):
+            lineage = self.get_single_cell_lineage(
+                target_cid, generations, start_cell=target_start_cell
+            )
+            nodes = list(lineage.nodes())
+
+            x_nodes = [lineage.nodes[node][x_prop_id] for node in nodes]
+            y_nodes = [lineage.nodes[node][y_prop_id] for node in nodes]
+
+            # Use fixed, informative defaults: hover text always shows the cell
+            # ID and plotted values; division cells are marked with triangles.
             node_hover_text = [
                 (
                     f"cell_ID: {lineage.nodes[node].get('cell_ID', node)}<br>"
@@ -1819,54 +1948,72 @@ class CellLineage(Lineage):
                 )
                 for node, x_value, y_value in zip(nodes, x_nodes, y_nodes)
             ]
-        else:
-            node_hover_text = [
-                "<br>".join(
-                    f"{prop}: {lineage.nodes[node][prop]}" for prop in node_hover_props
-                )
-                for node in nodes
-            ]
+            trace_color = get_highlight_color(index + 1)
 
-        if node_marker_style is None:
-            node_marker_style = {}
-        else:
-            node_marker_style = dict(node_marker_style)
-
-        if node_colormap_prop is not None:
-            node_marker_style["color"] = [
-                lineage.nodes[node][node_colormap_prop] for node in nodes
-            ]
-            node_marker_style["colorscale"] = node_color_scale
-            node_marker_style["colorbar"] = dict(title=node_colormap_prop)
-
-        fig = go.Figure()
-        fig.add_trace(
-            go.Scatter(
-                x=x_nodes,
-                y=y_nodes,
-                mode="lines+markers",
-                marker=node_marker_style,
-                hoverinfo="text",
-                hovertemplate="%{text}<extra></extra>",
-                text=node_hover_text,
-                name=y_label,
+            trace_name = (
+                f"{y_label} ({target_cid})"
+                if len(target_cids) > 1
+                else y_label
             )
-        )
+            fig.add_trace(
+                go.Scatter(
+                    x=x_nodes,
+                    y=y_nodes,
+                    mode="lines+markers",
+                    marker=dict(
+                        color=trace_color,
+                        size=10,
+                        symbol=[
+                            "triangle-up" if self.is_division(node) else "circle"
+                            for node in nodes
+                        ],
+                    ),
+                    line=dict(color=trace_color),
+                    hoverinfo="text",
+                    hovertemplate="%{text}<extra></extra>",
+                    text=node_hover_text,
+                    name=trace_name,
+                )
+            )
         fig.update_layout(
-            title=title,
             xaxis_title=x_label,
             yaxis_title=y_label,
-            width=width,
-            height=height,
-            showlegend=showlegend,
-            template=template,
+            showlegend=len(target_cids) > 1,
         )
-        fig.show()
+        return fig
 
     @staticmethod
-    # TODO: I don't think this function is good design, even if it factorises code.
-    # actually y_prop (prop name) and y_legend should be replaced by the Property y_prop
-    # so we can access name and unit to display in the axis legend.
+    def _normalize_single_cell_lineage_inputs(
+        cid: int | list[int],
+        start_cell: int | list[int] | None,
+        cid_arg_name: str,
+    ) -> tuple[bool, list[int], list[int | None]]:
+        # Normalize scalar input to a list so callers can use one code path for
+        # both a single target cell and multiple target cells.
+        is_single_target = isinstance(cid, int)
+        target_cids = [cid] if is_single_target else cid
+        if not target_cids:
+            raise ValueError(f"{cid_arg_name} must contain at least one target cell ID.")
+
+        # A list of start cells is positional and must match the target list.
+        # A scalar start cell, including None, is broadcast to every target.
+        if isinstance(start_cell, list):
+            if is_single_target:
+                raise ValueError(
+                    f"start_cell can be a list only when {cid_arg_name} is also a list."
+                )
+            if len(start_cell) != len(target_cids):
+                raise ValueError(
+                    f"start_cell must have the same length as {cid_arg_name} "
+                    "when both are lists."
+                )
+            start_cells = start_cell
+        else:
+            start_cells = [start_cell] * len(target_cids)
+
+        return is_single_target, target_cids, start_cells
+
+    @staticmethod
     def _get_lineage_ID_and_err_msg(lineage):
         """
         Return the lineage ID and a text to display in error messages.
