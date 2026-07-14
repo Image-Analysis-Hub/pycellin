@@ -2014,6 +2014,9 @@ class CellLineage(Lineage):
         return is_single_target, target_cids, start_cells
 
     @staticmethod
+    # TODO: I don't think this function is good design, even if it factorises code.
+    # actually y_prop (prop name) and y_legend should be replaced by the Property y_prop
+    # so we can access name and unit to display in the axis legend.
     def _get_lineage_ID_and_err_msg(lineage):
         """
         Return the lineage ID and a text to display in error messages.
