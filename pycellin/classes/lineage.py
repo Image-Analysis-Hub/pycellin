@@ -648,6 +648,14 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         elif "color" not in edge_line_style:
             edge_line_style["color"] = "dimgrey"
 
+        # Avoid Plotly's "bubble mode" defaults (a semi-transparent fill and a white
+        # outline) that kick in when marker.size is an array, i.e. when manually
+        # adjusting node_marker_style for a subset of nodes.
+        if "opacity" not in node_marker_style:
+            node_marker_style["opacity"] = 1.0
+        if "line" not in node_marker_style:
+            node_marker_style["line"] = {"width": 0}
+
         # Text in the nodes.
         node_annotations = (
             self._build_node_text_annotations(
@@ -687,6 +695,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 hoverinfo="text",
                 hovertemplate="%{text}",
                 text=node_hover_text,  # used in hoverinfo not for the nodes text
+                customdata=[index_to_nx_id[k] for k in range(nodes_count)],
                 name=graph_name if graph_name else "Nodes",
             )
         )
