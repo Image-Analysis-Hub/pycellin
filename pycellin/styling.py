@@ -14,6 +14,7 @@ PYCELLIN_ORANGE: Final = "#E36A5E"
 # Shared style config.
 _COMMON_AXIS = dict(
     showgrid=False,
+    zeroline=False,
     ticks="outside",
     ticklen=5,
     tickwidth=1,
