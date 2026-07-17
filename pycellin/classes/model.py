@@ -37,6 +37,7 @@ from pycellin.graph.properties.topology import (
     create_is_leaf_property,
     create_is_root_property,
 )
+from pycellin.styling import PYCELLIN_PURPLE
 from pycellin.utils import _color_to_rgba
 
 L = TypeVar("L", bound="Lineage")
@@ -3032,6 +3033,9 @@ class Model:
         marker: dict | None = None,
         band_line: dict | None = None,
         band_opacity: float = 0.1,
+        template: str | go.layout.Template = "pycellin_white",
+        width: int | None = None,
+        height: int | None = None,
     ) -> go.Figure:
         """
         Generate a Plotly figure showing the mean and std of a cell property over time.
@@ -3079,6 +3083,14 @@ class Model:
         band_opacity : float, optional
             Opacity of the std band fill, in [0, 1] (default is 0.1). The fill uses
             the mean line color with this opacity.
+        template : str or go.layout.Template, optional
+            Plotly template to use for the figure (default is "pycellin_white"). A
+            "pycellin_black" template is also available. See styling.py for Pycellin
+            template details. See Plotly documentation for more information on templates.
+        width: int, optional
+            Width of the figure in pixels (default is None, fallback to autosize).
+        height: int, optional
+            Height of the figure in pixels (default is None, fallback to autosize).
 
         Returns
         -------
@@ -3102,11 +3114,11 @@ class Model:
             )
 
         # Merge user style dicts over defaults.
-        line = {"color": "#7F08A4", "width": 3, **(line or {})}
+        line = {"color": PYCELLIN_PURPLE, "width": 3, **(line or {})}
         base_color = line["color"]
         marker = {**(marker or {})}  # empty by default: markers inherit the line color
         band_line = {"color": base_color, "width": 1, "dash": "dash", **(band_line or {})}
-        band_fill_color = _color_to_rgba(base_color, opacity=band_opacity)
+        band_fill_color = _color_to_rgba(base_color, alpha=band_opacity)
 
         # Subset.
         if subset is not None:
@@ -3181,10 +3193,12 @@ class Model:
         x_unit = self.props_metadata.props[time_prop].unit
         y_unit = self.props_metadata.props[y_prop].unit
         fig.update_layout(
-            title=title if title else f"{y_prop} Over Time",
+            title=title if title else f"Mean {y_prop} over time",
             xaxis_title=f"{time_prop} ({x_unit})" if x_unit else time_prop,
             yaxis_title=f"{y_prop} ({y_unit})" if y_unit else y_prop,
-            hovermode="x unified",
+            template=template,
+            width=width,
+            height=height,
         )
 
         return fig
@@ -3202,6 +3216,9 @@ class Model:
         marker: dict | None = None,
         band_line: dict | None = None,
         band_opacity: float = 0.1,
+        template: str | go.layout.Template = "pycellin_white",
+        width: int | None = None,
+        height: int | None = None,
     ) -> None:
         """
         Plot the mean and std of a cell property over time using Plotly.
@@ -3244,11 +3261,19 @@ class Model:
             markers inherit the mean line color automatically.
         band_line : dict, optional
             Plotly line properties for the std band border (upper/lower edges).
-            Merged over the defaults {"width": 0} (hidden border); its color defaults
-            to the mean line color. Set "width" > 0 to show the border.
+            Merged over the defaults {"width": 1, "dash": "dash"} (thin dashed border
+            in the mean line color). Set "width" to 0 to hide the border.
         band_opacity : float, optional
             Opacity of the std band fill, in [0, 1] (default is 0.1). The fill uses
             the mean line color with this opacity.
+        template : str or go.layout.Template, optional
+            Plotly template to use for the figure (default is "pycellin_white"). A
+            "pycellin_black" template is also available. See styling.py for Pycellin
+            template details. See Plotly documentation for more information on templates.
+        width: int, optional
+            Width of the figure in pixels (default is None, fallback to autosize).
+        height: int, optional
+            Height of the figure in pixels (default is None, fallback to autosize).
         """
         fig = self.get_mean_cell_prop_over_time_fig(
             y_prop=y_prop,
@@ -3262,5 +3287,8 @@ class Model:
             marker=marker,
             band_line=band_line,
             band_opacity=band_opacity,
+            template=template,
+            width=width,
+            height=height,
         )
         fig.show()
