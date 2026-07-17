@@ -5,7 +5,7 @@ from typing import Literal, get_args, get_origin
 
 import networkx as nx
 import networkx.algorithms.isomorphism as iso
-
+from plotly.colors import hex_to_rgb, unlabel_rgb
 
 
 def check_literal_type(value, literal_type) -> bool:
@@ -15,18 +15,22 @@ def check_literal_type(value, literal_type) -> bool:
 
 
 # TODO: this function should move into a tests/utils.py file
-def is_equal(obt, exp):
+def is_equal(obt: nx.DiGraph, exp: nx.DiGraph) -> bool:
     """Check if two graphs are perfectly identical.
 
     It checks that the graphs are isomorphic, and that their graph,
     nodes and edges attributes are all identical.
 
-    Args:
-        obt (nx.DiGraph): The obtained graph, built from XML_reader.py.
-        exp (nx.DiGraph): The expected graph, built from here.
+    Parameters
+    ----------
+    obt : nx.DiGraph
+        The obtained graph, built from XML_reader.py.
+    exp : nx.DiGraph
+        The expected graph, built from here.
 
-    Returns:
-        bool: True if the graphs are identical, False otherwise.
+    Returns
+    -------
+    bool : True if the graphs are identical, False otherwise.
     """
     edges_attr = list(set([k for (n1, n2, d) in exp.edges.data() for k in d]))
     edges_default = len(edges_attr) * [0]
@@ -72,10 +76,28 @@ def is_equal(obt, exp):
         return True
     else:
         return False
-      
+
+
 def get_pycellin_version() -> str:
     """Get pycellin version from package metadata"""
     try:
         return importlib.metadata.version("pycellin")
     except importlib.metadata.PackageNotFoundError:
         return "development"
+
+
+def _color_to_rgba(color: str, alpha: float) -> str:
+    """
+    Convert an 'rgb(r,g,b)' or '#rrggbb' color to an 'rgba(r,g,b,a)' string.
+    """
+    if not 0.0 <= alpha <= 1.0:
+        raise ValueError(f"Argument 'alpha' must be in [0, 1], got {alpha}.")
+    if color.startswith("#"):
+        r, g, b = hex_to_rgb(color)
+    elif color.startswith("rgb("):
+        r, g, b = (int(round(c)) for c in unlabel_rgb(color))
+    else:
+        raise ValueError(
+            f"Unsupported color format: {color!r}. Expected 'rgb(r,g,b)' or '#rrggbb'."
+        )
+    return f"rgba({r},{g},{b},{alpha})"

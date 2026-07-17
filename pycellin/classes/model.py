@@ -10,6 +10,7 @@ from typing import Any, Callable, Literal, TypeVar
 
 import networkx as nx
 import pandas as pd
+import plotly.graph_objects as go
 
 import pycellin.graph.properties.morphology as morpho
 import pycellin.graph.properties.motion as motion
@@ -30,12 +31,13 @@ from pycellin.graph.properties.core import (
 )
 from pycellin.graph.properties.topology import (
     IsDivision,
-    create_is_division_property,
     IsLeaf,
-    create_is_leaf_property,
     IsRoot,
+    create_is_division_property,
+    create_is_leaf_property,
     create_is_root_property,
 )
+from pycellin.utils import _color_to_rgba
 
 L = TypeVar("L", bound="Lineage")
 
@@ -3016,3 +3018,249 @@ class Model:
         """
         # TODO: implement
         pass
+
+    def get_mean_cell_prop_over_time_fig(
+        self,
+        y_prop: str,
+        time_prop: str | None = None,
+        subset: list[dict[int, list[int]]] | None = None,
+        std_band: bool = True,
+        clip_std_band: bool = True,
+        nan_std_handling: Literal["drop", "keep", "zero"] = "keep",
+        title: str | None = None,
+        line: dict | None = None,
+        marker: dict | None = None,
+        band_line: dict | None = None,
+        band_opacity: float = 0.1,
+    ) -> go.Figure:
+        """
+        Generate a Plotly figure showing the mean and std of a cell property over time.
+
+        Parameters
+        ----------
+        y_prop : str
+            The property to plot on the y-axis.
+        time_prop : str, optional
+            The time property to plot on the x-axis. If None, the model's reference time
+            property is used (default is None).
+        subset : list[dict[int, list[int]]], optional
+            A list of dictionaries specifying the data subset to include in the plot.
+            Each dictionary should have a lineage ID as the key and a list of cell IDs
+            as the value. If the list of cell IDs is empty, all the cells of the lineage
+            are included. If a lineage ID is not in the dictionary, the entire lineage
+            is ignored. If subset is None, all lineages are included (default is None).
+        std_band: bool, optional
+            True to display the standard deviation band (default is True).
+        clip_std_band : bool, optional
+            Whether to clip the standard deviation band to avoid negative values
+            (default is True).
+        nan_std_handling: Literal["drop", "keep", "zero"], optional
+            How to handle NaN values in the standard deviation calculation. A NaN std
+            occurs when a timepoint has only a single datapoint:
+            - "drop": drop the datapoint -> no mean and no std
+            - "keep": keep the datapoint -> drawn mean, but the std band has a gap
+            - "zero": replace NaN std by 0 -> the band collapses to the mean line
+        title : str, optional
+            The title of the figure. If None, a default title is generated based on the
+            y_prop (default is None).
+        line : dict, optional
+            Plotly line properties for the mean line (e.g. "color", "width", "dash").
+            Merged over the defaults {"color": "#7F08A4", "width": 3}. The
+            "color" is also used as the base color for the std band. Colors must be
+            given as 'rgb(r,g,b)' or '#rrggbb'.
+        marker : dict, optional
+            Plotly marker properties for the mean line's markers (e.g. "color",
+            "size", "symbol"). Merged over Plotly's defaults; if "color" is omitted,
+            markers inherit the mean line color automatically.
+        band_line : dict, optional
+            Plotly line properties for the std band border (upper/lower edges).
+            Merged over the defaults {"width": 1, "dash": "dash"} (thin dashed border
+            in the mean line color). Set "width" to 0 to hide the border.
+        band_opacity : float, optional
+            Opacity of the std band fill, in [0, 1] (default is 0.1). The fill uses
+            the mean line color with this opacity.
+
+        Returns
+        -------
+        fig : plotly.graph_objects.Figure
+        """
+        if time_prop is None:
+            time_prop = self.reference_time_property
+
+        # Validation.
+        df_cells = self.to_cell_dataframe()
+        if df_cells.empty:
+            raise ValueError("Cell dataframe is empty.")
+        if time_prop not in df_cells.columns:
+            raise ValueError(f"Property '{time_prop}' not found in cell data.")
+        if y_prop not in df_cells.columns:
+            raise ValueError(f"Property '{y_prop}' not found in cell data.")
+        if nan_std_handling not in ("drop", "keep", "zero"):
+            raise ValueError(
+                f"Invalid nan_std_handling value: {nan_std_handling!r}. "
+                f"Expected one of 'drop', 'keep', 'zero'."
+            )
+
+        # Merge user style dicts over defaults.
+        line = {"color": "#7F08A4", "width": 3, **(line or {})}
+        base_color = line["color"]
+        marker = {**(marker or {})}  # empty by default: markers inherit the line color
+        band_line = {"color": base_color, "width": 1, "dash": "dash", **(band_line or {})}
+        band_fill_color = _color_to_rgba(base_color, opacity=band_opacity)
+
+        # Subset.
+        if subset is not None:
+            mask = pd.Series(False, index=df_cells.index)
+            for lin_dict in subset:
+                for lin_id, cell_ids in lin_dict.items():
+                    if cell_ids:
+                        mask |= (df_cells["lineage_ID"] == lin_id) & (
+                            df_cells["cell_ID"].isin(cell_ids)
+                        )
+                    else:
+                        mask |= df_cells["lineage_ID"] == lin_id
+            df_cells = df_cells[mask]
+            if df_cells.empty:
+                raise ValueError("No cells match the subset criteria.")
+
+        # Compute mean and std.
+        df_agg = df_cells.groupby(time_prop)[y_prop].agg(["mean", "std"]).reset_index()
+        # Handle NaN std values (single-datapoint timepoints).
+        if std_band:
+            if nan_std_handling == "drop":
+                df_agg = df_agg.dropna(subset=["std"]).reset_index(drop=True)
+            elif nan_std_handling == "zero":
+                df_agg["std"] = df_agg["std"].fillna(0)
+
+            df_agg["upper"] = df_agg["mean"] + df_agg["std"]
+            if clip_std_band:
+                df_agg["lower"] = (df_agg["mean"] - df_agg["std"]).clip(lower=0)
+            else:
+                df_agg["lower"] = df_agg["mean"] - df_agg["std"]
+
+        fig = go.Figure()
+        # Mean line.
+        fig.add_trace(
+            go.Scatter(
+                x=df_agg[time_prop],
+                y=df_agg["mean"],
+                mode="lines+markers",
+                name=f"Mean {y_prop}",
+                line=line,
+                marker=marker,
+                connectgaps=True,  # continuous mean: no break where std is NaN ("keep" mode)
+                showlegend=False,
+            )
+        )
+        # Std band.
+        if std_band:
+            fig.add_trace(
+                go.Scatter(
+                    x=df_agg[time_prop],
+                    y=df_agg["upper"],
+                    fill=None,
+                    mode="lines",
+                    line=band_line,
+                    connectgaps=False,  # break the band where std is NaN ("keep" mode)
+                    showlegend=False,
+                )
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=df_agg[time_prop],
+                    y=df_agg["lower"],
+                    fill="tonexty",
+                    mode="lines",
+                    line=band_line,
+                    fillcolor=band_fill_color,
+                    connectgaps=False,  # break the band where std is NaN ("keep" mode)
+                    showlegend=False,
+                )
+            )
+        # Layout.
+        x_unit = self.props_metadata.props[time_prop].unit
+        y_unit = self.props_metadata.props[y_prop].unit
+        fig.update_layout(
+            title=title if title else f"{y_prop} Over Time",
+            xaxis_title=f"{time_prop} ({x_unit})" if x_unit else time_prop,
+            yaxis_title=f"{y_prop} ({y_unit})" if y_unit else y_prop,
+            hovermode="x unified",
+        )
+
+        return fig
+
+    def plot_mean_cell_prop_over_time(
+        self,
+        y_prop: str,
+        time_prop: str | None = None,
+        subset: list[dict[int, list[int]]] | None = None,
+        std_band: bool = True,
+        clip_std_band: bool = True,
+        nan_std_handling: Literal["drop", "keep", "zero"] = "keep",
+        title: str | None = None,
+        line: dict | None = None,
+        marker: dict | None = None,
+        band_line: dict | None = None,
+        band_opacity: float = 0.1,
+    ) -> None:
+        """
+        Plot the mean and std of a cell property over time using Plotly.
+
+        Parameters
+        ----------
+        y_prop : str
+            The property to plot on the y-axis.
+        time_prop : str, optional
+            The time property to plot on the x-axis. If None, the model's reference time
+            property is used (default is None).
+        subset : list[dict[int, list[int]]], optional
+            A list of dictionaries specifying the data subset to include in the plot.
+            Each dictionary should have a lineage ID as the key and a list of cell IDs
+            as the value. If the list of cell IDs is empty, all the cells of the lineage
+            are included. If a lineage ID is not in the dictionary, the entire lineage
+            is ignored. If subset is None, all lineages are included (default is None).
+        std_band: bool, optional
+            True to display the standard deviation band (default is True).
+        clip_std_band : bool, optional
+            Whether to clip the standard deviation band to avoid negative values
+            (default is True).
+        nan_std_handling: Literal["drop", "keep", "zero"], optional
+            How to handle NaN values in the standard deviation calculation. A NaN std
+            occurs when a timepoint has only a single datapoint:
+            - "drop": drop the datapoint -> no mean and no std
+            - "keep": keep the datapoint -> drawn mean, but the std band has a gap
+            - "zero": replace NaN std by 0 -> the band collapses to the mean line
+        title : str, optional
+            The title of the figure. If None, a default title is generated based on the
+            y_prop (default is None).
+        line : dict, optional
+            Plotly line properties for the mean line (e.g. "color", "width", "dash").
+            Merged over the defaults {"color": "#7F08A4", "width": 3}. The
+            "color" is also used as the base color for the std band. Colors must be
+            given as 'rgb(r,g,b)' or '#rrggbb'.
+        marker : dict, optional
+            Plotly marker properties for the mean line's markers (e.g. "color",
+            "size", "symbol"). Merged over Plotly's defaults; if "color" is omitted,
+            markers inherit the mean line color automatically.
+        band_line : dict, optional
+            Plotly line properties for the std band border (upper/lower edges).
+            Merged over the defaults {"width": 0} (hidden border); its color defaults
+            to the mean line color. Set "width" > 0 to show the border.
+        band_opacity : float, optional
+            Opacity of the std band fill, in [0, 1] (default is 0.1). The fill uses
+            the mean line color with this opacity.
+        """
+        fig = self.get_mean_cell_prop_over_time_fig(
+            y_prop=y_prop,
+            time_prop=time_prop,
+            subset=subset,
+            std_band=std_band,
+            clip_std_band=clip_std_band,
+            nan_std_handling=nan_std_handling,
+            title=title,
+            line=line,
+            marker=marker,
+            band_line=band_line,
+            band_opacity=band_opacity,
+        )
+        fig.show()
