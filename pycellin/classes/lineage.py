@@ -18,6 +18,12 @@ from pycellin.classes.exceptions import (
 )
 from pycellin.classes.property import Property
 from pycellin.custom_types import PropertyType
+from pycellin.styling import PYCELLIN_PURPLE
+
+_DEFAULT_UNMAPPED_COLOR = "dimgrey"
+
+# TODO: all the visuzalization functionalities will be refined and moved to a dedicated
+# subpackage.
 
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
@@ -410,11 +416,21 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         return annotations
 
     def _apply_node_color_mapping(
-        self, G: Graph, node_colormap_prop: str, node_color_scale: str | None
+        self,
+        G: Graph,
+        node_colormap_prop: str,
+        node_colormap: str | dict[Any, str] | None,
     ) -> dict:
         """Apply color mapping to node marker style based on a node property.
 
-        Returns a dict with color, colorscale, and colorbar settings.
+        Two modes, dispatched on the type of `node_colormap`:
+        - continuous (str or None): interpolate a Plotly colorscale over the
+          numeric property values, with a colorbar.
+        - discrete (dict): map each property value to an explicit color via the
+          provided {value: color} dict, with a fallback for unmapped values.
+
+        Returns a dict of marker settings (color, and colorscale/colorbar in
+        continuous mode).
         """
         color_values = G.vs[node_colormap_prop]
 
@@ -422,12 +438,32 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             raise ValueError(
                 f"Cannot color map: property '{node_colormap_prop}' has no values."
             )
+
+        # Discrete mode: explicit {value: color} mapping.
+        if isinstance(node_colormap, dict):
+            colors = [
+                node_colormap.get(val, _DEFAULT_UNMAPPED_COLOR) for val in color_values
+            ]
+            unmapped = {val for val in color_values if val not in node_colormap}
+            if unmapped:
+                warnings.warn(
+                    f"Color map for property '{node_colormap_prop}' does not cover "
+                    f"value(s) {sorted(unmapped, key=str)}; using "
+                    f"'{_DEFAULT_UNMAPPED_COLOR}' for those nodes.",
+                    stacklevel=2,
+                )
+            return {"color": colors}
+
+        # Continuous mode: colorscale over numeric values.
         if not all(isinstance(val, (int, float)) for val in color_values):
             raise ValueError(
                 f"Cannot color map: property '{node_colormap_prop}' contains "
-                "non-numeric values. Please use a numeric or boolean property."
+                "non-numeric values. Provide a discrete color map (a "
+                "{value: color} dict) for categorical properties, or use a "
+                "numeric/boolean property for continuous coloring."
             )
 
+        # Booleans are ints in Python, but Plotly's colorscale needs real numbers.
         if any(isinstance(val, bool) for val in color_values):
             color_values = [
                 int(val) if isinstance(val, bool) else val for val in color_values
@@ -435,7 +471,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         return {
             "color": color_values,
-            "colorscale": node_color_scale,
+            "colorscale": node_colormap,
             "colorbar": dict(title=node_colormap_prop),
         }
 
@@ -505,7 +541,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
         node_colormap_prop: str | None = None,
-        node_color_scale: str | None = None,
+        node_colormap: str | dict[Any, str] | None = None,
         node_hover_props: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
         edge_hover_props: list[str] | None = None,
@@ -546,17 +582,17 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_colormap_prop : str, optional
             The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
-        node_color_scale : str, optional
-            The color scale to use for coloring the nodes. If None,
+        node_colormap : str | dict[Any, str] | None, optional
+            The color map to use for coloring the nodes. If None,
             defaults to current Plotly template.
         node_hover_props : list[str], optional
-            The hover template for the nodes. If None, defaults to
+            The node properties to display on hover. If None, defaults to
             displaying `cell_ID` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
         edge_hover_props : list[str], optional
-            The hover template for the edges. If None, defaults to
+            The edge properties to display on hover. If None, defaults to
             displaying the source and target nodes.
         plot_bgcolor : str, optional
             The background color of the plot. If None, defaults to current
@@ -617,36 +653,38 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         G, index_to_nx_id = self._create_deterministic_igraph()
         nodes_count = G.vcount()
-        layout = G.layout("rt")  # Reingold-Tilford layout
+        tree_layout = G.layout("rt")  # Reingold-Tilford layout
         # Updating the layout so the y position of the nodes is given
         # by the value of y_prop.
-        layout = [(layout[k][0], G.vs[y_prop.identifier][k]) for k in range(nodes_count)]
+        tree_layout = [
+            (tree_layout[k][0], G.vs[y_prop.identifier][k]) for k in range(nodes_count)
+        ]
 
         # Computing the exact positions of nodes and edges.
-        positions = {k: layout[k] for k in range(nodes_count)}
+        positions = {k: tree_layout[k] for k in range(nodes_count)}
         x_nodes, y_nodes = self._get_nodes_position(positions)
         x_edges, y_edges = self._get_edges_position(G, positions)
+
+        # Copy caller-provided style dicts to avoid mutating them.
+        node_marker_style = dict(node_marker_style) if node_marker_style else {}
+        edge_line_style = dict(edge_line_style) if edge_line_style else {}
 
         # Color mapping the nodes to a node property.
         if node_colormap_prop:
             color_map_style = self._apply_node_color_mapping(
-                G, node_colormap_prop, node_color_scale
+                G, node_colormap_prop, node_colormap
             )
-            if node_marker_style is None:
-                node_marker_style = color_map_style
-            else:
-                node_marker_style.update(color_map_style)
+            node_marker_style.update(color_map_style)
 
         # Set default colors if not already specified.
-        if node_marker_style is None:
-            node_marker_style = {"color": "darkviolet"}
-        elif "color" not in node_marker_style:
-            node_marker_style["color"] = "darkviolet"
+        node_marker_style.setdefault("color", PYCELLIN_PURPLE)
+        edge_line_style.setdefault("color", "dimgrey")
 
-        if edge_line_style is None:
-            edge_line_style = {"color": "dimgrey"}
-        elif "color" not in edge_line_style:
-            edge_line_style["color"] = "dimgrey"
+        # Avoid Plotly's "bubble mode" defaults (a semi-transparent fill and a white
+        # outline) that kick in when marker.size is an array, i.e. when manually
+        # adjusting node_marker_style for a subset of nodes.
+        node_marker_style.setdefault("opacity", 1.0)
+        node_marker_style.setdefault("line", {"width": 0})
 
         # Avoid Plotly's "bubble mode" defaults (a semi-transparent fill and a white
         # outline) that kick in when marker.size is an array, i.e. when manually
@@ -806,7 +844,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             node_text_font=node_text_font,
             node_marker_style=node_marker_style,
             node_colormap_prop=node_colormap_prop,
-            node_color_scale=node_color_scale,
+            node_colormap=node_color_scale,
             node_hover_props=node_hover_props,
             edge_line_style=edge_line_style,
             edge_hover_props=edge_hover_props,
@@ -1428,7 +1466,7 @@ class CellLineage(Lineage):
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
         node_colormap_prop: str | None = None,
-        node_color_scale: str | None = None,
+        node_colormap: str | dict[Any, str] | None = None,
         node_hover_props: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
         edge_hover_props: list[str] | None = None,
@@ -1470,8 +1508,8 @@ class CellLineage(Lineage):
         node_colormap_prop : str, optional
             The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
-        node_color_scale : str, optional
-            The color scale to use for coloring the nodes. If None,
+        node_colormap : str | dict[Any, str], optional
+            The color map to use for coloring the nodes. If None,
             defaults to current Plotly template.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
@@ -1521,7 +1559,7 @@ class CellLineage(Lineage):
             node_text_font=node_text_font,
             node_marker_style=node_marker_style,
             node_colormap_prop=node_colormap_prop,
-            node_color_scale=node_color_scale,
+            node_colormap=node_colormap,
             node_hover_props=node_hover_props,
             edge_line_style=edge_line_style,
             edge_hover_props=edge_hover_props,
@@ -1542,7 +1580,7 @@ class CellLineage(Lineage):
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
         node_colormap_prop: str | None = None,
-        node_color_scale: str | None = None,
+        node_colormap: str | dict[Any, str] | None = None,
         node_hover_props: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
         edge_hover_props: list[str] | None = None,
@@ -1579,8 +1617,8 @@ class CellLineage(Lineage):
         node_colormap_prop : str, optional
             The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
-        node_color_scale : str, optional
-            The color scale to use for coloring the nodes. If None,
+        node_colormap : str | dict[Any, str], optional
+            The color map to use for coloring the nodes. If None,
             defaults to current Plotly template.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
@@ -1639,7 +1677,7 @@ class CellLineage(Lineage):
             node_text_font=node_text_font,
             node_marker_style=node_marker_style,
             node_colormap_prop=node_colormap_prop,
-            node_color_scale=node_color_scale,
+            node_colormap=node_colormap,
             node_hover_props=node_hover_props,
             edge_line_style=edge_line_style,
             edge_hover_props=edge_hover_props,
@@ -1826,7 +1864,7 @@ class CycleLineage(Lineage):
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
         node_colormap_prop: str | None = None,
-        node_color_scale: str | None = None,
+        node_colormap: str | dict[Any, str] | None = None,
         node_hover_props: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
         edge_hover_props: list[str] | None = None,
@@ -1868,8 +1906,8 @@ class CycleLineage(Lineage):
         node_colormap_prop : str, optional
             The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
-        node_color_scale : str, optional
-            The color scale to use for coloring the nodes. If None,
+        node_colormap : str | dict[Any, str], optional
+            The color map to use for coloring the nodes. If None,
             defaults to current Plotly template.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
@@ -1919,7 +1957,7 @@ class CycleLineage(Lineage):
             node_text_font=node_text_font,
             node_marker_style=node_marker_style,
             node_colormap_prop=node_colormap_prop,
-            node_color_scale=node_color_scale,
+            node_colormap=node_colormap,
             node_hover_props=node_hover_props,
             edge_line_style=edge_line_style,
             edge_hover_props=edge_hover_props,
@@ -1940,7 +1978,7 @@ class CycleLineage(Lineage):
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
         node_colormap_prop: str | None = None,
-        node_color_scale: str | None = None,
+        node_colormap: str | dict[Any, str] | None = None,
         node_hover_props: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
         edge_hover_props: list[str] | None = None,
@@ -1977,8 +2015,8 @@ class CycleLineage(Lineage):
         node_colormap_prop : str, optional
             The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
-        node_color_scale : str, optional
-            The color scale to use for coloring the nodes. If None,
+        node_colormap : str | dict[Any, str], optional
+            The color map to use for coloring the nodes. If None,
             defaults to current Plotly template.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
@@ -2038,7 +2076,7 @@ class CycleLineage(Lineage):
             node_text_font=node_text_font,
             node_marker_style=node_marker_style,
             node_colormap_prop=node_colormap_prop,
-            node_color_scale=node_color_scale,
+            node_colormap=node_colormap,
             node_hover_props=node_hover_props,
             edge_line_style=edge_line_style,
             edge_hover_props=edge_hover_props,
