@@ -3,6 +3,7 @@
 
 import pickle
 import warnings
+from copy import deepcopy
 from decimal import Decimal
 from itertools import pairwise
 from math import gcd
@@ -1116,8 +1117,10 @@ class Model:
             Lineage to add (default is None). If None, a new lineage
             will be created.
         lid : int, optional
-            ID of the lineage to add (default is None). If None, a new ID
-            will be generated.
+            ID to assign to the lineage (default is None). Resolution order:
+                1. Use `lid` if provided.
+                2. Fall back to the lineage's internal `lineage_ID` property.
+                3. Generate a new ID if neither is available.
         with_CycleLineage : bool, optional
             True to compute the cycle lineage, False otherwise (default is False).
 
@@ -1126,20 +1129,43 @@ class Model:
         int
             The ID of the added lineage.
 
+        Raises
+        ------
+        ValueError
+            If `lid` is provided and conflicts with the lineage's existing
+            internal `lineage_ID`.
+
         Warns
         -----
         UserWarning
             If `with_CycleLineage` is True but the cycle data has not been added yet.
             In this case, the cycle lineage cannot be computed.
         """
+        # Determine the lineage ID to use.
+        # TODO: check (and simplify) logic?
         if lineage is None:
             if lid is None:
                 lid = self.get_next_available_lineage_ID()
             lineage = CellLineage(lid=lid)
         else:
-            lid = lineage.graph["lineage_ID"]
-        assert lid is not None
+            inferred_lid = lineage.graph.get("lineage_ID")
+            if lid is None:
+                lid = inferred_lid
+            if lid is None:
+                lid = self.get_next_available_lineage_ID()
+            if inferred_lid is not None and lid != inferred_lid:
+                raise ValueError(
+                    f"Provided lid={lid} conflicts with the lineage's "
+                    f"internal lineage_ID={inferred_lid}."
+                )
+
+        # Update the data accordingly.
+        if lid in self.get_cell_lineage_IDs():
+            raise ValueError(f"Lineage with ID {lid} already exists in the model.")
+        lineage.graph["lineage_ID"] = lid
         self.data.cell_data[lid] = lineage
+        for cid in lineage.nodes():
+            lineage.nodes[cid]["lineage_ID"] = lid
 
         if with_CycleLineage:
             if self.data.cycle_data is None:
@@ -2780,6 +2806,71 @@ class Model:
         # AND cell lineages.
         for prop in propagated_props:
             self.props_metadata.props[prop].lin_type = "Lineage"
+
+    def merge(
+        self, model: "Model", new_name: str | None = None, unique_cell_ids: bool = False
+    ) -> None:
+        """
+        Merge another model into this one.
+
+        Parameters
+        ----------
+        model : Model
+            The model to merge into this one.
+        new_name : str | None, optional
+            The name of the merged model. If None, the name of the first model is used.
+            Default is None.
+        unique_cell_ids : bool, optional
+            Whether to ensure unique cell IDs in the merged model. Default is False.
+
+        Notes
+        -----
+        Regarding properties
+        This method assumes that 2 properties with an identical identifier (one from
+        each model) are strictly identical (type, lineage type, calculator...). If not
+        data and metadata related to the property in the model in argument will be lost.
+        """
+        # TODO: in place or not?
+        # Properties.
+        prop_ids1 = set(self.get_properties().keys())
+        props2 = model.get_properties()
+        prop_ids2 = set(props2.keys())
+        props_to_add = prop_ids2.difference(prop_ids1)
+        dict_calcs2 = model._updater._calculators
+
+        for prop_id in props_to_add:
+            prop = props2[prop_id]
+            calc = dict_calcs2.get(prop_id)
+
+            if calc is None:  # register just the metadata
+                self.props_metadata._add_prop(prop)
+            else:  # register both metadata and calculator
+                self.add_custom_property(calc)
+
+            if prop_id in model.props_metadata._protected_props:
+                self.props_metadata._protect_prop(prop_id)
+
+        # Lineages.
+        lin_ids1 = set(self.get_lineage_IDs())
+        lin_ids2 = set(model.get_lineage_IDs())
+        to_reid = lin_ids2.intersection(lin_ids1)
+        if to_reid:
+            pass
+            # Should use add_lineage()
+            # new_id = max(lin_ids1) + 1
+            # for lin_id in to_reid:
+            #     lin = deepcopy(model.get_cell_lineage_from_ID(lin_id))
+            #     if len(lin) == 1:
+            #         new_id = -new_id
+            #     lin.graph["lineage_ID"] = new_id
+            #     nx.set_node_attributes(lin, new_id, "lineage_ID")
+            #     model.
+
+            # new_id = abs(new_id) + 1
+
+        # Solve IDs collision.
+
+        # Solve metadata collision.
 
     def to_cell_dataframe(self, lids: list[int] | None = None) -> pd.DataFrame:
         """
