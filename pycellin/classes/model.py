@@ -1106,6 +1106,7 @@ class Model:
         self,
         lineage: CellLineage | None = None,
         lid: int | None = None,
+        overwrite_lid: bool = False,
         with_CycleLineage: bool = False,
     ) -> int:
         """
@@ -1121,6 +1122,10 @@ class Model:
                 1. Use `lid` if provided.
                 2. Fall back to the lineage's internal `lineage_ID` property.
                 3. Generate a new ID if neither is available.
+        overwrite_lid: bool, optional
+            If True, overwrite the lineage's internal `lineage_ID` with
+            the provided `lid`. If False, raise a ValueError if `lid` conflicts with
+            the lineage's existing internal `lineage_ID` (default is False).
         with_CycleLineage : bool, optional
             True to compute the cycle lineage, False otherwise (default is False).
 
@@ -1133,14 +1138,15 @@ class Model:
         ------
         ValueError
             If `lid` is provided and conflicts with the lineage's existing
-            internal `lineage_ID`.
+            internal `lineage_ID` and `overwrite_lid` is True.
+            If `lid` is already in use by another lineage in the model.
 
         Warns
         -----
         UserWarning
             If `with_CycleLineage` is True but the cycle data has not been added yet.
             If `with_CycleLineage` is True but the time step of the model is not defined.
-            In both theses cases, the cycle lineage is not computed.
+            In both these cases, the cycle lineage is not computed.
         """
         # Determine the lineage ID to use.
         if lineage is None:
@@ -1148,21 +1154,25 @@ class Model:
                 lid = self.get_next_available_lineage_ID()
             lineage = CellLineage(lid=lid)
         else:
-            update_data = True if lid is None else False
             inferred_lid = lineage.graph.get("lineage_ID")
-            if lid is not None and inferred_lid is not None and lid != inferred_lid:
+            if (
+                lid is not None
+                and inferred_lid is not None
+                and lid != inferred_lid
+                and not overwrite_lid
+            ):
                 raise ValueError(
                     f"Provided lid={lid} conflicts with the lineage's "
                     f"internal lineage_ID={inferred_lid}."
                 )
             lid = lid or inferred_lid or self.get_next_available_lineage_ID()
-        
+
         if lid in self.get_cell_lineage_IDs():
             raise ValueError(f"Lineage with ID {lid} already exists in the model.")
 
-        # Update the data accordingly.
-        if update_data:
-            self.data.cell_data[lid] = lineage
+        # Update the data.
+        self.data.cell_data[lid] = lineage
+        if lineage.graph.get("lineage_ID") != lid:
             lineage.graph["lineage_ID"] = lid
             nx.set_node_attributes(lineage, lid, "lineage_ID")
 
@@ -2864,8 +2874,11 @@ class Model:
         lin_ids1 = set(self.get_lineage_IDs())
         lin_ids2 = set(model.get_lineage_IDs())
         to_reid = lin_ids2.intersection(lin_ids1)
-        if to_reid:
-
+        for lin in model.get_cell_lineages():
+            if to_reid:
+                self.add_lineage()
+            else:
+                self.add_lineage(lin, lin.graph["lineage_ID"])
 
         # Solve IDs collision.
 
