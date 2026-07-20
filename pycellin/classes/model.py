@@ -1148,6 +1148,7 @@ class Model:
                 lid = self.get_next_available_lineage_ID()
             lineage = CellLineage(lid=lid)
         else:
+            update_data = True if lid is None else False
             inferred_lid = lineage.graph.get("lineage_ID")
             if lid is not None and inferred_lid is not None and lid != inferred_lid:
                 raise ValueError(
@@ -1155,14 +1156,15 @@ class Model:
                     f"internal lineage_ID={inferred_lid}."
                 )
             lid = lid or inferred_lid or self.get_next_available_lineage_ID()
-
-        # Update the data accordingly.
+        
         if lid in self.get_cell_lineage_IDs():
             raise ValueError(f"Lineage with ID {lid} already exists in the model.")
-        lineage.graph["lineage_ID"] = lid
-        self.data.cell_data[lid] = lineage
-        for cid in lineage.nodes():
-            lineage.nodes[cid]["lineage_ID"] = lid
+
+        # Update the data accordingly.
+        if update_data:
+            self.data.cell_data[lid] = lineage
+            lineage.graph["lineage_ID"] = lid
+            nx.set_node_attributes(lineage, lid, "lineage_ID")
 
         if with_CycleLineage:
             if self.data.cycle_data is None:
@@ -2863,18 +2865,7 @@ class Model:
         lin_ids2 = set(model.get_lineage_IDs())
         to_reid = lin_ids2.intersection(lin_ids1)
         if to_reid:
-            pass
-            # Should use add_lineage()
-            # new_id = max(lin_ids1) + 1
-            # for lin_id in to_reid:
-            #     lin = deepcopy(model.get_cell_lineage_from_ID(lin_id))
-            #     if len(lin) == 1:
-            #         new_id = -new_id
-            #     lin.graph["lineage_ID"] = new_id
-            #     nx.set_node_attributes(lin, new_id, "lineage_ID")
-            #     model.
 
-            # new_id = abs(new_id) + 1
 
         # Solve IDs collision.
 
