@@ -1139,25 +1139,22 @@ class Model:
         -----
         UserWarning
             If `with_CycleLineage` is True but the cycle data has not been added yet.
-            In this case, the cycle lineage cannot be computed.
+            If `with_CycleLineage` is True but the time step of the model is not defined.
+            In both theses cases, the cycle lineage is not computed.
         """
         # Determine the lineage ID to use.
-        # TODO: check (and simplify) logic?
         if lineage is None:
             if lid is None:
                 lid = self.get_next_available_lineage_ID()
             lineage = CellLineage(lid=lid)
         else:
             inferred_lid = lineage.graph.get("lineage_ID")
-            if lid is None:
-                lid = inferred_lid
-            if lid is None:
-                lid = self.get_next_available_lineage_ID()
-            if inferred_lid is not None and lid != inferred_lid:
+            if lid is not None and inferred_lid is not None and lid != inferred_lid:
                 raise ValueError(
                     f"Provided lid={lid} conflicts with the lineage's "
                     f"internal lineage_ID={inferred_lid}."
                 )
+            lid = lid or inferred_lid or self.get_next_available_lineage_ID()
 
         # Update the data accordingly.
         if lid in self.get_cell_lineage_IDs():
@@ -1169,11 +1166,22 @@ class Model:
 
         if with_CycleLineage:
             if self.data.cycle_data is None:
-                msg = f"Cannot add cycle lineage {lid} when cycle data has not been added yet."
-                warnings.warn(msg)
+                warnings.warn(
+                    f"Cannot add cycle lineage {lid} when cycle data "
+                    "has not been added yet."
+                )
             else:
-                cycle_lineage = self.data._compute_cycle_lineage(lid)
-                self.data.cycle_data[lid] = cycle_lineage
+                timestep = self.get_time_step()
+                if timestep is None:
+                    warnings.warn(
+                        f"Cannot add cycle lineage {lid} when the time step "
+                        "of the model is not defined."
+                    )
+                else:
+                    cycle_lineage = self.data._compute_cycle_lineage(
+                        self.reference_time_property, timestep, lid
+                    )
+                    self.data.cycle_data[lid] = cycle_lineage
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
