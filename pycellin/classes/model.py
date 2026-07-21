@@ -828,6 +828,30 @@ class Model:
         else:
             return None
 
+    def get_cell_lineages_from_IDs(
+        self, lids: list[int], ignore_missing: bool = True
+    ) -> list[CellLineage]:
+        """
+        Return a list of cell lineages with the specified IDs.
+
+        Parameters
+        ----------
+        lids : list[int]
+            IDs of the lineages to return.
+        ignore_missing: bool, optional
+            True to ignore  (default is True). The list of lineages might be shorter than `lids`. False to
+
+        Returns
+        -------
+        list[CellLineage]
+            The cell lineages with the specified IDs.
+        """
+        # TODO: finish docstrings
+        lins = [self.get_cell_lineage_from_ID(lid) for lid in lids]
+        if ignore_missing:
+            lins = [lin for lin in lins if lin is not None]
+        return lins
+
     def get_cycle_lineage_from_ID(self, lid: int) -> CycleLineage | None:
         """
         Return the cycle lineage with the specified ID.
@@ -846,6 +870,30 @@ class Model:
             return self.data.cycle_data[lid]
         else:
             return None
+
+    def get_cycle_lineages_from_IDs(
+        self, lids: list[int], ignore_missing: bool = True
+    ) -> list[CycleLineage]:
+        """
+        Return a list of cycle lineages with the specified IDs.
+
+        Parameters
+        ----------
+        lids : list[int]
+            IDs of the lineages to return.
+        ignore_missing: bool, optional
+            True to ignore  (default is True). The list of lineages might be shorter than `lids`. False to
+
+        Returns
+        -------
+        list[CycleLineage]
+            The cycle lineages with the specified IDs.
+        """
+        # TODO: finish docstrings
+        lins = [self.get_cycle_lineage_from_ID(lid) for lid in lids]
+        if ignore_missing:
+            lins = [lin for lin in lins if lin is not None]
+        return lins
 
     @staticmethod
     def _get_lineages_from_lin_prop(
@@ -1234,6 +1282,26 @@ class Model:
 
         return lineage
 
+    def remove_lineages(self, lids: list[int]) -> list[CellLineage]:
+        """
+        Remove the specified lineages from the model.
+
+        Parameters
+        ----------
+        lids : list[int]
+            IDs of the lineages to remove.
+
+        Returns
+        -------
+        list[CellLineage]
+            The removed lineages.
+        """
+        lins = []
+        for lid in lids:
+            lin = self.remove_lineage(lid)
+            lins.append(lin)
+        return lins
+
     def split_lineage_from_cell(
         self,
         cid: int,
@@ -1428,6 +1496,64 @@ class Model:
         self._updater._modified_lineages.add(lid)
 
         return cell_attrs
+
+    def relabel_cells(self, start_id: int = 0, unique_ids: bool = False) -> None:
+        """
+        Relabel the cells in the model to have consecutive IDs.
+
+        Parameters
+        ----------
+        start_id: int, optional
+            The starting ID for the relabeling (default is 0).
+        unique_ids : bool, optional
+            If True, cell IDs will be unique across all lineages in the model.
+            If False, cell IDs will only be unique within each lineage
+            (default is False).
+
+        Warnings
+        --------
+        If a property depends on cell IDs and is not associated with a calculator,
+        the property values cannot be updated.
+
+        Notes
+        -----
+        Within each lineage, cells are relabeled in a deterministic order:
+        a topological order (each cell is numbered after all of its ancestors,
+        so a parent always receives a smaller ID than its descendants), with
+        ties broken by the ``reference_time_property`` value and then by the
+        original cell ID. This guarantees reproducible IDs across runs and
+        across differently-built but structurally-identical lineages.
+        When ``unique_ids`` is True, lineages are processed in order of their
+        lineage ID, so global IDs are also reproducible.
+        """
+        self.update()  # better to start from a clean state, just in case
+
+        current_id = start_id
+        for lin in sorted(
+            self.get_cell_lineages(), key=lambda graph: graph.graph["lineage_ID"]
+        ):
+            if not unique_ids:
+                current_id = start_id
+
+            ordered = list(
+                nx.lexicographical_topological_sort(
+                    lin, key=lambda n: (lin.nodes[n][self.reference_time_property], n)
+                )
+            )
+            # Temporary relabeling to guard against cycles (e.g. {0: 55, 55: 0}).
+            tmp_mapping = {cid: ("__tmp__", i) for i, cid in enumerate(ordered)}
+            nx.relabel_nodes(lin, tmp_mapping, copy=False)
+
+            final_mapping = {("__tmp__", i): current_id + i for i in range(len(ordered))}
+            current_id += len(ordered)
+            nx.relabel_nodes(lin, final_mapping, copy=False)
+
+            for cid in lin.nodes():
+                lin.nodes[cid]["cell_ID"] = cid
+
+        # Full update in case of CycleLineages or of properties depending on cell IDs.
+        self.prepare_full_data_update()
+        self.update()
 
     def add_link(
         self,
@@ -2828,10 +2954,14 @@ class Model:
             self.props_metadata.props[prop].lin_type = "Lineage"
 
     def merge(
-        self, model: "Model", new_name: str | None = None, unique_cell_ids: bool = False
-    ) -> None:
+        self,
+        model: "Model",
+        new_name: str | None = None,
+        in_place: bool = False,
+        unique_cell_ids: bool = False,
+    ) -> "Model":
         """
-        Merge another model into this one.
+        Merge another model into this one, returning the merged model.
 
         Parameters
         ----------
@@ -2840,49 +2970,146 @@ class Model:
         new_name : str | None, optional
             The name of the merged model. If None, the name of the first model is used.
             Default is None.
+        in_place : bool, optional
+            Whether to merge the model in place or return a new model. Default is False.
         unique_cell_ids : bool, optional
             Whether to ensure unique cell IDs in the merged model. Default is False.
 
+        Returns
+        -------
+        Model
+            The merged model. If ``in_place`` is True, this is ``self`` (mutated);
+            otherwise it is a new, independent copy and ``self`` is left unchanged.
+
         Notes
         -----
-        Regarding properties
+        The argument ``model`` is never modified; it is deep-copied internally.
+
+        Regarding properties:
         This method assumes that 2 properties with an identical identifier (one from
         each model) are strictly identical (type, lineage type, calculator...). If not
-        data and metadata related to the property in the model in argument will be lost.
+        data and metadata related to the property in the model argument will be lost.
         """
-        # TODO: in place or not?
+        if in_place:
+            model1 = self
+        else:
+            model1 = deepcopy(self)
+        model2 = deepcopy(model)
+        if new_name is not None:
+            model1.model_metadata.name = new_name
+
+        # Standard model metadata compatibility.
+        md1 = model1.model_metadata.get_standard_metadata()
+        md2 = model2.model_metadata.get_standard_metadata()
+        if md1 != md2:
+            all_fields = md1.keys() | md2.keys()
+            diff = {
+                field: {"self_model": md1.get(field), "argument_model": md2.get(field)}
+                for field in all_fields
+                if md1.get(field) != md2.get(field)
+            }
+            raise ValueError(f"Model metadata is not compatible: {diff}")
+
         # Properties.
-        prop_ids1 = set(self.get_properties().keys())
-        props2 = model.get_properties()
+        prop_ids1 = set(model1.get_properties().keys())
+        props2 = model2.get_properties()
         prop_ids2 = set(props2.keys())
         props_to_add = prop_ids2.difference(prop_ids1)
-        dict_calcs2 = model._updater._calculators
+        dict_calcs2 = model2._updater._calculators
 
         for prop_id in props_to_add:
             prop = props2[prop_id]
             calc = dict_calcs2.get(prop_id)
 
             if calc is None:  # register just the metadata
-                self.props_metadata._add_prop(prop)
+                model1.props_metadata._add_prop(prop)
             else:  # register both metadata and calculator
-                self.add_custom_property(calc)
+                model1.add_custom_property(calc)
 
-            if prop_id in model.props_metadata._protected_props:
-                self.props_metadata._protect_prop(prop_id)
+            if prop_id in model2.props_metadata._protected_props:
+                model1.props_metadata._protect_prop(prop_id)
 
         # Lineages.
-        lin_ids1 = set(self.get_lineage_IDs())
-        lin_ids2 = set(model.get_lineage_IDs())
+        lin_ids1 = set(model1.get_cell_lineage_IDs())
+        lin_ids2 = set(model2.get_cell_lineage_IDs())
         to_reid = lin_ids2.intersection(lin_ids1)
-        for lin in model.get_cell_lineages():
-            if to_reid:
-                self.add_lineage()
+        new_lids = []
+        for lin in model2.get_cell_lineages():
+            current_lid = lin.graph.get("lineage_ID")
+            if current_lid is not None and current_lid in to_reid:
+                available_lid = model1.get_next_available_lineage_ID()
+                new_lid = model1.add_lineage(lin, available_lid, overwrite_lid=True)
             else:
-                self.add_lineage(lin, lin.graph["lineage_ID"])
+                new_lid = model1.add_lineage(lin)
+            new_lids.append(new_lid)
 
         # Solve IDs collision.
+        if unique_cell_ids:
+            model1.relabel_cells(unique_ids=True)
 
-        # Solve metadata collision.
+        # Solve custom model metadata collision by transforming into Lineage property.
+        md1 = model1.model_metadata.get_custom_metadata()
+        md2 = model2.model_metadata.get_custom_metadata()
+        if md1 != md2:
+            all_fields = md1.keys() | md2.keys()
+            diff = {
+                field: {"self_model": md1.get(field), "argument_model": md2.get(field)}
+                for field in all_fields
+                if md1.get(field) != md2.get(field)
+            }
+
+            for field, value in diff.items():
+                # Remove from model metadata.
+                if hasattr(model1.model_metadata, field):
+                    delattr(model1.model_metadata, field)
+
+                # Register as a new property (but no calculator).
+                new_prop = Property(
+                    identifier=field,
+                    name=field,
+                    description=field,
+                    provenance="merge models",
+                    prop_type=PropertyType.LINEAGE,
+                    lin_type="CellLineage",
+                    dtype="str",
+                )
+                model1.props_metadata._add_prop(new_prop)
+
+                # Set values on lineages.
+                value1, value2 = value["self_model"], value["argument_model"]
+                for lin in model1.get_cell_lineages():
+                    value_to_add = (
+                        value2 if lin.graph["lineage_ID"] in new_lids else value1
+                    )
+                    if value_to_add is not None:
+                        lin.graph[field] = value_to_add
+
+        return model1
+
+    def split(self, lin_id_groups: dict[str, list[int]]) -> list["Model"]:
+        """
+        Split the model into a list of models.
+
+        Parameters
+        ----------
+        lin_id_groups: dict[str, list[int]]
+            Dictionary mapping new model names to lists of lineage IDs. Each list
+            will be used to create a new model containing only the lineages
+            with the specified IDs.
+
+        Returns
+        -------
+        list[Model]
+            List of models created from the specified lineage ID groups.
+        """
+        models = []
+        for name, lids in lin_id_groups.items():
+            model = deepcopy(self)
+            model.remove_lineages(lids)
+            model.model_metadata.name = name
+            models.append(model)
+
+        return models
 
     def to_cell_dataframe(self, lids: list[int] | None = None) -> pd.DataFrame:
         """
