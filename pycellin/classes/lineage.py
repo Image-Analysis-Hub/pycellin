@@ -1204,31 +1204,31 @@ class CellLineage(Lineage):
                 )
         return ancestors
 
-    def get_single_cell_lineage(
+    def get_branch_lineage(
         self,
-        cid: int,
+        target_cell: int,
+        source_cell: int | None = None,
         generations: int | None = None,
-        start_cell: int | None = None,
     ) -> CellLineage:
         """
         Return the single-cell branch ending at the given cell.
 
         The extracted lineage contains the path from an upstream ancestor to
-        `cid`. The original lineage is not modified.
+        `target_cell`. The original lineage is not modified.
 
         Parameters
         ----------
-        cid : int
+        target_cell : int
             ID of the target cell. This can be a leaf, or any cell at a
             specified timepoint.
         generations : int, optional
             Number of upstream division generations to include. If None,
-            return the path from the root to `cid`. If 1, return the current
-            generation from the closest upstream division or root to `cid`.
+            return the path from the root to `target_cell`. If 1, return the current
+            generation from the closest upstream division or root to `target_cell`.
             Higher values include more upstream division generations.
-        start_cell : int, optional
+        source_cell : int, optional
             ID of the cell where the branch should start. If given, return the
-            path from `start_cell` to `cid`. Cannot be used together with
+            path from `source_cell` to `target_cell`. Cannot be used together with
             `generations`.
 
         Returns
@@ -1242,25 +1242,25 @@ class CellLineage(Lineage):
             If the cell does not exist in the lineage.
         ValueError
             If generations is not a positive integer or None, if generations
-            and start_cell are both given, or if start_cell is not upstream of
-            cid.
+            and source_cell are both given, or if source_cell is not upstream of
+            target_cell.
         """
-        if generations is not None and start_cell is not None:
-            raise ValueError("generations and start_cell cannot both be specified.")
+        if generations is not None and source_cell is not None:
+            raise ValueError("generations and source_cell cannot both be specified.")
         if generations is not None and generations <= 0:
             raise ValueError("generations must be a positive integer or None.")
 
         # Work on the direct ancestor path only: root/ancestor cells first,
         # target cell last. The returned branch is a slice of this path.
-        path = self.get_ancestors(cid) + [cid]
+        path = self.get_ancestors(target_cell) + [target_cell]
 
-        if start_cell is not None:
-            # Explicit start-cell mode: keep the path from start_cell to cid.
+        if source_cell is not None:
+            # Explicit start-cell mode: keep the path from source_cell to target_cell.
             try:
-                start_idx = path.index(start_cell)
+                start_idx = path.index(source_cell)
             except ValueError as err:
                 raise ValueError(
-                    f"Cell {start_cell} is not upstream of target cell {cid}."
+                    f"Cell {source_cell} is not upstream of target cell {target_cell}."
                 ) from err
         elif generations is None:
             start_idx = 0
@@ -1290,17 +1290,17 @@ class CellLineage(Lineage):
         for source, target in pairwise(selected_path):
             branch.add_edge(source, target, **self.edges[source, target])
         branch.graph["source_lineage_ID"] = self.graph.get("lineage_ID")
-        branch.graph["target_cell_ID"] = cid
+        branch.graph["target_cell_ID"] = target_cell
         branch.graph["included_generations"] = generations
-        branch.graph["start_cell_ID"] = start_cell
+        branch.graph["source_cell_ID"] = source_cell
         return branch
 
-    def get_single_cell_lineage_highlight(
+    def get_branches_lineage_highlight(
         self,
-        cid: int | list[int],
-        generations: int | None = None,
+        target_cell: int | list[int],
+        source_cell: int | list[int] | None = None,
+        generations: int | None = None, 
         highlight_prop: str = "selected_branch",
-        start_cell: int | list[int] | None = None,
     ) -> CellLineage:
         """
         Return a copy of the full lineage with single-cell branches marked.
@@ -1311,17 +1311,17 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        cid : int or list[int]
+        target_cell : int or list[int]
             ID of the target cell, or IDs of several target cells. If several
             cells are passed, the highlighted nodes are the union of their
             single-cell branches.
         generations : int, optional
             Number of upstream division generations to include. If None,
             highlight the path from the root to each target cell.
-        start_cell : int or list[int], optional
+        source_cell : int or list[int], optional
             ID of the cell where each highlighted branch should start. If a
             single ID is passed, it is used for every target cell. If a list is
-            passed, it must have the same length as `cid`, and starts are
+            passed, it must have the same length as `target_cell`, and starts are
             paired with targets by position. Cannot be used together with
             `generations`.
         highlight_prop : str, optional
@@ -1333,18 +1333,18 @@ class CellLineage(Lineage):
         CellLineage
             A copy of the full lineage with the selected branches marked.
         """
-        is_single_target, target_cids, start_cells = (
-            self._normalize_single_cell_lineage_inputs(cid, start_cell, "cid")
+        is_single_target, target_target_cells, source_cells = (
+            self._normalize_single_cell_lineage_inputs(target_cell, source_cell, "target_cell")
         )
 
         # Each set contains the cells in one selected single-cell lineage branch.
         branch_node_sets = [
             set(
                 self.get_single_cell_lineage(
-                    target_cid, generations, start_cell=target_start_cell
+                    target_target_cell, generations, source_cell=target_source_cell
                 ).nodes()
             )
-            for target_cid, target_start_cell in zip(target_cids, start_cells)
+            for target_target_cell, target_source_cell in zip(target_target_cells, source_cells)
         ]
 
         # If selected branches touch or converge, they form one connected group
@@ -1353,7 +1353,7 @@ class CellLineage(Lineage):
         selected_components = list(
             nx.connected_components(self.subgraph(branch_nodes).to_undirected())
         )
-        # Keep colors stable by ordering groups according to target_cids order.
+        # Keep colors stable by ordering groups according to target_target_cells order.
         selected_components.sort(
             key=lambda component: min(
                 index
@@ -1374,16 +1374,16 @@ class CellLineage(Lineage):
         nx.set_node_attributes(highlighted_lineage, highlight_values, highlight_prop)
 
         if is_single_target:
-            highlighted_lineage.graph["target_cell_ID"] = cid
+            highlighted_lineage.graph["target_cell_ID"] = target_cell
         else:
-            highlighted_lineage.graph["target_cell_IDs"] = list(cid)
+            highlighted_lineage.graph["target_cell_IDs"] = list(target_cell)
 
         highlighted_lineage.graph["included_generations"] = generations
 
-        if isinstance(start_cell, list):
-            highlighted_lineage.graph["start_cell_IDs"] = list(start_cell)
+        if isinstance(source_cell, list):
+            highlighted_lineage.graph["source_cell_IDs"] = list(source_cell)
         else:
-            highlighted_lineage.graph["start_cell_ID"] = start_cell
+            highlighted_lineage.graph["source_cell_ID"] = source_cell
 
         highlighted_lineage.graph["highlight_prop"] = highlight_prop
         highlighted_lineage.graph["highlight_group_count"] = len(selected_components)
@@ -1726,7 +1726,7 @@ class CellLineage(Lineage):
         ID_prop: str = "cell_ID",
         y_prop: Property | None = None,
         title: str | None = None,
-        single_cell_lineage: int | list[int] | None = None,
+        target_cells: int | list[int] | None = None,
         generations: int | None = None,
         start_cell: int | list[int] | None = None,
         highlight_prop: str = "selected_branch",
@@ -1758,18 +1758,18 @@ class CellLineage(Lineage):
             Property.name and Property.unit.
         title : str, optional
             The title of the plot. If None, no title is displayed.
-        single_cell_lineage : int or list[int], optional
+        target_cells : int or list[int], optional
             ID of the target cell, or IDs of several target cells, for plotting
             highlighted single-cell branches. If None, plot the whole lineage
             normally.
         generations : int, optional
             Number of upstream division generations to include when
-            `single_cell_lineage` is set. If None, use the path from the root
+            `target_cells` is set. If None, use the path from the root
             to each target cell.
         start_cell : int or list[int], optional
             ID of the cell where the highlighted branch should start. If a
             single ID is passed, it is used for every target cell. If a list is
-            passed, it must have the same length as `single_cell_lineage`, and
+            passed, it must have the same length as `target_cells`, and
             starts are paired with targets by position. Cannot be used together
             with `generations`.
         highlight_prop : str, optional
@@ -1841,11 +1841,11 @@ class CellLineage(Lineage):
         get_tree_figure : Generate the figure without displaying it.
         """
         lineage_to_plot = self
-        if single_cell_lineage is not None:
+        if target_cells is not None:
             # Keep using the tree plotting path, but first make a copy of the
             # lineage where the selected single-cell branch(es) are marked.
-            lineage_to_plot = self.get_single_cell_lineage_highlight(
-                single_cell_lineage,
+            lineage_to_plot = self.get_target_cells_highlight(
+                target_cells,
                 generations=generations,
                 highlight_prop=highlight_prop,
                 start_cell=start_cell,
@@ -1888,10 +1888,10 @@ class CellLineage(Lineage):
         fig.show()
 
     def plot_single_cell_property(
+    #def get_branch_property_figure(
         self,
-        single_cell_lineage: int | list[int],
         y_prop: str | Property,
-        x_prop: str | Property = "timepoint",
+        single_cell_lineage: int | list[int],
         generations: int | None = None,
         start_cell: int | list[int] | None = None,
     ) -> go.Figure:
