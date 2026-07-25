@@ -1368,6 +1368,7 @@ class CellLineage(Lineage):
             for node in component
         }
 
+# TODO: think about using a view or deepcopy to avoid messing with container attributes
         highlighted_lineage = self.copy()
         # First mark every cell as unselected, then overwrite the selected cells.
         nx.set_node_attributes(highlighted_lineage, 0, highlight_prop)
