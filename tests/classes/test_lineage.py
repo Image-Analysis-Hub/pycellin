@@ -1455,6 +1455,31 @@ class TestCellLineageGetDivisions:
 class TestCellLineageGetCellCycle:
     """Test cases for CellLineage.get_cell_cycle method."""
 
+    def test_normal_lineage(self, cell_lin):
+        """Test get_divisions on normal lineage."""
+        expected = [2, 4, 8, 14]
+        assert sorted(cell_lin.get_divisions()) == sorted(expected)
+
+    def test_empty_lineage(self, empty_cell_lin):
+        """Test get_divisions on empty lineage."""
+        assert empty_cell_lin.get_divisions() == []
+
+    def test_single_node(self, one_node_cell_lin):
+        """Test get_divisions on single node lineage."""
+        assert one_node_cell_lin.get_divisions() == []
+
+    def test_gap(self, cell_lin_gap):
+        """Test get_divisions on lineage with gaps."""
+        assert sorted(cell_lin_gap.get_divisions()) == [2, 4, 8, 14]
+        assert sorted(cell_lin_gap.get_divisions([1, 2, 3, 4, 6, 8, 9, 10])) == [
+            2,
+            4,
+            8,
+        ]
+        assert sorted(cell_lin_gap.get_divisions([1, 2, 3, 4])) == [2, 4]
+        assert sorted(cell_lin_gap.get_divisions([4])) == [4]
+        assert sorted(cell_lin_gap.get_divisions([1, 3, 11, 15, 16])) == []
+
     def test_normal_lin(self, cell_lin):
         """Test get_cell_cycle on normal lineage."""
         # From root.
