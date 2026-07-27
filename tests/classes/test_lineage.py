@@ -1159,13 +1159,13 @@ class TestCellLineageRemoveLink:
 # CellLineage advanced operations
 
 
-class TestCellLineageGetSingleCellLineageHighlight:
-    """Test cases for CellLineage.get_single_cell_lineage_highlight method."""
+class TestCellLineageGetBranchLineageHighlight:
+    """Test cases for CellLineage.get_branch_lineage_highlight method."""
 
-    def test_multiple_targets_with_paired_start_cells(self, cell_lin):
-        """Test highlighting multiple branches with paired start cells."""
-        highlighted = cell_lin.get_single_cell_lineage_highlight(
-            [6, 16], start_cell=[4, 14]
+    def test_multiple_targets_with_paired_source_cells(self, cell_lin):
+        """Test highlighting multiple branches with paired source cells."""
+        highlighted = cell_lin.get_branch_lineage_highlight(
+            [6, 16], source_cell=[4, 14]
         )
 
         selected = [
@@ -1175,7 +1175,7 @@ class TestCellLineageGetSingleCellLineageHighlight:
         ]
 
         assert sorted(selected) == [4, 5, 6, 14, 16]
-        assert highlighted.graph["start_cell_IDs"] == [4, 14]
+        assert highlighted.graph["source_cell_IDs"] == [4, 14]
         assert highlighted.graph["highlight_group_count"] == 2
         first_branch_values = {
             highlighted.nodes[node]["selected_branch"] for node in [4, 5, 6]
@@ -1186,24 +1186,24 @@ class TestCellLineageGetSingleCellLineageHighlight:
         assert first_branch_values == {1}
         assert second_branch_values == {2}
 
-    def test_start_cell_list_requires_target_list(self, cell_lin):
-        """Test that a start-cell list requires a target-cell list."""
-        with pytest.raises(ValueError, match="cid is also a list"):
-            cell_lin.get_single_cell_lineage_highlight(6, start_cell=[4])
+    def test_source_cell_list_requires_target_list(self, cell_lin):
+        """Test that a source-cell list requires a target-cell list."""
+        with pytest.raises(ValueError, match="target_cell is also a list"):
+            cell_lin.get_branch_lineage_highlight(6, source_cell=[4])
 
-    def test_start_cell_list_must_match_targets_length(self, cell_lin):
-        """Test that paired start-cell and target-cell lists have equal length."""
+    def test_source_cell_list_must_match_targets_length(self, cell_lin):
+        """Test that paired source-cell and target-cell lists have equal length."""
         with pytest.raises(ValueError, match="same length"):
-            cell_lin.get_single_cell_lineage_highlight([6, 16], start_cell=[4])
+            cell_lin.get_branch_lineage_highlight([6, 16], source_cell=[4])
 
 
-class TestCellLineagePlotSingleCellProperty:
-    """Test cases for CellLineage.plot_single_cell_property method."""
+class TestCellLineageGetBranchPropertyFigure:
+    """Test cases for CellLineage.get_branch_property_figure method."""
 
     def test_multiple_targets_create_multiple_traces(self, cell_lin):
         """Test plotting multiple target cells as separate traces."""
-        fig = cell_lin.plot_single_cell_property(
-            single_cell_lineage=[6, 16],
+        fig = cell_lin.get_branch_property_figure(
+            target_cells=[6, 16],
             y_prop="timepoint",
         )
 
@@ -1216,11 +1216,11 @@ class TestCellLineagePlotSingleCellProperty:
         assert fig.data[1].marker.color == HIGHLIGHT_COLORS[1]
         assert fig.layout.showlegend is True
 
-    def test_multiple_targets_with_paired_start_cells(self, cell_lin):
-        """Test property plotting with paired target and start cells."""
-        fig = cell_lin.plot_single_cell_property(
-            single_cell_lineage=[6, 16],
-            start_cell=[4, 14],
+    def test_multiple_targets_with_paired_source_cells(self, cell_lin):
+        """Test property plotting with paired target and source cells."""
+        fig = cell_lin.get_branch_property_figure(
+            target_cells=[6, 16],
+            source_cell=[4, 14],
             y_prop="timepoint",
         )
 
@@ -1232,14 +1232,44 @@ class TestCellLineagePlotSingleCellProperty:
         assert list(fig.data[0].marker.symbol) == ["triangle-up", "circle", "circle"]
         assert list(fig.data[1].marker.symbol) == ["triangle-up", "circle"]
 
-    def test_start_cell_list_must_match_targets(self, cell_lin):
+    def test_source_cell_list_must_match_targets(self, cell_lin):
         """Test that property plotting rejects mismatched paired lists."""
         with pytest.raises(ValueError, match="same length"):
-            cell_lin.plot_single_cell_property(
-                single_cell_lineage=[6, 16],
-                start_cell=[4],
+            cell_lin.get_branch_property_figure(
+                target_cells=[6, 16],
+                source_cell=[4],
                 y_prop="timepoint",
             )
+class TestCellLineagePlotBranchProperty:
+    """Test cases for CellLineage.plot_branch_property method."""
+
+    def test_shows_figure(self, cell_lin, monkeypatch):
+        fig = cell_lin.get_branch_property_figure(
+            target_cells=6,
+            y_prop="timepoint",
+        )
+
+        shown = False
+
+        def fake_show():
+            nonlocal shown
+            shown = True
+
+
+        monkeypatch.setattr(fig, "show", fake_show)
+        monkeypatch.setattr(
+            cell_lin,
+            "get_branch_property_figure",
+            lambda **kwargs: fig
+        )
+
+        result = cell_lin.plot_branch_property(
+            target_cells=6,
+            y_prop="timepoint"
+        )
+
+        assert result is None
+        assert shown is True
 
 
 class TestCellLineageSplitFromCell:
