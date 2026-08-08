@@ -13,6 +13,7 @@ from pycellin.classes.exceptions import (
     TimeFlowError,
     LineageStructureError,
 )
+from pycellin.classes.lineage import HIGHLIGHT_COLORS
 from pycellin.custom_types import PropertyType
 
 
@@ -1158,6 +1159,119 @@ class TestCellLineageRemoveLink:
 # CellLineage advanced operations
 
 
+class TestCellLineageGetBranchLineageHighlight:
+    """Test cases for CellLineage.get_branch_lineage_highlight method."""
+
+    def test_multiple_targets_with_paired_source_cells(self, cell_lin):
+        """Test highlighting multiple branches with paired source cells."""
+        highlighted = cell_lin.get_branch_lineage_highlight(
+            [6, 16], source_cell=[4, 14]
+        )
+
+        selected = [
+            node
+            for node in highlighted.nodes()
+            if highlighted.nodes[node]["selected_branch"] != 0
+        ]
+
+        assert sorted(selected) == [4, 5, 6, 14, 16]
+        assert highlighted.graph["source_cell_IDs"] == [4, 14]
+        assert highlighted.graph["highlight_group_count"] == 2
+        first_branch_values = {
+            highlighted.nodes[node]["selected_branch"] for node in [4, 5, 6]
+        }
+        second_branch_values = {
+            highlighted.nodes[node]["selected_branch"] for node in [14, 16]
+        }
+        assert first_branch_values == {1}
+        assert second_branch_values == {2}
+
+    def test_source_cell_list_requires_target_list(self, cell_lin):
+        """Test that a source-cell list requires a target-cell list."""
+        with pytest.raises(ValueError, match="target_cell is also a list"):
+            cell_lin.get_branch_lineage_highlight(6, source_cell=[4])
+
+    def test_source_cell_list_must_match_targets_length(self, cell_lin):
+        """Test that paired source-cell and target-cell lists have equal length."""
+        with pytest.raises(ValueError, match="same length"):
+            cell_lin.get_branch_lineage_highlight([6, 16], source_cell=[4])
+
+
+class TestCellLineageGetBranchPropertyFigure:
+    """Test cases for CellLineage.get_branch_property_figure method."""
+
+    def test_multiple_targets_create_multiple_traces(self, cell_lin):
+        """Test plotting multiple target cells as separate traces."""
+        fig = cell_lin.get_branch_property_figure(
+            target_cells=[6, 16],
+            y_prop="timepoint",
+        )
+
+        assert len(fig.data) == 2
+        assert fig.data[0].name == "timepoint (6)"
+        assert fig.data[1].name == "timepoint (16)"
+        assert list(fig.data[0].x) == [0, 1, 2, 3, 4, 5]
+        assert list(fig.data[1].x) == [0, 1, 2, 3, 4, 5, 6]
+        assert fig.data[0].marker.color == HIGHLIGHT_COLORS[0]
+        assert fig.data[1].marker.color == HIGHLIGHT_COLORS[1]
+        assert fig.layout.showlegend is True
+
+    def test_multiple_targets_with_paired_source_cells(self, cell_lin):
+        """Test property plotting with paired target and source cells."""
+        fig = cell_lin.get_branch_property_figure(
+            target_cells=[6, 16],
+            source_cell=[4, 14],
+            y_prop="timepoint",
+        )
+
+        assert len(fig.data) == 2
+        assert list(fig.data[0].x) == [3, 4, 5]
+        assert list(fig.data[1].x) == [5, 6]
+        assert fig.data[0].marker.color == HIGHLIGHT_COLORS[0]
+        assert fig.data[1].marker.color == HIGHLIGHT_COLORS[1]
+        assert list(fig.data[0].marker.symbol) == ["triangle-up", "circle", "circle"]
+        assert list(fig.data[1].marker.symbol) == ["triangle-up", "circle"]
+
+    def test_source_cell_list_must_match_targets(self, cell_lin):
+        """Test that property plotting rejects mismatched paired lists."""
+        with pytest.raises(ValueError, match="same length"):
+            cell_lin.get_branch_property_figure(
+                target_cells=[6, 16],
+                source_cell=[4],
+                y_prop="timepoint",
+            )
+class TestCellLineagePlotBranchProperty:
+    """Test cases for CellLineage.plot_branch_property method."""
+
+    def test_shows_figure(self, cell_lin, monkeypatch):
+        fig = cell_lin.get_branch_property_figure(
+            target_cells=6,
+            y_prop="timepoint",
+        )
+
+        shown = False
+
+        def fake_show():
+            nonlocal shown
+            shown = True
+
+
+        monkeypatch.setattr(fig, "show", fake_show)
+        monkeypatch.setattr(
+            cell_lin,
+            "get_branch_property_figure",
+            lambda **kwargs: fig
+        )
+
+        result = cell_lin.plot_branch_property(
+            target_cells=6,
+            y_prop="timepoint"
+        )
+
+        assert result is None
+        assert shown is True
+
+
 class TestCellLineageSplitFromCell:
     """Test cases for CellLineage.split_from_cell method."""
 
@@ -1283,32 +1397,7 @@ class TestCellLineageSplitFromCell:
 
 class TestCellLineageGetDivisions:
     """Test cases for CellLineage.get_divisions method."""
-
-    def test_normal_lineage(self, cell_lin):
-        """Test get_divisions on normal lineage."""
-        expected = [2, 4, 8, 14]
-        assert sorted(cell_lin.get_divisions()) == sorted(expected)
-
-    def test_empty_lineage(self, empty_cell_lin):
-        """Test get_divisions on empty lineage."""
-        assert empty_cell_lin.get_divisions() == []
-
-    def test_single_node(self, one_node_cell_lin):
-        """Test get_divisions on single node lineage."""
-        assert one_node_cell_lin.get_divisions() == []
-
-    def test_gap(self, cell_lin_gap):
-        """Test get_divisions on lineage with gaps."""
-        assert sorted(cell_lin_gap.get_divisions()) == [2, 4, 8, 14]
-        assert sorted(cell_lin_gap.get_divisions([1, 2, 3, 4, 6, 8, 9, 10])) == [
-            2,
-            4,
-            8,
-        ]
-        assert sorted(cell_lin_gap.get_divisions([1, 2, 3, 4])) == [2, 4]
-        assert sorted(cell_lin_gap.get_divisions([4])) == [4]
-        assert sorted(cell_lin_gap.get_divisions([1, 3, 11, 15, 16])) == []
-
+    
     def test_div_root(self, cell_lin_div_root):
         """Test get_divisions on lineage with division root."""
         lin = cell_lin_div_root
@@ -1365,6 +1454,31 @@ class TestCellLineageGetDivisions:
 
 class TestCellLineageGetCellCycle:
     """Test cases for CellLineage.get_cell_cycle method."""
+
+    def test_normal_lineage(self, cell_lin):
+        """Test get_divisions on normal lineage."""
+        expected = [2, 4, 8, 14]
+        assert sorted(cell_lin.get_divisions()) == sorted(expected)
+
+    def test_empty_lineage(self, empty_cell_lin):
+        """Test get_divisions on empty lineage."""
+        assert empty_cell_lin.get_divisions() == []
+
+    def test_single_node(self, one_node_cell_lin):
+        """Test get_divisions on single node lineage."""
+        assert one_node_cell_lin.get_divisions() == []
+
+    def test_gap(self, cell_lin_gap):
+        """Test get_divisions on lineage with gaps."""
+        assert sorted(cell_lin_gap.get_divisions()) == [2, 4, 8, 14]
+        assert sorted(cell_lin_gap.get_divisions([1, 2, 3, 4, 6, 8, 9, 10])) == [
+            2,
+            4,
+            8,
+        ]
+        assert sorted(cell_lin_gap.get_divisions([1, 2, 3, 4])) == [2, 4]
+        assert sorted(cell_lin_gap.get_divisions([4])) == [4]
+        assert sorted(cell_lin_gap.get_divisions([1, 3, 11, 15, 16])) == []
 
     def test_normal_lin(self, cell_lin):
         """Test get_cell_cycle on normal lineage."""
