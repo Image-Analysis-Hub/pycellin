@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+
 from __future__ import annotations
 
 import warnings
 from abc import ABCMeta, abstractmethod
+from collections.abc import Iterator
 from itertools import pairwise
-from typing import Any, Generator, Literal, Tuple
+from typing import Any, Literal
 
 import networkx as nx
 import plotly.express as px # import Plotly colormaps
@@ -23,7 +24,7 @@ from pycellin.styling import PYCELLIN_PURPLE
 
 _DEFAULT_UNMAPPED_COLOR = "dimgrey"
 
-# TODO: all the visuzalization functionalities will be refined and moved to a dedicated
+# TODO: all the visualization functionalities will be refined and moved to a dedicated
 # subpackage.
 
 UNSELECTED_HIGHLIGHT_COLOR = "lightgray"
@@ -77,7 +78,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Raises
         ------
-        ValueError
+        TypeError
             If prop_type is provided but is not a valid PropertyType Flag.
 
         Examples
@@ -100,7 +101,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         # Validate prop_type.
         if not isinstance(prop_type, PropertyType):
-            raise ValueError("Invalid prop_type. Must be a PropertyType Flag or None.")
+            raise TypeError("Invalid prop_type. Must be a PropertyType Flag or None.")
 
         # Remove from specified type(s) only.
         if PropertyType.NODE in prop_type:
@@ -229,10 +230,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         bool
             True if the node is a root node, False otherwise.
         """
-        if self.in_degree(nid) == 0:
-            return True
-        else:
-            return False
+        return self.in_degree(nid) == 0
 
     def is_leaf(self, nid: int) -> bool:
         """
@@ -250,10 +248,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         bool
             True if the node is a leaf node, False otherwise.
         """
-        if self.out_degree(nid) == 0:
-            return True
-        else:
-            return False
+        return self.out_degree(nid) == 0
 
     def get_fusions(self) -> list[int]:
         """
@@ -412,19 +407,18 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_labels = G.vs[node_text]
         if len(node_labels) != nodes_count:
             raise ValueError("The lists pos and text must have the same length.")
-        annotations = []
-        for k in range(nodes_count):
-            annotations.append(
-                dict(
-                    text=node_labels[k],
-                    x=positions[k][0],
-                    y=positions[k][1],
-                    xref="x1",
-                    yref="y1",
-                    font=node_text_font,
-                    showarrow=False,
-                )
-            )
+        annotations = [
+            {
+                "text": node_labels[k],
+                "x": positions[k][0],
+                "y": positions[k][1],
+                "xref": "x1",
+                "yref": "y1",
+                "font": node_text_font,
+                "showarrow": False,
+            }
+            for k in range(nodes_count)
+        ]
         return annotations
 
     def _apply_node_color_mapping(
@@ -484,7 +478,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         return {
             "color": color_values,
             "colorscale": node_colormap,
-            "colorbar": dict(title=node_colormap_prop),
+            "colorbar": {"title": node_colormap_prop},
         }
 
     def _build_node_hover_text(
@@ -923,7 +917,7 @@ class CellLineage(Lineage):
         self,
         nid: int | None = None,
         time_prop_name: str = "timepoint",
-        time_prop_value: int | float = 0,
+        time_prop_value: float = 0,
         timepoint: int | None = None,
         **cell_props,
     ) -> int:
@@ -937,7 +931,7 @@ class CellLineage(Lineage):
             available node ID is used.
         time_prop_name : str, optional
             The name of the time property. Default is "timepoint".
-        time_prop_value : int | float, optional
+        time_prop_value : float, optional
             The value of the time property. Default is 0.
         timepoint : int, optional
             The timepoint value to set for the cell. If None, it is not set.
@@ -1620,10 +1614,7 @@ class CellLineage(Lineage):
         bool
             True if the cell is a division cell, False otherwise.
         """
-        if self.in_degree(cid) <= 1 and self.out_degree(cid) > 1:  # type: ignore
-            return True
-        else:
-            return False
+        return self.in_degree(cid) <= 1 and self.out_degree(cid) > 1
 
     # def get_cousin_cells(
     #     self, node: int, max_ancestry_level: int = 0
@@ -2317,9 +2308,7 @@ class CycleLineage(Lineage):
         """
         return list(pairwise(self.nodes[ccid]["cells"]))
 
-    def yield_links_within_cycle(
-        self, ccid: int
-    ) -> Generator[Tuple[int, int], None, None]:
+    def yield_links_within_cycle(self, ccid: int) -> Iterator[tuple[int, int]]:
         """
         Yield all the links between the cells of a cell cycle.
 
@@ -2335,8 +2324,7 @@ class CycleLineage(Lineage):
         tuple(int, int)
             The links between the cells of a cell cycle.
         """
-        for edge in pairwise(self.nodes[ccid]["cells"]):
-            yield edge
+        yield from pairwise(self.nodes[ccid]["cells"])
 
     def get_tree_figure(
         self,
