@@ -271,15 +271,15 @@ def _identify_space_props(
         If any of the provided space properties are not found in the graph.
     """
     space_keys = [cell_x_key, cell_y_key, cell_z_key]
+    print(f"Initial space keys: {space_keys}")
     for i, key in enumerate(space_keys):
-        if key is not None:
-            if not _graph_has_node_prop(geff_graph, key):
-                logger.info(
-                    f"The provided property '{key}' is not present in the graph. "
-                    "It will be inferred from GEFF metadata, if possible.",
-                    stacklevel=3,
-                )
-                space_keys[i] = None
+        if key is not None and not _graph_has_node_prop(geff_graph, key):
+            logger.info(
+                f"The provided property '{key}' is not present in the graph. "
+                "It will be inferred from GEFF metadata, if possible.",
+                stacklevel=3,
+            )
+            space_keys[i] = None
 
     # Fallback to GEFF display hints.
     hints = geff_md.display_hints if geff_md is not None else None

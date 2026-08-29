@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import pickle
 import warnings
@@ -14,8 +13,6 @@ import pandas as pd
 import plotly.graph_objects as go
 
 import pycellin.graph.properties.morphology as morpho
-import pycellin.graph.properties.motion as motion
-import pycellin.graph.properties.tracking as tracking
 import pycellin.graph.properties.utils as futils
 from pycellin.classes.data import Data
 from pycellin.classes.exceptions import FusionError, ProtectedPropertyError
@@ -26,6 +23,7 @@ from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.classes.updater import ModelUpdater
 from pycellin.custom_types import Cell, Link, PropertyType, property_type_from_string
+from pycellin.graph.properties import motion, tracking
 from pycellin.graph.properties.core import (
     Timepoint,
     create_timepoint_property,
@@ -482,7 +480,7 @@ class Model:
 
     def set_time_step(
         self,
-        time_step: int | float | None = None,
+        time_step: int | float | None = None,  # noqa: PYI041
         variable_time_step: bool = False,
     ) -> None:
         """
@@ -830,7 +828,7 @@ class Model:
 
     def get_cell_lineages_from_IDs(
         self, lids: list[int], ignore_missing: bool = True
-    ) -> list[CellLineage]:
+    ) -> list[CellLineage | None]:
         """
         Return a list of cell lineages with the specified IDs.
 
@@ -839,14 +837,15 @@ class Model:
         lids : list[int]
             IDs of the lineages to return.
         ignore_missing: bool, optional
-            True to ignore  (default is True). The list of lineages might be shorter than `lids`. False to
+            True to ignore missing lineages (default is True). If True, the returned
+            list may be short than `lids`. If False, the returned list will be aligned
+            with `lids` but may contain None values.
 
         Returns
         -------
-        list[CellLineage]
+        list[CellLineage | None]
             The cell lineages with the specified IDs.
         """
-        # TODO: finish docstrings
         lins = [self.get_cell_lineage_from_ID(lid) for lid in lids]
         if ignore_missing:
             lins = [lin for lin in lins if lin is not None]
@@ -873,7 +872,7 @@ class Model:
 
     def get_cycle_lineages_from_IDs(
         self, lids: list[int], ignore_missing: bool = True
-    ) -> list[CycleLineage]:
+    ) -> list[CycleLineage | None]:
         """
         Return a list of cycle lineages with the specified IDs.
 
@@ -882,14 +881,15 @@ class Model:
         lids : list[int]
             IDs of the lineages to return.
         ignore_missing: bool, optional
-            True to ignore  (default is True). The list of lineages might be shorter than `lids`. False to
+            True to ignore missing lineages (default is True). If True, the returned
+            list may be short than `lids`. If False, the returned list will be aligned
+            with `lids` but may contain None values.
 
         Returns
         -------
-        list[CycleLineage]
+        list[CycleLineage | None]
             The cycle lineages with the specified IDs.
         """
-        # TODO: finish docstrings
         lins = [self.get_cycle_lineage_from_ID(lid) for lid in lids]
         if ignore_missing:
             lins = [lin for lin in lins if lin is not None]
@@ -2995,20 +2995,27 @@ class Model:
         else:
             model1 = deepcopy(self)
         model2 = deepcopy(model)
-        if new_name is not None:
-            model1.model_metadata.name = new_name
 
         # Standard model metadata compatibility.
         md1 = model1.model_metadata.get_standard_metadata()
         md2 = model2.model_metadata.get_standard_metadata()
-        if md1 != md2:
-            all_fields = md1.keys() | md2.keys()
-            diff = {
-                field: {"self_model": md1.get(field), "argument_model": md2.get(field)}
-                for field in all_fields
-                if md1.get(field) != md2.get(field)
-            }
-            raise ValueError(f"Model metadata is not compatible: {diff}")
+        critical = [
+            "reference_time_property",
+            "time_step",
+            "time_unit",
+            "pixel_width",
+            "pixel_height",
+            "pixel_depth",
+            "space_unit",
+        ]
+        incompatibilities = {}
+        for metadata in critical:
+            metadata1 = md1.get(metadata)
+            metadata2 = md2.get(metadata)
+            if metadata1 is not None and metadata2 is not None and metadata1 != metadata2:
+                incompatibilities[metadata] = (metadata1, metadata2)
+        if incompatibilities:
+            raise ValueError(f"Model metadata is not compatible: {incompatibilities}")
 
         # Properties.
         prop_ids1 = set(model1.get_properties().keys())
@@ -3084,6 +3091,13 @@ class Model:
                     if value_to_add is not None:
                         lin.graph[field] = value_to_add
 
+        if new_name is None:
+            name1 = model1.model_metadata.name
+            name2 = model1.model_metadata.name
+            model1.model_metadata.name = f"{name1}+{name2}"
+        else:
+            model1.model_metadata.name = new_name
+
         return model1
 
     def split(self, lin_id_groups: dict[str, list[int]]) -> list["Model"]:
@@ -3103,9 +3117,11 @@ class Model:
             List of models created from the specified lineage ID groups.
         """
         models = []
+        model_ids = set(self.get_cell_lineage_IDs())
         for name, lids in lin_id_groups.items():
-            model = deepcopy(self)
-            model.remove_lineages(lids)
+            model = deepcopy(self)  # TODO: this is heavy...
+            to_remove = list(model_ids - set(lids))
+            model.remove_lineages(to_remove)
             model.model_metadata.name = name
             models.append(model)
 

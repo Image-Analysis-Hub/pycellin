@@ -23,7 +23,7 @@ from pycellin.styling import PYCELLIN_PURPLE
 
 _DEFAULT_UNMAPPED_COLOR = "dimgrey"
 
-# TODO: all the visuzalization functionalities will be refined and moved to a dedicated
+# TODO: all the visualization functionalities will be refined and moved to a dedicated
 # subpackage.
 
 
