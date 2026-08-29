@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """Unit test for CellLineage and CycleLineage classes from lineage.py module."""
 
-import pytest
-
 import networkx as nx
+import pytest
 
 from pycellin.classes import CellLineage, CycleLineage
 from pycellin.classes.exceptions import (
     FusionError,
-    TimeFlowError,
     LineageStructureError,
+    TimeFlowError,
 )
 from pycellin.custom_types import PropertyType
-
 
 # CellLineage fixtures ########################################################
 
@@ -247,7 +244,7 @@ class TestLineageRemoveProp:
     def test_invalid_type_raises_error(self, cell_lin):
         """Test that invalid prop_type raises ValueError."""
         with pytest.raises(
-            ValueError,
+            TypeError,
             match="Invalid prop_type. Must be a PropertyType Flag",
         ):
             cell_lin._remove_prop("custom_property", "invalid_type")
@@ -255,7 +252,7 @@ class TestLineageRemoveProp:
     def test_invalid_type_object_raises_error(self, cell_lin):
         """Test that passing non-PropertyType object raises ValueError."""
         with pytest.raises(
-            ValueError,
+            TypeError,
             match="Invalid prop_type. Must be a PropertyType Flag",
         ):
             cell_lin._remove_prop("custom_property", 123)
