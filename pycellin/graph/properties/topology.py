@@ -2,6 +2,9 @@
 
 """Lineage topology property functions to create standard Property instances."""
 
+import numpy as np
+import tifffile
+
 from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import (
     LineageLocalPropCalculator,
@@ -373,18 +376,19 @@ def create_lineage_duration_property(
 
 
 class LineageDuration(LineageLocalPropCalculator):
-    """Calculator for the lineage_duration property."""
+    """
+    Calculator for the lineage_duration property.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    time_prop_name : str
+        The name of the time property (e.g. "frame", "time", etc.) to use
+        for calculation.)
+    """
 
     def __init__(self, property: Property, time_prop_name: str):
-        """
-        Parameters
-        ----------
-        property : Property
-            Property object to which the calculator is associated.
-        time_prop_name : str
-            The name of the time property (e.g. "frame", "time", etc.) to use
-            for calculation.)
-        """
         super().__init__(property)
         self.time_prop_name = time_prop_name
 
@@ -403,3 +407,54 @@ class LineageDuration(LineageLocalPropCalculator):
             The total lifespan of the lineage.
         """
         return lineage.get_duration(time_prop=self.time_prop_name)
+
+
+def create_location_tag_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "location_tag",
+        name=custom_name or "Location tag",
+        description=custom_description
+        or "A tag indicating the location of a cell in the image.",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="int",
+    )
+
+
+class LocationTag(NodeLocalPropCalculator):
+    """
+    Calculator for the location_tag property.
+
+    This calculator assigns a location tag to each node in the lineage based on
+    a provided mask image. The mask image should contain integer labels that
+    correspond to different locations in the image. The location tag for each node
+    is determined by the pixel value in the mask image at the node's (x, y) coordinates.
+
+    Parameters
+    ----------
+    prop: Property
+        Property object to which the calculator is associated.
+    mask_img: np.ndarray
+        The mask image that defines the location tags. It must be a tif stack with
+        dimensions (time, height, width), where each pixel value represents a
+        location tag. The first frame/slice of the mask image must correspond to the
+        first timepoint in the model.
+    pixel_size: float
+        The size of a pixel in the image.
+    """
+
+    def __init__(self, prop: Property, mask_img: np.ndarray, pixel_size: float):
+        super().__init__(prop)
+        self.mask = mask_img
+        self.pixel_size = pixel_size
+
+    def compute(self, lineage, nid: int) -> int:
+        x = int(lineage.nodes[nid]["cell_x"] / self.pixel_size)
+        y = int(lineage.nodes[nid]["cell_y"] / self.pixel_size)
+        t = lineage.nodes[nid]["timepoint"]
+        return self.mask[t, y, x]

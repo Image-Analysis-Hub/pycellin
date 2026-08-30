@@ -12,7 +12,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from tifffile import imread
+import tifffile
 
 import pycellin.graph.properties.morphology as morpho
 import pycellin.graph.properties.topology as topo
@@ -2087,7 +2087,7 @@ class Model:
                     )
 
             if label_img is None:
-                label_img = imread(label_img_path).astype(np.uint32)
+                label_img = tifffile.imread(label_img_path).astype(np.uint32)
 
         # Resolve pixel size.
         size_x = self.get_pixel_width() or 1.0
@@ -2526,6 +2526,61 @@ class Model:
         )
 
         self.add_custom_property(topo.LineageDuration(prop, time_prop.identifier))
+
+    def add_location_tag(
+        self,
+        mask_path: str,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the location_tag property to the model.
+
+        The location_tag property is a cell property defined by a mask image. In this
+        mask image, each pixel value represents a location tag. The property is
+        assigned to each cell based on the pixel value at the cell's position in the
+        mask image.
+        The location tag can be used to define different regions of interest in the
+        image, such as different tissues.
+
+        Parameters
+        ----------
+        mask_path : str
+            Path to the mask image (tif stack) that defines the location tags.
+            The mask must be a tif stack where each pixel value represents a
+            location tag. The first frame/slice of the mask image must correspond to
+            the first timepoint in the model.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "location_tag".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Location tag".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.topology.create_location_tag_property`).
+        """
+        mask_img = tifffile.imread(mask_path).astype(np.uint32)
+
+        # Resolve pixel size.
+        size_x = self.get_pixel_width() or 1.0
+        size_y = self.get_pixel_height() or 1.0
+        if size_x != size_y:
+            raise ValueError("Pixels must be isotropic in x and y.")
+
+        prop = topo.create_location_tag_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(
+            topo.LocationTag(
+                prop,
+                mask_img=mask_img,
+                pixel_size=size_x,
+            )
+        )
 
     def add_num_cells(
         self,

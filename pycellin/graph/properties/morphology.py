@@ -49,7 +49,7 @@ class CellPolygonFromLabelImg(NodeLocalPropCalculator):
     Parameters
     ----------
     property : Property
-        The property to be calculated.
+        Property object to which the calculator is associated.
     label_prop : str
         Name of the property that stores cell labels.
     label_img : np.ndarray
