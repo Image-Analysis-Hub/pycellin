@@ -152,11 +152,12 @@ def _unit_to_dimension(
         "rod_length": "LENGTH",
         "rod_width": "LENGTH",
         "timepoint": "NONE",
+        "cell_poly": "NONE",  # not float nor int so won't be exported anyway
         # Cycle features.
         "branch_total_displacement": "LENGTH",
         "branch_mean_displacement": "LENGTH",
         "branch_mean_speed": "VELOCITY",
-        "cells": "NONE",  # not float nor int so won't be exported to TM anyway
+        "cells": "NONE",  # not float nor int so won't be exported anyway
         "cycle_completeness": "NONE",
         "cycle_duration": "TIME",
         "cycle_ID": "NONE",

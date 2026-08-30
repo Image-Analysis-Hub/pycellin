@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
+
+import numpy as np
 
 from pycellin.utils import get_pycellin_version
 
@@ -91,6 +92,8 @@ class ModelMetadata:
     name: str | None = None
     provenance: str | None = None
     file_location: str | None = None
+    label_img_path: str | None = None
+    label_img: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         """

@@ -9,8 +9,10 @@ from math import gcd
 from typing import Any, Callable, Literal, TypeVar
 
 import networkx as nx
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from tifffile import imread
 
 import pycellin.graph.properties.morphology as morpho
 import pycellin.graph.properties.topology as topo
@@ -2014,6 +2016,100 @@ class Model:
             unit=self.model_metadata.space_unit or "pixel",
         )
         self.add_custom_property(motion.CellDisplacement(prop))
+
+    def add_cell_polygon(
+        self,
+        label_prop: str = "label",
+        label_img: np.ndarray | None = None,
+        label_img_path: str | None = None,
+        force_recompute: bool = False,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell polygon property to the model.
+
+        Parameters
+        ----------
+        label_prop: str
+            Name of the property that stores cell labels. Must match the labels in
+            the label image. Defaults to "label".
+        label_img : np.ndarray, optional
+            The label image. If None, the method will fallback to `label_img_path`
+            or attempt to find it in the model's metadata.
+        label_img_path: str, optional
+            The path to the label image (tif stack). If None, the method will attempt
+            to find it in the model's metadata.
+        force_recompute : bool
+            Whether to force recomputation of the property when it has already been
+            computed. Defaults to False.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_polygon".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cell polygon from
+            label image".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.morphology.create_cell_polygon_property`).
+
+        Raises
+        ------
+        KeyError
+            If the specified label property has not been declared in the model.
+        ValueError
+            If `label_img` and `label_img_path` are not provided nor defined in the
+            model's metadata.
+        ValueError
+            If pixels are not isotropic in x and y.
+        """
+        if not self.props_metadata._has_prop(label_prop):
+            raise KeyError(f"The property '{label_prop}' has not been declared.")
+
+        # Resolve label_img.
+        if label_img is None:
+            if label_img_path is None:
+                if (
+                    hasattr(self.model_metadata, "label_img")
+                    and self.model_metadata.label_img is not None
+                ):
+                    label_img = self.model_metadata.label_img
+                elif (
+                    hasattr(self.model_metadata, "label_img_path")
+                    and self.model_metadata.label_img_path is not None
+                ):
+                    label_img_path = self.model_metadata.label_img_path
+                else:
+                    raise ValueError(
+                        "No label image provided. Please provide `label_img` or "
+                        "`label_img_path`, or set them in the model metadata."
+                    )
+
+            if label_img is None:
+                label_img = imread(label_img_path).astype(np.uint32)
+
+        # Resolve pixel size.
+        size_x = self.get_pixel_width() or 1.0
+        size_y = self.get_pixel_height() or 1.0
+        if size_x != size_y:
+            raise ValueError("Pixels must be isotropic in x and y.")
+
+        prop = morpho.create_cell_polygon_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self.model_metadata.space_unit or "pixel",
+        )
+
+        calc = morpho.CellPolygonFromLabelImg(
+            prop,
+            label_prop=label_prop,
+            label_img=label_img,
+            pixel_size=size_x,
+            force_recompute=force_recompute,
+        )
+        self.add_custom_property(calc)
 
     def add_rod_length(
         self,
