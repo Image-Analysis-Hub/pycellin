@@ -13,6 +13,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 import pycellin.graph.properties.morphology as morpho
+import pycellin.graph.properties.topology as topo
 import pycellin.graph.properties.utils as futils
 from pycellin.classes.data import Data
 from pycellin.classes.exceptions import FusionError, ProtectedPropertyError
@@ -27,14 +28,6 @@ from pycellin.graph.properties import motion, tracking
 from pycellin.graph.properties.core import (
     Timepoint,
     create_timepoint_property,
-)
-from pycellin.graph.properties.topology import (
-    IsDivision,
-    IsLeaf,
-    IsRoot,
-    create_is_division_property,
-    create_is_leaf_property,
-    create_is_root_property,
 )
 from pycellin.styling import PYCELLIN_PURPLE
 from pycellin.utils import _color_to_rgba
@@ -1402,6 +1395,8 @@ class Model:
             If the lineage with the specified ID does not exist in the model.
         KeyError
             If a property in the prop_values is not declared.
+        TypeError
+            If the time_value is not an integer or a float.
         """
         try:
             lineage = self.data.cell_data[lid]
@@ -1409,7 +1404,7 @@ class Model:
             raise KeyError(f"Lineage with ID {lid} does not exist.") from err
 
         if not isinstance(time_value, (int, float)):
-            raise ValueError("Time value must be an integer or a float.")
+            raise TypeError("Time value must be an integer or a float.")
 
         if prop_values is not None:
             for prop in prop_values:
@@ -1791,6 +1786,11 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Age of the cell since the start of the lineage".
+
+        Raises
+        ------
+        KeyError
+            If the specified time property has not been declared in the model.
         """
         if custom_time_property is None:
             time_prop = self.props_metadata.props.get(
@@ -2242,13 +2242,13 @@ class Model:
             New description for the property. If None, the description will be
             "Whether the cell is a division event, i.e. has more than one daughter cell".
         """
-        prop = create_is_division_property(
+        prop = topo.create_is_division_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
         )
 
-        self.add_custom_property(IsDivision(prop))
+        self.add_custom_property(topo.IsDivision(prop))
 
     def add_is_leaf(
         self,
@@ -2273,13 +2273,13 @@ class Model:
             New description for the property. If None, the description will be
             "Whether the cell is a leaf cell, i.e. has no daughter cells".
         """
-        prop = create_is_leaf_property(
+        prop = topo.create_is_leaf_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
         )
 
-        self.add_custom_property(IsLeaf(prop))
+        self.add_custom_property(topo.IsLeaf(prop))
 
     def add_is_root(
         self,
@@ -2304,13 +2304,256 @@ class Model:
             New description for the property. If None, the description will be
             "Whether the cell is a root cell, i.e. has no parent cell".
         """
-        prop = create_is_root_property(
+        prop = topo.create_is_root_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
         )
 
-        self.add_custom_property(IsRoot(prop))
+        self.add_custom_property(topo.IsRoot(prop))
+
+    def add_lineage_cell_depth(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the lineage_cell_depth property to the model.
+
+        The lineage_cell_depth property is a cell lineage property that indicates the
+        number of cells from the founding cell (root) to the most recent descendant
+        (leaf).
+        The founding cell has a depth of 0, its children have a depth of 1, etc.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "lineage_cell_depth".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Lineage cell depth".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.topology.create_lineage_cell_depth_property`).
+        """
+        prop = topo.create_lineage_cell_depth_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(topo.LineageCellDepth(prop))
+
+    def add_lineage_cycle_depth(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the lineage_cycle_depth property to the model.
+
+        The lineage_cycle_depth property is a cycle lineage property that indicates the
+        maximum number of cell cycles along any path from founding cell (root) to
+        terminal cell (leaf).
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "lineage_cycle_depth".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Lineage cycle depth".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.topology.create_lineage_cycle_depth_property`).
+        """
+        prop = topo.create_lineage_cycle_depth_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(topo.LineageCycleDepth(prop))
+
+    def add_lineage_duration(
+        self,
+        custom_time_property: str | None = None,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the lineage_duration property to the model.
+
+        The lineage duration is a cell lineage property that represents the total
+        lifespan of a lineage.
+        By default, lineage duration is given in the time unit of the model,
+        but a custom time property can be specified.
+
+        Parameters
+        ----------
+        custom_time_property : str, optional
+            Identifier of the time property to use for the computation.
+            If None, the reference time property of the model will be used.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "lineage_duration".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Lineage duration".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.topology.create_lineage_duration_property`).
+
+        Raises
+        ------
+        KeyError
+            If the specified time property has not been declared in the model.
+        """
+        if custom_time_property is None:
+            time_prop = self.props_metadata.props.get(
+                self.model_metadata.reference_time_property
+            )
+        else:
+            time_prop = self.props_metadata.props.get(custom_time_property)
+        if time_prop is None:
+            time_prop = (
+                custom_time_property or self.model_metadata.reference_time_property
+            )
+            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+
+        prop = topo.create_lineage_duration_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(topo.LineageDuration(prop, time_prop.identifier))
+
+    def add_num_cells(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the num_cells property to the model.
+
+        The num_cells property is a cell lineage property that indicates the number of
+        cells in the lineage.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "num_cells".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Number of cells".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.topology.create_num_cells_property`).
+        """
+        prop = topo.create_num_cells_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(topo.NumCells(prop))
+
+    def add_num_cycles(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the num_cycles property to the model.
+
+        The num_cycles property is a cell cycle lineage property that indicates the
+        number of cell cycles in the lineage.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "num_cycles".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Number of cell cycles".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.topology.create_num_cycles_property`).
+        """
+        prop = topo.create_num_cycles_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(topo.NumCycles(prop))
+
+    def add_num_divs(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the num_divs property to the model.
+
+        The num_divs property is a cell lineage property that indicates the number of
+        cell divisions in the lineage.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "num_divs".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Number of cell divisions".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.topology.create_num_divs_property`).
+        """
+        prop = topo.create_num_divs_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(topo.NumDivs(prop))
+
+    def add_num_gaps(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the num_gaps property to the model.
+
+        The num_gaps property is a cell lineage property that indicates the number of
+        gaps (missing detections) in the lineage.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "num_gaps".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Number of gaps".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.topology.create_num_gaps_property`).
+        """
+        prop = topo.create_num_gaps_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(topo.NumGaps(prop))
 
     def add_relative_age(
         self,
@@ -2341,6 +2584,11 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Age of the cell since the start of the current cell cycle".
+
+        Raises
+        ------
+        KeyError
+            If the specified time property has not been declared in the model.
         """
         if custom_time_property is None:
             time_prop = self.props_metadata.props.get(
