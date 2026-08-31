@@ -418,7 +418,7 @@ def create_location_tag_property(
         identifier=custom_identifier or "location_tag",
         name=custom_name or "Location tag",
         description=custom_description
-        or "A tag indicating the location of a cell in the image.",
+        or "A tag indicating the location of a cell in the image",
         provenance="pycellin",
         prop_type="node",
         lin_type="CellLineage",
