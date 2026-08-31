@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import ast
 from pathlib import Path
-from typing import Dict, Optional
 
 
 class PropertyExtractor(ast.NodeVisitor):
     """AST visitor to extract property information from create_xxxxx_property functions."""
 
-    def __init__(self):
-        self.properties = {}
+    def __init__(self) -> None:
+        self.properties: dict[str, dict[str, str]] = {}
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         """
@@ -31,7 +29,7 @@ class PropertyExtractor(ast.NodeVisitor):
                         self.properties[node.name] = prop_info
         self.generic_visit(node)
 
-    def _extract_from_call(self, call: ast.Call) -> Optional[Dict[str, str]]:
+    def _extract_from_call(self, call: ast.Call) -> dict[str, str] | None:
         """
         Extract property info from Property constructor call.
 
@@ -42,14 +40,14 @@ class PropertyExtractor(ast.NodeVisitor):
 
         Returns
         -------
-        Optional[Dict[str, str]]
+        dict[str, str] | None
             Dictionary with property information if found, else None.
         """
         is_property = isinstance(call.func, ast.Name) and call.func.id == "Property"
         if not is_property:
             return None
 
-        info = {}
+        info: dict[str, str] = {}
         for kw in call.keywords:
             fields = ["identifier", "description", "lin_type"]
             if kw.arg in fields:
@@ -59,7 +57,7 @@ class PropertyExtractor(ast.NodeVisitor):
 
         return info if info else None
 
-    def _extract_value(self, node: ast.AST) -> Optional[str]:
+    def _extract_value(self, node: ast.AST) -> str | None:
         """
         Extract string value from AST node, handling constants and BoolOp expressions.
 
@@ -70,7 +68,7 @@ class PropertyExtractor(ast.NodeVisitor):
 
         Returns
         -------
-        Optional[str]
+        str | None
             The extracted string value, or None if not found.
 
         Notes
@@ -91,7 +89,7 @@ class PropertyExtractor(ast.NodeVisitor):
         return None
 
 
-def _discover_props_via_ast(include_core: bool) -> Dict[str, Dict[str, str]]:
+def _discover_props_via_ast(include_core: bool) -> dict[str, dict[str, str]]:
     """
     Discover properties by parsing Python files with AST.
 
@@ -107,7 +105,7 @@ def _discover_props_via_ast(include_core: bool) -> Dict[str, Dict[str, str]]:
     """
     props_dir = Path(__file__).parent
     ignore = ["utils.py"] if include_core else ["utils.py", "core.py"]
-    all_props = {}
+    all_props: dict[str, dict[str, str]] = {}
 
     for py_file in props_dir.glob("*.py"):
         if py_file.name.startswith("__") or py_file.name in ignore:
@@ -144,9 +142,9 @@ def _get_pycellin_props_by_lin_type(
         with properties name as keys and properties description as values.
     """
     all_properties = _discover_props_via_ast(include_core)
-    filtered_props = {}
+    filtered_props: dict[str, str] = {}
 
-    for _, prop_info in all_properties.items():
+    for prop_info in all_properties.values():
         lin_type = prop_info.get("lin_type")
         if lin_type in lin_type_filter:
             identifier = prop_info.get("identifier")

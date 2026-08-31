@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """Lineage topology property functions to create standard Property instances."""
 
+import numpy as np
+import tifffile
+
 from pycellin.classes.property import Property
-from pycellin.classes.property_calculator import NodeLocalPropCalculator
+from pycellin.classes.property_calculator import (
+    LineageLocalPropCalculator,
+    NodeLocalPropCalculator,
+)
 
 
 def create_is_division_property(
@@ -14,7 +19,7 @@ def create_is_division_property(
 ) -> Property:
     return Property(
         identifier=custom_identifier or "is_division",
-        name=custom_name or "is division",
+        name=custom_name or "Is division",
         description=custom_description
         or "Whether the cell is a division event, i.e. has more than one daughter cell",
         provenance="pycellin",
@@ -54,7 +59,7 @@ def create_is_leaf_property(
 ) -> Property:
     return Property(
         identifier=custom_identifier or "is_leaf",
-        name=custom_name or "is leaf",
+        name=custom_name or "Is leaf",
         description=custom_description
         or "Whether the cell is a leaf cell, i.e. has no daughter cells",
         provenance="pycellin",
@@ -94,7 +99,7 @@ def create_is_root_property(
 ) -> Property:
     return Property(
         identifier=custom_identifier or "is_root",
-        name=custom_name or "is root",
+        name=custom_name or "Is root",
         description=custom_description
         or "Whether the cell is a root cell, i.e. has no parent cell",
         provenance="pycellin",
@@ -125,3 +130,331 @@ class IsRoot(NodeLocalPropCalculator):
             False otherwise.
         """
         return lineage.is_root(nid)  # type: ignore
+
+
+# TODO: should be named num_cells or lineage_length?
+def create_num_cells_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "num_cells",
+        name=custom_name or "Number of cells",
+        description=custom_description or "Number of cells in the lineage",
+        provenance="pycellin",
+        prop_type="lineage",
+        lin_type="CellLineage",
+        dtype="int",
+    )
+
+
+class NumCells(LineageLocalPropCalculator):
+    """Calculator for the num_cells property."""
+
+    def compute(self, lineage) -> int:
+        """
+        Compute the number of cells in the lineage.
+
+        Parameters
+        ----------
+        lineage : Lineage
+            Lineage graph containing the node of interest.
+
+        Returns
+        -------
+        int
+            The number of cells in the lineage.
+        """
+        return len(lineage)
+
+
+# TODO: should be named num_cycles or lineage_length?
+# TODO: turn into a Lineage prop instead of just CycleLineage
+def create_num_cycles_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "num_cycles",
+        name=custom_name or "Number of cell cycles",
+        description=custom_description or "Number of cell cycles in the lineage",
+        provenance="pycellin",
+        prop_type="lineage",
+        lin_type="CycleLineage",
+        dtype="int",
+    )
+
+
+class NumCycles(LineageLocalPropCalculator):
+    """Calculator for the num_cycles property."""
+
+    def compute(self, lineage) -> int:
+        """
+        Compute the number of cell cycles in the lineage.
+
+        Parameters
+        ----------
+        lineage : Lineage
+            Lineage graph containing the node of interest.
+
+        Returns
+        -------
+        int
+            The number of cell cycles in the lineage.
+        """
+        return len(lineage)
+
+
+def create_num_divs_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "num_divs",
+        name=custom_name or "Number of divisions",
+        description=custom_description or "Number of cell divisions in the lineage",
+        provenance="pycellin",
+        prop_type="lineage",
+        lin_type="CellLineage",
+        dtype="int",
+    )
+
+
+class NumDivs(LineageLocalPropCalculator):
+    """Calculator for the num_divs property."""
+
+    def compute(self, lineage) -> int:
+        """
+        Compute the number of cell divisions in the lineage.
+
+        Parameters
+        ----------
+        lineage : Lineage
+            Lineage graph containing the node of interest.
+
+        Returns
+        -------
+        int
+            The number of cell divisions in the lineage.
+        """
+        return len(lineage.get_divisions())
+
+
+# TODO: turn into a cell+cycle prop
+def create_num_gaps_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "num_gaps",
+        name=custom_name or "Number of gaps",
+        description=custom_description
+        or "Number of gaps (missing detections) in the lineage",
+        provenance="pycellin",
+        prop_type="lineage",
+        lin_type="CellLineage",
+        dtype="int",
+    )
+
+
+class NumGaps(LineageLocalPropCalculator):
+    """Calculator for the num_gaps property."""
+
+    def compute(self, lineage) -> int:
+        """
+        Compute the number of gaps in the lineage.
+
+        Parameters
+        ----------
+        lineage : Lineage
+            Lineage graph containing the node of interest.
+
+        Returns
+        -------
+        int
+            The number of gaps in the lineage.
+        """
+        return len(lineage.get_gaps())
+
+
+def create_lineage_cell_depth_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "lineage_cell_depth",
+        name=custom_name or "Lineage cell depth",
+        description=custom_description
+        or "Number of cells from the founding cell (root) to the most recent "
+        "descendant (leaf)",
+        provenance="pycellin",
+        prop_type="lineage",
+        lin_type="CellLineage",
+        dtype="int",
+    )
+
+
+class LineageCellDepth(LineageLocalPropCalculator):
+    """Calculator for the lineage_cell_depth property."""
+
+    def compute(self, lineage) -> int:
+        """
+        Compute the number of cells from the root to the most recent leaf.
+
+        Parameters
+        ----------
+        lineage : Lineage
+            Lineage graph containing the node of interest.
+
+        Returns
+        -------
+        int
+            The lineage depth given in number of cells.
+        """
+        return lineage.get_depth()
+
+
+# TODO: turn into a Lineage prop instead of just CycleLineage
+def create_lineage_cycle_depth_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "lineage_cycle_depth",
+        name=custom_name or "Lineage cycle depth",
+        description=custom_description
+        or "Maximum number of cell cycles along any path from founding cell (root) to terminal cell (leaf)",
+        provenance="pycellin",
+        prop_type="lineage",
+        lin_type="CycleLineage",
+        dtype="int",
+    )
+
+
+class LineageCycleDepth(LineageLocalPropCalculator):
+    """Calculator for the lineage_cell_depth property."""
+
+    def compute(self, lineage) -> int:
+        """
+        Compute the maximum number of cell cycles along any path from root to leaf.
+
+        Parameters
+        ----------
+        lineage : Lineage
+            Lineage graph containing the node of interest.
+
+        Returns
+        -------
+        int
+            The lineage depth given in number of cell cycles.
+        """
+        return lineage.get_depth()
+
+
+def create_lineage_duration_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "lineage_duration",
+        name=custom_name or "Lineage duration",
+        description=custom_description
+        or "Total lifespan of the lineage, from the founding cell (root) to the most "
+        "recent descendant (leaf)",
+        provenance="pycellin",
+        prop_type="lineage",
+        lin_type="CellLineage",
+        dtype="float",
+    )
+
+
+class LineageDuration(LineageLocalPropCalculator):
+    """
+    Calculator for the lineage_duration property.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    time_prop_name : str
+        The name of the time property (e.g. "frame", "time", etc.) to use
+        for calculation.)
+    """
+
+    def __init__(self, property: Property, time_prop_name: str):
+        super().__init__(property)
+        self.time_prop_name = time_prop_name
+
+    def compute(self, lineage) -> float:
+        """
+        Compute the total lifespan of the lineage.
+
+        Parameters
+        ----------
+        lineage : Lineage
+            Lineage graph containing the node of interest.
+
+        Returns
+        -------
+        float
+            The total lifespan of the lineage.
+        """
+        return lineage.get_duration(time_prop=self.time_prop_name)
+
+
+def create_location_tag_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "location_tag",
+        name=custom_name or "Location tag",
+        description=custom_description
+        or "A tag indicating the location of a cell in the image.",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="int",
+    )
+
+
+class LocationTag(NodeLocalPropCalculator):
+    """
+    Calculator for the location_tag property.
+
+    This calculator assigns a location tag to each node in the lineage based on
+    a provided mask image. The mask image should contain integer labels that
+    correspond to different locations in the image. The location tag for each node
+    is determined by the pixel value in the mask image at the node's (x, y) coordinates.
+
+    Parameters
+    ----------
+    prop: Property
+        Property object to which the calculator is associated.
+    mask_img: np.ndarray
+        The mask image that defines the location tags. It must be a tif stack with
+        dimensions (time, height, width), where each pixel value represents a
+        location tag. The first frame/slice of the mask image must correspond to the
+        first timepoint in the model.
+    pixel_size: float
+        The size of a pixel in the image.
+    """
+
+    def __init__(self, prop: Property, mask_img: np.ndarray, pixel_size: float):
+        super().__init__(prop)
+        self.mask = mask_img
+        self.pixel_size = pixel_size
+
+    def compute(self, lineage, nid: int) -> int:
+        x = int(lineage.nodes[nid]["cell_x"] / self.pixel_size)
+        y = int(lineage.nodes[nid]["cell_y"] / self.pixel_size)
+        t = lineage.nodes[nid]["timepoint"]
+        return self.mask[t, y, x]

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 A collection of diverse morphology properties that can be added to
@@ -14,14 +13,81 @@ import networkx as nx
 import numpy as np
 from PIL import Image, ImageDraw
 from scipy import ndimage as ndi
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, Polygon
+from skimage.measure import find_contours
 from skimage.morphology import skeletonize
 
 from pycellin.classes.lineage import CellLineage
 from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import NodeLocalPropCalculator
 
-# TODO:
+
+def create_cell_polygon_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    unit: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "cell_polygon",
+        name=custom_name or "Cell polygon from label image",
+        description=custom_description
+        or "Cell shape as a shapely.Polygon, computed from a label image (tif stack)",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="shapely.Polygon",
+        unit=unit,
+    )
+
+
+class CellPolygonFromLabelImg(NodeLocalPropCalculator):
+    """
+    A calculator for the cell polygon property, which computes the cell shape as a
+    shapely.Polygon from a label image (tif stack).
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    label_prop : str
+        Name of the property that stores cell labels.
+    label_img : np.ndarray
+        The label image.
+    pixel_size : float
+        The size of each pixel. Must be in the same unit as the property unit.
+    force_recompute : bool, optional
+        Whether to force recomputation of the property when it has already been
+        computed, by default False.
+    """
+
+    def __init__(
+        self,
+        property: Property,
+        label_prop: str,
+        label_img: np.ndarray,
+        pixel_size: float,
+        force_recompute: bool = False,
+    ):
+        super().__init__(property)
+        self.label_prop = label_prop
+        self.label_img = label_img
+        self.pixel_size = pixel_size
+        self.force_recompute = force_recompute
+
+    def compute(self, lineage, nid: int) -> np.ndarray:
+        if not self.force_recompute and "cell_polygon" in lineage.nodes[nid]:
+            return lineage.nodes[nid]["cell_polygon"]
+
+        label = lineage.nodes[nid][self.label_prop]
+        t = lineage.nodes[nid]["timepoint"]
+        binary_mask = self.label_img[t] == label
+        contours_px = find_contours(binary_mask)
+        contours = contours_px[0] * self.pixel_size
+        return Polygon(contours)
+
+
+# TODO on rod length and width:
 # - remove debug code
 # - always return a value even if weird skeleton shape (but put a warning in that case)
 # - separate width and length. Width only requires skeleton length and the distance

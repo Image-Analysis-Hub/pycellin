@@ -9,7 +9,7 @@ from itertools import pairwise
 from typing import Any, Literal
 
 import networkx as nx
-import plotly.express as px # import Plotly colormaps
+import plotly.express as px  # import Plotly colormaps
 import plotly.graph_objects as go
 from igraph import Graph
 
@@ -29,7 +29,9 @@ _DEFAULT_UNMAPPED_COLOR = "dimgrey"
 
 UNSELECTED_HIGHLIGHT_COLOR = "lightgray"
 PYCELLIN_PURPLE = "#981cfd"
-HIGHLIGHT_COLORS = [PYCELLIN_PURPLE] + px.colors.qualitative.Safe # 12 Total IDs: 1 purple + 11 from Safe palette
+HIGHLIGHT_COLORS = [
+    PYCELLIN_PURPLE
+] + px.colors.qualitative.Safe  # 12 Total IDs: 1 purple + 11 from Safe palette
 
 
 def get_highlight_color(group: int) -> str:
@@ -212,6 +214,27 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         descendants = nx.descendants(self, nid)
         return list(descendants)
+
+    def get_depth(self) -> int:
+        """
+        Return the depth of the lineage.
+
+        The depth is defined as the number of nodes in the longest path from the root
+        to any leaf.
+
+        Notes
+        -----
+        If the lineage is in a transient state where it has more than one root,
+        `get_depth()` will still return the length of the longest path from any root
+        to any leaf.
+
+        Returns
+        -------
+        int
+            The depth of the lineage.
+        """
+        # TODO: decide how to deal with gaps...
+        return len(nx.dag_longest_path(self))
 
     def is_root(self, nid: int) -> bool:
         """
@@ -1453,6 +1476,53 @@ class CellLineage(Lineage):
             cids = list(self.nodes())
         return [n for n in cids if self.out_degree(n) > 1]  # type: ignore
 
+    def get_gaps(self) -> list[tuple[int, int]]:
+        """
+        Return the gaps in the lineage.
+
+        A gap is defined as a link between two cells that are not consecutive
+        in time. The gap is represented as a tuple of the two cell IDs.
+
+        Returns
+        -------
+        list[tuple[int, int]]
+            A list of tuples representing the gaps in the lineage.
+        """
+        gaps = []
+        for source, target in self.edges():
+            if self.nodes[source]["timepoint"] + 1 != self.nodes[target]["timepoint"]:
+                gaps.append((source, target))
+        return gaps
+
+    def get_duration(self, time_prop: str = "timepoint") -> float:
+        """
+        Return the duration of the lineage, given in the units of the time property.
+
+        The duration is defined as the difference between the maximum and minimum
+        time values of all nodes in the lineage.
+
+        Parameters
+        ----------
+        time_prop : str, optional
+            The name of the time property in which the duration is measured.
+            Defaults to "timepoint".
+
+        Raises
+        ------
+        ValueError
+            If no `time_prop` property is found in the lineage nodes.
+
+        Returns
+        -------
+        float
+            The total duration of the lineage in the units of the time property.
+        """
+        times = nx.get_node_attributes(self, time_prop)
+        # nx.get_node_attributes() only gets nodes with the prop.
+        if not times:
+            raise ValueError(f"No '{time_prop}' property found in the lineage nodes.")
+        return max(times.values()) - min(times.values())
+
     def get_cell_cycle(self, cid: int) -> list[int]:
         """
         Return all the cells in the cell cycle of the given cell, in chronological order.
@@ -2043,11 +2113,7 @@ class CellLineage(Lineage):
 
             trace_color = get_highlight_color(index + 1)
 
-            trace_name = (
-                f"{y_label} ({target_cid})"
-                if len(target_cids) > 1
-                else y_label
-            )
+            trace_name = f"{y_label} ({target_cid})" if len(target_cids) > 1 else y_label
             trace_marker_style = (
                 {} if node_marker_style is None else dict(node_marker_style)
             )
@@ -2055,10 +2121,7 @@ class CellLineage(Lineage):
             trace_marker_style.setdefault("size", 10)
             trace_marker_style.setdefault(
                 "symbol",
-                [
-                    "triangle-up" if self.is_division(node) else "circle"
-                    for node in nodes
-                ],
+                ["triangle-up" if self.is_division(node) else "circle" for node in nodes],
             )
             trace_line_style = {} if line_style is None else dict(line_style)
             trace_line_style.setdefault("color", trace_color)

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 Features in the XML file are not in the same order as a file that was exported
@@ -7,12 +6,12 @@ directly from TrackMate.
 I've tested quickly and it doesn't seem to be a problem for TrackMate.
 """
 
-from collections import Counter
 import copy
 import logging
 import math
 import numbers
 import re
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -153,11 +152,13 @@ def _unit_to_dimension(
         "rod_length": "LENGTH",
         "rod_width": "LENGTH",
         "timepoint": "NONE",
+        "cell_polygon": "NONE",  # not float nor int so won't be exported anyway
+        "location_tag": "NONE",
         # Cycle features.
         "branch_total_displacement": "LENGTH",
         "branch_mean_displacement": "LENGTH",
         "branch_mean_speed": "VELOCITY",
-        "cells": "NONE",  # not float nor int so won't be exported to TM anyway
+        "cells": "NONE",  # not float nor int so won't be exported anyway
         "cycle_completeness": "NONE",
         "cycle_duration": "TIME",
         "cycle_ID": "NONE",
@@ -166,7 +167,17 @@ def _unit_to_dimension(
         "division_rate": "TIME",  # TODO: check if this is correct
         "level": "NONE",
         "straightness": "NONE",
+        # Lineage features.
+        "num_cells": "NONE",
+        "num_cycles": "NONE",
+        "num_divs": "NONE",
+        "num_gaps": "NONE",
+        "lineage_cell_depth": "NONE",
+        "lineage_cycle_depth": "NONE",
+        "lineage_duration": "TIME",
     }
+    # TODO: I could regroup all the props starting with is_ or num_,
+    # since their dimension should always be NONE
     if name == "absolute_age":
         if unit == "frame":
             pycellin_props["absolute_age"] = "NONE"
