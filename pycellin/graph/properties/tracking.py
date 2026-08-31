@@ -205,7 +205,9 @@ def create_cycle_completeness_property(
     return Property(
         identifier=custom_identifier or "cycle_completeness",
         name=custom_name or "Cycle completeness",
-        description=custom_description or "Completeness of the cell cycle",
+        description=custom_description
+        or "Whether the full cell cycle is captured, i.e. starts from a division "
+        "and ends with a division",
         provenance="pycellin",
         prop_type="node",
         lin_type="CycleLineage",

@@ -1976,8 +1976,8 @@ class Model:
             New name for the property. If None, the name will be
             "Cycle completeness".
         custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Completeness of the cell cycle".
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.tracking.create_cycle_completeness_property`).
         """
         prop = tracking.create_cycle_completeness_property(
             custom_identifier=custom_identifier,
