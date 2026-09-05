@@ -135,7 +135,7 @@ def format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
         The formatted DataFrame.
     """
     # Drop unnecessary columns.
-    drop_columns_if_exist(df, ["ROI_coords", "particle"])
+    drop_columns_if_exist(df, ["cr_contour", "particle"])
     # If we already have the "particle" column, it means the data is coming from
     # trackpy, but it might not be up to date. Safer to remove it then recreate
     # it from "lineage_ID".

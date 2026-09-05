@@ -319,14 +319,6 @@
                 "unit": "micrometer",
                 "varlength": false
             },
-            "ROI_coords": {
-                "description": "List of coordinates of the region of interest",
-                "dtype": "float64",
-                "identifier": "ROI_coords",
-                "name": "ROI coords",
-                "unit": "micrometer",
-                "varlength": true
-            },
             "SHAPE_INDEX": {
                 "description": "Shape index",
                 "dtype": "float64",
@@ -438,6 +430,14 @@
                 "name": "Z",
                 "unit": "micrometer",
                 "varlength": false
+            },
+            "cr_contour": {
+                "description": "List of coordinates of the region of interest",
+                "dtype": "float64",
+                "identifier": "cr_contour",
+                "name": "ROI coords",
+                "unit": "micrometer",
+                "varlength": true
             },
             "lineage_ID": {
                 "description": null,

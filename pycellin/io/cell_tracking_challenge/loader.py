@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 loader.py
@@ -19,19 +18,21 @@ https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content
 import re
 from itertools import pairwise
 from pathlib import Path
-from typing import Any, Tuple
+from typing import Any
 
 import networkx as nx
 import tifffile
 from skimage.measure import find_contours, regionprops
 
-from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
+from pycellin.classes import CellLineage, Data, Model, PropsMetadata
 from pycellin.graph.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
-    create_frame_property,
     create_lineage_id_property,
     create_timepoint_property,
+)
+from pycellin.graph.properties.morphology import (
+    create_cr_contour_property,
 )
 
 # TODO: what if the first frame is empty...?
@@ -218,17 +219,8 @@ def _create_PropsMetadata(seg_data: bool) -> PropsMetadata:
         # TODO: put the real unit, pixel is juste a placeholder for now
         cell_x_prop = create_cell_coord_property(unit="pixel", axis="x", provenance="CTC")
         cell_y_prop = create_cell_coord_property(unit="pixel", axis="y", provenance="CTC")
-        roi_coords_prop = Property(
-            identifier="ROI_coords",
-            name="ROI coords",
-            description="List of coordinates of the region of interest",
-            provenance="CTC",
-            prop_type="node",
-            lin_type="CellLineage",
-            dtype="float",
-            unit="pixel",
-        )
-        props_md._add_props([cell_x_prop, cell_y_prop, roi_coords_prop])
+        cr_contour_prop = create_cr_contour_property(unit="pixel", provenance="CTC")
+        props_md._add_props([cell_x_prop, cell_y_prop, cr_contour_prop])
 
     return props_md
 
@@ -236,7 +228,7 @@ def _create_PropsMetadata(seg_data: bool) -> PropsMetadata:
 def _read_track_line(
     line: str,
     current_node_id: int,
-) -> Tuple[list[Tuple[int, dict[str, Any]]], int]:
+) -> tuple[list[tuple[int, dict[str, Any]]], int]:
     """
     Parse a single track line to generate a list of the nodes present in the track.
 
@@ -276,7 +268,7 @@ def _read_track_line(
 
 def _add_nodes_and_edges(
     graph: nx.DiGraph,
-    nodes: list[Tuple[int, dict[str, Any]]],
+    nodes: list[tuple[int, dict[str, Any]]],
 ) -> None:
     """
     Add nodes and edges to a directed graph from a list of nodes.
@@ -300,7 +292,7 @@ def _add_nodes_and_edges(
 
 def _merge_tracks(
     graph: nx.DiGraph,
-    nodes: list[Tuple[int, dict[str, Any]]],
+    nodes: list[tuple[int, dict[str, Any]]],
 ) -> None:
     """
     Merge a track with its parent track in the directed graph.
@@ -358,7 +350,7 @@ def _update_node_attributes(
 
 def _extract_seg_data(
     label_img_path: str,
-) -> Tuple[list[int], list[list[float]], list[list[Tuple[float, float]]]]:
+) -> tuple[list[int], list[list[float]], list[list[tuple[float, float]]]]:
     """
     Extract segmentation data from a label image.
 
@@ -406,16 +398,16 @@ def _integrate_seg_data(
     frame: int,
     labels: list[int],
     centroids: list[list[float]],
-    contours: list[list[Tuple[float, float]]],
+    contours: list[list[tuple[float, float]]],
 ) -> None:
     """
-    Integrate segmentation data into the pycellin model.
+    Integrate segmentation data into the Pycellin model.
 
-    This function updates the pycellin model with segmentation data
+    This function updates the Pycellin model with segmentation data
     for a specific frame. It identifies the graph nodes to update thanks to the
-    frame and labels and adds the following attributes to each node:
+    frame and labels and adds the following properties to each node:
     - the centroids as cell positions (cell_x, cell_y),
-    - the contours as cell ROIs (ROI_coords).
+    - the centroid-relative contours of the cells (cr_contour).
 
     Parameters
     ----------
@@ -453,7 +445,7 @@ def _integrate_seg_data(
         # Updating the nodes.
         graph.nodes[node]["cell_x"] = centroid[0]
         graph.nodes[node]["cell_y"] = centroid[1]
-        graph.nodes[label]["ROI_coords"] = contour
+        graph.nodes[node]["cr_contour"] = contour
 
 
 def load_CTC_file(
@@ -533,23 +525,22 @@ def load_CTC_file(
         _merge_tracks(graph, nodes)
 
     # Adding the segmentation data, if any.
-    if labels_path:
-        if Path(labels_path).is_dir():
-            list_paths = sorted(Path(labels_path).glob("*.tif"))
-            if len(list_paths) == 0:
-                raise ValueError(f"No label images found in the directory: {labels_path}")
-            pattern = r"(\d+)\.tif"
-            for label_img_path in list_paths:
-                match = re.search(pattern, str(label_img_path))
-                try:
-                    frame = int(match.group(1))
-                except AttributeError:
-                    raise ValueError(
-                        f"Can't parse frame value: file name {label_img_path} "
-                        f"does not match the expected pattern."
-                    )
-                labels, centroids, contours = _extract_seg_data(str(label_img_path))
-                _integrate_seg_data(graph, frame, labels, centroids, contours)
+    if labels_path and Path(labels_path).is_dir():
+        list_paths = sorted(Path(labels_path).glob("*.tif"))
+        if len(list_paths) == 0:
+            raise ValueError(f"No label images found in the directory: {labels_path}")
+        pattern = r"(\d+)\.tif"
+        for label_img_path in list_paths:
+            match = re.search(pattern, str(label_img_path))
+            try:
+                frame = int(match.group(1))
+            except AttributeError:
+                raise ValueError(
+                    f"Can't parse frame value: file name {label_img_path} "
+                    f"does not match the expected pattern."
+                )
+            labels, centroids, contours = _extract_seg_data(str(label_img_path))
+            _integrate_seg_data(graph, frame, labels, centroids, contours)
 
     # We want one lineage per connected component of the graph.
     lineages = [
@@ -558,10 +549,8 @@ def load_CTC_file(
     ]
 
     # Adding a unique lineage_ID to each lineage and their nodes.
-    lin_ID = 0
-    for lin in lineages:
-        _update_node_attributes(lin, lin_ID)
-        lin_ID += 1
+    for lin_id, lin in enumerate(lineages):
+        _update_node_attributes(lin, lin_id)
     data = {}
     for lin in lineages:
         if "lineage_ID" in lin.graph:

@@ -480,5 +480,5 @@ if __name__ == "__main__":
             model,
             geff_out,
             space_axes=["cell_x", "cell_y", "cell_z"],
-            variable_length_props=["ROI_coords"],
+            variable_length_props=["cr_contour"],
         )

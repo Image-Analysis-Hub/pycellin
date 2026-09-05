@@ -358,11 +358,11 @@ def _convert_ROI_coordinates(
         points_dimension = len(points_coordinates) // n_points
         it = [iter(points_coordinates)] * points_dimension
         points_coordinates = list(zip(*it))  # type: ignore
-        attribs["ROI_coords"] = points_coordinates
+        attribs["cr_contour"] = points_coordinates
     else:
-        attribs["ROI_coords"] = None
+        attribs["cr_contour"] = None
 
-    del attribs["ROI_N_POINTS"]  # redundant with the new "ROI_coords" attribute
+    del attribs["ROI_N_POINTS"]  # redundant with the new "cr_contour" attribute
 
 
 def _add_all_nodes(
@@ -663,7 +663,7 @@ def _update_props_metadata(
         )
     if segmentation:
         roi_coord_prop = Property(
-            identifier="ROI_coords",
+            identifier="cr_contour",
             name="ROI coords",
             description="List of coordinates of the region of interest",
             provenance="TrackMate",

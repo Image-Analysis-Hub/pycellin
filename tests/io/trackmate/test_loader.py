@@ -524,7 +524,7 @@ def test_convert_ROI_coordinates_2D():
     att_obtained = deepcopy(el_obtained.attrib)
     tml._convert_ROI_coordinates(el_obtained, att_obtained)
 
-    att_expected = {"ROI_coords": [(1.0, 2.0), (-3.0, -4.0), (5.5, 6.0)]}
+    att_expected = {"cr_contour": [(1.0, 2.0), (-3.0, -4.0), (5.5, 6.0)]}
 
     assert att_obtained == att_expected
 
@@ -536,7 +536,7 @@ def test_convert_ROI_coordinates_3D():
     att_obtained = deepcopy(el_obtained.attrib)
     tml._convert_ROI_coordinates(el_obtained, att_obtained)
 
-    att_expected = {"ROI_coords": [(1.0, 2.0, -3.0), (-4.0, 5.5, 6.0)]}
+    att_expected = {"cr_contour": [(1.0, 2.0, -3.0), (-4.0, 5.5, 6.0)]}
 
     assert att_obtained == att_expected
 
@@ -556,7 +556,7 @@ def test_convert_ROI_coordinates_no_ROI_txt():
     att_obtained = deepcopy(el_obtained.attrib)
     tml._convert_ROI_coordinates(el_obtained, att_obtained)
 
-    att_expected = {"ROI_coords": None}
+    att_expected = {"cr_contour": None}
 
     assert att_obtained == att_expected
 

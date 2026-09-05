@@ -299,6 +299,7 @@ class TestIsNumericDtype:
         assert _is_numeric_dtype("list") is False
         assert _is_numeric_dtype("dict") is False
         assert _is_numeric_dtype("array") is False
+        assert _is_numeric_dtype("shapely.Polygon") is False
 
     def test_empty_string(self):
         """Test empty string returns False."""

@@ -77,16 +77,18 @@ for clin in model.get_cycle_lineages():
     plot(clin)
 
 # Enrich your lineages with additional predefined properties.
-model.add_pycellin_properties([
-    "rod_length", 
-    "rod_width",
-    "cell_displacement", 
-    "cell_speed", 
-    "branch_mean_speed",
-    "relative_age",
-    "division_time", 
-    "cycle_completeness",
-    ])
+model.add_pycellin_properties(
+    [
+        "rod_length",
+        "rod_width",
+        "cell_displacement",
+        "cell_speed",
+        "branch_mean_speed",
+        "relative_age",
+        "division_time",
+        "cycle_completeness",
+    ]
+)
 model.update()
 
 # Export the enriched data as dataframes...
@@ -112,8 +114,8 @@ pycellin.export_GEFF(
     "sample_data/Ecoli_growth_on_agar_pad_enriched.geff",
     time_axes=["POSITION_T"],
     space_axes=["cell_x", "cell_y", "cell_z"],
-    variable_length_props=["ROI_coords"],
-) 
+    variable_length_props=["cr_contour"],
+)
 ```
 
 

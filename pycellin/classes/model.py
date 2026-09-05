@@ -1951,6 +1951,42 @@ class Model:
         )
         self.add_custom_property(motion.BranchTotalDisplacement(prop))
 
+    def add_cr_contour(
+        self,
+        force_recompute: bool = False,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the centroid-relative contour property to the model.
+
+        The centroid-relative contour is the coordinates of the contour of the cell,
+        relative to the cell centroid.
+
+        Parameters
+        ----------
+        force_recompute : bool
+            Whether to force recomputation of the property when it has already been
+            computed. Defaults to False.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cr_contour".
+        custom_name : str, optional
+            New name for the property. If None, the name will be
+            "Centroid-relative contour".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.morphology.create_cr_contour_property`).
+        """
+        prop = morpho.create_cr_contour_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self.get_space_unit() or "pixel",
+        )
+        self.add_custom_property(morpho.CRContour(prop, force_recompute=force_recompute))
+
     def add_cycle_completeness(
         self,
         custom_identifier: str | None = None,

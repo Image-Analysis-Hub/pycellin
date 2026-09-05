@@ -32,7 +32,7 @@ def create_cell_polygon_property(
         identifier=custom_identifier or "cell_polygon",
         name=custom_name or "Cell polygon from label image",
         description=custom_description
-        or "Cell shape as a shapely.Polygon, computed from a label image (tif stack)",
+        or "Cell shape as a shapely.Polygon, computed from a label image",
         provenance="pycellin",
         prop_type="node",
         lin_type="CellLineage",
@@ -44,7 +44,7 @@ def create_cell_polygon_property(
 class CellPolygonFromLabelImg(NodeLocalPropCalculator):
     """
     A calculator for the cell polygon property, which computes the cell shape as a
-    shapely.Polygon from a label image (tif stack).
+    shapely.Polygon from a label image.
 
     Parameters
     ----------
@@ -83,8 +83,54 @@ class CellPolygonFromLabelImg(NodeLocalPropCalculator):
         t = lineage.nodes[nid]["timepoint"]
         binary_mask = self.label_img[t] == label
         contours_px = find_contours(binary_mask)
-        contours = contours_px[0] * self.pixel_size
-        return Polygon(contours)
+        # find_contours returns (row, col) = (y, x) so flip to (x, y) for Shapely.
+        contours_xy = contours_px[0][:, ::-1] * self.pixel_size
+        return Polygon(contours_xy)
+
+
+def create_cr_contour_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    unit: str | None = None,
+):
+    return Property(
+        identifier=custom_identifier or "cr_contour",
+        name=custom_name or "Centroid-relative contour",
+        description=custom_description
+        or "Coordinates of the cell's contour, relative to its centroid",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="list[tuple[int]]",
+        unit=unit,
+    )
+
+
+class CRContour(NodeLocalPropCalculator):
+    def __init__(
+        self,
+        property: Property,
+        force_recompute: bool = False,
+    ):
+        super().__init__(property)
+        self.force_recompute = force_recompute
+
+    def compute(self, lineage, nid: int) -> list[tuple[int, int]]:
+        if not self.force_recompute and "cr_contour" in lineage.nodes[nid]:
+            return lineage.nodes[nid]["cr_contour"]
+        try:
+            poly = lineage.nodes[nid]["cell_polygon"]
+        except KeyError:
+            msg = (
+                f"Cannot compute 'cr_contour': missing 'cell_polygon' property "
+                f"for cell {nid}, lineage {lineage.graph['lineage_ID']}. "
+                f"Please compute the 'cell_polygon' property first."
+            )
+            raise KeyError(msg)
+        return [
+            (x - poly.centroid.x, y - poly.centroid.y) for (x, y) in poly.exterior.coords
+        ]
 
 
 # TODO on rod length and width:
@@ -224,7 +270,7 @@ def get_width_and_length(
     # First we need to reconstruct the image of the object we are working on.
     # This is done by drawing and filling a polygon defined by the points
     # in the ROI list.
-    roi = lineage.nodes[nid]["ROI_coords"]
+    roi = lineage.nodes[nid]["cr_contour"]
     # The coordinates extracted from the graph are in microns, not in pixels.
     # roi = [(int(x * x_resolution), int(y * x_resolution)) for (x, y) in roi]
     roi = [(int(x * 1 / pixel_size), int(y * 1 / pixel_size)) for (x, y) in roi]
@@ -669,16 +715,16 @@ if __name__ == "__main__":
 
     model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
     lineage = model.data.cell_data[0]
-    # print(lineage.nodes[2004]["ROI_coords"])
+    # print(lineage.nodes[2004]["cr_contour"])
     node = 2035
     print(lineage.nodes[node]["area"])
 
     # Shapely
-    roi = Polygon(lineage.nodes[node]["ROI_coords"])
+    roi = Polygon(lineage.nodes[node]["cr_contour"])
     print(roi.area)
 
     # Shoelace formula
-    vertices = lineage.nodes[node]["ROI_coords"]
+    vertices = lineage.nodes[node]["cr_contour"]
     border = vertices + [vertices[0]]
     area = sum([p1[0] * p2[1] - p1[1] * p2[0] for (p1, p2) in itertools.pairwise(border)])
     print(abs(area) / 2)

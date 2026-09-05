@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 # TODO: add a Warning when a property is not present across all cells,
 # links, or lineages?
@@ -9,7 +8,7 @@
 # TODO: maybe add a PropertyTypeValueError and a LineageTypeValueError
 
 
-class LineageStructureError(Exception):
+class LineageStructureError(ValueError):
     """
     Raised when an incorrect lineage structure is detected.
     """
@@ -34,8 +33,7 @@ class FusionError(LineageStructureError):
         The ID of the lineage where the fusion event was detected.
         None by default.
     message : str, optional
-        The error message to display.
-        If not provided, a default message is displayed.
+        Custom error message. If not provided, a default message is displayed.
     """
 
     def __init__(
@@ -74,8 +72,7 @@ class TimeFlowError(LineageStructureError):
         The ID of the lineage of the target node.
         None by default.
     message : str, optional
-        The error message to display.
-        If not provided, a default message is displayed.
+        Custom error message. If not provided, a default message is displayed.
     """
 
     def __init__(
@@ -91,8 +88,12 @@ class TimeFlowError(LineageStructureError):
         self.target_nid = target_nid
         self.target_lineage_ID = target_lineage_ID
         if message is None:
-            txt_source_lin = "" if source_lineage_ID is None else f" in lineage {source_lineage_ID}"
-            txt_target_lin = "" if target_lineage_ID is None else f" in lineage {target_lineage_ID}"
+            txt_source_lin = (
+                "" if source_lineage_ID is None else f" in lineage {source_lineage_ID}"
+            )
+            txt_target_lin = (
+                "" if target_lineage_ID is None else f" in lineage {target_lineage_ID}"
+            )
             message = (
                 f"Node {target_nid}{txt_target_lin} "
                 f"has a time value lower than its parent node, "
@@ -101,15 +102,14 @@ class TimeFlowError(LineageStructureError):
         super().__init__(message)
 
 
-class UpdateRequiredError(Exception):
+class UpdateRequiredError(RuntimeError):
     """
     Raised when an update is required before performing an operation.
 
     Parameters
     ----------
     message : str, optional
-        The error message to display.
-        If not provided, a default message is displayed.
+        Custom error message. If not provided, a default message is displayed.
     """
 
     def __init__(
@@ -121,7 +121,7 @@ class UpdateRequiredError(Exception):
         super().__init__(message)
 
 
-class ProtectedPropertyError(Exception):
+class ProtectedPropertyError(AttributeError):
     """
     Raised when trying to modify or delete a protected property.
 
@@ -130,12 +130,46 @@ class ProtectedPropertyError(Exception):
     property_name : str
         The name of the property that is protected.
     message : str, optional
-        The error message to display.
-        If not provided, a default message is displayed.
+        Custom error message. If not provided, a default message is displayed.
     """
 
     def __init__(self, prop_name: str, message: str | None = None):
         self.property_name = prop_name
         if message is None:
             message = f"The property '{prop_name}' is protected and cannot be modified nor removed."
+        super().__init__(message)
+
+
+class MissingPropertyError(KeyError):
+    """
+    Raised when a required property is missing from a node or edge.
+
+    Parameters
+    ----------
+    prop_name : str
+        The name of the missing property.
+    nid : int
+        The ID of the node where the property is missing.
+    lineage_ID : int, optional
+        The ID of the lineage where the property is missing.
+    message : str, optional
+        Custom error message. If not provided, a default message is displayed.
+    """
+
+    def __init__(
+        self,
+        prop_name: str,
+        nid: int,
+        lineage_ID: int | None = None,
+        message: str | None = None,
+    ):
+        self.prop_name = prop_name
+        self.nid = nid
+        self.lineage_ID = lineage_ID
+        if message is None:
+            lin_txt = f" in lineage {lineage_ID}" if lineage_ID is not None else ""
+            message = (
+                f"Required property '{prop_name}' is missing for node {nid}{lin_txt}."
+            )
+        self.message = message
         super().__init__(message)
