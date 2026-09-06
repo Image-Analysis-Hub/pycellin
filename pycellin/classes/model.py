@@ -1659,6 +1659,42 @@ class Model:
 
         return link_attrs
 
+    def remove_intercycle_links(self, lids: list[int] | None = None) -> dict[str, Any]:
+        """
+        Remove the outgoing links from all division cells of the specified lineages.
+
+        Parameters
+        ----------
+        lids : list[int], optional
+            List of lineage IDs for which to remove intercycle links.
+            If not specified, all lineages will be processed (default is None).
+
+        Returns
+        -------
+        dict[str, Any]
+            A dictionary containing the property values of the removed links.
+        """
+        if lids is None:
+            lids = list(self.data.cell_data.keys())
+
+        removed_links = {}
+        updater_links = []
+        for lid in lids:
+            try:
+                lineage = self.data.cell_data[lid]
+            except KeyError as err:
+                raise KeyError(f"Lineage with ID {lid} does not exist.") from err
+            edges = lineage._remove_intercycle_links()
+            removed_links[lid] = edges
+            updater_links.extend(Link(source, target, lid) for source, target, _ in edges)
+
+        # Notify that an update of the property values may be required.
+        self._updater._update_required = True
+        self._updater._removed_links.update(updater_links)
+        self._updater._modified_lineages.update(lids)
+
+        return removed_links
+
     def get_fusions(self, lids: list[int] | None = None) -> list[Cell]:
         """
         Return fusion cells, i.e. cells with more than one parent.
