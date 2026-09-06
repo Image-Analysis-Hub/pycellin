@@ -1280,6 +1280,8 @@ def _write_Settings(
         xf.write("\n    ")
         xf.write(ET.Element("SpotFilterCollection"))
         xf.write("\n    ")
+        xf.write(ET.Element("TrackerSettings", {"TRACKER_NAME": "MANUAL_TRACKER"}))
+        xf.write("\n    ")
         xf.write(ET.Element("TrackFilterCollection"))
         xf.write("\n  ")
 
