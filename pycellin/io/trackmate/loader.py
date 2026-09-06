@@ -16,6 +16,7 @@ from pycellin.classes import (
 )
 from pycellin.custom_types import PropertyType
 from pycellin.graph.properties.core import create_cell_id_property
+from pycellin.graph.properties.morphology import create_cell_contour_property
 from pycellin.io.utils import (
     _split_graph_into_lineages,
     _update_lineage_prop_key,
@@ -358,11 +359,11 @@ def _convert_ROI_coordinates(
         points_dimension = len(points_coordinates) // n_points
         it = [iter(points_coordinates)] * points_dimension
         points_coordinates = list(zip(*it))  # type: ignore
-        attribs["cr_contour"] = points_coordinates
+        attribs["cell_contour"] = points_coordinates
     else:
-        attribs["cr_contour"] = None
+        attribs["cell_contour"] = None
 
-    del attribs["ROI_N_POINTS"]  # redundant with the new "cr_contour" attribute
+    del attribs["ROI_N_POINTS"]  # redundant with the new "cell_contour" attribute
 
 
 def _add_all_nodes(
@@ -662,14 +663,8 @@ def _update_props_metadata(
             f"cell_{axis}", f"{axis.upper()} coordinate of the cell"
         )
     if segmentation:
-        roi_coord_prop = Property(
-            identifier="cr_contour",
-            name="ROI coords",
-            description="List of coordinates of the region of interest",
+        roi_coord_prop = create_cell_contour_property(
             provenance="TrackMate",
-            prop_type="node",
-            lin_type="CellLineage",
-            dtype="float",
             unit=units["spatialunits"],
         )
         props_md._add_prop(roi_coord_prop)

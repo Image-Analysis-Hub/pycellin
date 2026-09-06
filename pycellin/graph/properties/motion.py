@@ -506,7 +506,7 @@ class Straightness(NodeGlobalPropCalculator):
                 distances.append(dist)
             elif len(preds) > 1:
                 raise FusionError(first_cell, lin_ID)
-        
+
         if sum(distances) == 0:
             return math.nan
 
@@ -523,15 +523,15 @@ class Straightness(NodeGlobalPropCalculator):
         return math.dist(first_cell_loc, last_cell_loc) / sum(distances)
 
 
-def create_angle_property(
+def create_turning_angle_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
     unit: Literal["radian", "degree"] = "radian",
 ) -> Property:
     return Property(
-        identifier=custom_identifier or "angle",
-        name=custom_name or "Angle",
+        identifier=custom_identifier or "turning_angle",
+        name=custom_name or "Turning angle",
         description=custom_description
         or "Angle of the cell trajectory between two consecutive displacements",
         provenance="pycellin",
@@ -542,7 +542,7 @@ def create_angle_property(
     )
 
 
-class Angle(NodeGlobalPropCalculator):
+class TurningAngle(NodeGlobalPropCalculator):
     """
     Calculator to compute the angle between two consecutive displacement vectors of a cell.
 

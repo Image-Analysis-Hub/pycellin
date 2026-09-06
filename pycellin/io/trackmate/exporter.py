@@ -142,20 +142,20 @@ def _unit_to_dimension(
     # Pycellin features.
     pycellin_props = {
         # Cell features.
-        "angle": "ANGLE",
         "cell_area": "AREA",
         "cell_displacement": "LENGTH",
         "cell_perimeter": "LENGTH",
+        "cell_polygon": "NONE",  # not float nor int so won't be exported anyway
         "cell_speed": "VELOCITY",
         "is_division": "NONE",
         "is_leaf": "NONE",
         "is_root": "NONE",
+        "location_tag": "NONE",
         "pycellin_cell_ID": "NONE",
         "rod_length": "LENGTH",
         "rod_width": "LENGTH",
         "timepoint": "NONE",
-        "cell_polygon": "NONE",  # not float nor int so won't be exported anyway
-        "location_tag": "NONE",
+        "turning_angle": "ANGLE",
         # Cycle features.
         "branch_total_displacement": "LENGTH",
         "branch_mean_displacement": "LENGTH",
@@ -442,22 +442,22 @@ def _create_Spot(
     ET._Element
         The newly created Spot Element.
     """
-    exluded_keys = ["TRACK_ID", "cr_contour"]
+    exluded_keys = ["TRACK_ID", "cell_contour"]
     n_attr = {
         k: _value_to_str(v)
         for k, v in lineage.nodes[node].items()
         if k not in exluded_keys
     }
-    if "cr_contour" in lineage.nodes[node]:
-        n_attr["ROI_N_POINTS"] = str(len(lineage.nodes[node]["cr_contour"]))
+    if "cell_contour" in lineage.nodes[node]:
+        n_attr["ROI_N_POINTS"] = str(len(lineage.nodes[node]["cell_contour"]))
         # The text of a Spot is the coordinates of its ROI points, in a flattened list.
-        coords = [item for pt in lineage.nodes[node]["cr_contour"] for item in pt]
+        coords = [item for pt in lineage.nodes[node]["cell_contour"] for item in pt]
     else:
         # No segmentation mask, so we set the ROI_N_POINTS to 0.
         n_attr["ROI_N_POINTS"] = "0"
 
     el_node = ET.Element("Spot", n_attr)
-    if "cr_contour" in lineage.nodes[node]:
+    if "cell_contour" in lineage.nodes[node]:
         el_node.text = " ".join(map(str, coords))
     return el_node
 
@@ -883,7 +883,7 @@ def _remove_props(props_md: PropsMetadata) -> None:
         # property is used and renamed to FRAME. So no need to remove it in this case.
         props_md._unprotect_prop("timepoint")
         props_md._remove_prop("timepoint")
-    for prop in ["cell_name", "lineage_name", "FilteredTrack", "cr_contour"]:
+    for prop in ["cell_name", "lineage_name", "FilteredTrack", "cell_contour"]:
         try:
             props_md._remove_prop(prop)
         except KeyError:

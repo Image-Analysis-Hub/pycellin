@@ -20,8 +20,8 @@ import pycellin.graph.properties.utils as futils
 from pycellin.classes.data import Data
 from pycellin.classes.exceptions import (
     FusionError,
-    ProtectedPropertyError,
     MissingPropertyError,
+    ProtectedPropertyError,
 )
 from pycellin.classes.lineage import CellLineage, CycleLineage, Lineage
 from pycellin.classes.model_metadata import ModelMetadata
@@ -1819,7 +1819,7 @@ class Model:
         )
         self.add_custom_property(tracking.AbsoluteAge(prop, time_prop.identifier))
 
-    def add_angle(
+    def add_turning_angle(
         self,
         unit: Literal["radian", "degree"] = "radian",
         custom_identifier: str | None = None,
@@ -1827,31 +1827,31 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the angle property to the model.
+        Add the turningangle property to the model.
 
-        The angle is defined as the angle between the vectors representing
+        The turning angle is defined as the angle between the vectors representing
         the displacement of the cell at two consecutive detections.
 
         Parameters
         ----------
         unit : Literal["radian", "degree"], optional
-            Unit of the angle (default is "radian").
+            Unit of the turning angle (default is "radian").
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
-            "angle".
+            "turning_angle".
         custom_name : str, optional
-            New name for the property. If None, the name will be "Angle".
+            New name for the property. If None, the name will be "Turning angle".
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Angle of the cell trajectory between two consecutive detections".
         """
-        prop = motion.create_angle_property(
+        prop = motion.create_turning_angle_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=unit,
         )
-        self.add_custom_property(motion.Angle(prop, unit))
+        self.add_custom_property(motion.TurningAngle(prop, unit))
 
     def add_branch_mean_displacement(
         self,
@@ -1964,7 +1964,7 @@ class Model:
         """
         Add the cell area property to the model.
 
-        "cell_polygon" needs to be present in the model for this property 
+        "cell_polygon" needs to be present in the model for this property
         to be computed.
 
         Parameters
@@ -2007,7 +2007,7 @@ class Model:
         """
         Add the cell perimeter property to the model.
 
-        "cell_polygon" needs to be present in the model for this property 
+        "cell_polygon" needs to be present in the model for this property
         to be computed.
 
         Parameters
@@ -2042,7 +2042,7 @@ class Model:
         )
         self.add_custom_property(morpho.CellPerimeter(prop))
 
-    def add_cr_contour(
+    def add_cell_contour(
         self,
         force_recompute: bool = False,
         custom_identifier: str | None = None,
@@ -2050,9 +2050,9 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the centroid-relative contour property to the model.
+        Add the cell contour property to the model.
 
-        The centroid-relative contour is the coordinates of the contour of the cell,
+        The cell contour is the coordinates of the contour of the cell,
         relative to the cell centroid.
 
         Parameters
@@ -2062,21 +2062,23 @@ class Model:
             computed. Defaults to False.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
-            "cr_contour".
+            "cell_contour".
         custom_name : str, optional
             New name for the property. If None, the name will be
-            "Centroid-relative contour".
+            "Cell contour".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.morphology.create_cr_contour_property`).
+            default value (see :func:`graph.properties.morphology.create_cell_contour_property`).
         """
-        prop = morpho.create_cr_contour_property(
+        prop = morpho.create_cell_contour_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=self.get_space_unit() or "pixel",
         )
-        self.add_custom_property(morpho.CRContour(prop, force_recompute=force_recompute))
+        self.add_custom_property(
+            morpho.CellContour(prop, force_recompute=force_recompute)
+        )
 
     def add_cycle_completeness(
         self,

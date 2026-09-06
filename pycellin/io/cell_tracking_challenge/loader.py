@@ -32,7 +32,7 @@ from pycellin.graph.properties.core import (
     create_timepoint_property,
 )
 from pycellin.graph.properties.morphology import (
-    create_cr_contour_property,
+    create_cell_contour_property,
 )
 
 # TODO: what if the first frame is empty...?
@@ -219,8 +219,8 @@ def _create_PropsMetadata(seg_data: bool) -> PropsMetadata:
         # TODO: put the real unit, pixel is juste a placeholder for now
         cell_x_prop = create_cell_coord_property(unit="pixel", axis="x", provenance="CTC")
         cell_y_prop = create_cell_coord_property(unit="pixel", axis="y", provenance="CTC")
-        cr_contour_prop = create_cr_contour_property(unit="pixel", provenance="CTC")
-        props_md._add_props([cell_x_prop, cell_y_prop, cr_contour_prop])
+        cell_contour_prop = create_cell_contour_property(unit="pixel", provenance="CTC")
+        props_md._add_props([cell_x_prop, cell_y_prop, cell_contour_prop])
 
     return props_md
 
@@ -407,7 +407,7 @@ def _integrate_seg_data(
     for a specific frame. It identifies the graph nodes to update thanks to the
     frame and labels and adds the following properties to each node:
     - the centroids as cell positions (cell_x, cell_y),
-    - the centroid-relative contours of the cells (cr_contour).
+    - the centroid-relative contours of the cells (cell_contour).
 
     Parameters
     ----------
@@ -445,7 +445,7 @@ def _integrate_seg_data(
         # Updating the nodes.
         graph.nodes[node]["cell_x"] = centroid[0]
         graph.nodes[node]["cell_y"] = centroid[1]
-        graph.nodes[node]["cr_contour"] = contour
+        graph.nodes[node]["cell_contour"] = contour
 
 
 def load_CTC_file(
