@@ -88,6 +88,70 @@ class CellPolygonFromLabelImg(NodeLocalPropCalculator):
         return Polygon(contours_xy)
 
 
+def create_cell_area_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    unit: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "cell_area",
+        name=custom_name or "Cell area",
+        description=custom_description or "Area of the cell",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
+class CellArea(NodeLocalPropCalculator):
+    def compute(self, lineage, nid: int) -> float:
+        try:
+            area = lineage.nodes[nid]["cell_polygon"].area
+        except KeyError:
+            msg = (
+                f"Cannot compute 'cell_area': missing 'cell_polygon' property "
+                f"for cell {nid}, lineage {lineage.graph['lineage_ID']}. "
+                f"Please compute the 'cell_polygon' property first."
+            )
+            raise KeyError(msg)
+        return area
+
+
+def create_cell_perimeter_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    unit: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "cell_perimeter",
+        name=custom_name or "Cell perimeter",
+        description=custom_description or "Perimeter of the cell",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
+class CellPerimeter(NodeLocalPropCalculator):
+    def compute(self, lineage, nid: int) -> float:
+        try:
+            length = lineage.nodes[nid]["cell_polygon"].length
+        except KeyError:
+            msg = (
+                f"Cannot compute 'cell_perimeter': missing 'cell_polygon' property "
+                f"for cell {nid}, lineage {lineage.graph['lineage_ID']}. "
+                f"Please compute the 'cell_polygon' property first."
+            )
+            raise KeyError(msg)
+        return length
+
+
 def create_cr_contour_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,

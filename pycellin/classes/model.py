@@ -18,7 +18,11 @@ import pycellin.graph.properties.morphology as morpho
 import pycellin.graph.properties.topology as topo
 import pycellin.graph.properties.utils as futils
 from pycellin.classes.data import Data
-from pycellin.classes.exceptions import FusionError, ProtectedPropertyError
+from pycellin.classes.exceptions import (
+    FusionError,
+    ProtectedPropertyError,
+    MissingPropertyError,
+)
 from pycellin.classes.lineage import CellLineage, CycleLineage, Lineage
 from pycellin.classes.model_metadata import ModelMetadata
 from pycellin.classes.property import Property
@@ -1950,6 +1954,93 @@ class Model:
             unit=self.model_metadata.space_unit or "pixel",
         )
         self.add_custom_property(motion.BranchTotalDisplacement(prop))
+
+    def add_cell_area(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell area property to the model.
+
+        "cell_polygon" needs to be present in the model for this property 
+        to be computed.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_area".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cell area".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.morphology.create_cell_area_property`).
+
+        Raises
+        -----
+        MissingPropertyError
+            If the 'cell_polygon' property is not present in the model. The
+            'cell_polygon' property is required for computing the cell area.
+        """
+        cell_poly = self.get_property("cell_polygon")
+        if cell_poly is None:
+            raise MissingPropertyError(
+                "Property 'cell_polygon' is required for computing cell area. "
+                "Please add it before adding 'cell_area'."
+            )
+        prop = morpho.create_cell_area_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=f"{self.get_space_unit() or 'pixel'}^2",
+        )
+        self.add_custom_property(morpho.CellArea(prop))
+
+    def add_cell_perimeter(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell perimeter property to the model.
+
+        "cell_polygon" needs to be present in the model for this property 
+        to be computed.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_perimeter".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cell perimeter".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.morphology.create_cell_perimeter_property`).
+
+        Raises
+        -----
+        MissingPropertyError
+            If the 'cell_polygon' property is not present in the model. The
+            'cell_polygon' property is required for computing the cell perimeter.
+        """
+        cell_poly = self.get_property("cell_polygon")
+        if cell_poly is None:
+            raise MissingPropertyError(
+                "Property 'cell_polygon' is required for computing cell perimeter. "
+                "Please add it before adding 'cell_perimeter'."
+            )
+
+        prop = morpho.create_cell_perimeter_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=f"{self.get_space_unit() or 'pixel'}",
+        )
+        self.add_custom_property(morpho.CellPerimeter(prop))
 
     def add_cr_contour(
         self,

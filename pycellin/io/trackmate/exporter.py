@@ -143,7 +143,9 @@ def _unit_to_dimension(
     pycellin_props = {
         # Cell features.
         "angle": "ANGLE",
+        "cell_area": "AREA",
         "cell_displacement": "LENGTH",
+        "cell_perimeter": "LENGTH",
         "cell_speed": "VELOCITY",
         "is_division": "NONE",
         "is_leaf": "NONE",
@@ -1464,7 +1466,6 @@ if __name__ == "__main__":
     print(model)
     print("Model metadata:")
     print(model.model_metadata)
-
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         xml_out = Path(tmp_dir) / "output.xml"
