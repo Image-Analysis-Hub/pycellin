@@ -399,6 +399,14 @@
                 "unit": null,
                 "varlength": false
             },
+            "cell_contour": {
+                "description": "List of coordinates of the cell's contour, relative to its centroid",
+                "dtype": "float64",
+                "identifier": "cell_contour",
+                "name": "Cell contour",
+                "unit": "micrometer",
+                "varlength": true
+            },
             "cell_name": {
                 "description": "Name of the spot",
                 "dtype": "str",
@@ -430,14 +438,6 @@
                 "name": "Z",
                 "unit": "micrometer",
                 "varlength": false
-            },
-            "cr_contour": {
-                "description": "List of coordinates of the region of interest",
-                "dtype": "float64",
-                "identifier": "cr_contour",
-                "name": "ROI coords",
-                "unit": "micrometer",
-                "varlength": true
             },
             "lineage_ID": {
                 "description": null,
