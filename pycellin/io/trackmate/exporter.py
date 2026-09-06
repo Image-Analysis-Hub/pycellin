@@ -157,9 +157,9 @@ def _unit_to_dimension(
         "timepoint": "NONE",
         "turning_angle": "ANGLE",
         # Cycle features.
-        "branch_total_displacement": "LENGTH",
-        "branch_mean_displacement": "LENGTH",
-        "branch_mean_speed": "VELOCITY",
+        "cycle_total_displacement": "LENGTH",
+        "cycle_mean_displacement": "LENGTH",
+        "cycle_mean_speed": "VELOCITY",
         "cells": "NONE",  # not float nor int so won't be exported anyway
         "cycle_completeness": "NONE",
         "cycle_duration": "TIME",

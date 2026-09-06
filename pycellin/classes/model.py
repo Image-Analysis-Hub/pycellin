@@ -1853,39 +1853,39 @@ class Model:
         )
         self.add_custom_property(motion.TurningAngle(prop, unit))
 
-    def add_branch_mean_displacement(
+    def add_cycle_mean_displacement(
         self,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the branch mean displacement property to the model.
+        Add the cycle mean displacement property to the model.
 
-        The branch mean displacement is defined as the mean displacement of the cell
+        The cycle mean displacement is defined as the mean displacement of the cell
         during the cell cycle.
 
         Parameters
         ----------
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
-            "branch_mean_displacement".
+            "cycle_mean_displacement".
         custom_name : str, optional
             New name for the property. If None, the name will be
-            "Branch mean displacement".
+            "Cycle mean displacement".
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Mean displacement of the cell during the cell cycle".
         """
-        prop = motion.create_branch_mean_displacement_property(
+        prop = motion.create_cycle_mean_displacement_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-        self.add_custom_property(motion.BranchMeanDisplacement(prop))
+        self.add_custom_property(motion.CycleMeanDisplacement(prop))
 
-    def add_branch_mean_speed(
+    def add_cycle_mean_speed(
         self,
         include_incoming_edge: bool = False,
         custom_identifier: str | None = None,
@@ -1893,9 +1893,9 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the branch mean speed property to the model.
+        Add the cycle mean speed property to the model.
 
-        The branch mean speed is defined as the mean speed of the cell
+        The cycle mean speed is defined as the mean speed of the cell
         during the cell cycle.
 
         Parameters
@@ -1905,55 +1905,55 @@ class Model:
             and its predecessor. Default is False.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
-            "branch_mean_speed".
+            "cycle_mean_speed".
         custom_name : str, optional
             New name for the property. If None, the name will be
-            "Branch mean speed".
+            "Cycle mean speed".
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Mean speed of the cell during the cell cycle".
         """
         space_unit = self.model_metadata.space_unit or "pixel"
         time_unit = self.model_metadata.time_unit or "frame"
-        prop = motion.create_branch_mean_speed_property(
+        prop = motion.create_cycle_mean_speed_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=f"{space_unit} / {time_unit}",
         )
-        self.add_custom_property(motion.BranchMeanSpeed(prop, include_incoming_edge))
+        self.add_custom_property(motion.CycleMeanSpeed(prop, include_incoming_edge))
 
-    def add_branch_total_displacement(
+    def add_cycle_total_displacement(
         self,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the branch total displacement property to the model.
+        Add the cycle total displacement property to the model.
 
-        The branch total displacement is defined as the displacement of the cell
+        The cycle total displacement is defined as the displacement of the cell
         during the cell cycle.
 
         Parameters
         ----------
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
-            "branch_total_displacement".
+            "cycle_total_displacement".
         custom_name : str, optional
             New name for the property. If None, the name will be
-            "Branch total displacement".
+            "Cycle total displacement".
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Displacement of the cell during the cell cycle".
         """
-        prop = motion.create_branch_total_displacement_property(
+        prop = motion.create_cycle_total_displacement_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-        self.add_custom_property(motion.BranchTotalDisplacement(prop))
+        self.add_custom_property(motion.CycleTotalDisplacement(prop))
 
     def add_cell_area(
         self,

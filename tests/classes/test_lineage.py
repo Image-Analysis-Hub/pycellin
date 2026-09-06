@@ -1157,7 +1157,7 @@ class TestCellLineageRemoveLink:
 
 
 class TestCellLineageGetBranchLineageHighlight:
-    """Test cases for CellLineage.get_branch_lineage_highlight method."""
+    """Test cases for CellLineage.get_cycle_lineage_highlight method."""
 
     def test_multiple_targets_with_paired_source_cells(self, cell_lin):
         """Test highlighting multiple branches with paired source cells."""

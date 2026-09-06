@@ -83,7 +83,7 @@ model.add_pycellin_properties(
         "rod_width",
         "cell_displacement",
         "cell_speed",
-        "branch_mean_speed",
+        "cycle_mean_speed",
         "relative_age",
         "division_time",
         "cycle_completeness",
