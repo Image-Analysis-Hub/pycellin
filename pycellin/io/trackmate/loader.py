@@ -664,7 +664,7 @@ def _update_props_metadata(
         )
     if segmentation:
         roi_coord_prop = create_cell_contour_property(
-            provenance="TrackMate",
+            custom_provenance="TrackMate",
             unit=units["spatialunits"],
         )
         props_md._add_prop(roi_coord_prop)
