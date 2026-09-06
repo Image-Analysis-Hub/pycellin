@@ -26,6 +26,7 @@ def create_cell_polygon_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
+    custom_provenance: str | None = None,
     unit: str | None = None,
 ) -> Property:
     return Property(
@@ -33,7 +34,7 @@ def create_cell_polygon_property(
         name=custom_name or "Cell polygon from label image",
         description=custom_description
         or "Cell shape as a shapely.Polygon, computed from a label image",
-        provenance="pycellin",
+        provenance=custom_provenance or "pycellin",
         prop_type="node",
         lin_type="CellLineage",
         dtype="shapely.Polygon",
@@ -92,13 +93,14 @@ def create_cell_area_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
+    custom_provenance: str | None = None,
     unit: str | None = None,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "cell_area",
         name=custom_name or "Cell area",
         description=custom_description or "Area of the cell",
-        provenance="pycellin",
+        provenance=custom_provenance or "pycellin",
         prop_type="node",
         lin_type="CellLineage",
         dtype="float",
@@ -124,17 +126,18 @@ def create_cell_contour_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
+    custom_provenance: str | None = None,
     unit: str | None = None,
 ):
     return Property(
         identifier=custom_identifier or "cell_contour",
         name=custom_name or "Cell contour",
         description=custom_description
-        or "Coordinates of the cell's contour, relative to its centroid",
-        provenance="pycellin",
+        or "List of coordinates of the cell's contour, relative to its centroid",
+        provenance=custom_provenance or "pycellin",
         prop_type="node",
         lin_type="CellLineage",
-        dtype="list[tuple[int]]",
+        dtype="float",
         unit=unit,
     )
 
@@ -169,13 +172,14 @@ def create_cell_perimeter_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
+    custom_provenance: str | None = None,
     unit: str | None = None,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "cell_perimeter",
         name=custom_name or "Cell perimeter",
         description=custom_description or "Perimeter of the cell",
-        provenance="pycellin",
+        provenance=custom_provenance or "pycellin",
         prop_type="node",
         lin_type="CellLineage",
         dtype="float",
