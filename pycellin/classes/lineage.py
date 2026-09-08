@@ -236,6 +236,17 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # TODO: decide how to deal with gaps...
         return len(nx.dag_longest_path(self))
 
+    def get_fusions(self) -> list[int]:
+        """
+        Return fusion nodes, i.e. nodes with more than one parent.
+
+        Returns
+        -------
+        list[int]
+            The list of fusion nodes in the lineage.
+        """
+        return [n for n in self.nodes() if self.in_degree(n) > 1]  # type: ignore
+
     def is_root(self, nid: int) -> bool:
         """
         Check if a given node is a root node.
@@ -272,17 +283,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             True if the node is a leaf node, False otherwise.
         """
         return self.out_degree(nid) == 0
-
-    def get_fusions(self) -> list[int]:
-        """
-        Return fusion nodes, i.e. nodes with more than one parent.
-
-        Returns
-        -------
-        list[int]
-            The list of fusion nodes in the lineage.
-        """
-        return [n for n in self.nodes() if self.in_degree(n) > 1]  # type: ignore
 
     def _get_nodes_position(self, positions: dict) -> tuple[list, list]:
         """Extract x and y coordinates from positions dict."""
@@ -1470,7 +1470,7 @@ class CellLineage(Lineage):
         Returns
         -------
         list[int]
-            The list of dividing cells in the lineage.
+            The list of dividing cells of the lineage.
         """
         if cids is None:
             cids = list(self.nodes())
@@ -1685,6 +1685,20 @@ class CellLineage(Lineage):
             True if the cell is a division cell, False otherwise.
         """
         return self.in_degree(cid) <= 1 and self.out_degree(cid) > 1
+
+    def _remove_intercycle_links(self) -> list[tuple[int, int, dict]]:
+        """
+        Remove the outgoing links from all division cells of the lineage.
+
+        Returns
+        -------
+        list[tuple[int, int, dict]]
+            A list of tuples representing the removed links. Each tuple contains
+            the source cell, target cell, and the link attributes.
+        """
+        edges = list(self.out_edges(self.get_divisions(), data=True))
+        self.remove_edges_from(edges)
+        return edges
 
     # def get_cousin_cells(
     #     self, node: int, max_ancestry_level: int = 0
@@ -2288,12 +2302,9 @@ class CycleLineage(Lineage):
                 self.nodes[n]["cycle_length"] = len(cells_in_cycle)
                 # How long does the cycle last?
                 self.nodes[n]["cycle_duration"] = (
-                    (
-                        cell_lineage.nodes[last][time_prop]
-                        - cell_lineage.nodes[first][time_prop]
-                    )
-                    + 1
-                ) * time_step
+                    cell_lineage.nodes[last][time_prop]
+                    - cell_lineage.nodes[first][time_prop]
+                )
                 root = self.get_root()
                 if isinstance(root, list):
                     raise LineageStructureError(

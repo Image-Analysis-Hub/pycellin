@@ -1,393 +1,393 @@
 {
-  "geff": {
-    "geff_version": "1.1",
-    "directed": true,
-    "axes": [
-      {
-        "name": "POSITION_T",
-        "type": "time",
-        "unit": "second",
-        "min": 0.0,
-        "max": 49.0,
-        "scale": null,
-        "scaled_unit": null,
-        "offset": null
-      },
-      {
-        "name": "cell_x",
-        "type": "space",
-        "unit": "micrometer",
-        "min": 8.866666666666667,
-        "max": 109.03703703703704,
-        "scale": null,
-        "scaled_unit": null,
-        "offset": null
-      },
-      {
-        "name": "cell_y",
-        "type": "space",
-        "unit": "micrometer",
-        "min": 3.8846153846153846,
-        "max": 120.54263565891472,
-        "scale": null,
-        "scaled_unit": null,
-        "offset": null
-      },
-      {
-        "name": "cell_z",
-        "type": "space",
-        "unit": "micrometer",
-        "min": 0.0,
-        "max": 0.0,
-        "scale": null,
-        "scaled_unit": null,
-        "offset": null
-      }
-    ],
-    "node_props_metadata": {
-      "QUALITY": {
-        "identifier": "QUALITY",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": null,
-        "name": "Quality",
-        "description": "Quality"
-      },
-      "POSITION_T": {
-        "identifier": "POSITION_T",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "second",
-        "name": "T",
-        "description": "T"
-      },
-      "FRAME": {
-        "identifier": "FRAME",
-        "dtype": "int64",
-        "varlength": false,
-        "unit": null,
-        "name": "Frame",
-        "description": "Frame"
-      },
-      "RADIUS": {
-        "identifier": "RADIUS",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "Radius",
-        "description": "Radius"
-      },
-      "VISIBILITY": {
-        "identifier": "VISIBILITY",
-        "dtype": "int64",
-        "varlength": false,
-        "unit": null,
-        "name": "Visibility",
-        "description": "Visibility"
-      },
-      "MEAN_INTENSITY_CH1": {
-        "identifier": "MEAN_INTENSITY_CH1",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": null,
-        "name": "Mean intensity ch1",
-        "description": "Mean intensity ch1"
-      },
-      "MEDIAN_INTENSITY_CH1": {
-        "identifier": "MEDIAN_INTENSITY_CH1",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": null,
-        "name": "Median intensity ch1",
-        "description": "Median intensity ch1"
-      },
-      "MIN_INTENSITY_CH1": {
-        "identifier": "MIN_INTENSITY_CH1",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": null,
-        "name": "Min intensity ch1",
-        "description": "Min intensity ch1"
-      },
-      "MAX_INTENSITY_CH1": {
-        "identifier": "MAX_INTENSITY_CH1",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": null,
-        "name": "Max intensity ch1",
-        "description": "Max intensity ch1"
-      },
-      "TOTAL_INTENSITY_CH1": {
-        "identifier": "TOTAL_INTENSITY_CH1",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": null,
-        "name": "Sum intensity ch1",
-        "description": "Sum intensity ch1"
-      },
-      "STD_INTENSITY_CH1": {
-        "identifier": "STD_INTENSITY_CH1",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": null,
-        "name": "Std intensity ch1",
-        "description": "Std intensity ch1"
-      },
-      "CONTRAST_CH1": {
-        "identifier": "CONTRAST_CH1",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": null,
-        "name": "Contrast ch1",
-        "description": "Contrast ch1"
-      },
-      "SNR_CH1": {
-        "identifier": "SNR_CH1",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": null,
-        "name": "Signal/Noise ratio ch1",
-        "description": "Signal/Noise ratio ch1"
-      },
-      "ELLIPSE_X0": {
-        "identifier": "ELLIPSE_X0",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "Ellipse center x0",
-        "description": "Ellipse center x0"
-      },
-      "ELLIPSE_Y0": {
-        "identifier": "ELLIPSE_Y0",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "Ellipse center y0",
-        "description": "Ellipse center y0"
-      },
-      "ELLIPSE_MAJOR": {
-        "identifier": "ELLIPSE_MAJOR",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "Ellipse long axis",
-        "description": "Ellipse long axis"
-      },
-      "ELLIPSE_MINOR": {
-        "identifier": "ELLIPSE_MINOR",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "Ellipse short axis",
-        "description": "Ellipse short axis"
-      },
-      "ELLIPSE_THETA": {
-        "identifier": "ELLIPSE_THETA",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "rad",
-        "name": "Ellipse angle",
-        "description": "Ellipse angle"
-      },
-      "ELLIPSE_ASPECTRATIO": {
-        "identifier": "ELLIPSE_ASPECTRATIO",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": null,
-        "name": "Ellipse aspect ratio",
-        "description": "Ellipse aspect ratio"
-      },
-      "AREA": {
-        "identifier": "AREA",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer^2",
-        "name": "Area",
-        "description": "Area"
-      },
-      "PERIMETER": {
-        "identifier": "PERIMETER",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "Perimeter",
-        "description": "Perimeter"
-      },
-      "CIRCULARITY": {
-        "identifier": "CIRCULARITY",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": null,
-        "name": "Circularity",
-        "description": "Circularity"
-      },
-      "SOLIDITY": {
-        "identifier": "SOLIDITY",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": null,
-        "name": "Solidity",
-        "description": "Solidity"
-      },
-      "cell_name": {
-        "identifier": "cell_name",
-        "dtype": "str",
-        "varlength": false,
-        "unit": null,
-        "name": "cell name",
-        "description": "Name of the spot"
-      },
-      "cell_ID": {
-        "identifier": "cell_ID",
-        "dtype": "int64",
-        "varlength": false,
-        "unit": null,
-        "name": "cell ID",
-        "description": "Unique identifier of the cell"
-      },
-      "cell_x": {
-        "identifier": "cell_x",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "X",
-        "description": "X coordinate of the cell"
-      },
-      "cell_y": {
-        "identifier": "cell_y",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "Y",
-        "description": "Y coordinate of the cell"
-      },
-      "cell_z": {
-        "identifier": "cell_z",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "Z",
-        "description": "Z coordinate of the cell"
-      },
-      "ROI_coords": {
-        "identifier": "ROI_coords",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "ROI coords",
-        "description": "List of coordinates of the region of interest"
-      },
-      "timepoint": {
-        "identifier": "timepoint",
-        "dtype": "int64",
-        "varlength": false,
-        "unit": null,
-        "name": "timepoint",
-        "description": "Timepoint of the detection"
-      },
-      "lineage_ID": {
-        "identifier": "lineage_ID",
-        "dtype": "int64",
-        "varlength": false,
-        "unit": null,
-        "name": null,
-        "description": null
-      }
-    },
-    "edge_props_metadata": {
-      "SPOT_SOURCE_ID": {
-        "identifier": "SPOT_SOURCE_ID",
-        "dtype": "int64",
-        "varlength": false,
-        "unit": null,
-        "name": "Source spot ID",
-        "description": "Source spot ID"
-      },
-      "SPOT_TARGET_ID": {
-        "identifier": "SPOT_TARGET_ID",
-        "dtype": "int64",
-        "varlength": false,
-        "unit": null,
-        "name": "Target spot ID",
-        "description": "Target spot ID"
-      },
-      "LINK_COST": {
-        "identifier": "LINK_COST",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": null,
-        "name": "Edge cost",
-        "description": "Edge cost"
-      },
-      "DIRECTIONAL_CHANGE_RATE": {
-        "identifier": "DIRECTIONAL_CHANGE_RATE",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "rad/second",
-        "name": "Directional change rate",
-        "description": "Directional change rate"
-      },
-      "SPEED": {
-        "identifier": "SPEED",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer/second",
-        "name": "Speed",
-        "description": "Speed"
-      },
-      "DISPLACEMENT": {
-        "identifier": "DISPLACEMENT",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "Displacement",
-        "description": "Displacement"
-      },
-      "EDGE_TIME": {
-        "identifier": "EDGE_TIME",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "second",
-        "name": "Edge time",
-        "description": "Edge time"
-      },
-      "link_x": {
-        "identifier": "link_x",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "Edge X",
-        "description": "X coordinate of the link, i.e. mean coordinate of its two cells"
-      },
-      "link_y": {
-        "identifier": "link_y",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "Edge Y",
-        "description": "Y coordinate of the link, i.e. mean coordinate of its two cells"
-      },
-      "link_z": {
-        "identifier": "link_z",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "Edge Z",
-        "description": "Z coordinate of the link, i.e. mean coordinate of its two cells"
-      }
-    },
-    "sphere": null,
-    "ellipsoid": null,
-    "track_node_props": {
-      "lineage": "lineage_ID"
-    },
-    "related_objects": null,
-    "display_hints": {
-      "display_horizontal": "cell_x",
-      "display_vertical": "cell_y",
-      "display_depth": "cell_z",
-      "display_time": "POSITION_T"
-    },
-    "extra": {}
-  }
+    "geff": {
+        "axes": [
+            {
+                "max": 49.0,
+                "min": 0.0,
+                "name": "POSITION_T",
+                "offset": null,
+                "scale": null,
+                "scaled_unit": null,
+                "type": "time",
+                "unit": "second"
+            },
+            {
+                "max": 109.03703703703704,
+                "min": 8.866666666666667,
+                "name": "cell_x",
+                "offset": null,
+                "scale": null,
+                "scaled_unit": null,
+                "type": "space",
+                "unit": "micrometer"
+            },
+            {
+                "max": 120.54263565891472,
+                "min": 3.8846153846153846,
+                "name": "cell_y",
+                "offset": null,
+                "scale": null,
+                "scaled_unit": null,
+                "type": "space",
+                "unit": "micrometer"
+            },
+            {
+                "max": 0.0,
+                "min": 0.0,
+                "name": "cell_z",
+                "offset": null,
+                "scale": null,
+                "scaled_unit": null,
+                "type": "space",
+                "unit": "micrometer"
+            }
+        ],
+        "directed": true,
+        "display_hints": {
+            "display_depth": "cell_z",
+            "display_horizontal": "cell_x",
+            "display_time": "POSITION_T",
+            "display_vertical": "cell_y"
+        },
+        "edge_props_metadata": {
+            "DIRECTIONAL_CHANGE_RATE": {
+                "description": "Directional change rate",
+                "dtype": "float64",
+                "identifier": "DIRECTIONAL_CHANGE_RATE",
+                "name": "Directional change rate",
+                "unit": "rad/second",
+                "varlength": false
+            },
+            "DISPLACEMENT": {
+                "description": "Displacement",
+                "dtype": "float64",
+                "identifier": "DISPLACEMENT",
+                "name": "Displacement",
+                "unit": "micrometer",
+                "varlength": false
+            },
+            "EDGE_TIME": {
+                "description": "Edge time",
+                "dtype": "float64",
+                "identifier": "EDGE_TIME",
+                "name": "Edge time",
+                "unit": "second",
+                "varlength": false
+            },
+            "LINK_COST": {
+                "description": "Edge cost",
+                "dtype": "float64",
+                "identifier": "LINK_COST",
+                "name": "Edge cost",
+                "unit": null,
+                "varlength": false
+            },
+            "SPEED": {
+                "description": "Speed",
+                "dtype": "float64",
+                "identifier": "SPEED",
+                "name": "Speed",
+                "unit": "micrometer/second",
+                "varlength": false
+            },
+            "SPOT_SOURCE_ID": {
+                "description": "Source spot ID",
+                "dtype": "int64",
+                "identifier": "SPOT_SOURCE_ID",
+                "name": "Source spot ID",
+                "unit": null,
+                "varlength": false
+            },
+            "SPOT_TARGET_ID": {
+                "description": "Target spot ID",
+                "dtype": "int64",
+                "identifier": "SPOT_TARGET_ID",
+                "name": "Target spot ID",
+                "unit": null,
+                "varlength": false
+            },
+            "link_x": {
+                "description": "X coordinate of the link, i.e. mean coordinate of its two cells",
+                "dtype": "float64",
+                "identifier": "link_x",
+                "name": "Edge X",
+                "unit": "micrometer",
+                "varlength": false
+            },
+            "link_y": {
+                "description": "Y coordinate of the link, i.e. mean coordinate of its two cells",
+                "dtype": "float64",
+                "identifier": "link_y",
+                "name": "Edge Y",
+                "unit": "micrometer",
+                "varlength": false
+            },
+            "link_z": {
+                "description": "Z coordinate of the link, i.e. mean coordinate of its two cells",
+                "dtype": "float64",
+                "identifier": "link_z",
+                "name": "Edge Z",
+                "unit": "micrometer",
+                "varlength": false
+            }
+        },
+        "ellipsoid": null,
+        "extra": {},
+        "geff_version": "1.1",
+        "node_props_metadata": {
+            "AREA": {
+                "description": "Area",
+                "dtype": "float64",
+                "identifier": "AREA",
+                "name": "Area",
+                "unit": "micrometer^2",
+                "varlength": false
+            },
+            "CIRCULARITY": {
+                "description": "Circularity",
+                "dtype": "float64",
+                "identifier": "CIRCULARITY",
+                "name": "Circularity",
+                "unit": null,
+                "varlength": false
+            },
+            "CONTRAST_CH1": {
+                "description": "Contrast ch1",
+                "dtype": "float64",
+                "identifier": "CONTRAST_CH1",
+                "name": "Contrast ch1",
+                "unit": null,
+                "varlength": false
+            },
+            "ELLIPSE_ASPECTRATIO": {
+                "description": "Ellipse aspect ratio",
+                "dtype": "float64",
+                "identifier": "ELLIPSE_ASPECTRATIO",
+                "name": "Ellipse aspect ratio",
+                "unit": null,
+                "varlength": false
+            },
+            "ELLIPSE_MAJOR": {
+                "description": "Ellipse long axis",
+                "dtype": "float64",
+                "identifier": "ELLIPSE_MAJOR",
+                "name": "Ellipse long axis",
+                "unit": "micrometer",
+                "varlength": false
+            },
+            "ELLIPSE_MINOR": {
+                "description": "Ellipse short axis",
+                "dtype": "float64",
+                "identifier": "ELLIPSE_MINOR",
+                "name": "Ellipse short axis",
+                "unit": "micrometer",
+                "varlength": false
+            },
+            "ELLIPSE_THETA": {
+                "description": "Ellipse angle",
+                "dtype": "float64",
+                "identifier": "ELLIPSE_THETA",
+                "name": "Ellipse angle",
+                "unit": "rad",
+                "varlength": false
+            },
+            "ELLIPSE_X0": {
+                "description": "Ellipse center x0",
+                "dtype": "float64",
+                "identifier": "ELLIPSE_X0",
+                "name": "Ellipse center x0",
+                "unit": "micrometer",
+                "varlength": false
+            },
+            "ELLIPSE_Y0": {
+                "description": "Ellipse center y0",
+                "dtype": "float64",
+                "identifier": "ELLIPSE_Y0",
+                "name": "Ellipse center y0",
+                "unit": "micrometer",
+                "varlength": false
+            },
+            "FRAME": {
+                "description": "Frame",
+                "dtype": "int64",
+                "identifier": "FRAME",
+                "name": "Frame",
+                "unit": null,
+                "varlength": false
+            },
+            "MAX_INTENSITY_CH1": {
+                "description": "Max intensity ch1",
+                "dtype": "float64",
+                "identifier": "MAX_INTENSITY_CH1",
+                "name": "Max intensity ch1",
+                "unit": null,
+                "varlength": false
+            },
+            "MEAN_INTENSITY_CH1": {
+                "description": "Mean intensity ch1",
+                "dtype": "float64",
+                "identifier": "MEAN_INTENSITY_CH1",
+                "name": "Mean intensity ch1",
+                "unit": null,
+                "varlength": false
+            },
+            "MEDIAN_INTENSITY_CH1": {
+                "description": "Median intensity ch1",
+                "dtype": "float64",
+                "identifier": "MEDIAN_INTENSITY_CH1",
+                "name": "Median intensity ch1",
+                "unit": null,
+                "varlength": false
+            },
+            "MIN_INTENSITY_CH1": {
+                "description": "Min intensity ch1",
+                "dtype": "float64",
+                "identifier": "MIN_INTENSITY_CH1",
+                "name": "Min intensity ch1",
+                "unit": null,
+                "varlength": false
+            },
+            "PERIMETER": {
+                "description": "Perimeter",
+                "dtype": "float64",
+                "identifier": "PERIMETER",
+                "name": "Perimeter",
+                "unit": "micrometer",
+                "varlength": false
+            },
+            "POSITION_T": {
+                "description": "T",
+                "dtype": "float64",
+                "identifier": "POSITION_T",
+                "name": "T",
+                "unit": "second",
+                "varlength": false
+            },
+            "QUALITY": {
+                "description": "Quality",
+                "dtype": "float64",
+                "identifier": "QUALITY",
+                "name": "Quality",
+                "unit": null,
+                "varlength": false
+            },
+            "RADIUS": {
+                "description": "Radius",
+                "dtype": "float64",
+                "identifier": "RADIUS",
+                "name": "Radius",
+                "unit": "micrometer",
+                "varlength": false
+            },
+            "ROI_coords": {
+                "description": "List of coordinates of the region of interest",
+                "dtype": "float64",
+                "identifier": "ROI_coords",
+                "name": "ROI coords",
+                "unit": "micrometer",
+                "varlength": false
+            },
+            "SNR_CH1": {
+                "description": "Signal/Noise ratio ch1",
+                "dtype": "float64",
+                "identifier": "SNR_CH1",
+                "name": "Signal/Noise ratio ch1",
+                "unit": null,
+                "varlength": false
+            },
+            "SOLIDITY": {
+                "description": "Solidity",
+                "dtype": "float64",
+                "identifier": "SOLIDITY",
+                "name": "Solidity",
+                "unit": null,
+                "varlength": false
+            },
+            "STD_INTENSITY_CH1": {
+                "description": "Std intensity ch1",
+                "dtype": "float64",
+                "identifier": "STD_INTENSITY_CH1",
+                "name": "Std intensity ch1",
+                "unit": null,
+                "varlength": false
+            },
+            "TOTAL_INTENSITY_CH1": {
+                "description": "Sum intensity ch1",
+                "dtype": "float64",
+                "identifier": "TOTAL_INTENSITY_CH1",
+                "name": "Sum intensity ch1",
+                "unit": null,
+                "varlength": false
+            },
+            "VISIBILITY": {
+                "description": "Visibility",
+                "dtype": "int64",
+                "identifier": "VISIBILITY",
+                "name": "Visibility",
+                "unit": null,
+                "varlength": false
+            },
+            "cell_ID": {
+                "description": "Unique identifier of the cell",
+                "dtype": "int64",
+                "identifier": "cell_ID",
+                "name": "cell ID",
+                "unit": null,
+                "varlength": false
+            },
+            "cell_name": {
+                "description": "Name of the spot",
+                "dtype": "str",
+                "identifier": "cell_name",
+                "name": "cell name",
+                "unit": null,
+                "varlength": false
+            },
+            "cell_x": {
+                "description": "X coordinate of the cell",
+                "dtype": "float64",
+                "identifier": "cell_x",
+                "name": "X",
+                "unit": "micrometer",
+                "varlength": false
+            },
+            "cell_y": {
+                "description": "Y coordinate of the cell",
+                "dtype": "float64",
+                "identifier": "cell_y",
+                "name": "Y",
+                "unit": "micrometer",
+                "varlength": false
+            },
+            "cell_z": {
+                "description": "Z coordinate of the cell",
+                "dtype": "float64",
+                "identifier": "cell_z",
+                "name": "Z",
+                "unit": "micrometer",
+                "varlength": false
+            },
+            "lineage_ID": {
+                "description": null,
+                "dtype": "int64",
+                "identifier": "lineage_ID",
+                "name": null,
+                "unit": null,
+                "varlength": false
+            },
+            "timepoint": {
+                "description": "Timepoint of the detection",
+                "dtype": "int64",
+                "identifier": "timepoint",
+                "name": "timepoint",
+                "unit": null,
+                "varlength": false
+            }
+        },
+        "related_objects": null,
+        "sphere": null,
+        "track_node_props": {
+            "lineage": "lineage_ID"
+        }
+    }
 }

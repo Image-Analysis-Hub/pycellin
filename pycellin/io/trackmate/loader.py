@@ -16,6 +16,7 @@ from pycellin.classes import (
 )
 from pycellin.custom_types import PropertyType
 from pycellin.graph.properties.core import create_cell_id_property
+from pycellin.graph.properties.morphology import create_cell_contour_property
 from pycellin.io.utils import (
     _split_graph_into_lineages,
     _update_lineage_prop_key,
@@ -284,20 +285,20 @@ def _convert_attributes(
         If a property is not found in the properties metadata.
     """
     # TODO: Rewrite this.
-    for key in attributes:
+    for key, value in attributes.items():
         if key in props:
             match props[key].dtype:
                 case "int":
-                    attributes[key] = int(attributes[key])  # type: ignore
+                    attributes[key] = int(value)  # type: ignore
                 case "float":
-                    attributes[key] = float(attributes[key])  # type: ignore
+                    attributes[key] = float(value)  # type: ignore
                 case "string":
                     pass  # Nothing to do.
                 case _:
                     raise ValueError(f"Invalid data type: {props[key].dtype}")
         elif key == "ID":
             # IDs are always integers.
-            attributes[key] = int(attributes[key])  # type: ignore
+            attributes[key] = int(value)  # type: ignore
         elif key == "name":
             # "name" is a string so we don't need to convert it.
             pass
@@ -358,11 +359,11 @@ def _convert_ROI_coordinates(
         points_dimension = len(points_coordinates) // n_points
         it = [iter(points_coordinates)] * points_dimension
         points_coordinates = list(zip(*it))  # type: ignore
-        attribs["ROI_coords"] = points_coordinates
+        attribs["cell_contour"] = points_coordinates
     else:
-        attribs["ROI_coords"] = None
+        attribs["cell_contour"] = None
 
-    del attribs["ROI_N_POINTS"]  # redundant with the new "ROI_coords" attribute
+    del attribs["ROI_N_POINTS"]  # redundant with the new "cell_contour" attribute
 
 
 def _add_all_nodes(
@@ -662,14 +663,8 @@ def _update_props_metadata(
             f"cell_{axis}", f"{axis.upper()} coordinate of the cell"
         )
     if segmentation:
-        roi_coord_prop = Property(
-            identifier="ROI_coords",
-            name="ROI coords",
-            description="List of coordinates of the region of interest",
-            provenance="TrackMate",
-            prop_type="node",
-            lin_type="CellLineage",
-            dtype="float",
+        roi_coord_prop = create_cell_contour_property(
+            custom_provenance="TrackMate",
             unit=units["spatialunits"],
         )
         props_md._add_prop(roi_coord_prop)
@@ -1023,6 +1018,7 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
 
 def load_TrackMate_XML(
     xml_path: str | Path,
+    ref_time_prop: str = "POSITION_T",
     keep_all_spots: bool = False,
     keep_all_tracks: bool = False,
 ) -> Model:
@@ -1041,6 +1037,11 @@ def load_TrackMate_XML(
     ----------
     xml_path : str | Path
         Path of the XML file to process.
+    ref_time_prop : str, optional
+        Name of the property that contains the time information of the model. Must
+        match the time unit and timestep of the TrackMate model (i.e. the properties
+        of the image on which TrackMate was applied). "POSITION_T" by default as it is
+        what TrackMate uses.
     keep_all_spots : bool, optional
         True to keep the spots filtered out in TrackMate, False otherwise.
         False by default.
@@ -1062,7 +1063,7 @@ def load_TrackMate_XML(
     )
     pixel_size = _get_pixel_size(dict_tags["Settings"])
     metadata: dict[str, Any] = {}
-    metadata["reference_time_property"] = "POSITION_T"
+    metadata["reference_time_property"] = ref_time_prop
     # Dimensions info.
     metadata["space_unit"] = units["spatialunits"]
     metadata["time_unit"] = units["timeunits"]

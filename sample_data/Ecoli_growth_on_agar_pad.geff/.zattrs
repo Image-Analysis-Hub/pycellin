@@ -319,14 +319,6 @@
                 "unit": "micrometer",
                 "varlength": false
             },
-            "ROI_coords": {
-                "description": "List of coordinates of the region of interest",
-                "dtype": "float64",
-                "identifier": "ROI_coords",
-                "name": "ROI coords",
-                "unit": "micrometer",
-                "varlength": true
-            },
             "SHAPE_INDEX": {
                 "description": "Shape index",
                 "dtype": "float64",
@@ -406,6 +398,14 @@
                 "name": "Cell ID",
                 "unit": null,
                 "varlength": false
+            },
+            "cell_contour": {
+                "description": "List of coordinates of the cell's contour, relative to its centroid",
+                "dtype": "float64",
+                "identifier": "cell_contour",
+                "name": "Cell contour",
+                "unit": "micrometer",
+                "varlength": true
             },
             "cell_name": {
                 "description": "Name of the spot",

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import networkx as nx
 
 from pycellin.classes import Data
-from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.lineage import CellLineage
+from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.custom_types import Cell, Link
 
 

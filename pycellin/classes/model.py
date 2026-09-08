@@ -18,7 +18,11 @@ import pycellin.graph.properties.morphology as morpho
 import pycellin.graph.properties.topology as topo
 import pycellin.graph.properties.utils as futils
 from pycellin.classes.data import Data
-from pycellin.classes.exceptions import FusionError, ProtectedPropertyError
+from pycellin.classes.exceptions import (
+    FusionError,
+    MissingPropertyError,
+    ProtectedPropertyError,
+)
 from pycellin.classes.lineage import CellLineage, CycleLineage, Lineage
 from pycellin.classes.model_metadata import ModelMetadata
 from pycellin.classes.property import Property
@@ -496,6 +500,18 @@ class Model:
         if time_step is None:
             time_step = self._compute_time_step(variable_time_step)
         self.model_metadata.time_step = time_step
+
+        # Update the timepoint calculator with the new time step.
+        if "timepoint" in self._updater._calculators:
+            self._updater.register_calculator(
+                Timepoint(
+                    property=create_timepoint_property(),
+                    data=self.data,
+                    time_step=time_step,
+                    reference_time_property=self.reference_time_property,
+                )
+            )
+            self.prepare_full_data_update()
 
     @staticmethod
     def _gcd_floats(values: set[float]) -> float:
@@ -1655,6 +1671,42 @@ class Model:
 
         return link_attrs
 
+    def remove_intercycle_links(self, lids: list[int] | None = None) -> dict[str, Any]:
+        """
+        Remove the outgoing links from all division cells of the specified lineages.
+
+        Parameters
+        ----------
+        lids : list[int], optional
+            List of lineage IDs for which to remove intercycle links.
+            If not specified, all lineages will be processed (default is None).
+
+        Returns
+        -------
+        dict[str, Any]
+            A dictionary containing the property values of the removed links.
+        """
+        if lids is None:
+            lids = list(self.data.cell_data.keys())
+
+        removed_links = {}
+        updater_links = []
+        for lid in lids:
+            try:
+                lineage = self.data.cell_data[lid]
+            except KeyError as err:
+                raise KeyError(f"Lineage with ID {lid} does not exist.") from err
+            edges = lineage._remove_intercycle_links()
+            removed_links[lid] = edges
+            updater_links.extend(Link(source, target, lid) for source, target, _ in edges)
+
+        # Notify that an update of the property values may be required.
+        self._updater._update_required = True
+        self._updater._removed_links.update(updater_links)
+        self._updater._modified_lineages.update(lids)
+
+        return removed_links
+
     def get_fusions(self, lids: list[int] | None = None) -> list[Cell]:
         """
         Return fusion cells, i.e. cells with more than one parent.
@@ -1815,7 +1867,7 @@ class Model:
         )
         self.add_custom_property(tracking.AbsoluteAge(prop, time_prop.identifier))
 
-    def add_angle(
+    def add_turning_angle(
         self,
         unit: Literal["radian", "degree"] = "radian",
         custom_identifier: str | None = None,
@@ -1823,65 +1875,65 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the angle property to the model.
+        Add the turningangle property to the model.
 
-        The angle is defined as the angle between the vectors representing
+        The turning angle is defined as the angle between the vectors representing
         the displacement of the cell at two consecutive detections.
 
         Parameters
         ----------
         unit : Literal["radian", "degree"], optional
-            Unit of the angle (default is "radian").
+            Unit of the turning angle (default is "radian").
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
-            "angle".
+            "turning_angle".
         custom_name : str, optional
-            New name for the property. If None, the name will be "Angle".
+            New name for the property. If None, the name will be "Turning angle".
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Angle of the cell trajectory between two consecutive detections".
         """
-        prop = motion.create_angle_property(
+        prop = motion.create_turning_angle_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=unit,
         )
-        self.add_custom_property(motion.Angle(prop, unit))
+        self.add_custom_property(motion.TurningAngle(prop, unit))
 
-    def add_branch_mean_displacement(
+    def add_cycle_mean_displacement(
         self,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the branch mean displacement property to the model.
+        Add the cycle mean displacement property to the model.
 
-        The branch mean displacement is defined as the mean displacement of the cell
+        The cycle mean displacement is defined as the mean displacement of the cell
         during the cell cycle.
 
         Parameters
         ----------
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
-            "branch_mean_displacement".
+            "cycle_mean_displacement".
         custom_name : str, optional
             New name for the property. If None, the name will be
-            "Branch mean displacement".
+            "Cycle mean displacement".
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Mean displacement of the cell during the cell cycle".
         """
-        prop = motion.create_branch_mean_displacement_property(
+        prop = motion.create_cycle_mean_displacement_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-        self.add_custom_property(motion.BranchMeanDisplacement(prop))
+        self.add_custom_property(motion.CycleMeanDisplacement(prop))
 
-    def add_branch_mean_speed(
+    def add_cycle_mean_speed(
         self,
         include_incoming_edge: bool = False,
         custom_identifier: str | None = None,
@@ -1889,9 +1941,9 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the branch mean speed property to the model.
+        Add the cycle mean speed property to the model.
 
-        The branch mean speed is defined as the mean speed of the cell
+        The cycle mean speed is defined as the mean speed of the cell
         during the cell cycle.
 
         Parameters
@@ -1901,55 +1953,180 @@ class Model:
             and its predecessor. Default is False.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
-            "branch_mean_speed".
+            "cycle_mean_speed".
         custom_name : str, optional
             New name for the property. If None, the name will be
-            "Branch mean speed".
+            "Cycle mean speed".
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Mean speed of the cell during the cell cycle".
         """
         space_unit = self.model_metadata.space_unit or "pixel"
         time_unit = self.model_metadata.time_unit or "frame"
-        prop = motion.create_branch_mean_speed_property(
+        prop = motion.create_cycle_mean_speed_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=f"{space_unit} / {time_unit}",
         )
-        self.add_custom_property(motion.BranchMeanSpeed(prop, include_incoming_edge))
+        self.add_custom_property(motion.CycleMeanSpeed(prop, include_incoming_edge))
 
-    def add_branch_total_displacement(
+    def add_cycle_total_displacement(
         self,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the branch total displacement property to the model.
+        Add the cycle total displacement property to the model.
 
-        The branch total displacement is defined as the displacement of the cell
+        The cycle total displacement is defined as the displacement of the cell
         during the cell cycle.
 
         Parameters
         ----------
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
-            "branch_total_displacement".
+            "cycle_total_displacement".
         custom_name : str, optional
             New name for the property. If None, the name will be
-            "Branch total displacement".
+            "Cycle total displacement".
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Displacement of the cell during the cell cycle".
         """
-        prop = motion.create_branch_total_displacement_property(
+        prop = motion.create_cycle_total_displacement_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-        self.add_custom_property(motion.BranchTotalDisplacement(prop))
+        self.add_custom_property(motion.CycleTotalDisplacement(prop))
+
+    def add_cell_area(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell area property to the model.
+
+        "cell_polygon" needs to be present in the model for this property
+        to be computed.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_area".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cell area".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.morphology.create_cell_area_property`).
+
+        Raises
+        -----
+        MissingPropertyError
+            If the 'cell_polygon' property is not present in the model. The
+            'cell_polygon' property is required for computing the cell area.
+        """
+        cell_poly = self.get_property("cell_polygon")
+        if cell_poly is None:
+            raise MissingPropertyError(
+                "Property 'cell_polygon' is required for computing cell area. "
+                "Please add it before adding 'cell_area'."
+            )
+        prop = morpho.create_cell_area_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=f"{self.get_space_unit() or 'pixel'}^2",
+        )
+        self.add_custom_property(morpho.CellArea(prop))
+
+    def add_cell_perimeter(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell perimeter property to the model.
+
+        "cell_polygon" needs to be present in the model for this property
+        to be computed.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_perimeter".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cell perimeter".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.morphology.create_cell_perimeter_property`).
+
+        Raises
+        -----
+        MissingPropertyError
+            If the 'cell_polygon' property is not present in the model. The
+            'cell_polygon' property is required for computing the cell perimeter.
+        """
+        cell_poly = self.get_property("cell_polygon")
+        if cell_poly is None:
+            raise MissingPropertyError(
+                "Property 'cell_polygon' is required for computing cell perimeter. "
+                "Please add it before adding 'cell_perimeter'."
+            )
+
+        prop = morpho.create_cell_perimeter_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=f"{self.get_space_unit() or 'pixel'}",
+        )
+        self.add_custom_property(morpho.CellPerimeter(prop))
+
+    def add_cell_contour(
+        self,
+        force_recompute: bool = False,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell contour property to the model.
+
+        The cell contour is the coordinates of the contour of the cell,
+        relative to the cell centroid.
+
+        Parameters
+        ----------
+        force_recompute : bool
+            Whether to force recomputation of the property when it has already been
+            computed. Defaults to False.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_contour".
+        custom_name : str, optional
+            New name for the property. If None, the name will be
+            "Cell contour".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.morphology.create_cell_contour_property`).
+        """
+        prop = morpho.create_cell_contour_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self.get_space_unit() or "pixel",
+        )
+        self.add_custom_property(
+            morpho.CellContour(prop, force_recompute=force_recompute)
+        )
 
     def add_cycle_completeness(
         self,
@@ -2529,7 +2706,8 @@ class Model:
 
     def add_location_tag(
         self,
-        mask_path: str,
+        mask_path_metadata_field: str | None = None,
+        mask_path: str | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2542,11 +2720,16 @@ class Model:
         assigned to each cell based on the pixel value at the cell's position in the
         mask image.
         The location tag can be used to define different regions of interest in the
-        image, such as different tissues.
+        image, such as different tissues. It supports an arbitrary number of regions
+        of interest, as long as they are represented by different pixel values in the
+        mask image.
 
         Parameters
         ----------
-        mask_path : str
+        mask_path_metadata_field: str, optional
+            Name of the model metadata field that contains the path to the mask
+            image (str).
+        mask_path : str, optional
             Path to the mask image (tif stack) that defines the location tags.
             The mask must be a tif stack where each pixel value represents a
             location tag. The first frame/slice of the mask image must correspond to
@@ -2559,10 +2742,51 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will take its
             default value (see :func:`graph.properties.topology.create_location_tag_property`).
+
+        Raises
+        ------
+        ValueError
+            If neither `mask_path_metadata_field` nor `mask_path` are provided.
+        ValueError
+            If the specified mask metadata field is None and no mask path is provided.
+        ValueError
+            If the specified mask metadata field is a string (path to mask) but does not
+            match the provided mask path.
+        TypeError
+            If the specified mask metadata field is not a string (path to mask).
         """
+        # Resolve mask_path from metadata or argument.
+        if mask_path_metadata_field is None:
+            if mask_path is None:
+                raise ValueError(
+                    "Either 'mask_path_metadata_field' or 'mask_path' must be provided."
+                )
+        else:
+            mask_md_value = self.model_metadata[mask_path_metadata_field]
+            if mask_md_value is None:
+                if mask_path is None:
+                    raise ValueError(
+                        f"No mask found: metadata field '{mask_path_metadata_field}' "
+                        "is None and no mask path is provided."
+                    )
+                self.model_metadata[mask_path_metadata_field] = mask_path
+            elif isinstance(mask_md_value, str):
+                if mask_path is None:
+                    mask_path = mask_md_value
+                elif mask_path != mask_md_value:
+                    raise ValueError(
+                        f"Metadata field '{mask_path_metadata_field}' value "
+                        f"'{mask_md_value}' does not match provided mask_path"
+                        f"'{mask_path}'."
+                    )
+            else:
+                raise TypeError(
+                    f"Metadata field '{mask_path_metadata_field}' must be a string "
+                    f"but got type {type(mask_md_value).__name__}."
+                )
+
         mask_img = tifffile.imread(mask_path).astype(np.uint32)
 
-        # Resolve pixel size.
         size_x = self.get_pixel_width() or 1.0
         size_y = self.get_pixel_height() or 1.0
         if size_x != size_y:
@@ -2573,13 +2797,8 @@ class Model:
             custom_name=custom_name,
             custom_description=custom_description,
         )
-
         self.add_custom_property(
-            topo.LocationTag(
-                prop,
-                mask_img=mask_img,
-                pixel_size=size_x,
-            )
+            topo.LocationTag(prop, mask_img=mask_img, pixel_size=size_x)
         )
 
     def add_num_cells(

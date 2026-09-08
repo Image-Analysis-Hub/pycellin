@@ -21,7 +21,7 @@ from pycellin.classes.property_calculator import (
 )
 
 
-def _get_branch_edge_property_values(
+def _get_cycle_edge_property_values(
     prop_name: str,
     data: Data,
     lineage: CycleLineage,
@@ -139,15 +139,15 @@ class CellDisplacement(EdgeLocalPropCalculator):
         return math.dist(pos1, pos2)
 
 
-def create_branch_total_displacement_property(
+def create_cycle_total_displacement_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
     unit: str | None = None,
 ) -> Property:
     return Property(
-        identifier=custom_identifier or "branch_total_displacement",
-        name=custom_name or "Branch total displacement",
+        identifier=custom_identifier or "cycle_total_displacement",
+        name=custom_name or "Cycle total displacement",
         description=custom_description
         or "Displacement of the cell during the cell cycle",
         provenance="pycellin",
@@ -158,11 +158,11 @@ def create_branch_total_displacement_property(
     )
 
 
-class BranchTotalDisplacement(NodeGlobalPropCalculator):
+class CycleTotalDisplacement(NodeGlobalPropCalculator):
     """
     Calculator to compute the total displacement of a cell during a cell cycle.
 
-    The branch total displacement is defined as the displacement of the cell during
+    The cycle total displacement is defined as the displacement of the cell during
     the cell cycle.
     """
 
@@ -199,21 +199,21 @@ class BranchTotalDisplacement(NodeGlobalPropCalculator):
         float
             Total displacement of the cell during the cell cycle.
         """
-        disps = _get_branch_edge_property_values(
+        disps = _get_cycle_edge_property_values(
             "cell_displacement", data, lineage, nid, self.include_incoming_edge
         )
         return np.nansum(disps)
 
 
-def create_branch_mean_displacement_property(
+def create_cycle_mean_displacement_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
     unit: str | None = None,
 ) -> Property:
     return Property(
-        identifier=custom_identifier or "branch_mean_displacement",
-        name=custom_name or "Branch mean displacement",
+        identifier=custom_identifier or "cycle_mean_displacement",
+        name=custom_name or "Cycle mean displacement",
         description=custom_description
         or "Mean displacement of the cell during the cell cycle",
         provenance="pycellin",
@@ -224,11 +224,11 @@ def create_branch_mean_displacement_property(
     )
 
 
-class BranchMeanDisplacement(NodeGlobalPropCalculator):
+class CycleMeanDisplacement(NodeGlobalPropCalculator):
     """
     Calculator to compute the mean displacement of a cell during a cell cycle.
 
-    The branch mean displacement is defined as the mean displacement of the cell during
+    The cycle mean displacement is defined as the mean displacement of the cell during
     the cell cycle.
     """
 
@@ -265,7 +265,7 @@ class BranchMeanDisplacement(NodeGlobalPropCalculator):
         float
             Mean displacement of the cell during the cell cycle.
         """
-        disps = _get_branch_edge_property_values(
+        disps = _get_cycle_edge_property_values(
             "cell_displacement", data, lineage, nid, self.include_incoming_edge
         )
         return np.nanmean(disps).item()
@@ -342,15 +342,15 @@ class CellSpeed(EdgeLocalPropCalculator):
             return math.dist(pos1, pos2) / (time2 - time1)
 
 
-def create_branch_mean_speed_property(
+def create_cycle_mean_speed_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
     unit: str | None = None,
 ) -> Property:
     return Property(
-        identifier=custom_identifier or "branch_mean_speed",
-        name=custom_name or "Branch mean speed",
+        identifier=custom_identifier or "cycle_mean_speed",
+        name=custom_name or "Cycle mean speed",
         description=custom_description or "Mean speed of the cell during the cell cycle",
         provenance="pycellin",
         prop_type="node",
@@ -360,11 +360,11 @@ def create_branch_mean_speed_property(
     )
 
 
-class BranchMeanSpeed(NodeGlobalPropCalculator):
+class CycleMeanSpeed(NodeGlobalPropCalculator):
     """
     Calculator to compute the mean speed of a cell during a cell cycle.
 
-    The branch mean speed is defined as the mean speed of the cell
+    The cycle mean speed is defined as the mean speed of the cell
     during the cell cycle.
     """
 
@@ -401,7 +401,7 @@ class BranchMeanSpeed(NodeGlobalPropCalculator):
         float
             Mean speed of the cell during the cell cycle.
         """
-        speeds = _get_branch_edge_property_values(
+        speeds = _get_cycle_edge_property_values(
             "cell_speed", data, lineage, nid, self.include_incoming_edge
         )
         return np.nanmean(speeds).item()
@@ -506,7 +506,7 @@ class Straightness(NodeGlobalPropCalculator):
                 distances.append(dist)
             elif len(preds) > 1:
                 raise FusionError(first_cell, lin_ID)
-        
+
         if sum(distances) == 0:
             return math.nan
 
@@ -523,15 +523,15 @@ class Straightness(NodeGlobalPropCalculator):
         return math.dist(first_cell_loc, last_cell_loc) / sum(distances)
 
 
-def create_angle_property(
+def create_turning_angle_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
     unit: Literal["radian", "degree"] = "radian",
 ) -> Property:
     return Property(
-        identifier=custom_identifier or "angle",
-        name=custom_name or "Angle",
+        identifier=custom_identifier or "turning_angle",
+        name=custom_name or "Turning angle",
         description=custom_description
         or "Angle of the cell trajectory between two consecutive displacements",
         provenance="pycellin",
@@ -542,7 +542,7 @@ def create_angle_property(
     )
 
 
-class Angle(NodeGlobalPropCalculator):
+class TurningAngle(NodeGlobalPropCalculator):
     """
     Calculator to compute the angle between two consecutive displacement vectors of a cell.
 

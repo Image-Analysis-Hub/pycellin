@@ -24,6 +24,95 @@ def create_frame_property(provenance: str = "pycellin") -> Property:
     )
 
 
+def create_time_property(
+    unit: str | None,
+    provenance: str = "pycellin",
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "time",
+        name=custom_name or "Time",
+        description=custom_description or "Time of the detection",
+        provenance=provenance,
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
+class Time(NodeLocalPropCalculator):
+    """
+    Calculator for the time property.
+
+    Attributes
+    ----------
+    property : Property
+        Property instance containing the time property metadata.
+    base_time_prop : str
+        Name of the base time property to use for time calculation.
+    factor : float
+        Factor to multiply the base time property by to get the time property.
+    force_recompute : bool
+        If True, forces the recomputation of the time property even if it already
+        exists in the lineage graph. Defaults to False.
+
+    Warnings
+    --------
+    As a general rule, do not use 'timepoint' as the base time property if the
+    calculator is associated with the reference time property of the model. This is
+    due to 'timepoint' being derived from the reference time property of the model,
+    meaning that at each model update the 'timepoint' property will be recomputed
+    from the reference time property. This will create a circular dependency that will
+    lead to incorrect time values.
+    """
+
+    def __init__(
+        self,
+        property: Property,
+        base_time_prop: str,
+        factor: float,
+        force_recompute: bool = False,
+    ):
+        super().__init__(property)
+
+        if factor == 0:
+            raise ValueError(
+                "'factor' cannot be None nor zero for time property calculation."
+            )
+        self.base_time_prop = base_time_prop
+        self.factor = factor
+        self.force_recompute = force_recompute
+
+    def compute(self, lineage, nid: int) -> float:
+        """
+        Compute the time of a given node.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage graph containing the node of interest.
+        nid : int
+            Node ID (cell_ID) of the cell of interest.
+
+        Returns
+        -------
+        float
+            The computed time value for the given node.
+        """
+        if not self.force_recompute and self.prop.identifier in lineage.nodes[nid]:
+            return lineage.nodes[nid][self.prop.identifier]
+
+        if self.base_time_prop not in lineage.nodes[nid]:
+            raise KeyError(
+                f"Base time property '{self.base_time_prop}' not found "
+                f"in node {nid} of lineage {lineage.graph['lineage_ID']}."
+            )
+        return lineage.nodes[nid][self.base_time_prop] * self.factor
+
+
 def create_timepoint_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="timepoint",
@@ -51,7 +140,7 @@ class Timepoint(NodeLocalPropCalculator):
 
         if time_step is None or time_step == 0:
             raise ValueError(
-                "`time_step` cannot be None nor zero for timepoint property calculation."
+                "'time_step' cannot be None nor zero for timepoint property calculation."
             )
 
         self.time_step = time_step
