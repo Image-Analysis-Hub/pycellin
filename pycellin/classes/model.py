@@ -501,6 +501,18 @@ class Model:
             time_step = self._compute_time_step(variable_time_step)
         self.model_metadata.time_step = time_step
 
+        # Update the timepoint calculator with the new time step.
+        if "timepoint" in self._updater._calculators:
+            self._updater.register_calculator(
+                Timepoint(
+                    property=create_timepoint_property(),
+                    data=self.data,
+                    time_step=time_step,
+                    reference_time_property=self.reference_time_property,
+                )
+            )
+            self.prepare_full_data_update()
+
     @staticmethod
     def _gcd_floats(values: set[float]) -> float:
         """
