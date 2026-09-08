@@ -53,7 +53,7 @@ class Time(NodeLocalPropCalculator):
     base_time_prop : str
         Name of the base time property to use for time calculation.
     factor : float
-        Factor to multiply the base time property by to get the time property.
+        Factor to multiply the base time property by to get the new time property.
     force_recompute : bool
         If True, forces the recomputation of the time property even if it already
         exists in the lineage graph. Defaults to False.
