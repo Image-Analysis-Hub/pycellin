@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import copy
 import warnings
@@ -132,10 +131,7 @@ class PropsMetadata:
         bool
             True if the property has been declared, False otherwise.
         """
-        if prop_id in self.props:
-            return True
-        else:
-            return False
+        return prop_id in self.props
 
     def _get_prop_dict_from_prop_type(
         self,
