@@ -457,4 +457,4 @@ class LocationTag(NodeLocalPropCalculator):
         x = int(lineage.nodes[nid]["cell_x"] / self.pixel_size)
         y = int(lineage.nodes[nid]["cell_y"] / self.pixel_size)
         t = lineage.nodes[nid]["timepoint"]
-        return self.mask[t, y, x]
+        return int(self.mask[t, y, x])
