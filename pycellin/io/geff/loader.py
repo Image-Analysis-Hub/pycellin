@@ -189,14 +189,13 @@ def _identify_time_prop(
     UserWarning
         If a valid time property is inferred from axes.
     """
-    if time_key is not None:
-        if not _graph_has_node_prop(geff_graph, time_key):
-            logger.info(
-                f"The provided property '{time_key}' is not present in the graph. "
-                "It will be inferred from GEFF metadata, if possible.",
-                stacklevel=3,
-            )
-            time_key = None
+    if time_key is not None and not _graph_has_node_prop(geff_graph, time_key):
+        logger.info(
+            f"The provided property '{time_key}' is not present in the graph. "
+            "It will be inferred from GEFF metadata, if possible.",
+            stacklevel=3,
+        )
+        time_key = None
 
     # Fallback to GEFF display hints.
     hints = geff_md.display_hints if geff_md is not None else None
@@ -243,9 +242,14 @@ def _identify_space_props(
     """
     Identify the space properties (x, y, z) from arguments or GEFF metadata.
 
-    If space keys are provided, the function will check that they exist in the graph.
-    If not provided, the function will try to infer them from the GEFF metadata,
-    first from the display hints, then from the axes.
+    User-provided space properties must describe either a complete 2D coordinate
+    system (`x` and `y`) or a complete 3D coordinate system (`x`, `y`, and `z`).
+    Partial specifications and duplicate property names raise `ValueError`.
+
+    When no space properties are provided, the function infers them first from
+    GEFF display hints and then from space axes. Inferred properties are assigned
+    at most once. Missing or unavailable properties remain `None`, so a 2D result
+    is returned as `(x, y, None)`.
 
     Parameters
     ----------
@@ -265,13 +269,24 @@ def _identify_space_props(
     tuple[str | None, str | None, str | None]
         The identified space properties.
 
-    Warns
+    Raises
+    ------
+    ValueError
+        If only one space property is provided or if duplicate property names are
+        provided.
+
+    Notes
     -----
-    UserWarning
-        If any of the provided space properties are not found in the graph.
+    A property provided by the caller is replaced by metadata inference if it is
+    not present on the graph.
     """
     space_keys = [cell_x_key, cell_y_key, cell_z_key]
-    print(f"Initial space keys: {space_keys}")
+    provided_keys = [key for key in space_keys if key is not None]
+    if provided_keys and len(provided_keys) not in (2, 3):
+        raise ValueError("Space properties must include both x and y, and optionally z.")
+    if len(set(provided_keys)) != len(provided_keys):
+        raise ValueError("Space properties must be distinct.")
+
     for i, key in enumerate(space_keys):
         if key is not None and not _graph_has_node_prop(geff_graph, key):
             logger.info(
@@ -284,30 +299,37 @@ def _identify_space_props(
     # Fallback to GEFF display hints.
     hints = geff_md.display_hints if geff_md is not None else None
     hint_fields = ["display_horizontal", "display_vertical", "display_depth"]
+    assigned_keys = {key for key in space_keys if key is not None}
     for i, (hint_field, key) in enumerate(zip(hint_fields, space_keys)):
         if key is None and hints is not None:
             space_key = getattr(hints, hint_field, None)
-            if space_key is not None:
+            if space_key is not None and space_key not in assigned_keys:
                 if _graph_has_node_prop(geff_graph, space_key):
                     logger.info(
                         f"Valid space property inferred from display hints: '{space_key}'.",
                         stacklevel=3,
                     )
+                    assigned_keys.add(space_key)
                 else:
                     space_key = None
+            else:
+                space_key = None
             space_keys[i] = space_key
 
     # Fallback to GEFF axes: space axes are consumed in order.
     axes = geff_md.axes if geff_md is not None else None
     if axes is not None:
-        space_axes = iter(axis for axis in axes if axis.type == "space")
+        space_axes = [axis for axis in axes if axis.type == "space"]
         for i, key in enumerate(space_keys):
             if key is None:
                 for axis in space_axes:
-                    if axis.name is not None and _graph_has_node_prop(
-                        geff_graph, axis.name
+                    if (
+                        axis.name is not None
+                        and axis.name not in assigned_keys
+                        and _graph_has_node_prop(geff_graph, axis.name)
                     ):
                         space_keys[i] = axis.name
+                        assigned_keys.add(axis.name)
                         logger.info(
                             f"Valid space property inferred from axes: '{space_keys[i]}'.",
                             stacklevel=3,
@@ -1097,17 +1119,39 @@ def load_GEFF(
         If None, the default property 'cell_ID' will be created and populated based
         on GEFF IDs array (graph node IDs).
     cell_x_prop : str | None, optional
-        Name of the property that identifies the x-coordinate of cells in the GEFF file.
+        Name of the node property that contains the x-coordinate. Provide this
+        together with ``cell_y_prop`` for 2D data, or with both ``cell_y_prop``
+        and ``cell_z_prop`` for 3D data. If all coordinate properties are
+        ``None``, they will be inferred from GEFF metadata.
     cell_y_prop : str | None, optional
-        Name of the property that identifies the y-coordinate of cells in the GEFF file.
+        Name of the node property that contains the y-coordinate. It must be
+        provided together with ``cell_x_prop`` when coordinates are specified
+        explicitly. If all coordinate properties are ``None``, it will be
+        inferred from GEFF metadata.
     cell_z_prop : str | None, optional
-        Name of the property that identifies the z-coordinate of cells in the GEFF file.
+        Name of the node property that contains the z-coordinate for 3D data.
+        Omit it for 2D data. If all coordinate properties are ``None``, it will
+        be inferred from GEFF metadata when available.
     time_prop : str | None, optional
         Name of the property to use as the reference time property.
         If None, it will be infered from the GEFF metadata.
     structure_validation : bool, optional
         Whether to validate the GEFF file's structure, i.e. to check that it is
         compliant with the GEFF specification. Default is True.
+
+    Notes
+    -----
+    When coordinate properties are not provided, ``load_GEFF`` first tries to
+    infer them from GEFF display hints and then from space axes. Inferred
+    properties are assigned at most once, and a 2D dataset is represented by
+    ``(x, y, None)`` internally. Coordinate properties in the resulting model
+    are normalized to ``cell_x``, ``cell_y``, and ``cell_z`` when available.
+
+    If a supplied coordinate property is not present in the graph, inference is
+    attempted for that coordinate from GEFF metadata. Explicit coordinate
+    arguments must otherwise describe either a complete 2D set (x and y) or a
+    complete 3D set (x, y, and z); partial specifications and duplicate
+    property names are invalid.
 
     Returns
     -------
@@ -1117,7 +1161,9 @@ def load_GEFF(
     Raises
     ------
     ValueError
-        If the GEFF graph is undirected, as pycellin does not support undirected graphs.
+        If the GEFF graph is undirected, as pycellin does not support undirected
+        graphs, or if the coordinate arguments contain only one property or
+        duplicate property names.
     """
     # Read the GEFF file.
     geff_graph, geff_md = geff.read(geff_file, structure_validation=structure_validation)
@@ -1188,6 +1234,10 @@ if __name__ == "__main__":
     """
     Quick demo with sample data.
     """
+    import logging
+
+    logging.basicConfig(level=logging.INFO)
+
     geff_in = (
         Path(__file__).resolve().parents[3]
         / "sample_data"

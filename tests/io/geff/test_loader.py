@@ -589,17 +589,15 @@ class TestIdentifySpaceProps:
         )
         assert result == ("position_x", "position_y", "position_z")
 
-    def test_provided_key_not_in_graph_logs_becomes_none(self, caplog, graph_with_coords):
-        """When a provided key is absent from the graph, log and set it to None."""
-        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
-            result = _identify_space_props(
-                "missing_x", None, None, None, graph_with_coords
-            )
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "INFO"
-        assert "not present in the graph" in caplog.records[0].message
+    def test_invalid_partial_coordinate_specification_raises(self, graph_with_coords):
+        """A lone coordinate key is invalid even when that key is absent."""
+        with pytest.raises(ValueError, match="both x and y"):
+            _identify_space_props("missing_x", None, None, None, graph_with_coords)
 
-        assert result == (None, None, None)
+    def test_single_provided_key_raises(self, graph_with_coords):
+        """A partial coordinate specification is invalid."""
+        with pytest.raises(ValueError, match="both x and y"):
+            _identify_space_props("position_x", None, None, None, graph_with_coords)
 
     def test_all_none_no_geff_md_returns_none_tuple(self, graph_with_coords):
         """When all keys are None and geff_md is None, return (None, None, None) with no logging."""
@@ -652,32 +650,34 @@ class TestIdentifySpaceProps:
     def test_provided_key_not_in_graph_falls_back_to_display_hints(
         self, caplog, graph_with_coords, geff_md_display_hints
     ):
-        """When x key is absent from the graph, log and infer it from display hints."""
+        """When x and y keys are absent from the graph, log and infer them from display hints."""
         with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_space_props(
-                "missing_x", None, None, geff_md_display_hints, graph_with_coords
+                "missing_x", "missing_y", None, geff_md_display_hints, graph_with_coords
             )
-        assert len(caplog.records) == 3
+        assert len(caplog.records) == 4
         assert caplog.records[0].levelname == "INFO"
         assert "not present in the graph" in caplog.records[0].message
-        assert "inferred from display hints" in caplog.records[1].message
+        assert "not present in the graph" in caplog.records[1].message
         assert "inferred from display hints" in caplog.records[2].message
+        assert "inferred from display hints" in caplog.records[3].message
 
         assert result == ("position_x", "position_y", None)
 
     def test_provided_key_not_in_graph_falls_back_to_axes(
         self, caplog, graph_with_coords, geff_md_axes
     ):
-        """When x key is absent from the graph, log and infer it from axes."""
+        """When x and y keys are absent from the graph, log and infer them from axes."""
         with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_space_props(
-                "missing_x", None, None, geff_md_axes, graph_with_coords
+                "missing_x", "missing_y", None, geff_md_axes, graph_with_coords
             )
-        assert len(caplog.records) == 3
+        assert len(caplog.records) == 4
         assert caplog.records[0].levelname == "INFO"
         assert "not present in the graph" in caplog.records[0].message
-        assert "inferred from axes" in caplog.records[1].message
+        assert "not present in the graph" in caplog.records[1].message
         assert "inferred from axes" in caplog.records[2].message
+        assert "inferred from axes" in caplog.records[3].message
 
         assert result == ("position_x", "position_y", None)
 
