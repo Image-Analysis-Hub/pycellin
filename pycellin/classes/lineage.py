@@ -2302,12 +2302,9 @@ class CycleLineage(Lineage):
                 self.nodes[n]["cycle_length"] = len(cells_in_cycle)
                 # How long does the cycle last?
                 self.nodes[n]["cycle_duration"] = (
-                    (
-                        cell_lineage.nodes[last][time_prop]
-                        - cell_lineage.nodes[first][time_prop]
-                    )
-                    + 1
-                ) * time_step
+                    cell_lineage.nodes[last][time_prop]
+                    - cell_lineage.nodes[first][time_prop]
+                )
                 root = self.get_root()
                 if isinstance(root, list):
                     raise LineageStructureError(
