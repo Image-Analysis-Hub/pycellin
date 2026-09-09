@@ -1161,9 +1161,7 @@ class TestCellLineageGetBranchLineageHighlight:
 
     def test_multiple_targets_with_paired_source_cells(self, cell_lin):
         """Test highlighting multiple branches with paired source cells."""
-        highlighted = cell_lin.get_branch_lineage_highlight(
-            [6, 16], source_cell=[4, 14]
-        )
+        highlighted = cell_lin.get_branch_lineage_highlight([6, 16], source_cell=[4, 14])
 
         selected = [
             node
@@ -1195,11 +1193,11 @@ class TestCellLineageGetBranchLineageHighlight:
 
 
 class TestCellLineageGetBranchPropertyFigure:
-    """Test cases for CellLineage.get_branch_property_figure method."""
+    """Test cases for CellLineage.get_branch_profile_figure method."""
 
     def test_multiple_targets_create_multiple_traces(self, cell_lin):
         """Test plotting multiple target cells as separate traces."""
-        fig = cell_lin.get_branch_property_figure(
+        fig = cell_lin.get_branch_profile_figure(
             target_cells=[6, 16],
             y_prop="timepoint",
         )
@@ -1215,7 +1213,7 @@ class TestCellLineageGetBranchPropertyFigure:
 
     def test_multiple_targets_with_paired_source_cells(self, cell_lin):
         """Test property plotting with paired target and source cells."""
-        fig = cell_lin.get_branch_property_figure(
+        fig = cell_lin.get_branch_profile_figure(
             target_cells=[6, 16],
             source_cell=[4, 14],
             y_prop="timepoint",
@@ -1226,22 +1224,51 @@ class TestCellLineageGetBranchPropertyFigure:
         assert list(fig.data[1].x) == [5, 6]
         assert fig.data[0].marker.color == HIGHLIGHT_COLORS[0]
         assert fig.data[1].marker.color == HIGHLIGHT_COLORS[1]
-        assert list(fig.data[0].marker.symbol) == ["triangle-up", "circle", "circle"]
-        assert list(fig.data[1].marker.symbol) == ["triangle-up", "circle"]
+        assert list(fig.data[0].marker.symbol) == ["circle-cross", "circle", "circle"]
+        assert list(fig.data[1].marker.symbol) == ["circle-cross", "circle"]
+        assert list(fig.data[0].marker.line.color) == [
+            "black",
+            HIGHLIGHT_COLORS[0],
+            HIGHLIGHT_COLORS[0],
+        ]
+        assert list(fig.data[0].marker.line.width) == [2, 0, 0]
+        assert list(fig.data[1].marker.line.color) == ["black", HIGHLIGHT_COLORS[1]]
+        assert list(fig.data[1].marker.line.width) == [2, 0]
 
     def test_source_cell_list_must_match_targets(self, cell_lin):
         """Test that property plotting rejects mismatched paired lists."""
         with pytest.raises(ValueError, match="same length"):
-            cell_lin.get_branch_property_figure(
+            cell_lin.get_branch_profile_figure(
                 target_cells=[6, 16],
                 source_cell=[4],
                 y_prop="timepoint",
             )
+
+    def test_normal_and_division_marker_styles_are_applied(self, cell_lin):
+        """Test that marker styles can be configured independently."""
+        fig = cell_lin.get_branch_profile_figure(
+            target_cells=6,
+            source_cell=4,
+            y_prop="timepoint",
+            node_marker_style={"color": "green", "symbol": "diamond"},
+            division_marker_style={
+                "color": "orange",
+                "symbol": "star",
+                "line": {"color": "red", "width": 4},
+            },
+        )
+
+        assert list(fig.data[0].marker.color) == ["orange", "green", "green"]
+        assert list(fig.data[0].marker.symbol) == ["star", "diamond", "diamond"]
+        assert list(fig.data[0].marker.line.color) == ["red", "green", "green"]
+        assert list(fig.data[0].marker.line.width) == [4, 0, 0]
+
+
 class TestCellLineagePlotBranchProperty:
-    """Test cases for CellLineage.plot_branch_property method."""
+    """Test cases for CellLineage.plot_branch_profile method."""
 
     def test_shows_figure(self, cell_lin, monkeypatch):
-        fig = cell_lin.get_branch_property_figure(
+        fig = cell_lin.get_branch_profile_figure(
             target_cells=6,
             y_prop="timepoint",
         )
@@ -1252,18 +1279,10 @@ class TestCellLineagePlotBranchProperty:
             nonlocal shown
             shown = True
 
-
         monkeypatch.setattr(fig, "show", fake_show)
-        monkeypatch.setattr(
-            cell_lin,
-            "get_branch_property_figure",
-            lambda **kwargs: fig
-        )
+        monkeypatch.setattr(cell_lin, "get_branch_profile_figure", lambda **kwargs: fig)
 
-        result = cell_lin.plot_branch_property(
-            target_cells=6,
-            y_prop="timepoint"
-        )
+        result = cell_lin.plot_branch_profile(target_cells=6, y_prop="timepoint")
 
         assert result is None
         assert shown is True
@@ -1394,7 +1413,7 @@ class TestCellLineageSplitFromCell:
 
 class TestCellLineageGetDivisions:
     """Test cases for CellLineage.get_divisions method."""
-    
+
     def test_div_root(self, cell_lin_div_root):
         """Test get_divisions on lineage with division root."""
         lin = cell_lin_div_root

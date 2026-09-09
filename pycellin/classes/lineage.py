@@ -16,6 +16,7 @@ from igraph import Graph
 from pycellin.classes.exceptions import (
     FusionError,
     LineageStructureError,
+    MissingPropertyError,
     TimeFlowError,
 )
 from pycellin.classes.property import Property
@@ -28,7 +29,6 @@ _DEFAULT_UNMAPPED_COLOR = "dimgrey"
 # subpackage.
 
 UNSELECTED_HIGHLIGHT_COLOR = "lightgray"
-PYCELLIN_PURPLE = "#981cfd"
 HIGHLIGHT_COLORS = [
     PYCELLIN_PURPLE
 ] + px.colors.qualitative.Safe  # 12 Total IDs: 1 purple + 11 from Safe palette
@@ -2011,7 +2011,7 @@ class CellLineage(Lineage):
         )
         fig.show()
 
-    def get_branch_property_figure(
+    def get_branch_profile_figure(
         self,
         target_cells: int | list[int],
         y_prop: str | Property,
@@ -2021,6 +2021,7 @@ class CellLineage(Lineage):
         title: str | None = None,
         mode: str = "lines+markers",
         node_marker_style: dict[str, Any] | None = None,
+        division_marker_style: dict[str, Any] | None = None,
         line_style: dict[str, Any] | None = None,
         node_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
@@ -2052,7 +2053,10 @@ class CellLineage(Lineage):
         mode : str, optional
             Plotly scatter mode. "lines+markers" by default.
         node_marker_style : dict, optional
-            The style of the markers representing the cells in the plot.
+            The style of node markers representing the cells in the plot.
+        division_marker_style : dict, optional
+            The style of markers representing division cells. Values not provided
+            here use the node marker style or the default division style.
         line_style : dict, optional
             The style of the lines representing the branches in the plot.
         node_hover_props : list[str], optional
@@ -2074,7 +2078,35 @@ class CellLineage(Lineage):
         plotly.graph_objects.Figure
             The generated figure. Use Plotly's figure methods to customize or
             display it.
+
+        Examples
+        --------
+        Configure node and division markers independently:
+
+        node_marker_style = dict(color="orange", symbol="circle")
+        division_marker_style = dict(
+            color="orange",
+            symbol="star",
+            line=dict(color="purple", width=3),
+        )
+        fig = lineage.get_branch_profile_figure(
+            target_cells=100,
+            y_prop="cell_area",
+            node_marker_style=node_marker_style,
+            division_marker_style=division_marker_style,
+        )
         """
+        # Validate style arguments early for a clear error message
+        for arg_name, arg_value in [
+            ("node_marker_style", node_marker_style),
+            ("division_marker_style", division_marker_style),
+            ("line_style", line_style),
+        ]:
+            if arg_value is not None and not isinstance(arg_value, dict):
+                raise TypeError(
+                    f"'{arg_name}' must be a dict or None, "
+                    f"got {type(arg_value).__name__!r} instead."
+                )
 
         def _prop_info(prop: str | Property) -> tuple[str, str]:
             if isinstance(prop, Property):
@@ -2107,8 +2139,8 @@ class CellLineage(Lineage):
             x_nodes = [lineage.nodes[node][x_prop_id] for node in nodes]
             y_nodes = [lineage.nodes[node][y_prop_id] for node in nodes]
 
-            # Use fixed, informative defaults: hover text always shows the cell
-            # ID and plotted values; division cells are marked with triangles.
+            # Hover text always shows the cell ID and plotted values;
+            # division cells are marked with a distinct symbol and border.
             node_hover_text = []
             for node, x_value, y_value in zip(nodes, x_nodes, y_nodes):
                 text = (
@@ -2118,9 +2150,10 @@ class CellLineage(Lineage):
                 if node_hover_props:
                     for prop in node_hover_props:
                         if prop not in lineage.nodes[node]:
-                            raise KeyError(
-                                f"Cannot plot: property {prop} is not present "
-                                "in the node attributes."
+                            raise MissingPropertyError(
+                                prop_name=prop,
+                                nid=node,
+                                lineage_ID=lineage.graph["lineage_ID"],
                             )
                         text += f"<br>{prop}: {lineage.nodes[node][prop]}"
                 node_hover_text.append(text)
@@ -2128,15 +2161,65 @@ class CellLineage(Lineage):
             trace_color = get_highlight_color(index + 1)
 
             trace_name = f"{y_label} ({target_cid})" if len(target_cids) > 1 else y_label
-            trace_marker_style = (
-                {} if node_marker_style is None else dict(node_marker_style)
-            )
-            trace_marker_style.setdefault("color", trace_color)
-            trace_marker_style.setdefault("size", 10)
-            trace_marker_style.setdefault(
-                "symbol",
-                ["triangle-up" if self.is_division(node) else "circle" for node in nodes],
-            )
+            division_nodes = [self.is_division(node) for node in nodes]
+            # Node style
+            # Layer 1: Pycellin defaults
+            # Layer 2: user overrides (node_marker_style)
+            default_node = {
+                "color": trace_color,
+                "size": 10,
+                "symbol": "circle",
+                "line": {"color": trace_color, "width": 0},
+            }
+            user_node = node_marker_style or {}
+            node_style = {
+                **default_node,
+                **user_node,
+                # "line" is a nested dict, so it needs an explicit deep merge
+                "line": {**default_node["line"], **user_node.get("line", {})},
+            }
+
+            # Division style
+            # Layer 1: inherit everything from node_style
+            # Layer 2: division-specific defaults (make them visually distinct)
+            # Layer 3: user overrides (division_marker_style)
+            default_division_overrides = {
+                "color": "white",
+                "symbol": "circle-cross",
+                "line": {"color": trace_color, "width": 2},
+            }
+            user_division = division_marker_style or {}
+            division_style = {
+                **node_style,
+                **default_division_overrides,
+                **user_division,
+                # Merge all three line dicts explicitly to preserve partial user overrides.
+                "line": {
+                    **node_style["line"],
+                    **default_division_overrides["line"],
+                    **user_division.get("line", {}),
+                },
+            }
+
+            trace_marker_style = {}
+            for style_name in node_style.keys() | division_style.keys():
+                node_value = node_style.get(style_name)
+                division_value = division_style.get(style_name, node_value)
+                if style_name == "line":
+                    node_line = node_value or {}
+                    division_line = division_value or {}
+                    trace_marker_style[style_name] = {
+                        line_name: [
+                            (division_line if is_division else node_line).get(line_name)
+                            for is_division in division_nodes
+                        ]
+                        for line_name in node_line.keys() | division_line.keys()
+                    }
+                else:
+                    trace_marker_style[style_name] = [
+                        division_value if is_division else node_value
+                        for is_division in division_nodes
+                    ]
             trace_line_style = {} if line_style is None else dict(line_style)
             trace_line_style.setdefault("color", trace_color)
             fig.add_trace(
@@ -2164,7 +2247,7 @@ class CellLineage(Lineage):
         )
         return fig
 
-    def plot_branch_property(
+    def plot_branch_profile(
         self,
         target_cells: int | list[int],
         y_prop: str | Property,
@@ -2174,6 +2257,7 @@ class CellLineage(Lineage):
         title: str | None = None,
         mode: str = "lines+markers",
         node_marker_style: dict[str, Any] | None = None,
+        division_marker_style: dict[str, Any] | None = None,
         line_style: dict[str, Any] | None = None,
         node_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
@@ -2189,9 +2273,24 @@ class CellLineage(Lineage):
 
         See Also
         --------
-        get_branch_property_figure : Generate the figure without displaying it.
+        get_branch_profile_figure : Generate the figure without displaying it.
+
+        Examples
+        --------
+        Plot a branch with separate styles for node and division cells:
+
+        lineage.plot_branch_profile(
+            target_cells=100,
+            y_prop="cell_area",
+            node_marker_style=dict(color="orange", symbol="circle"),
+            division_marker_style=dict(
+                color="orange",
+                symbol="star",
+                line=dict(color="purple", width=3),
+            ),
+        )
         """
-        fig = self.get_branch_property_figure(
+        fig = self.get_branch_profile_figure(
             target_cells=target_cells,
             y_prop=y_prop,
             x_prop=x_prop,
@@ -2200,6 +2299,7 @@ class CellLineage(Lineage):
             title=title,
             mode=mode,
             node_marker_style=node_marker_style,
+            division_marker_style=division_marker_style,
             line_style=line_style,
             node_hover_props=node_hover_props,
             plot_bgcolor=plot_bgcolor,
