@@ -32,21 +32,21 @@ BRANCH_PROFILE_DIVISION_SIZE_INCREASE: Final = 2
 
 # Pycellin templates.
 # Shared style config.
-_COMMON_AXIS = dict(
-    showgrid=False,
-    zeroline=False,
-    ticks="outside",
-    ticklen=5,
-    tickwidth=1,
-    showline=True,
-    linewidth=1,
-    rangemode="tozero",
-)
-_COMMON_LAYOUT = dict(
-    hovermode="x unified",
-    font=dict(family="Arial", size=13),
-    colorway=list(px.colors.qualitative.Safe),
-)
+_COMMON_AXIS = {
+    "showgrid": False,
+    "zeroline": False,
+    "ticks": "outside",
+    "ticklen": 5,
+    "tickwidth": 1,
+    "showline": True,
+    "linewidth": 1,
+    "rangemode": "tozero",
+}
+_COMMON_LAYOUT = {
+    "hovermode": "x unified",
+    "font": {"family": "Arial", "size": 13},
+    "colorway": list(px.colors.qualitative.Safe),
+}
 
 
 def _make_axis(color: str) -> dict:
