@@ -4049,7 +4049,7 @@ class Model:
             the mean line color with this opacity.
         template : str or go.layout.Template, optional
             Plotly template to use for the figure (default is "pycellin_white"). A
-            "pycellin_black" template is also available. See styling.py for Pycellin
+            "pycellin_dark" template is also available. See styling.py for Pycellin
             template details. See Plotly documentation for more information on templates.
         width: int, optional
             Width of the figure in pixels (default is None, fallback to autosize).
@@ -4232,7 +4232,7 @@ class Model:
             the mean line color with this opacity.
         template : str or go.layout.Template, optional
             Plotly template to use for the figure (default is "pycellin_white"). A
-            "pycellin_black" template is also available. See styling.py for Pycellin
+            "pycellin_dark" template is also available. See styling.py for Pycellin
             template details. See Plotly documentation for more information on templates.
         width: int, optional
             Width of the figure in pixels (default is None, fallback to autosize).
