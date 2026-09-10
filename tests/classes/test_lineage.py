@@ -1157,11 +1157,13 @@ class TestCellLineageRemoveLink:
 
 
 class TestCellLineageGetBranchLineageHighlight:
-    """Test cases for CellLineage.get_cycle_lineage_highlight method."""
+    """Test cases for CellLineage.get_branch_lineage_highlight method."""
 
     def test_multiple_targets_with_paired_source_cells(self, cell_lin):
         """Test highlighting multiple branches with paired source cells."""
-        highlighted = cell_lin.get_branch_lineage_highlight([6, 16], source_cell=[4, 14])
+        highlighted = cell_lin.get_branch_lineage_highlight(
+            [6, 16], source_cells=[4, 14]
+        )
 
         selected = [
             node
@@ -1183,16 +1185,16 @@ class TestCellLineageGetBranchLineageHighlight:
 
     def test_source_cell_list_requires_target_list(self, cell_lin):
         """Test that a source-cell list requires a target-cell list."""
-        with pytest.raises(ValueError, match="target_cell is also a list"):
-            cell_lin.get_branch_lineage_highlight(6, source_cell=[4])
+        with pytest.raises(ValueError, match="target_cells is also a list"):
+            cell_lin.get_branch_lineage_highlight(6, source_cells=[4])
 
     def test_source_cell_list_must_match_targets_length(self, cell_lin):
         """Test that paired source-cell and target-cell lists have equal length."""
         with pytest.raises(ValueError, match="same length"):
-            cell_lin.get_branch_lineage_highlight([6, 16], source_cell=[4])
+            cell_lin.get_branch_lineage_highlight([6, 16], source_cells=[4])
 
 
-class TestCellLineageGetBranchPropertyFigure:
+class TestCellLineageGetBranchProfileFigure:
     """Test cases for CellLineage.get_branch_profile_figure method."""
 
     def test_multiple_targets_create_multiple_traces(self, cell_lin):
@@ -1207,32 +1209,54 @@ class TestCellLineageGetBranchPropertyFigure:
         assert fig.data[1].name == "timepoint (16)"
         assert list(fig.data[0].x) == [0, 1, 2, 3, 4, 5]
         assert list(fig.data[1].x) == [0, 1, 2, 3, 4, 5, 6]
-        assert fig.data[0].marker.color == HIGHLIGHT_COLORS[0]
-        assert fig.data[1].marker.color == HIGHLIGHT_COLORS[1]
+        # Each trace uses its own highlight color; division cells (cells 2 and 4
+        # for the first branch) get a white fill and a ring in the trace color.
+        assert list(fig.data[0].marker.color) == [
+            HIGHLIGHT_COLORS[0],
+            "white",
+            HIGHLIGHT_COLORS[0],
+            "white",
+            HIGHLIGHT_COLORS[0],
+            HIGHLIGHT_COLORS[0],
+        ]
+        assert set(fig.data[1].marker.color) == {HIGHLIGHT_COLORS[1], "white"}
+        assert all(c == HIGHLIGHT_COLORS[0] for c in fig.data[0].marker.line.color)
         assert fig.layout.showlegend is True
 
     def test_multiple_targets_with_paired_source_cells(self, cell_lin):
         """Test property plotting with paired target and source cells."""
         fig = cell_lin.get_branch_profile_figure(
             target_cells=[6, 16],
-            source_cell=[4, 14],
+            source_cells=[4, 14],
             y_prop="timepoint",
         )
 
         assert len(fig.data) == 2
         assert list(fig.data[0].x) == [3, 4, 5]
         assert list(fig.data[1].x) == [5, 6]
-        assert fig.data[0].marker.color == HIGHLIGHT_COLORS[0]
-        assert fig.data[1].marker.color == HIGHLIGHT_COLORS[1]
+        # The source cell of each branch is a division: white fill, "circle-cross"
+        # symbol, a ring in the trace color, and a marker 2 px larger than the
+        # node markers.
+        assert list(fig.data[0].marker.color) == [
+            "white",
+            HIGHLIGHT_COLORS[0],
+            HIGHLIGHT_COLORS[0],
+        ]
+        assert list(fig.data[1].marker.color) == ["white", HIGHLIGHT_COLORS[1]]
         assert list(fig.data[0].marker.symbol) == ["circle-cross", "circle", "circle"]
         assert list(fig.data[1].marker.symbol) == ["circle-cross", "circle"]
+        assert list(fig.data[0].marker.size) == [12, 10, 10]
+        assert list(fig.data[1].marker.size) == [12, 10]
         assert list(fig.data[0].marker.line.color) == [
-            "black",
+            HIGHLIGHT_COLORS[0],
             HIGHLIGHT_COLORS[0],
             HIGHLIGHT_COLORS[0],
         ]
         assert list(fig.data[0].marker.line.width) == [2, 0, 0]
-        assert list(fig.data[1].marker.line.color) == ["black", HIGHLIGHT_COLORS[1]]
+        assert list(fig.data[1].marker.line.color) == [
+            HIGHLIGHT_COLORS[1],
+            HIGHLIGHT_COLORS[1],
+        ]
         assert list(fig.data[1].marker.line.width) == [2, 0]
 
     def test_source_cell_list_must_match_targets(self, cell_lin):
@@ -1240,7 +1264,7 @@ class TestCellLineageGetBranchPropertyFigure:
         with pytest.raises(ValueError, match="same length"):
             cell_lin.get_branch_profile_figure(
                 target_cells=[6, 16],
-                source_cell=[4],
+                source_cells=[4],
                 y_prop="timepoint",
             )
 
@@ -1248,7 +1272,7 @@ class TestCellLineageGetBranchPropertyFigure:
         """Test that marker styles can be configured independently."""
         fig = cell_lin.get_branch_profile_figure(
             target_cells=6,
-            source_cell=4,
+            source_cells=4,
             y_prop="timepoint",
             node_marker_style={"color": "green", "symbol": "diamond"},
             division_marker_style={
@@ -1260,11 +1284,18 @@ class TestCellLineageGetBranchPropertyFigure:
 
         assert list(fig.data[0].marker.color) == ["orange", "green", "green"]
         assert list(fig.data[0].marker.symbol) == ["star", "diamond", "diamond"]
-        assert list(fig.data[0].marker.line.color) == ["red", "green", "green"]
+        # Division size defaults to the node size + 2; the node border keeps its
+        # default (trace color, width 0) since only the division line was set.
+        assert list(fig.data[0].marker.size) == [12, 10, 10]
+        assert list(fig.data[0].marker.line.color) == [
+            "red",
+            HIGHLIGHT_COLORS[0],
+            HIGHLIGHT_COLORS[0],
+        ]
         assert list(fig.data[0].marker.line.width) == [4, 0, 0]
 
 
-class TestCellLineagePlotBranchProperty:
+class TestCellLineagePlotBranchProfile:
     """Test cases for CellLineage.plot_branch_profile method."""
 
     def test_shows_figure(self, cell_lin, monkeypatch):
