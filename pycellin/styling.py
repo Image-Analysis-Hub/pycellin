@@ -4,7 +4,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 
-
 # Pycellin colors.
 PYCELLIN_PURPLE: Final = "#7F08A4"
 PYCELLIN_PINK: Final = "#BE3985"

@@ -1210,7 +1210,8 @@ class TestCellLineageGetBranchProfileFigure:
         assert list(fig.data[0].x) == [0, 1, 2, 3, 4, 5]
         assert list(fig.data[1].x) == [0, 1, 2, 3, 4, 5, 6]
         # Each trace uses its own highlight color; division cells (cells 2 and 4
-        # for the first branch) get a white fill and a ring in the trace color.
+        # for the first branch) get a white fill and a ring in the branch color
+        # (here the highlight color, since node markers are not recolored).
         assert list(fig.data[0].marker.color) == [
             HIGHLIGHT_COLORS[0],
             "white",
@@ -1235,7 +1236,7 @@ class TestCellLineageGetBranchProfileFigure:
         assert list(fig.data[0].x) == [3, 4, 5]
         assert list(fig.data[1].x) == [5, 6]
         # The source cell of each branch is a division: white fill, "circle-cross"
-        # symbol, a ring in the trace color, and a marker 2 px larger than the
+        # symbol, a ring in the branch color, and a marker 2 px larger than the
         # node markers.
         assert list(fig.data[0].marker.color) == [
             "white",
@@ -1293,6 +1294,53 @@ class TestCellLineageGetBranchProfileFigure:
             HIGHLIGHT_COLORS[0],
         ]
         assert list(fig.data[0].marker.line.width) == [4, 0, 0]
+
+    def test_per_target_marker_and_line_styles(self, cell_lin):
+        """Test that a style list gives each branch its own style."""
+        fig = cell_lin.get_branch_profile_figure(
+            target_cells=[6, 16],
+            y_prop="timepoint",
+            node_marker_style=[{"color": "green"}, {"color": "orange"}],
+            line_style=[{"color": "green"}, {"color": "orange"}],
+        )
+
+        # Non-division cells take the per-branch color; divisions stay white
+        # with a ring in that same per-branch color.
+        assert set(fig.data[0].marker.color) == {"green", "white"}
+        assert set(fig.data[1].marker.color) == {"orange", "white"}
+        assert "green" in fig.data[0].marker.line.color
+        assert "orange" in fig.data[1].marker.line.color
+        assert fig.data[0].line.color == "green"
+        assert fig.data[1].line.color == "orange"
+
+    def test_style_list_entry_none_uses_defaults(self, cell_lin):
+        """Test that a None entry in a style list falls back to the defaults."""
+        fig = cell_lin.get_branch_profile_figure(
+            target_cells=[6, 16],
+            y_prop="timepoint",
+            node_marker_style=[{"color": "green"}, None],
+        )
+
+        assert set(fig.data[0].marker.color) == {"green", "white"}
+        assert set(fig.data[1].marker.color) == {HIGHLIGHT_COLORS[1], "white"}
+
+    def test_style_list_length_must_match_targets(self, cell_lin):
+        """Test that a style list must have one entry per target cell."""
+        with pytest.raises(ValueError, match="one style per target cell"):
+            cell_lin.get_branch_profile_figure(
+                target_cells=[6, 16],
+                y_prop="timepoint",
+                line_style=[{"color": "green"}],
+            )
+
+    def test_invalid_style_type_raises(self, cell_lin):
+        """Test that a non-dict, non-list style argument is rejected."""
+        with pytest.raises(TypeError, match="dict, a list of dicts, or None"):
+            cell_lin.get_branch_profile_figure(
+                target_cells=6,
+                y_prop="timepoint",
+                line_style="nope",
+            )
 
 
 class TestCellLineagePlotBranchProfile:

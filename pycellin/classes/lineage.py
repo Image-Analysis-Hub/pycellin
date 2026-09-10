@@ -30,6 +30,11 @@ from pycellin.styling import (
 
 _DEFAULT_UNMAPPED_COLOR = "dimgrey"
 
+# Style argument for get_branch_profile_figure / plot_branch_profile
+# (node_marker_style, division_marker_style, line_style): one dict applied to
+# every branch, or a list with one entry (dict or None) per target cell.
+BranchStyle = dict[str, Any] | list[dict[str, Any] | None] | None
+
 # TODO: all the visualization functionalities will be refined and moved to a dedicated
 # subpackage.
 
@@ -2027,9 +2032,9 @@ class CellLineage(Lineage):
         generations: int | None = None,
         title: str | None = None,
         mode: str = "lines+markers",
-        node_marker_style: dict[str, Any] | None = None,
-        division_marker_style: dict[str, Any] | None = None,
-        line_style: dict[str, Any] | None = None,
+        node_marker_style: BranchStyle = None,
+        division_marker_style: BranchStyle = None,
+        line_style: BranchStyle = None,
         node_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         showlegend: bool | None = None,
@@ -2071,20 +2076,25 @@ class CellLineage(Lineage):
         mode : str, optional
             Plotly scatter mode, e.g. "lines", "markers" or "lines+markers"
             (the default).
-        node_marker_style : dict, optional
+        node_marker_style : dict or list of dict, optional
             Marker style for ordinary (non-division) cells, merged over the
             Pycellin defaults: the branch's trace color, size 10, a "circle"
             symbol and no border. A nested "line" dict is merged key by key, so
             a partial override such as {"line": {"width": 2}} keeps the default
-            line color.
-        division_marker_style : dict, optional
+            line color. Pass one dict to use the same style on every branch, or
+            a list with one dict (or None) per target cell to style branches
+            independently.
+        division_marker_style : dict or list of dict, optional
             The style of markers representing division cells. Values not provided
             here fall back to the node marker style, then to the default division
-            style: a hollow white fill, a "circle-cross" symbol, a 2 px border,
-            and a size 2 px larger than the node marker size.
-        line_style : dict, optional
+            style: a hollow white fill, a "circle-cross" symbol, a 2 px border in
+            the branch (node) color, and a size 2 px larger than the node marker
+            size. Accepts one dict or a per-target-cell list, as for
+            `node_marker_style`.
+        line_style : dict or list of dict, optional
             Plotly line style for the branch lines (color, width, dash, etc.).
-            Defaults to the branch's trace color.
+            Defaults to the branch's trace color. Accepts one dict or a
+            per-target-cell list, as for `node_marker_style`.
         node_hover_props : list[str], optional
             Extra node properties to append to the hover text, which always
             shows the cell ID and the plotted x and y values.
@@ -2112,15 +2122,16 @@ class CellLineage(Lineage):
         ------
         TypeError
             If `node_marker_style`, `division_marker_style` or `line_style` is
-            not a dict or None.
+            not a dict, a list of dicts, or None.
         KeyError
             If a target or source cell ID is not in the lineage, or if `x_prop`
             or `y_prop` is missing from a plotted node.
         ValueError
             If `target_cells` is an empty list; if `source_cells` is a list
-            while `target_cells` is not, or the two lists differ in length; if
-            both `source_cells` and `generations` are given; or if a source cell
-            is not upstream of its target.
+            while `target_cells` is not, or the two lists differ in length; if a
+            per-target-cell style list has the wrong length; if both
+            `source_cells` and `generations` are given; or if a source cell is
+            not upstream of its target.
         MissingPropertyError
             If a name in `node_hover_props` is absent from a plotted node.
 
@@ -2152,18 +2163,16 @@ class CellLineage(Lineage):
                 line=dict(color="purple", width=3),
             ),
         )
+
+        Give each branch its own color with per-target-cell style lists:
+
+        fig = lineage.get_branch_profile_figure(
+            target_cells=[100, 142],
+            y_prop="cell_area",
+            node_marker_style=[{"color": "darkorange"}, {"color": "#7f08a4"}],
+            line_style=[{"color": "orange"}, {"color": "#7f08a4"}],
+        )
         """
-        # Validate style arguments early for a clear error message
-        for arg_name, arg_value in [
-            ("node_marker_style", node_marker_style),
-            ("division_marker_style", division_marker_style),
-            ("line_style", line_style),
-        ]:
-            if arg_value is not None and not isinstance(arg_value, dict):
-                raise TypeError(
-                    f"'{arg_name}' must be a dict or None, "
-                    f"got {type(arg_value).__name__!r} instead."
-                )
 
         def _prop_info(prop: str | Property) -> tuple[str, str]:
             if isinstance(prop, Property):
@@ -2183,6 +2192,17 @@ class CellLineage(Lineage):
         _, target_cids, source_cids = self._normalize_single_cell_lineage_inputs(
             target_cells, source_cells
         )
+
+        # Expand each style argument to one dict per trace: a single dict is
+        # broadcast, a list is paired with the target cells by position.
+        n_targets = len(target_cids)
+        node_styles = self._expand_branch_style(
+            node_marker_style, "node_marker_style", n_targets
+        )
+        division_styles = self._expand_branch_style(
+            division_marker_style, "division_marker_style", n_targets
+        )
+        line_styles = self._expand_branch_style(line_style, "line_style", n_targets)
 
         fig = go.Figure()
         for index, (target_cid, target_source_cell) in enumerate(
@@ -2227,7 +2247,7 @@ class CellLineage(Lineage):
                 "color": trace_color,
                 "line": {**BRANCH_PROFILE_NODE_MARKER["line"], "color": trace_color},
             }
-            user_node = node_marker_style or {}
+            user_node = node_styles[index]
             node_style = {
                 **default_node,
                 **user_node,
@@ -2236,23 +2256,27 @@ class CellLineage(Lineage):
 
             # Division style
             # Layer 1: inherit everything from node_style
-            # Layer 2: division-specific defaults (constants + per-trace color;
-            #   size defaults to the effective node size + a fixed increase so
-            #   divisions stand out even when they share the node color)
+            # Layer 2: division-specific defaults (constants + colors derived
+            #   from node_style; size defaults to the effective node size + a
+            #   fixed increase so divisions stand out even when they share the
+            #   node color)
             # Layer 3: user overrides (division_marker_style)
             node_size = node_style["size"]
             default_division_overrides = {
                 **BRANCH_PROFILE_DIVISION_MARKER,
+                # The division marker has a white fill, so its ring carries the
+                # branch color: match the node fill color rather than the trace
+                # color, so a recolored branch keeps matching division rings.
                 "line": {
                     **BRANCH_PROFILE_DIVISION_MARKER["line"],
-                    "color": trace_color,
+                    "color": node_style["color"],
                 },
             }
             if isinstance(node_size, (int, float)):
                 default_division_overrides["size"] = (
                     node_size + BRANCH_PROFILE_DIVISION_SIZE_INCREASE
                 )
-            user_division = division_marker_style or {}
+            user_division = division_styles[index]
             division_style = {
                 **node_style,
                 **default_division_overrides,
@@ -2284,7 +2308,7 @@ class CellLineage(Lineage):
                         division_value if is_division else node_value
                         for is_division in division_nodes
                     ]
-            trace_line_style = {} if line_style is None else dict(line_style)
+            trace_line_style = dict(line_styles[index])
             trace_line_style.setdefault("color", trace_color)
             fig.add_trace(
                 go.Scatter(
@@ -2320,9 +2344,9 @@ class CellLineage(Lineage):
         generations: int | None = None,
         title: str | None = None,
         mode: str = "lines+markers",
-        node_marker_style: dict[str, Any] | None = None,
-        division_marker_style: dict[str, Any] | None = None,
-        line_style: dict[str, Any] | None = None,
+        node_marker_style: BranchStyle = None,
+        division_marker_style: BranchStyle = None,
+        line_style: BranchStyle = None,
         node_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         showlegend: bool | None = None,
@@ -2403,6 +2427,36 @@ class CellLineage(Lineage):
             source_cids = [source_cells] * len(target_cids)
 
         return is_single_target, target_cids, source_cids
+
+    @staticmethod
+    def _expand_branch_style(
+        style: BranchStyle, arg_name: str, n_targets: int
+    ) -> list[dict[str, Any]]:
+        # Expand a branch-style argument to one plain dict per target cell.
+        # None or a single dict is broadcast to every trace; a list is paired
+        # with the target cells by position. Each returned dict is a fresh
+        # shallow copy the caller may mutate.
+        if style is None or isinstance(style, dict):
+            return [dict(style) if style else {} for _ in range(n_targets)]
+        if not isinstance(style, list):
+            raise TypeError(
+                f"'{arg_name}' must be a dict, a list of dicts, or None, "
+                f"got {type(style).__name__!r} instead."
+            )
+        if len(style) != n_targets:
+            raise ValueError(
+                f"'{arg_name}' has {len(style)} entries but there are {n_targets} "
+                "target cells; pass one style per target cell."
+            )
+        expanded = []
+        for i, entry in enumerate(style):
+            if entry is not None and not isinstance(entry, dict):
+                raise TypeError(
+                    f"'{arg_name}[{i}]' must be a dict or None, "
+                    f"got {type(entry).__name__!r} instead."
+                )
+            expanded.append(dict(entry) if entry else {})
+        return expanded
 
     @staticmethod
     # TODO: I don't think this function is good design, even if it factorises code.
