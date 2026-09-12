@@ -3672,9 +3672,18 @@ class Model:
         if unique_cell_ids:
             model1.relabel_cells(unique_ids=True)
 
-        # Solve custom model metadata collision by transforming into Lineage property.
-        md1 = model1.model_metadata.get_custom_metadata()
-        md2 = model2.model_metadata.get_custom_metadata()
+        # Solve collision in remaining model metadata by transforming into Lineage
+        # property.
+        md1 = {
+            k: v
+            for k, v in model1.model_metadata.get_all_metadata().items()
+            if k not in critical
+        }
+        md2 = {
+            k: v
+            for k, v in model2.model_metadata.get_all_metadata().items()
+            if k not in critical
+        }
         if md1 != md2:
             all_fields = md1.keys() | md2.keys()
             diff = {
@@ -3683,9 +3692,11 @@ class Model:
                 if md1.get(field) != md2.get(field)
             }
 
+            custom_md = model1.model_metadata.get_custom_metadata()
             for field, value in diff.items():
-                # Remove from model metadata.
-                if hasattr(model1.model_metadata, field):
+                # Remove from model metadata if custom, ignore if standard.
+                # if hasattr(model1.model_metadata, field):
+                if field in custom_md:
                     delattr(model1.model_metadata, field)
 
                 # Register as a new property (but no calculator).
