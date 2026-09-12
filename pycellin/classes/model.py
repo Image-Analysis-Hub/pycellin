@@ -3586,8 +3586,8 @@ class Model:
         model : Model
             The model to merge into this one.
         new_name : str | None, optional
-            The name of the merged model. If None, the name of the first model is used.
-            Default is None.
+            The name of the merged model. If None, the names of the two models are
+            concatenated, separated by a "+"sign. Default is None.
         in_place : bool, optional
             Whether to merge the model in place or return a new model. Default is False.
         unique_cell_ids : bool, optional
@@ -3599,9 +3599,29 @@ class Model:
             The merged model. If ``in_place`` is True, this is ``self`` (mutated);
             otherwise it is a new, independent copy and ``self`` is left unchanged.
 
+        Raises
+        ------
+        ValueError
+            If the model metadata is not compatible (e.g., different time step, time unit,
+            pixel size, or reference time property).
+            If a property with the same identifier and not created by a merge operation
+            already exists in the model.
+            If ``model`` has cycle lineage properties with a calculator but this model
+            has no cycle lineages.
+        RuntimeError
+            If relabeling the cells fails when ``unique_cell_ids`` is True. The error
+            message describes the state of the model, and the original exception is
+            chained as the cause.
+
         Notes
         -----
         The argument ``model`` is never modified; it is deep-copied internally.
+
+        All checks are performed before any modification, so if a ValueError is raised,
+        this model is left unchanged even when ``in_place`` is True. The only step that
+        can fail after modifications have started is the cell relabeling
+        (``unique_cell_ids=True``), since it updates the model and therefore runs every
+        property calculator.
 
         Regarding properties:
         This method assumes that 2 properties with an identical identifier (one from
@@ -3635,13 +3655,68 @@ class Model:
         if incompatibilities:
             raise ValueError(f"Model metadata is not compatible: {incompatibilities}")
 
-        # Properties.
+        # Properties to add. Cycle lineage properties with a calculator can only be
+        # added if model1 has cycle lineages (same check as in add_custom_property()).
         prop_ids1 = set(model1.get_properties().keys())
         props2 = model2.get_properties()
         prop_ids2 = set(props2.keys())
         props_to_add = prop_ids2.difference(prop_ids1)
         dict_calcs2 = model2._updater._calculators
 
+        if not model1.data.cycle_data:
+            cycle_props = sorted(
+                prop_id
+                for prop_id in props_to_add
+                if prop_id in dict_calcs2
+                and dict_calcs2[prop_id].prop.lin_type == "CycleLineage"
+            )
+            if cycle_props:
+                raise ValueError(
+                    f"Cannot merge cycle lineage properties {cycle_props}: this model "
+                    "has no cycle lineages. Please compute the cycle lineages first "
+                    "with `model.add_cycle_data()`."
+                )
+
+        # Lineage IDs of the lineages to add. IDs already used in model1 or planned for
+        # a previous lineage are replaced by new ones, and so is ID 0 since
+        # add_lineage() does not keep it.
+        used_lids = set(model1.get_cell_lineage_IDs())
+        lineages_to_add = []
+        for lin in model2.get_cell_lineages():
+            lid = lin.graph.get("lineage_ID")
+            if not lid or lid in used_lids:
+                lid = max(max(used_lids, default=0) + 1, 1)
+            used_lids.add(lid)
+            lineages_to_add.append((lin, lid))
+        new_lids = {lid for _, lid in lineages_to_add}
+
+        # Remaining model metadata that differs between the two models, to be
+        # transformed into lineage properties.
+        diff = model1.model_metadata.diff(model2.model_metadata, exclude=critical)
+        # Lineage properties of model1 once the properties of model2 are added.
+        lin_props = {
+            **model1.get_lineage_properties(),
+            **{
+                prop_id: prop
+                for prop_id, prop in model2.get_lineage_properties().items()
+                if prop_id in props_to_add
+            },
+        }
+        conflicting_fields = sorted(
+            field
+            for field in diff
+            if field in lin_props and lin_props[field].provenance != "merge models"
+        )
+        if conflicting_fields:
+            raise ValueError(
+                f"Cannot move model metadata {conflicting_fields} to lineage "
+                "properties: properties with the same identifiers and not created "
+                "by a merge operation already exist in the model."
+            )
+
+        # All checks passed, model1 can now be modified.
+
+        # Properties.
         for prop_id in props_to_add:
             prop = props2[prop_id]
             calc = dict_calcs2.get(prop_id)
@@ -3655,51 +3730,20 @@ class Model:
                 model1.props_metadata._protect_prop(prop_id)
 
         # Lineages.
-        lin_ids1 = set(model1.get_cell_lineage_IDs())
-        lin_ids2 = set(model2.get_cell_lineage_IDs())
-        to_reid = lin_ids2.intersection(lin_ids1)
-        new_lids = []
-        for lin in model2.get_cell_lineages():
-            current_lid = lin.graph.get("lineage_ID")
-            if current_lid is not None and current_lid in to_reid:
-                available_lid = model1.get_next_available_lineage_ID()
-                new_lid = model1.add_lineage(lin, available_lid, overwrite_lid=True)
-            else:
-                new_lid = model1.add_lineage(lin)
-            new_lids.append(new_lid)
-
-        # Solve IDs collision.
-        if unique_cell_ids:
-            model1.relabel_cells(unique_ids=True)
+        for lin, lid in lineages_to_add:
+            model1.add_lineage(lin, lid, overwrite_lid=True)
 
         # Solve collision in remaining model metadata by transforming into Lineage
         # property.
-        md1 = {
-            k: v
-            for k, v in model1.model_metadata.get_all_metadata().items()
-            if k not in critical
-        }
-        md2 = {
-            k: v
-            for k, v in model2.model_metadata.get_all_metadata().items()
-            if k not in critical
-        }
-        if md1 != md2:
-            all_fields = md1.keys() | md2.keys()
-            diff = {
-                field: {"self_model": md1.get(field), "argument_model": md2.get(field)}
-                for field in all_fields
-                if md1.get(field) != md2.get(field)
-            }
+        custom_md = model1.model_metadata.get_custom_metadata()
+        for field, (value1, value2) in diff.items():
+            # Remove from model metadata if custom, ignore if standard.
+            # if hasattr(model1.model_metadata, field):
+            if field in custom_md:
+                delattr(model1.model_metadata, field)
 
-            custom_md = model1.model_metadata.get_custom_metadata()
-            for field, value in diff.items():
-                # Remove from model metadata if custom, ignore if standard.
-                # if hasattr(model1.model_metadata, field):
-                if field in custom_md:
-                    delattr(model1.model_metadata, field)
-
-                # Register as a new property (but no calculator).
+            # Register as a new property (but no calculator).
+            if field not in lin_props:
                 new_prop = Property(
                     identifier=field,
                     name=field,
@@ -3711,21 +3755,39 @@ class Model:
                 )
                 model1.props_metadata._add_prop(new_prop)
 
-                # Set values on lineages.
-                value1, value2 = value["self_model"], value["argument_model"]
-                for lin in model1.get_cell_lineages():
-                    value_to_add = (
-                        value2 if lin.graph["lineage_ID"] in new_lids else value1
-                    )
-                    if value_to_add is not None:
-                        lin.graph[field] = value_to_add
+            # Set values on lineages.
+            for lin in model1.get_cell_lineages():
+                value_to_add = value2 if lin.graph["lineage_ID"] in new_lids else value1
+                if value_to_add is not None:
+                    lin.graph[field] = value_to_add
 
         if new_name is None:
             name1 = model1.model_metadata.name
-            name2 = model1.model_metadata.name
+            name2 = model2.model_metadata.name
             model1.model_metadata.name = f"{name1}+{name2}"
         else:
             model1.model_metadata.name = new_name
+
+        # Solve IDs collision. This is done last because it is the only step that can
+        # fail once model1 has been modified: relabel_cells() updates the model, which
+        # runs every property calculator.
+        if unique_cell_ids:
+            try:
+                model1.relabel_cells(unique_ids=True)
+            except Exception as err:
+                if in_place:
+                    state = (
+                        "This model was modified in place and is only partially "
+                        "merged: the lineages, properties and metadata of the other "
+                        "model were added, but cell IDs may be only partially "
+                        "relabeled and property values only partially updated."
+                    )
+                else:
+                    state = "This model was left unchanged."
+                raise RuntimeError(
+                    "Merge failed while relabeling cells to make cell IDs unique. "
+                    f"{state}"
+                ) from err
 
         return model1
 

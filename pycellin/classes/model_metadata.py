@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -7,6 +8,29 @@ from typing import Any
 import numpy as np
 
 from pycellin.utils import get_pycellin_version
+
+
+def _are_values_equal(value1: Any, value2: Any) -> bool:
+    """
+    Check if two metadata values are equal.
+
+    Unlike ``==``, this function can compare numpy arrays, such as label images.
+
+    Parameters
+    ----------
+    value1 : Any
+        First metadata value.
+    value2 : Any
+        Second metadata value.
+
+    Returns
+    -------
+    bool
+        True if the values are equal, False otherwise.
+    """
+    if isinstance(value1, np.ndarray) or isinstance(value2, np.ndarray):
+        return bool(np.array_equal(value1, value2))
+    return bool(value1 == value2)
 
 
 @dataclass
@@ -169,6 +193,40 @@ class ModelMetadata:
             Dictionary containing all metadatafields.
         """
         return dict(self.__dict__)
+
+    def diff(
+        self,
+        other: "ModelMetadata",
+        exclude: Iterable[str] | None = None,
+    ) -> dict[str, tuple[Any, Any]]:
+        """
+        Return the metadata fields whose values differ from another metadata.
+
+        Both standard and custom fields are compared. A field missing from one of
+        the metadata is considered to have a None value. Numpy arrays, such as label
+        images, are compared element-wise.
+
+        Parameters
+        ----------
+        other : ModelMetadata
+            The metadata to compare with.
+        exclude : Iterable[str] | None, optional
+            Fields to ignore in the comparison. Default is None.
+
+        Returns
+        -------
+        dict[str, tuple[Any, Any]]
+            Dictionary with the differing fields as keys, sorted by name, and
+            (value in this metadata, value in the other metadata) tuples as values.
+        """
+        excluded = set(exclude) if exclude is not None else set()
+        md1 = self.get_all_metadata()
+        md2 = other.get_all_metadata()
+        return {
+            name: (md1.get(name), md2.get(name))
+            for name in sorted((md1.keys() | md2.keys()) - excluded)
+            if not _are_values_equal(md1.get(name), md2.get(name))
+        }
 
     def to_dict(self) -> dict[str, Any]:
         """
