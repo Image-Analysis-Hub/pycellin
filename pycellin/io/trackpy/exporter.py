@@ -10,7 +10,7 @@ It includes a function to export a pycellin model to a trackpy file and helper f
 to build trackpy tracks from a lineage.
 
 References:
-- trackpy: D. B. Allan, T. Caswell, N. C. Keim, C. M. van der Weland R. W. Verweij,
+- trackpy: D. B. Allan, T. Caswell, N. C. Keim, C. M. van der Wel and R. W. Verweij,
 “soft-matter/trackpy: v0.6.4”. Zenodo, Jul. 10, 2024. doi: 10.5281/zenodo.12708864.
 - trackpy GitHub: https://github.com/soft-matter/trackpy
 """

@@ -77,7 +77,7 @@ def _add_lineage_props(
 
     for lin in lineages:
         # Finding the dict of properties matching the lineage.
-        tmp = set(t_id for _, t_id in lin.nodes(data=lineage_ID_key))
+        tmp = {t_id for _, t_id in lin.nodes(data=lineage_ID_key)}
 
         if not tmp:
             # 'tmp' is empty because there's no nodes in the current graph.
@@ -94,7 +94,7 @@ def _add_lineage_props(
         if len(tmp) != 1:
             raise ValueError("Impossible state: several IDs for one lineage.")
 
-        current_lineage_id = list(tmp)[0]
+        current_lineage_id = next(iter(tmp))
         current_lineage_attr = next(
             (
                 d_attr
@@ -431,13 +431,20 @@ def _split_graph_into_lineages(
     if lineage_ID_key is None:
         # We need to create and add a lineage_ID key to each lineage and
         # to each node of the lineage.
+        # Single-cell lineages use -cell_ID, so multi-cell lineages skip the IDs
+        # they already use (0 for a single-cell lineage holding cell 0).
+        single_cell_lin_ids = {
+            -next(iter(lin.nodes)) for lin in lineages if len(lin) == 1
+        }
         lin_id = 0
         for lin in lineages:
             if len(lin) == 1:
-                node = list(lin.nodes)[0]
+                node = next(iter(lin.nodes))
                 lin.graph["lineage_ID"] = -node
                 lin.nodes[node]["lineage_ID"] = -node
             else:
+                while lin_id in single_cell_lin_ids:
+                    lin_id += 1
                 lin.graph["lineage_ID"] = lin_id
                 for node in lin.nodes:
                     lin.nodes[node]["lineage_ID"] = lin_id
@@ -475,7 +482,7 @@ def _split_graph_into_lineages(
                 if len(non_null_node_lin_ids) == 1:
                     # Specific case when some nodes have a lineage ID but not all,
                     # and agree on a non-null value.
-                    generated_lin_id = list(non_null_node_lin_ids)[0]
+                    generated_lin_id = next(iter(non_null_node_lin_ids))
                 else:
                     generated_lin_id = next_lin_id
                     next_lin_id += 1
@@ -487,7 +494,7 @@ def _split_graph_into_lineages(
             elif not lin_has_lin_id and nodes_have_lin_id:
                 # We need to create and add a lineage_ID key to each lineage,
                 # using the node property.
-                tmp_lin_id = set(lin.nodes[node][lineage_ID_key] for node in lin.nodes)
+                tmp_lin_id = {lin.nodes[node][lineage_ID_key] for node in lin.nodes}
                 if len(tmp_lin_id) > 1:
                     raise ValueError(
                         "Impossible state: inconsistent lineage ID values between "
@@ -496,7 +503,7 @@ def _split_graph_into_lineages(
                 elif len(tmp_lin_id) == 0:
                     lin.graph[lineage_ID_key] = 0
                 else:
-                    lin.graph[lineage_ID_key] = list(tmp_lin_id)[0]
+                    lin.graph[lineage_ID_key] = next(iter(tmp_lin_id))
 
             elif lin_has_lin_id and not nodes_have_lin_id:
                 # We need to add the lineage_ID_key property to each node of
@@ -518,7 +525,7 @@ def _split_graph_into_lineages(
                         "Impossible state: inconsistent lineage ID values between "
                         "the nodes of a same lineage."
                     )
-                if lin.graph[lineage_ID_key] != list(non_null_node_lin_ids)[0]:
+                if lin.graph[lineage_ID_key] != next(iter(non_null_node_lin_ids)):
                     raise ValueError(
                         f"Impossible state: inconsistent lineage ID values between "
                         f"nodes and lineage of lineage {lin.graph[lineage_ID_key]}."
@@ -653,7 +660,7 @@ def _update_lineages_IDs_key(
             lin.graph["lineage_ID"] = lin.graph.pop(lineage_ID_key)
         except KeyError:
             if len(lin) == 1:
-                node = list(lin.nodes)[0]
+                node = next(iter(lin.nodes))
                 lin.graph["lineage_ID"] = -node
             else:
                 lin.graph["lineage_ID"] = next_id
