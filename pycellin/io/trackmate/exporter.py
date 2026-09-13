@@ -518,9 +518,9 @@ def _write_AllTracks(
     with xf.element("AllTracks"):
         for lineage in data.values():
             # We have track tags to add only for tracks with several spots,
-            # so one-node tracks are to be ignored. In pycellin, a one-node
-            # lineage is identified by a negative ID.
-            if lineage.graph["TRACK_ID"] < 0:
+            # so one-node lineages are to be ignored. They are identified by their
+            # size rather than by their negative ID, which is only a convention.
+            if len(lineage) < 2:
                 continue
 
             # Track tags.
@@ -555,16 +555,17 @@ def _write_track_id(xf: ET.xmlfile, lineage: CellLineage) -> None:
     Raises
     ------
     KeyError
-        If the lineage does not have a TRACK_ID attribute.
+        If a lineage with several cells does not have a TRACK_ID attribute.
     """
+    if len(lineage) < 2:
+        # We don't want to write the track ID for one-node lineages.
+        return
     try:
-        if lineage.graph["TRACK_ID"] < 0:
-            # We don't want to write the track ID for one-node lineages.
-            return
+        track_id = lineage.graph["TRACK_ID"]
     except KeyError as err:
         raise KeyError("The lineage does not have a TRACK_ID attribute.") from err
     xf.write(f"\n{' ' * 6}")
-    t_attr = {"TRACK_ID": str(lineage.graph["TRACK_ID"])}
+    t_attr = {"TRACK_ID": str(track_id)}
     xf.write(ET.Element("TrackID", t_attr))
 
 
