@@ -1227,7 +1227,10 @@ class Model:
                     f"Provided lid={lid} conflicts with the lineage's "
                     f"internal lineage_ID={inferred_lid}."
                 )
-            lid = lid or inferred_lid or self.get_next_available_lineage_ID()
+            if lid is None:
+                lid = inferred_lid
+            if lid is None:
+                lid = self.get_next_available_lineage_ID()
 
         if lid in self.get_cell_lineage_IDs():
             raise ValueError(f"Lineage with ID {lid} already exists in the model.")
@@ -3799,17 +3802,16 @@ class Model:
                 if prop_id in dict_calcs2 and dict_calcs2[prop_id].uses_external_data()
             }
 
-        # Lineage IDs of the lineages to add. IDs already used in model1 or planned for
-        # a previous lineage are replaced by new ones, and so is ID 0 since
-        # add_lineage() does not keep it. Single-cell lineages keep the convention
-        # lineage ID = -cell ID: if that ID is not available, their cell is renumbered,
-        # as when splitting lineages in ModelUpdater._update(). Only model2, a copy, is
-        # modified here.
+        # Lineage IDs of the lineages to add. Missing IDs, and IDs already used in
+        # model1 or planned for a previous lineage, are replaced by new ones.
+        # Single-cell lineages keep the convention lineage ID = -cell ID: if that ID is
+        # not available, their cell is renumbered, as when splitting lineages in
+        # ModelUpdater._update(). Only model2, a copy, is modified here.
         used_lids = set(model1.get_cell_lineage_IDs())
         lineages_to_add = []
         for lin in model2.get_cell_lineages():
             lid = lin.graph.get("lineage_ID")
-            if not lid or lid in used_lids:
+            if lid is None or lid in used_lids:
                 if len(lin) == 1:
                     cid = next(iter(lin.nodes))
                     lid = -cid
