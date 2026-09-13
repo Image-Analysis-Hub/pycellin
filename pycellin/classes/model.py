@@ -3591,7 +3591,8 @@ class Model:
             The model to merge into this one.
         new_name : str | None, optional
             The name of the merged model. If None, the names of the two models are
-            concatenated, separated by a "+"sign. Default is None.
+            concatenated, separated by a "+" sign, with "unnamed" for a model without
+            a name (None or empty). Default is None.
         in_place : bool, optional
             Whether to merge the model in place or return a new model. Default is False.
         unique_cell_ids : bool, optional
@@ -3675,7 +3676,8 @@ class Model:
         type and unit. A different data type only triggers a warning, data types being
         compared after normalizing their spelling (e.g. "float" and "float64"). Their
         name, description and provenance can differ: the declaration and calculator of
-        this model are kept.
+        this model are kept. A property is protected in the merged model if it is
+        protected in either model.
         Calculators using external data (e.g. a label image or a mask) are not kept in
         the merged model, since that data belongs to only one of the models. Their
         property values are kept, but are not computed again until the properties are
@@ -3854,6 +3856,10 @@ class Model:
         standard_fields = model1.model_metadata.get_standard_metadata().keys()
         md1_values = model1.model_metadata.get_all_metadata()
         md2_values = model2.model_metadata.get_all_metadata()
+        # Empty names are treated as missing names.
+        for md_values in (md1_values, md2_values):
+            if md_values.get("name") == "":
+                md_values["name"] = None
         merged_md = {
             field: value
             for field, value in md1_values.items()
@@ -3866,8 +3872,8 @@ class Model:
         merged_md.pop("creation_timestamp")
         merged_md.pop("pycellin_version")
         if new_name is None:
-            name1 = model1.model_metadata.name
-            name2 = model2.model_metadata.name
+            name1 = model1.model_metadata.name or "unnamed"
+            name2 = model2.model_metadata.name or "unnamed"
             merged_md["name"] = f"{name1}+{name2}"
         else:
             merged_md["name"] = new_name
@@ -3889,10 +3895,14 @@ class Model:
             if prop.provenance == _MERGE_PROVENANCE
         }
         changed_fields = set()
-        for source_md in (model1.model_metadata, model2.model_metadata):
+        sources = (
+            (model1.model_metadata, md1_values),
+            (model2.model_metadata, md2_values),
+        )
+        for source_md, source_values in sources:
             md_diff = source_md.diff(merged_metadata, exclude=critical)
             changed_fields.update(
-                field for field, (value, _) in md_diff.items() if value is not None
+                field for field in md_diff if source_values.get(field) is not None
             )
         lineage_fields = (merge_props1 | merge_props2 | changed_fields) - {"label_img"}
 
@@ -3968,7 +3978,9 @@ class Model:
             else:  # register both metadata and calculator
                 model1.add_custom_property(calc)
 
-            if prop_id in model2.props_metadata._protected_props:
+        # A property is protected if it is protected in either model.
+        for prop_id in model2.props_metadata._protected_props:
+            if model1.has_property(prop_id):
                 model1.props_metadata._protect_prop(prop_id)
 
         # Model metadata stored on lineages. Each lineage gets the value of the model it
