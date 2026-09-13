@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 exporter.py
@@ -19,9 +18,8 @@ https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content
 from pathlib import Path
 
 from pycellin.classes.exceptions import FusionError
-from pycellin.classes.model import Model
 from pycellin.classes.lineage import CellLineage
-
+from pycellin.classes.model import Model
 
 # TODO: need to extensively test this.
 # TODO: check beforehand for fusions and gap just after division. No need to start

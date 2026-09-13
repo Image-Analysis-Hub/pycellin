@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 loader.py
@@ -49,14 +48,12 @@ def _add_nodes(graph: nx.DiGraph, df: pd.DataFrame) -> None:
     graph : nx.DiGraph
         The graph to which nodes will be added.
     """
-    current_node_id = 0
-    for _, row in df.iterrows():
+    for i, (_, row) in enumerate(df.iterrows()):
         row_dict = row.to_dict()
         row_dict["frame"] = int(row_dict["frame"])
         row_dict["particle"] = int(row_dict["particle"])
-        graph.add_node(current_node_id, **row_dict)
-        graph.nodes[current_node_id]["cell_ID"] = current_node_id
-        current_node_id += 1
+        graph.add_node(i, **row_dict)
+        graph.nodes[i]["cell_ID"] = i
 
 
 def _add_edges(graph: nx.DiGraph, particles: list) -> None:
@@ -104,11 +101,9 @@ def _split_into_lineages(graph: nx.DiGraph) -> dict[int, CellLineage]:
         for c in nx.weakly_connected_components(graph)
     ]
     data = {}
-    current_node_id = 0
-    for lin in lineages:
-        lin.graph["lineage_ID"] = current_node_id
-        data[current_node_id] = lin
-        current_node_id += 1
+    for i, lin in enumerate(lineages):
+        lin.graph["lineage_ID"] = i
+        data[i] = lin
     return data
 
 
