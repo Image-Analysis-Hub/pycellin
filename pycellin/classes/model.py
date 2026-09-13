@@ -3619,6 +3619,8 @@ class Model:
             has no cycle lineages.
             If ``new_metadata`` contains a critical field, or a name while ``new_name``
             is also given.
+            If ``model`` starts earlier than the time origin of this model, which would
+            give negative timepoints.
         RuntimeError
             If relabeling the cells fails when ``unique_cell_ids`` is True. The error
             message describes the state of the model, and the original exception is
@@ -3692,6 +3694,32 @@ class Model:
                 "The name of the merged model is given both by `new_name` and by "
                 "`new_metadata`."
             )
+
+        # Time origin. Timepoints are computed relative to the time origin stored in the
+        # timepoint calculator of model1, so lineages of model2 starting earlier would
+        # get negative timepoints.
+        # TODO: support models with different time origins. The Timepoint calculator
+        # stores the earliest reference time when it is created, and does not update it
+        # when earlier lineages are added (merge, add_lineage...). Possible approaches:
+        # rebuild the calculator on the merged data (shifts existing timepoints and
+        # label image indexing), or use an absolute time origin (breaking change for
+        # released timepoint values).
+        timepoint_calc = model1._updater._calculators.get("timepoint")
+        if isinstance(timepoint_calc, Timepoint):
+            ref_time_prop = timepoint_calc.ref_time_prop
+            times2 = [
+                lin.nodes[nid][ref_time_prop]
+                for lin in model2.get_cell_lineages()
+                for nid in lin.nodes
+                if ref_time_prop in lin.nodes[nid]
+            ]
+            if times2 and min(times2) < timepoint_calc.min_time:
+                raise ValueError(
+                    f"Cannot merge a model starting earlier ({ref_time_prop}="
+                    f"{min(times2)}) than the time origin of this model "
+                    f"({timepoint_calc.min_time}), since it would give negative "
+                    "timepoints. Merge this model into the other one instead."
+                )
 
         # Properties to add. Cycle lineage properties with a calculator can only be
         # added if model1 has cycle lineages (same check as in add_custom_property()).
