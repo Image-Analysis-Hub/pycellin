@@ -3615,8 +3615,9 @@ class Model:
             pixel size, or reference time property).
             If a property with the same identifier and not created by a merge operation
             already exists in the model.
-            If ``model`` has cycle lineage properties with a calculator but this model
-            has no cycle lineages.
+            If one of the models has cycle lineages but the time step of this model is
+            not defined, or if a cycle lineage cannot be built (e.g. a lineage with
+            several roots).
             If ``new_metadata`` contains a critical field, or a name while ``new_name``
             is also given.
             If ``model`` starts earlier than the time origin of this model, which would
@@ -3648,6 +3649,11 @@ class Model:
         property with the "pycellin merge" provenance. Lineages already storing a field
         from a previous merge keep their values. Label images (``label_img``) are never
         stored on lineages.
+
+        Regarding cycle lineages:
+        If one of the models has cycle lineages, the merged model has cycle lineages
+        for all its lineages. Their property values are computed at the next
+        ``update()``.
 
         Regarding properties:
         This method assumes that 2 properties with an identical identifier (one from
@@ -3721,27 +3727,12 @@ class Model:
                     "timepoints. Merge this model into the other one instead."
                 )
 
-        # Properties to add. Cycle lineage properties with a calculator can only be
-        # added if model1 has cycle lineages (same check as in add_custom_property()).
+        # Properties to add.
         prop_ids1 = set(model1.get_properties().keys())
         props2 = model2.get_properties()
         prop_ids2 = set(props2.keys())
         props_to_add = prop_ids2.difference(prop_ids1)
         dict_calcs2 = model2._updater._calculators
-
-        if not model1.data.cycle_data:
-            cycle_props = sorted(
-                prop_id
-                for prop_id in props_to_add
-                if prop_id in dict_calcs2
-                and dict_calcs2[prop_id].prop.lin_type == "CycleLineage"
-            )
-            if cycle_props:
-                raise ValueError(
-                    f"Cannot merge cycle lineage properties {cycle_props}: this model "
-                    "has no cycle lineages. Please compute the cycle lineages first "
-                    "with `model.add_cycle_data()`."
-                )
 
         # Lineage IDs of the lineages to add. IDs already used in model1 or planned for
         # a previous lineage are replaced by new ones, and so is ID 0 since
@@ -3755,6 +3746,32 @@ class Model:
             used_lids.add(lid)
             lineages_to_add.append((lin, lid))
         new_lids = {lid for _, lid in lineages_to_add}
+
+        # Cycle lineages. If one of the models has cycle lineages, or if cycle lineage
+        # properties with a calculator are added, the merged model gets cycle lineages
+        # for all its lineages. They are built now so that a lineage whose cycle lineage
+        # cannot be built stops the merge before any modification.
+        with_cycles = bool(model1.data.cycle_data or model2.data.cycle_data) or any(
+            dict_calcs2[prop_id].prop.lin_type == "CycleLineage"
+            for prop_id in props_to_add
+            if prop_id in dict_calcs2
+        )
+        cycle_lineages_to_add = {}
+        if with_cycles:
+            time_prop = model1.reference_time_property
+            time_step = model1.model_metadata.time_step
+            if time_step is None:
+                raise ValueError(
+                    "Cannot build the cycle lineages of the merged model: the time "
+                    "step of this model is not defined."
+                )
+            lineages = list(lineages_to_add)
+            if not model1.data.cycle_data:
+                lineages += [(lin, lid) for lid, lin in model1.data.cell_data.items()]
+            for lin, lid in lineages:
+                cycle_lin = CycleLineage(time_prop, time_step, lin)
+                cycle_lin.graph["lineage_ID"] = lid
+                cycle_lineages_to_add[lid] = cycle_lin
 
         # Model metadata of the merged model. Fields shared by both models are kept,
         # differing standard fields are set to None, except provenance, and differing
@@ -3829,6 +3846,16 @@ class Model:
 
         # All checks passed, model1 can now be modified.
 
+        # Lineages, with their cycle lineages.
+        for lin, lid in lineages_to_add:
+            model1.add_lineage(lin, lid, overwrite_lid=True)
+        if with_cycles:
+            if model1.data.cycle_data is None:
+                model1.data.cycle_data = {}
+            model1.data.cycle_data.update(cycle_lineages_to_add)
+            time_unit = model1.model_metadata.time_unit
+            model1.props_metadata._add_cycle_lineage_props(time_unit)
+
         # Properties.
         # Model2's calculators are registered in model2's order, since properties 
         # are computed in calculator registration order.
@@ -3839,6 +3866,9 @@ class Model:
             if prop_id in props_to_add and prop_id not in dict_calcs2
         ]
         for prop_id in props_order:
+            # Skip the core cycle lineage properties declared with the cycle lineages.
+            if model1.has_property(prop_id):
+                continue
             prop = props2[prop_id]
             calc = dict_calcs2.get(prop_id)
 
@@ -3849,10 +3879,6 @@ class Model:
 
             if prop_id in model2.props_metadata._protected_props:
                 model1.props_metadata._protect_prop(prop_id)
-
-        # Lineages.
-        for lin, lid in lineages_to_add:
-            model1.add_lineage(lin, lid, overwrite_lid=True)
 
         # Model metadata stored on lineages. Each lineage gets the value of the model it
         # comes from, unless that model already stores the field from a previous merge.
