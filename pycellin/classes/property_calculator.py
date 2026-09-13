@@ -44,6 +44,10 @@ class PropertyCalculator(ABC):
 
     _LOCAL_PROPERTY = None  # type: bool | None
     _PROPERTY_TYPE = None  # type: str | None
+    # True for calculators holding data that belong to the model they were created
+    # for and are not stored in it (e.g. a label image). Such calculators are not
+    # kept by Model.merge(), since they cannot compute the lineages of another model.
+    _USES_EXTERNAL_DATA = False
 
     def __init__(self, property: Property):
         self.prop = property
@@ -67,6 +71,16 @@ class PropertyCalculator(ABC):
         (node, edge, lineage).
         """
         return cls._PROPERTY_TYPE
+
+    @classmethod
+    def uses_external_data(cls) -> bool:
+        """
+        Accessor to the _USES_EXTERNAL_DATA attribute.
+
+        Return True if the calculator uses data that belong to a specific model and
+        are not stored in it (e.g. a label image), False otherwise.
+        """
+        return cls._USES_EXTERNAL_DATA
 
     @abstractmethod
     def compute(self, *args, **kwargs) -> Any:

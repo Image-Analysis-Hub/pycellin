@@ -62,6 +62,9 @@ class CellPolygonFromLabelImg(NodeLocalPropCalculator):
         computed, by default False.
     """
 
+    # The label image belongs to the model the calculator was created for.
+    _USES_EXTERNAL_DATA = True
+
     def __init__(
         self,
         property: Property,

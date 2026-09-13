@@ -3634,6 +3634,8 @@ class Model:
         -----
         UserWarning
             If a property declared in both models has a different data type.
+            If calculators using external data (e.g. a label image) are not kept in the
+            merged model.
 
         Notes
         -----
@@ -3669,6 +3671,10 @@ class Model:
         compared after normalizing their spelling (e.g. "float" and "float64"). Their
         name, description and provenance can differ: the declaration and calculator of
         this model are kept.
+        Calculators using external data (e.g. a label image or a mask) are not kept in
+        the merged model, since that data belongs to only one of the models. Their
+        property values are kept, but are not computed again until the properties are
+        added again.
         """
         if in_place:
             model1 = self
@@ -3764,6 +3770,26 @@ class Model:
             )
         props_to_add = prop_ids2.difference(prop_ids1)
         dict_calcs2 = model2._updater._calculators
+
+        # Calculators using external data (e.g. a label image) would compute the
+        # lineages of the other model with data that does not belong to it, so they
+        # are not kept in the merged model. Their property values are kept.
+        # TODO: let such calculators get their data per lineage (e.g. from a label
+        # image path stored on lineages), so that they can be kept when merging.
+        external_calcs1 = set()
+        if model2.data.cell_data:
+            external_calcs1 = {
+                prop_id
+                for prop_id, calc in model1._updater._calculators.items()
+                if calc.uses_external_data()
+            }
+        external_calcs2 = set()
+        if model1.data.cell_data:
+            external_calcs2 = {
+                prop_id
+                for prop_id in props_to_add
+                if prop_id in dict_calcs2 and dict_calcs2[prop_id].uses_external_data()
+            }
 
         # Lineage IDs of the lineages to add. IDs already used in model1 or planned for
         # a previous lineage are replaced by new ones, and so is ID 0 since
@@ -3882,6 +3908,18 @@ class Model:
                 f"{dtype_mismatches}. The declarations of this model are kept.",
                 stacklevel=2,
             )
+        external_calcs = sorted(external_calcs1 | external_calcs2)
+        if external_calcs:
+            warnings.warn(
+                "Calculators using external data (e.g. a label image) are not kept in "
+                f"the merged model: {external_calcs}. The property values are kept, "
+                "but are not computed again until the properties are added again.",
+                stacklevel=2,
+            )
+
+        # Calculators using external data.
+        for prop_id in external_calcs1:
+            model1._updater.delete_calculator(prop_id)
 
         # Lineages, with their cycle lineages.
         for lin, lid in lineages_to_add:
@@ -3909,7 +3947,7 @@ class Model:
             prop = props2[prop_id]
             calc = dict_calcs2.get(prop_id)
 
-            if calc is None:  # register just the metadata
+            if calc is None or prop_id in external_calcs2:  # register just the metadata
                 model1.props_metadata._add_prop(prop)
             else:  # register both metadata and calculator
                 model1.add_custom_property(calc)

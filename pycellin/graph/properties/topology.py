@@ -448,6 +448,9 @@ class LocationTag(NodeLocalPropCalculator):
         The size of a pixel in the image.
     """
 
+    # The mask image belongs to the model the calculator was created for.
+    _USES_EXTERNAL_DATA = True
+
     def __init__(self, prop: Property, mask_img: np.ndarray, pixel_size: float):
         super().__init__(prop)
         self.mask = mask_img
