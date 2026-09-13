@@ -3802,7 +3802,15 @@ class Model:
         # All checks passed, model1 can now be modified.
 
         # Properties.
-        for prop_id in props_to_add:
+        # Model2's calculators are registered in model2's order, since properties 
+        # are computed in calculator registration order.
+        props_order = [prop_id for prop_id in dict_calcs2 if prop_id in props_to_add]
+        props_order += [
+            prop_id
+            for prop_id in props2
+            if prop_id in props_to_add and prop_id not in dict_calcs2
+        ]
+        for prop_id in props_order:
             prop = props2[prop_id]
             calc = dict_calcs2.get(prop_id)
 
