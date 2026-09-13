@@ -656,7 +656,6 @@ def _update_props_metadata(
     # Node properties.
     prop_cell_ID = create_cell_id_property("TrackMate")
     props_md._add_prop(prop_cell_ID)
-    props_md._protect_prop("cell_ID")
     for axis in ["x", "y", "z"]:
         props_md._change_prop_identifier(f"POSITION_{axis.upper()}", f"cell_{axis}")
         props_md._change_prop_description(
@@ -682,7 +681,6 @@ def _update_props_metadata(
     props_md._change_prop_identifier("TRACK_ID", "lineage_ID")
     props_md._change_prop_description("lineage_ID", "Unique identifier of the lineage")
     props_md.props["lineage_ID"].prop_type = PropertyType.NODE | PropertyType.LINEAGE
-    props_md._protect_prop("lineage_ID")
     prop_filtered_track = Property(
         identifier="FilteredTrack",
         name="FilteredTrack",

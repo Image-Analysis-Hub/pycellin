@@ -193,7 +193,6 @@ def _create_PropsMetadata(props: list[str], metadata: dict[str, Any]) -> PropsMe
     lin_ID_prop = create_lineage_id_property()
     for prop in [cell_ID_prop, frame_prop, lin_ID_prop]:
         props_md._add_prop(prop)
-        props_md._protect_prop(prop.identifier)
 
     # Trackpy properties.
     for axis in ["x", "y", "z"]:

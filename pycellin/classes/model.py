@@ -90,6 +90,11 @@ class Model:
         UserWarning
             If `time_step` is not provided in `model_metadata` and cannot be inferred
             from the data.
+
+        Notes
+        -----
+        The core properties "cell_ID", "lineage_ID", "timepoint" and the reference
+        time property are protected whenever they are declared.
         """
         # Check that we have a reference_time_property.
         if reference_time_property is None:
@@ -181,8 +186,18 @@ class Model:
                     reference_time_property=self.reference_time_property,
                 )
             )
-            self.props_metadata._protect_prop("timepoint")
             self.update(["timepoint"])
+
+        # Core properties are protected whenever they are declared.
+        core_props = (
+            "cell_ID",
+            "lineage_ID",
+            "timepoint",
+            self.reference_time_property,
+        )
+        for prop_id in core_props:
+            if self.props_metadata._has_prop(prop_id):
+                self.props_metadata._protect_prop(prop_id)
 
         # Add an optional argument to ask to compute the CycleLineage?
         # Should name be optional or set to None? If optional and not provided, an

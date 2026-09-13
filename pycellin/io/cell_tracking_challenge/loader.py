@@ -213,7 +213,6 @@ def _create_PropsMetadata(seg_data: bool) -> PropsMetadata:
     lin_ID_prop = create_lineage_id_property()
     for prop in [cell_ID_prop, ref_time_prop, lin_ID_prop]:
         props_md._add_prop(prop)
-        props_md._protect_prop(prop.identifier)
     if seg_data:
         # TODO: deal with z dimension
         # TODO: put the real unit, pixel is juste a placeholder for now

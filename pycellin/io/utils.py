@@ -323,6 +323,10 @@ def _remove_orphaned_metadata(model: Model) -> None:
     of a property have no corresponding data, the property will be removed entirely
     from the metadata.
 
+    Protected properties are unprotected to be removed, then protected again if some
+    of their types remain. This function is meant to be used on a copy of a model,
+    e.g. before exporting it.
+
     Parameters
     ----------
     model : Model
@@ -356,7 +360,17 @@ def _remove_orphaned_metadata(model: Model) -> None:
                 stacklevel=2,
             )
             prop_type = property_type_from_string(prop_type_str)
+            protected = [
+                prop_id
+                for prop_id in orphaned_props
+                if prop_id in model.props_metadata._protected_props
+            ]
+            for prop_id in protected:
+                model.props_metadata._unprotect_prop(prop_id)
             model.props_metadata._remove_props(orphaned_props, prop_type=prop_type)
+            for prop_id in protected:
+                if model.props_metadata._has_prop(prop_id):
+                    model.props_metadata._protect_prop(prop_id)
 
 
 def _split_graph_into_lineages(
