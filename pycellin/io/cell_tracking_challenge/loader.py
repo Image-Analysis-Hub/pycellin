@@ -24,16 +24,18 @@ import networkx as nx
 import tifffile
 from skimage.measure import find_contours, regionprops
 
-from pycellin.classes import CellLineage, Data, Model, PropsMetadata
+from pycellin.classes import Data, Model, PropsMetadata
 from pycellin.graph.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
+    create_frame_property,
     create_lineage_id_property,
-    create_timepoint_property,
+    create_time_property,
 )
 from pycellin.graph.properties.morphology import (
     create_cell_contour_property,
 )
+from pycellin.io.utils import _split_graph_into_lineages
 
 # TODO: what if the first frame is empty...?
 
@@ -81,28 +83,28 @@ def _integrate_label_imgs_metadata(metadata: dict[str, Any], labels_path: str) -
                 metadata["space_unit"] = "pixel"
 
         # Check and set pixel_width
-        if "pixel_size" not in metadata or "width" not in metadata["pixel_size"]:
+        if "pixel_width" not in metadata:
             if "XResolution" in tags and tags.get("XResolution") is not None:
                 xres = tags.get("XResolution").value
-                metadata["pixel_size"]["width"] = xres[1] / xres[0]
+                metadata["pixel_width"] = xres[1] / xres[0]
             else:
-                metadata["pixel_size"]["width"] = 1.0
+                metadata["pixel_width"] = 1.0
 
         # Check and set pixel_height
-        if "pixel_size" not in metadata or "height" not in metadata["pixel_size"]:
+        if "pixel_height" not in metadata:
             if "YResolution" in tags and tags.get("YResolution") is not None:
                 yres = tags.get("YResolution").value
-                metadata["pixel_size"]["height"] = yres[1] / yres[0]
+                metadata["pixel_height"] = yres[1] / yres[0]
             else:
-                metadata["pixel_size"]["height"] = 1.0
+                metadata["pixel_height"] = 1.0
 
         # Check and set pixel_depth
-        if "pixel_size" not in metadata or "depth" not in metadata["pixel_size"]:
+        if "pixel_depth" not in metadata:
             if "ZResolution" in tags and tags.get("ZResolution") is not None:
                 zres = tags.get("ZResolution").value
-                metadata["pixel_size"]["depth"] = zres[1] / zres[0]
+                metadata["pixel_depth"] = zres[1] / zres[0]
             else:
-                metadata["pixel_size"]["depth"] = 1.0
+                metadata["pixel_depth"] = 1.0
 
 
 def _create_metadata(
@@ -192,7 +194,7 @@ def _create_metadata(
     return metadata
 
 
-def _create_PropsMetadata(seg_data: bool) -> PropsMetadata:
+def _create_PropsMetadata(seg_data: bool, time_unit: str | None) -> PropsMetadata:
     """
     Return a PropsMetadata object populated with pycellin basic properties.
 
@@ -200,18 +202,21 @@ def _create_PropsMetadata(seg_data: bool) -> PropsMetadata:
     ----------
     seg_data : bool
         A boolean indicating whether segmentation data is available.
+    time_unit : str | None
+        The temporal unit of the data, used as the unit of the time property.
 
     Returns
     -------
     PropsMetadata
         An instance of PropsMetadata populated with cell and lineage
-        identification properties.
+        identification properties, and with the frame and time properties.
     """
     props_md = PropsMetadata()
     cell_ID_prop = create_cell_id_property()
-    ref_time_prop = create_timepoint_property()
+    frame_prop = create_frame_property(provenance="CTC")
+    time_prop = create_time_property(unit=time_unit, provenance="CTC")
     lin_ID_prop = create_lineage_id_property()
-    for prop in [cell_ID_prop, ref_time_prop, lin_ID_prop]:
+    for prop in [cell_ID_prop, frame_prop, time_prop, lin_ID_prop]:
         props_md._add_prop(prop)
     if seg_data:
         # TODO: deal with z dimension
@@ -315,36 +320,25 @@ def _merge_tracks(
             for node, data in graph.nodes(data=True)
             if data["TRACK"] == parent_track
         ]
-        parent_node = sorted(parent_nodes, key=lambda x: x[1])[-1]
+        parent_node = max(parent_nodes, key=lambda x: x[1])
         graph.add_edge(parent_node[0], nodes[0][0])
 
 
-def _update_node_attributes(
-    lineage: CellLineage,
-    lid: int,
-) -> None:
+def _remove_track_attributes(graph: nx.DiGraph) -> None:
     """
-    Update the nodes attributes in a lineage graph.
+    Remove the node attributes that were only needed for graph construction.
 
-    This function assigns a new unique ID to the entire lineage
-    and to each node within it. It also cleans up the node attributes
-    by removing the 'TRACK' and 'PARENT' attributes, that were only needed
-    for graph construction.
+    The 'TRACK' and 'PARENT' attributes are used to merge tracks and to match
+    segmentation labels to nodes. They are obsolete once the graph is complete.
 
     Parameters
     ----------
-    lineage : CellLineage
-        The lineage graph whose node attributes are to be updated.
-    lid : int
-        The new lineage ID to be assigned to the lineage graph and its nodes.
+    graph : nx.DiGraph
+        The graph whose node attributes are to be cleaned.
     """
-    lineage.graph["lineage_ID"] = lid
-    for _, data in lineage.nodes(data=True):
-        # Removing obsolete attributes.
-        if "TRACK" in data:
-            del data["TRACK"]
-        if "PARENT" in data:
-            del data["PARENT"]
+    for _, data in graph.nodes(data=True):
+        data.pop("TRACK", None)
+        data.pop("PARENT", None)
 
 
 def _extract_seg_data(
@@ -471,6 +465,9 @@ def load_CTC_file(
     For image metadata, priority is given to the img_metadata given by the user.
     If not provided, pycellin will try to extract the metadata from the label images.
     If it fails or if no label images are given, default values will be used.
+    Cell times are stored in two node properties: 'frame', read from the CTC file,
+    and 'time', equal to frame * time_step and expressed in time_unit. 'time' is
+    the reference time property of the model.
 
     Parameters
     ----------
@@ -494,10 +491,10 @@ def load_CTC_file(
         The pixel depth in the spatial unit. If not provided or not infered from the
         label images, it will be set to 1.0 by default.
     time_unit : str, optional
-        The temporal unit of the data. If not provided, it will be set to 'frame'
+        The temporal unit of the data. If not provided, it will be set to None
         by default.
     time_step : float, optional
-        The time step in the temporal unit. If not provided, it will be set to 1.0
+        The time step in the temporal unit. If not provided, it will be set to 1
         by default.
 
     Returns
@@ -541,26 +538,7 @@ def load_CTC_file(
             labels, centroids, contours = _extract_seg_data(str(label_img_path))
             _integrate_seg_data(graph, frame, labels, centroids, contours)
 
-    # We want one lineage per connected component of the graph.
-    lineages = [
-        CellLineage(graph.subgraph(c).copy())
-        for c in nx.weakly_connected_components(graph)
-    ]
-
-    # Adding a unique lineage_ID to each lineage and their nodes.
-    for lin_id, lin in enumerate(lineages):
-        _update_node_attributes(lin, lin_id)
-    data = {}
-    for lin in lineages:
-        if "lineage_ID" in lin.graph:
-            data[lin.graph["lineage_ID"]] = lin
-        else:
-            assert len(lin) == 1, "Lineage ID not found and not a one-node lineage."
-            node = [n for n in lin.nodes][0]
-            # We set the ID of a one-node lineage to the negative of the node ID.
-            lin_ID = -node
-            lin.graph["lineage_ID"] = lin_ID
-            data[lin_ID] = lin
+    _remove_track_attributes(graph)
 
     md = _create_metadata(
         ctc_path,
@@ -572,12 +550,21 @@ def load_CTC_file(
         time_unit=time_unit,
         time_step=time_step,
     )
-    props_md = _create_PropsMetadata(labels_path is not None)
+    # The reference time property is the physical time, so that the time step and
+    # time unit apply to it. Timepoints are then derived from it by the model.
+    for _, node_data in graph.nodes(data=True):
+        node_data["time"] = float(node_data["frame"] * md["time_step"])
+
+    # One lineage per connected component of the graph.
+    lineages = _split_graph_into_lineages(graph)
+    data = {lin.graph["lineage_ID"]: lin for lin in lineages if len(lin) > 0}
+
+    props_md = _create_PropsMetadata(labels_path is not None, md["time_unit"])
     model = Model(
         model_metadata=md,
         props_metadata=props_md,
         data=Data(data),
-        reference_time_property="timepoint",
+        reference_time_property="time",
     )
     return model
 
