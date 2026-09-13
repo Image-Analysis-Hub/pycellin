@@ -265,8 +265,9 @@ class ModelUpdater:
             for cell in self._added_cells - self._removed_cells
             if cell.lineage_ID in lins_to_process
         ]
-        # Also include existing nodes in modified lineages that weren't explicitly added/removed.
-        for lin_ID in self._modified_lineages - self._removed_lineages:
+        # Also include the nodes of added and modified lineages that weren't explicitly
+        # added/removed.
+        for lin_ID in lins_to_process:
             if lin_ID in data.cell_data:
                 for cell_id in data.cell_data[lin_ID].nodes():
                     cell = Cell(cell_ID=cell_id, lineage_ID=lin_ID)
@@ -277,8 +278,8 @@ class ModelUpdater:
 
         # Prepare the list of edges to process.
         edges_to_process = list(self._added_links - self._removed_links)
-        # Also include existing edges in modified lineages.
-        for lin_ID in self._modified_lineages - self._removed_lineages:
+        # Also include the edges of added and modified lineages.
+        for lin_ID in lins_to_process:
             if lin_ID in data.cell_data:
                 for source, target in data.cell_data[lin_ID].edges():
                     link = Link(
