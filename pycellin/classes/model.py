@@ -36,7 +36,7 @@ from pycellin.graph.properties.core import (
     create_timepoint_property,
 )
 from pycellin.styling import PYCELLIN_PURPLE
-from pycellin.utils import _color_to_rgba
+from pycellin.utils import _color_to_rgba, _infer_dtype
 
 L = TypeVar("L", bound="Lineage")
 
@@ -3664,7 +3664,8 @@ class Model:
         the models, the values of each model are stored on its lineages, in a lineage
         property with the "pycellin merge" provenance. Lineages already storing a field
         from a previous merge keep their values. Label images (``label_img``) are never
-        stored on lineages.
+        stored on lineages. The data type of these lineage properties is inferred from
+        the stored values, in Python type hint syntax (e.g. "float", "int | str").
 
         Regarding cycle lineages:
         If one of the models has cycle lineages, the merged model has cycle lineages
@@ -3986,8 +3987,10 @@ class Model:
         # Model metadata stored on lineages. Each lineage gets the value of the model it
         # comes from, unless that model already stores the field from a previous merge.
         for field in sorted(lineage_fields):
-            # Register as a new property (but no calculator).
+            # Register as a new property (but no calculator), with the data type of
+            # the values stored on lineages.
             if field not in lin_props:
+                values = (md1_values.get(field), md2_values.get(field))
                 new_prop = Property(
                     identifier=field,
                     name=field,
@@ -3995,7 +3998,7 @@ class Model:
                     provenance=_MERGE_PROVENANCE,
                     prop_type=PropertyType.LINEAGE,
                     lin_type="CellLineage",
-                    dtype="string",
+                    dtype=_infer_dtype(values),
                 )
                 model1.props_metadata._add_prop(new_prop)
 

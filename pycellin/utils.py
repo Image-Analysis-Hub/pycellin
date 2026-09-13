@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 import importlib.metadata
+import numbers
 import re
-from typing import Literal, get_args, get_origin
+from collections.abc import Iterable
+from typing import Any, Literal, get_args, get_origin
 
 import networkx as nx
 import networkx.algorithms.isomorphism as iso
@@ -209,3 +211,49 @@ def _is_numeric_dtype(dtype: str | None) -> bool:
         r")\b"
     )
     return bool(re.search(numeric_pattern, dtype_lower))
+
+
+def _infer_dtype(values: Iterable[Any]) -> str | None:
+    """
+    Infer the data type of values, in Python type hint syntax.
+
+    Booleans, integers (numpy integers included), real numbers and strings give "bool",
+    "int", "float" and "str" respectively. Integers mixed with real numbers give 
+    "float". Values of other types give their class name, prefixed by their module 
+    unless built in (e.g. "dict", "numpy.ndarray"). Values of several types give a 
+    union of their data types (e.g. "int | str"). None values are ignored.
+
+    Parameters
+    ----------
+    values : Iterable[Any]
+        The values whose data type to infer.
+
+    Returns
+    -------
+    str | None
+        The inferred data type, or None if all values are None.
+    """
+    names = set()
+    for value in values:
+        if value is None:
+            continue
+        # bool is checked first since it is a subclass of int.
+        if isinstance(value, bool):
+            names.add("bool")
+        elif isinstance(value, numbers.Integral):
+            names.add("int")
+        elif isinstance(value, numbers.Real):
+            names.add("float")
+        elif isinstance(value, str):
+            names.add("str")
+        else:
+            cls = type(value)
+            if cls.__module__ == "builtins":
+                names.add(cls.__qualname__)
+            else:
+                names.add(f"{cls.__module__}.{cls.__qualname__}")
+    if not names:
+        return None
+    if {"int", "float"} <= names:
+        names.discard("int")
+    return " | ".join(sorted(names))
