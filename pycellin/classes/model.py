@@ -40,6 +40,9 @@ from pycellin.utils import _color_to_rgba
 
 L = TypeVar("L", bound="Lineage")
 
+# Provenance of models built by Model.merge() and of the lineage properties it creates.
+_MERGE_PROVENANCE = "pycellin merge"
+
 
 class Model:
     """ """
@@ -3577,6 +3580,7 @@ class Model:
         new_name: str | None = None,
         in_place: bool = False,
         unique_cell_ids: bool = False,
+        new_metadata: dict[str, Any] | None = None,
     ) -> "Model":
         """
         Merge another model into this one, returning the merged model.
@@ -3592,6 +3596,11 @@ class Model:
             Whether to merge the model in place or return a new model. Default is False.
         unique_cell_ids : bool, optional
             Whether to ensure unique cell IDs in the merged model. Default is False.
+        new_metadata : dict[str, Any] | None, optional
+            Model metadata fields to set on the merged model, overriding the values
+            computed by the merge (see Notes). Critical fields (reference time property,
+            time step, time unit, pixel size and space unit) cannot be set.
+            Default is None.
 
         Returns
         -------
@@ -3608,6 +3617,8 @@ class Model:
             already exists in the model.
             If ``model`` has cycle lineage properties with a calculator but this model
             has no cycle lineages.
+            If ``new_metadata`` contains a critical field, or a name while ``new_name``
+            is also given.
         RuntimeError
             If relabeling the cells fails when ``unique_cell_ids`` is True. The error
             message describes the state of the model, and the original exception is
@@ -3622,6 +3633,19 @@ class Model:
         can fail after modifications have started is the cell relabeling
         (``unique_cell_ids=True``), since it updates the model and therefore runs every
         property calculator.
+
+        Regarding model metadata:
+        Critical fields must be compatible between the two models. The merged model
+        keeps the other fields shared by both models, except ``creation_timestamp`` and
+        ``pycellin_version`` which are set at merge time, and ``name`` which follows
+        ``new_name``. Standard fields whose values differ are set to None, except
+        ``provenance`` which is set to "pycellin merge", and custom fields whose values
+        differ are removed. ``new_metadata`` is applied last.
+        When the value of a field for the merged model differs from its value in one of
+        the models, the values of each model are stored on its lineages, in a lineage
+        property with the "pycellin merge" provenance. Lineages already storing a field
+        from a previous merge keep their values. Label images (``label_img``) are never
+        stored on lineages.
 
         Regarding properties:
         This method assumes that 2 properties with an identical identifier (one from
@@ -3654,6 +3678,20 @@ class Model:
                 incompatibilities[metadata] = (metadata1, metadata2)
         if incompatibilities:
             raise ValueError(f"Model metadata is not compatible: {incompatibilities}")
+
+        # Metadata given by the user for the merged model.
+        new_metadata = new_metadata or {}
+        forbidden_fields = sorted(set(new_metadata) & set(critical))
+        if forbidden_fields:
+            raise ValueError(
+                f"Critical model metadata {forbidden_fields} cannot be set through "
+                "`new_metadata`."
+            )
+        if new_name is not None and "name" in new_metadata:
+            raise ValueError(
+                "The name of the merged model is given both by `new_name` and by "
+                "`new_metadata`."
+            )
 
         # Properties to add. Cycle lineage properties with a calculator can only be
         # added if model1 has cycle lineages (same check as in add_custom_property()).
@@ -3690,9 +3728,56 @@ class Model:
             lineages_to_add.append((lin, lid))
         new_lids = {lid for _, lid in lineages_to_add}
 
-        # Remaining model metadata that differs between the two models, to be
-        # transformed into lineage properties.
+        # Model metadata of the merged model. Fields shared by both models are kept,
+        # differing standard fields are set to None, except provenance, and differing
+        # custom fields are removed. creation_timestamp and pycellin_version are left
+        # out so that ModelMetadata sets them at merge time.
         diff = model1.model_metadata.diff(model2.model_metadata, exclude=critical)
+        standard_fields = model1.model_metadata.get_standard_metadata().keys()
+        md1_values = model1.model_metadata.get_all_metadata()
+        md2_values = model2.model_metadata.get_all_metadata()
+        merged_md = {
+            field: value
+            for field, value in md1_values.items()
+            if field not in diff or field in standard_fields
+        }
+        for field in diff.keys() & standard_fields:
+            merged_md[field] = None
+        if "provenance" in diff:
+            merged_md["provenance"] = _MERGE_PROVENANCE
+        merged_md.pop("creation_timestamp")
+        merged_md.pop("pycellin_version")
+        if new_name is None:
+            name1 = model1.model_metadata.name
+            name2 = model2.model_metadata.name
+            merged_md["name"] = f"{name1}+{name2}"
+        else:
+            merged_md["name"] = new_name
+        merged_md.update(new_metadata)
+        merged_metadata = ModelMetadata.from_dict(merged_md)
+
+        # Metadata fields to store on lineages: fields already stored on lineages by a
+        # previous merge in one of the models, and fields whose value for the merged
+        # model differs from a non-None value of one of the models. Label images are
+        # never stored on lineages.
+        merge_props1 = {
+            prop_id
+            for prop_id, prop in model1.get_lineage_properties().items()
+            if prop.provenance == _MERGE_PROVENANCE
+        }
+        merge_props2 = {
+            prop_id
+            for prop_id, prop in model2.get_lineage_properties().items()
+            if prop.provenance == _MERGE_PROVENANCE
+        }
+        changed_fields = set()
+        for source_md in (model1.model_metadata, model2.model_metadata):
+            md_diff = source_md.diff(merged_metadata, exclude=critical)
+            changed_fields.update(
+                field for field, (value, _) in md_diff.items() if value is not None
+            )
+        lineage_fields = (merge_props1 | merge_props2 | changed_fields) - {"label_img"}
+
         # Lineage properties of model1 once the properties of model2 are added.
         lin_props = {
             **model1.get_lineage_properties(),
@@ -3704,8 +3789,8 @@ class Model:
         }
         conflicting_fields = sorted(
             field
-            for field in diff
-            if field in lin_props and lin_props[field].provenance != "merge models"
+            for field in lineage_fields
+            if field in lin_props and lin_props[field].provenance != _MERGE_PROVENANCE
         )
         if conflicting_fields:
             raise ValueError(
@@ -3733,22 +3818,16 @@ class Model:
         for lin, lid in lineages_to_add:
             model1.add_lineage(lin, lid, overwrite_lid=True)
 
-        # Solve collision in remaining model metadata by transforming into Lineage
-        # property.
-        custom_md = model1.model_metadata.get_custom_metadata()
-        for field, (value1, value2) in diff.items():
-            # Remove from model metadata if custom, ignore if standard.
-            # if hasattr(model1.model_metadata, field):
-            if field in custom_md:
-                delattr(model1.model_metadata, field)
-
+        # Model metadata stored on lineages. Each lineage gets the value of the model it
+        # comes from, unless that model already stores the field from a previous merge.
+        for field in sorted(lineage_fields):
             # Register as a new property (but no calculator).
             if field not in lin_props:
                 new_prop = Property(
                     identifier=field,
                     name=field,
                     description=field,
-                    provenance="merge models",
+                    provenance=_MERGE_PROVENANCE,
                     prop_type=PropertyType.LINEAGE,
                     lin_type="CellLineage",
                     dtype="str",
@@ -3757,16 +3836,20 @@ class Model:
 
             # Set values on lineages.
             for lin in model1.get_cell_lineages():
-                value_to_add = value2 if lin.graph["lineage_ID"] in new_lids else value1
-                if value_to_add is not None:
-                    lin.graph[field] = value_to_add
+                from_model2 = lin.graph["lineage_ID"] in new_lids
+                value = (md2_values if from_model2 else md1_values).get(field)
+                stored_fields = merge_props2 if from_model2 else merge_props1
+                if value is not None and field not in stored_fields:
+                    lin.graph[field] = value
 
-        if new_name is None:
-            name1 = model1.model_metadata.name
-            name2 = model2.model_metadata.name
-            model1.model_metadata.name = f"{name1}+{name2}"
-        else:
-            model1.model_metadata.name = new_name
+        # Model metadata of the merged model. The metadata object is updated rather
+        # than replaced, so that references to it stay valid when merging in place.
+        metadata = model1.model_metadata
+        final_md = merged_metadata.get_all_metadata()
+        for field in metadata.get_custom_metadata().keys() - final_md.keys():
+            delattr(metadata, field)
+        for field, value in final_md.items():
+            setattr(metadata, field, value)
 
         # Solve IDs collision. This is done last because it is the only step that can
         # fail once model1 has been modified: relabel_cells() updates the model, which
