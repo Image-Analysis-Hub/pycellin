@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
-from typing import get_args
+from typing import Any, get_args
 
 from pycellin.custom_types import (
     LineageType,
@@ -9,7 +8,10 @@ from pycellin.custom_types import (
     property_type_from_string,
     property_type_to_strings,
 )
-from pycellin.utils import check_literal_type
+from pycellin.utils import _normalize_dtype, check_literal_type
+
+# Unit and data type of properties whose declaration is unknown (e.g. TrackMate stubs).
+_UNKNOWN = "unknown"
 
 
 class Property:
@@ -98,6 +100,39 @@ class Property:
             and self.dtype == other.dtype
             and self.unit == other.unit
         )
+
+    def get_incompatibilities(self, other: "Property") -> dict[str, tuple[Any, Any]]:
+        """
+        Return the declaration fields that are incompatible with another property.
+
+        Two properties are compatible when they have the same property type, lineage
+        type, unit and data type. Data types are compared after normalizing their
+        spelling (e.g. "float" and "float64", "str" and "string"). An "unknown" unit or
+        data type is compatible with any value. Name, description and provenance are
+        not compared.
+
+        Parameters
+        ----------
+        other : Property
+            The property to compare with.
+
+        Returns
+        -------
+        dict[str, tuple[Any, Any]]
+            The incompatible fields, with (value in this property, value in the other
+            property) tuples as values. Empty if the properties are compatible.
+        """
+        incompatibilities = {
+            field: (getattr(self, field), getattr(other, field))
+            for field in ("prop_type", "lin_type")
+            if getattr(self, field) != getattr(other, field)
+        }
+        if _UNKNOWN not in (self.unit, other.unit) and self.unit != other.unit:
+            incompatibilities["unit"] = (self.unit, other.unit)
+        dtypes = (_normalize_dtype(self.dtype), _normalize_dtype(other.dtype))
+        if _UNKNOWN not in (self.dtype, other.dtype) and dtypes[0] != dtypes[1]:
+            incompatibilities["dtype"] = (self.dtype, other.dtype)
+        return incompatibilities
 
     def __repr__(self) -> str:
         """

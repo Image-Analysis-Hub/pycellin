@@ -28,6 +28,7 @@ from pycellin.io.utils import (
     _identify_frame_prop,
     _update_node_prop_key,
 )
+from pycellin.utils import _is_numeric_dtype, _normalize_dtype
 
 logger = logging.getLogger(__name__)
 
@@ -325,7 +326,7 @@ def _convert_prop_to_feat(
     trackmate_feat["name"] = new_name
     trackmate_feat["shortname"] = new_name
     trackmate_feat["dimension"] = _unit_to_dimension(prop)
-    if prop.dtype == "int":
+    if _normalize_dtype(prop.dtype) == "int":
         trackmate_feat["isint"] = "true"
     else:
         trackmate_feat["isint"] = "false"
@@ -739,62 +740,6 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
             + "\n".join(msg_parts)
         )
         logger.warning(msg)
-
-
-def _is_numeric_dtype(dtype: str | None) -> bool:
-    """
-    Check if a dtype string represents a numeric type.
-
-    Parameters
-    ----------
-    dtype : str | None
-        The dtype string to check.
-
-    Returns
-    -------
-    bool
-        True if the dtype represents a numeric type, False otherwise.
-    """
-    if dtype is None:
-        return False
-
-    dtype_lower = dtype.lower()
-
-    # Reject collection and container types that are not numeric.
-    non_numeric_keywords = [
-        "array",
-        "bytes",
-        "dict",
-        "dictionary",
-        "iterable",
-        "list",
-        "matrix",
-        "object",
-        "sequence",
-        "set",
-        "str",
-        "string",
-        "tuple",
-    ]
-    if any(keyword in dtype_lower for keyword in non_numeric_keywords):
-        return False
-
-    # Check for numeric types using regex with word boundaries
-    # to avoid false positives (e.g., "point" containing "int").
-    numeric_pattern = (
-        r"\b(?:"
-        r"int|integer|"
-        r"uint|uint8|uint16|uint32|uint64|"
-        r"int8|int16|int32|int64|"
-        r"float|double|float16|float32|float64|float128|"
-        r"complex|"
-        r"bool|bool_|boolean|"
-        r"fraction|decimal|"
-        r"number|numeric|"
-        r"real|rational"
-        r")\b"
-    )
-    return bool(re.search(numeric_pattern, dtype_lower))
 
 
 def _remove_non_numeric_props(model: Model) -> None:

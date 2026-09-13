@@ -22,6 +22,7 @@ import networkx as nx
 from pycellin.classes import CellLineage, Model, Property
 from pycellin.custom_types import PropertyType
 from pycellin.io.utils import _remove_orphaned_metadata
+from pycellin.utils import _normalize_dtype
 
 # TODO: geffception for cycle and lineage props
 
@@ -252,7 +253,8 @@ def _build_props_metadata(
     edge_props_md: dict[str, geff_spec.PropMetadata] = {}
 
     for prop_id, prop in properties.items():
-        if prop.dtype.lower() == "string":
+        # GEFF spells the string data type "str".
+        if _normalize_dtype(prop.dtype) == "string":
             dtype = "str"
         else:
             dtype = prop.dtype

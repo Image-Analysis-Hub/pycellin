@@ -3611,8 +3611,9 @@ class Model:
         Raises
         ------
         ValueError
-            If the model metadata is not compatible (e.g., different time step, time unit,
-            pixel size, or reference time property).
+            If critical model metadata (reference time property, time step and unit,
+            pixel size, space unit) differs between the models, including when a field
+            is set in only one of them.
             If a property with the same identifier and not created by a merge operation
             already exists in the model.
             If one of the models has cycle lineages but the time step of this model is
@@ -3622,10 +3623,17 @@ class Model:
             is also given.
             If ``model`` starts earlier than the time origin of this model, which would
             give negative timepoints.
+            If a property declared in both models has a different property type,
+            lineage type or unit.
         RuntimeError
             If relabeling the cells fails when ``unique_cell_ids`` is True. The error
             message describes the state of the model, and the original exception is
             chained as the cause.
+
+        Warns
+        -----
+        UserWarning
+            If a property declared in both models has a different data type.
 
         Notes
         -----
@@ -3638,7 +3646,7 @@ class Model:
         property calculator.
 
         Regarding model metadata:
-        Critical fields must be compatible between the two models. The merged model
+        Critical fields must be identical in both models. The merged model
         keeps the other fields shared by both models, except ``creation_timestamp`` and
         ``pycellin_version`` which are set at merge time, and ``name`` which follows
         ``new_name``. Standard fields whose values differ are set to None, except
@@ -3656,9 +3664,11 @@ class Model:
         ``update()``.
 
         Regarding properties:
-        This method assumes that 2 properties with an identical identifier (one from
-        each model) are strictly identical (type, lineage type, calculator...). If not
-        data and metadata related to the property in the model argument will be lost.
+        Properties declared in both models must have the same property type, lineage
+        type and unit. A different data type only triggers a warning, data types being
+        compared after normalizing their spelling (e.g. "float" and "float64"). Their
+        name, description and provenance can differ: the declaration and calculator of
+        this model are kept.
         """
         if in_place:
             model1 = self
@@ -3678,14 +3688,18 @@ class Model:
             "pixel_depth",
             "space_unit",
         ]
-        incompatibilities = {}
-        for metadata in critical:
-            metadata1 = md1.get(metadata)
-            metadata2 = md2.get(metadata)
-            if metadata1 is not None and metadata2 is not None and metadata1 != metadata2:
-                incompatibilities[metadata] = (metadata1, metadata2)
+        # Critical fields must be identical, including when set in only one model.
+        incompatibilities = {
+            field: (md1.get(field), md2.get(field))
+            for field in critical
+            if md1.get(field) != md2.get(field)
+        }
         if incompatibilities:
-            raise ValueError(f"Model metadata is not compatible: {incompatibilities}")
+            raise ValueError(
+                f"Model metadata is not compatible: {incompatibilities}. Critical "
+                "fields must be identical in both models, including when a field is "
+                "set in only one of them."
+            )
 
         # Metadata given by the user for the merged model.
         new_metadata = new_metadata or {}
@@ -3727,10 +3741,27 @@ class Model:
                     "timepoints. Merge this model into the other one instead."
                 )
 
-        # Properties to add.
-        prop_ids1 = set(model1.get_properties().keys())
+        # Properties. Properties declared in both models must have compatible
+        # declarations (see Property.get_incompatibilities()).
+        props1 = model1.get_properties()
         props2 = model2.get_properties()
+        prop_ids1 = set(props1.keys())
         prop_ids2 = set(props2.keys())
+        # A different data type only triggers a warning, since data types are free
+        # strings that cannot always be compared reliably.
+        incompatible_props = {}
+        dtype_mismatches = {}
+        for prop_id in sorted(prop_ids1 & prop_ids2):
+            diffs = props1[prop_id].get_incompatibilities(props2[prop_id])
+            if "dtype" in diffs:
+                dtype_mismatches[prop_id] = diffs.pop("dtype")
+            if diffs:
+                incompatible_props[prop_id] = diffs
+        if incompatible_props:
+            raise ValueError(
+                "Properties are declared differently in the two models: "
+                f"{incompatible_props}."
+            )
         props_to_add = prop_ids2.difference(prop_ids1)
         dict_calcs2 = model2._updater._calculators
 
@@ -3845,6 +3876,12 @@ class Model:
             )
 
         # All checks passed, model1 can now be modified.
+        if dtype_mismatches:
+            warnings.warn(
+                "Properties declared with different data types in the two models: "
+                f"{dtype_mismatches}. The declarations of this model are kept.",
+                stacklevel=2,
+            )
 
         # Lineages, with their cycle lineages.
         for lin, lid in lineages_to_add:
@@ -3892,7 +3929,7 @@ class Model:
                     provenance=_MERGE_PROVENANCE,
                     prop_type=PropertyType.LINEAGE,
                     lin_type="CellLineage",
-                    dtype="str",
+                    dtype="string",
                 )
                 model1.props_metadata._add_prop(new_prop)
 
