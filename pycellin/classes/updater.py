@@ -6,6 +6,7 @@ from pycellin.classes import Data
 from pycellin.classes.lineage import CellLineage
 from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.custom_types import Cell, Link
+from pycellin.graph.properties.core import Timepoint, create_timepoint_property
 
 
 class ModelUpdater:
@@ -39,6 +40,50 @@ class ModelUpdater:
         # So if a cell property depends on a cycle property, it will not be computed
         # correctly. In that case, the solution is to add the cycle properties first,
         # then update, then add the cell properties and update again.
+
+    def _ensure_timepoint_calculator(
+        self, data: Data, time_prop: str, time_step: int | float
+    ) -> bool:
+        """
+        Build the timepoint calculator when it is missing or outdated.
+
+        The timepoint property is relied upon throughout pycellin, so it must always be
+        present and up to date. No calculator is needed when timepoint is the
+        reference time property itself, nor when there is no data.
+
+        Parameters
+        ----------
+        data : Data
+            The data of the model.
+        time_prop : str
+            The name of the reference time property of the model.
+        time_step : int | float
+            The time step of the model.
+
+        Returns
+        -------
+        bool
+            True if a calculator was built, False otherwise.
+        """
+        if time_prop == "timepoint" or not data.cell_data:
+            return False
+        calc = self._calculators.get("timepoint")
+        if (
+            isinstance(calc, Timepoint)
+            and calc.ref_time_prop == time_prop
+            and calc.time_step == time_step
+        ):
+            return False
+        new_calc = Timepoint(
+            property=create_timepoint_property(),
+            data=data,
+            time_step=time_step,
+            reference_time_property=time_prop,
+        )
+        # Registered first, so that timepoint is computed before the other properties.
+        others = {k: v for k, v in self._calculators.items() if k != "timepoint"}
+        self._calculators = {"timepoint": new_calc, **others}
+        return True
 
     def _reinit(self) -> None:
         """
@@ -240,6 +285,9 @@ class ModelUpdater:
                     data.cell_data[new_lin_ID] = split_lin
                     self._added_lineages.add(new_lin_ID)
 
+        # The timepoint property is always kept present and up to date.
+        timepoint_built = self._ensure_timepoint_calculator(data, time_prop, time_step)
+
         # Update cell lineage properties.
         # TODO: Deal with property dependencies. See comments in __init__.
         if props_to_update is None:
@@ -253,6 +301,13 @@ class ModelUpdater:
                 self._calculators[prop]
                 for prop in props_to_update
                 if self._calculators[prop].prop.lin_type == "CellLineage"
+            ]
+
+        # The timepoint property is computed first, since other properties rely on it.
+        timepoint_calc = self._calculators.get("timepoint")
+        if timepoint_calc is not None:
+            cell_calculators = [timepoint_calc] + [
+                calc for calc in cell_calculators if calc is not timepoint_calc
             ]
 
         lins_to_process = (
@@ -290,13 +345,25 @@ class ModelUpdater:
         # Remove duplicates.
         edges_to_process = list(set(edges_to_process))
 
-        # Recompute the properties as needed.
+        # Recompute the properties as needed. A newly built timepoint calculator
+        # computes the timepoint of all cells.
+        all_nodes = []
+        if timepoint_built:
+            all_nodes = [
+                Cell(cell_ID=cid, lineage_ID=lid)
+                for lid, lin in data.cell_data.items()
+                for cid in lin.nodes()
+            ]
         for calc in cell_calculators:
+            if timepoint_built and calc is timepoint_calc:
+                nodes = all_nodes
+            else:
+                nodes = nodes_to_process
             # Depending on the class of the calculator, a different version of
             # the enrich() method is called.
             calc.enrich(
                 data,
-                nodes_to_enrich=nodes_to_process,  # self._added_cells,
+                nodes_to_enrich=nodes,  # self._added_cells,
                 edges_to_enrich=edges_to_process,  # self._added_links,
                 lineages_to_enrich=lins_to_process,  # self._added_lineages | self._modified_lineages
             )

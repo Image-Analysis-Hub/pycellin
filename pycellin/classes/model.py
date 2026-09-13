@@ -519,16 +519,11 @@ class Model:
             time_step = self._compute_time_step(variable_time_step)
         self.model_metadata.time_step = time_step
 
-        # Update the timepoint calculator with the new time step.
-        if "timepoint" in self._updater._calculators:
-            self._updater.register_calculator(
-                Timepoint(
-                    property=create_timepoint_property(),
-                    data=self.data,
-                    time_step=time_step,
-                    reference_time_property=self.reference_time_property,
-                )
-            )
+        # Timepoints depend on the time step: the timepoint calculator is removed so
+        # that the next update() rebuilds it from the current data and recomputes all
+        # values.
+        self._updater._calculators.pop("timepoint", None)
+        if self.data.cell_data:
             self.prepare_full_data_update()
 
     @staticmethod
@@ -1131,6 +1126,13 @@ class Model:
         a warning is raised and that property is ignored during the update.
         If no properties are left to update after filtering, a warning is raised
         and the model is not updated.
+
+        Notes
+        -----
+        The "timepoint" property is always kept declared and up to date: its calculator
+        is created or rebuilt when missing or outdated (e.g. after a change of time
+        step), in which case the timepoint of all cells is recomputed. The only
+        exception is when "timepoint" is the reference time property itself.
         """
         if not self._updater._update_required:
             warnings.warn("Model is already up to date.")
@@ -1170,6 +1172,15 @@ class Model:
                 "The time step of the model is currently not defined "
                 "but is required for cycle lineage computation."
             )
+        # The timepoint property is always declared and protected, unless it is the
+        # reference time property (see ModelUpdater._update()).
+        if (
+            self.model_metadata.reference_time_property != "timepoint"
+            and self.data.cell_data
+            and not self.props_metadata._has_prop("timepoint")
+        ):
+            self.props_metadata._add_prop(create_timepoint_property())
+            self.props_metadata._protect_prop("timepoint")
         self._updater._update(
             self.data,
             time_prop=self.model_metadata.reference_time_property,
@@ -1436,6 +1447,10 @@ class Model:
             If a property in the prop_values is not declared.
         TypeError
             If the time_value is not an integer or a float.
+
+        Notes
+        -----
+        The timepoint of the cell is computed at the next ``update()``.
         """
         try:
             lineage = self.data.cell_data[lid]
@@ -1453,18 +1468,14 @@ class Model:
             prop_values = dict()
         prop_values["lineage_ID"] = lid
 
+        # Is the time value consistent with the time step of the model?
         time_step = self.model_metadata.time_step
-        timepoint: int | None = None
-        if time_step is not None:
-            # Is the time value consistent with the time step of the model?
-            if time_value % time_step != 0:
-                warnings.warn(
-                    f"The time value {time_value} is not consistent with the time step "
-                    f"of the model ({time_step}). Use model.set_time_step() to set or "
-                    f"compute a new time step compatible with all time values."
-                )
-            # Timepoint value computation.
-            timepoint = int(time_value // time_step)
+        if time_step is not None and time_value % time_step != 0:
+            warnings.warn(
+                f"The time value {time_value} is not consistent with the time step "
+                f"of the model ({time_step}). Use model.set_time_step() to set or "
+                f"compute a new time step compatible with all time values."
+            )
 
         if global_cid is True:
             if cid is None:
@@ -1485,7 +1496,6 @@ class Model:
             cid,
             time_prop_name=self.model_metadata.reference_time_property,
             time_prop_value=time_value,
-            timepoint=timepoint,
             **prop_values,
         )
 
