@@ -3582,7 +3582,6 @@ class Model:
         model: "Model",
         new_name: str | None = None,
         in_place: bool = False,
-        unique_cell_ids: bool = False,
         new_metadata: dict[str, Any] | None = None,
     ) -> "Model":
         """
@@ -3598,8 +3597,6 @@ class Model:
             a name (None or empty). Default is None.
         in_place : bool, optional
             Whether to merge the model in place or return a new model. Default is False.
-        unique_cell_ids : bool, optional
-            Whether to ensure unique cell IDs in the merged model. Default is False.
         new_metadata : dict[str, Any] | None, optional
             Model metadata fields to set on the merged model, overriding the values
             computed by the merge (see Notes). Critical fields (reference time property,
@@ -3629,10 +3626,6 @@ class Model:
             give negative timepoints.
             If a property declared in both models has a different property type,
             lineage type or unit.
-        RuntimeError
-            If relabeling the cells fails when ``unique_cell_ids`` is True. The error
-            message describes the state of the model, and the original exception is
-            chained as the cause.
 
         Warns
         -----
@@ -3645,11 +3638,12 @@ class Model:
         -----
         The argument ``model`` is never modified; it is deep-copied internally.
 
-        All checks are performed before any modification, so if a ValueError is raised,
-        this model is left unchanged even when ``in_place`` is True. The only step that
-        can fail after modifications have started is the cell relabeling
-        (``unique_cell_ids=True``), since it updates the model and therefore runs every
-        property calculator.
+        All checks are performed before any modification, so if an error is raised,
+        this model is left unchanged, even when ``in_place`` is True.
+
+        The merged model is not updated: call ``update()`` to compute the property
+        values of the added lineages. To make cell IDs unique across all lineages, call
+        ``relabel_cells(unique_ids=True)`` on the merged model.
 
         Regarding lineages:
         Lineages of ``model`` whose lineage ID is already used get a new ID. Single-cell
@@ -4020,27 +4014,6 @@ class Model:
             delattr(metadata, field)
         for field, value in final_md.items():
             setattr(metadata, field, value)
-
-        # Solve IDs collision. This is done last because it is the only step that can
-        # fail once model1 has been modified: relabel_cells() updates the model, which
-        # runs every property calculator.
-        if unique_cell_ids:
-            try:
-                model1.relabel_cells(unique_ids=True)
-            except Exception as err:
-                if in_place:
-                    state = (
-                        "This model was modified in place and is only partially "
-                        "merged: the lineages, properties and metadata of the other "
-                        "model were added, but cell IDs may be only partially "
-                        "relabeled and property values only partially updated."
-                    )
-                else:
-                    state = "This model was left unchanged."
-                raise RuntimeError(
-                    "Merge failed while relabeling cells to make cell IDs unique. "
-                    f"{state}"
-                ) from err
 
         return model1
 
