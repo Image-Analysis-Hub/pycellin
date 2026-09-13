@@ -3647,6 +3647,11 @@ class Model:
         (``unique_cell_ids=True``), since it updates the model and therefore runs every
         property calculator.
 
+        Regarding lineages:
+        Lineages of ``model`` whose lineage ID is already used get a new ID. Single-cell
+        lineages keep the convention lineage ID = -cell ID: their cell is renumbered
+        when needed.
+
         Regarding model metadata:
         Critical fields must be identical in both models. The merged model
         keeps the other fields shared by both models, except ``creation_timestamp`` and
@@ -3793,13 +3798,24 @@ class Model:
 
         # Lineage IDs of the lineages to add. IDs already used in model1 or planned for
         # a previous lineage are replaced by new ones, and so is ID 0 since
-        # add_lineage() does not keep it.
+        # add_lineage() does not keep it. Single-cell lineages keep the convention
+        # lineage ID = -cell ID: if that ID is not available, their cell is renumbered,
+        # as when splitting lineages in ModelUpdater._update(). Only model2, a copy, is
+        # modified here.
         used_lids = set(model1.get_cell_lineage_IDs())
         lineages_to_add = []
         for lin in model2.get_cell_lineages():
             lid = lin.graph.get("lineage_ID")
             if not lid or lid in used_lids:
-                lid = max(max(used_lids, default=0) + 1, 1)
+                if len(lin) == 1:
+                    cid = next(iter(lin.nodes))
+                    lid = -cid
+                    if lid >= 0 or lid in used_lids:
+                        lid = min(min(used_lids, default=0) - 1, -1)
+                        nx.relabel_nodes(lin, {cid: -lid}, copy=False)
+                        lin.nodes[-lid]["cell_ID"] = -lid
+                else:
+                    lid = max(max(used_lids, default=0) + 1, 1)
             used_lids.add(lid)
             lineages_to_add.append((lin, lid))
         new_lids = {lid for _, lid in lineages_to_add}
