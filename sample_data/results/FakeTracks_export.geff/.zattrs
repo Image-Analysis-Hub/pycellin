@@ -368,10 +368,10 @@
                 "varlength": false
             },
             "lineage_ID": {
-                "description": null,
+                "description": "Unique identifier of the lineage",
                 "dtype": "int64",
                 "identifier": "lineage_ID",
-                "name": null,
+                "name": "Track ID",
                 "unit": null,
                 "varlength": false
             },
