@@ -18,6 +18,7 @@ from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import (
     EdgeLocalPropCalculator,
     NodeGlobalPropCalculator,
+    NodeLocalPropCalculator,
 )
 
 
@@ -542,7 +543,7 @@ def create_turning_angle_property(
     )
 
 
-class TurningAngle(NodeGlobalPropCalculator):
+class TurningAngle(NodeLocalPropCalculator):
     """
     Calculator to compute the angle between two consecutive displacement vectors of a cell.
 
@@ -565,15 +566,13 @@ class TurningAngle(NodeGlobalPropCalculator):
         self.unit = unit
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage, nid: int
+        self, lineage: CellLineage, nid: int
     ) -> float:
         """
         Compute the angle between two consecutive displacement vectors at a cell detection.
 
         Parameters
         ----------
-        data : Data
-            Data object containing the lineage.
         lineage : CellLineage
             Lineage graph containing the node of interest.
         nid : int
