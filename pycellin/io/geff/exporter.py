@@ -78,8 +78,7 @@ def _get_next_available_id(lineages: list[CellLineage]) -> int:
     for lineage in lineages:
         if lineage.nodes:
             lineage_max = max(lineage.nodes)
-            if lineage_max > max_node_id:
-                max_node_id = lineage_max
+            max_node_id = max(max_node_id, lineage_max)
 
     return max_node_id + 1
 
@@ -268,9 +267,8 @@ def _build_props_metadata(
             description=prop.description,
         )
 
-        if prop.prop_type & PropertyType.LINEAGE:
-            # Not implemented yet, need geffception for lineage and cycle props
-            continue
+        # Lineage values are not exported yet (need geffception for lineage and cycle
+        # props), but node and edge values of multi-type properties are.
         if prop.prop_type & PropertyType.NODE:
             node_props_md[prop_id] = prop_md
         if prop.prop_type & PropertyType.EDGE:
