@@ -191,6 +191,9 @@ def _unit_to_dimension(
             pycellin_props["relative_age"] = "NONE"
         else:
             pycellin_props["relative_age"] = "TIME"
+    elif name == "turning_angle" and unit == "degree":
+        # TrackMate angles are in radians.
+        pycellin_props["turning_angle"] = "NONE"
 
     dimension = None
     if name in trackmate_props:
