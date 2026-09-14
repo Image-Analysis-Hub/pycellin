@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """Unit tests for Model class from model.py module."""
 
@@ -7,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pycellin.classes import Model, Property
+from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.custom_types import PropertyType
 from pycellin.graph.properties.tracking import (
     create_absolute_age_property,
@@ -144,3 +143,150 @@ class TestCategorizePropsMockModel:
         assert "mixed_prop" in node_props
         assert "mixed_prop" in edge_props
         assert "mixed_prop" not in lin_props
+
+
+@pytest.fixture()
+def lineage_props_model():
+    """
+    Create a model with a dividing lineage and a single-cell lineage, and properties
+    of lineage, node and node-and-lineage types.
+    """
+    lin = CellLineage(lid=1)
+    lin.add_node(1, cell_ID=1, frame=0, node_prop=10, mixed_prop="node1")
+    lin.add_node(2, cell_ID=2, frame=1, node_prop=20, mixed_prop="node2")
+    lin.add_node(3, cell_ID=3, frame=1, node_prop=30, mixed_prop="node3")
+    lin.add_edge(1, 2)
+    lin.add_edge(1, 3)
+    lin.graph["lin_prop"] = 1.5
+    lin.graph["shared_prop"] = "a"
+    lin.graph["mixed_prop"] = "lineage1"
+    single_lin = CellLineage(lid=-4)
+    single_lin.add_node(4, cell_ID=4, frame=0, node_prop=40, mixed_prop="node4")
+    single_lin.graph["lin_prop"] = 2.5
+    single_lin.graph["mixed_prop"] = "lineage-4"
+
+    def make_prop(identifier, prop_type, lin_type):
+        return Property(
+            identifier=identifier,
+            name=identifier,
+            description=f"{identifier} for testing",
+            provenance="test",
+            prop_type=prop_type,
+            lin_type=lin_type,
+            dtype="float",
+        )
+
+    props_md = PropsMetadata(
+        props={
+            "lin_prop": make_prop("lin_prop", PropertyType.LINEAGE, "CellLineage"),
+            "shared_prop": make_prop("shared_prop", PropertyType.LINEAGE, "Lineage"),
+            "node_prop": make_prop("node_prop", PropertyType.NODE, "CellLineage"),
+            "mixed_prop": make_prop(
+                "mixed_prop", PropertyType.NODE | PropertyType.LINEAGE, "CellLineage"
+            ),
+            "cycle_prop": make_prop("cycle_prop", PropertyType.LINEAGE, "CycleLineage"),
+        }
+    )
+    return Model(
+        model_metadata={"time_step": 1},
+        props_metadata=props_md,
+        data=Data({1: lin, -4: single_lin}),
+        reference_time_property="frame",
+    )
+
+
+class TestToCellDataframe:
+    """Test cases for Model.to_cell_dataframe() method."""
+
+    def test_lineage_props_added_as_columns(self, lineage_props_model):
+        df = lineage_props_model.to_cell_dataframe(
+            lineage_props=["lin_prop", "shared_prop"]
+        )
+
+        lin_rows = df[df["lineage_ID"] == 1]
+        single_rows = df[df["lineage_ID"] == -4]
+        assert len(lin_rows) == 3
+        assert (lin_rows["lin_prop"] == 1.5).all()
+        assert (lin_rows["shared_prop"] == "a").all()
+        assert single_rows["lin_prop"].tolist() == [2.5]
+        assert single_rows["shared_prop"].isna().all()
+
+    def test_lineage_props_none_adds_no_column(self, lineage_props_model):
+        df = lineage_props_model.to_cell_dataframe()
+
+        assert "lin_prop" not in df.columns
+        assert "shared_prop" not in df.columns
+
+    def test_lineage_ID_lineage_prop_is_skipped(self, lineage_props_model):
+        df = lineage_props_model.to_cell_dataframe(lineage_props=["lineage_ID"])
+
+        assert df.equals(lineage_props_model.to_cell_dataframe())
+
+    def test_lineage_props_restricted_to_lids(self, lineage_props_model):
+        df = lineage_props_model.to_cell_dataframe(
+            lids=[-4], lineage_props=["lin_prop"]
+        )
+
+        assert df["lin_prop"].tolist() == [2.5]
+
+    def test_lineage_prop_clashing_with_column_raises(self, lineage_props_model):
+        with pytest.raises(ValueError, match="existing columns.*'mixed_prop'"):
+            lineage_props_model.to_cell_dataframe(lineage_props=["mixed_prop"])
+
+    def test_invalid_lineage_props_raise(self, lineage_props_model):
+        with pytest.raises(
+            ValueError,
+            match="declared in the model: 'node_prop', 'cycle_prop', 'unknown'",
+        ):
+            lineage_props_model.to_cell_dataframe(
+                lineage_props=["node_prop", "cycle_prop", "unknown", "lin_prop"]
+            )
+
+    def test_missing_mandatory_cell_prop_raises(self, lineage_props_model):
+        for lin in lineage_props_model.data.cell_data.values():
+            for nid in lin.nodes:
+                del lin.nodes[nid]["cell_ID"]
+        with pytest.raises(ValueError, match="not found in the model: 'cell_ID'"):
+            lineage_props_model.to_cell_dataframe()
+
+
+class TestToLinkDataframe:
+    """Test cases for Model.to_link_dataframe() method."""
+
+    def test_lineage_props_added_as_columns(self, lineage_props_model):
+        df = lineage_props_model.to_link_dataframe(lineage_props=["lin_prop"])
+
+        assert df["lin_prop"].tolist() == [1.5, 1.5]
+
+    def test_node_and_lineage_prop_added_when_not_a_column(self, lineage_props_model):
+        df = lineage_props_model.to_link_dataframe(lineage_props=["mixed_prop"])
+
+        assert df["mixed_prop"].tolist() == ["lineage1", "lineage1"]
+
+    def test_invalid_lineage_props_raise(self, lineage_props_model):
+        with pytest.raises(ValueError, match="declared in the model: 'node_prop'"):
+            lineage_props_model.to_link_dataframe(lineage_props=["node_prop"])
+
+
+class TestToLineageDataframe:
+    """Test cases for Model.to_lineage_dataframe() method."""
+
+    def test_missing_lineage_ID_raises(self, lineage_props_model):
+        for lin in lineage_props_model.data.cell_data.values():
+            del lin.graph["lineage_ID"]
+        with pytest.raises(ValueError, match="not found in the model: 'lineage_ID'"):
+            lineage_props_model.to_lineage_dataframe()
+
+
+class TestToCycleDataframe:
+    """Test cases for Model.to_cycle_dataframe() method."""
+
+    def test_lineage_props_added_as_columns(self, lineage_props_model):
+        model = lineage_props_model
+        model.add_cycle_data()
+        df = model.to_cycle_dataframe(lineage_props=["lin_prop"])
+
+        lin_rows = df[df["lineage_ID"] == 1]
+        assert len(lin_rows) == 3
+        assert (lin_rows["lin_prop"] == 1.5).all()
+        assert df.loc[df["lineage_ID"] == -4, "lin_prop"].tolist() == [2.5]

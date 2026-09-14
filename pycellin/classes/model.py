@@ -117,7 +117,7 @@ class Model:
         self._reference_time_property = reference_time_property
 
         # Initialize data early since _compute_time_step() needs it.
-        self.data = data.copy() if data is not None else Data(dict())
+        self.data = data.copy() if data is not None else Data({})
 
         # Do we already have a time_step?
         if model_metadata is not None:
@@ -1465,7 +1465,7 @@ class Model:
                 if not self.props_metadata._has_prop(prop):
                     raise KeyError(f"The property {prop} has not been declared.")
         else:
-            prop_values = dict()
+            prop_values = {}
         prop_values["lineage_ID"] = lid
 
         # Is the time value consistent with the time step of the model?
@@ -1649,7 +1649,7 @@ class Model:
                 if not self.props_metadata._has_prop(prop):
                     raise KeyError(f"The property '{prop}' has not been declared.")
         else:
-            prop_values = dict()
+            prop_values = {}
 
         source_lineage._add_link(
             source_cid,
@@ -1906,7 +1906,7 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the turningangle property to the model.
+        Add the turning angle property to the model.
 
         The turning angle is defined as the angle between the vectors representing
         the displacement of the cell at two consecutive detections.
@@ -1922,7 +1922,7 @@ class Model:
             New name for the property. If None, the name will be "Turning angle".
         custom_description : str, optional
             New description for the property. If None, the description will be
-            "Angle of the cell trajectory between two consecutive detections".
+            "Angle of the cell trajectory between two consecutive displacements".
         """
         prop = motion.create_turning_angle_property(
             custom_identifier=custom_identifier,
@@ -3153,27 +3153,27 @@ class Model:
                 for prop_id, kwargs in prop_info.items():
                     self.add_pycellin_property(prop_id, **kwargs)
 
-    def recompute_property(self, prop_identifier: str) -> None:
-        """
-        Recompute the values of the specified property for all lineages.
+    # def recompute_property(self, prop_identifier: str) -> None:
+    #     """
+    #     Recompute the values of the specified property for all lineages.
 
-        Parameters
-        ----------
-        prop_identifier : str
-            Identifier of the property to recompute.
+    #     Parameters
+    #     ----------
+    #     prop_identifier : str
+    #         Identifier of the property to recompute.
 
-        Raises
-        ------
-        ValueError
-            If the property does not exist.
-        """
-        # First need to check if the property exists.
-        if not self.props_metadata._has_prop(prop_identifier):
-            raise ValueError(f"Property '{prop_identifier}' does not exist.")
+    #     Raises
+    #     ------
+    #     ValueError
+    #         If the property does not exist.
+    #     """
+    #     # First need to check if the property exists.
+    #     if not self.props_metadata._has_prop(prop_identifier):
+    #         raise ValueError(f"Property '{prop_identifier}' does not exist.")
 
-        # Then need to update the data.
-        # TODO: implement
-        pass
+    #     # Then need to update the data.
+    #     # TODO: implement
+    #     pass
 
     def remove_property(
         self,
@@ -3405,7 +3405,7 @@ class Model:
         return (node_props, edge_props, lin_props)
 
     @staticmethod
-    def _propagate_node_props(
+    def _propagate_cycle_node_props(
         node_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
@@ -3440,7 +3440,7 @@ class Model:
         return propagated
 
     @staticmethod
-    def _propagate_edge_props(
+    def _propagate_cycle_edge_props(
         edge_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
@@ -3497,7 +3497,7 @@ class Model:
         return propagated
 
     @staticmethod
-    def _propagate_lineage_props(
+    def _propagate_cycle_lineage_props(
         lin_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
@@ -3534,6 +3534,26 @@ class Model:
         """
         Propagate the cycle properties to the cell lineages.
 
+        Values are copied from each cycle lineage to the cell lineage with the same
+        lineage ID:
+
+        - node property: the value of a cycle node is copied onto every cell of
+          that cycle;
+        - edge property: the value of an edge between two cycles is copied onto
+          every link of the child cycle, and onto the link between the last cell
+          of the parent cycle and the first cell of the child cycle. Links of root
+          cycles get no value;
+        - lineage property: the value of the cycle lineage is copied onto the
+          cell lineage graph.
+
+        Values missing on the cycle lineage are skipped. The lineage type of the
+        properties that were propagated becomes `Lineage`, since the properties are
+        then present on both cycle and cell lineages.
+
+        This is a one-shot copy: cell lineage values are not kept in sync if the
+        cycle lineages change later, e.g. when they are rebuilt during `update()`.
+        Call this method again to refresh them.
+
         Parameters
         ----------
         props : list[str], optional
@@ -3553,8 +3573,8 @@ class Model:
             If a property in the list is not a cycle lineage property or not declared
             in the model.
         FusionError
-            If a cell has more than one incoming edge in the cycle lineage,
-            which indicates a fusion event.
+            If the first cell of a cycle has more than one incoming link in the cell
+            lineage, which indicates a fusion event.
 
         Warnings
         --------
@@ -3585,15 +3605,15 @@ class Model:
             clin = self.data.cycle_data[lin_ID]
             if node_props:
                 propagated_props.update(
-                    Model._propagate_node_props(node_props, clin, lin)
+                    Model._propagate_cycle_node_props(node_props, clin, lin)
                 )
             if edge_props:
                 propagated_props.update(
-                    Model._propagate_edge_props(edge_props, clin, lin)
+                    Model._propagate_cycle_edge_props(edge_props, clin, lin)
                 )
             if lin_props:
                 propagated_props.update(
-                    Model._propagate_lineage_props(lin_props, clin, lin)
+                    Model._propagate_cycle_lineage_props(lin_props, clin, lin)
                 )
 
         # Update the properties declaration: now the property type is `Lineage`
@@ -4069,7 +4089,73 @@ class Model:
 
         return models
 
-    def to_cell_dataframe(self, lids: list[int] | None = None) -> pd.DataFrame:
+    def _add_lineage_props_to_df(
+        self, df: pd.DataFrame, lineage_props: list[str] | None
+    ) -> pd.DataFrame:
+        """
+        Add cell lineage properties as columns of a DataFrame.
+
+        Each row gets the value of the cell lineage matching its `lineage_ID`, or NaN
+        if that lineage has no value. `lineage_ID` is skipped since it is already
+        a column.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame with a `lineage_ID` column.
+        lineage_props : list[str] | None
+            Identifiers of the cell lineage properties to add. If None or empty,
+            the DataFrame is returned unchanged.
+
+        Returns
+        -------
+        pd.DataFrame
+            The DataFrame with one added column per lineage property.
+
+        Raises
+        ------
+        ValueError
+            If a property is not a lineage property of cell lineages or is not
+            declared in the model.
+            If a property has the same identifier as an existing column.
+        """
+        props = [prop for prop in lineage_props or [] if prop != "lineage_ID"]
+        if not props:
+            return df
+
+        available_props = {
+            prop_id
+            for prop_id, prop in self.get_cell_lineage_properties().items()
+            if PropertyType.LINEAGE in prop.prop_type
+        }
+        invalid_props = [prop for prop in props if prop not in available_props]
+        if invalid_props:
+            invalid_str = ", ".join(repr(prop) for prop in invalid_props)
+            raise ValueError(
+                "Not lineage properties of cell lineages, or not declared in the "
+                f"model: {invalid_str}."
+            )
+        clashing_props = [prop for prop in props if prop in df.columns]
+        if clashing_props:
+            clashing_str = ", ".join(repr(prop) for prop in clashing_props)
+            raise ValueError(
+                "Lineage properties clash with existing columns of the DataFrame: "
+                f"{clashing_str}."
+            )
+
+        new_columns = {}
+        for prop in props:
+            values = {
+                lin_ID: lin.graph[prop]
+                for lin_ID, lin in self.data.cell_data.items()
+                if prop in lin.graph
+            }
+            new_columns[prop] = df["lineage_ID"].map(values)
+        return df.assign(**new_columns)
+
+    def to_cell_dataframe(
+        self, lids: list[int] | None = None, lineage_props: list[str] | None = None
+    ) -> pd.DataFrame:
         """
         Return the cell data of the model as a pandas DataFrame.
 
@@ -4078,6 +4164,10 @@ class Model:
         lids : list[int], optional
             List of IDs of the lineages to export (default is None).
             If None, all lineages are exported.
+        lineage_props : list[str], optional
+            Identifiers of cell lineage properties to add as columns, e.g. an
+            experimental condition stored on lineages (default is None). Each row
+            gets the value of its lineage, or NaN if the lineage has no value.
 
         Returns
         -------
@@ -4088,6 +4178,9 @@ class Model:
         ------
         ValueError
             If the `lineage_ID`, `frame` or `cell_ID` property is not found in the model.
+            If a property of `lineage_props` is not a lineage property of cell
+            lineages, is not declared in the model, or clashes with an existing
+            column.
         """
         list_df = []
         nb_nodes = 0
@@ -4103,22 +4196,26 @@ class Model:
 
         # Reoder the columns to have pycellin mandatory properties first.
         time_prop = self.model_metadata.reference_time_property
-        columns = df.columns.tolist()
-        try:
-            columns.remove("lineage_ID")
-            columns.remove(time_prop)
-            columns.remove("cell_ID")
-        except ValueError as err:
-            raise err
-        columns = ["lineage_ID", time_prop, "cell_ID"] + columns
+        mandatory_columns = ["lineage_ID", time_prop, "cell_ID"]
+        missing_columns = [col for col in mandatory_columns if col not in df.columns]
+        if missing_columns:
+            missing_str = ", ".join(repr(col) for col in missing_columns)
+            raise ValueError(
+                f"Mandatory cell properties not found in the model: {missing_str}."
+            )
+        columns = mandatory_columns + [
+            col for col in df.columns if col not in mandatory_columns
+        ]
         df = df[columns]
         df.sort_values(
             ["lineage_ID", time_prop, "cell_ID"], ignore_index=True, inplace=True
         )
 
-        return df
+        return self._add_lineage_props_to_df(df, lineage_props)
 
-    def to_link_dataframe(self, lids: list[int] | None = None) -> pd.DataFrame:
+    def to_link_dataframe(
+        self, lids: list[int] | None = None, lineage_props: list[str] | None = None
+    ) -> pd.DataFrame:
         """
         Return the link data of the model as a pandas DataFrame.
 
@@ -4127,11 +4224,22 @@ class Model:
         lids : list[int], optional
             List of IDs of the lineages to export (default is None).
             If None, all lineages are exported.
+        lineage_props : list[str], optional
+            Identifiers of cell lineage properties to add as columns, e.g. an
+            experimental condition stored on lineages (default is None). Each row
+            gets the value of its lineage, or NaN if the lineage has no value.
 
         Returns
         -------
         pd.DataFrame
             DataFrame containing the link data.
+
+        Raises
+        ------
+        ValueError
+            If a property of `lineage_props` is not a lineage property of cell
+            lineages, is not declared in the model, or clashes with an existing
+            column.
         """
         list_df = []
         nb_edges = 0
@@ -4151,15 +4259,12 @@ class Model:
 
         # Reoder the columns to have pycellin mandatory properties first.
         columns = df.columns.tolist()
-        try:
-            columns.remove("lineage_ID")
-        except ValueError as err:
-            raise err
+        columns.remove("lineage_ID")
         columns = ["lineage_ID"] + columns
         df = df[columns]
         df.sort_values("lineage_ID", ignore_index=True, inplace=True)
 
-        return df
+        return self._add_lineage_props_to_df(df, lineage_props)
 
     def to_lineage_dataframe(self, lids: list[int] | None = None) -> pd.DataFrame:
         """
@@ -4190,18 +4295,21 @@ class Model:
         df = pd.concat(list_df, ignore_index=True)
 
         # Reoder the columns to have pycellin mandatory properties first.
+        if "lineage_ID" not in df.columns:
+            raise ValueError(
+                "Mandatory lineage property not found in the model: 'lineage_ID'."
+            )
         columns = df.columns.tolist()
-        try:
-            columns.remove("lineage_ID")
-        except ValueError as err:
-            raise err
+        columns.remove("lineage_ID")
         columns = ["lineage_ID"] + columns
         df = df[columns]
         df.sort_values("lineage_ID", ignore_index=True, inplace=True)
 
         return df
 
-    def to_cycle_dataframe(self, lids: list[int] | None = None) -> pd.DataFrame:
+    def to_cycle_dataframe(
+        self, lids: list[int] | None = None, lineage_props: list[str] | None = None
+    ) -> pd.DataFrame:
         """
         Return the cell cycle data of the model as a pandas DataFrame.
 
@@ -4210,6 +4318,10 @@ class Model:
         lids : list[int], optional
             List of IDs of the lineages to export (default is None).
             If None, all lineages are exported.
+        lineage_props : list[str], optional
+            Identifiers of cell lineage properties to add as columns, e.g. an
+            experimental condition stored on lineages (default is None). Each row
+            gets the value of its lineage, or NaN if the lineage has no value.
 
         Returns
         -------
@@ -4222,6 +4334,9 @@ class Model:
             If the cycle lineages have not been computed yet.
             If the `lineage_ID`, `level` or `cycle_ID` property is not found
             in the model.
+            If a property of `lineage_props` is not a lineage property of cell
+            lineages, is not declared in the model, or clashes with an existing
+            column.
         """
         list_df = []  # type: list[pd.DataFrame]
         nb_nodes = 0
@@ -4242,19 +4357,16 @@ class Model:
 
         # Reoder the columns to have pycellin mandatory properties first.
         columns = df.columns.tolist()
-        try:
-            columns.remove("lineage_ID")
-            columns.remove("level")
-            columns.remove("cycle_ID")
-        except ValueError as err:
-            raise err
+        columns.remove("lineage_ID")
+        columns.remove("level")
+        columns.remove("cycle_ID")
         columns = ["lineage_ID", "level", "cycle_ID"] + columns
         df = df[columns]
         df.sort_values(
             ["lineage_ID", "level", "cycle_ID"], ignore_index=True, inplace=True
         )
 
-        return df
+        return self._add_lineage_props_to_df(df, lineage_props)
 
     def save_to_pickle(self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL) -> None:
         """
@@ -4294,19 +4406,19 @@ class Model:
         with open(path, "rb") as file:
             return pickle.load(file)
 
-    def export(self, path: str, format: str) -> None:
-        """
-        Export the model to a file in a specific format (e.g. TrackMate).
+    # def export(self, path: str, format: str) -> None:
+    #     """
+    #     Export the model to a file in a specific format (e.g. TrackMate).
 
-        Parameters
-        ----------
-        path : str
-            Path to export the model.
-        format : str
-            Format of the exported file.
-        """
-        # TODO: implement
-        pass
+    #     Parameters
+    #     ----------
+    #     path : str
+    #         Path to export the model.
+    #     format : str
+    #         Format of the exported file.
+    #     """
+    #     # TODO: implement
+    #     pass
 
     def get_mean_cell_prop_over_time_fig(
         self,
