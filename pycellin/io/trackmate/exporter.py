@@ -175,6 +175,7 @@ def _unit_to_dimension(
         "num_cycles": "NONE",
         "num_divs": "NONE",
         "num_gaps": "NONE",
+        "num_leaves": "NONE",
         "lineage_cell_depth": "NONE",
         "lineage_cycle_depth": "NONE",
         "lineage_duration": "TIME",

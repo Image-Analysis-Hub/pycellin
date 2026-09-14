@@ -2956,6 +2956,37 @@ class Model:
 
         self.add_custom_property(topo.NumGaps(prop))
 
+    def add_num_leaves(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the num_leaves property to the model.
+
+        The num_leaves property is a cell lineage property that indicates the number of
+        leaf cells (cells without daughter cells) in the lineage.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "num_leaves".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Number of leaves".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.topology.create_num_leaves_property`).
+        """
+        prop = topo.create_num_leaves_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(topo.NumLeaves(prop))
+
     def add_relative_age(
         self,
         custom_time_property: str | None = None,

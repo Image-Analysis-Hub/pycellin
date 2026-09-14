@@ -281,6 +281,43 @@ class NumGaps(LineageLocalPropCalculator):
         return len(lineage.get_gaps())
 
 
+def create_num_leaves_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "num_leaves",
+        name=custom_name or "Number of leaves",
+        description=custom_description
+        or "Number of leaf cells (cells without daughter cells) in the lineage",
+        provenance="pycellin",
+        prop_type="lineage",
+        lin_type="CellLineage",
+        dtype="int",
+    )
+
+
+class NumLeaves(LineageLocalPropCalculator):
+    """Calculator for the num_leaves property."""
+
+    def compute(self, lineage) -> int:
+        """
+        Compute the number of leaf cells in the lineage.
+
+        Parameters
+        ----------
+        lineage : Lineage
+            Lineage graph containing the node of interest.
+
+        Returns
+        -------
+        int
+            The number of leaf cells in the lineage.
+        """
+        return len(lineage.get_leaves())
+
+
 def create_lineage_cell_depth_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
