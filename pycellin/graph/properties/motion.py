@@ -535,7 +535,7 @@ def create_turning_angle_property(
         description=custom_description
         or "Angle of the cell trajectory between two consecutive displacements",
         provenance="pycellin",
-        prop_type="edge",
+        prop_type="node",
         lin_type="CellLineage",
         dtype="float",
         unit=unit,
