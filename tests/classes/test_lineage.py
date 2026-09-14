@@ -3,6 +3,7 @@
 """Unit test for CellLineage and CycleLineage classes from lineage.py module."""
 
 import networkx as nx
+import plotly.io as pio
 import pytest
 
 from pycellin.classes import CellLineage, CycleLineage
@@ -1192,6 +1193,38 @@ class TestCellLineageGetBranchLineageHighlight:
         """Test that paired source-cell and target-cell lists have equal length."""
         with pytest.raises(ValueError, match="same length"):
             cell_lin.get_branch_lineage_highlight([6, 16], source_cells=[4])
+
+
+class TestCellLineageGetTreeFigure:
+    """Test cases for CellLineage.get_tree_figure() method."""
+
+    def test_default_template_axis_lines_and_ticks_hidden(self, cell_lin):
+        fig = cell_lin.get_tree_figure()
+
+        assert fig.layout.xaxis.showline is False
+        assert fig.layout.yaxis.showline is False
+        assert fig.layout.xaxis.ticks == ""
+        assert fig.layout.yaxis.ticks == ""
+
+    def test_default_template_y_range_not_clamped_at_zero(self, cell_lin):
+        fig = cell_lin.get_tree_figure()
+
+        assert fig.layout.yaxis.rangemode == "normal"
+        assert fig.layout.yaxis.autorange == "reversed"
+
+    def test_dark_template_axis_settings_overridden(self, cell_lin):
+        fig = cell_lin.get_tree_figure(template="pycellin_dark")
+
+        assert fig.layout.xaxis.showline is False
+        assert fig.layout.yaxis.showline is False
+        assert fig.layout.xaxis.ticks == ""
+        assert fig.layout.yaxis.ticks == ""
+        assert fig.layout.yaxis.rangemode == "normal"
+
+    def test_pycellin_template_still_applied(self, cell_lin):
+        fig = cell_lin.get_tree_figure()
+
+        assert fig.layout.template == pio.templates["pycellin_white"]
 
 
 class TestCellLineageGetBranchProfileFigure:

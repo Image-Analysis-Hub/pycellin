@@ -788,9 +788,20 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             height=height,
             template=template,
         )
-        fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+        # Pycellin templates target charts: hide their axis lines and ticks, and
+        # don't clamp the reversed y range at 0, which would cut the root nodes.
+        fig.update_xaxes(
+            showticklabels=False,
+            showgrid=False,
+            zeroline=False,
+            showline=False,
+            ticks="",
+        )
         fig.update_yaxes(
             autorange="reversed",
+            rangemode="normal",
+            showline=False,
+            ticks="",
             showgrid=show_horizontal_grid,
             zeroline=show_horizontal_grid,
             title=self._construct_y_legend(y_prop),
