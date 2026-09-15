@@ -17,9 +17,14 @@ from shapely.geometry import LineString, Point, Polygon
 from skimage.measure import find_contours
 from skimage.morphology import skeletonize
 
-from pycellin.classes.lineage import CellLineage
+from pycellin.classes.data import Data
+from pycellin.classes.lineage import CellLineage, CycleLineage
 from pycellin.classes.property import Property
-from pycellin.classes.property_calculator import NodeLocalPropCalculator
+from pycellin.classes.property_calculator import (
+    NodeGlobalPropCalculator,
+    NodeLocalPropCalculator,
+)
+from pycellin.graph.properties.utils import _get_cycle_node_property_values
 
 
 def create_cell_polygon_property(
@@ -123,6 +128,164 @@ class CellArea(NodeLocalPropCalculator):
             )
             raise KeyError(msg)
         return area
+
+
+def create_cycle_mean_area_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    unit: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "cycle_mean_area",
+        name=custom_name or "Cycle mean area",
+        description=custom_description or "Mean area of the cell during the cell cycle",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
+class CycleMeanArea(NodeGlobalPropCalculator):
+    """
+    Calculator to compute the mean area of a cell during a cell cycle.
+
+    The cycle mean area is defined as the mean of the 'cell_area' values
+    of all the cells of the cell cycle. NaN values are ignored.
+    """
+
+    def compute(  # type: ignore[override]
+        self, data: Data, lineage: CycleLineage, nid: int
+    ) -> float:
+        """
+        Compute the mean area of a cell during the cell cycle.
+
+        Parameters
+        ----------
+        data : Data
+            Data object containing the lineage.
+        lineage : CycleLineage
+            Lineage graph containing the node of interest.
+        nid : int
+            Node ID (cycle_ID) of the cell cycle of interest.
+
+        Returns
+        -------
+        float
+            Mean area of the cell during the cell cycle.
+        """
+        areas = _get_cycle_node_property_values("cell_area", data, lineage, nid)
+        return np.nanmean(areas).item()
+
+
+def create_birth_area_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    unit: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "birth_area",
+        name=custom_name or "Birth area",
+        description=custom_description
+        or "Area of the cell at the start of the cell cycle, right after division",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
+class BirthArea(NodeGlobalPropCalculator):
+    """
+    Calculator to compute the area of a cell at birth.
+
+    The birth area is defined as the 'cell_area' value of the first cell
+    of the cell cycle. It is NaN for cell cycles starting at a root,
+    since their birth was not observed.
+    """
+
+    def compute(  # type: ignore[override]
+        self, data: Data, lineage: CycleLineage, nid: int
+    ) -> float:
+        """
+        Compute the area of a cell at birth.
+
+        Parameters
+        ----------
+        data : Data
+            Data object containing the lineage.
+        lineage : CycleLineage
+            Lineage graph containing the node of interest.
+        nid : int
+            Node ID (cycle_ID) of the cell cycle of interest.
+
+        Returns
+        -------
+        float
+            Area of the first cell of the cell cycle, or NaN if the cell cycle
+            starts at a root.
+        """
+        if lineage.is_root(nid):
+            return np.nan
+        return _get_cycle_node_property_values("cell_area", data, lineage, nid)[0]
+
+
+def create_division_area_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    unit: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "division_area",
+        name=custom_name or "Division area",
+        description=custom_description
+        or "Area of the cell at the end of the cell cycle, right before division",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=unit,
+    )
+
+
+class DivisionArea(NodeGlobalPropCalculator):
+    """
+    Calculator to compute the area of a cell at division.
+
+    The division area is defined as the 'cell_area' value of the last cell
+    of the cell cycle. It is NaN for cell cycles ending at a leaf,
+    since their division was not observed.
+    """
+
+    def compute(  # type: ignore[override]
+        self, data: Data, lineage: CycleLineage, nid: int
+    ) -> float:
+        """
+        Compute the area of a cell at division.
+
+        Parameters
+        ----------
+        data : Data
+            Data object containing the lineage.
+        lineage : CycleLineage
+            Lineage graph containing the node of interest.
+        nid : int
+            Node ID (cycle_ID) of the cell cycle of interest.
+
+        Returns
+        -------
+        float
+            Area of the last cell of the cell cycle, or NaN if the cell cycle
+            ends at a leaf.
+        """
+        if lineage.is_leaf(nid):
+            return np.nan
+        return _get_cycle_node_property_values("cell_area", data, lineage, nid)[-1]
 
 
 def create_cell_contour_property(

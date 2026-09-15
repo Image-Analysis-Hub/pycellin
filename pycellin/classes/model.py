@@ -2300,8 +2300,11 @@ class Model:
         cell_poly = self.get_property("cell_polygon")
         if cell_poly is None:
             raise MissingPropertyError(
-                "Property 'cell_polygon' is required for computing cell area. "
-                "Please add it before adding 'cell_area'."
+                "cell_polygon",
+                message=(
+                    "Property 'cell_polygon' is required for computing cell area. "
+                    "Please add it before adding 'cell_area'."
+                ),
             )
         prop = morpho.create_cell_area_property(
             custom_identifier=custom_identifier,
@@ -2310,6 +2313,152 @@ class Model:
             unit=f"{self.get_space_unit() or 'pixel'}^2",
         )
         self.add_custom_property(morpho.CellArea(prop))
+
+    def add_cycle_mean_area(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cycle mean area property to the model.
+
+        The cycle mean area is defined as the mean area of the cell
+        during the cell cycle. "cell_area" needs to be present in the model
+        for this property to be computed.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cycle_mean_area".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cycle mean area".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.morphology.create_cycle_mean_area_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If the 'cell_area' property is not present in the model.
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        cell_area = self.get_property("cell_area")
+        if cell_area is None:
+            raise MissingPropertyError(
+                "cell_area",
+                message=(
+                    "Property 'cell_area' is required for computing cycle mean area. "
+                    "Please add it before adding 'cycle_mean_area'."
+                ),
+            )
+        prop = morpho.create_cycle_mean_area_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=cell_area.unit,
+        )
+        self.add_custom_property(morpho.CycleMeanArea(prop))
+
+    def add_birth_area(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the birth area property to the model.
+
+        The birth area is defined as the area of the first cell of the cell cycle,
+        i.e. right after division. It is NaN for cell cycles starting at a root,
+        since their birth was not observed. "cell_area" needs to be present
+        in the model for this property to be computed.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "birth_area".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Birth area".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.morphology.create_birth_area_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If the 'cell_area' property is not present in the model.
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        cell_area = self.get_property("cell_area")
+        if cell_area is None:
+            raise MissingPropertyError(
+                "cell_area",
+                message=(
+                    "Property 'cell_area' is required for computing birth area. "
+                    "Please add it before adding 'birth_area'."
+                ),
+            )
+        prop = morpho.create_birth_area_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=cell_area.unit,
+        )
+        self.add_custom_property(morpho.BirthArea(prop))
+
+    def add_division_area(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the division area property to the model.
+
+        The division area is defined as the area of the last cell of the cell cycle,
+        i.e. right before division. It is NaN for cell cycles ending at a leaf,
+        since their division was not observed. "cell_area" needs to be present
+        in the model for this property to be computed.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "division_area".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Division area".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`graph.properties.morphology.create_division_area_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If the 'cell_area' property is not present in the model.
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        cell_area = self.get_property("cell_area")
+        if cell_area is None:
+            raise MissingPropertyError(
+                "cell_area",
+                message=(
+                    "Property 'cell_area' is required for computing division area. "
+                    "Please add it before adding 'division_area'."
+                ),
+            )
+        prop = morpho.create_division_area_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=cell_area.unit,
+        )
+        self.add_custom_property(morpho.DivisionArea(prop))
 
     def add_cell_perimeter(
         self,
@@ -2343,8 +2492,11 @@ class Model:
         cell_poly = self.get_property("cell_polygon")
         if cell_poly is None:
             raise MissingPropertyError(
-                "Property 'cell_polygon' is required for computing cell perimeter. "
-                "Please add it before adding 'cell_perimeter'."
+                "cell_polygon",
+                message=(
+                    "Property 'cell_polygon' is required for computing cell perimeter. "
+                    "Please add it before adding 'cell_perimeter'."
+                ),
             )
 
         prop = morpho.create_cell_perimeter_property(

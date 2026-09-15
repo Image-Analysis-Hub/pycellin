@@ -142,14 +142,15 @@ class ProtectedPropertyError(AttributeError):
 
 class MissingPropertyError(KeyError):
     """
-    Raised when a required property is missing from a node or edge.
+    Raised when a required property is missing from a node, an edge or the model.
 
     Parameters
     ----------
     prop_name : str
         The name of the missing property.
-    nid : int
-        The ID of the node where the property is missing.
+    nid : int, optional
+        The ID of the node where the property is missing. None when the property
+        is missing from the model rather than from a specific node.
     lineage_ID : int, optional
         The ID of the lineage where the property is missing.
     message : str, optional
@@ -159,7 +160,7 @@ class MissingPropertyError(KeyError):
     def __init__(
         self,
         prop_name: str,
-        nid: int,
+        nid: int | None = None,
         lineage_ID: int | None = None,
         message: str | None = None,
     ):
@@ -167,9 +168,8 @@ class MissingPropertyError(KeyError):
         self.nid = nid
         self.lineage_ID = lineage_ID
         if message is None:
+            node_txt = f" for node {nid}" if nid is not None else ""
             lin_txt = f" in lineage {lineage_ID}" if lineage_ID is not None else ""
-            message = (
-                f"Required property '{prop_name}' is missing for node {nid}{lin_txt}."
-            )
+            message = f"Required property '{prop_name}' is missing{node_txt}{lin_txt}."
         self.message = message
         super().__init__(message)
