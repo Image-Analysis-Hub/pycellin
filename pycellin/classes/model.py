@@ -526,6 +526,228 @@ class Model:
         if self.data.cell_data:
             self.prepare_full_data_update()
 
+    def rescale_time(
+        self,
+        factor: int | float,  # noqa: PYI041
+        time_unit: str | None = None,
+    ) -> None:
+        """
+        Multiply the reference time values and the time step of the model by a factor.
+
+        Use this method to convert the time of the model into another unit, e.g. from
+        frames to minutes when the data was loaded without time calibration. The
+        reference time values are rescaled immediately. The "timepoint" property and
+        the other properties with a calculator are recomputed at the next `update()`.
+
+        Parameters
+        ----------
+        factor : int | float
+            Strictly positive factor to multiply the reference time values and the
+            time step by, e.g. 5 to convert frames acquired every 5 minutes into
+            minutes.
+        time_unit : str | None, optional
+            New time unit, e.g. "min". It is set as the time unit of the model, as
+            the unit of the reference time property and, if declared, as the unit of
+            the "cycle_duration" property. If None (default), units are unchanged.
+
+        Raises
+        ------
+        ValueError
+            If `factor` is not strictly positive.
+            If the reference time property is "timepoint".
+
+        Warns
+        -----
+        UserWarning
+            If the reference time property has a calculator, since it will overwrite
+            the rescaled values at the next update.
+
+        Notes
+        -----
+        Timepoints are left unchanged, since the time values and the time step are
+        multiplied by the same factor.
+        Only the values of the reference time property are rescaled. Time-dependent
+        values of other properties without a calculator (e.g. loaded from a file),
+        as well as the units of other property declarations, are left as they are.
+        As such, the rescaling should be done shortly after loading the data and
+        before adding any other properties or calculators.
+
+        Examples
+        --------
+        >>> model.reference_time_property, model.get_time_step()
+        ('time', 1)
+        >>> model.rescale_time(5, time_unit="min")  # frames acquired every 5 min
+        >>> model.update()
+        >>> model.get_time_step(), model.get_time_unit()
+        (5, 'min')
+        """
+        if not factor > 0:
+            raise ValueError(f"`factor` must be strictly positive, got {factor}.")
+        time_prop = self.reference_time_property
+        if time_prop == "timepoint":
+            raise ValueError(
+                "Cannot rescale the 'timepoint' reference time property. Set another "
+                "reference time property first with `set_reference_time_property()`."
+            )
+        if time_prop in self._updater._calculators:
+            warnings.warn(
+                f"The reference time property '{time_prop}' has a calculator, which "
+                "will overwrite the rescaled values at the next update.",
+                stacklevel=2,
+            )
+
+        self._multiply_prop_values(time_prop, PropertyType.NODE, factor)
+        if time_unit is not None:
+            self.model_metadata.time_unit = time_unit
+            prop = self.props_metadata.props.get(time_prop)
+            if prop is not None:
+                prop.unit = time_unit
+            cycle_duration_prop = self.props_metadata.props.get("cycle_duration")
+            if cycle_duration_prop is not None:
+                cycle_duration_prop.unit = time_unit
+
+        time_step = self.model_metadata.time_step
+        if time_step is not None:
+            # set_time_step() also removes the timepoint calculator, whose stored
+            # time step and minimum time are outdated (in the old unit), so that
+            # update() can rebuild it with correct values.
+            self.set_time_step(time_step * factor)
+        elif self.data.cell_data:
+            self.prepare_full_data_update()
+
+    def rescale_space(
+        self,
+        factor: int | float,  # noqa: PYI041
+        space_unit: str | None = None,
+        z_factor: int | float | None = None,  # noqa: PYI041
+    ) -> None:
+        """
+        Multiply the coordinates and the pixel size of the model by a factor.
+
+        Use this method to convert the coordinates of the model into another unit, e.g.
+        from pixels to micrometers when the data was loaded without space calibration.
+        The coordinate values are rescaled immediately. The properties with a
+        calculator are recomputed at the next `update()`.
+
+        Parameters
+        ----------
+        factor : int | float
+            Strictly positive factor to multiply the coordinates and the pixel size by,
+            e.g. the size of a pixel in micrometers to convert pixels into micrometers.
+        space_unit : str | None, optional
+            New space unit, e.g. "µm". It is set as the space unit of the model and as
+            the unit of the rescaled coordinate properties. If None (default), units
+            are unchanged.
+        z_factor : int | float | None, optional
+            Strictly positive factor for the z axis, for anisotropic data. If None
+            (default), `factor` is used for all axes.
+
+        Raises
+        ------
+        ValueError
+            If `factor` or `z_factor` is not strictly positive.
+
+        Warns
+        -----
+        UserWarning
+            If a coordinate property has a calculator, since it will overwrite the
+            rescaled values at the next update.
+
+        Notes
+        -----
+        The rescaled coordinate properties are the declared "cell_x", "cell_y",
+        "cell_z", "link_x", "link_y", "link_z", "lineage_x", "lineage_y" and
+        "lineage_z". The pixel width, height and depth of the model, expressed in the
+        space unit, are multiplied too when they are defined. An undefined pixel size
+        stays undefined: set it after rescaling, not before, or it will be multiplied.
+        Space-dependent values of other properties without a calculator (e.g. loaded
+        from a file), the units of other property declarations, and the parameters of
+        existing calculators (e.g. the pixel size used by `add_cell_polygon()`) are
+        left as they are. As such, the rescaling should be done shortly after loading
+        the data and before adding any other properties or calculators.
+
+        Examples
+        --------
+        >>> model.get_space_unit(), model.get_pixel_width()
+        ('pixel', 1.0)
+        >>> model.rescale_space(0.2, space_unit="µm")  # pixels of 0.2 µm
+        >>> model.update()
+        >>> model.get_space_unit(), model.get_pixel_width()
+        ('µm', 0.2)
+        """
+        if not factor > 0:
+            raise ValueError(f"`factor` must be strictly positive, got {factor}.")
+        if z_factor is None:
+            z_factor = factor
+        elif not z_factor > 0:
+            raise ValueError(f"`z_factor` must be strictly positive, got {z_factor}.")
+
+        for axis in ("x", "y", "z"):
+            axis_factor = z_factor if axis == "z" else factor
+            for element in ("cell", "link", "lineage"):
+                prop = self.props_metadata.props.get(f"{element}_{axis}")
+                if prop is None:
+                    continue
+                if prop.identifier in self._updater._calculators:
+                    warnings.warn(
+                        f"The coordinate property '{prop.identifier}' has a calculator, "
+                        "which will overwrite the rescaled values at the next update.",
+                        stacklevel=2,
+                    )
+                self._multiply_prop_values(prop.identifier, prop.prop_type, axis_factor)
+                if space_unit is not None:
+                    prop.unit = space_unit
+
+        metadata = self.model_metadata
+        if metadata.pixel_width is not None:
+            metadata.pixel_width *= factor
+        if metadata.pixel_height is not None:
+            metadata.pixel_height *= factor
+        if metadata.pixel_depth is not None:
+            metadata.pixel_depth *= z_factor
+        if space_unit is not None:
+            metadata.space_unit = space_unit
+
+        if self.data.cell_data:
+            self.prepare_full_data_update()
+
+    def _multiply_prop_values(
+        self,
+        prop_id: str,
+        prop_type: PropertyType,
+        factor: int | float,  # noqa: PYI041
+    ) -> None:
+        """
+        Multiply in place the values of a property in the cell lineages.
+
+        If the property is declared with an "int" dtype and `factor` is a float, its
+        dtype is set to "float".
+
+        Parameters
+        ----------
+        prop_id : str
+            The identifier of the property.
+        prop_type : PropertyType
+            Where the values are stored: on nodes, edges and/or lineages.
+        factor : int | float
+            The factor to multiply the values by.
+        """
+        for lin in self.data.cell_data.values():
+            elements_props = []
+            if PropertyType.NODE in prop_type:
+                elements_props.extend(props for _, props in lin.nodes(data=True))
+            if PropertyType.EDGE in prop_type:
+                elements_props.extend(props for _, _, props in lin.edges(data=True))
+            if PropertyType.LINEAGE in prop_type:
+                elements_props.append(lin.graph)
+            for props in elements_props:
+                if props.get(prop_id) is not None:
+                    props[prop_id] *= factor
+
+        prop = self.props_metadata.props.get(prop_id)
+        if prop is not None and prop.dtype == "int" and isinstance(factor, float):
+            prop.dtype = "float"
+
     @staticmethod
     def _gcd_floats(values: set[float]) -> float:
         """
@@ -1116,6 +1338,8 @@ class Model:
         ----------
         props_to_update : list[str], optional
             List of properties to update. If None, all properties are updated.
+            The "timepoint" property is updated even if it is not in the list
+            (see Notes).
 
         Warns
         -----
@@ -1129,10 +1353,20 @@ class Model:
 
         Notes
         -----
-        The "timepoint" property is always kept declared and up to date: its calculator
-        is created or rebuilt when missing or outdated (e.g. after a change of time
-        step), in which case the timepoint of all cells is recomputed. The only
-        exception is when "timepoint" is the reference time property itself.
+        The "timepoint" property is always kept declared and up to date, whatever
+        `props_to_update` contains. The only exception is when "timepoint" is the
+        reference time property itself.
+
+        - It is computed before all the other properties, since they may rely on it.
+          It is thus computed from the reference time values as they are before the
+          update.
+        - Its calculator is rebuilt when missing or outdated, e.g. after
+          `set_time_step()` or `rescale_time()`. The timepoint of all cells is then
+          recomputed.
+
+        Consequently, the reference time property must not be computed from
+        "timepoint", which would be a circular dependency. To convert the reference
+        time into another unit, e.g. from frames to minutes, use `rescale_time()`.
         """
         if not self._updater._update_required:
             warnings.warn("Model is already up to date.")
@@ -4031,7 +4265,7 @@ class Model:
             model1.props_metadata._add_cycle_lineage_props(time_unit)
 
         # Properties.
-        # Model2's calculators are registered in model2's order, since properties 
+        # Model2's calculators are registered in model2's order, since properties
         # are computed in calculator registration order.
         props_order = [prop_id for prop_id in dict_calcs2 if prop_id in props_to_add]
         props_order += [

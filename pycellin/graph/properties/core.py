@@ -61,8 +61,9 @@ class Time(NodeLocalPropCalculator):
     Warnings
     --------
     As a general rule, do not use 'timepoint' as the base time property if the
-    calculator is associated with the reference time property of the model. This is
-    due to 'timepoint' being derived from the reference time property of the model,
+    calculator is associated with the reference time property of the model. To convert
+    the reference time property into another unit, use `Model.rescale_time()` instead.
+    This is due to 'timepoint' being derived from the reference time property,
     meaning that at each model update the 'timepoint' property will be recomputed
     from the reference time property. This will create a circular dependency that will
     lead to incorrect time values.
