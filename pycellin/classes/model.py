@@ -14,9 +14,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import tifffile
 
-import pycellin.graph.properties.morphology as morpho
-import pycellin.graph.properties.topology as topo
-import pycellin.graph.properties.utils as futils
+import pycellin.properties.morphology as morpho
+import pycellin.properties.topology as topo
+import pycellin.properties.utils as futils
 from pycellin.classes.data import Data
 from pycellin.classes.exceptions import (
     FusionError,
@@ -30,8 +30,8 @@ from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.classes.updater import ModelUpdater
 from pycellin.custom_types import Cell, Link, PropertyType, property_type_from_string
-from pycellin.graph.properties import motion, tracking
-from pycellin.graph.properties.core import (
+from pycellin.properties import motion, tracking
+from pycellin.properties.core import (
     Timepoint,
     create_timepoint_property,
 )
@@ -2289,7 +2289,7 @@ class Model:
             New name for the property. If None, the name will be "Cell area".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.morphology.create_cell_area_property`).
+            default value (see :func:`pycellin.properties.morphology.create_cell_area_property`).
 
         Raises
         -----
@@ -2336,7 +2336,7 @@ class Model:
             New name for the property. If None, the name will be "Cycle mean area".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.morphology.create_cycle_mean_area_property`).
+            default value (see :func:`pycellin.properties.morphology.create_cycle_mean_area_property`).
 
         Raises
         ------
@@ -2385,7 +2385,7 @@ class Model:
             New name for the property. If None, the name will be "Birth area".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.morphology.create_birth_area_property`).
+            default value (see :func:`pycellin.properties.morphology.create_birth_area_property`).
 
         Raises
         ------
@@ -2434,7 +2434,7 @@ class Model:
             New name for the property. If None, the name will be "Division area".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.morphology.create_division_area_property`).
+            default value (see :func:`pycellin.properties.morphology.create_division_area_property`).
 
         Raises
         ------
@@ -2481,7 +2481,7 @@ class Model:
             New name for the property. If None, the name will be "Cell perimeter".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.morphology.create_cell_perimeter_property`).
+            default value (see :func:`pycellin.properties.morphology.create_cell_perimeter_property`).
 
         Raises
         -----
@@ -2533,7 +2533,7 @@ class Model:
             "Cell contour".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.morphology.create_cell_contour_property`).
+            default value (see :func:`pycellin.properties.morphology.create_cell_contour_property`).
         """
         prop = morpho.create_cell_contour_property(
             custom_identifier=custom_identifier,
@@ -2571,7 +2571,7 @@ class Model:
             "Cycle completeness".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.tracking.create_cycle_completeness_property`).
+            default value (see :func:`pycellin.properties.tracking.create_cycle_completeness_property`).
         """
         prop = tracking.create_cycle_completeness_property(
             custom_identifier=custom_identifier,
@@ -2646,7 +2646,7 @@ class Model:
             label image".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.morphology.create_cell_polygon_property`).
+            default value (see :func:`pycellin.properties.morphology.create_cell_polygon_property`).
 
         Raises
         ------
@@ -3025,7 +3025,7 @@ class Model:
             New name for the property. If None, the name will be "Lineage cell depth".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_lineage_cell_depth_property`).
+            default value (see :func:`pycellin.properties.topology.create_lineage_cell_depth_property`).
         """
         prop = topo.create_lineage_cell_depth_property(
             custom_identifier=custom_identifier,
@@ -3057,7 +3057,7 @@ class Model:
             New name for the property. If None, the name will be "Lineage cycle depth".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_lineage_cycle_depth_property`).
+            default value (see :func:`pycellin.properties.topology.create_lineage_cycle_depth_property`).
         """
         prop = topo.create_lineage_cycle_depth_property(
             custom_identifier=custom_identifier,
@@ -3094,7 +3094,7 @@ class Model:
             New name for the property. If None, the name will be "Lineage duration".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_lineage_duration_property`).
+            default value (see :func:`pycellin.properties.topology.create_lineage_duration_property`).
 
         Raises
         ------
@@ -3158,7 +3158,7 @@ class Model:
             New name for the property. If None, the name will be "Location tag".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_location_tag_property`).
+            default value (see :func:`pycellin.properties.topology.create_location_tag_property`).
 
         Raises
         ------
@@ -3239,7 +3239,7 @@ class Model:
             New name for the property. If None, the name will be "Number of cells".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_num_cells_property`).
+            default value (see :func:`pycellin.properties.topology.create_num_cells_property`).
         """
         prop = topo.create_num_cells_property(
             custom_identifier=custom_identifier,
@@ -3270,7 +3270,7 @@ class Model:
             New name for the property. If None, the name will be "Number of cell cycles".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_num_cycles_property`).
+            default value (see :func:`pycellin.properties.topology.create_num_cycles_property`).
         """
         prop = topo.create_num_cycles_property(
             custom_identifier=custom_identifier,
@@ -3301,7 +3301,7 @@ class Model:
             New name for the property. If None, the name will be "Number of cell divisions".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_num_divs_property`).
+            default value (see :func:`pycellin.properties.topology.create_num_divs_property`).
         """
         prop = topo.create_num_divs_property(
             custom_identifier=custom_identifier,
@@ -3332,7 +3332,7 @@ class Model:
             New name for the property. If None, the name will be "Number of gaps".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_num_gaps_property`).
+            default value (see :func:`pycellin.properties.topology.create_num_gaps_property`).
         """
         prop = topo.create_num_gaps_property(
             custom_identifier=custom_identifier,
@@ -3363,7 +3363,7 @@ class Model:
             New name for the property. If None, the name will be "Number of leaves".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_num_leaves_property`).
+            default value (see :func:`pycellin.properties.topology.create_num_leaves_property`).
         """
         prop = topo.create_num_leaves_property(
             custom_identifier=custom_identifier,

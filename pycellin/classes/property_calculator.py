@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 from abc import ABC, abstractmethod
 from typing import Any
 
 from pycellin.classes.data import Data
-from pycellin.classes.property import Property
 from pycellin.classes.lineage import Lineage
+from pycellin.classes.property import Property
 
 
 def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Lineage]:
@@ -93,7 +92,6 @@ class PropertyCalculator(ABC):
         Any
             The value of the property for the object.
         """
-        pass
 
     @abstractmethod
     def enrich(self, data: Data, *args, **kwargs) -> None:
@@ -105,7 +103,6 @@ class PropertyCalculator(ABC):
         data : Data
             Data object containing the lineages.
         """
-        pass
 
 
 class LocalPropCalculator(PropertyCalculator):
@@ -141,7 +138,6 @@ class LocalPropCalculator(PropertyCalculator):
         Any
             The value of the local property for the object.
         """
-        pass
 
     @abstractmethod
     def enrich(self, data: Data, *args, **kwargs) -> None:
@@ -153,7 +149,6 @@ class LocalPropCalculator(PropertyCalculator):
         data : Data
             Data object containing the lineages.
         """
-        pass
 
 
 class NodeLocalPropCalculator(LocalPropCalculator):
@@ -177,7 +172,6 @@ class NodeLocalPropCalculator(LocalPropCalculator):
         Any
             The value of the local property for the node.
         """
-        pass
 
     def enrich(
         self, data: Data, nodes_to_enrich: list[tuple[int, int]], **kwargs
@@ -220,7 +214,6 @@ class EdgeLocalPropCalculator(LocalPropCalculator):
         Any
             The value of the local property for the edge.
         """
-        pass
 
     def enrich(
         self, data: Data, edges_to_enrich: list[tuple[int, int, int]], **kwargs
@@ -262,7 +255,6 @@ class LineageLocalPropCalculator(LocalPropCalculator):
         Any
             The value of the local property for the lineage.
         """
-        pass
 
     def enrich(self, data: Data, lineages_to_enrich: list[int], **kwargs) -> None:
         """
@@ -308,7 +300,6 @@ class GlobalPropCalculator(PropertyCalculator):
         Any
             The value of the global property for the object.
         """
-        pass
 
     @abstractmethod
     def enrich(self, data: Data, **kwargs) -> None:
@@ -320,7 +311,6 @@ class GlobalPropCalculator(PropertyCalculator):
         data : Data
             Data object containing the lineages to enrich.
         """
-        pass
 
 
 class NodeGlobalPropCalculator(GlobalPropCalculator):
@@ -346,7 +336,6 @@ class NodeGlobalPropCalculator(GlobalPropCalculator):
         Any
             The value of the global property for the node.
         """
-        pass
 
     def enrich(self, data: Data, **kwargs) -> None:
         """
@@ -386,7 +375,6 @@ class EdgeGlobalPropCalculator(GlobalPropCalculator):
         Any
             The value of the global property for the edge.
         """
-        pass
 
     def enrich(self, data: Data, **kwargs) -> None:
         """
@@ -424,7 +412,6 @@ class LineageGlobalPropCalculator(GlobalPropCalculator):
         Any
             The value of the global property for the lineage.
         """
-        pass
 
     def enrich(self, data: Data, **kwargs) -> None:
         """

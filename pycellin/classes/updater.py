@@ -6,7 +6,7 @@ from pycellin.classes import Data
 from pycellin.classes.lineage import CellLineage
 from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.custom_types import Cell, Link
-from pycellin.graph.properties.core import Timepoint, create_timepoint_property
+from pycellin.properties.core import Timepoint, create_timepoint_property
 
 
 class ModelUpdater:
@@ -27,7 +27,7 @@ class ModelUpdater:
         self._removed_lineages = set()
         self._modified_lineages = set()
 
-        self._calculators = dict()  # {prop_name: PropertyCalculator}
+        self._calculators = {}  # {prop_name: PropertyCalculator}
 
         # TODO: add something to store the order in which properties are computed?
         # Or maybe add an argument to update() to specify the order? We need to be able
@@ -218,7 +218,7 @@ class ModelUpdater:
             for split_lin in splitted_lins:
                 if len(split_lin) == 1:
                     # ID of a one-node lineage is minus the ID of the node.
-                    original_cell_id = list(split_lin.nodes())[0]
+                    original_cell_id = next(iter(split_lin.nodes()))
                     new_lin_ID = -original_cell_id
                     if new_lin_ID in data.cell_data:
                         # ID is already taken, so we get a new one based on the

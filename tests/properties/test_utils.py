@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
-"""Unit test for helper functions from graph.properties.utils."""
+"""Unit test for helper functions from pycellin.properties.utils."""
 
 import networkx as nx
 import pytest
 
 from pycellin.classes import CellLineage, Data
-from pycellin.graph.properties.utils import (
+from pycellin.properties.utils import (
     _get_cycle_edge_property_values,
     _get_cycle_node_property_values,
 )

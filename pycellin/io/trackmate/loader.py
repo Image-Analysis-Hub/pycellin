@@ -15,8 +15,8 @@ from pycellin.classes import (
     PropsMetadata,
 )
 from pycellin.custom_types import PropertyType
-from pycellin.graph.properties.core import create_cell_id_property
-from pycellin.graph.properties.morphology import create_cell_contour_property
+from pycellin.properties.core import create_cell_id_property
+from pycellin.properties.morphology import create_cell_contour_property
 from pycellin.io.utils import (
     _split_graph_into_lineages,
     _update_lineage_prop_key,

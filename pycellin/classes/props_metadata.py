@@ -6,7 +6,7 @@ from typing import get_args
 
 from pycellin.classes.property import Property
 from pycellin.custom_types import LineageType, PropertyType, property_type_from_string
-from pycellin.graph.properties.core import (
+from pycellin.properties.core import (
     create_cells_property,
     create_cycle_duration_property,
     create_cycle_id_property,

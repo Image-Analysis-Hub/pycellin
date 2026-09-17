@@ -10,7 +10,7 @@ import pytest
 
 from pycellin.classes import CellLineage, Property
 from pycellin.custom_types import PropertyType
-from pycellin.graph.properties.core import (
+from pycellin.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
     create_lineage_id_property,

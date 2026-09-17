@@ -5,15 +5,15 @@ import geff_spec
 import pytest
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
-from pycellin.graph.properties.core import (
+from pycellin.properties.core import (
     create_cell_coord_property,
     create_frame_property,
     create_lineage_id_property,
     create_link_coord_property,
     create_timepoint_property,
 )
-from pycellin.graph.properties.motion import create_cell_displacement_property
-from pycellin.graph.properties.tracking import (
+from pycellin.properties.motion import create_cell_displacement_property
+from pycellin.properties.tracking import (
     create_absolute_age_property,
 )
 from pycellin.io.geff.exporter import (

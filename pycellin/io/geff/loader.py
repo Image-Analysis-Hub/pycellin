@@ -23,7 +23,7 @@ import networkx as nx
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.custom_types import PropertyType, property_type_to_strings
-from pycellin.graph.properties.core import (
+from pycellin.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
     create_lineage_id_property,

@@ -26,7 +26,7 @@ from pycellin.classes import (
     Model,
     PropsMetadata,
 )
-from pycellin.graph.properties.core import (
+from pycellin.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
     create_frame_property,

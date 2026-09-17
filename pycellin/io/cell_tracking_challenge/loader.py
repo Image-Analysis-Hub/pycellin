@@ -25,14 +25,14 @@ import tifffile
 from skimage.measure import find_contours, regionprops
 
 from pycellin.classes import Data, Model, PropsMetadata
-from pycellin.graph.properties.core import (
+from pycellin.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
     create_frame_property,
     create_lineage_id_property,
     create_time_property,
 )
-from pycellin.graph.properties.morphology import (
+from pycellin.properties.morphology import (
     create_cell_contour_property,
 )
 from pycellin.io.utils import _split_graph_into_lineages

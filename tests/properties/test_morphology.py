@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Unit test for morphology property classes from graph.properties."""
+"""Unit test for morphology property classes from pycellin.properties."""
 
 import math
 
@@ -8,7 +8,7 @@ import networkx as nx
 import pytest
 
 from pycellin.classes import CellLineage, Data, Property
-from pycellin.graph.properties.morphology import (
+from pycellin.properties.morphology import (
     BirthArea,
     CycleMeanArea,
     DivisionArea,

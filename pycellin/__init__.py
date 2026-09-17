@@ -12,10 +12,6 @@ from .classes.property_calculator import (
     NodeLocalPropCalculator,
 )
 from .classes.props_metadata import PropsMetadata
-from .graph.properties.utils import (
-    get_pycellin_cell_lineage_properties,
-    get_pycellin_cycle_lineage_properties,
-)
 from .io.cell_tracking_challenge.exporter import export_CTC_file
 from .io.cell_tracking_challenge.loader import load_CTC_file
 from .io.geff.exporter import export_GEFF
@@ -24,6 +20,10 @@ from .io.trackmate.exporter import export_TrackMate_XML
 from .io.trackmate.loader import load_TrackMate_XML
 from .io.trackpy.exporter import export_trackpy_dataframe
 from .io.trackpy.loader import load_trackpy_dataframe
+from .properties import (
+    get_pycellin_cell_lineage_properties,
+    get_pycellin_cycle_lineage_properties,
+)
 
 __all__ = [
     "CellLineage",

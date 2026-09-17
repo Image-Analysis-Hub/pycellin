@@ -1918,7 +1918,7 @@ class CellLineage(Lineage):
         get_branch_lineage_highlight : Mark single-cell branches in a lineage copy.
         """
         if y_prop is None:
-            from pycellin.graph.properties.core import create_timepoint_property
+            from pycellin.properties.core import create_timepoint_property
 
             y_prop = create_timepoint_property()
 
@@ -2810,7 +2810,7 @@ class CycleLineage(Lineage):
         This cannot easily be corrected.
         """
         if y_prop is None:
-            from pycellin.graph.properties.core import create_level_property
+            from pycellin.properties.core import create_level_property
 
             y_prop = create_level_property()
 

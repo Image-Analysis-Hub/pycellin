@@ -8,14 +8,14 @@ import pytest
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.custom_types import PropertyType
-from pycellin.graph.properties.core import (
+from pycellin.properties.core import (
     Time,
     create_cell_coord_property,
     create_lineage_coord_property,
     create_link_coord_property,
     create_time_property,
 )
-from pycellin.graph.properties.tracking import (
+from pycellin.properties.tracking import (
     create_absolute_age_property,
     create_division_time_property,
 )

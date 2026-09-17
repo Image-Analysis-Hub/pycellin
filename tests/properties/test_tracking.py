@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Unit test for tracking property classes from graph.properties."""
+"""Unit test for tracking property classes from pycellin.properties."""
 
 import pytest
 
 import networkx as nx
 
-from pycellin.graph.properties.tracking import (
+from pycellin.properties.tracking import (
     AbsoluteAge,
     RelativeAge,
     CycleCompleteness,

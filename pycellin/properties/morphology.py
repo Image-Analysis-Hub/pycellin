@@ -24,7 +24,7 @@ from pycellin.classes.property_calculator import (
     NodeGlobalPropCalculator,
     NodeLocalPropCalculator,
 )
-from pycellin.graph.properties.utils import _get_cycle_node_property_values
+from pycellin.properties.utils import _get_cycle_node_property_values
 
 
 def create_cell_polygon_property(

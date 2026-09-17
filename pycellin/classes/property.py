@@ -182,11 +182,11 @@ class Property:
 
         Raises
         ------
-        ValueError
+        TypeError
             If the new identifier is not a string.
         """
         if not isinstance(new_identifier, str):
-            raise ValueError("Property identifier must be a string.")
+            raise TypeError("Property identifier must be a string.")
         self.identifier = new_identifier
 
     def _change_name(self, new_name: str) -> None:
@@ -200,11 +200,11 @@ class Property:
 
         Raises
         ------
-        ValueError
+        TypeError
             If the new name is not a string.
         """
         if not isinstance(new_name, str):
-            raise ValueError("Property name must be a string.")
+            raise TypeError("Property name must be a string.")
         self.name = new_name
 
     def _change_description(self, new_description: str) -> None:
@@ -218,11 +218,11 @@ class Property:
 
         Raises
         ------
-        ValueError
+        TypeError
             If the new description is not a string.
         """
         if not isinstance(new_description, str):
-            raise ValueError("Property description must be a string.")
+            raise TypeError("Property description must be a string.")
         self.description = new_description
 
     def _change_provenance(self, new_provenance: str) -> None:
@@ -236,11 +236,11 @@ class Property:
 
         Raises
         ------
-        ValueError
+        TypeError
             If the new provenance is not a string.
         """
         if not isinstance(new_provenance, str):
-            raise ValueError("Property provenance must be a string.")
+            raise TypeError("Property provenance must be a string.")
         self.provenance = new_provenance
 
     # Is this really needed?
