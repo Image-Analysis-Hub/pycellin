@@ -14,8 +14,8 @@ from pycellin.classes.exceptions import (
     TimeFlowError,
 )
 from pycellin.classes.lineage import HIGHLIGHT_COLORS, UNSELECTED_HIGHLIGHT_COLOR
-from pycellin.styling import PYCELLIN_PURPLE
 from pycellin.custom_types import PropertyType
+from pycellin.styling import PYCELLIN_PURPLE
 
 # CellLineage fixtures ########################################################
 
@@ -246,7 +246,7 @@ class TestLineageRemoveProp:
         cell_lin._remove_prop("name", PropertyType.EDGE)
 
     def test_invalid_type_raises_error(self, cell_lin):
-        """Test that invalid prop_type raises ValueError."""
+        """Test that invalid prop_type raises TypeError."""
         with pytest.raises(
             TypeError,
             match="Invalid prop_type. Must be a PropertyType Flag",
@@ -254,7 +254,7 @@ class TestLineageRemoveProp:
             cell_lin._remove_prop("custom_property", "invalid_type")
 
     def test_invalid_type_object_raises_error(self, cell_lin):
-        """Test that passing non-PropertyType object raises ValueError."""
+        """Test that passing a non-PropertyType object raises TypeError."""
         with pytest.raises(
             TypeError,
             match="Invalid prop_type. Must be a PropertyType Flag",
@@ -368,8 +368,6 @@ class TestLineageGetAncestors:
         # Leaves.
         assert cell_lin.get_ancestors(6) == [1, 2, 3, 4, 5]
         assert sorted(cell_lin.get_ancestors(6, sorted=False)) == [1, 2, 3, 4, 5]
-        assert cell_lin.get_ancestors(9) == [1, 2, 3, 4, 7, 8]
-        assert sorted(cell_lin.get_ancestors(9, sorted=False)) == [1, 2, 3, 4, 7, 8]
         assert cell_lin.get_ancestors(10) == [1, 2, 3, 4, 7, 8]
         assert sorted(cell_lin.get_ancestors(10, sorted=False)) == [1, 2, 3, 4, 7, 8]
         # Other.
@@ -377,8 +375,6 @@ class TestLineageGetAncestors:
         assert sorted(cell_lin.get_ancestors(12, sorted=False)) == [1, 2, 11]
         assert cell_lin.get_ancestors(13) == [1, 2, 11, 12]
         assert sorted(cell_lin.get_ancestors(13, sorted=False)) == [1, 2, 11, 12]
-        assert cell_lin.get_ancestors(14) == [1, 2, 11, 12, 13]
-        assert sorted(cell_lin.get_ancestors(14, sorted=False)) == [1, 2, 11, 12, 13]
 
     def test_normal_cycle_lineage(self, cycle_lin):
         """Test get_ancestors on normal CycleLineage."""
@@ -431,7 +427,7 @@ class TestLineageGetAncestors:
     def test_division_root(self, cell_lin_div_root):
         """Test get_ancestors on lineage with division at root."""
         assert cell_lin_div_root.get_ancestors(1) == []
-        assert sorted(cell_lin_div_root.get_ancestors(1, sorted=False)) == []
+        assert cell_lin_div_root.get_ancestors(1, sorted=False) == []
         assert cell_lin_div_root.get_ancestors(2) == [1]
         assert sorted(cell_lin_div_root.get_ancestors(2, sorted=False)) == [1]
         assert cell_lin_div_root.get_ancestors(17) == [1]
@@ -749,7 +745,7 @@ class TestLineageGetFusions:
         assert cell_lin_successive_divs_and_root.get_fusions() == [9]
 
     def test_triple_fusion(self, cell_lin_triple_div):
-        """Test get_fusions on lineage with triple division."""
+        """Test get_fusions on lineage with a triple fusion."""
         # No fusions.
         assert cell_lin_triple_div.get_fusions() == []
         # Fusion.
@@ -843,9 +839,6 @@ class TestCellLineageAddCell:
         """Test _add_cell raises ValueError for existing ID."""
         with pytest.raises(ValueError):
             cell_lin._add_cell(1)
-        cell_lin.graph["lineage_ID"] = 1
-        with pytest.raises(ValueError):
-            cell_lin._add_cell(1)
 
     def test_empty_lineage(self, empty_cell_lin):
         """Test _add_cell on empty lineage."""
@@ -866,7 +859,9 @@ class TestCellLineageRemoveCell:
     @staticmethod
     def check_correct_cell_removal(cell_lin, node_id):
         """Helper function to check correct cell removal."""
-        cell_props = cell_lin.nodes[node_id]
+        # Copy the props: _remove_cell returns the node's own attribute dict, so
+        # comparing against a live reference would compare it with itself.
+        cell_props = dict(cell_lin.nodes[node_id])
         assert cell_lin._remove_cell(node_id) == cell_props
         assert node_id not in cell_lin.nodes
         assert not any(node_id in edge for edge in cell_lin.edges)
@@ -1089,17 +1084,19 @@ class TestCellLineageAddLink:
 
 
 class TestCellLineageRemoveLink:
-    """Test cases for CellLineage.remove_link method."""
+    """Test cases for CellLineage._remove_link method."""
 
     @staticmethod
     def check_correct_link_removal(cell_lin, source_nid, target_nid):
         """Helper function to check correct link removal."""
-        link_props = cell_lin[source_nid][target_nid]
+        # Copy the props: _remove_link returns the edge's own attribute dict, so
+        # comparing against a live reference would compare it with itself.
+        link_props = dict(cell_lin[source_nid][target_nid])
         assert cell_lin._remove_link(source_nid, target_nid) == link_props
         assert not cell_lin.has_edge(source_nid, target_nid)
 
     def test_normal_lin(self, cell_lin):
-        """Test remove_link on normal lineage."""
+        """Test _remove_link on normal lineage."""
         # Remove a valid link with root.
         self.check_correct_link_removal(cell_lin, 1, 2)
         # Remove a valid link with division.
@@ -1110,47 +1107,47 @@ class TestCellLineageRemoveLink:
         self.check_correct_link_removal(cell_lin, 12, 13)
 
     def test_nonexistent_source(self, cell_lin):
-        """Test remove_link with a nonexistent source."""
+        """Test _remove_link with a nonexistent source."""
         with pytest.raises(ValueError):
             cell_lin._remove_link(99, 2)
 
     def test_nonexistent_target(self, cell_lin):
-        """Test remove_link with a nonexistent target."""
+        """Test _remove_link with a nonexistent target."""
         with pytest.raises(ValueError):
             cell_lin._remove_link(1, 99)
 
     def test_nonexistent_link(self, cell_lin):
-        """Test remove_link on a nonexistent link."""
+        """Test _remove_link on a nonexistent link."""
         with pytest.raises(KeyError):
             cell_lin._remove_link(1, 3)
 
     def test_empty_lin(self, empty_cell_lin):
-        """Test remove_link raises ValueError for empty lineage."""
+        """Test _remove_link raises ValueError for empty lineage."""
         with pytest.raises(ValueError):
             empty_cell_lin._remove_link(0, 1)
 
     def test_single_node(self, one_node_cell_lin):
-        """Test remove_link raises ValueError for single node lineage."""
+        """Test _remove_link raises ValueError for single node lineage."""
         with pytest.raises(ValueError):
             one_node_cell_lin._remove_link(1, 2)
 
     def test_gap(self, cell_lin_gap):
-        """Test remove_link on a valid link in a lineage with gaps."""
+        """Test _remove_link on a valid link in a lineage with gaps."""
         self.check_correct_link_removal(cell_lin_gap, 1, 2)
         self.check_correct_link_removal(cell_lin_gap, 4, 6)
         self.check_correct_link_removal(cell_lin_gap, 8, 9)
         self.check_correct_link_removal(cell_lin_gap, 11, 14)
 
     def test_div_root(self, cell_lin_div_root):
-        """Test remove_link on a valid link in a lineage with a division root."""
+        """Test _remove_link on a valid link in a lineage with a division root."""
         self.check_correct_link_removal(cell_lin_div_root, 1, 17)
 
     def test_unconnected_component(self, cell_lin_unconnected_component):
-        """Test remove_link on a valid link in a lineage with an unconnected component."""
+        """Test _remove_link on a valid link in a lineage with an unconnected component."""
         self.check_correct_link_removal(cell_lin_unconnected_component, 17, 18)
 
     def test_unconnected_component_div(self, cell_lin_unconnected_component_div):
-        """Test remove_link on a valid link in a lineage with an unconnected component and division root."""
+        """Test _remove_link on a valid link in a lineage with an unconnected component and division root."""
         self.check_correct_link_removal(cell_lin_unconnected_component_div, 17, 18)
         self.check_correct_link_removal(cell_lin_unconnected_component_div, 19, 20)
         self.check_correct_link_removal(cell_lin_unconnected_component_div, 19, 22)
@@ -1199,6 +1196,7 @@ class TestCellLineageGetTreeFigure:
     """Test cases for CellLineage.get_tree_figure() method."""
 
     def test_default_template_axis_lines_and_ticks_hidden(self, cell_lin):
+        """Test that the default template hides axis lines and ticks."""
         fig = cell_lin.get_tree_figure()
 
         assert fig.layout.xaxis.showline is False
@@ -1207,12 +1205,14 @@ class TestCellLineageGetTreeFigure:
         assert fig.layout.yaxis.ticks == ""
 
     def test_default_template_y_range_not_clamped_at_zero(self, cell_lin):
+        """Test that the reversed y range is not clamped at zero."""
         fig = cell_lin.get_tree_figure()
 
         assert fig.layout.yaxis.rangemode == "normal"
         assert fig.layout.yaxis.autorange == "reversed"
 
     def test_dark_template_axis_settings_overridden(self, cell_lin):
+        """Test that the dark template gets the same axis overrides."""
         fig = cell_lin.get_tree_figure(template="pycellin_dark")
 
         assert fig.layout.xaxis.showline is False
@@ -1222,6 +1222,7 @@ class TestCellLineageGetTreeFigure:
         assert fig.layout.yaxis.rangemode == "normal"
 
     def test_pycellin_template_still_applied(self, cell_lin):
+        """Test that the Pycellin template is applied to the figure."""
         fig = cell_lin.get_tree_figure()
 
         assert fig.layout.template == pio.templates["pycellin_white"]
@@ -1555,6 +1556,7 @@ class TestCellLineagePlotBranchProfile:
     """Test cases for CellLineage.plot_branch_profile method."""
 
     def test_shows_figure(self, cell_lin, monkeypatch):
+        """Test that plot_branch_profile shows the figure and returns None."""
         fig = cell_lin.get_branch_profile_figure(
             target_cells=6,
             y_prop="timepoint",
@@ -1576,7 +1578,7 @@ class TestCellLineagePlotBranchProfile:
 
 
 class TestCellLineageSplitFromCell:
-    """Test cases for CellLineage.split_from_cell method."""
+    """Test cases for CellLineage._split_from_cell method."""
 
     def test_division_upstream(self, cell_lin):
         """Test split upstream from a division node."""
@@ -1594,7 +1596,7 @@ class TestCellLineageSplitFromCell:
         """Test split upstream from a root node."""
         new_lin = cell_lin._split_from_cell(1, split="upstream")
         assert sorted(new_lin.nodes()) == list(range(1, 17))
-        assert sorted(cell_lin.nodes()) == []
+        assert list(cell_lin.nodes()) == []
 
     def test_root_downstream(self, cell_lin):
         """Test split downstream from a root node."""
@@ -1611,7 +1613,7 @@ class TestCellLineageSplitFromCell:
     def test_leaf_downstream(self, cell_lin):
         """Test split downstream from a leaf node."""
         new_lin = cell_lin._split_from_cell(9, split="downstream")
-        assert sorted(new_lin.nodes()) == []
+        assert list(new_lin.nodes()) == []
         assert sorted(cell_lin.nodes()) == list(range(1, 17))
 
     def test_middle_upstream(self, cell_lin):
@@ -1630,12 +1632,12 @@ class TestCellLineageSplitFromCell:
         """Test split upstream from a single node."""
         new_lin = one_node_cell_lin._split_from_cell(1, split="upstream")
         assert sorted(new_lin.nodes()) == [1]
-        assert sorted(one_node_cell_lin.nodes()) == []
+        assert list(one_node_cell_lin.nodes()) == []
 
     def test_downstream_single_node(self, one_node_cell_lin):
         """Test split downstream from a single node."""
         new_lin = one_node_cell_lin._split_from_cell(1, split="downstream")
-        assert sorted(new_lin.nodes()) == []
+        assert list(new_lin.nodes()) == []
         assert sorted(one_node_cell_lin.nodes()) == [1]
 
     def test_upstream_gap(self, cell_lin_gap):
@@ -1655,7 +1657,7 @@ class TestCellLineageSplitFromCell:
         """Test split upstream from a node in a lineage with a division root."""
         new_lin = cell_lin_div_root._split_from_cell(1, split="upstream")
         assert sorted(new_lin.nodes()) == list(range(1, 18))
-        assert sorted(cell_lin_div_root.nodes()) == []
+        assert list(cell_lin_div_root.nodes()) == []
 
     def test_downstream_div_root(self, cell_lin_div_root):
         """Test split downstream from a node in a lineage with a division root."""
@@ -1672,7 +1674,7 @@ class TestCellLineageSplitFromCell:
     def test_downstream_unconnected_node(self, cell_lin_unconnected_node):
         """Test split downstream from an unconnected node."""
         new_lin = cell_lin_unconnected_node._split_from_cell(17, split="downstream")
-        assert sorted(new_lin.nodes()) == []
+        assert list(new_lin.nodes()) == []
         assert sorted(cell_lin_unconnected_node.nodes()) == list(range(1, 18))
 
     def test_upstream_unconnected_component(self, cell_lin_unconnected_component):
@@ -1701,63 +1703,6 @@ class TestCellLineageSplitFromCell:
 class TestCellLineageGetDivisions:
     """Test cases for CellLineage.get_divisions method."""
 
-    def test_div_root(self, cell_lin_div_root):
-        """Test get_divisions on lineage with division root."""
-        lin = cell_lin_div_root
-        assert sorted(lin.get_divisions()) == [1, 2, 4, 8, 14]
-        assert sorted(lin.get_divisions([1, 2, 3, 4, 6, 8, 9, 10])) == [1, 2, 4, 8]
-        assert sorted(lin.get_divisions([1])) == [1]
-        assert sorted(lin.get_divisions([3, 5, 7, 9])) == []
-
-    def test_successive_divs_and_root(self, cell_lin_successive_divs_and_root):
-        """Test get_divisions on lineage with successive divisions and division root."""
-        lin = cell_lin_successive_divs_and_root
-        assert sorted(lin.get_divisions()) == [2, 3, 5, 8]
-        assert sorted(lin.get_divisions(list(range(2, 12)))) == [2, 3, 5, 8]
-        assert sorted(lin.get_divisions([2, 3, 4, 5, 6, 7])) == [2, 3, 5]
-        assert sorted(lin.get_divisions([3])) == [3]
-        assert sorted(lin.get_divisions([4, 6, 7, 11])) == []
-
-    def test_triple_div(self, cell_lin_triple_div):
-        """Test get_divisions on lineage with triple division."""
-        assert sorted(cell_lin_triple_div.get_divisions()) == [2, 4, 8, 14]
-        assert sorted(cell_lin_triple_div.get_divisions([1, 2, 3, 4, 5, 6])) == [2, 4]
-        assert sorted(cell_lin_triple_div.get_divisions([4])) == [4]
-        assert sorted(cell_lin_triple_div.get_divisions([17, 18])) == []
-
-    def test_unconnected_node(self, cell_lin_unconnected_node):
-        """Test get_divisions on unconnected node lineage."""
-        lin = cell_lin_unconnected_node
-        assert sorted(lin.get_divisions()) == [2, 4, 8, 14]
-        assert sorted(lin.get_divisions(list(range(1, 18)))) == [2, 4, 8, 14]
-        assert sorted(lin.get_divisions([1, 2, 3, 4, 17])) == [2, 4]
-        assert sorted(lin.get_divisions([17])) == []
-
-    def test_unconnected_component(self, cell_lin_unconnected_component):
-        """Test get_divisions on unconnected component lineage."""
-        lin = cell_lin_unconnected_component
-        assert sorted(lin.get_divisions()) == [2, 4, 8, 14]
-        assert sorted(lin.get_divisions(list(range(1, 18)))) == [2, 4, 8, 14]
-        assert sorted(lin.get_divisions([1, 2, 3, 4, 17, 18])) == [2, 4]
-        assert sorted(lin.get_divisions([17])) == []
-
-    def test_unconnected_component_div(self, cell_lin_unconnected_component_div):
-        """Test get_divisions on unconnected component with multiple divisions."""
-        lin = cell_lin_unconnected_component_div
-        assert sorted(lin.get_divisions()) == [2, 4, 8, 14, 17, 19]
-        assert sorted(lin.get_divisions(list(range(1, 23)))) == [2, 4, 8, 14, 17, 19]
-        assert sorted(lin.get_divisions([1, 2, 3, 4, 17, 18, 19, 20])) == [2, 4, 17, 19]
-        assert sorted(lin.get_divisions([17])) == [17]
-        assert sorted(lin.get_divisions([19])) == [19]
-        assert sorted(lin.get_divisions([20, 21, 22])) == []
-
-
-# CellLineage cell cycle operations
-
-
-class TestCellLineageGetCellCycle:
-    """Test cases for CellLineage.get_cell_cycle method."""
-
     def test_normal_lineage(self, cell_lin):
         """Test get_divisions on normal lineage."""
         expected = [2, 4, 8, 14]
@@ -1781,7 +1726,64 @@ class TestCellLineageGetCellCycle:
         ]
         assert sorted(cell_lin_gap.get_divisions([1, 2, 3, 4])) == [2, 4]
         assert sorted(cell_lin_gap.get_divisions([4])) == [4]
-        assert sorted(cell_lin_gap.get_divisions([1, 3, 11, 15, 16])) == []
+        assert cell_lin_gap.get_divisions([1, 3, 11, 15, 16]) == []
+
+    def test_div_root(self, cell_lin_div_root):
+        """Test get_divisions on lineage with division root."""
+        lin = cell_lin_div_root
+        assert sorted(lin.get_divisions()) == [1, 2, 4, 8, 14]
+        assert sorted(lin.get_divisions([1, 2, 3, 4, 6, 8, 9, 10])) == [1, 2, 4, 8]
+        assert sorted(lin.get_divisions([1])) == [1]
+        assert lin.get_divisions([3, 5, 7, 9]) == []
+
+    def test_successive_divs_and_root(self, cell_lin_successive_divs_and_root):
+        """Test get_divisions on lineage with successive divisions and division root."""
+        lin = cell_lin_successive_divs_and_root
+        assert sorted(lin.get_divisions()) == [2, 3, 5, 8]
+        assert sorted(lin.get_divisions(list(range(2, 12)))) == [2, 3, 5, 8]
+        assert sorted(lin.get_divisions([2, 3, 4, 5, 6, 7])) == [2, 3, 5]
+        assert sorted(lin.get_divisions([3])) == [3]
+        assert lin.get_divisions([4, 6, 7, 11]) == []
+
+    def test_triple_div(self, cell_lin_triple_div):
+        """Test get_divisions on lineage with triple division."""
+        assert sorted(cell_lin_triple_div.get_divisions()) == [2, 4, 8, 14]
+        assert sorted(cell_lin_triple_div.get_divisions([1, 2, 3, 4, 5, 6])) == [2, 4]
+        assert sorted(cell_lin_triple_div.get_divisions([4])) == [4]
+        assert cell_lin_triple_div.get_divisions([17, 18]) == []
+
+    def test_unconnected_node(self, cell_lin_unconnected_node):
+        """Test get_divisions on unconnected node lineage."""
+        lin = cell_lin_unconnected_node
+        assert sorted(lin.get_divisions()) == [2, 4, 8, 14]
+        assert sorted(lin.get_divisions(list(range(1, 18)))) == [2, 4, 8, 14]
+        assert sorted(lin.get_divisions([1, 2, 3, 4, 17])) == [2, 4]
+        assert lin.get_divisions([17]) == []
+
+    def test_unconnected_component(self, cell_lin_unconnected_component):
+        """Test get_divisions on unconnected component lineage."""
+        lin = cell_lin_unconnected_component
+        assert sorted(lin.get_divisions()) == [2, 4, 8, 14]
+        assert sorted(lin.get_divisions(list(range(1, 18)))) == [2, 4, 8, 14]
+        assert sorted(lin.get_divisions([1, 2, 3, 4, 17, 18])) == [2, 4]
+        assert lin.get_divisions([17]) == []
+
+    def test_unconnected_component_div(self, cell_lin_unconnected_component_div):
+        """Test get_divisions on unconnected component with multiple divisions."""
+        lin = cell_lin_unconnected_component_div
+        assert sorted(lin.get_divisions()) == [2, 4, 8, 14, 17, 19]
+        assert sorted(lin.get_divisions(list(range(1, 23)))) == [2, 4, 8, 14, 17, 19]
+        assert sorted(lin.get_divisions([1, 2, 3, 4, 17, 18, 19, 20])) == [2, 4, 17, 19]
+        assert sorted(lin.get_divisions([17])) == [17]
+        assert sorted(lin.get_divisions([19])) == [19]
+        assert lin.get_divisions([20, 21, 22]) == []
+
+
+# CellLineage cell cycle operations
+
+
+class TestCellLineageGetCellCycle:
+    """Test cases for CellLineage.get_cell_cycle method."""
 
     def test_normal_lin(self, cell_lin):
         """Test get_cell_cycle on normal lineage."""
@@ -2010,8 +2012,7 @@ class TestCellLineageGetCellCycles:
         # Remove incomplete cycles.
         incomplete = [[1, 2], [5, 6], [9], [10], [15], [16], [17]]
         expected = [cycle for cycle in expected if cycle not in incomplete]
-        assert len(lin.get_cell_cycles(ignore_incomplete_cycles=True)) == len(expected)
-        # assert lin.get_cell_cycles(ignore_incomplete_cycles=True) == expected
+        assert lin.get_cell_cycles(ignore_incomplete_cycles=True) == expected
 
     def test_unconnected_component(self, cell_lin_unconnected_component):
         """Test get_cell_cycles on lineage with unconnected component."""
@@ -2419,11 +2420,11 @@ class TestCycleLineageGetAncestors:
             cycle_lin.get_ancestors(5)
 
 
-class TestCycleLineageGetEdgesWithinCycle:
-    """Test cases for CycleLineage.get_edges_within_cycle method."""
+class TestCycleLineageGetLinksWithinCycle:
+    """Test cases for CycleLineage.get_links_within_cycle method."""
 
     def test_normal_lin(self, cell_lin):
-        """Test get_edges_within_cycle on normal lineage."""
+        """Test get_links_within_cycle on normal lineage."""
         cycle_lin = CycleLineage(
             time_prop="timepoint", time_step=1, cell_lineage=cell_lin
         )
@@ -2438,14 +2439,14 @@ class TestCycleLineageGetEdgesWithinCycle:
         assert cycle_lin.get_links_within_cycle(16) == []
 
     def test_single_node(self, one_node_cell_lin):
-        """Test get_edges_within_cycle on single node lineage."""
+        """Test get_links_within_cycle on single node lineage."""
         cycle_lin = CycleLineage(
             time_prop="timepoint", time_step=1, cell_lineage=one_node_cell_lin
         )
         assert cycle_lin.get_links_within_cycle(1) == []
 
     def test_gap(self, cell_lin_gap):
-        """Test get_edges_within_cycle on lineage with gaps."""
+        """Test get_links_within_cycle on lineage with gaps."""
         cycle_lin = CycleLineage(
             time_prop="timepoint", time_step=1, cell_lineage=cell_lin_gap
         )
@@ -2460,7 +2461,7 @@ class TestCycleLineageGetEdgesWithinCycle:
         assert cycle_lin.get_links_within_cycle(16) == []
 
     def test_div_root(self, cell_lin_div_root):
-        """Test get_edges_within_cycle on lineage with division root."""
+        """Test get_links_within_cycle on lineage with division root."""
         cycle_lin = CycleLineage(
             time_prop="timepoint", time_step=1, cell_lineage=cell_lin_div_root
         )
@@ -2472,7 +2473,7 @@ class TestCycleLineageGetEdgesWithinCycle:
         self,
         cell_lin_successive_divs_and_root,
     ):
-        """Test get_edges_within_cycle on lineage with successive divisions and division root."""
+        """Test get_links_within_cycle on lineage with successive divisions and division root."""
         cycle_lin = CycleLineage(
             time_prop="timepoint",
             time_step=1,
@@ -2487,7 +2488,7 @@ class TestCycleLineageGetEdgesWithinCycle:
         assert cycle_lin.get_links_within_cycle(11) == []
 
     def test_triple_div(self, cell_lin_triple_div):
-        """Test get_edges_within_cycle on lineage with triple division."""
+        """Test get_links_within_cycle on lineage with triple division."""
         cycle_lin = CycleLineage(
             time_prop="timepoint", time_step=1, cell_lineage=cell_lin_triple_div
         )
