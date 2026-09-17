@@ -61,11 +61,11 @@ It is recommended to install pycellin in a conda or mamba environment.
 ## Code Example
 
 ```python
-import pycellin
+import pycellin as pc
 
 # Import data from an external tool, here TrackMate.
 xml_path = "sample_data/Ecoli_growth_on_agar_pad.xml"
-model = pycellin.load_TrackMate_XML(xml_path)
+model = pc.load_TrackMate_XML(xml_path)
 
 # Plot the cell lineages.
 for lin in model.get_cell_lineages():
@@ -98,7 +98,7 @@ cycle_df = model.to_cycle_dataframe()
 lineage_df = model.to_lineage_dataframe()
 
 # ... or export back to TrackMate...
-pycellin.export_TrackMate_XML(
+pc.export_TrackMate_XML(
     model,
     "sample_data/Ecoli_growth_on_agar_pad_enriched.xml",
     units={
@@ -109,7 +109,7 @@ pycellin.export_TrackMate_XML(
 )
 
 # ... or to another file format.
-pycellin.export_GEFF(
+pc.export_GEFF(
     model,
     "sample_data/Ecoli_growth_on_agar_pad_enriched.geff",
     time_axes=["POSITION_T"],

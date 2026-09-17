@@ -279,14 +279,6 @@
                 "unit": "micrometer",
                 "varlength": false
             },
-            "ROI_coords": {
-                "description": "List of coordinates of the region of interest",
-                "dtype": "float64",
-                "identifier": "ROI_coords",
-                "name": "ROI coords",
-                "unit": "micrometer",
-                "varlength": false
-            },
             "SNR_CH1": {
                 "description": "Signal/Noise ratio ch1",
                 "dtype": "float64",
@@ -331,8 +323,16 @@
                 "description": "Unique identifier of the cell",
                 "dtype": "int64",
                 "identifier": "cell_ID",
-                "name": "cell ID",
+                "name": "Cell ID",
                 "unit": null,
+                "varlength": false
+            },
+            "cell_contour": {
+                "description": "List of coordinates of the cell's contour, relative to its centroid",
+                "dtype": "float64",
+                "identifier": "cell_contour",
+                "name": "Cell contour",
+                "unit": "micrometer",
                 "varlength": false
             },
             "cell_name": {
@@ -379,7 +379,7 @@
                 "description": "Timepoint of the detection",
                 "dtype": "int64",
                 "identifier": "timepoint",
-                "name": "timepoint",
+                "name": "Timepoint",
                 "unit": null,
                 "varlength": false
             }
