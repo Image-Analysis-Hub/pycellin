@@ -10,9 +10,11 @@ from pycellin.classes import CellLineage, CycleLineage
 from pycellin.classes.exceptions import (
     FusionError,
     LineageStructureError,
+    MissingPropertyError,
     TimeFlowError,
 )
-from pycellin.classes.lineage import HIGHLIGHT_COLORS
+from pycellin.classes.lineage import HIGHLIGHT_COLORS, UNSELECTED_HIGHLIGHT_COLOR
+from pycellin.styling import PYCELLIN_PURPLE
 from pycellin.custom_types import PropertyType
 
 # CellLineage fixtures ########################################################
@@ -1225,6 +1227,185 @@ class TestCellLineageGetTreeFigure:
         fig = cell_lin.get_tree_figure()
 
         assert fig.layout.template == pio.templates["pycellin_white"]
+
+    def test_target_cells_colors_selected_branch(self, cell_lin):
+        """Test that target cells get highlight colors and others stay gray."""
+        fig = cell_lin.get_tree_figure(target_cells=6)
+
+        _, index_to_nx_id = cell_lin._create_deterministic_igraph()
+        colors = dict(
+            zip(
+                (index_to_nx_id[k] for k in range(len(index_to_nx_id))),
+                fig.data[1].marker.color,
+            )
+        )
+        # The branch from the root down to cell 6.
+        for cid in [1, 2, 3, 4, 5, 6]:
+            assert colors[cid] == HIGHLIGHT_COLORS[0]
+        for cid in [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]:
+            assert colors[cid] == UNSELECTED_HIGHLIGHT_COLOR
+
+    def test_target_cells_leaves_original_lineage_untouched(self, cell_lin):
+        """Test that highlighting does not add the property to the lineage."""
+        cell_lin.get_tree_figure(target_cells=6)
+
+        assert all(
+            "selected_branch" not in cell_lin.nodes[cid] for cid in cell_lin.nodes()
+        )
+
+    def test_disjoint_targets_get_different_colors(self, cell_lin):
+        """Test that two disjoint branches are colored as two groups."""
+        fig = cell_lin.get_tree_figure(target_cells=[6, 16], source_cells=[4, 14])
+
+        assert set(fig.data[1].marker.color) == {
+            HIGHLIGHT_COLORS[0],
+            HIGHLIGHT_COLORS[1],
+            UNSELECTED_HIGHLIGHT_COLOR,
+        }
+
+    def test_generations_restricts_highlighted_branch(self, cell_lin):
+        """Test that generations limits how far upstream the branch goes."""
+        fig = cell_lin.get_tree_figure(target_cells=6, generations=1)
+
+        _, index_to_nx_id = cell_lin._create_deterministic_igraph()
+        colors = dict(
+            zip(
+                (index_to_nx_id[k] for k in range(len(index_to_nx_id))),
+                fig.data[1].marker.color,
+            )
+        )
+        # Only the last cell cycle, from the division at cell 4 down to cell 6.
+        for cid in [5, 6]:
+            assert colors[cid] == HIGHLIGHT_COLORS[0]
+        for cid in [1, 2, 3]:
+            assert colors[cid] == UNSELECTED_HIGHLIGHT_COLOR
+
+    def test_explicit_marker_color_wins_over_highlight(self, cell_lin):
+        """Test that a caller-provided marker color is not overridden."""
+        fig = cell_lin.get_tree_figure(
+            target_cells=6, node_marker_style={"color": "red"}
+        )
+
+        assert fig.data[1].marker.color == "red"
+
+    def test_target_cells_without_highlight_is_customizable(self, cell_lin):
+        """Test that the highlighted figure can still be customized afterwards."""
+        fig = cell_lin.get_tree_figure(target_cells=6)
+        fig.update_layout(title="Custom title")
+
+        assert fig.layout.title.text == "Custom title"
+
+    def test_custom_highlight_prop_name(self, cell_lin):
+        """Test that the highlight property name can be changed."""
+        fig = cell_lin.get_tree_figure(target_cells=6, highlight_prop="my_branch")
+
+        assert set(fig.data[1].marker.color) == {
+            HIGHLIGHT_COLORS[0],
+            UNSELECTED_HIGHLIGHT_COLOR,
+        }
+
+    def test_no_target_cells_keeps_single_default_color(self, cell_lin):
+        """Test that the figure is unchanged when no target cell is given."""
+        fig = cell_lin.get_tree_figure()
+
+        assert fig.data[1].marker.color == PYCELLIN_PURPLE
+
+    def test_bare_colormap_recolors_highlight_groups(self, cell_lin):
+        """Test that a colormap without a property maps the highlight groups."""
+        fig = cell_lin.get_tree_figure(
+            target_cells=[6, 16],
+            source_cells=[4, 14],
+            node_colormap={0: "whitesmoke", 1: "crimson", 2: "teal"},
+        )
+
+        assert set(fig.data[1].marker.color) == {"whitesmoke", "crimson", "teal"}
+
+    def test_explicit_colormap_prop_recolors_highlight_groups(self, cell_lin):
+        """Test that naming the highlight property explicitly also works."""
+        fig = cell_lin.get_tree_figure(
+            target_cells=[6, 16],
+            source_cells=[4, 14],
+            node_colormap_prop="selected_branch",
+            node_colormap={0: "whitesmoke", 1: "crimson", 2: "teal"},
+        )
+
+        assert set(fig.data[1].marker.color) == {"whitesmoke", "crimson", "teal"}
+
+    def test_colormap_groups_follow_target_cells_order(self, cell_lin):
+        """Test that group numbers are assigned in target_cells order."""
+        fig = cell_lin.get_tree_figure(
+            target_cells=[6, 16],
+            source_cells=[4, 14],
+            node_colormap={0: "whitesmoke", 1: "crimson", 2: "teal"},
+        )
+
+        _, index_to_nx_id = cell_lin._create_deterministic_igraph()
+        colors = dict(
+            zip(
+                (index_to_nx_id[k] for k in range(len(index_to_nx_id))),
+                fig.data[1].marker.color,
+            )
+        )
+        assert all(colors[cid] == "crimson" for cid in [4, 5, 6])
+        assert all(colors[cid] == "teal" for cid in [14, 16])
+        assert colors[1] == "whitesmoke"
+
+    def test_incomplete_colormap_warns(self, cell_lin):
+        """Test that highlight groups missing from the colormap are reported."""
+        with pytest.warns(UserWarning, match="does not cover"):
+            cell_lin.get_tree_figure(
+                target_cells=[6, 16],
+                source_cells=[4, 14],
+                node_colormap={1: "crimson", 2: "teal"},
+            )
+
+    def test_colormap_on_another_prop_is_not_hijacked(self, cell_lin):
+        """Test that highlighting does not steal a colormap on another property."""
+        fig = cell_lin.get_tree_figure(
+            target_cells=6,
+            node_colormap_prop="timepoint",
+            node_colormap="Viridis",
+        )
+
+        assert fig.data[1].marker.colorscale is not None
+        assert list(fig.data[1].marker.color) == [
+            cell_lin.nodes[cid]["timepoint"] for cid in fig.data[1].customdata
+        ]
+
+
+class TestCellLineageGetHighlightMarkerColors:
+    """Test cases for CellLineage._get_highlight_marker_colors method."""
+
+    def test_colors_follow_tree_figure_node_order(self, cell_lin):
+        """Test that the colors match the node order of the tree figure."""
+        highlighted = cell_lin.get_branch_lineage_highlight(6)
+        colors = highlighted._get_highlight_marker_colors()
+        fig = highlighted.get_tree_figure(node_marker_style={"color": colors})
+
+        assert list(fig.data[1].marker.color) == colors
+        assert len(colors) == len(cell_lin)
+
+    def test_unselected_cells_get_gray(self, cell_lin):
+        """Test that cells outside the selected branch are grayed out."""
+        highlighted = cell_lin.get_branch_lineage_highlight(6)
+        colors = highlighted._get_highlight_marker_colors()
+
+        assert colors.count(HIGHLIGHT_COLORS[0]) == 6
+        assert colors.count(UNSELECTED_HIGHLIGHT_COLOR) == len(cell_lin) - 6
+
+    def test_custom_highlight_prop(self, cell_lin):
+        """Test reading the highlight groups from a custom property name."""
+        highlighted = cell_lin.get_branch_lineage_highlight(
+            6, highlight_prop="my_branch"
+        )
+        colors = highlighted._get_highlight_marker_colors("my_branch")
+
+        assert colors.count(HIGHLIGHT_COLORS[0]) == 6
+
+    def test_missing_highlight_prop_raises(self, cell_lin):
+        """Test that a lineage without the highlight property is rejected."""
+        with pytest.raises(MissingPropertyError):
+            cell_lin._get_highlight_marker_colors()
 
 
 class TestCellLineageGetBranchProfileFigure:
