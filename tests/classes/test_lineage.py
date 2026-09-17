@@ -1164,9 +1164,7 @@ class TestCellLineageGetBranchLineageHighlight:
 
     def test_multiple_targets_with_paired_source_cells(self, cell_lin):
         """Test highlighting multiple branches with paired source cells."""
-        highlighted = cell_lin.get_branch_lineage_highlight(
-            [6, 16], source_cells=[4, 14]
-        )
+        highlighted = cell_lin.get_branch_lineage_highlight([6, 16], source_cells=[4, 14])
 
         selected = [
             node
@@ -1282,9 +1280,7 @@ class TestCellLineageGetTreeFigure:
 
     def test_explicit_marker_color_wins_over_highlight(self, cell_lin):
         """Test that a caller-provided marker color is not overridden."""
-        fig = cell_lin.get_tree_figure(
-            target_cells=6, node_marker_style={"color": "red"}
-        )
+        fig = cell_lin.get_tree_figure(target_cells=6, node_marker_style={"color": "red"})
 
         assert fig.data[1].marker.color == "red"
 
@@ -1395,9 +1391,7 @@ class TestCellLineageGetHighlightMarkerColors:
 
     def test_custom_highlight_prop(self, cell_lin):
         """Test reading the highlight groups from a custom property name."""
-        highlighted = cell_lin.get_branch_lineage_highlight(
-            6, highlight_prop="my_branch"
-        )
+        highlighted = cell_lin.get_branch_lineage_highlight(6, highlight_prop="my_branch")
         colors = highlighted._get_highlight_marker_colors("my_branch")
 
         assert colors.count(HIGHLIGHT_COLORS[0]) == 6
@@ -2284,7 +2278,7 @@ class TestCycleLineageInit:
         cycle_lin = CycleLineage(
             time_prop="timepoint", time_step=1, cell_lineage=cell_lin
         )
-        assert sorted(list(cycle_lin.nodes())) == [2, 4, 6, 8, 9, 10, 14, 15, 16]
+        assert sorted(cycle_lin.nodes()) == [2, 4, 6, 8, 9, 10, 14, 15, 16]
         assert cycle_lin.graph["lineage_ID"] == 1
         assert cycle_lin.nodes[2]["cycle_ID"] == 2
         assert cycle_lin.nodes[2]["cells"] == [1, 2]
@@ -2324,7 +2318,7 @@ class TestCycleLineageInit:
         cycle_lin = CycleLineage(
             time_prop="timepoint", time_step=1, cell_lineage=cell_lin_gap
         )
-        assert sorted(list(cycle_lin.nodes())) == [2, 4, 6, 8, 9, 10, 14, 15, 16]
+        assert sorted(cycle_lin.nodes()) == [2, 4, 6, 8, 9, 10, 14, 15, 16]
         assert cycle_lin.graph["lineage_ID"] == 1
         assert cycle_lin.nodes[2]["cycle_ID"] == 2
         assert cycle_lin.nodes[2]["cells"] == [1, 2]
@@ -2344,7 +2338,7 @@ class TestCycleLineageInit:
         cycle_lin = CycleLineage(
             time_prop="timepoint", time_step=1, cell_lineage=cell_lin_div_root
         )
-        assert sorted(list(cycle_lin.nodes())) == [1, 2, 4, 6, 8, 9, 10, 14, 15, 16, 17]
+        assert sorted(cycle_lin.nodes()) == [1, 2, 4, 6, 8, 9, 10, 14, 15, 16, 17]
         assert cycle_lin.graph["lineage_ID"] == 1
         assert cycle_lin.nodes[1]["cycle_ID"] == 1
         assert cycle_lin.nodes[1]["cells"] == [1]
@@ -2362,7 +2356,7 @@ class TestCycleLineageInit:
             time_step=1,
             cell_lineage=cell_lin_successive_divs_and_root,
         )
-        assert sorted(list(cycle_lin.nodes())) == [2, 3, 5, 6, 7, 8, 9, 10, 11]
+        assert sorted(cycle_lin.nodes()) == [2, 3, 5, 6, 7, 8, 9, 10, 11]
         assert cycle_lin.graph["lineage_ID"] == 2
         assert cycle_lin.nodes[3]["cycle_ID"] == 3
         assert cycle_lin.nodes[3]["cells"] == [3]
@@ -2378,7 +2372,7 @@ class TestCycleLineageInit:
         cycle_lin = CycleLineage(
             time_prop="timepoint", time_step=1, cell_lineage=cell_lin_triple_div
         )
-        assert sorted(list(cycle_lin.nodes())) == [2, 4, 6, 8, 9, 10, 14, 15, 16, 18]
+        assert sorted(cycle_lin.nodes()) == [2, 4, 6, 8, 9, 10, 14, 15, 16, 18]
         assert cycle_lin.graph["lineage_ID"] == 1
         assert cycle_lin.nodes[4]["cycle_ID"] == 4
         assert cycle_lin.nodes[4]["cells"] == [3, 4]
