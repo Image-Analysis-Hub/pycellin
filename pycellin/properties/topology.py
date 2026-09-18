@@ -494,7 +494,37 @@ class LocationTag(NodeLocalPropCalculator):
         self.pixel_size = pixel_size
 
     def compute(self, lineage, nid: int) -> int:
-        x = int(lineage.nodes[nid]["cell_x"] / self.pixel_size)
-        y = int(lineage.nodes[nid]["cell_y"] / self.pixel_size)
+        """
+        Compute the location tag of a cell.
+
+        Coordinates are converted to the nearest pixel, pixel centers being at
+        integer positions.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage graph containing the cell of interest.
+        nid : int
+            Node ID (cell_ID) of the cell of interest.
+
+        Returns
+        -------
+        int
+            The mask value at the cell's position.
+
+        Raises
+        ------
+        ValueError
+            If the cell's position is outside the mask image.
+        """
+        x = int(np.floor(lineage.nodes[nid]["cell_x"] / self.pixel_size + 0.5))
+        y = int(np.floor(lineage.nodes[nid]["cell_y"] / self.pixel_size + 0.5))
         t = lineage.nodes[nid]["timepoint"]
+        # Explicit check: negative indices would silently wrap around.
+        for axis, index, size in zip("tyx", (t, y, x), self.mask.shape):
+            if not 0 <= index < size:
+                raise ValueError(
+                    f"Cell {nid} is outside the mask image: {axis} index {index} "
+                    f"is out of range [0, {size - 1}]."
+                )
         return int(self.mask[t, y, x])
