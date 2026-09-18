@@ -154,8 +154,8 @@ class TestPropertyChangeDescription:
     # TODO: maybe it should be a TypeError instead?
     # Same for _change_name() above and _change_provenance() below
     def test_invalid_description_raises_error(self, prop1):
-        """Test that invalid description raises ValueError."""
-        with pytest.raises(ValueError):
+        """Test that invalid description raises TypeError."""
+        with pytest.raises(TypeError):
             prop1._change_description(42)
 
 
@@ -168,8 +168,8 @@ class TestPropertyChangeIdentifier:
         assert prop1.identifier == "new_id"
 
     def test_invalid_identifier_raises_error(self, prop1):
-        """Test that invalid identifier raises ValueError."""
-        with pytest.raises(ValueError):
+        """Test that invalid identifier raises TypeError."""
+        with pytest.raises(TypeError):
             prop1._change_identifier(42)
 
 
@@ -182,8 +182,8 @@ class TestPropertyChangeName:
         assert prop1.name == "new_name"
 
     def test_invalid_name_raises_error(self, prop1):
-        """Test that invalid name raises ValueError."""
-        with pytest.raises(ValueError):
+        """Test that invalid name raises TypeError."""
+        with pytest.raises(TypeError):
             prop1._change_name(42)
 
 
@@ -196,8 +196,8 @@ class TestPropertyChangeProvenance:
         assert prop1.provenance == "new_prov"
 
     def test_invalid_provenance_raises_error(self, prop1):
-        """Test that invalid provenance raises ValueError."""
-        with pytest.raises(ValueError):
+        """Test that invalid provenance raises TypeError."""
+        with pytest.raises(TypeError):
             prop1._change_provenance(42)
 
 
