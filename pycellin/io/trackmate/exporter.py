@@ -1355,6 +1355,14 @@ def export_TrackMate_XML(
     over-represented in long cell cycles since these properties are propagated on each
     node of the cell cycle in cell lineages, whereas they are stored only once
     per cell cycle on the cycle node in cycle lineages.
+
+    Notes
+    -----
+    TrackMate only supports numeric features. Non-numeric properties (strings,
+    lists, polygons...) are not exported, except TrackMate's own properties and
+    'name'. Boolean properties are exported as integers (1 for True, 0 for False).
+    For example, a location tag added with `tag_names` holds strings and is not
+    exported: add it without `tag_names` to keep the integer tags.
     """
     # We don't want to modify the original model.
     model_copy = copy.deepcopy(model)

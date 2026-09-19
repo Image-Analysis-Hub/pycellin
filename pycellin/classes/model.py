@@ -3125,6 +3125,7 @@ class Model:
         self,
         mask_path_metadata_field: str | None = None,
         mask_path: str | None = None,
+        tag_names: dict[int, str] | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -3140,6 +3141,9 @@ class Model:
         image, such as different tissues. It supports an arbitrary number of regions
         of interest, as long as they are represented by different pixel values in the
         mask image.
+        By default, the tag is the raw pixel value (int). If `tag_names` is given,
+        the tag is the name of the region instead (str), and None for cells on pixel
+        values that are not in `tag_names`, such as the background.
 
         Parameters
         ----------
@@ -3151,6 +3155,10 @@ class Model:
             The mask must be a tif stack where each pixel value represents a
             location tag. The first frame/slice of the mask image must correspond to
             the first timepoint in the model.
+        tag_names : dict[int, str], optional
+            Mapping from mask pixel values to tag names, e.g.
+            ``{1: "cortex", 2: "medulla"}``. If None (default), the tag is the raw
+            pixel value.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "location_tag".
@@ -3169,8 +3177,17 @@ class Model:
         ValueError
             If the specified mask metadata field is a string (path to mask) but does not
             match the provided mask path.
+        ValueError
+            If `tag_names` is empty.
         TypeError
             If the specified mask metadata field is not a string (path to mask).
+        TypeError
+            If `tag_names` has a key that is not an int or a value that is not a str.
+
+        Warns
+        -----
+        UserWarning
+            If some keys of `tag_names` are not values of the mask.
         """
         # Resolve mask_path from metadata or argument.
         if mask_path_metadata_field is None:
@@ -3213,9 +3230,12 @@ class Model:
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
+            dtype="int" if tag_names is None else "str",
         )
         self.add_custom_property(
-            topo.LocationTag(prop, mask_img=mask_img, pixel_size=size_x)
+            topo.LocationTag(
+                prop, mask_img=mask_img, pixel_size=size_x, tag_names=tag_names
+            )
         )
 
     def add_num_cells(

@@ -2,14 +2,18 @@
 
 """Lineage topology property functions to create standard Property instances."""
 
+import logging
+import warnings
+
 import numpy as np
-import tifffile
 
 from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import (
     LineageLocalPropCalculator,
     NodeLocalPropCalculator,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def create_is_division_property(
@@ -450,7 +454,29 @@ def create_location_tag_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
+    dtype: str = "int",
 ) -> Property:
+    """
+    Create the location_tag property.
+
+    Parameters
+    ----------
+    custom_identifier : str, optional
+        New identifier for the property. If None, the identifier will be
+        "location_tag".
+    custom_name : str, optional
+        New name for the property. If None, the name will be "Location tag".
+    custom_description : str, optional
+        New description for the property. If None, a default description is used.
+    dtype : str, optional
+        Data type of the tags: "int" for raw mask values (default), "str" for
+        tag names.
+
+    Returns
+    -------
+    Property
+        The location_tag property.
+    """
     return Property(
         identifier=custom_identifier or "location_tag",
         name=custom_name or "Location tag",
@@ -459,7 +485,7 @@ def create_location_tag_property(
         provenance="pycellin",
         prop_type="node",
         lin_type="CellLineage",
-        dtype="int",
+        dtype=dtype,
     )
 
 
@@ -471,6 +497,8 @@ class LocationTag(NodeLocalPropCalculator):
     a provided mask image. The mask image should contain integer labels that
     correspond to different locations in the image. The location tag for each node
     is determined by the pixel value in the mask image at the node's (x, y) coordinates.
+    If `tag_names` is given, the tag is the name mapped to that pixel value instead,
+    and None for pixel values that are not in the mapping.
 
     Parameters
     ----------
@@ -483,17 +511,84 @@ class LocationTag(NodeLocalPropCalculator):
         first timepoint in the model.
     pixel_size: float
         The size of a pixel in the image.
+    tag_names: dict[int, str], optional
+        Mapping from mask pixel values to tag names. If None (default), the tag is
+        the raw pixel value.
+
+    Raises
+    ------
+    ValueError
+        If `tag_names` is empty.
+    TypeError
+        If `tag_names` has a key that is not an int or a value that is not a str.
+
+    Warns
+    -----
+    UserWarning
+        If some keys of `tag_names` are not values of the mask.
     """
 
     # The mask image belongs to the model the calculator was created for.
     _USES_EXTERNAL_DATA = True
 
-    def __init__(self, prop: Property, mask_img: np.ndarray, pixel_size: float):
+    def __init__(
+        self,
+        prop: Property,
+        mask_img: np.ndarray,
+        pixel_size: float,
+        tag_names: dict[int, str] | None = None,
+    ):
         super().__init__(prop)
         self.mask = mask_img
         self.pixel_size = pixel_size
+        if tag_names is not None:
+            if not tag_names:
+                raise ValueError("'tag_names' must not be empty.")
+            for value, name in tag_names.items():
+                if isinstance(value, bool) or not isinstance(value, (int, np.integer)):
+                    raise TypeError(
+                        f"'tag_names' keys must be int, got {value!r} "
+                        f"of type {type(value).__name__}."
+                    )
+                if not isinstance(name, str):
+                    raise TypeError(
+                        f"'tag_names' values must be str, got {name!r} "
+                        f"of type {type(name).__name__}."
+                    )
+            self._check_tag_names_coverage(tag_names)
+        self.tag_names = tag_names
 
-    def compute(self, lineage, nid: int) -> int:
+    def _check_tag_names_coverage(self, tag_names: dict[int, str]) -> None:
+        """
+        Compare the values of the mask with the keys of `tag_names`.
+
+        Parameters
+        ----------
+        tag_names : dict[int, str]
+            Mapping from mask pixel values to tag names.
+
+        Warns
+        -----
+        UserWarning
+            If some keys of `tag_names` are not values of the mask.
+        """
+        mask_values = set(np.unique(self.mask).tolist())
+        mapped_values = {int(value) for value in tag_names}
+        missing = sorted(mapped_values - mask_values)
+        if missing:
+            warnings.warn(
+                f"Tag name values {missing} are not in the mask, "
+                "so no cell will get these tags.",
+                stacklevel=4,
+            )
+        unmapped = sorted(mask_values - mapped_values)
+        if unmapped:
+            logger.info(
+                f"Mask values {unmapped} have no tag name, "
+                "so cells on these values will get None."
+            )
+
+    def compute(self, lineage, nid: int) -> int | str | None:
         """
         Compute the location tag of a cell.
 
@@ -509,8 +604,9 @@ class LocationTag(NodeLocalPropCalculator):
 
         Returns
         -------
-        int
-            The mask value at the cell's position.
+        int | str | None
+            The mask value at the cell's position, or its name if `tag_names` was
+            given (None if the value is not in `tag_names`).
 
         Raises
         ------
@@ -527,4 +623,7 @@ class LocationTag(NodeLocalPropCalculator):
                     f"Cell {nid} is outside the mask image: {axis} index {index} "
                     f"is out of range [0, {size - 1}]."
                 )
-        return int(self.mask[t, y, x])
+        value = int(self.mask[t, y, x])
+        if self.tag_names is None:
+            return value
+        return self.tag_names.get(value)

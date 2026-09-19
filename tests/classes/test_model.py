@@ -2,9 +2,12 @@
 
 """Unit tests for Model class from model.py module."""
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
+import tifffile
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.custom_types import PropertyType
@@ -520,3 +523,30 @@ class TestRescaleSpace:
         pixel_space_model._updater.register_calculator(calc)
         with pytest.warns(UserWarning, match="'cell_x' has a calculator"):
             pixel_space_model.rescale_space(2)
+
+
+class TestAddLocationTag:
+    """Test cases for Model.add_location_tag() method."""
+
+    def test_int_dtype_without_tag_names(self, pixel_space_model, tmp_path):
+        mask_path = tmp_path / "mask.tif"
+        tifffile.imwrite(mask_path, np.zeros((2, 50, 50), dtype=np.uint8))
+        pixel_space_model.add_location_tag(mask_path=str(mask_path))
+        assert pixel_space_model.get_property("location_tag").dtype == "int"
+
+    def test_str_dtype_with_tag_names(self, pixel_space_model, tmp_path):
+        mask_path = tmp_path / "mask.tif"
+        tifffile.imwrite(mask_path, np.zeros((2, 50, 50), dtype=np.uint8))
+        pixel_space_model.add_location_tag(
+            mask_path=str(mask_path), tag_names={0: "a"}
+        )
+        assert pixel_space_model.get_property("location_tag").dtype == "str"
+
+    def test_missing_tag_name_value_warns_at_caller(self, pixel_space_model, tmp_path):
+        mask_path = tmp_path / "mask.tif"
+        tifffile.imwrite(mask_path, np.zeros((2, 50, 50), dtype=np.uint8))
+        with pytest.warns(UserWarning, match=r"\[1\] are not in the mask") as record:
+            pixel_space_model.add_location_tag(
+                mask_path=str(mask_path), tag_names={0: "a", 1: "b"}
+            )
+        assert Path(record[0].filename).samefile(__file__)
