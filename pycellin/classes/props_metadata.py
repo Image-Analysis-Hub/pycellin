@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import copy
 import warnings
@@ -7,7 +6,7 @@ from typing import get_args
 
 from pycellin.classes.property import Property
 from pycellin.custom_types import LineageType, PropertyType, property_type_from_string
-from pycellin.graph.properties.core import (
+from pycellin.properties.core import (
     create_cells_property,
     create_cycle_duration_property,
     create_cycle_id_property,
@@ -132,10 +131,7 @@ class PropsMetadata:
         bool
             True if the property has been declared, False otherwise.
         """
-        if prop_id in self.props:
-            return True
-        else:
-            return False
+        return prop_id in self.props
 
     def _get_prop_dict_from_prop_type(
         self,

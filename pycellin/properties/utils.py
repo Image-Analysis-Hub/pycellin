@@ -2,6 +2,109 @@
 
 import ast
 from pathlib import Path
+from typing import Any
+
+from pycellin.classes.data import Data
+from pycellin.classes.exceptions import FusionError
+from pycellin.classes.lineage import CycleLineage
+
+
+def _get_cycle_node_property_values(
+    prop_name: str,
+    data: Data,
+    lineage: CycleLineage,
+    nid: int,
+) -> list[Any]:
+    """
+    Get the values of a given property for all cells within a cell cycle.
+
+    Parameters
+    ----------
+    prop_name : str
+        Name of the property to retrieve.
+    data : Data
+        Data object containing the lineage.
+    lineage : CycleLineage
+        Lineage graph containing the node of interest.
+    nid : int
+        Node ID (cycle_ID) of the cell cycle of interest.
+
+    Returns
+    -------
+    list of Any
+        List of values of the property for all cells within the cell cycle.
+
+    Raises
+    ------
+    KeyError
+        If the property does not exist in the cell lineage.
+    """
+    lin_ID = lineage.graph["lineage_ID"]
+    cell_lin = data.cell_data[lin_ID]
+    try:
+        values = [cell_lin.nodes[cid][prop_name] for cid in lineage.nodes[nid]["cells"]]
+    except KeyError:
+        raise KeyError(
+            f"Property '{prop_name}' does not exist in the cell lineage '{lin_ID}'."
+        )
+    return values
+
+
+def _get_cycle_edge_property_values(
+    prop_name: str,
+    data: Data,
+    lineage: CycleLineage,
+    nid: int,
+    include_incoming_edge: bool,
+) -> list[Any]:
+    """
+    Get the values of a given property for all edges within a cell cycle.
+
+    Parameters
+    ----------
+    prop_name : str
+        Name of the property to retrieve.
+    data : Data
+        Data object containing the lineage.
+    lineage : CycleLineage
+        Lineage graph containing the node of interest.
+    nid : int
+        Node ID (cycle_ID) of the cell of interest.
+    include_incoming_edge : bool
+        Whether to include the incoming edge of the first cell of the cell cycle.
+
+    Returns
+    -------
+    list of Any
+        List of values of the property for all edges within the cell cycle.
+
+    Raises
+    ------
+    KeyError
+        If the property does not exist in the cell lineage.
+    """
+    lin_ID = lineage.graph["lineage_ID"]
+    cell_lin = data.cell_data[lin_ID]
+    try:
+        values = [
+            cell_lin.edges[edge][prop_name]
+            for edge in lineage.yield_links_within_cycle(nid)
+        ]
+    except KeyError:
+        raise KeyError(
+            f"Property '{prop_name}' does not exist in the cell lineage '{lin_ID}'."
+        )
+
+    if include_incoming_edge:
+        first_cell = lineage.nodes[nid]["cells"][0]
+        predecessors = list(cell_lin.predecessors(first_cell))
+        if len(predecessors) == 1:
+            edge = (predecessors[0], first_cell)
+            values.append(cell_lin.edges[edge][prop_name])
+        elif len(predecessors) > 1:
+            raise FusionError(first_cell, lin_ID)
+
+    return values
 
 
 class PropertyExtractor(ast.NodeVisitor):

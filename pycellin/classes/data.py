@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import copy
 import math
@@ -101,10 +100,13 @@ class Data:
         if lids is None:
             lids = list(self.cell_data.keys())
         self.cycle_data = {
-            lin_id: self._compute_cycle_lineage(time_prop, time_step, lin_id) for lin_id in lids
+            lin_id: self._compute_cycle_lineage(time_prop, time_step, lin_id)
+            for lin_id in lids
         }
 
-    def _compute_cycle_lineage(self, time_prop: str, time_step: float, lid: int) -> CycleLineage:
+    def _compute_cycle_lineage(
+        self, time_prop: str, time_step: float, lid: int
+    ) -> CycleLineage:
         """
         Compute and return the cycle lineage corresponding to a given cell lineage.
 
@@ -177,14 +179,13 @@ class Data:
         Warning
             If the number of cell lineages and cycle lineages do not match.
         """
-        if self.cycle_data:
-            if len(self.cell_data) != len(self.cycle_data):
-                msg = (
-                    f"Number of cell lineages ({len(self.cell_data)}) "
-                    f"and cycle lineages ({len(self.cycle_data)}) do not match. "
-                    "An update of the model is required. "
-                )
-                warnings.warn(msg)
+        if self.cycle_data and len(self.cell_data) != len(self.cycle_data):
+            msg = (
+                f"Number of cell lineages ({len(self.cell_data)}) "
+                f"and cycle lineages ({len(self.cycle_data)}) do not match. "
+                "An update of the model is required. "
+            )
+            warnings.warn(msg)
         return len(self.cell_data)
 
     def _get_next_available_lineage_ID(self, positive: bool) -> int:
@@ -223,12 +224,10 @@ class Data:
         else:
             if positive:
                 new_lin_id = max(self.cell_data.keys()) + 1
-                if new_lin_id < 1:
-                    new_lin_id = 1
+                new_lin_id = max(new_lin_id, 1)
             else:
                 new_lin_id = min(self.cell_data.keys()) - 1
-                if new_lin_id > -1:
-                    new_lin_id = -1
+                new_lin_id = min(new_lin_id, -1)
         return new_lin_id
 
     def get_closest_cell(
@@ -327,7 +326,9 @@ class Data:
         else:
             if time_window_type == "symmetric":
                 timepoints_to_search = list(
-                    range(center_timepoint - time_window, center_timepoint + time_window + 1)
+                    range(
+                        center_timepoint - time_window, center_timepoint + time_window + 1
+                    )
                 )
             elif time_window_type == "before":
                 timepoints_to_search = list(
@@ -365,7 +366,9 @@ class Data:
         distances = []
         for lin, nodes in candidate_cells.items():
             for node in nodes:
-                distance = math.dist(lineage.nodes[nid]["location"], lin.nodes[node]["location"])
+                distance = math.dist(
+                    lineage.nodes[nid]["location"], lin.nodes[node]["location"]
+                )
                 if radius == 0 or distance <= radius:
                     distances.append((node, lin, distance))
         distances.sort(key=lambda x: x[2])

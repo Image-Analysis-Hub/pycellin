@@ -28,6 +28,7 @@ from pycellin.io.utils import (
     _identify_frame_prop,
     _update_node_prop_key,
 )
+from pycellin.utils import _is_numeric_dtype, _normalize_dtype
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +175,7 @@ def _unit_to_dimension(
         "num_cycles": "NONE",
         "num_divs": "NONE",
         "num_gaps": "NONE",
+        "num_leaves": "NONE",
         "lineage_cell_depth": "NONE",
         "lineage_cycle_depth": "NONE",
         "lineage_duration": "TIME",
@@ -190,6 +192,9 @@ def _unit_to_dimension(
             pycellin_props["relative_age"] = "NONE"
         else:
             pycellin_props["relative_age"] = "TIME"
+    elif name == "turning_angle" and unit == "degree":
+        # TrackMate angles are in radians.
+        pycellin_props["turning_angle"] = "NONE"
 
     dimension = None
     if name in trackmate_props:
@@ -325,7 +330,7 @@ def _convert_prop_to_feat(
     trackmate_feat["name"] = new_name
     trackmate_feat["shortname"] = new_name
     trackmate_feat["dimension"] = _unit_to_dimension(prop)
-    if prop.dtype == "int":
+    if _normalize_dtype(prop.dtype) == "int":
         trackmate_feat["isint"] = "true"
     else:
         trackmate_feat["isint"] = "false"
@@ -517,9 +522,9 @@ def _write_AllTracks(
     with xf.element("AllTracks"):
         for lineage in data.values():
             # We have track tags to add only for tracks with several spots,
-            # so one-node tracks are to be ignored. In pycellin, a one-node
-            # lineage is identified by a negative ID.
-            if lineage.graph["TRACK_ID"] < 0:
+            # so one-node lineages are to be ignored. They are identified by their
+            # size rather than by their negative ID, which is only a convention.
+            if len(lineage) < 2:
                 continue
 
             # Track tags.
@@ -554,16 +559,17 @@ def _write_track_id(xf: ET.xmlfile, lineage: CellLineage) -> None:
     Raises
     ------
     KeyError
-        If the lineage does not have a TRACK_ID attribute.
+        If a lineage with several cells does not have a TRACK_ID attribute.
     """
+    if len(lineage) < 2:
+        # We don't want to write the track ID for one-node lineages.
+        return
     try:
-        if lineage.graph["TRACK_ID"] < 0:
-            # We don't want to write the track ID for one-node lineages.
-            return
+        track_id = lineage.graph["TRACK_ID"]
     except KeyError as err:
         raise KeyError("The lineage does not have a TRACK_ID attribute.") from err
     xf.write(f"\n{' ' * 6}")
-    t_attr = {"TRACK_ID": str(lineage.graph["TRACK_ID"])}
+    t_attr = {"TRACK_ID": str(track_id)}
     xf.write(ET.Element("TrackID", t_attr))
 
 
@@ -739,62 +745,6 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
             + "\n".join(msg_parts)
         )
         logger.warning(msg)
-
-
-def _is_numeric_dtype(dtype: str | None) -> bool:
-    """
-    Check if a dtype string represents a numeric type.
-
-    Parameters
-    ----------
-    dtype : str | None
-        The dtype string to check.
-
-    Returns
-    -------
-    bool
-        True if the dtype represents a numeric type, False otherwise.
-    """
-    if dtype is None:
-        return False
-
-    dtype_lower = dtype.lower()
-
-    # Reject collection and container types that are not numeric.
-    non_numeric_keywords = [
-        "array",
-        "bytes",
-        "dict",
-        "dictionary",
-        "iterable",
-        "list",
-        "matrix",
-        "object",
-        "sequence",
-        "set",
-        "str",
-        "string",
-        "tuple",
-    ]
-    if any(keyword in dtype_lower for keyword in non_numeric_keywords):
-        return False
-
-    # Check for numeric types using regex with word boundaries
-    # to avoid false positives (e.g., "point" containing "int").
-    numeric_pattern = (
-        r"\b(?:"
-        r"int|integer|"
-        r"uint|uint8|uint16|uint32|uint64|"
-        r"int8|int16|int32|int64|"
-        r"float|double|float16|float32|float64|float128|"
-        r"complex|"
-        r"bool|bool_|boolean|"
-        r"fraction|decimal|"
-        r"number|numeric|"
-        r"real|rational"
-        r")\b"
-    )
-    return bool(re.search(numeric_pattern, dtype_lower))
 
 
 def _remove_non_numeric_props(model: Model) -> None:
@@ -1405,6 +1355,14 @@ def export_TrackMate_XML(
     over-represented in long cell cycles since these properties are propagated on each
     node of the cell cycle in cell lineages, whereas they are stored only once
     per cell cycle on the cycle node in cycle lineages.
+
+    Notes
+    -----
+    TrackMate only supports numeric features. Non-numeric properties (strings,
+    lists, polygons...) are not exported, except TrackMate's own properties and
+    'name'. Boolean properties are exported as integers (1 for True, 0 for False).
+    For example, a location tag added with `tag_names` holds strings and is not
+    exported: add it without `tag_names` to keep the integer tags.
     """
     # We don't want to modify the original model.
     model_copy = copy.deepcopy(model)

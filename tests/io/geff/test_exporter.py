@@ -5,15 +5,15 @@ import geff_spec
 import pytest
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
-from pycellin.graph.properties.core import (
+from pycellin.properties.core import (
     create_cell_coord_property,
     create_frame_property,
     create_lineage_id_property,
     create_link_coord_property,
     create_timepoint_property,
 )
-from pycellin.graph.properties.motion import create_cell_displacement_property
-from pycellin.graph.properties.tracking import (
+from pycellin.properties.motion import create_cell_displacement_property
+from pycellin.properties.tracking import (
     create_absolute_age_property,
 )
 from pycellin.io.geff.exporter import (
@@ -475,21 +475,51 @@ class TestBuildPropsMetadata:
         """Test building metadata with node and edge properties."""
         node_props_md, edge_props_md = _build_props_metadata(mixed_props)
 
-        # Node properties.
-        assert len(node_props_md) == 4
+        # Node properties, including the node and lineage property lineage_ID.
+        assert len(node_props_md) == 5
         assert "timepoint" in node_props_md
         assert "cell_x" in node_props_md
         assert "absolute_age" in node_props_md
         assert "label" in node_props_md
+        assert "lineage_ID" in node_props_md
 
         # Edge properties.
         assert len(edge_props_md) == 2
         assert "link_x" in edge_props_md
         assert "cell_displacement" in edge_props_md
-
-        # Lineage property is excluded (not supported for now, requires geffception).
-        assert "lineage_ID" not in node_props_md
         assert "lineage_ID" not in edge_props_md
+
+    def test_lineage_only_property_excluded(self, mixed_props):
+        """Test that lineage-only properties are excluded (requires geffception)."""
+        mixed_props["lineage_name"] = Property(
+            identifier="lineage_name",
+            name="Lineage name",
+            description="Name of the lineage",
+            provenance="Test",
+            prop_type="lineage",
+            lin_type="CellLineage",
+            dtype="string",
+        )
+        node_props_md, edge_props_md = _build_props_metadata(mixed_props)
+
+        assert "lineage_name" not in node_props_md
+        assert "lineage_name" not in edge_props_md
+
+    def test_node_and_lineage_property_exported_as_node(self, mixed_props):
+        """Test that a property propagated from lineages to nodes is exported."""
+        mixed_props["lineage_name"] = Property(
+            identifier="lineage_name",
+            name="Lineage name",
+            description="Name of the lineage",
+            provenance="Test",
+            prop_type=["node", "lineage"],
+            lin_type="CellLineage",
+            dtype="string",
+        )
+        node_props_md, edge_props_md = _build_props_metadata(mixed_props)
+
+        assert node_props_md["lineage_name"].dtype == "str"
+        assert "lineage_name" not in edge_props_md
 
     def test_string_dtype_conversion(self, mixed_props):
         """Test that string dtype is converted to str."""

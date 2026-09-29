@@ -6,6 +6,7 @@ from pycellin.classes import Data
 from pycellin.classes.lineage import CellLineage
 from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.custom_types import Cell, Link
+from pycellin.properties.core import Timepoint, create_timepoint_property
 
 
 class ModelUpdater:
@@ -26,7 +27,7 @@ class ModelUpdater:
         self._removed_lineages = set()
         self._modified_lineages = set()
 
-        self._calculators = dict()  # {prop_name: PropertyCalculator}
+        self._calculators = {}  # {prop_name: PropertyCalculator}
 
         # TODO: add something to store the order in which properties are computed?
         # Or maybe add an argument to update() to specify the order? We need to be able
@@ -39,6 +40,50 @@ class ModelUpdater:
         # So if a cell property depends on a cycle property, it will not be computed
         # correctly. In that case, the solution is to add the cycle properties first,
         # then update, then add the cell properties and update again.
+
+    def _ensure_timepoint_calculator(
+        self, data: Data, time_prop: str, time_step: int | float
+    ) -> bool:
+        """
+        Build the timepoint calculator when it is missing or outdated.
+
+        The timepoint property is relied upon throughout pycellin, so it must always be
+        present and up to date. No calculator is needed when timepoint is the
+        reference time property itself, nor when there is no data.
+
+        Parameters
+        ----------
+        data : Data
+            The data of the model.
+        time_prop : str
+            The name of the reference time property of the model.
+        time_step : int | float
+            The time step of the model.
+
+        Returns
+        -------
+        bool
+            True if a calculator was built, False otherwise.
+        """
+        if time_prop == "timepoint" or not data.cell_data:
+            return False
+        calc = self._calculators.get("timepoint")
+        if (
+            isinstance(calc, Timepoint)
+            and calc.ref_time_prop == time_prop
+            and calc.time_step == time_step
+        ):
+            return False
+        new_calc = Timepoint(
+            property=create_timepoint_property(),
+            data=data,
+            time_step=time_step,
+            reference_time_property=time_prop,
+        )
+        # Registered first, so that timepoint is computed before the other properties.
+        others = {k: v for k, v in self._calculators.items() if k != "timepoint"}
+        self._calculators = {"timepoint": new_calc, **others}
+        return True
 
     def _reinit(self) -> None:
         """
@@ -173,7 +218,7 @@ class ModelUpdater:
             for split_lin in splitted_lins:
                 if len(split_lin) == 1:
                     # ID of a one-node lineage is minus the ID of the node.
-                    original_cell_id = list(split_lin.nodes())[0]
+                    original_cell_id = next(iter(split_lin.nodes()))
                     new_lin_ID = -original_cell_id
                     if new_lin_ID in data.cell_data:
                         # ID is already taken, so we get a new one based on the
@@ -240,6 +285,9 @@ class ModelUpdater:
                     data.cell_data[new_lin_ID] = split_lin
                     self._added_lineages.add(new_lin_ID)
 
+        # The timepoint property is always kept present and up to date.
+        timepoint_built = self._ensure_timepoint_calculator(data, time_prop, time_step)
+
         # Update cell lineage properties.
         # TODO: Deal with property dependencies. See comments in __init__.
         if props_to_update is None:
@@ -255,6 +303,13 @@ class ModelUpdater:
                 if self._calculators[prop].prop.lin_type == "CellLineage"
             ]
 
+        # The timepoint property is computed first, since other properties rely on it.
+        timepoint_calc = self._calculators.get("timepoint")
+        if timepoint_calc is not None:
+            cell_calculators = [timepoint_calc] + [
+                calc for calc in cell_calculators if calc is not timepoint_calc
+            ]
+
         lins_to_process = (
             self._added_lineages | self._modified_lineages
         ) - self._removed_lineages
@@ -265,8 +320,9 @@ class ModelUpdater:
             for cell in self._added_cells - self._removed_cells
             if cell.lineage_ID in lins_to_process
         ]
-        # Also include existing nodes in modified lineages that weren't explicitly added/removed.
-        for lin_ID in self._modified_lineages - self._removed_lineages:
+        # Also include the nodes of added and modified lineages that weren't explicitly
+        # added/removed.
+        for lin_ID in lins_to_process:
             if lin_ID in data.cell_data:
                 for cell_id in data.cell_data[lin_ID].nodes():
                     cell = Cell(cell_ID=cell_id, lineage_ID=lin_ID)
@@ -277,8 +333,8 @@ class ModelUpdater:
 
         # Prepare the list of edges to process.
         edges_to_process = list(self._added_links - self._removed_links)
-        # Also include existing edges in modified lineages.
-        for lin_ID in self._modified_lineages - self._removed_lineages:
+        # Also include the edges of added and modified lineages.
+        for lin_ID in lins_to_process:
             if lin_ID in data.cell_data:
                 for source, target in data.cell_data[lin_ID].edges():
                     link = Link(
@@ -289,13 +345,25 @@ class ModelUpdater:
         # Remove duplicates.
         edges_to_process = list(set(edges_to_process))
 
-        # Recompute the properties as needed.
+        # Recompute the properties as needed. A newly built timepoint calculator
+        # computes the timepoint of all cells.
+        all_nodes = []
+        if timepoint_built:
+            all_nodes = [
+                Cell(cell_ID=cid, lineage_ID=lid)
+                for lid, lin in data.cell_data.items()
+                for cid in lin.nodes()
+            ]
         for calc in cell_calculators:
+            if timepoint_built and calc is timepoint_calc:
+                nodes = all_nodes
+            else:
+                nodes = nodes_to_process
             # Depending on the class of the calculator, a different version of
             # the enrich() method is called.
             calc.enrich(
                 data,
-                nodes_to_enrich=nodes_to_process,  # self._added_cells,
+                nodes_to_enrich=nodes,  # self._added_cells,
                 edges_to_enrich=edges_to_process,  # self._added_links,
                 lineages_to_enrich=lins_to_process,  # self._added_lineages | self._modified_lineages
             )

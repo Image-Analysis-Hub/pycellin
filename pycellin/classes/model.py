@@ -14,9 +14,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import tifffile
 
-import pycellin.graph.properties.morphology as morpho
-import pycellin.graph.properties.topology as topo
-import pycellin.graph.properties.utils as futils
+import pycellin.properties.morphology as morpho
+import pycellin.properties.topology as topo
+import pycellin.properties.utils as futils
 from pycellin.classes.data import Data
 from pycellin.classes.exceptions import (
     FusionError,
@@ -30,15 +30,18 @@ from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.classes.updater import ModelUpdater
 from pycellin.custom_types import Cell, Link, PropertyType, property_type_from_string
-from pycellin.graph.properties import motion, tracking
-from pycellin.graph.properties.core import (
+from pycellin.properties import motion, tracking
+from pycellin.properties.core import (
     Timepoint,
     create_timepoint_property,
 )
 from pycellin.styling import PYCELLIN_PURPLE
-from pycellin.utils import _color_to_rgba
+from pycellin.utils import _color_to_rgba, _infer_dtype
 
 L = TypeVar("L", bound="Lineage")
+
+# Provenance of models built by Model.merge() and of the lineage properties it creates.
+_MERGE_PROVENANCE = "pycellin merge"
 
 
 class Model:
@@ -87,6 +90,11 @@ class Model:
         UserWarning
             If `time_step` is not provided in `model_metadata` and cannot be inferred
             from the data.
+
+        Notes
+        -----
+        The core properties "cell_ID", "lineage_ID", "timepoint" and the reference
+        time property are protected whenever they are declared.
         """
         # Check that we have a reference_time_property.
         if reference_time_property is None:
@@ -109,7 +117,7 @@ class Model:
         self._reference_time_property = reference_time_property
 
         # Initialize data early since _compute_time_step() needs it.
-        self.data = data.copy() if data is not None else Data(dict())
+        self.data = data.copy() if data is not None else Data({})
 
         # Do we already have a time_step?
         if model_metadata is not None:
@@ -178,8 +186,18 @@ class Model:
                     reference_time_property=self.reference_time_property,
                 )
             )
-            self.props_metadata._protect_prop("timepoint")
             self.update(["timepoint"])
+
+        # Core properties are protected whenever they are declared.
+        core_props = (
+            "cell_ID",
+            "lineage_ID",
+            "timepoint",
+            self.reference_time_property,
+        )
+        for prop_id in core_props:
+            if self.props_metadata._has_prop(prop_id):
+                self.props_metadata._protect_prop(prop_id)
 
         # Add an optional argument to ask to compute the CycleLineage?
         # Should name be optional or set to None? If optional and not provided, an
@@ -501,17 +519,234 @@ class Model:
             time_step = self._compute_time_step(variable_time_step)
         self.model_metadata.time_step = time_step
 
-        # Update the timepoint calculator with the new time step.
-        if "timepoint" in self._updater._calculators:
-            self._updater.register_calculator(
-                Timepoint(
-                    property=create_timepoint_property(),
-                    data=self.data,
-                    time_step=time_step,
-                    reference_time_property=self.reference_time_property,
-                )
-            )
+        # Timepoints depend on the time step: the timepoint calculator is removed so
+        # that the next update() rebuilds it from the current data and recomputes all
+        # values.
+        self._updater._calculators.pop("timepoint", None)
+        if self.data.cell_data:
             self.prepare_full_data_update()
+
+    def rescale_time(
+        self,
+        factor: int | float,  # noqa: PYI041
+        time_unit: str | None = None,
+    ) -> None:
+        """
+        Multiply the reference time values and the time step of the model by a factor.
+
+        Use this method to convert the time of the model into another unit, e.g. from
+        frames to minutes when the data was loaded without time calibration. The
+        reference time values are rescaled immediately. The "timepoint" property and
+        the other properties with a calculator are recomputed at the next `update()`.
+
+        Parameters
+        ----------
+        factor : int | float
+            Strictly positive factor to multiply the reference time values and the
+            time step by, e.g. 5 to convert frames acquired every 5 minutes into
+            minutes.
+        time_unit : str | None, optional
+            New time unit, e.g. "min". It is set as the time unit of the model, as
+            the unit of the reference time property and, if declared, as the unit of
+            the "cycle_duration" property. If None (default), units are unchanged.
+
+        Raises
+        ------
+        ValueError
+            If `factor` is not strictly positive.
+            If the reference time property is "timepoint".
+
+        Warns
+        -----
+        UserWarning
+            If the reference time property has a calculator, since it will overwrite
+            the rescaled values at the next update.
+
+        Notes
+        -----
+        Timepoints are left unchanged, since the time values and the time step are
+        multiplied by the same factor.
+        Only the values of the reference time property are rescaled. Time-dependent
+        values of other properties without a calculator (e.g. loaded from a file),
+        as well as the units of other property declarations, are left as they are.
+        As such, the rescaling should be done shortly after loading the data and
+        before adding any other properties or calculators.
+
+        Examples
+        --------
+        >>> model.reference_time_property, model.get_time_step()
+        ('time', 1)
+        >>> model.rescale_time(5, time_unit="min")  # frames acquired every 5 min
+        >>> model.update()
+        >>> model.get_time_step(), model.get_time_unit()
+        (5, 'min')
+        """
+        if not factor > 0:
+            raise ValueError(f"`factor` must be strictly positive, got {factor}.")
+        time_prop = self.reference_time_property
+        if time_prop == "timepoint":
+            raise ValueError(
+                "Cannot rescale the 'timepoint' reference time property. Set another "
+                "reference time property first with `set_reference_time_property()`."
+            )
+        if time_prop in self._updater._calculators:
+            warnings.warn(
+                f"The reference time property '{time_prop}' has a calculator, which "
+                "will overwrite the rescaled values at the next update.",
+                stacklevel=2,
+            )
+
+        self._multiply_prop_values(time_prop, PropertyType.NODE, factor)
+        if time_unit is not None:
+            self.model_metadata.time_unit = time_unit
+            prop = self.props_metadata.props.get(time_prop)
+            if prop is not None:
+                prop.unit = time_unit
+            cycle_duration_prop = self.props_metadata.props.get("cycle_duration")
+            if cycle_duration_prop is not None:
+                cycle_duration_prop.unit = time_unit
+
+        time_step = self.model_metadata.time_step
+        if time_step is not None:
+            # set_time_step() also removes the timepoint calculator, whose stored
+            # time step and minimum time are outdated (in the old unit), so that
+            # update() can rebuild it with correct values.
+            self.set_time_step(time_step * factor)
+        elif self.data.cell_data:
+            self.prepare_full_data_update()
+
+    def rescale_space(
+        self,
+        factor: int | float,  # noqa: PYI041
+        space_unit: str | None = None,
+        z_factor: int | float | None = None,  # noqa: PYI041
+    ) -> None:
+        """
+        Multiply the coordinates and the pixel size of the model by a factor.
+
+        Use this method to convert the coordinates of the model into another unit, e.g.
+        from pixels to micrometers when the data was loaded without space calibration.
+        The coordinate values are rescaled immediately. The properties with a
+        calculator are recomputed at the next `update()`.
+
+        Parameters
+        ----------
+        factor : int | float
+            Strictly positive factor to multiply the coordinates and the pixel size by,
+            e.g. the size of a pixel in micrometers to convert pixels into micrometers.
+        space_unit : str | None, optional
+            New space unit, e.g. "µm". It is set as the space unit of the model and as
+            the unit of the rescaled coordinate properties. If None (default), units
+            are unchanged.
+        z_factor : int | float | None, optional
+            Strictly positive factor for the z axis, for anisotropic data. If None
+            (default), `factor` is used for all axes.
+
+        Raises
+        ------
+        ValueError
+            If `factor` or `z_factor` is not strictly positive.
+
+        Warns
+        -----
+        UserWarning
+            If a coordinate property has a calculator, since it will overwrite the
+            rescaled values at the next update.
+
+        Notes
+        -----
+        The rescaled coordinate properties are the declared "cell_x", "cell_y",
+        "cell_z", "link_x", "link_y", "link_z", "lineage_x", "lineage_y" and
+        "lineage_z". The pixel width, height and depth of the model, expressed in the
+        space unit, are multiplied too when they are defined. An undefined pixel size
+        stays undefined: set it after rescaling, not before, or it will be multiplied.
+        Space-dependent values of other properties without a calculator (e.g. loaded
+        from a file), the units of other property declarations, and the parameters of
+        existing calculators (e.g. the pixel size used by `add_cell_polygon()`) are
+        left as they are. As such, the rescaling should be done shortly after loading
+        the data and before adding any other properties or calculators.
+
+        Examples
+        --------
+        >>> model.get_space_unit(), model.get_pixel_width()
+        ('pixel', 1.0)
+        >>> model.rescale_space(0.2, space_unit="µm")  # pixels of 0.2 µm
+        >>> model.update()
+        >>> model.get_space_unit(), model.get_pixel_width()
+        ('µm', 0.2)
+        """
+        if not factor > 0:
+            raise ValueError(f"`factor` must be strictly positive, got {factor}.")
+        if z_factor is None:
+            z_factor = factor
+        elif not z_factor > 0:
+            raise ValueError(f"`z_factor` must be strictly positive, got {z_factor}.")
+
+        for axis in ("x", "y", "z"):
+            axis_factor = z_factor if axis == "z" else factor
+            for element in ("cell", "link", "lineage"):
+                prop = self.props_metadata.props.get(f"{element}_{axis}")
+                if prop is None:
+                    continue
+                if prop.identifier in self._updater._calculators:
+                    warnings.warn(
+                        f"The coordinate property '{prop.identifier}' has a calculator, "
+                        "which will overwrite the rescaled values at the next update.",
+                        stacklevel=2,
+                    )
+                self._multiply_prop_values(prop.identifier, prop.prop_type, axis_factor)
+                if space_unit is not None:
+                    prop.unit = space_unit
+
+        metadata = self.model_metadata
+        if metadata.pixel_width is not None:
+            metadata.pixel_width *= factor
+        if metadata.pixel_height is not None:
+            metadata.pixel_height *= factor
+        if metadata.pixel_depth is not None:
+            metadata.pixel_depth *= z_factor
+        if space_unit is not None:
+            metadata.space_unit = space_unit
+
+        if self.data.cell_data:
+            self.prepare_full_data_update()
+
+    def _multiply_prop_values(
+        self,
+        prop_id: str,
+        prop_type: PropertyType,
+        factor: int | float,  # noqa: PYI041
+    ) -> None:
+        """
+        Multiply in place the values of a property in the cell lineages.
+
+        If the property is declared with an "int" dtype and `factor` is a float, its
+        dtype is set to "float".
+
+        Parameters
+        ----------
+        prop_id : str
+            The identifier of the property.
+        prop_type : PropertyType
+            Where the values are stored: on nodes, edges and/or lineages.
+        factor : int | float
+            The factor to multiply the values by.
+        """
+        for lin in self.data.cell_data.values():
+            elements_props = []
+            if PropertyType.NODE in prop_type:
+                elements_props.extend(props for _, props in lin.nodes(data=True))
+            if PropertyType.EDGE in prop_type:
+                elements_props.extend(props for _, _, props in lin.edges(data=True))
+            if PropertyType.LINEAGE in prop_type:
+                elements_props.append(lin.graph)
+            for props in elements_props:
+                if props.get(prop_id) is not None:
+                    props[prop_id] *= factor
+
+        prop = self.props_metadata.props.get(prop_id)
+        if prop is not None and prop.dtype == "int" and isinstance(factor, float):
+            prop.dtype = "float"
 
     @staticmethod
     def _gcd_floats(values: set[float]) -> float:
@@ -1103,6 +1338,8 @@ class Model:
         ----------
         props_to_update : list[str], optional
             List of properties to update. If None, all properties are updated.
+            The "timepoint" property is updated even if it is not in the list
+            (see Notes).
 
         Warns
         -----
@@ -1113,6 +1350,23 @@ class Model:
         a warning is raised and that property is ignored during the update.
         If no properties are left to update after filtering, a warning is raised
         and the model is not updated.
+
+        Notes
+        -----
+        The "timepoint" property is always kept declared and up to date, whatever
+        `props_to_update` contains. The only exception is when "timepoint" is the
+        reference time property itself.
+
+        - It is computed before all the other properties, since they may rely on it.
+          It is thus computed from the reference time values as they are before the
+          update.
+        - Its calculator is rebuilt when missing or outdated, e.g. after
+          `set_time_step()` or `rescale_time()`. The timepoint of all cells is then
+          recomputed.
+
+        Consequently, the reference time property must not be computed from
+        "timepoint", which would be a circular dependency. To convert the reference
+        time into another unit, e.g. from frames to minutes, use `rescale_time()`.
         """
         if not self._updater._update_required:
             warnings.warn("Model is already up to date.")
@@ -1152,6 +1406,15 @@ class Model:
                 "The time step of the model is currently not defined "
                 "but is required for cycle lineage computation."
             )
+        # The timepoint property is always declared and protected, unless it is the
+        # reference time property (see ModelUpdater._update()).
+        if (
+            self.model_metadata.reference_time_property != "timepoint"
+            and self.data.cell_data
+            and not self.props_metadata._has_prop("timepoint")
+        ):
+            self.props_metadata._add_prop(create_timepoint_property())
+            self.props_metadata._protect_prop("timepoint")
         self._updater._update(
             self.data,
             time_prop=self.model_metadata.reference_time_property,
@@ -1224,7 +1487,10 @@ class Model:
                     f"Provided lid={lid} conflicts with the lineage's "
                     f"internal lineage_ID={inferred_lid}."
                 )
-            lid = lid or inferred_lid or self.get_next_available_lineage_ID()
+            if lid is None:
+                lid = inferred_lid
+            if lid is None:
+                lid = self.get_next_available_lineage_ID()
 
         if lid in self.get_cell_lineage_IDs():
             raise ValueError(f"Lineage with ID {lid} already exists in the model.")
@@ -1415,6 +1681,10 @@ class Model:
             If a property in the prop_values is not declared.
         TypeError
             If the time_value is not an integer or a float.
+
+        Notes
+        -----
+        The timepoint of the cell is computed at the next ``update()``.
         """
         try:
             lineage = self.data.cell_data[lid]
@@ -1429,21 +1699,17 @@ class Model:
                 if not self.props_metadata._has_prop(prop):
                     raise KeyError(f"The property {prop} has not been declared.")
         else:
-            prop_values = dict()
+            prop_values = {}
         prop_values["lineage_ID"] = lid
 
+        # Is the time value consistent with the time step of the model?
         time_step = self.model_metadata.time_step
-        timepoint: int | None = None
-        if time_step is not None:
-            # Is the time value consistent with the time step of the model?
-            if time_value % time_step != 0:
-                warnings.warn(
-                    f"The time value {time_value} is not consistent with the time step "
-                    f"of the model ({time_step}). Use model.set_time_step() to set or "
-                    f"compute a new time step compatible with all time values."
-                )
-            # Timepoint value computation.
-            timepoint = int(time_value // time_step)
+        if time_step is not None and time_value % time_step != 0:
+            warnings.warn(
+                f"The time value {time_value} is not consistent with the time step "
+                f"of the model ({time_step}). Use model.set_time_step() to set or "
+                f"compute a new time step compatible with all time values."
+            )
 
         if global_cid is True:
             if cid is None:
@@ -1464,7 +1730,6 @@ class Model:
             cid,
             time_prop_name=self.model_metadata.reference_time_property,
             time_prop_value=time_value,
-            timepoint=timepoint,
             **prop_values,
         )
 
@@ -1618,7 +1883,7 @@ class Model:
                 if not self.props_metadata._has_prop(prop):
                     raise KeyError(f"The property '{prop}' has not been declared.")
         else:
-            prop_values = dict()
+            prop_values = {}
 
         source_lineage._add_link(
             source_cid,
@@ -1875,7 +2140,7 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the turningangle property to the model.
+        Add the turning angle property to the model.
 
         The turning angle is defined as the angle between the vectors representing
         the displacement of the cell at two consecutive detections.
@@ -1891,7 +2156,7 @@ class Model:
             New name for the property. If None, the name will be "Turning angle".
         custom_description : str, optional
             New description for the property. If None, the description will be
-            "Angle of the cell trajectory between two consecutive detections".
+            "Angle of the cell trajectory between two consecutive displacements".
         """
         prop = motion.create_turning_angle_property(
             custom_identifier=custom_identifier,
@@ -2024,7 +2289,7 @@ class Model:
             New name for the property. If None, the name will be "Cell area".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.morphology.create_cell_area_property`).
+            default value (see :func:`pycellin.properties.morphology.create_cell_area_property`).
 
         Raises
         -----
@@ -2035,8 +2300,11 @@ class Model:
         cell_poly = self.get_property("cell_polygon")
         if cell_poly is None:
             raise MissingPropertyError(
-                "Property 'cell_polygon' is required for computing cell area. "
-                "Please add it before adding 'cell_area'."
+                "cell_polygon",
+                message=(
+                    "Property 'cell_polygon' is required for computing cell area. "
+                    "Please add it before adding 'cell_area'."
+                ),
             )
         prop = morpho.create_cell_area_property(
             custom_identifier=custom_identifier,
@@ -2045,6 +2313,152 @@ class Model:
             unit=f"{self.get_space_unit() or 'pixel'}^2",
         )
         self.add_custom_property(morpho.CellArea(prop))
+
+    def add_cycle_mean_area(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cycle mean area property to the model.
+
+        The cycle mean area is defined as the mean area of the cell
+        during the cell cycle. "cell_area" needs to be present in the model
+        for this property to be computed.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cycle_mean_area".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cycle mean area".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.morphology.create_cycle_mean_area_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If the 'cell_area' property is not present in the model.
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        cell_area = self.get_property("cell_area")
+        if cell_area is None:
+            raise MissingPropertyError(
+                "cell_area",
+                message=(
+                    "Property 'cell_area' is required for computing cycle mean area. "
+                    "Please add it before adding 'cycle_mean_area'."
+                ),
+            )
+        prop = morpho.create_cycle_mean_area_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=cell_area.unit,
+        )
+        self.add_custom_property(morpho.CycleMeanArea(prop))
+
+    def add_birth_area(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the birth area property to the model.
+
+        The birth area is defined as the area of the first cell of the cell cycle,
+        i.e. right after division. It is NaN for cell cycles starting at a root,
+        since their birth was not observed. "cell_area" needs to be present
+        in the model for this property to be computed.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "birth_area".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Birth area".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.morphology.create_birth_area_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If the 'cell_area' property is not present in the model.
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        cell_area = self.get_property("cell_area")
+        if cell_area is None:
+            raise MissingPropertyError(
+                "cell_area",
+                message=(
+                    "Property 'cell_area' is required for computing birth area. "
+                    "Please add it before adding 'birth_area'."
+                ),
+            )
+        prop = morpho.create_birth_area_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=cell_area.unit,
+        )
+        self.add_custom_property(morpho.BirthArea(prop))
+
+    def add_division_area(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the division area property to the model.
+
+        The division area is defined as the area of the last cell of the cell cycle,
+        i.e. right before division. It is NaN for cell cycles ending at a leaf,
+        since their division was not observed. "cell_area" needs to be present
+        in the model for this property to be computed.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "division_area".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Division area".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.morphology.create_division_area_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If the 'cell_area' property is not present in the model.
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        cell_area = self.get_property("cell_area")
+        if cell_area is None:
+            raise MissingPropertyError(
+                "cell_area",
+                message=(
+                    "Property 'cell_area' is required for computing division area. "
+                    "Please add it before adding 'division_area'."
+                ),
+            )
+        prop = morpho.create_division_area_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=cell_area.unit,
+        )
+        self.add_custom_property(morpho.DivisionArea(prop))
 
     def add_cell_perimeter(
         self,
@@ -2067,7 +2481,7 @@ class Model:
             New name for the property. If None, the name will be "Cell perimeter".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.morphology.create_cell_perimeter_property`).
+            default value (see :func:`pycellin.properties.morphology.create_cell_perimeter_property`).
 
         Raises
         -----
@@ -2078,8 +2492,11 @@ class Model:
         cell_poly = self.get_property("cell_polygon")
         if cell_poly is None:
             raise MissingPropertyError(
-                "Property 'cell_polygon' is required for computing cell perimeter. "
-                "Please add it before adding 'cell_perimeter'."
+                "cell_polygon",
+                message=(
+                    "Property 'cell_polygon' is required for computing cell perimeter. "
+                    "Please add it before adding 'cell_perimeter'."
+                ),
             )
 
         prop = morpho.create_cell_perimeter_property(
@@ -2116,7 +2533,7 @@ class Model:
             "Cell contour".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.morphology.create_cell_contour_property`).
+            default value (see :func:`pycellin.properties.morphology.create_cell_contour_property`).
         """
         prop = morpho.create_cell_contour_property(
             custom_identifier=custom_identifier,
@@ -2154,7 +2571,7 @@ class Model:
             "Cycle completeness".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.tracking.create_cycle_completeness_property`).
+            default value (see :func:`pycellin.properties.tracking.create_cycle_completeness_property`).
         """
         prop = tracking.create_cycle_completeness_property(
             custom_identifier=custom_identifier,
@@ -2229,7 +2646,7 @@ class Model:
             label image".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.morphology.create_cell_polygon_property`).
+            default value (see :func:`pycellin.properties.morphology.create_cell_polygon_property`).
 
         Raises
         ------
@@ -2608,7 +3025,7 @@ class Model:
             New name for the property. If None, the name will be "Lineage cell depth".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_lineage_cell_depth_property`).
+            default value (see :func:`pycellin.properties.topology.create_lineage_cell_depth_property`).
         """
         prop = topo.create_lineage_cell_depth_property(
             custom_identifier=custom_identifier,
@@ -2640,7 +3057,7 @@ class Model:
             New name for the property. If None, the name will be "Lineage cycle depth".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_lineage_cycle_depth_property`).
+            default value (see :func:`pycellin.properties.topology.create_lineage_cycle_depth_property`).
         """
         prop = topo.create_lineage_cycle_depth_property(
             custom_identifier=custom_identifier,
@@ -2677,7 +3094,7 @@ class Model:
             New name for the property. If None, the name will be "Lineage duration".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_lineage_duration_property`).
+            default value (see :func:`pycellin.properties.topology.create_lineage_duration_property`).
 
         Raises
         ------
@@ -2708,6 +3125,7 @@ class Model:
         self,
         mask_path_metadata_field: str | None = None,
         mask_path: str | None = None,
+        tag_names: dict[int, str] | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2723,6 +3141,9 @@ class Model:
         image, such as different tissues. It supports an arbitrary number of regions
         of interest, as long as they are represented by different pixel values in the
         mask image.
+        By default, the tag is the raw pixel value (int). If `tag_names` is given,
+        the tag is the name of the region instead (str), and None for cells on pixel
+        values that are not in `tag_names`, such as the background.
 
         Parameters
         ----------
@@ -2734,6 +3155,10 @@ class Model:
             The mask must be a tif stack where each pixel value represents a
             location tag. The first frame/slice of the mask image must correspond to
             the first timepoint in the model.
+        tag_names : dict[int, str], optional
+            Mapping from mask pixel values to tag names, e.g.
+            ``{1: "cortex", 2: "medulla"}``. If None (default), the tag is the raw
+            pixel value.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "location_tag".
@@ -2741,7 +3166,7 @@ class Model:
             New name for the property. If None, the name will be "Location tag".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_location_tag_property`).
+            default value (see :func:`pycellin.properties.topology.create_location_tag_property`).
 
         Raises
         ------
@@ -2752,8 +3177,17 @@ class Model:
         ValueError
             If the specified mask metadata field is a string (path to mask) but does not
             match the provided mask path.
+        ValueError
+            If `tag_names` is empty.
         TypeError
             If the specified mask metadata field is not a string (path to mask).
+        TypeError
+            If `tag_names` has a key that is not an int or a value that is not a str.
+
+        Warns
+        -----
+        UserWarning
+            If some keys of `tag_names` are not values of the mask.
         """
         # Resolve mask_path from metadata or argument.
         if mask_path_metadata_field is None:
@@ -2796,9 +3230,12 @@ class Model:
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
+            dtype="int" if tag_names is None else "str",
         )
         self.add_custom_property(
-            topo.LocationTag(prop, mask_img=mask_img, pixel_size=size_x)
+            topo.LocationTag(
+                prop, mask_img=mask_img, pixel_size=size_x, tag_names=tag_names
+            )
         )
 
     def add_num_cells(
@@ -2822,7 +3259,7 @@ class Model:
             New name for the property. If None, the name will be "Number of cells".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_num_cells_property`).
+            default value (see :func:`pycellin.properties.topology.create_num_cells_property`).
         """
         prop = topo.create_num_cells_property(
             custom_identifier=custom_identifier,
@@ -2853,7 +3290,7 @@ class Model:
             New name for the property. If None, the name will be "Number of cell cycles".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_num_cycles_property`).
+            default value (see :func:`pycellin.properties.topology.create_num_cycles_property`).
         """
         prop = topo.create_num_cycles_property(
             custom_identifier=custom_identifier,
@@ -2884,7 +3321,7 @@ class Model:
             New name for the property. If None, the name will be "Number of cell divisions".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_num_divs_property`).
+            default value (see :func:`pycellin.properties.topology.create_num_divs_property`).
         """
         prop = topo.create_num_divs_property(
             custom_identifier=custom_identifier,
@@ -2915,7 +3352,7 @@ class Model:
             New name for the property. If None, the name will be "Number of gaps".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`graph.properties.topology.create_num_gaps_property`).
+            default value (see :func:`pycellin.properties.topology.create_num_gaps_property`).
         """
         prop = topo.create_num_gaps_property(
             custom_identifier=custom_identifier,
@@ -2924,6 +3361,37 @@ class Model:
         )
 
         self.add_custom_property(topo.NumGaps(prop))
+
+    def add_num_leaves(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the num_leaves property to the model.
+
+        The num_leaves property is a cell lineage property that indicates the number of
+        leaf cells (cells without daughter cells) in the lineage.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "num_leaves".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Number of leaves".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.topology.create_num_leaves_property`).
+        """
+        prop = topo.create_num_leaves_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+
+        self.add_custom_property(topo.NumLeaves(prop))
 
     def add_relative_age(
         self,
@@ -3122,27 +3590,27 @@ class Model:
                 for prop_id, kwargs in prop_info.items():
                     self.add_pycellin_property(prop_id, **kwargs)
 
-    def recompute_property(self, prop_identifier: str) -> None:
-        """
-        Recompute the values of the specified property for all lineages.
+    # def recompute_property(self, prop_identifier: str) -> None:
+    #     """
+    #     Recompute the values of the specified property for all lineages.
 
-        Parameters
-        ----------
-        prop_identifier : str
-            Identifier of the property to recompute.
+    #     Parameters
+    #     ----------
+    #     prop_identifier : str
+    #         Identifier of the property to recompute.
 
-        Raises
-        ------
-        ValueError
-            If the property does not exist.
-        """
-        # First need to check if the property exists.
-        if not self.props_metadata._has_prop(prop_identifier):
-            raise ValueError(f"Property '{prop_identifier}' does not exist.")
+    #     Raises
+    #     ------
+    #     ValueError
+    #         If the property does not exist.
+    #     """
+    #     # First need to check if the property exists.
+    #     if not self.props_metadata._has_prop(prop_identifier):
+    #         raise ValueError(f"Property '{prop_identifier}' does not exist.")
 
-        # Then need to update the data.
-        # TODO: implement
-        pass
+    #     # Then need to update the data.
+    #     # TODO: implement
+    #     pass
 
     def remove_property(
         self,
@@ -3374,7 +3842,7 @@ class Model:
         return (node_props, edge_props, lin_props)
 
     @staticmethod
-    def _propagate_node_props(
+    def _propagate_cycle_node_props(
         node_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
@@ -3409,7 +3877,7 @@ class Model:
         return propagated
 
     @staticmethod
-    def _propagate_edge_props(
+    def _propagate_cycle_edge_props(
         edge_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
@@ -3466,7 +3934,7 @@ class Model:
         return propagated
 
     @staticmethod
-    def _propagate_lineage_props(
+    def _propagate_cycle_lineage_props(
         lin_props: list[str],
         clin: CycleLineage,
         lin: CellLineage,
@@ -3503,6 +3971,26 @@ class Model:
         """
         Propagate the cycle properties to the cell lineages.
 
+        Values are copied from each cycle lineage to the cell lineage with the same
+        lineage ID:
+
+        - node property: the value of a cycle node is copied onto every cell of
+          that cycle;
+        - edge property: the value of an edge between two cycles is copied onto
+          every link of the child cycle, and onto the link between the last cell
+          of the parent cycle and the first cell of the child cycle. Links of root
+          cycles get no value;
+        - lineage property: the value of the cycle lineage is copied onto the
+          cell lineage graph.
+
+        Values missing on the cycle lineage are skipped. The lineage type of the
+        properties that were propagated becomes `Lineage`, since the properties are
+        then present on both cycle and cell lineages.
+
+        This is a one-shot copy: cell lineage values are not kept in sync if the
+        cycle lineages change later, e.g. when they are rebuilt during `update()`.
+        Call this method again to refresh them.
+
         Parameters
         ----------
         props : list[str], optional
@@ -3522,8 +4010,8 @@ class Model:
             If a property in the list is not a cycle lineage property or not declared
             in the model.
         FusionError
-            If a cell has more than one incoming edge in the cycle lineage,
-            which indicates a fusion event.
+            If the first cell of a cycle has more than one incoming link in the cell
+            lineage, which indicates a fusion event.
 
         Warnings
         --------
@@ -3554,15 +4042,15 @@ class Model:
             clin = self.data.cycle_data[lin_ID]
             if node_props:
                 propagated_props.update(
-                    Model._propagate_node_props(node_props, clin, lin)
+                    Model._propagate_cycle_node_props(node_props, clin, lin)
                 )
             if edge_props:
                 propagated_props.update(
-                    Model._propagate_edge_props(edge_props, clin, lin)
+                    Model._propagate_cycle_edge_props(edge_props, clin, lin)
                 )
             if lin_props:
                 propagated_props.update(
-                    Model._propagate_lineage_props(lin_props, clin, lin)
+                    Model._propagate_cycle_lineage_props(lin_props, clin, lin)
                 )
 
         # Update the properties declaration: now the property type is `Lineage`
@@ -3576,7 +4064,7 @@ class Model:
         model: "Model",
         new_name: str | None = None,
         in_place: bool = False,
-        unique_cell_ids: bool = False,
+        new_metadata: dict[str, Any] | None = None,
     ) -> "Model":
         """
         Merge another model into this one, returning the merged model.
@@ -3586,12 +4074,16 @@ class Model:
         model : Model
             The model to merge into this one.
         new_name : str | None, optional
-            The name of the merged model. If None, the name of the first model is used.
-            Default is None.
+            The name of the merged model. If None, the names of the two models are
+            concatenated, separated by a "+" sign, with "unnamed" for a model without
+            a name (None or empty). Default is None.
         in_place : bool, optional
             Whether to merge the model in place or return a new model. Default is False.
-        unique_cell_ids : bool, optional
-            Whether to ensure unique cell IDs in the merged model. Default is False.
+        new_metadata : dict[str, Any] | None, optional
+            Model metadata fields to set on the merged model, overriding the values
+            computed by the merge (see Notes). Critical fields (reference time property,
+            time step, time unit, pixel size and space unit) cannot be set.
+            Default is None.
 
         Returns
         -------
@@ -3599,14 +4091,77 @@ class Model:
             The merged model. If ``in_place`` is True, this is ``self`` (mutated);
             otherwise it is a new, independent copy and ``self`` is left unchanged.
 
+        Raises
+        ------
+        ValueError
+            If critical model metadata (reference time property, time step and unit,
+            pixel size, space unit) differs between the models, including when a field
+            is set in only one of them.
+            If a property with the same identifier and not created by a merge operation
+            already exists in the model.
+            If one of the models has cycle lineages but the time step of this model is
+            not defined, or if a cycle lineage cannot be built (e.g. a lineage with
+            several roots).
+            If ``new_metadata`` contains a critical field, or a name while ``new_name``
+            is also given.
+            If ``model`` starts earlier than the time origin of this model, which would
+            give negative timepoints.
+            If a property declared in both models has a different property type,
+            lineage type or unit.
+
+        Warns
+        -----
+        UserWarning
+            If a property declared in both models has a different data type.
+            If calculators using external data (e.g. a label image) are not kept in the
+            merged model.
+
         Notes
         -----
         The argument ``model`` is never modified; it is deep-copied internally.
 
+        All checks are performed before any modification, so if an error is raised,
+        this model is left unchanged, even when ``in_place`` is True.
+
+        The merged model is not updated: call ``update()`` to compute the property
+        values of the added lineages. To make cell IDs unique across all lineages, call
+        ``relabel_cells(unique_ids=True)`` on the merged model.
+
+        Regarding lineages:
+        Lineages of ``model`` whose lineage ID is already used get a new ID. Single-cell
+        lineages keep the convention lineage ID = -cell ID: their cell is renumbered
+        when needed.
+
+        Regarding model metadata:
+        Critical fields must be identical in both models. The merged model
+        keeps the other fields shared by both models, except ``creation_timestamp`` and
+        ``pycellin_version`` which are set at merge time, and ``name`` which follows
+        ``new_name``. Standard fields whose values differ are set to None, except
+        ``provenance`` which is set to "pycellin merge", and custom fields whose values
+        differ are removed. ``new_metadata`` is applied last.
+        When the value of a field for the merged model differs from its value in one of
+        the models, the values of each model are stored on its lineages, in a lineage
+        property with the "pycellin merge" provenance. Lineages already storing a field
+        from a previous merge keep their values. Label images (``label_img``) are never
+        stored on lineages. The data type of these lineage properties is inferred from
+        the stored values, in Python type hint syntax (e.g. "float", "int | str").
+
+        Regarding cycle lineages:
+        If one of the models has cycle lineages, the merged model has cycle lineages
+        for all its lineages. Their property values are computed at the next
+        ``update()``.
+
         Regarding properties:
-        This method assumes that 2 properties with an identical identifier (one from
-        each model) are strictly identical (type, lineage type, calculator...). If not
-        data and metadata related to the property in the model argument will be lost.
+        Properties declared in both models must have the same property type, lineage
+        type and unit. A different data type only triggers a warning, data types being
+        compared after normalizing their spelling (e.g. "float" and "float64"). Their
+        name, description and provenance can differ: the declaration and calculator of
+        this model are kept. A property is protected in the merged model if it is
+        protected in either model.
+        Calculators using external data (e.g. a label image or a mask) are not kept in
+        the merged model, since that data belongs to only one of the models. Their
+        property values are kept, but are not computed again until the properties are
+        added again.
         """
         if in_place:
             model1 = self
@@ -3626,95 +4181,321 @@ class Model:
             "pixel_depth",
             "space_unit",
         ]
-        incompatibilities = {}
-        for metadata in critical:
-            metadata1 = md1.get(metadata)
-            metadata2 = md2.get(metadata)
-            if metadata1 is not None and metadata2 is not None and metadata1 != metadata2:
-                incompatibilities[metadata] = (metadata1, metadata2)
+        # Critical fields must be identical, including when set in only one model.
+        incompatibilities = {
+            field: (md1.get(field), md2.get(field))
+            for field in critical
+            if md1.get(field) != md2.get(field)
+        }
         if incompatibilities:
-            raise ValueError(f"Model metadata is not compatible: {incompatibilities}")
+            raise ValueError(
+                f"Model metadata is not compatible: {incompatibilities}. Critical "
+                "fields must be identical in both models, including when a field is "
+                "set in only one of them."
+            )
 
-        # Properties.
-        prop_ids1 = set(model1.get_properties().keys())
+        # Metadata given by the user for the merged model.
+        new_metadata = new_metadata or {}
+        forbidden_fields = sorted(set(new_metadata) & set(critical))
+        if forbidden_fields:
+            raise ValueError(
+                f"Critical model metadata {forbidden_fields} cannot be set through "
+                "`new_metadata`."
+            )
+        if new_name is not None and "name" in new_metadata:
+            raise ValueError(
+                "The name of the merged model is given both by `new_name` and by "
+                "`new_metadata`."
+            )
+
+        # Time origin. Timepoints are computed relative to the time origin stored in the
+        # timepoint calculator of model1, so lineages of model2 starting earlier would
+        # get negative timepoints.
+        # TODO: support models with different time origins. The Timepoint calculator
+        # stores the earliest reference time when it is created, and does not update it
+        # when earlier lineages are added (merge, add_lineage...). Possible approaches:
+        # rebuild the calculator on the merged data (shifts existing timepoints and
+        # label image indexing), or use an absolute time origin (breaking change for
+        # released timepoint values).
+        timepoint_calc = model1._updater._calculators.get("timepoint")
+        if isinstance(timepoint_calc, Timepoint):
+            ref_time_prop = timepoint_calc.ref_time_prop
+            times2 = [
+                lin.nodes[nid][ref_time_prop]
+                for lin in model2.get_cell_lineages()
+                for nid in lin.nodes
+                if ref_time_prop in lin.nodes[nid]
+            ]
+            if times2 and min(times2) < timepoint_calc.min_time:
+                raise ValueError(
+                    f"Cannot merge a model starting earlier ({ref_time_prop}="
+                    f"{min(times2)}) than the time origin of this model "
+                    f"({timepoint_calc.min_time}), since it would give negative "
+                    "timepoints. Merge this model into the other one instead."
+                )
+
+        # Properties. Properties declared in both models must have compatible
+        # declarations (see Property.get_incompatibilities()).
+        props1 = model1.get_properties()
         props2 = model2.get_properties()
+        prop_ids1 = set(props1.keys())
         prop_ids2 = set(props2.keys())
+        # A different data type only triggers a warning, since data types are free
+        # strings that cannot always be compared reliably.
+        incompatible_props = {}
+        dtype_mismatches = {}
+        for prop_id in sorted(prop_ids1 & prop_ids2):
+            diffs = props1[prop_id].get_incompatibilities(props2[prop_id])
+            if "dtype" in diffs:
+                dtype_mismatches[prop_id] = diffs.pop("dtype")
+            if diffs:
+                incompatible_props[prop_id] = diffs
+        if incompatible_props:
+            raise ValueError(
+                "Properties are declared differently in the two models: "
+                f"{incompatible_props}."
+            )
         props_to_add = prop_ids2.difference(prop_ids1)
         dict_calcs2 = model2._updater._calculators
 
-        for prop_id in props_to_add:
+        # Calculators using external data (e.g. a label image) would compute the
+        # lineages of the other model with data that does not belong to it, so they
+        # are not kept in the merged model. Their property values are kept.
+        # TODO: let such calculators get their data per lineage (e.g. from a label
+        # image path stored on lineages), so that they can be kept when merging.
+        external_calcs1 = set()
+        if model2.data.cell_data:
+            external_calcs1 = {
+                prop_id
+                for prop_id, calc in model1._updater._calculators.items()
+                if calc.uses_external_data()
+            }
+        external_calcs2 = set()
+        if model1.data.cell_data:
+            external_calcs2 = {
+                prop_id
+                for prop_id in props_to_add
+                if prop_id in dict_calcs2 and dict_calcs2[prop_id].uses_external_data()
+            }
+
+        # Lineage IDs of the lineages to add. Missing IDs, and IDs already used in
+        # model1 or planned for a previous lineage, are replaced by new ones.
+        # Single-cell lineages keep the convention lineage ID = -cell ID: if that ID is
+        # not available, their cell is renumbered, as when splitting lineages in
+        # ModelUpdater._update(). Only model2, a copy, is modified here.
+        used_lids = set(model1.get_cell_lineage_IDs())
+        lineages_to_add = []
+        for lin in model2.get_cell_lineages():
+            lid = lin.graph.get("lineage_ID")
+            if lid is None or lid in used_lids:
+                if len(lin) == 1:
+                    cid = next(iter(lin.nodes))
+                    lid = -cid
+                    if lid >= 0 or lid in used_lids:
+                        lid = min(min(used_lids, default=0) - 1, -1)
+                        nx.relabel_nodes(lin, {cid: -lid}, copy=False)
+                        lin.nodes[-lid]["cell_ID"] = -lid
+                else:
+                    lid = max(max(used_lids, default=0) + 1, 1)
+            used_lids.add(lid)
+            lineages_to_add.append((lin, lid))
+        new_lids = {lid for _, lid in lineages_to_add}
+
+        # Cycle lineages. If one of the models has cycle lineages, or if cycle lineage
+        # properties with a calculator are added, the merged model gets cycle lineages
+        # for all its lineages. They are built now so that a lineage whose cycle lineage
+        # cannot be built stops the merge before any modification.
+        with_cycles = bool(model1.data.cycle_data or model2.data.cycle_data) or any(
+            dict_calcs2[prop_id].prop.lin_type == "CycleLineage"
+            for prop_id in props_to_add
+            if prop_id in dict_calcs2
+        )
+        cycle_lineages_to_add = {}
+        if with_cycles:
+            time_prop = model1.reference_time_property
+            time_step = model1.model_metadata.time_step
+            if time_step is None:
+                raise ValueError(
+                    "Cannot build the cycle lineages of the merged model: the time "
+                    "step of this model is not defined."
+                )
+            lineages = list(lineages_to_add)
+            if not model1.data.cycle_data:
+                lineages += [(lin, lid) for lid, lin in model1.data.cell_data.items()]
+            for lin, lid in lineages:
+                cycle_lin = CycleLineage(time_prop, time_step, lin)
+                cycle_lin.graph["lineage_ID"] = lid
+                cycle_lineages_to_add[lid] = cycle_lin
+
+        # Model metadata of the merged model. Fields shared by both models are kept,
+        # differing standard fields are set to None, except provenance, and differing
+        # custom fields are removed. creation_timestamp and pycellin_version are left
+        # out so that ModelMetadata sets them at merge time.
+        diff = model1.model_metadata.diff(model2.model_metadata, exclude=critical)
+        standard_fields = model1.model_metadata.get_standard_metadata().keys()
+        md1_values = model1.model_metadata.get_all_metadata()
+        md2_values = model2.model_metadata.get_all_metadata()
+        # Empty names are treated as missing names.
+        for md_values in (md1_values, md2_values):
+            if md_values.get("name") == "":
+                md_values["name"] = None
+        merged_md = {
+            field: value
+            for field, value in md1_values.items()
+            if field not in diff or field in standard_fields
+        }
+        for field in diff.keys() & standard_fields:
+            merged_md[field] = None
+        if "provenance" in diff:
+            merged_md["provenance"] = _MERGE_PROVENANCE
+        merged_md.pop("creation_timestamp")
+        merged_md.pop("pycellin_version")
+        if new_name is None:
+            name1 = model1.model_metadata.name or "unnamed"
+            name2 = model2.model_metadata.name or "unnamed"
+            merged_md["name"] = f"{name1}+{name2}"
+        else:
+            merged_md["name"] = new_name
+        merged_md.update(new_metadata)
+        merged_metadata = ModelMetadata.from_dict(merged_md)
+
+        # Metadata fields to store on lineages: fields already stored on lineages by a
+        # previous merge in one of the models, and fields whose value for the merged
+        # model differs from a non-None value of one of the models. Label images are
+        # never stored on lineages.
+        merge_props1 = {
+            prop_id
+            for prop_id, prop in model1.get_lineage_properties().items()
+            if prop.provenance == _MERGE_PROVENANCE
+        }
+        merge_props2 = {
+            prop_id
+            for prop_id, prop in model2.get_lineage_properties().items()
+            if prop.provenance == _MERGE_PROVENANCE
+        }
+        changed_fields = set()
+        sources = (
+            (model1.model_metadata, md1_values),
+            (model2.model_metadata, md2_values),
+        )
+        for source_md, source_values in sources:
+            md_diff = source_md.diff(merged_metadata, exclude=critical)
+            changed_fields.update(
+                field for field in md_diff if source_values.get(field) is not None
+            )
+        lineage_fields = (merge_props1 | merge_props2 | changed_fields) - {"label_img"}
+
+        # Lineage properties of model1 once the properties of model2 are added.
+        lin_props = {
+            **model1.get_lineage_properties(),
+            **{
+                prop_id: prop
+                for prop_id, prop in model2.get_lineage_properties().items()
+                if prop_id in props_to_add
+            },
+        }
+        conflicting_fields = sorted(
+            field
+            for field in lineage_fields
+            if field in lin_props and lin_props[field].provenance != _MERGE_PROVENANCE
+        )
+        if conflicting_fields:
+            raise ValueError(
+                f"Cannot move model metadata {conflicting_fields} to lineage "
+                "properties: properties with the same identifiers and not created "
+                "by a merge operation already exist in the model."
+            )
+
+        # All checks passed, model1 can now be modified.
+        if dtype_mismatches:
+            warnings.warn(
+                "Properties declared with different data types in the two models: "
+                f"{dtype_mismatches}. The declarations of this model are kept.",
+                stacklevel=2,
+            )
+        external_calcs = sorted(external_calcs1 | external_calcs2)
+        if external_calcs:
+            warnings.warn(
+                "Calculators using external data (e.g. a label image) are not kept in "
+                f"the merged model: {external_calcs}. The property values are kept, "
+                "but are not computed again until the properties are added again.",
+                stacklevel=2,
+            )
+
+        # Calculators using external data.
+        for prop_id in external_calcs1:
+            model1._updater.delete_calculator(prop_id)
+
+        # Lineages, with their cycle lineages.
+        for lin, lid in lineages_to_add:
+            model1.add_lineage(lin, lid, overwrite_lid=True)
+        if with_cycles:
+            if model1.data.cycle_data is None:
+                model1.data.cycle_data = {}
+            model1.data.cycle_data.update(cycle_lineages_to_add)
+            time_unit = model1.model_metadata.time_unit
+            model1.props_metadata._add_cycle_lineage_props(time_unit)
+
+        # Properties.
+        # Model2's calculators are registered in model2's order, since properties
+        # are computed in calculator registration order.
+        props_order = [prop_id for prop_id in dict_calcs2 if prop_id in props_to_add]
+        props_order += [
+            prop_id
+            for prop_id in props2
+            if prop_id in props_to_add and prop_id not in dict_calcs2
+        ]
+        for prop_id in props_order:
+            # Skip the core cycle lineage properties declared with the cycle lineages.
+            if model1.has_property(prop_id):
+                continue
             prop = props2[prop_id]
             calc = dict_calcs2.get(prop_id)
 
-            if calc is None:  # register just the metadata
+            if calc is None or prop_id in external_calcs2:  # register just the metadata
                 model1.props_metadata._add_prop(prop)
             else:  # register both metadata and calculator
                 model1.add_custom_property(calc)
 
-            if prop_id in model2.props_metadata._protected_props:
+        # A property is protected if it is protected in either model.
+        for prop_id in model2.props_metadata._protected_props:
+            if model1.has_property(prop_id):
                 model1.props_metadata._protect_prop(prop_id)
 
-        # Lineages.
-        lin_ids1 = set(model1.get_cell_lineage_IDs())
-        lin_ids2 = set(model2.get_cell_lineage_IDs())
-        to_reid = lin_ids2.intersection(lin_ids1)
-        new_lids = []
-        for lin in model2.get_cell_lineages():
-            current_lid = lin.graph.get("lineage_ID")
-            if current_lid is not None and current_lid in to_reid:
-                available_lid = model1.get_next_available_lineage_ID()
-                new_lid = model1.add_lineage(lin, available_lid, overwrite_lid=True)
-            else:
-                new_lid = model1.add_lineage(lin)
-            new_lids.append(new_lid)
-
-        # Solve IDs collision.
-        if unique_cell_ids:
-            model1.relabel_cells(unique_ids=True)
-
-        # Solve custom model metadata collision by transforming into Lineage property.
-        md1 = model1.model_metadata.get_custom_metadata()
-        md2 = model2.model_metadata.get_custom_metadata()
-        if md1 != md2:
-            all_fields = md1.keys() | md2.keys()
-            diff = {
-                field: {"self_model": md1.get(field), "argument_model": md2.get(field)}
-                for field in all_fields
-                if md1.get(field) != md2.get(field)
-            }
-
-            for field, value in diff.items():
-                # Remove from model metadata.
-                if hasattr(model1.model_metadata, field):
-                    delattr(model1.model_metadata, field)
-
-                # Register as a new property (but no calculator).
+        # Model metadata stored on lineages. Each lineage gets the value of the model it
+        # comes from, unless that model already stores the field from a previous merge.
+        for field in sorted(lineage_fields):
+            # Register as a new property (but no calculator), with the data type of
+            # the values stored on lineages.
+            if field not in lin_props:
+                values = (md1_values.get(field), md2_values.get(field))
                 new_prop = Property(
                     identifier=field,
                     name=field,
                     description=field,
-                    provenance="merge models",
+                    provenance=_MERGE_PROVENANCE,
                     prop_type=PropertyType.LINEAGE,
                     lin_type="CellLineage",
-                    dtype="str",
+                    dtype=_infer_dtype(values),
                 )
                 model1.props_metadata._add_prop(new_prop)
 
-                # Set values on lineages.
-                value1, value2 = value["self_model"], value["argument_model"]
-                for lin in model1.get_cell_lineages():
-                    value_to_add = (
-                        value2 if lin.graph["lineage_ID"] in new_lids else value1
-                    )
-                    if value_to_add is not None:
-                        lin.graph[field] = value_to_add
+            # Set values on lineages.
+            for lin in model1.get_cell_lineages():
+                from_model2 = lin.graph["lineage_ID"] in new_lids
+                value = (md2_values if from_model2 else md1_values).get(field)
+                stored_fields = merge_props2 if from_model2 else merge_props1
+                if value is not None and field not in stored_fields:
+                    lin.graph[field] = value
 
-        if new_name is None:
-            name1 = model1.model_metadata.name
-            name2 = model1.model_metadata.name
-            model1.model_metadata.name = f"{name1}+{name2}"
-        else:
-            model1.model_metadata.name = new_name
+        # Model metadata of the merged model. The metadata object is updated rather
+        # than replaced, so that references to it stay valid when merging in place.
+        metadata = model1.model_metadata
+        final_md = merged_metadata.get_all_metadata()
+        for field in metadata.get_custom_metadata().keys() - final_md.keys():
+            delattr(metadata, field)
+        for field, value in final_md.items():
+            setattr(metadata, field, value)
 
         return model1
 
@@ -3745,7 +4526,73 @@ class Model:
 
         return models
 
-    def to_cell_dataframe(self, lids: list[int] | None = None) -> pd.DataFrame:
+    def _add_lineage_props_to_df(
+        self, df: pd.DataFrame, lineage_props: list[str] | None
+    ) -> pd.DataFrame:
+        """
+        Add cell lineage properties as columns of a DataFrame.
+
+        Each row gets the value of the cell lineage matching its `lineage_ID`, or NaN
+        if that lineage has no value. `lineage_ID` is skipped since it is already
+        a column.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame with a `lineage_ID` column.
+        lineage_props : list[str] | None
+            Identifiers of the cell lineage properties to add. If None or empty,
+            the DataFrame is returned unchanged.
+
+        Returns
+        -------
+        pd.DataFrame
+            The DataFrame with one added column per lineage property.
+
+        Raises
+        ------
+        ValueError
+            If a property is not a lineage property of cell lineages or is not
+            declared in the model.
+            If a property has the same identifier as an existing column.
+        """
+        props = [prop for prop in lineage_props or [] if prop != "lineage_ID"]
+        if not props:
+            return df
+
+        available_props = {
+            prop_id
+            for prop_id, prop in self.get_cell_lineage_properties().items()
+            if PropertyType.LINEAGE in prop.prop_type
+        }
+        invalid_props = [prop for prop in props if prop not in available_props]
+        if invalid_props:
+            invalid_str = ", ".join(repr(prop) for prop in invalid_props)
+            raise ValueError(
+                "Not lineage properties of cell lineages, or not declared in the "
+                f"model: {invalid_str}."
+            )
+        clashing_props = [prop for prop in props if prop in df.columns]
+        if clashing_props:
+            clashing_str = ", ".join(repr(prop) for prop in clashing_props)
+            raise ValueError(
+                "Lineage properties clash with existing columns of the DataFrame: "
+                f"{clashing_str}."
+            )
+
+        new_columns = {}
+        for prop in props:
+            values = {
+                lin_ID: lin.graph[prop]
+                for lin_ID, lin in self.data.cell_data.items()
+                if prop in lin.graph
+            }
+            new_columns[prop] = df["lineage_ID"].map(values)
+        return df.assign(**new_columns)
+
+    def to_cell_dataframe(
+        self, lids: list[int] | None = None, lineage_props: list[str] | None = None
+    ) -> pd.DataFrame:
         """
         Return the cell data of the model as a pandas DataFrame.
 
@@ -3754,6 +4601,10 @@ class Model:
         lids : list[int], optional
             List of IDs of the lineages to export (default is None).
             If None, all lineages are exported.
+        lineage_props : list[str], optional
+            Identifiers of cell lineage properties to add as columns, e.g. an
+            experimental condition stored on lineages (default is None). Each row
+            gets the value of its lineage, or NaN if the lineage has no value.
 
         Returns
         -------
@@ -3764,6 +4615,9 @@ class Model:
         ------
         ValueError
             If the `lineage_ID`, `frame` or `cell_ID` property is not found in the model.
+            If a property of `lineage_props` is not a lineage property of cell
+            lineages, is not declared in the model, or clashes with an existing
+            column.
         """
         list_df = []
         nb_nodes = 0
@@ -3779,22 +4633,26 @@ class Model:
 
         # Reoder the columns to have pycellin mandatory properties first.
         time_prop = self.model_metadata.reference_time_property
-        columns = df.columns.tolist()
-        try:
-            columns.remove("lineage_ID")
-            columns.remove(time_prop)
-            columns.remove("cell_ID")
-        except ValueError as err:
-            raise err
-        columns = ["lineage_ID", time_prop, "cell_ID"] + columns
+        mandatory_columns = ["lineage_ID", time_prop, "cell_ID"]
+        missing_columns = [col for col in mandatory_columns if col not in df.columns]
+        if missing_columns:
+            missing_str = ", ".join(repr(col) for col in missing_columns)
+            raise ValueError(
+                f"Mandatory cell properties not found in the model: {missing_str}."
+            )
+        columns = mandatory_columns + [
+            col for col in df.columns if col not in mandatory_columns
+        ]
         df = df[columns]
         df.sort_values(
             ["lineage_ID", time_prop, "cell_ID"], ignore_index=True, inplace=True
         )
 
-        return df
+        return self._add_lineage_props_to_df(df, lineage_props)
 
-    def to_link_dataframe(self, lids: list[int] | None = None) -> pd.DataFrame:
+    def to_link_dataframe(
+        self, lids: list[int] | None = None, lineage_props: list[str] | None = None
+    ) -> pd.DataFrame:
         """
         Return the link data of the model as a pandas DataFrame.
 
@@ -3803,11 +4661,22 @@ class Model:
         lids : list[int], optional
             List of IDs of the lineages to export (default is None).
             If None, all lineages are exported.
+        lineage_props : list[str], optional
+            Identifiers of cell lineage properties to add as columns, e.g. an
+            experimental condition stored on lineages (default is None). Each row
+            gets the value of its lineage, or NaN if the lineage has no value.
 
         Returns
         -------
         pd.DataFrame
             DataFrame containing the link data.
+
+        Raises
+        ------
+        ValueError
+            If a property of `lineage_props` is not a lineage property of cell
+            lineages, is not declared in the model, or clashes with an existing
+            column.
         """
         list_df = []
         nb_edges = 0
@@ -3827,15 +4696,12 @@ class Model:
 
         # Reoder the columns to have pycellin mandatory properties first.
         columns = df.columns.tolist()
-        try:
-            columns.remove("lineage_ID")
-        except ValueError as err:
-            raise err
+        columns.remove("lineage_ID")
         columns = ["lineage_ID"] + columns
         df = df[columns]
         df.sort_values("lineage_ID", ignore_index=True, inplace=True)
 
-        return df
+        return self._add_lineage_props_to_df(df, lineage_props)
 
     def to_lineage_dataframe(self, lids: list[int] | None = None) -> pd.DataFrame:
         """
@@ -3866,18 +4732,21 @@ class Model:
         df = pd.concat(list_df, ignore_index=True)
 
         # Reoder the columns to have pycellin mandatory properties first.
+        if "lineage_ID" not in df.columns:
+            raise ValueError(
+                "Mandatory lineage property not found in the model: 'lineage_ID'."
+            )
         columns = df.columns.tolist()
-        try:
-            columns.remove("lineage_ID")
-        except ValueError as err:
-            raise err
+        columns.remove("lineage_ID")
         columns = ["lineage_ID"] + columns
         df = df[columns]
         df.sort_values("lineage_ID", ignore_index=True, inplace=True)
 
         return df
 
-    def to_cycle_dataframe(self, lids: list[int] | None = None) -> pd.DataFrame:
+    def to_cycle_dataframe(
+        self, lids: list[int] | None = None, lineage_props: list[str] | None = None
+    ) -> pd.DataFrame:
         """
         Return the cell cycle data of the model as a pandas DataFrame.
 
@@ -3886,6 +4755,10 @@ class Model:
         lids : list[int], optional
             List of IDs of the lineages to export (default is None).
             If None, all lineages are exported.
+        lineage_props : list[str], optional
+            Identifiers of cell lineage properties to add as columns, e.g. an
+            experimental condition stored on lineages (default is None). Each row
+            gets the value of its lineage, or NaN if the lineage has no value.
 
         Returns
         -------
@@ -3898,6 +4771,9 @@ class Model:
             If the cycle lineages have not been computed yet.
             If the `lineage_ID`, `level` or `cycle_ID` property is not found
             in the model.
+            If a property of `lineage_props` is not a lineage property of cell
+            lineages, is not declared in the model, or clashes with an existing
+            column.
         """
         list_df = []  # type: list[pd.DataFrame]
         nb_nodes = 0
@@ -3918,19 +4794,16 @@ class Model:
 
         # Reoder the columns to have pycellin mandatory properties first.
         columns = df.columns.tolist()
-        try:
-            columns.remove("lineage_ID")
-            columns.remove("level")
-            columns.remove("cycle_ID")
-        except ValueError as err:
-            raise err
+        columns.remove("lineage_ID")
+        columns.remove("level")
+        columns.remove("cycle_ID")
         columns = ["lineage_ID", "level", "cycle_ID"] + columns
         df = df[columns]
         df.sort_values(
             ["lineage_ID", "level", "cycle_ID"], ignore_index=True, inplace=True
         )
 
-        return df
+        return self._add_lineage_props_to_df(df, lineage_props)
 
     def save_to_pickle(self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL) -> None:
         """
@@ -3970,19 +4843,19 @@ class Model:
         with open(path, "rb") as file:
             return pickle.load(file)
 
-    def export(self, path: str, format: str) -> None:
-        """
-        Export the model to a file in a specific format (e.g. TrackMate).
+    # def export(self, path: str, format: str) -> None:
+    #     """
+    #     Export the model to a file in a specific format (e.g. TrackMate).
 
-        Parameters
-        ----------
-        path : str
-            Path to export the model.
-        format : str
-            Format of the exported file.
-        """
-        # TODO: implement
-        pass
+    #     Parameters
+    #     ----------
+    #     path : str
+    #         Path to export the model.
+    #     format : str
+    #         Format of the exported file.
+    #     """
+    #     # TODO: implement
+    #     pass
 
     def get_mean_cell_prop_over_time_fig(
         self,
@@ -4049,7 +4922,7 @@ class Model:
             the mean line color with this opacity.
         template : str or go.layout.Template, optional
             Plotly template to use for the figure (default is "pycellin_white"). A
-            "pycellin_black" template is also available. See styling.py for Pycellin
+            "pycellin_dark" template is also available. See styling.py for Pycellin
             template details. See Plotly documentation for more information on templates.
         width: int, optional
             Width of the figure in pixels (default is None, fallback to autosize).
@@ -4232,7 +5105,7 @@ class Model:
             the mean line color with this opacity.
         template : str or go.layout.Template, optional
             Plotly template to use for the figure (default is "pycellin_white"). A
-            "pycellin_black" template is also available. See styling.py for Pycellin
+            "pycellin_dark" template is also available. See styling.py for Pycellin
             template details. See Plotly documentation for more information on templates.
         width: int, optional
             Width of the figure in pixels (default is None, fallback to autosize).

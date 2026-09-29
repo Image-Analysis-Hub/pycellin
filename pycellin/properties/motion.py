@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 A collection of properties related to cell mobility/motility.
@@ -7,7 +6,7 @@ A collection of properties related to cell mobility/motility.
 
 import math
 from itertools import pairwise
-from typing import Any, Literal
+from typing import Literal
 
 import numpy as np
 
@@ -18,64 +17,9 @@ from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import (
     EdgeLocalPropCalculator,
     NodeGlobalPropCalculator,
+    NodeLocalPropCalculator,
 )
-
-
-def _get_cycle_edge_property_values(
-    prop_name: str,
-    data: Data,
-    lineage: CycleLineage,
-    nid: int,
-    include_incoming_edge: bool,
-) -> list[Any]:
-    """
-    Get the values of a given property for all edges within a cell cycle.
-
-    Parameters
-    ----------
-    prop_name : str
-        Name of the property to retrieve.
-    data : Data
-        Data object containing the lineage.
-    lineage : CycleLineage
-        Lineage graph containing the node of interest.
-    nid : int
-        Node ID (cycle_ID) of the cell of interest.
-    include_incoming_edge : bool
-        Whether to include the incoming edge of the first cell of the cell cycle.
-
-    Returns
-    -------
-    list of Any
-        List of values of the property for all edges within the cell cycle.
-
-    Raises
-    ------
-    KeyError
-        If the property does not exist in the cell lineage.
-    """
-    lin_ID = lineage.graph["lineage_ID"]
-    cell_lin = data.cell_data[lin_ID]
-    try:
-        values = [
-            cell_lin.edges[edge][prop_name]
-            for edge in lineage.yield_links_within_cycle(nid)
-        ]
-    except KeyError:
-        raise KeyError(
-            f"Property '{prop_name}' does not exist in the cell lineage '{lin_ID}'."
-        )
-
-    if include_incoming_edge:
-        first_cell = lineage.nodes[nid]["cells"][0]
-        predecessors = list(cell_lin.predecessors(first_cell))
-        if len(predecessors) == 1:
-            edge = (predecessors[0], first_cell)
-            values.append(cell_lin.edges[edge][prop_name])
-        elif len(predecessors) > 1:
-            raise FusionError(first_cell, lin_ID)
-
-    return values
+from pycellin.properties.utils import _get_cycle_edge_property_values
 
 
 def create_cell_displacement_property(
@@ -535,14 +479,14 @@ def create_turning_angle_property(
         description=custom_description
         or "Angle of the cell trajectory between two consecutive displacements",
         provenance="pycellin",
-        prop_type="edge",
+        prop_type="node",
         lin_type="CellLineage",
         dtype="float",
         unit=unit,
     )
 
 
-class TurningAngle(NodeGlobalPropCalculator):
+class TurningAngle(NodeLocalPropCalculator):
     """
     Calculator to compute the angle between two consecutive displacement vectors of a cell.
 
@@ -565,15 +509,13 @@ class TurningAngle(NodeGlobalPropCalculator):
         self.unit = unit
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage, nid: int
+        self, lineage: CellLineage, nid: int
     ) -> float:
         """
         Compute the angle between two consecutive displacement vectors at a cell detection.
 
         Parameters
         ----------
-        data : Data
-            Data object containing the lineage.
         lineage : CellLineage
             Lineage graph containing the node of interest.
         nid : int

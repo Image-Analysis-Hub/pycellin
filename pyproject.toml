@@ -44,18 +44,8 @@ Examples = "https://Image-Analysis-Hub.github.io/pycellin/notebooks/"
 Issues = "https://github.com/Image-Analysis-Hub/pycellin/issues"
 Source = "https://github.com/Image-Analysis-Hub/pycellin/"
 
-[tool.setuptools]
-packages = [
-    "pycellin",
-    "pycellin.classes",
-    "pycellin.graph",
-    "pycellin.graph.properties",
-    "pycellin.io",
-    "pycellin.io.cell_tracking_challenge",
-    "pycellin.io.geff",
-    "pycellin.io.trackmate",
-    "pycellin.io.trackpy",
-]
+[tool.setuptools.packages.find]
+include = ["pycellin*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -16,19 +16,29 @@ from igraph import Graph
 from pycellin.classes.exceptions import (
     FusionError,
     LineageStructureError,
+    MissingPropertyError,
     TimeFlowError,
 )
 from pycellin.classes.property import Property
 from pycellin.custom_types import PropertyType
-from pycellin.styling import PYCELLIN_PURPLE
+from pycellin.styling import (
+    BRANCH_PROFILE_DIVISION_MARKER,
+    BRANCH_PROFILE_DIVISION_SIZE_INCREASE,
+    BRANCH_PROFILE_NODE_MARKER,
+    PYCELLIN_PURPLE,
+)
 
 _DEFAULT_UNMAPPED_COLOR = "dimgrey"
+
+# Style argument for get_branch_profile_figure / plot_branch_profile
+# (node_marker_style, division_marker_style, line_style): one dict applied to
+# every branch, or a list with one entry (dict or None) per target cell.
+BranchStyle = dict[str, Any] | list[dict[str, Any] | None] | None
 
 # TODO: all the visualization functionalities will be refined and moved to a dedicated
 # subpackage.
 
 UNSELECTED_HIGHLIGHT_COLOR = "lightgray"
-PYCELLIN_PURPLE = "#981cfd"
 HIGHLIGHT_COLORS = [
     PYCELLIN_PURPLE
 ] + px.colors.qualitative.Safe  # 12 Total IDs: 1 purple + 11 from Safe palette
@@ -579,7 +589,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
-        template: str | None = None,
+        template: str | go.layout.Template = "pycellin_white",
     ) -> go.Figure:
         """
         Generate a Plotly figure of the lineage tree.
@@ -634,9 +644,10 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
-        template : str, optional
-            The Plotly template to use for the figure. If None, defaults to Plotly's
-            default template. Examples: "plotly", "plotly_white", "plotly_dark".
+        template : str or go.layout.Template, optional
+            Plotly template to use for the figure (default is "pycellin_white"). A
+            "pycellin_dark" template is also available. See styling.py for Pycellin
+            template details. See Plotly documentation for more information on templates.
 
         Returns
         -------
@@ -715,14 +726,6 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_marker_style.setdefault("opacity", 1.0)
         node_marker_style.setdefault("line", {"width": 0})
 
-        # Avoid Plotly's "bubble mode" defaults (a semi-transparent fill and a white
-        # outline) that kick in when marker.size is an array, i.e. when manually
-        # adjusting node_marker_style for a subset of nodes.
-        if "opacity" not in node_marker_style:
-            node_marker_style["opacity"] = 1.0
-        if "line" not in node_marker_style:
-            node_marker_style["line"] = {"width": 0}
-
         # Text in the nodes.
         node_annotations = (
             self._build_node_text_annotations(
@@ -777,9 +780,20 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             height=height,
             template=template,
         )
-        fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+        # Pycellin templates target charts: hide their axis lines and ticks, and
+        # don't clamp the reversed y range at 0, which would cut the root nodes.
+        fig.update_xaxes(
+            showticklabels=False,
+            showgrid=False,
+            zeroline=False,
+            showline=False,
+            ticks="",
+        )
         fig.update_yaxes(
             autorange="reversed",
+            rangemode="normal",
+            showline=False,
+            ticks="",
             showgrid=show_horizontal_grid,
             zeroline=show_horizontal_grid,
             title=self._construct_y_legend(y_prop),
@@ -795,8 +809,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
-        node_colormap_prop: str | None = None,
-        node_color_scale: str | None = None,
+        node_colormap_prop: str | None = None,  # TODO: node_cmap_prop
+        node_color_scale: str | None = None,  # TODO: node_cmap
         node_hover_props: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
         edge_hover_props: list[str] | None = None,
@@ -805,7 +819,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
-        template: str | None = None,
+        template: str | go.layout.Template = "pycellin_white",
     ) -> None:
         """
         Plot the lineage as a tree using Plotly.
@@ -857,9 +871,10 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
-        template : str, optional
-            The Plotly template to use for the figure. If None, defaults to Plotly's
-            default template. Examples: "plotly", "plotly_white", "plotly_dark".
+        template : str or go.layout.Template, optional
+            Plotly template to use for the figure (default is "pycellin_white"). A
+            "pycellin_dark" template is also available. See styling.py for Pycellin
+            template details. See Plotly documentation for more information on templates.
 
         See Also
         --------
@@ -1285,15 +1300,15 @@ class CellLineage(Lineage):
         target_cell : int
             ID of the target cell. This can be a leaf, or any cell at a
             specified timepoint.
+        source_cell : int, optional
+            ID of the cell where the branch should start. If given, return the
+            path from `source_cell` to `target_cell`. Cannot be used together with
+            `generations`.
         generations : int, optional
             Number of upstream division generations to include. If None,
             return the path from the root to `target_cell`. If 1, return the current
             generation from the closest upstream division or root to `target_cell`.
             Higher values include more upstream division generations.
-        source_cell : int, optional
-            ID of the cell where the branch should start. If given, return the
-            path from `source_cell` to `target_cell`. Cannot be used together with
-            `generations`.
 
         Returns
         -------
@@ -1361,8 +1376,8 @@ class CellLineage(Lineage):
 
     def get_branch_lineage_highlight(
         self,
-        target_cell: int | list[int],
-        source_cell: int | list[int] | None = None,
+        target_cells: int | list[int],
+        source_cells: int | list[int] | None = None,
         generations: int | None = None,
         highlight_prop: str = "selected_branch",
     ) -> CellLineage:
@@ -1375,19 +1390,19 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        cid : int or list[int]
+        target_cells : int or list[int]
             ID of the target cell, or IDs of several target cells. If several
             cells are passed, the highlighted nodes are the union of their
             single-cell branches.
+        source_cells : int or list[int], optional
+            ID of the cell where each highlighted branch should start. If a
+            single ID is passed, it is used for every target cell. If a list is
+            passed, it must have the same length as `target_cells`, and starts
+            are paired with targets by position. Cannot be used together with
+            `generations`.
         generations : int, optional
             Number of upstream division generations to include. If None,
             highlight the path from the root to each target cell.
-        source_cell : int or list[int], optional
-            ID of the cell where each highlighted branch should start. If a
-            single ID is passed, it is used for every target cell. If a list is
-            passed, it must have the same length as `cid`, and starts are
-            paired with targets by position. Cannot be used together with
-            `generations`.
         highlight_prop : str, optional
             Name of the node property used to mark the selected branch.
             "selected_branch" by default.
@@ -1397,10 +1412,8 @@ class CellLineage(Lineage):
         CellLineage
             A copy of the full lineage with the selected branches marked.
         """
-        is_single_target, target_cids, source_cells = (
-            self._normalize_single_cell_lineage_inputs(
-                target_cell, source_cell, "target_cell"
-            )
+        is_single_target, target_cids, source_cids = (
+            self._normalize_single_cell_lineage_inputs(target_cells, source_cells)
         )
 
         # Each set contains the cells in one selected single-cell lineage branch.
@@ -1410,7 +1423,7 @@ class CellLineage(Lineage):
                     target_cid, source_cell=target_source_cell, generations=generations
                 ).nodes()
             )
-            for target_cid, target_source_cell in zip(target_cids, source_cells)
+            for target_cid, target_source_cell in zip(target_cids, source_cids)
         ]
 
         # If selected branches touch or converge, they form one connected group
@@ -1440,20 +1453,71 @@ class CellLineage(Lineage):
         nx.set_node_attributes(highlighted_lineage, highlight_values, highlight_prop)
 
         if is_single_target:
-            highlighted_lineage.graph["target_cell_ID"] = target_cell
+            highlighted_lineage.graph["target_cell_ID"] = target_cells
         else:
-            highlighted_lineage.graph["target_cell_IDs"] = list(target_cell)
+            highlighted_lineage.graph["target_cell_IDs"] = list(target_cells)
 
         highlighted_lineage.graph["included_generations"] = generations
 
-        if isinstance(source_cell, list):
-            highlighted_lineage.graph["source_cell_IDs"] = list(source_cell)
+        if isinstance(source_cells, list):
+            highlighted_lineage.graph["source_cell_IDs"] = list(source_cells)
         else:
-            highlighted_lineage.graph["source_cell_ID"] = source_cell
+            highlighted_lineage.graph["source_cell_ID"] = source_cells
 
         highlighted_lineage.graph["highlight_prop"] = highlight_prop
         highlighted_lineage.graph["highlight_group_count"] = len(selected_components)
         return highlighted_lineage
+
+    def _get_highlight_marker_colors(
+        self, highlight_prop: str = "selected_branch"
+    ) -> list[str]:
+        """
+        Return one marker color per cell, following the highlight groups.
+
+        The colors are ordered the way `get_tree_figure` orders the cells, so the
+        returned list can be used directly as the "color" entry of its
+        `node_marker_style`. Cells of highlight group 0 (unselected) get a neutral
+        gray; each selected group gets its own color from the Pycellin highlight
+        palette.
+
+        Meant to be called on a lineage returned by `get_branch_lineage_highlight`,
+        which is where the highlight property comes from. Callers who want their
+        own colors per group should instead pass a {group: color} dict as the
+        `node_colormap` of `get_tree_figure`.
+
+        Parameters
+        ----------
+        highlight_prop : str, optional
+            Name of the node property holding the highlight group of each cell.
+            "selected_branch" by default.
+
+        Returns
+        -------
+        list[str]
+            One color per cell of the lineage, in tree figure order.
+
+        Raises
+        ------
+        MissingPropertyError
+            If a cell of the lineage does not have the highlight property.
+
+        See Also
+        --------
+        get_branch_lineage_highlight : Mark single-cell branches in a lineage copy.
+        get_tree_figure : Generate the tree figure the colors are meant for.
+        """
+        _, index_to_nx_id = self._create_deterministic_igraph()
+        colors = []
+        for k in range(len(index_to_nx_id)):
+            cid = index_to_nx_id[k]
+            try:
+                group = self.nodes[cid][highlight_prop]
+            except KeyError:
+                raise MissingPropertyError(
+                    highlight_prop, nid=cid, lineage_ID=self.graph.get("lineage_ID")
+                ) from None
+            colors.append(get_highlight_color(group))
+        return colors
 
     def get_divisions(self, cids: list[int] | None = None) -> list[int]:
         """
@@ -1736,6 +1800,10 @@ class CellLineage(Lineage):
         ID_prop: str = "cell_ID",
         y_prop: Property | None = None,
         title: str | None = None,
+        target_cells: int | list[int] | None = None,
+        source_cells: int | list[int] | None = None,
+        generations: int | None = None,
+        highlight_prop: str = "selected_branch",
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
@@ -1749,7 +1817,7 @@ class CellLineage(Lineage):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
-        template: str | None = None,
+        template: str | go.layout.Template = "pycellin_white",
     ) -> go.Figure:
         """
         Generate a Plotly figure of the cell lineage tree.
@@ -1769,6 +1837,23 @@ class CellLineage(Lineage):
             Property.name and Property.unit.
         title : str, optional
             The title of the plot. If None, no title is displayed.
+        target_cells : int or list[int], optional
+            ID of the target cell, or IDs of several target cells, for plotting
+            highlighted single-cell branches. If None, the whole lineage is
+            plotted normally.
+        source_cells : int or list[int], optional
+            ID of the cell where the highlighted branch should start. If a
+            single ID is passed, it is used for every target cell. If a list is
+            passed, it must have the same length as `target_cells`, and
+            starts are paired with targets by position. Cannot be used together
+            with `generations`.
+        generations : int, optional
+            Number of upstream division generations to include when
+            `target_cells` is set. If None, use the path from the root
+            to each target cell.
+        highlight_prop : str, optional
+            Name of the temporary node property used for highlighting.
+            "selected_branch" by default.
         node_text : str, optional
             The property of the nodes to display as text inside the nodes
             of the plot. If None, no text is displayed. None by default.
@@ -1781,10 +1866,16 @@ class CellLineage(Lineage):
             current Plotly template.
         node_colormap_prop : str, optional
             The property of the nodes to use for coloring the nodes.
-            If None, no color mapping is applied.
+            If None, no color mapping is applied, unless `node_colormap` is
+            given while highlighting branches (see `node_colormap`).
         node_colormap : str | dict[Any, str], optional
             The color map to use for coloring the nodes. If None,
-            defaults to current Plotly template.
+            defaults to current Plotly template. When `target_cells` is set and
+            `node_colormap_prop` is not, the color map is applied to the
+            highlight groups: pass a {group: color} dict where group 0 is the
+            unselected cells and groups 1, 2, ... follow the order of
+            `target_cells`. Groups left out of the dict fall back to a default
+            color and trigger a warning.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
             displaying `cell_ID` and the value of the y_prop.
@@ -1805,9 +1896,10 @@ class CellLineage(Lineage):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
-        template : str, optional
-            The Plotly template to use for the figure. If None, defaults to Plotly's
-            default template. Examples: "plotly", "plotly_white", "plotly_dark".
+        template : str or go.layout.Template, optional
+            Plotly template to use for the figure (default is "pycellin_white"). A
+            "pycellin_dark" template is also available. See styling.py for Pycellin
+            template details. See Plotly documentation for more information on templates.
 
         Returns
         -------
@@ -1819,13 +1911,50 @@ class CellLineage(Lineage):
         In case of cell divisions, the hover text of the edges between the parent
         and child cells will be displayed only for one child cell.
         This cannot easily be corrected.
+
+        See Also
+        --------
+        plot : Generate the same figure and display it.
+        get_branch_lineage_highlight : Mark single-cell branches in a lineage copy.
         """
         if y_prop is None:
-            from pycellin.graph.properties.core import create_timepoint_property
+            from pycellin.properties.core import create_timepoint_property
 
             y_prop = create_timepoint_property()
 
-        return super().get_tree_figure(
+        lineage_to_plot = self
+        if target_cells is not None:
+            # Keep using the tree plotting path, but first make a copy of the
+            # lineage where the selected single-cell branch(es) are marked.
+            lineage_to_plot = self.get_branch_lineage_highlight(
+                target_cells,
+                generations=generations,
+                highlight_prop=highlight_prop,
+                source_cells=source_cells,
+            )
+            # While highlighting, a color map given without a property to map it
+            # over is understood as colors for the highlight groups themselves.
+            if node_colormap is not None and node_colormap_prop is None:
+                node_colormap_prop = highlight_prop
+
+            # When the user did not request any color mapping, turn the highlight
+            # groups into explicit marker colors. This avoids treating the
+            # discrete branch labels as a continuous Plotly colorscale.
+            if node_colormap_prop is None or (
+                node_colormap_prop == highlight_prop and node_colormap is None
+            ):
+                node_marker_style = (
+                    {} if node_marker_style is None else dict(node_marker_style)
+                )
+                highlight_colors = lineage_to_plot._get_highlight_marker_colors(
+                    highlight_prop
+                )
+                node_marker_style.setdefault("color", highlight_colors)
+                node_colormap_prop = None
+
+        # Bind the base implementation to the (possibly highlighted) copy rather
+        # than to self, since it reads the graph it is called on.
+        return super(CellLineage, lineage_to_plot).get_tree_figure(
             ID_prop=ID_prop,
             y_prop=y_prop,
             title=title,
@@ -1851,7 +1980,7 @@ class CellLineage(Lineage):
         y_prop: Property | None = None,
         title: str | None = None,
         target_cells: int | list[int] | None = None,
-        source_cell: int | list[int] | None = None,
+        source_cells: int | list[int] | None = None,
         generations: int | None = None,
         highlight_prop: str = "selected_branch",
         node_text: str | None = None,
@@ -1867,7 +1996,7 @@ class CellLineage(Lineage):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
-        template: str | None = None,
+        template: str | go.layout.Template = "pycellin_white",
     ) -> None:
         """
         Plot the cell lineage as a tree using Plotly.
@@ -1886,16 +2015,16 @@ class CellLineage(Lineage):
             ID of the target cell, or IDs of several target cells, for plotting
             highlighted single-cell branches. If None, plot the whole lineage
             normally.
-        generations : int, optional
-            Number of upstream division generations to include when
-            `target_cells` is set. If None, use the path from the root
-            to each target cell.
-        source_cell : int or list[int], optional
+        source_cells : int or list[int], optional
             ID of the cell where the highlighted branch should start. If a
             single ID is passed, it is used for every target cell. If a list is
             passed, it must have the same length as `target_cells`, and
             starts are paired with targets by position. Cannot be used together
             with `generations`.
+        generations : int, optional
+            Number of upstream division generations to include when
+            `target_cells` is set. If None, use the path from the root
+            to each target cell.
         highlight_prop : str, optional
             Name of the temporary node property used for highlighting.
             "selected_branch" by default.
@@ -1911,10 +2040,16 @@ class CellLineage(Lineage):
             current Plotly template.
         node_colormap_prop : str, optional
             The property of the nodes to use for coloring the nodes.
-            If None, no color mapping is applied.
+            If None, no color mapping is applied, unless `node_colormap` is
+            given while highlighting branches (see `node_colormap`).
         node_colormap : str | dict[Any, str], optional
             The color map to use for coloring the nodes. If None,
-            defaults to current Plotly template.
+            defaults to current Plotly template. When `target_cells` is set and
+            `node_colormap_prop` is not, the color map is applied to the
+            highlight groups: pass a {group: color} dict where group 0 is the
+            unselected cells and groups 1, 2, ... follow the order of
+            `target_cells`. Groups left out of the dict fall back to a default
+            color and trigger a warning.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
             displaying `cell_ID` and the value of the y_prop.
@@ -1935,9 +2070,10 @@ class CellLineage(Lineage):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
-        template : str, optional
-            The Plotly template to use for the figure. If None, defaults to Plotly's
-            default template. Examples: "plotly", "plotly_white", "plotly_dark".
+        template : str or go.layout.Template, optional
+            Plotly template to use for the figure (default is "pycellin_white"). A
+            "pycellin_dark" template is also available. See styling.py for Pycellin
+            template details. See Plotly documentation for more information on templates.
         Warnings
         --------
         In case of cell divisions, the hover text of the edges between the parent
@@ -1964,36 +2100,14 @@ class CellLineage(Lineage):
         --------
         get_tree_figure : Generate the figure without displaying it.
         """
-        lineage_to_plot = self
-        if target_cells is not None:
-            # Keep using the tree plotting path, but first make a copy of the
-            # lineage where the selected single-cell branch(es) are marked.
-            lineage_to_plot = self.get_branch_lineage_highlight(
-                target_cells,
-                generations=generations,
-                highlight_prop=highlight_prop,
-                source_cell=source_cell,
-            )
-            # When the user did not request another color mapping, turn the
-            # highlight groups into explicit marker colors. This avoids treating
-            # the discrete branch labels as a continuous Plotly colorscale.
-            if node_colormap_prop is None or node_colormap_prop == highlight_prop:
-                _, index_to_nx_id = lineage_to_plot._create_deterministic_igraph()
-                groups = [
-                    lineage_to_plot.nodes[index_to_nx_id[k]][highlight_prop]
-                    for k in range(len(index_to_nx_id))
-                ]
-                marker_colors = [get_highlight_color(group) for group in groups]
-                node_marker_style = (
-                    {} if node_marker_style is None else dict(node_marker_style)
-                )
-                node_marker_style.setdefault("color", marker_colors)
-                node_colormap_prop = None
-
-        fig = lineage_to_plot.get_tree_figure(
+        fig = self.get_tree_figure(
             ID_prop=ID_prop,
             y_prop=y_prop,
             title=title,
+            target_cells=target_cells,
+            source_cells=source_cells,
+            generations=generations,
+            highlight_prop=highlight_prop,
             node_text=node_text,
             node_text_font=node_text_font,
             node_marker_style=node_marker_style,
@@ -2011,69 +2125,155 @@ class CellLineage(Lineage):
         )
         fig.show()
 
-    def get_branch_property_figure(
+    def get_branch_profile_figure(
         self,
         target_cells: int | list[int],
         y_prop: str | Property,
         x_prop: str | Property = "timepoint",
-        source_cell: int | list[int] | None = None,
+        source_cells: int | list[int] | None = None,
         generations: int | None = None,
         title: str | None = None,
         mode: str = "lines+markers",
-        node_marker_style: dict[str, Any] | None = None,
-        line_style: dict[str, Any] | None = None,
+        node_marker_style: BranchStyle = None,
+        division_marker_style: BranchStyle = None,
+        line_style: BranchStyle = None,
         node_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         showlegend: bool | None = None,
         width: int | None = None,
         height: int | None = None,
-        template: str | None = None,
+        template: str | go.layout.Template = "pycellin_white",
     ) -> go.Figure:
         """
-        Generate a Plotly figure of one node property over another for branches.
+        Generate a Plotly figure tracking a node property along single-cell branches.
 
-        The method returns the figure so callers can customize it further with
-        Plotly's own methods.
+        One branch is plotted per target cell as its own scatter trace, with
+        `y_prop` on the y-axis and `x_prop` (time by default) on the x-axis. A
+        branch is the path running from an upstream ancestor down to its target
+        cell; division cells along the way are drawn with a distinct marker so
+        they stand out. The figure is returned rather than shown, so callers can
+        keep customizing it with Plotly's own methods before displaying it.
 
         Parameters
         ----------
         target_cells : int or list[int]
-            Target cell ID or IDs whose branches are plotted.
+            Target cell ID, or IDs of several target cells. Each target cell
+            produces one branch and one trace.
         y_prop : str or Property
-            Node property to plot on the y-axis.
+            Node property to plot on the y-axis. A Property also supplies the
+            axis label (its name and unit); a plain string is used as-is.
         x_prop : str or Property, optional
             Node property to plot on the x-axis. "timepoint" by default.
-        source_cell : int or list[int], optional
-            Source cell ID or IDs used to restrict each plotted branch.
+        source_cells : int or list[int], optional
+            Cell ID where each branch should start. A single value (including
+            the default None, meaning the root) is used for every target cell; a
+            list is paired with `target_cells` by position and must have the
+            same length. Cannot be combined with `generations`.
         generations : int, optional
-            Number of generations to include upstream of each target cell.
+            Number of upstream division generations to include in each branch.
+            If None, the branch starts at the root, or at `source_cells` when it
+            is given. Cannot be combined with `source_cells`.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         mode : str, optional
-            Plotly scatter mode. "lines+markers" by default.
-        node_marker_style : dict, optional
-            The style of the markers representing the cells in the plot.
-        line_style : dict, optional
-            The style of the lines representing the branches in the plot.
+            Plotly scatter mode, e.g. "lines", "markers" or "lines+markers"
+            (the default).
+        node_marker_style : dict or list of dict, optional
+            Marker style for ordinary (non-division) cells, merged over the
+            Pycellin defaults: the branch's trace color, size 10, a "circle"
+            symbol and no border. A nested "line" dict is merged key by key, so
+            a partial override such as {"line": {"width": 2}} keeps the default
+            line color. Pass one dict to use the same style on every branch, or
+            a list with one dict (or None) per target cell to style branches
+            independently.
+        division_marker_style : dict or list of dict, optional
+            The style of markers representing division cells. Values not provided
+            here fall back to the node marker style, then to the default division
+            style: a hollow white fill, a "circle-cross" symbol, a 2 px border in
+            the branch (node) color, and a size 2 px larger than the node marker
+            size. Accepts one dict or a per-target-cell list, as for
+            `node_marker_style`.
+        line_style : dict or list of dict, optional
+            Plotly line style for the branch lines (color, width, dash, etc.).
+            Defaults to the branch's trace color. Accepts one dict or a
+            per-target-cell list, as for `node_marker_style`.
         node_hover_props : list[str], optional
-            Additional node properties to display in hover text.
+            Extra node properties to append to the hover text, which always
+            shows the cell ID and the plotted x and y values.
         plot_bgcolor : str, optional
-            The background color of the plot.
+            The background color of the plot area.
         showlegend : bool, optional
-            True to display the legend, False otherwise. If None, the legend is
-            displayed when plotting several target cells.
+            True to display the legend, False to hide it. If None, the legend is
+            shown only when several target cells are plotted.
         width : int, optional
-            The width of the plot.
+            The width of the plot, in pixels.
         height : int, optional
-            The height of the plot.
-        template : str, optional
-            The Plotly template to use for the figure.
+            The height of the plot, in pixels.
+        template : str or go.layout.Template, optional
+            Plotly template to use for the figure (default is "pycellin_white"). A
+            "pycellin_dark" template is also available. See styling.py for Pycellin
+            template details. See Plotly documentation for more information on templates.
 
         Returns
         -------
         plotly.graph_objects.Figure
             The generated figure. Use Plotly's figure methods to customize or
             display it.
+
+        Raises
+        ------
+        TypeError
+            If `node_marker_style`, `division_marker_style` or `line_style` is
+            not a dict, a list of dicts, or None.
+        KeyError
+            If a target or source cell ID is not in the lineage, or if `x_prop`
+            or `y_prop` is missing from a plotted node.
+        ValueError
+            If `target_cells` is an empty list; if `source_cells` is a list
+            while `target_cells` is not, or the two lists differ in length; if a
+            per-target-cell style list has the wrong length; if both
+            `source_cells` and `generations` are given; or if a source cell is
+            not upstream of its target.
+        MissingPropertyError
+            If a name in `node_hover_props` is absent from a plotted node.
+
+        See Also
+        --------
+        plot_branch_profile : Build this figure and display it directly.
+        get_branch_lineage : Extract the single-cell branch used for one trace.
+
+        Examples
+        --------
+        Plot cell area over time for two branches, each starting at its own
+        mother cell:
+
+        fig = lineage.get_branch_profile_figure(
+            target_cells=[100, 142],
+            y_prop="cell_area",
+            source_cells=[80, 130],
+        )
+
+        Style ordinary cells and division cells independently:
+
+        fig = lineage.get_branch_profile_figure(
+            target_cells=100,
+            y_prop="cell_area",
+            node_marker_style=dict(color="orange", symbol="circle"),
+            division_marker_style=dict(
+                color="orange",
+                symbol="star",
+                line=dict(color="purple", width=3),
+            ),
+        )
+
+        Give each branch its own color with per-target-cell style lists:
+
+        fig = lineage.get_branch_profile_figure(
+            target_cells=[100, 142],
+            y_prop="cell_area",
+            node_marker_style=[{"color": "darkorange"}, {"color": "#7f08a4"}],
+            line_style=[{"color": "orange"}, {"color": "#7f08a4"}],
+        )
         """
 
         def _prop_info(prop: str | Property) -> tuple[str, str]:
@@ -2091,13 +2291,24 @@ class CellLineage(Lineage):
 
         # Treat a single target and several targets the same while plotting:
         # each target cell becomes one trace, paired with one source cell.
-        _, target_cids, source_cells = self._normalize_single_cell_lineage_inputs(
-            target_cells, source_cell, "target_cells"
+        _, target_cids, source_cids = self._normalize_single_cell_lineage_inputs(
+            target_cells, source_cells
         )
+
+        # Expand each style argument to one dict per trace: a single dict is
+        # broadcast, a list is paired with the target cells by position.
+        n_targets = len(target_cids)
+        node_styles = self._expand_branch_style(
+            node_marker_style, "node_marker_style", n_targets
+        )
+        division_styles = self._expand_branch_style(
+            division_marker_style, "division_marker_style", n_targets
+        )
+        line_styles = self._expand_branch_style(line_style, "line_style", n_targets)
 
         fig = go.Figure()
         for index, (target_cid, target_source_cell) in enumerate(
-            zip(target_cids, source_cells)
+            zip(target_cids, source_cids)
         ):
             lineage = self.get_branch_lineage(
                 target_cid, source_cell=target_source_cell, generations=generations
@@ -2107,8 +2318,8 @@ class CellLineage(Lineage):
             x_nodes = [lineage.nodes[node][x_prop_id] for node in nodes]
             y_nodes = [lineage.nodes[node][y_prop_id] for node in nodes]
 
-            # Use fixed, informative defaults: hover text always shows the cell
-            # ID and plotted values; division cells are marked with triangles.
+            # Hover text always shows the cell ID and plotted values;
+            # division cells are marked with a distinct symbol and border.
             node_hover_text = []
             for node, x_value, y_value in zip(nodes, x_nodes, y_nodes):
                 text = (
@@ -2118,9 +2329,10 @@ class CellLineage(Lineage):
                 if node_hover_props:
                     for prop in node_hover_props:
                         if prop not in lineage.nodes[node]:
-                            raise KeyError(
-                                f"Cannot plot: property {prop} is not present "
-                                "in the node attributes."
+                            raise MissingPropertyError(
+                                prop_name=prop,
+                                nid=node,
+                                lineage_ID=lineage.graph["lineage_ID"],
                             )
                         text += f"<br>{prop}: {lineage.nodes[node][prop]}"
                 node_hover_text.append(text)
@@ -2128,16 +2340,77 @@ class CellLineage(Lineage):
             trace_color = get_highlight_color(index + 1)
 
             trace_name = f"{y_label} ({target_cid})" if len(target_cids) > 1 else y_label
-            trace_marker_style = (
-                {} if node_marker_style is None else dict(node_marker_style)
-            )
-            trace_marker_style.setdefault("color", trace_color)
-            trace_marker_style.setdefault("size", 10)
-            trace_marker_style.setdefault(
-                "symbol",
-                ["triangle-up" if self.is_division(node) else "circle" for node in nodes],
-            )
-            trace_line_style = {} if line_style is None else dict(line_style)
+            division_nodes = [self.is_division(node) for node in nodes]
+            # Node style
+            # Layer 1: Pycellin defaults (constants + per-trace color)
+            # Layer 2: user overrides (node_marker_style)
+            default_node = {
+                **BRANCH_PROFILE_NODE_MARKER,
+                "color": trace_color,
+                "line": {**BRANCH_PROFILE_NODE_MARKER["line"], "color": trace_color},
+            }
+            user_node = node_styles[index]
+            node_style = {
+                **default_node,
+                **user_node,
+                "line": {**default_node["line"], **user_node.get("line", {})},
+            }
+
+            # Division style
+            # Layer 1: inherit everything from node_style
+            # Layer 2: division-specific defaults (constants + colors derived
+            #   from node_style; size defaults to the effective node size + a
+            #   fixed increase so divisions stand out even when they share the
+            #   node color)
+            # Layer 3: user overrides (division_marker_style)
+            node_size = node_style["size"]
+            default_division_overrides = {
+                **BRANCH_PROFILE_DIVISION_MARKER,
+                # The division marker has a white fill, so its ring carries the
+                # branch color: match the node fill color rather than the trace
+                # color, so a recolored branch keeps matching division rings.
+                "line": {
+                    **BRANCH_PROFILE_DIVISION_MARKER["line"],
+                    "color": node_style["color"],
+                },
+            }
+            if isinstance(node_size, (int, float)):
+                default_division_overrides["size"] = (
+                    node_size + BRANCH_PROFILE_DIVISION_SIZE_INCREASE
+                )
+            user_division = division_styles[index]
+            division_style = {
+                **node_style,
+                **default_division_overrides,
+                **user_division,
+                # Merge all three line dicts explicitly to preserve partial user overrides.
+                "line": {
+                    **node_style["line"],
+                    **default_division_overrides["line"],
+                    **user_division.get("line", {}),
+                },
+            }
+
+            trace_marker_style = {}
+            for style_name in node_style.keys() | division_style.keys():
+                node_value = node_style.get(style_name)
+                division_value = division_style.get(style_name, node_value)
+                if style_name == "line":
+                    node_line = node_value or {}
+                    division_line = division_value or {}
+                    trace_marker_style[style_name] = {
+                        line_name: [
+                            (division_line if is_division else node_line).get(line_name)
+                            for is_division in division_nodes
+                        ]
+                        for line_name in node_line.keys() | division_line.keys()
+                    }
+                else:
+                    trace_marker_style[style_name] = [
+                        division_value if is_division else node_value
+                        for is_division in division_nodes
+                    ]
+            trace_line_style = dict(line_styles[index])
             trace_line_style.setdefault("color", trace_color)
             fig.add_trace(
                 go.Scatter(
@@ -2164,23 +2437,24 @@ class CellLineage(Lineage):
         )
         return fig
 
-    def plot_branch_property(
+    def plot_branch_profile(
         self,
         target_cells: int | list[int],
         y_prop: str | Property,
         x_prop: str | Property = "timepoint",
-        source_cell: int | list[int] | None = None,
+        source_cells: int | list[int] | None = None,
         generations: int | None = None,
         title: str | None = None,
         mode: str = "lines+markers",
-        node_marker_style: dict[str, Any] | None = None,
-        line_style: dict[str, Any] | None = None,
+        node_marker_style: BranchStyle = None,
+        division_marker_style: BranchStyle = None,
+        line_style: BranchStyle = None,
         node_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         showlegend: bool | None = None,
         width: int | None = None,
         height: int | None = None,
-        template: str | None = None,
+        template: str | go.layout.Template = "pycellin_white",
     ) -> None:
         """
         Plot one node property over another for single-cell lineage branches.
@@ -2189,17 +2463,33 @@ class CellLineage(Lineage):
 
         See Also
         --------
-        get_branch_property_figure : Generate the figure without displaying it.
+        get_branch_profile_figure : Generate the figure without displaying it.
+
+        Examples
+        --------
+        Plot a branch with separate styles for node and division cells:
+
+        lineage.plot_branch_profile(
+            target_cells=100,
+            y_prop="cell_area",
+            node_marker_style=dict(color="orange", symbol="circle"),
+            division_marker_style=dict(
+                color="orange",
+                symbol="star",
+                line=dict(color="purple", width=3),
+            ),
+        )
         """
-        fig = self.get_branch_property_figure(
+        fig = self.get_branch_profile_figure(
             target_cells=target_cells,
             y_prop=y_prop,
             x_prop=x_prop,
-            source_cell=source_cell,
+            source_cells=source_cells,
             generations=generations,
             title=title,
             mode=mode,
             node_marker_style=node_marker_style,
+            division_marker_style=division_marker_style,
             line_style=line_style,
             node_hover_props=node_hover_props,
             plot_bgcolor=plot_bgcolor,
@@ -2212,34 +2502,63 @@ class CellLineage(Lineage):
 
     @staticmethod
     def _normalize_single_cell_lineage_inputs(
-        cid: int | list[int],
-        source_cell: int | list[int] | None,
-        cid_arg_name: str,
+        target_cells: int | list[int],
+        source_cells: int | list[int] | None,
     ) -> tuple[bool, list[int], list[int | None]]:
         # Normalize scalar input to a list so callers can use one code path for
         # both a single target cell and multiple target cells.
-        is_single_target = isinstance(cid, int)
-        target_cids = [cid] if is_single_target else cid
+        is_single_target = isinstance(target_cells, int)
+        target_cids = [target_cells] if is_single_target else target_cells
         if not target_cids:
-            raise ValueError(f"{cid_arg_name} must contain at least one target cell ID.")
+            raise ValueError("target_cells must contain at least one target cell ID.")
 
         # A list of source cells is positional and must match the target list.
         # A scalar source cell, including None, is broadcast to every target.
-        if isinstance(source_cell, list):
+        if isinstance(source_cells, list):
             if is_single_target:
                 raise ValueError(
-                    f"source_cell can be a list only when {cid_arg_name} is also a list."
+                    "source_cells can be a list only when target_cells is also a list."
                 )
-            if len(source_cell) != len(target_cids):
+            if len(source_cells) != len(target_cids):
                 raise ValueError(
-                    f"source_cell must have the same length as {cid_arg_name} "
+                    "source_cells must have the same length as target_cells "
                     "when both are lists."
                 )
-            source_cells = source_cell
+            source_cids = source_cells
         else:
-            source_cells = [source_cell] * len(target_cids)
+            source_cids = [source_cells] * len(target_cids)
 
-        return is_single_target, target_cids, source_cells
+        return is_single_target, target_cids, source_cids
+
+    @staticmethod
+    def _expand_branch_style(
+        style: BranchStyle, arg_name: str, n_targets: int
+    ) -> list[dict[str, Any]]:
+        # Expand a branch-style argument to one plain dict per target cell.
+        # None or a single dict is broadcast to every trace; a list is paired
+        # with the target cells by position. Each returned dict is a fresh
+        # shallow copy the caller may mutate.
+        if style is None or isinstance(style, dict):
+            return [dict(style) if style else {} for _ in range(n_targets)]
+        if not isinstance(style, list):
+            raise TypeError(
+                f"'{arg_name}' must be a dict, a list of dicts, or None, "
+                f"got {type(style).__name__!r} instead."
+            )
+        if len(style) != n_targets:
+            raise ValueError(
+                f"'{arg_name}' has {len(style)} entries but there are {n_targets} "
+                "target cells; pass one style per target cell."
+            )
+        expanded = []
+        for i, entry in enumerate(style):
+            if entry is not None and not isinstance(entry, dict):
+                raise TypeError(
+                    f"'{arg_name}[{i}]' must be a dict or None, "
+                    f"got {type(entry).__name__!r} instead."
+                )
+            expanded.append(dict(entry) if entry else {})
+        return expanded
 
     @staticmethod
     # TODO: I don't think this function is good design, even if it factorises code.
@@ -2418,7 +2737,7 @@ class CycleLineage(Lineage):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
-        template: str | None = None,
+        template: str | go.layout.Template = "pycellin_white",
     ) -> go.Figure:
         """
         Generate a Plotly figure of the cell cycle lineage tree.
@@ -2474,9 +2793,10 @@ class CycleLineage(Lineage):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
-        template : str, optional
-            The Plotly template to use for the figure. If None, defaults to Plotly's
-            default template. Examples: "plotly", "plotly_white", "plotly_dark".
+        template : str or go.layout.Template, optional
+            Plotly template to use for the figure (default is "pycellin_white"). A
+            "pycellin_dark" template is also available. See styling.py for Pycellin
+            template details. See Plotly documentation for more information on templates.
 
         Returns
         -------
@@ -2490,7 +2810,7 @@ class CycleLineage(Lineage):
         This cannot easily be corrected.
         """
         if y_prop is None:
-            from pycellin.graph.properties.core import create_level_property
+            from pycellin.properties.core import create_level_property
 
             y_prop = create_level_property()
 
@@ -2532,7 +2852,7 @@ class CycleLineage(Lineage):
         showlegend: bool = True,
         width: int | None = None,
         height: int | None = None,
-        template: str | None = None,
+        template: str | go.layout.Template = "pycellin_white",
     ) -> None:
         """
         Plot the cell cycle lineage as a tree using Plotly.
@@ -2583,9 +2903,10 @@ class CycleLineage(Lineage):
             The width of the plot. If None, defaults to current Plotly template.
         height : int, optional
             The height of the plot. If None, defaults to current Plotly template.
-        template : str, optional
-            The Plotly template to use for the figure. If None, defaults to Plotly's
-            default template. Examples: "plotly", "plotly_white", "plotly_dark".
+        template : str or go.layout.Template, optional
+            Plotly template to use for the figure (default is "pycellin_white"). A
+            "pycellin_dark" template is also available. See styling.py for Pycellin
+            template details. See Plotly documentation for more information on templates.
 
         Warnings
         --------
