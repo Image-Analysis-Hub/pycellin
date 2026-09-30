@@ -50,9 +50,14 @@ It is recommended to install pycellin in a conda or mamba environment.
     ```
     pip install pycellin
     ```
-    or if you want to install the optional test related dependencies use instead:
+    or if you want to run the example notebooks, use instead:
     ```
-    pip install pycellin[test]
+    pip install "pycellin[notebooks]"
+    ```
+    This also installs JupyterLab, which you start with `jupyter lab`.
+    To run the tests from a clone of the repository, install the test dependencies with pip >= 25.1:
+    ```
+    pip install -e . --group test
     ```
 
 5. You're good to go!

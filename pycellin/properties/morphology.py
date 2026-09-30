@@ -8,7 +8,6 @@ lineage graphs.
 from itertools import combinations, product
 from operator import itemgetter
 
-import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 from PIL import Image, ImageDraw
@@ -486,6 +485,7 @@ def get_width_and_length(
         True to ignore the skeleton tips while computing width, by default False.
     debug : bool, optional
         True to activate debug behavior, by default False.
+        Requires matplotlib, which pycellin does not install.
     debug_folder : Optional[str], optional
         Folder in which to save the debug graphs, by default None.
 
@@ -527,6 +527,8 @@ def get_width_and_length(
     img = from_roi_to_array(roi, img_width, img_height)
 
     if debug:
+        import matplotlib.pyplot as plt
+
         fig, ax = plt.subplots(nrows=2, ncols=3, sharex=True, sharey=True, dpi=400)
         ax[0, 0].imshow(img, cmap="gray")
         ax[0, 0].set_aspect("equal")
