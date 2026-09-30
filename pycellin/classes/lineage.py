@@ -2271,8 +2271,8 @@ class CellLineage(Lineage):
         fig = lineage.get_branch_profile_figure(
             target_cells=[100, 142],
             y_prop="cell_area",
-            node_marker_style=[{"color": "darkorange"}, {"color": "#7f08a4"}],
-            line_style=[{"color": "orange"}, {"color": "#7f08a4"}],
+            node_marker_style=[{"color": "darkorange"}, {"color": "#862cc6"}],
+            line_style=[{"color": "orange"}, {"color": "#862cc6"}],
         )
         """
 
