@@ -2400,14 +2400,15 @@ class Model:
         """
         Add the cell area property to the model.
 
-        The cell area is computed from the cell polygons.
+        The cell area is computed from the cell polygons. For a
+        shapely.MultiPolygon, it is the area of all the pieces, holes excluded.
 
         Parameters
         ----------
         polygon_prop : str, optional
             Identifier of the cell lineage node property holding the cell shapes
-            as shapely.Polygon. Defaults to "cell_polygon", added by
-            `add_cell_polygon()`.
+            as shapely.Polygon or shapely.MultiPolygon. Defaults to
+            "cell_polygon", added by `add_cell_polygon()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cell_area".
@@ -2578,14 +2579,15 @@ class Model:
         """
         Add the cell perimeter property to the model.
 
-        The cell perimeter is computed from the cell polygons.
+        The cell perimeter is computed from the cell polygons. For a
+        shapely.MultiPolygon, it includes all the pieces and the edges of their holes.
 
         Parameters
         ----------
         polygon_prop : str, optional
             Identifier of the cell lineage node property holding the cell shapes
-            as shapely.Polygon. Defaults to "cell_polygon", added by
-            `add_cell_polygon()`.
+            as shapely.Polygon or shapely.MultiPolygon. Defaults to
+            "cell_polygon", added by `add_cell_polygon()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cell_perimeter".
@@ -2628,7 +2630,8 @@ class Model:
         ----------
         polygon_prop : str, optional
             Identifier of the cell lineage node property holding the cell shapes
-            as shapely.Polygon. Defaults to "cell_polygon", added by
+            as shapely.Polygon. A shapely.MultiPolygon is not accepted, since it has
+            no single contour. Defaults to "cell_polygon", added by
             `add_cell_polygon()`.
         force_recompute : bool
             Whether to force recomputation of the property when it has already been
@@ -2743,8 +2746,11 @@ class Model:
 
         The cell polygon is the outline of the cell label in the label image,
         as a shapely.Polygon. Holes are filled and, when a label is made of several
-        pieces, only the largest one is kept: a warning lists such cells when the
-        model is updated. Pixels that touch only by a corner belong to the same piece.
+        pieces, only the largest one is kept: a warning lists the cells concerned when
+        the model is updated. Pixels that touch only by a corner belong to the same
+        piece.
+        To keep all the pieces and holes, use the cell multipolygon property instead
+        (`add_cell_multipolygon()`).
 
         Parameters
         ----------
@@ -2782,49 +2788,149 @@ class Model:
         ValueError
             If `label_prop` is not a node property of cell lineages.
         """
-        # Resolve label_img.
-        if label_img is None:
-            if label_img_path is None:
-                if (
-                    hasattr(self.model_metadata, "label_img")
-                    and self.model_metadata.label_img is not None
-                ):
-                    label_img = self.model_metadata.label_img
-                elif (
-                    hasattr(self.model_metadata, "label_img_path")
-                    and self.model_metadata.label_img_path is not None
-                ):
-                    label_img_path = self.model_metadata.label_img_path
-                else:
-                    raise ValueError(
-                        "No label image provided. Please provide 'label_img' or "
-                        "'label_img_path', or set them in the model metadata."
-                    )
-
-            if label_img is None:
-                label_img = tifffile.imread(label_img_path).astype(np.uint32)
-
-        # Resolve pixel size.
-        size_x = self.get_pixel_width() or 1.0
-        size_y = self.get_pixel_height() or 1.0
-        if size_x != size_y:
-            raise ValueError("Pixels must be isotropic in x and y.")
-
         prop = morpho.create_cell_polygon_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-
         calc = morpho.CellPolygonFromLabelImg(
             prop,
             label_prop=label_prop,
-            label_img=label_img,
-            pixel_size=size_x,
+            label_img=self._resolve_label_img(label_img, label_img_path),
+            pixel_size=self._get_xy_pixel_size(),
             force_recompute=force_recompute,
         )
         self.add_custom_property(calc)
+
+    def add_cell_multipolygon(
+        self,
+        label_prop: str = "label",
+        label_img: np.ndarray | None = None,
+        label_img_path: str | None = None,
+        force_recompute: bool = False,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell multipolygon property to the model.
+
+        The cell multipolygon is the shape of the cell label in the label image,
+        as a shapely.MultiPolygon. It holds one polygon per piece of the label,
+        sorted by decreasing area, with the holes of each piece as interior rings.
+        Pixels that touch only by a corner belong to the same piece. For labels
+        made of a single piece without holes, prefer the cell polygon property
+        (`add_cell_polygon()`), which more properties accept as input.
+
+        Parameters
+        ----------
+        label_prop: str
+            Name of the property that stores cell labels. Must match the labels in
+            the label image. Defaults to "label".
+        label_img : np.ndarray, optional
+            The label image. If None, the method will fallback to `label_img_path`
+            or attempt to find it in the model's metadata.
+        label_img_path: str, optional
+            The path to the label image (tif stack). If None, the method will attempt
+            to find it in the model's metadata.
+        force_recompute : bool
+            Whether to force recomputation of the property when it has already been
+            computed. Defaults to False.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_multipolygon".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cell multipolygon
+            from label image".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.morphology.create_cell_multipolygon_property`).
+
+        Raises
+        ------
+        ValueError
+            If `label_img` and `label_img_path` are not provided nor defined in the
+            model's metadata.
+        ValueError
+            If pixels are not isotropic in x and y.
+        MissingPropertyError
+            If `label_prop` has not been declared in the model.
+        ValueError
+            If `label_prop` is not a node property of cell lineages.
+        """
+        prop = morpho.create_cell_multipolygon_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self.model_metadata.space_unit or "pixel",
+        )
+        calc = morpho.CellMultiPolygonFromLabelImg(
+            prop,
+            label_prop=label_prop,
+            label_img=self._resolve_label_img(label_img, label_img_path),
+            pixel_size=self._get_xy_pixel_size(),
+            force_recompute=force_recompute,
+        )
+        self.add_custom_property(calc)
+
+    def _resolve_label_img(
+        self, label_img: np.ndarray | None, label_img_path: str | None
+    ) -> np.ndarray:
+        """
+        Return the label image to use, from the arguments or the model metadata.
+
+        Parameters
+        ----------
+        label_img : np.ndarray | None
+            The label image. If None, `label_img_path` is used.
+        label_img_path : str | None
+            The path to the label image (tif stack). If None as well, the label
+            image or its path is taken from the model metadata.
+
+        Returns
+        -------
+        np.ndarray
+            The label image.
+
+        Raises
+        ------
+        ValueError
+            If `label_img` and `label_img_path` are not provided nor defined in the
+            model's metadata.
+        """
+        if label_img is not None:
+            return label_img
+        if label_img_path is None:
+            if getattr(self.model_metadata, "label_img", None) is not None:
+                return self.model_metadata.label_img
+            label_img_path = getattr(self.model_metadata, "label_img_path", None)
+            if label_img_path is None:
+                raise ValueError(
+                    "No label image provided. Please provide 'label_img' or "
+                    "'label_img_path', or set them in the model metadata."
+                )
+        return tifffile.imread(label_img_path).astype(np.uint32)
+
+    def _get_xy_pixel_size(self) -> float:
+        """
+        Return the pixel size in x and y, which must be the same.
+
+        Returns
+        -------
+        float
+            The pixel size in x and y, or 1.0 if it is not defined.
+
+        Raises
+        ------
+        ValueError
+            If pixels are not isotropic in x and y.
+        """
+        size_x = self.get_pixel_width() or 1.0
+        size_y = self.get_pixel_height() or 1.0
+        if size_x != size_y:
+            raise ValueError("Pixels must be isotropic in x and y.")
+        return size_x
 
     def add_rod_length(
         self,

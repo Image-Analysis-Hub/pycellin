@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 import tifffile
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPolygon, Polygon
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.classes.exceptions import MissingPropertyError
@@ -733,6 +733,39 @@ class TestAddCycleMeanSpeed:
     def test_unit_from_speed_prop(self, input_props_model):
         input_props_model.add_cycle_mean_speed(speed_prop="my_speed")
         assert input_props_model.get_property("cycle_mean_speed").unit == "um/frame"
+
+
+class TestAddCellMultipolygon:
+    """Test cases for Model.add_cell_multipolygon() method."""
+
+    def test_values(self, input_props_model):
+        # Cells 1 and 2 are at timepoints 0 and 1, cells 3 and 4 at timepoint 2.
+        input_props_model.props_metadata._add_prop(
+            _create_test_property("label", "node", dtype="int")
+        )
+        lin = input_props_model.data.cell_data[1]
+        for nid, label in [(1, 1), (2, 1), (3, 1), (4, 2)]:
+            lin.nodes[nid]["label"] = label
+        label_img = np.zeros((3, 6, 6), dtype=np.uint32)
+        label_img[0, 0:2, 0:2] = label_img[0, 4, 4] = 1
+        label_img[1, 1:3, 1:3] = 1
+        label_img[2, 0:2, 0:2] = 1
+        label_img[2, 3:5, 3:5] = 2
+        input_props_model.add_cell_multipolygon(label_img=label_img)
+        input_props_model.update()
+        multipolygon = lin.nodes[1]["cell_multipolygon"]
+        assert isinstance(multipolygon, MultiPolygon)
+        assert len(multipolygon.geoms) == 2
+
+    def test_missing_label_prop_raises(self, input_props_model):
+        with pytest.raises(MissingPropertyError, match="set 'label_prop'"):
+            input_props_model.add_cell_multipolygon(
+                label_img=np.zeros((3, 6, 6), dtype=np.uint32)
+            )
+
+    def test_no_label_image_raises(self, input_props_model):
+        with pytest.raises(ValueError, match="No label image provided"):
+            input_props_model.add_cell_multipolygon()
 
 
 class TestAddAbsoluteAge:

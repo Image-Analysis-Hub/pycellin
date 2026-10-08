@@ -8,13 +8,14 @@ import warnings
 import networkx as nx
 import numpy as np
 import pytest
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPolygon, Polygon
 
 from pycellin.classes import CellLineage, Data, Property
 from pycellin.properties.morphology import (
     BirthArea,
     CellArea,
     CellContour,
+    CellMultiPolygonFromLabelImg,
     CellPerimeter,
     CellPolygonFromLabelImg,
     CycleMeanArea,
@@ -86,11 +87,14 @@ def prop_cell_lin():
 @pytest.fixture
 def label_img():
     # Timepoint 0: label 3 is a 2x3 rectangle (rows 2-3, columns 5-7). Label 4 is
-    # made of a 3x3 square (rows 6-8, columns 1-3) and of a single pixel.
+    # made of a 3x3 square (rows 6-8, columns 1-3) and of a single pixel. Label 5
+    # is a 3x3 square with a hole at its center (rows 6-8, columns 6-8).
     img = np.zeros((1, 10, 12), dtype=np.uint32)
     img[0, 2:4, 5:8] = 3
     img[0, 6:9, 1:4] = 4
     img[0, 9, 10] = 4
+    img[0, 6:9, 6:9] = 5
+    img[0, 7, 7] = 0
     return img
 
 
@@ -130,6 +134,24 @@ class TestMaskToPolygons:
     def test_empty_mask(self):
         assert _mask_to_polygons(np.zeros((3, 3), dtype=bool)) == []
 
+    def test_holes_kept_as_interior_rings(self):
+        mask = np.zeros((7, 7), dtype=bool)
+        mask[1:6, 1:6] = True
+        mask[3, 3] = False
+        polygon = _mask_to_polygons(mask, fill_holes=False)[0]
+        assert len(polygon.interiors) == 1
+        assert polygon.area == 24.0
+
+    def test_piece_inside_hole(self):
+        # A ring of 40 pixels around a 3x3 hole, with a 1-pixel piece at its center.
+        mask = np.zeros((9, 9), dtype=bool)
+        mask[1:8, 1:8] = True
+        mask[3:6, 3:6] = False
+        mask[4, 4] = True
+        polygons = _mask_to_polygons(mask, fill_holes=False)
+        assert [polygon.area for polygon in polygons] == [40.0, 0.5]
+        assert MultiPolygon(polygons).is_valid
+
 
 # CellPolygonFromLabelImg #####################################################
 
@@ -167,12 +189,12 @@ class TestCellPolygonFromLabelImg:
 
     def test_compute_missing_label_raises(self, label_img, prop_cell_lin):
         lineage = CellLineage()
-        lineage.add_node(1, label=5, timepoint=0)
+        lineage.add_node(1, label=7, timepoint=0)
         lineage.graph["lineage_ID"] = 1
         calculator = CellPolygonFromLabelImg(
             prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
         )
-        with pytest.raises(ValueError, match="Label 5 of cell 1"):
+        with pytest.raises(ValueError, match="Label 7 of cell 1"):
             calculator.compute(lineage, nid=1)
 
     def test_enrich_warns_once_for_fragmented_labels(self, label_img, prop_cell_lin):
@@ -187,6 +209,35 @@ class TestCellPolygonFromLabelImg:
             calculator.enrich(Data({1: lineage}), [(1, 1), (2, 1)])
         assert len(record) == 1
         assert "cell 2 of lineage 1" in str(record[0].message)
+        assert "model.add_cell_multipolygon()" in str(record[0].message)
+
+    def test_enrich_warns_for_holes(self, label_img, prop_cell_lin):
+        lineage = CellLineage()
+        lineage.add_node(1, label=5, timepoint=0)
+        lineage.graph["lineage_ID"] = 1
+        calculator = CellPolygonFromLabelImg(
+            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        )
+        with pytest.warns(UserWarning, match=r"1 cell has a label with holes \(cell 1"):
+            calculator.enrich(Data({1: lineage}), [(1, 1)])
+        assert lineage.nodes[1]["test_property"].area == 8.5
+
+    def test_enrich_single_warning_for_pieces_and_holes(
+        self, label_img, prop_cell_lin
+    ):
+        lineage = CellLineage()
+        lineage.add_node(1, label=4, timepoint=0)
+        lineage.add_node(2, label=5, timepoint=0)
+        lineage.graph["lineage_ID"] = 1
+        calculator = CellPolygonFromLabelImg(
+            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        )
+        with pytest.warns(UserWarning) as record:
+            calculator.enrich(Data({1: lineage}), [(1, 1), (2, 1)])
+        assert len(record) == 1
+        message = str(record[0].message)
+        assert "a label made of several pieces (cell 1 of lineage 1)" in message
+        assert "a label with holes (cell 2 of lineage 1)" in message
 
     def test_enrich_no_warning_without_fragmented_label(
         self, label_img, prop_cell_lin
@@ -213,6 +264,42 @@ class TestCellPolygonFromLabelImg:
         }
 
 
+# CellMultiPolygonFromLabelImg ################################################
+
+
+class TestCellMultiPolygonFromLabelImg:
+    def test_compute_keeps_all_pieces(self, label_img, prop_cell_lin):
+        lineage = CellLineage()
+        lineage.add_node(1, label=4, timepoint=0)
+        calculator = CellMultiPolygonFromLabelImg(
+            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        )
+        multipolygon = calculator.compute(lineage, nid=1)
+        assert [polygon.area for polygon in multipolygon.geoms] == [8.5, 0.5]
+
+    def test_compute_single_piece(self, label_img, prop_cell_lin):
+        lineage = CellLineage()
+        lineage.add_node(1, label=3, timepoint=0)
+        calculator = CellMultiPolygonFromLabelImg(
+            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=2.0
+        )
+        multipolygon = calculator.compute(lineage, nid=1)
+        assert isinstance(multipolygon, MultiPolygon)
+        assert len(multipolygon.geoms) == 1
+        assert multipolygon.bounds == (9.0, 3.0, 15.0, 7.0)
+
+    def test_enrich_no_warning_for_fragmented_labels(self, label_img, prop_cell_lin):
+        lineage = CellLineage()
+        lineage.add_node(1, label=4, timepoint=0)
+        lineage.graph["lineage_ID"] = 1
+        calculator = CellMultiPolygonFromLabelImg(
+            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            calculator.enrich(Data({1: lineage}), [(1, 1)])
+
+
 # CellArea ####################################################################
 
 
@@ -224,6 +311,16 @@ class TestCellArea:
     def test_compute_custom_polygon_prop(self, polygon_lineage, prop_cell_lin):
         calculator = CellArea(prop_cell_lin, polygon_prop="my_polygon")
         assert calculator.compute(polygon_lineage, nid=2) == 3.0
+
+    def test_compute_multipolygon(self, polygon_lineage, prop_cell_lin):
+        polygon_lineage.nodes[1]["my_multipolygon"] = MultiPolygon(
+            [
+                Polygon([(0, 0), (2, 0), (2, 1), (0, 1)]),
+                Polygon([(5, 5), (6, 5), (6, 6), (5, 6)]),
+            ]
+        )
+        calculator = CellArea(prop_cell_lin, polygon_prop="my_multipolygon")
+        assert calculator.compute(polygon_lineage, nid=1) == 3.0
 
     def test_compute_missing_polygon(self, polygon_lineage, prop_cell_lin):
         calculator = CellArea(prop_cell_lin)
@@ -258,6 +355,14 @@ class TestCellContour:
         calculator = CellContour(prop_cell_lin, polygon_prop="my_polygon")
         contour = calculator.compute(polygon_lineage, nid=2)
         assert contour[:4] == [(-1.5, -0.5), (1.5, -0.5), (1.5, 0.5), (-1.5, 0.5)]
+
+    def test_compute_multipolygon_raises(self, polygon_lineage, prop_cell_lin):
+        polygon_lineage.nodes[1]["my_multipolygon"] = MultiPolygon(
+            [polygon_lineage.nodes[1]["cell_polygon"]]
+        )
+        calculator = CellContour(prop_cell_lin, polygon_prop="my_multipolygon")
+        with pytest.raises(TypeError, match="a contour needs a Polygon"):
+            calculator.compute(polygon_lineage, nid=1)
 
     def test_existing_value_kept_with_custom_identifier(
         self, polygon_lineage, prop_cell_lin

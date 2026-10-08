@@ -6,6 +6,7 @@ lineage graphs.
 """
 
 import warnings
+from abc import abstractmethod
 from itertools import combinations, product
 from operator import itemgetter
 from typing import ClassVar
@@ -15,7 +16,8 @@ import numpy as np
 from PIL import Image, ImageDraw
 from scipy import ndimage as ndi
 from shapely.affinity import affine_transform
-from shapely.geometry import LineString, Point, Polygon
+from shapely.geometry import LineString, MultiPolygon, Point, Polygon
+from shapely.geometry.base import BaseGeometry
 from skimage.measure import find_contours
 from skimage.morphology import skeletonize
 
@@ -49,19 +51,69 @@ def create_cell_polygon_property(
     )
 
 
-def _mask_to_polygons(mask: np.ndarray) -> list[Polygon]:
+def create_cell_multipolygon_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+    custom_provenance: str | None = None,
+    unit: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "cell_multipolygon",
+        name=custom_name or "Cell multipolygon from label image",
+        description=custom_description
+        or "Cell shape as a shapely.MultiPolygon, with all the pieces and holes "
+        "of the cell label, computed from a label image",
+        provenance=custom_provenance or "pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="shapely.MultiPolygon",
+        unit=unit,
+    )
+
+
+def _trace_region(region: np.ndarray, fully_connected: str) -> np.ndarray:
+    """
+    Trace the contour of a 2D region without holes.
+
+    The region is padded before tracing, so that a region touching the border
+    of the array gets a closed contour.
+
+    Parameters
+    ----------
+    region : np.ndarray
+        2D binary array holding a single region without holes.
+    fully_connected : {"high", "low"}
+        "high" if the region is 8-connected, "low" if it is 4-connected
+        (see skimage.measure.find_contours).
+
+    Returns
+    -------
+    np.ndarray
+        Contour of the region, as (x, y) pixel coordinates of the array.
+    """
+    padded = np.pad(region, 1)
+    # A region without holes has a single contour.
+    contour = find_contours(padded, 0.5, fully_connected=fully_connected)[0]
+    # Undo the padding and switch from (row, col) to (x, y).
+    return contour[:, ::-1] - 1
+
+
+def _mask_to_polygons(mask: np.ndarray, fill_holes: bool = True) -> list[Polygon]:
     """
     Convert a 2D binary mask into one polygon per piece of the mask.
 
     Pieces are 8-connected: pixels that touch only by a corner belong to the same
-    piece. Holes are filled, so each polygon is the outline of its piece. The mask
-    is padded before tracing the contours, so that pieces touching the border
-    of the mask get closed outlines.
+    piece. Holes are 4-connected regions of background enclosed by a piece.
+    Pieces touching the border of the mask get closed outlines.
 
     Parameters
     ----------
     mask : np.ndarray
         2D binary mask.
+    fill_holes : bool, optional
+        If True (default), holes are filled and each polygon is the outline of its
+        piece. If False, holes become interior rings of the polygons.
 
     Returns
     -------
@@ -69,28 +121,34 @@ def _mask_to_polygons(mask: np.ndarray) -> list[Polygon]:
         Polygons in (x, y) pixel coordinates of the mask, sorted by decreasing area.
         Empty if the mask is empty.
     """
-    pieces, n_pieces = ndi.label(mask, structure=np.ones((3, 3), dtype=bool))
+    eight_connectivity = np.ones((3, 3), dtype=bool)
+    pieces, n_pieces = ndi.label(mask, structure=eight_connectivity)
     polygons = []
     for piece_id in range(1, n_pieces + 1):
-        # binary_fill_holes() treats the background as 4-connected, which matches
-        # the 8-connectivity of the pieces.
-        piece = np.pad(ndi.binary_fill_holes(pieces == piece_id), 1)
-        # A filled 8-connected piece has a single contour.
-        contour = find_contours(piece, 0.5, fully_connected="high")[0]
-        # Undo the padding and switch from (row, col) to (x, y).
-        polygons.append(Polygon(contour[:, ::-1] - 1))
+        piece = pieces == piece_id
+        # binary_fill_holes() treats the background as 4-connected by default,
+        # which matches the 8-connectivity of the pieces.
+        filled = ndi.binary_fill_holes(piece)
+        shell = _trace_region(filled, fully_connected="high")
+        holes = []
+        if not fill_holes:
+            hole_regions, n_holes = ndi.label(filled & ~piece)
+            for hole_id in range(1, n_holes + 1):
+                # A hole can enclose other pieces: its ring is its filled outline.
+                hole = ndi.binary_fill_holes(
+                    hole_regions == hole_id, structure=eight_connectivity
+                )
+                holes.append(_trace_region(hole, fully_connected="low"))
+        polygons.append(Polygon(shell, holes))
     return sorted(polygons, key=lambda polygon: polygon.area, reverse=True)
 
 
-class CellPolygonFromLabelImg(NodeLocalPropCalculator):
+class _LabelImgShapeCalculator(NodeLocalPropCalculator):
     """
-    A calculator for the cell polygon property, which computes the cell shape as a
-    shapely.Polygon from a label image.
+    Base class of the calculators computing the shape of cells from a label image.
 
-    The polygon is the outline of the cell label: holes are filled and, when the
-    label is made of several pieces, only the largest one is kept. A warning lists
-    such cells at the end of each update. Pixels that touch only by a corner belong
-    to the same piece.
+    Subclasses implement `_shape_from_mask()`, which converts the mask of a cell
+    label into a shapely geometry.
 
     Parameters
     ----------
@@ -128,8 +186,90 @@ class CellPolygonFromLabelImg(NodeLocalPropCalculator):
         self.force_recompute = force_recompute
         # Bounding boxes of the labels of each timepoint, computed on first use.
         self._label_slices: dict[int, list[tuple[slice, slice] | None]] = {}
-        # (cell ID, lineage ID) of the cells whose label is in several pieces.
+
+    @abstractmethod
+    def _shape_from_mask(self, mask: np.ndarray, lineage, nid: int) -> BaseGeometry:
+        """
+        Convert the mask of a cell label into a shapely geometry.
+
+        Parameters
+        ----------
+        mask : np.ndarray
+            Binary mask of the cell label, cropped to its bounding box.
+        lineage : CellLineage
+            Lineage graph containing the cell.
+        nid : int
+            Node ID of the cell.
+
+        Returns
+        -------
+        BaseGeometry
+            Shape of the cell, in (x, y) pixel coordinates of the mask.
+        """
+
+    def compute(self, lineage, nid: int) -> BaseGeometry:
+        if not self.force_recompute and self.prop.identifier in lineage.nodes[nid]:
+            return lineage.nodes[nid][self.prop.identifier]
+
+        label = int(lineage.nodes[nid][self.label_prop])
+        t = lineage.nodes[nid]["timepoint"]
+        frame = self.label_img[t]
+        if t not in self._label_slices:
+            self._label_slices[t] = ndi.find_objects(frame)
+        slices = self._label_slices[t]
+        if not 0 < label <= len(slices) or slices[label - 1] is None:
+            raise ValueError(
+                f"Label {label} of cell {nid} (lineage "
+                f"{lineage.graph['lineage_ID']}) is not in timepoint {t} "
+                "of the label image."
+            )
+        rows, cols = slices[label - 1]
+        shape = self._shape_from_mask(frame[rows, cols] == label, lineage, nid)
+        # Move the shape from the bounding box to the frame, then scale it.
+        size = self.pixel_size
+        return affine_transform(
+            shape, [size, 0, 0, size, size * cols.start, size * rows.start]
+        )
+
+
+class CellPolygonFromLabelImg(_LabelImgShapeCalculator):
+    """
+    A calculator for the cell polygon property, which computes the cell shape as a
+    shapely.Polygon from a label image.
+
+    The polygon is the outline of the cell label: holes are filled and, when the
+    label is made of several pieces, only the largest one is kept. At the end of
+    each update, a single warning lists the cells whose label is made of several
+    pieces or has holes. Pixels that touch only by a corner belong to the same piece.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    label_prop : str
+        Name of the property that stores cell labels.
+    label_img : np.ndarray
+        The label image.
+    pixel_size : float
+        The size of each pixel. Must be in the same unit as the property unit.
+    force_recompute : bool, optional
+        Whether to force recomputation of the property when it has already been
+        computed, by default False.
+    """
+
+    def __init__(
+        self,
+        property: Property,
+        label_prop: str,
+        label_img: np.ndarray,
+        pixel_size: float,
+        force_recompute: bool = False,
+    ):
+        super().__init__(property, label_prop, label_img, pixel_size, force_recompute)
+        # (cell ID, lineage ID) of the cells whose label is in several pieces,
+        # and of the cells whose label has holes.
         self._fragmented_cells: list[tuple[int, int]] = []
+        self._cells_with_holes: list[tuple[int, int]] = []
 
     def enrich(
         self, data: Data, nodes_to_enrich: list[tuple[int, int]], **kwargs
@@ -148,50 +288,87 @@ class CellPolygonFromLabelImg(NodeLocalPropCalculator):
         Warns
         -----
         UserWarning
-            If the label of some cells is made of several pieces.
+            If the label of some cells is made of several pieces or has holes.
         """
         self._fragmented_cells = []
+        self._cells_with_holes = []
         super().enrich(data, nodes_to_enrich, **kwargs)
+        issues = []
         if self._fragmented_cells:
-            n_cells = len(self._fragmented_cells)
-            examples = ", ".join(
-                f"cell {nid} of lineage {lin_ID}"
-                for nid, lin_ID in self._fragmented_cells[:5]
+            issues.append(
+                _describe_cells(
+                    self._fragmented_cells, "a label made of several pieces"
+                )
             )
-            if n_cells > 5:
-                examples += ", ..."
-            cells_txt = "1 cell has" if n_cells == 1 else f"{n_cells} cells have"
+        if self._cells_with_holes:
+            issues.append(_describe_cells(self._cells_with_holes, "a label with holes"))
+        if issues:
             warnings.warn(
-                f"{cells_txt} a label made of several pieces in the label image "
-                f"({examples}). '{self.prop.identifier}' only keeps the largest "
-                "piece of each label."
+                f"In the label image, {' and '.join(issues)}. "
+                f"'{self.prop.identifier}' only keeps the largest piece of each label "
+                "and fills its holes. To keep all the pieces and holes, use the cell "
+                "multipolygon property instead: model.add_cell_multipolygon()."
             )
 
-    def compute(self, lineage, nid: int) -> Polygon:
-        if not self.force_recompute and self.prop.identifier in lineage.nodes[nid]:
-            return lineage.nodes[nid][self.prop.identifier]
-
-        label = int(lineage.nodes[nid][self.label_prop])
-        t = lineage.nodes[nid]["timepoint"]
-        frame = self.label_img[t]
-        if t not in self._label_slices:
-            self._label_slices[t] = ndi.find_objects(frame)
-        slices = self._label_slices[t]
-        if not 0 < label <= len(slices) or slices[label - 1] is None:
-            raise ValueError(
-                f"Label {label} of cell {nid} (lineage "
-                f"{lineage.graph['lineage_ID']}) is not in timepoint {t} "
-                "of the label image."
-            )
-        rows, cols = slices[label - 1]
-        polygons = _mask_to_polygons(frame[rows, cols] == label)
+    def _shape_from_mask(self, mask: np.ndarray, lineage, nid: int) -> Polygon:
+        polygons = _mask_to_polygons(mask)
         if len(polygons) > 1:
             self._fragmented_cells.append((nid, lineage.graph["lineage_ID"]))
-        # Move the polygon from the bounding box to the frame, then scale it.
-        size = self.pixel_size
-        return affine_transform(
-            polygons[0], [size, 0, 0, size, size * cols.start, size * rows.start]
-        )
+        if (ndi.binary_fill_holes(mask) & ~mask).any():
+            self._cells_with_holes.append((nid, lineage.graph["lineage_ID"]))
+        return polygons[0]
+
+
+def _describe_cells(cells: list[tuple[int, int]], what: str) -> str:
+    """
+    Describe a list of cells for a warning, naming the first five.
+
+    Parameters
+    ----------
+    cells : list of tuple[int, int]
+        (cell ID, lineage ID) of the cells.
+    what : str
+        What the cells have, e.g. "a label with holes".
+
+    Returns
+    -------
+    str
+        Description such as "2 cells have a label with holes (cell 3 of lineage 1,
+        cell 8 of lineage 2)".
+    """
+    examples = ", ".join(f"cell {nid} of lineage {lin_ID}" for nid, lin_ID in cells[:5])
+    if len(cells) > 5:
+        examples += ", ..."
+    cells_txt = "1 cell has" if len(cells) == 1 else f"{len(cells)} cells have"
+    return f"{cells_txt} {what} ({examples})"
+
+
+class CellMultiPolygonFromLabelImg(_LabelImgShapeCalculator):
+    """
+    A calculator for the cell multipolygon property, which computes the cell shape
+    as a shapely.MultiPolygon from a label image.
+
+    The multipolygon holds one polygon per piece of the cell label, sorted by
+    decreasing area, with the holes of each piece as interior rings. Pixels that
+    touch only by a corner belong to the same piece.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    label_prop : str
+        Name of the property that stores cell labels.
+    label_img : np.ndarray
+        The label image.
+    pixel_size : float
+        The size of each pixel. Must be in the same unit as the property unit.
+    force_recompute : bool, optional
+        Whether to force recomputation of the property when it has already been
+        computed, by default False.
+    """
+
+    def _shape_from_mask(self, mask: np.ndarray, lineage, nid: int) -> MultiPolygon:
+        return MultiPolygon(_mask_to_polygons(mask, fill_holes=False))
 
 
 def create_cell_area_property(
@@ -217,13 +394,15 @@ class CellArea(NodeLocalPropCalculator):
     """
     Calculator to compute the area of a cell from its polygon.
 
+    The area of a shapely.MultiPolygon is the area of all its pieces, holes excluded.
+
     Parameters
     ----------
     property : Property
         Property object to which the calculator is associated.
     polygon_prop : str, optional
         Identifier of the node property holding the cell shapes as
-        shapely.Polygon. Defaults to "cell_polygon".
+        shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
     """
 
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
@@ -520,6 +699,12 @@ class CellContour(NodeLocalPropCalculator):
                 f"Please compute the '{self.polygon_prop}' property first."
             )
             raise KeyError(msg)
+        if not isinstance(poly, Polygon):
+            raise TypeError(
+                f"Cannot compute '{self.prop.identifier}' for cell {nid}, lineage "
+                f"{lineage.graph['lineage_ID']}: '{self.polygon_prop}' holds a "
+                f"{type(poly).__name__}, but a contour needs a Polygon."
+            )
         return [
             (x - poly.centroid.x, y - poly.centroid.y) for (x, y) in poly.exterior.coords
         ]
@@ -548,13 +733,16 @@ class CellPerimeter(NodeLocalPropCalculator):
     """
     Calculator to compute the perimeter of a cell from its polygon.
 
+    The perimeter of a shapely.MultiPolygon is the length of the boundaries of all
+    its pieces, including the edges of their holes.
+
     Parameters
     ----------
     property : Property
         Property object to which the calculator is associated.
     polygon_prop : str, optional
         Identifier of the node property holding the cell shapes as
-        shapely.Polygon. Defaults to "cell_polygon".
+        shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
     """
 
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
