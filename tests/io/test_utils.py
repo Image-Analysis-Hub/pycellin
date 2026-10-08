@@ -3,6 +3,7 @@
 import logging
 
 import networkx as nx
+import numpy as np
 import pytest
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
@@ -14,8 +15,10 @@ from pycellin.properties.core import (
 )
 from pycellin.io.utils import (
     _add_lineage_props,
+    _get_int_ids,
     _get_props_from_data,
     _graph_has_node_prop,
+    _has_lin_id,
     _remove_orphaned_metadata,
     _split_graph_into_lineages,
     _update_lineage_prop_key,
@@ -828,9 +831,9 @@ class TestSplitGraphIntoLineages:
         self, two_lin_graph, lin_props, expected_two_lins
     ):
         """Test when some (not all) nodes have the ID key with same value."""
-        # Remove lineage_ID from some nodes.
+        # Remove lineage_ID from one node of each lineage.
         two_lin_graph.nodes[1].pop("lineage_ID")
-        two_lin_graph.nodes[2].pop("lineage_ID")
+        two_lin_graph.nodes[3].pop("lineage_ID")
         obtained = _split_graph_into_lineages(
             two_lin_graph, lineage_ID_key="lineage_ID", lin_props=lin_props
         )
@@ -841,6 +844,81 @@ class TestSplitGraphIntoLineages:
         assert len(obtained) == 2
         for g1, g2 in zip(obtained, expected_two_lins):
             assert is_equal(g1, g2)
+
+    def test_lineage_without_id_gets_unused_id(self, two_lin_graph):
+        """Test that a multi-cell lineage without ID skips the IDs held by nodes."""
+        two_lin_graph.add_edge(5, 6)
+        obtained = _split_graph_into_lineages(
+            two_lin_graph, lineage_ID_key="lineage_ID"
+        )
+
+        lin_ids = {min(lin.nodes): lin.graph["lineage_ID"] for lin in obtained}
+        assert lin_ids == {1: 0, 3: 1, 5: 2}
+
+    def test_single_cell_without_id_gets_minus_cell_id(self, two_lin_graph):
+        """Test that a single-cell lineage without ID gets minus its cell ID."""
+        two_lin_graph.add_node(5)
+        obtained = _split_graph_into_lineages(
+            two_lin_graph, lineage_ID_key="lineage_ID"
+        )
+
+        lin_ids = {min(lin.nodes): lin.graph["lineage_ID"] for lin in obtained}
+        assert lin_ids == {1: 0, 3: 1, 5: -5}
+        lin5 = next(lin for lin in obtained if 5 in lin)
+        assert lin5.nodes[5]["lineage_ID"] == -5
+
+    def test_single_cell_whose_minus_cell_id_is_used(self, two_lin_graph):
+        """Test that cell 0 alone gets a negative ID when lineage ID 0 is used."""
+        two_lin_graph.add_node(0)
+        obtained = _split_graph_into_lineages(
+            two_lin_graph, lineage_ID_key="lineage_ID"
+        )
+
+        lin_ids = {min(lin.nodes): lin.graph["lineage_ID"] for lin in obtained}
+        assert lin_ids == {1: 0, 3: 1, 0: -1}
+
+    def test_single_cell_fallback_id_skips_single_cell_ids(self):
+        """Test that the replacement of a used -cell_ID skips other single-cell IDs."""
+        g = nx.DiGraph()
+        g.add_edge(5, 6)
+        g.nodes[5]["lineage_ID"] = g.nodes[6]["lineage_ID"] = 0
+        g.add_nodes_from([0, 1])
+        obtained = _split_graph_into_lineages(g, lineage_ID_key="lineage_ID")
+
+        lin_ids = {min(lin.nodes): lin.graph["lineage_ID"] for lin in obtained}
+        assert lin_ids == {5: 0, 0: -2, 1: -1}
+
+    def test_numpy_int_ids_count_as_used(self, two_lin_graph):
+        """Test that IDs stored as NumPy integers count as used IDs."""
+        for node in two_lin_graph.nodes:
+            two_lin_graph.nodes[node]["lineage_ID"] = np.int64(
+                two_lin_graph.nodes[node]["lineage_ID"]
+            )
+        two_lin_graph.add_edge(5, 6)
+        obtained = _split_graph_into_lineages(
+            two_lin_graph, lineage_ID_key="lineage_ID"
+        )
+
+        lin_ids = {min(lin.nodes): lin.graph["lineage_ID"] for lin in obtained}
+        assert lin_ids == {1: 0, 3: 1, 5: 2}
+
+    def test_lineage_without_id_skips_single_cell_id(self):
+        """Test that a multi-cell lineage without ID skips the ID of cell 0 alone."""
+        g = nx.DiGraph()
+        g.add_edge(1, 2)
+        g.add_node(0)
+        obtained = _split_graph_into_lineages(g, lineage_ID_key="lineage_ID")
+
+        lin_ids = {min(lin.nodes): lin.graph["lineage_ID"] for lin in obtained}
+        assert lin_ids == {1: 1, 0: 0}
+
+    def test_duplicate_lineage_ids_raise(self, two_lin_graph):
+        """Test ValueError when disconnected parts of the graph share a lineage ID."""
+        two_lin_graph.nodes[3]["lineage_ID"] = 0
+        two_lin_graph.nodes[4]["lineage_ID"] = 0
+
+        with pytest.raises(ValueError, match="have the same 'lineage_ID' value: 0"):
+            _split_graph_into_lineages(two_lin_graph, lineage_ID_key="lineage_ID")
 
     def test_empty_graph_with_lin_key(self):
         """Test with an empty graph (no nodes)."""
@@ -916,6 +994,51 @@ class TestSplitGraphIntoLineages:
             ValueError, match="inconsistent lineage ID values between nodes and lineage"
         ):
             _split_graph_into_lineages(g, lineage_ID_key="lineage_ID")
+
+
+class TestHasLinId:
+    """Test cases for _has_lin_id function."""
+
+    def test_lineage_has_id(self):
+        lin = CellLineage()
+        lin.add_node(1)
+        lin.graph["lineage_ID"] = 3
+        assert _has_lin_id(lin, "lineage_ID")
+
+    def test_one_node_has_id(self):
+        lin = CellLineage()
+        lin.add_edge(1, 2)
+        lin.nodes[2]["lineage_ID"] = 3
+        assert _has_lin_id(lin, "lineage_ID")
+
+    def test_no_id(self):
+        lin = CellLineage()
+        lin.add_edge(1, 2)
+        assert not _has_lin_id(lin, "lineage_ID")
+
+    def test_none_ids(self):
+        lin = CellLineage()
+        lin.add_node(1, lineage_ID=None)
+        lin.graph["lineage_ID"] = None
+        assert not _has_lin_id(lin, "lineage_ID")
+
+    def test_id_0(self):
+        lin = CellLineage()
+        lin.add_node(1, lineage_ID=0)
+        assert _has_lin_id(lin, "lineage_ID")
+
+
+class TestGetIntIds:
+    """Test cases for _get_int_ids function."""
+
+    def test_python_and_numpy_ints(self):
+        assert sorted(_get_int_ids({-2, np.int64(5), np.int32(1)})) == [-2, 1, 5]
+
+    def test_other_types_excluded(self):
+        assert _get_int_ids({"a", 1.5, None, True, 3}) == [3]
+
+    def test_empty(self):
+        assert _get_int_ids(set()) == []
 
 
 class TestUpdateNodePropKey:

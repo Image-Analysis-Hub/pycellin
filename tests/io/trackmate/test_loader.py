@@ -1116,6 +1116,32 @@ def test_update_location_related_props_one_node():
     assert lineage.nodes[1]["cell_z"] == 3
 
 
+# _parse_model_tag ############################################################
+
+
+def test_parse_model_tag_keep_all_spots_and_tracks():
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    _, _, data = tml._parse_model_tag(
+        xml_path, keep_all_spots=True, keep_all_tracks=True
+    )
+
+    # 107 spots: 96 in 7 tracks that keep their TrackMate ID, and 11 lone spots
+    # whose lineage ID is -cell_ID.
+    track_sizes = {
+        lin_id: len(lin) for lin_id, lin in data.cell_data.items() if lin_id >= 0
+    }
+    assert track_sizes == {0: 74, 1: 2, 2: 4, 3: 2, 4: 10, 5: 2, 6: 2}
+    lone_spots = {lin_id: lin for lin_id, lin in data.cell_data.items() if lin_id < 0}
+    assert len(lone_spots) == 11
+    for lin_id, lin in lone_spots.items():
+        assert list(lin.nodes) == [-lin_id]
+    # The lineage ID of each lineage and of its cells matches its key in the data.
+    for lin_id, lin in data.cell_data.items():
+        assert lin.graph["lineage_ID"] == lin_id
+        cell_lin_ids = {cell_lin_id for _, cell_lin_id in lin.nodes(data="lineage_ID")}
+        assert cell_lin_ids == {lin_id}
+
+
 # _get_specific_tags ##########################################################
 
 
