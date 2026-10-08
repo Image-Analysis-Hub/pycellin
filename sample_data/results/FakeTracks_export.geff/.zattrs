@@ -133,7 +133,7 @@
         },
         "ellipsoid": null,
         "extra": {},
-        "geff_version": "1.1",
+        "geff_version": "1.3",
         "node_props_metadata": {
             "AREA": {
                 "description": "Area",
@@ -384,6 +384,7 @@
                 "varlength": false
             }
         },
+        "polygon": null,
         "related_objects": null,
         "sphere": null,
         "track_node_props": {
