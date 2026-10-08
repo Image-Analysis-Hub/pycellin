@@ -954,7 +954,7 @@ class CellLineage(Lineage):
     def _add_cell(
         self,
         nid: int | None = None,
-        time_prop_name: str = "timepoint",
+        time_prop: str = "timepoint",
         time_prop_value: float = 0,
         timepoint: int | None = None,
         **cell_props,
@@ -967,7 +967,7 @@ class CellLineage(Lineage):
         nid : int, optional
             The node ID to assign to the new cell. If None, the next
             available node ID is used.
-        time_prop_name : str, optional
+        time_prop : str, optional
             The name of the time property. Default is "timepoint".
         time_prop_value : float, optional
             The value of the time property. Default is 0.
@@ -996,7 +996,7 @@ class CellLineage(Lineage):
             raise ValueError(msg)
         self.add_node(nid, **cell_props)
         self.nodes[nid]["cell_ID"] = nid
-        self.nodes[nid][time_prop_name] = time_prop_value
+        self.nodes[nid][time_prop] = time_prop_value
         if timepoint is not None:
             self.nodes[nid]["timepoint"] = timepoint
         return nid
@@ -1036,7 +1036,7 @@ class CellLineage(Lineage):
         source_nid: int,
         target_nid: int,
         target_lineage: CellLineage | None = None,
-        time_prop_name: str = "timepoint",
+        time_prop: str = "timepoint",
         **link_props,
     ) -> dict[int, int] | None:
         """
@@ -1055,7 +1055,7 @@ class CellLineage(Lineage):
         target_lineage : CellLineage, optional
             The lineage of the target cell. If None, the target cell is
             assumed to be in the same lineage as the source cell.
-        time_prop_name : str, optional
+        time_prop : str, optional
             The name of the time property. Default is "timepoint".
         **link_props
             Property values to set for the edge.
@@ -1107,8 +1107,8 @@ class CellLineage(Lineage):
 
         # Check that the link respects the flow of time.
         if (
-            self.nodes[source_nid][time_prop_name]
-            >= target_lineage.nodes[target_nid][time_prop_name]
+            self.nodes[source_nid][time_prop]
+            >= target_lineage.nodes[target_nid][time_prop]
         ):
             raise TimeFlowError(
                 source_nid,

@@ -362,7 +362,7 @@ class TestRescaleTime:
         timepoints = dict(lin.nodes(data="timepoint"))
         frame_time_model.rescale_time(5)
         time_copy_prop = create_time_property(unit=None, custom_identifier="time_copy")
-        calc = Time(time_copy_prop, base_time_prop="time", factor=1)
+        calc = Time(time_copy_prop, time_prop="time", factor=1)
         frame_time_model.add_custom_property(calc)
         frame_time_model.update(["time_copy"])
         lin = frame_time_model.data.cell_data[1]
@@ -413,7 +413,7 @@ class TestRescaleTime:
             Model.rescale_time(model, 5)
 
     def test_reference_time_calculator_warns(self, frame_time_model):
-        calc = Time(create_time_property(unit=None), base_time_prop="timepoint", factor=5)
+        calc = Time(create_time_property(unit=None), time_prop="timepoint", factor=5)
         frame_time_model._updater.register_calculator(calc)
         with pytest.warns(UserWarning, match="has a calculator"):
             frame_time_model.rescale_time(5)
@@ -525,7 +525,7 @@ class TestRescaleSpace:
 
     def test_coordinate_calculator_warns(self, pixel_space_model):
         prop = create_cell_coord_property(unit=None, axis="x")
-        calc = Time(prop, base_time_prop="frame", factor=1)
+        calc = Time(prop, time_prop="frame", factor=1)
         pixel_space_model._updater.register_calculator(calc)
         with pytest.warns(UserWarning, match="'cell_x' has a calculator"):
             pixel_space_model.rescale_space(2)

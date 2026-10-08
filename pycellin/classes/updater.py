@@ -230,7 +230,7 @@ class ModelUpdater:
                         assert len(split_lin) == 0
                         split_lin._add_cell(
                             new_cell_ID,
-                            time_prop_name=time_prop,
+                            time_prop=time_prop,
                             time_prop_value=time_value,
                             **cell_props,
                         )

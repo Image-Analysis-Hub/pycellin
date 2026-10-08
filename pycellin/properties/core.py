@@ -3,6 +3,7 @@
 """Core property functions to create standard Property instances."""
 
 import math
+from typing import ClassVar
 
 from pycellin.classes.data import Data
 from pycellin.classes.exceptions import UpdateRequiredError
@@ -93,17 +94,18 @@ class Time(NodeLocalPropCalculator):
     ----------
     property : Property
         Property instance containing the time property metadata.
-    base_time_prop : str
-        Name of the base time property to use for time calculation.
+    time_prop : str
+        Identifier of the cell lineage node property holding the time
+        of the cells that the new time property is computed from.
     factor : float
-        Factor to multiply the base time property by to get the new time property.
+        Factor to multiply `time_prop` by to get the new time property.
     force_recompute : bool
         If True, forces the recomputation of the time property even if it already
         exists in the lineage graph. Defaults to False.
 
     Warnings
     --------
-    As a general rule, do not use 'timepoint' as the base time property if the
+    As a general rule, do not use 'timepoint' as `time_prop` if the
     calculator is associated with the reference time property of the model. To convert
     the reference time property into another unit, use `Model.rescale_time()` instead.
     This is due to 'timepoint' being derived from the reference time property,
@@ -112,10 +114,14 @@ class Time(NodeLocalPropCalculator):
     lead to incorrect time values.
     """
 
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
+
     def __init__(
         self,
         property: Property,
-        base_time_prop: str,
+        time_prop: str,
         factor: float,
         force_recompute: bool = False,
     ):
@@ -125,7 +131,7 @@ class Time(NodeLocalPropCalculator):
             raise ValueError(
                 "'factor' cannot be None nor zero for time property calculation."
             )
-        self.base_time_prop = base_time_prop
+        self.time_prop = time_prop
         self.factor = factor
         self.force_recompute = force_recompute
 
@@ -148,12 +154,12 @@ class Time(NodeLocalPropCalculator):
         if not self.force_recompute and self.prop.identifier in lineage.nodes[nid]:
             return lineage.nodes[nid][self.prop.identifier]
 
-        if self.base_time_prop not in lineage.nodes[nid]:
+        if self.time_prop not in lineage.nodes[nid]:
             raise KeyError(
-                f"Base time property '{self.base_time_prop}' not found "
+                f"Time property '{self.time_prop}' not found "
                 f"in node {nid} of lineage {lineage.graph['lineage_ID']}."
             )
-        return lineage.nodes[nid][self.base_time_prop] * self.factor
+        return lineage.nodes[nid][self.time_prop] * self.factor
 
 
 def create_timepoint_property(provenance: str = "pycellin") -> Property:

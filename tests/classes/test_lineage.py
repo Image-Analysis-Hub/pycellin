@@ -821,7 +821,7 @@ class TestCellLineageAddCell:
         """Test _add_cell with specific timepoint."""
         next_id = cell_lin._get_next_available_node_ID()
         assert (
-            cell_lin._add_cell(time_prop_name="timepoint", time_prop_value=5) == next_id
+            cell_lin._add_cell(time_prop="timepoint", time_prop_value=5) == next_id
         )
         assert cell_lin.nodes[next_id]["cell_ID"] == next_id
         assert cell_lin.nodes[next_id]["timepoint"] == 5

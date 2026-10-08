@@ -1729,7 +1729,7 @@ class Model:
 
         cid = lineage._add_cell(
             cid,
-            time_prop_name=self.model_metadata.reference_time_property,
+            time_prop=self.model_metadata.reference_time_property,
             time_prop_value=time_value,
             **prop_values,
         )
@@ -1890,7 +1890,7 @@ class Model:
             source_cid,
             target_cid,
             target_lineage,
-            time_prop_name=self.model_metadata.reference_time_property,
+            time_prop=self.model_metadata.reference_time_property,
             **prop_values,
         )
 

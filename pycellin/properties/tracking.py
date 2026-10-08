@@ -281,7 +281,7 @@ class CycleCompleteness(NodeGlobalPropCalculator):
 
 
 def _get_cell_lin_timepoints(
-    lineage: CellLineage, nid: int, time_prop_name: str
+    lineage: CellLineage, nid: int, time_prop: str
 ) -> tuple[int, int]:
     """
     Get the timepoints of the divisions defining the cell cycle.
@@ -294,7 +294,7 @@ def _get_cell_lin_timepoints(
         Lineage graph containing the node of interest.
     nid : int
         Node ID (cell_ID) of the cell of interest.
-    time_prop_name : str
+    time_prop : str
         The name of the time property (e.g. "frame", "time", etc.) to use
         for calculation.
 
@@ -313,19 +313,19 @@ def _get_cell_lin_timepoints(
     if nid not in lineage.nodes:
         raise KeyError(f"Cell {nid} not in the lineage.")
     cells = lineage.get_cell_cycle(nid)
-    frame_current_div = lineage.nodes[cells[-1]][time_prop_name]
+    frame_current_div = lineage.nodes[cells[-1]][time_prop]
     ancestors = list(lineage.predecessors(cells[0]))
     if len(ancestors) > 1:
         raise FusionError(nid, lineage.graph["lineage_ID"])
     elif len(ancestors) == 0:
-        frame_prev_div = lineage.nodes[cells[0]][time_prop_name]
+        frame_prev_div = lineage.nodes[cells[0]][time_prop]
     else:
-        frame_prev_div = lineage.nodes[ancestors[0]][time_prop_name]
+        frame_prev_div = lineage.nodes[ancestors[0]][time_prop]
     return frame_current_div, frame_prev_div
 
 
 def _get_cycle_lin_timepoints(
-    data: Data, lineage: CycleLineage, nid: int, time_prop_name: str
+    data: Data, lineage: CycleLineage, nid: int, time_prop: str
 ) -> tuple[int, int]:
     """
     Get the timepoints of the divisions defining the cell cycle.
@@ -357,15 +357,15 @@ def _get_cycle_lin_timepoints(
         raise KeyError(f"Cycle {nid} not in the lineage.")
     cells = lineage.nodes[nid]["cells"]
     cell_lin = data.cell_data[lineage.graph["lineage_ID"]]
-    frame_current_div = cell_lin.nodes[cells[-1]][time_prop_name]
+    frame_current_div = cell_lin.nodes[cells[-1]][time_prop]
     ancestors = list(lineage.predecessors(nid))
     if len(ancestors) > 1:
         raise FusionError(nid, lineage.graph["lineage_ID"])
     elif len(ancestors) == 0:
-        frame_prev_div = cell_lin.nodes[cells[0]][time_prop_name]
+        frame_prev_div = cell_lin.nodes[cells[0]][time_prop]
     else:
         prev_cells = lineage.nodes[ancestors[0]]["cells"]
-        frame_prev_div = cell_lin.nodes[prev_cells[-1]][time_prop_name]
+        frame_prev_div = cell_lin.nodes[prev_cells[-1]][time_prop]
     return frame_current_div, frame_prev_div
 
 
