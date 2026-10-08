@@ -264,7 +264,7 @@ def load_trackpy_dataframe(
         raise ValueError(
             f"Cannot build the time property '{computed_time_prop}': a column or "
             f"a pycellin property with this name already exists. Use the "
-            f"`computed_time_prop` argument to choose another name."
+            f"'computed_time_prop' argument to choose another name."
         )
 
     # Build the lineages.
