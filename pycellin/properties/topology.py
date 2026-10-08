@@ -424,14 +424,16 @@ class LineageDuration(LineageLocalPropCalculator):
     ----------
     property : Property
         Property object to which the calculator is associated.
-    time_prop_name : str
-        The name of the time property (e.g. "frame", "time", etc.) to use
-        for calculation.)
+    time_prop : str
+        Identifier of the cell lineage node property holding the time
+        of the cells (e.g. "frame", "POSITION_T").
     """
 
-    def __init__(self, property: Property, time_prop_name: str):
+    INPUT_PROPS = {"time_prop": ("node", "CellLineage")}
+
+    def __init__(self, property: Property, time_prop: str):
         super().__init__(property)
-        self.time_prop_name = time_prop_name
+        self.time_prop = time_prop
 
     def compute(self, lineage) -> float:
         """
@@ -447,7 +449,7 @@ class LineageDuration(LineageLocalPropCalculator):
         float
             The total lifespan of the lineage.
         """
-        return lineage.get_duration(time_prop=self.time_prop_name)
+        return lineage.get_duration(time_prop=self.time_prop)
 
 
 def create_location_tag_property(

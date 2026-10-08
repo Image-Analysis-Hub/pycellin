@@ -47,6 +47,12 @@ class PropertyCalculator(ABC):
     # for and are not stored in it (e.g. a label image). Such calculators are not
     # kept by Model.merge(), since they cannot compute the lineages of another model.
     _USES_EXTERNAL_DATA = False
+    # Properties read by the calculator whose identifier is chosen by the user.
+    # Maps the name of the calculator attribute holding the identifier of such
+    # a property to the property type and lineage type the property must have,
+    # e.g. {"area_prop": ("node", "CellLineage")}.
+    # Model.add_custom_property() checks that these properties are declared.
+    INPUT_PROPS: dict[str, tuple[str, str]] = {}
 
     def __init__(self, property: Property):
         self.prop = property
@@ -80,6 +86,24 @@ class PropertyCalculator(ABC):
         are not stored in it (e.g. a label image), False otherwise.
         """
         return cls._USES_EXTERNAL_DATA
+
+    def get_input_props(self) -> dict[str, tuple[str, str, str]]:
+        """
+        Return the properties read by the calculator whose identifier is chosen
+        by the user.
+
+        Returns
+        -------
+        dict[str, tuple[str, str, str]]
+            Keys are the names of the calculator attributes holding the identifiers
+            of the input properties (e.g. "area_prop"). Values are tuples
+            (identifier, property type, lineage type), where property type and
+            lineage type are the ones the input property must have.
+        """
+        return {
+            attr: (getattr(self, attr), prop_type, lin_type)
+            for attr, (prop_type, lin_type) in self.INPUT_PROPS.items()
+        }
 
     @abstractmethod
     def compute(self, *args, **kwargs) -> Any:

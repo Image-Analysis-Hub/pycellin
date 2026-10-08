@@ -19,7 +19,11 @@ from pycellin.classes.property_calculator import (
     NodeGlobalPropCalculator,
     NodeLocalPropCalculator,
 )
-from pycellin.properties.utils import _get_cycle_edge_property_values
+from pycellin.properties.utils import (
+    _get_cycle_edge_property_values,
+    _nanmean,
+    _nansum,
+)
 
 
 def create_cell_displacement_property(
@@ -107,10 +111,18 @@ class CycleTotalDisplacement(NodeGlobalPropCalculator):
     Calculator to compute the total displacement of a cell during a cell cycle.
 
     The cycle total displacement is defined as the displacement of the cell during
-    the cell cycle.
+    the cell cycle. NaN values are ignored. It is NaN when the cell cycle has
+    no link with a displacement value, e.g. a cell cycle of a single cell.
     """
 
-    def __init__(self, property: Property, include_incoming_edge: bool = False):
+    INPUT_PROPS = {"displacement_prop": ("edge", "CellLineage")}
+
+    def __init__(
+        self,
+        property: Property,
+        include_incoming_edge: bool = False,
+        displacement_prop: str = "cell_displacement",
+    ):
         """
         Parameters
         ----------
@@ -119,9 +131,14 @@ class CycleTotalDisplacement(NodeGlobalPropCalculator):
         include_incoming_edge : bool, optional
             Whether to include the incoming edge of the first cell of the cell cycle.
             Default is False.
+        displacement_prop : str, optional
+            Identifier of the cell lineage edge property holding the
+            cell displacements.
+            Default is "cell_displacement".
         """
         super().__init__(property)
         self.include_incoming_edge = include_incoming_edge
+        self.displacement_prop = displacement_prop
 
     def compute(  # type: ignore[override]
         self, data: Data, lineage: CycleLineage, nid: int
@@ -141,12 +158,13 @@ class CycleTotalDisplacement(NodeGlobalPropCalculator):
         Returns
         -------
         float
-            Total displacement of the cell during the cell cycle.
+            Total displacement of the cell during the cell cycle, or NaN if
+            the cell cycle has no link with a displacement value.
         """
         disps = _get_cycle_edge_property_values(
-            "cell_displacement", data, lineage, nid, self.include_incoming_edge
+            self.displacement_prop, data, lineage, nid, self.include_incoming_edge
         )
-        return np.nansum(disps)
+        return _nansum(disps)
 
 
 def create_cycle_mean_displacement_property(
@@ -173,10 +191,18 @@ class CycleMeanDisplacement(NodeGlobalPropCalculator):
     Calculator to compute the mean displacement of a cell during a cell cycle.
 
     The cycle mean displacement is defined as the mean displacement of the cell during
-    the cell cycle.
+    the cell cycle. NaN values are ignored. It is NaN when the cell cycle has
+    no link with a displacement value, e.g. a cell cycle of a single cell.
     """
 
-    def __init__(self, property: Property, include_incoming_edge: bool = False):
+    INPUT_PROPS = {"displacement_prop": ("edge", "CellLineage")}
+
+    def __init__(
+        self,
+        property: Property,
+        include_incoming_edge: bool = False,
+        displacement_prop: str = "cell_displacement",
+    ):
         """
         Parameters
         ----------
@@ -185,9 +211,14 @@ class CycleMeanDisplacement(NodeGlobalPropCalculator):
         include_incoming_edge : bool, optional
             Whether to include the incoming edge of the first cell of the cell cycle.
             Default is False.
+        displacement_prop : str, optional
+            Identifier of the cell lineage edge property holding the
+            cell displacements.
+            Default is "cell_displacement".
         """
         super().__init__(property)
         self.include_incoming_edge = include_incoming_edge
+        self.displacement_prop = displacement_prop
 
     def compute(  # type: ignore[override]
         self, data: Data, lineage: CycleLineage, nid: int
@@ -207,12 +238,13 @@ class CycleMeanDisplacement(NodeGlobalPropCalculator):
         Returns
         -------
         float
-            Mean displacement of the cell during the cell cycle.
+            Mean displacement of the cell during the cell cycle, or NaN if
+            the cell cycle has no link with a displacement value.
         """
         disps = _get_cycle_edge_property_values(
-            "cell_displacement", data, lineage, nid, self.include_incoming_edge
+            self.displacement_prop, data, lineage, nid, self.include_incoming_edge
         )
-        return np.nanmean(disps).item()
+        return _nanmean(disps)
 
 
 def create_cell_speed_property(
@@ -239,21 +271,24 @@ class CellSpeed(EdgeLocalPropCalculator):
     Calculator to compute the speed of a cell between two consecutive detections.
 
     The speed is defined as the displacement of the cell divided by the time interval
-    between the two consecutive detections.
+    between the two consecutive detections. It is computed from the cell positions
+    and the time property, not from the cell displacement property.
     """
 
-    def __init__(self, property: Property, time_prop_name: str):
+    INPUT_PROPS = {"time_prop": ("node", "CellLineage")}
+
+    def __init__(self, property: Property, time_prop: str):
         """
         Parameters
         ----------
         property : Property
             Property object to which the calculator is associated.
-        time_prop_name : str
-            The name of the time property (e.g. "frame", "time", etc.) to use
-            for calculation.
+        time_prop : str
+            Identifier of the cell lineage node property holding the time
+            of the cells (e.g. "frame", "POSITION_T").
         """
         super().__init__(property)
-        self.time_prop_name = time_prop_name
+        self.time_prop = time_prop
 
     def compute(  # type: ignore[override]
         self, lineage: CellLineage, edge: tuple[int, int]
@@ -273,17 +308,14 @@ class CellSpeed(EdgeLocalPropCalculator):
         float
             Cell speed between two consecutive detections.
         """
-        time1 = lineage.nodes[edge[0]][self.time_prop_name]
-        time2 = lineage.nodes[edge[1]][self.time_prop_name]
-        if "cell_displacement" in lineage.edges[edge]:
-            return lineage.edges[edge]["cell_displacement"] / (time2 - time1)
-        else:
-            pos1 = []
-            pos2 = []
-            for axis in ["x", "y", "z"]:
-                pos1.append(lineage.nodes[edge[0]][f"cell_{axis}"])
-                pos2.append(lineage.nodes[edge[1]][f"cell_{axis}"])
-            return math.dist(pos1, pos2) / (time2 - time1)
+        time1 = lineage.nodes[edge[0]][self.time_prop]
+        time2 = lineage.nodes[edge[1]][self.time_prop]
+        pos1 = []
+        pos2 = []
+        for axis in ["x", "y", "z"]:
+            pos1.append(lineage.nodes[edge[0]][f"cell_{axis}"])
+            pos2.append(lineage.nodes[edge[1]][f"cell_{axis}"])
+        return math.dist(pos1, pos2) / (time2 - time1)
 
 
 def create_cycle_mean_speed_property(
@@ -309,10 +341,18 @@ class CycleMeanSpeed(NodeGlobalPropCalculator):
     Calculator to compute the mean speed of a cell during a cell cycle.
 
     The cycle mean speed is defined as the mean speed of the cell
-    during the cell cycle.
+    during the cell cycle. NaN values are ignored. It is NaN when the cell cycle
+    has no link with a speed value, e.g. a cell cycle of a single cell.
     """
 
-    def __init__(self, property: Property, include_incoming_edge: bool = False):
+    INPUT_PROPS = {"speed_prop": ("edge", "CellLineage")}
+
+    def __init__(
+        self,
+        property: Property,
+        include_incoming_edge: bool = False,
+        speed_prop: str = "cell_speed",
+    ):
         """
         Parameters
         ----------
@@ -321,9 +361,14 @@ class CycleMeanSpeed(NodeGlobalPropCalculator):
         include_incoming_edge : bool, optional
             Whether to include the incoming edge of the first cell of the cell cycle.
             Default is False.
+        speed_prop : str, optional
+            Identifier of the cell lineage edge property holding the
+            cell speeds.
+            Default is "cell_speed".
         """
         super().__init__(property)
         self.include_incoming_edge = include_incoming_edge
+        self.speed_prop = speed_prop
 
     def compute(  # type: ignore[override]
         self, data: Data, lineage: CycleLineage, nid: int
@@ -343,12 +388,13 @@ class CycleMeanSpeed(NodeGlobalPropCalculator):
         Returns
         -------
         float
-            Mean speed of the cell during the cell cycle.
+            Mean speed of the cell during the cell cycle, or NaN if the cell cycle
+            has no link with a speed value.
         """
         speeds = _get_cycle_edge_property_values(
-            "cell_speed", data, lineage, nid, self.include_incoming_edge
+            self.speed_prop, data, lineage, nid, self.include_incoming_edge
         )
-        return np.nanmean(speeds).item()
+        return _nanmean(speeds)
 
 
 def create_straightness_property(

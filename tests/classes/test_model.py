@@ -8,8 +8,10 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 import tifffile
+from shapely.geometry import Polygon
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
+from pycellin.classes.exceptions import MissingPropertyError
 from pycellin.custom_types import PropertyType
 from pycellin.properties.core import (
     Time,
@@ -17,6 +19,10 @@ from pycellin.properties.core import (
     create_lineage_coord_property,
     create_link_coord_property,
     create_time_property,
+)
+from pycellin.properties.morphology import (
+    CycleMeanArea,
+    create_cycle_mean_area_property,
 )
 from pycellin.properties.tracking import (
     create_absolute_age_property,
@@ -510,11 +516,11 @@ class TestRescaleSpace:
         assert pixel_space_model.is_update_required()
 
     def test_zero_factor_raises(self, pixel_space_model):
-        with pytest.raises(ValueError, match="`factor` must be strictly positive"):
+        with pytest.raises(ValueError, match="'factor' must be strictly positive"):
             pixel_space_model.rescale_space(0)
 
     def test_negative_z_factor_raises(self, pixel_space_model):
-        with pytest.raises(ValueError, match="`z_factor` must be strictly positive"):
+        with pytest.raises(ValueError, match="'z_factor' must be strictly positive"):
             pixel_space_model.rescale_space(2, z_factor=-1)
 
     def test_coordinate_calculator_warns(self, pixel_space_model):
@@ -550,3 +556,210 @@ class TestAddLocationTag:
                 mask_path=str(mask_path), tag_names={0: "a", 1: "b"}
             )
         assert Path(record[0].filename).samefile(__file__)
+
+
+def _create_test_property(
+    identifier: str,
+    prop_type: str | list[str],
+    lin_type: str = "CellLineage",
+    dtype: str = "float",
+    unit: str | None = None,
+) -> Property:
+    """Create a property declared by the user, for testing input properties."""
+    return Property(
+        identifier=identifier,
+        name=identifier,
+        description=identifier,
+        provenance="test",
+        prop_type=prop_type,
+        lin_type=lin_type,
+        dtype=dtype,
+        unit=unit,
+    )
+
+
+@pytest.fixture()
+def input_props_model():
+    """
+    Create a model with cycle lineages and user-declared properties that can be used
+    as inputs of predefined properties: a cell area, a cell polygon and a cell speed.
+    Cycles: 2 = [1, 2], 3 = [3] and 4 = [4].
+    """
+    lin = CellLineage(lid=1)
+    for nid, time in [(1, 0), (2, 1), (3, 2), (4, 2)]:
+        lin.add_node(
+            nid,
+            cell_ID=nid,
+            time=time,
+            my_area=float(nid),
+            my_polygon=Polygon([(0, 0), (nid, 0), (nid, 1), (0, 1)]),
+        )
+    for source, target, speed in [(1, 2, 1.0), (2, 3, 2.0), (2, 4, 3.0)]:
+        lin.add_edge(source, target, my_speed=speed)
+
+    time_prop = create_time_property(unit="frame")
+    time_prop.dtype = "int"
+    props = [
+        time_prop,
+        _create_test_property("my_area", "node", unit="um^2"),
+        _create_test_property("my_polygon", "node", dtype="shapely.Polygon", unit="um"),
+        _create_test_property("my_speed", "edge", unit="um/frame"),
+    ]
+    model = Model(
+        model_metadata={"time_step": 1, "time_unit": "frame"},
+        props_metadata=PropsMetadata(props={prop.identifier: prop for prop in props}),
+        data=Data({1: lin}),
+        reference_time_property="time",
+    )
+    model.add_cycle_data()
+    return model
+
+
+class TestCheckInputProps:
+    """Test cases for Model._check_input_props() method."""
+
+    def test_declared_input_passes(self, input_props_model):
+        calc = CycleMeanArea(create_cycle_mean_area_property(), area_prop="my_area")
+        input_props_model._check_input_props(calc)
+
+    def test_missing_pycellin_input_suggests_add_method(self, input_props_model):
+        calc = CycleMeanArea(create_cycle_mean_area_property())
+        with pytest.raises(MissingPropertyError, match=r"model\.add_cell_area\(\)"):
+            input_props_model._check_input_props(calc)
+
+    def test_missing_input_suggests_parameter(self, input_props_model):
+        calc = CycleMeanArea(create_cycle_mean_area_property(), area_prop="unknown")
+        with pytest.raises(MissingPropertyError, match="set 'area_prop'") as exc_info:
+            input_props_model._check_input_props(calc)
+        assert "add_" not in str(exc_info.value)
+
+    def test_wrong_prop_type_raises(self, input_props_model):
+        calc = CycleMeanArea(create_cycle_mean_area_property(), area_prop="my_speed")
+        with pytest.raises(ValueError, match="prop_type 'node'"):
+            input_props_model._check_input_props(calc)
+
+    def test_wrong_lin_type_raises(self, input_props_model):
+        calc = CycleMeanArea(
+            create_cycle_mean_area_property(), area_prop="cycle_length"
+        )
+        with pytest.raises(ValueError, match="lin_type 'CellLineage'"):
+            input_props_model._check_input_props(calc)
+
+    def test_lineage_lin_type_accepted(self, input_props_model):
+        input_props_model.props_metadata._add_prop(
+            _create_test_property("any_lin_area", "node", lin_type="Lineage")
+        )
+        calc = CycleMeanArea(
+            create_cycle_mean_area_property(), area_prop="any_lin_area"
+        )
+        input_props_model._check_input_props(calc)
+
+    def test_multi_type_prop_accepted(self, input_props_model):
+        input_props_model.props_metadata._add_prop(
+            _create_test_property("node_lin_area", ["node", "lineage"])
+        )
+        calc = CycleMeanArea(
+            create_cycle_mean_area_property(), area_prop="node_lin_area"
+        )
+        input_props_model._check_input_props(calc)
+
+
+class TestAddCustomProperty:
+    """Test cases for Model.add_custom_property() method."""
+
+    def test_missing_input_prop_not_added(self, input_props_model):
+        calc = CycleMeanArea(create_cycle_mean_area_property())
+        with pytest.raises(MissingPropertyError):
+            input_props_model.add_custom_property(calc)
+        assert input_props_model.get_property("cycle_mean_area") is None
+
+
+class TestAddCellArea:
+    """Test cases for Model.add_cell_area() method."""
+
+    def test_missing_default_polygon_prop_raises(self, input_props_model):
+        with pytest.raises(MissingPropertyError, match="add_cell_polygon"):
+            input_props_model.add_cell_area()
+
+    def test_custom_polygon_prop(self, input_props_model):
+        input_props_model.add_cell_area(polygon_prop="my_polygon")
+        input_props_model.update()
+        assert input_props_model.data.cell_data[1].nodes[3]["cell_area"] == 3.0
+
+    def test_unit_from_polygon_prop(self, input_props_model):
+        input_props_model.add_cell_area(polygon_prop="my_polygon")
+        assert input_props_model.get_property("cell_area").unit == "um^2"
+
+
+class TestAddCycleMeanArea:
+    """Test cases for Model.add_cycle_mean_area() method."""
+
+    def test_missing_default_area_prop_raises(self, input_props_model):
+        with pytest.raises(MissingPropertyError, match="add_cell_area"):
+            input_props_model.add_cycle_mean_area()
+
+    def test_default_area_prop(self, input_props_model):
+        input_props_model.add_cell_area(polygon_prop="my_polygon")
+        input_props_model.add_cycle_mean_area()
+        input_props_model.update()
+        assert input_props_model.data.cycle_data[1].nodes[2]["cycle_mean_area"] == 1.5
+
+    def test_custom_area_prop(self, input_props_model):
+        input_props_model.add_cycle_mean_area(area_prop="my_area")
+        input_props_model.update()
+        assert input_props_model.data.cycle_data[1].nodes[2]["cycle_mean_area"] == 1.5
+
+    def test_unit_from_area_prop(self, input_props_model):
+        input_props_model.add_cycle_mean_area(area_prop="my_area")
+        assert input_props_model.get_property("cycle_mean_area").unit == "um^2"
+
+
+class TestAddCycleMeanSpeed:
+    """Test cases for Model.add_cycle_mean_speed() method."""
+
+    def test_missing_default_speed_prop_raises(self, input_props_model):
+        with pytest.raises(MissingPropertyError, match="add_cell_speed"):
+            input_props_model.add_cycle_mean_speed()
+
+    def test_custom_speed_prop(self, input_props_model):
+        input_props_model.add_cycle_mean_speed(
+            speed_prop="my_speed", include_incoming_edge=True
+        )
+        input_props_model.update()
+        cycle_lin = input_props_model.data.cycle_data[1]
+        assert cycle_lin.nodes[2]["cycle_mean_speed"] == 1.0
+        assert cycle_lin.nodes[4]["cycle_mean_speed"] == 3.0
+
+    def test_unit_from_speed_prop(self, input_props_model):
+        input_props_model.add_cycle_mean_speed(speed_prop="my_speed")
+        assert input_props_model.get_property("cycle_mean_speed").unit == "um/frame"
+
+
+class TestAddAbsoluteAge:
+    """Test cases for Model.add_absolute_age() method."""
+
+    def test_default_time_prop_is_reference(self, input_props_model):
+        input_props_model.add_absolute_age()
+        input_props_model.update()
+        assert input_props_model.data.cell_data[1].nodes[3]["absolute_age"] == 2
+
+    def test_dtype_and_unit_from_time_prop(self, input_props_model):
+        input_props_model.add_absolute_age()
+        prop = input_props_model.get_property("absolute_age")
+        assert (prop.dtype, prop.unit) == ("int", "frame")
+
+    def test_missing_time_prop_raises(self, input_props_model):
+        with pytest.raises(MissingPropertyError, match="set 'time_prop'"):
+            input_props_model.add_absolute_age(time_prop="unknown")
+
+
+class TestAddCellSpeed:
+    """Test cases for Model.add_cell_speed() method."""
+
+    def test_unit_from_time_prop(self, input_props_model):
+        input_props_model.add_cell_speed()
+        assert input_props_model.get_property("cell_speed").unit == "pixel/frame"
+
+    def test_wrong_time_prop_type_raises(self, input_props_model):
+        with pytest.raises(ValueError, match="prop_type 'node'"):
+            input_props_model.add_cell_speed(time_prop="my_speed")

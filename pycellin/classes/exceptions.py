@@ -173,3 +173,7 @@ class MissingPropertyError(KeyError):
             message = f"Required property '{prop_name}' is missing{node_txt}{lin_txt}."
         self.message = message
         super().__init__(message)
+
+    def __str__(self) -> str:
+        # KeyError.__str__() returns the repr of the message, i.e. in quotes.
+        return self.message

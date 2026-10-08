@@ -94,7 +94,7 @@ def prop_cycle_lin():
 
 def test_absolute_age(cell_lin, prop_cell_lin):
     """Test AbsoluteAge Calculator."""
-    calculator = AbsoluteAge(prop_cell_lin, time_prop_name="frame")
+    calculator = AbsoluteAge(prop_cell_lin, time_prop="frame")
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 0
     # Divisions.
@@ -116,7 +116,7 @@ def test_absolute_age(cell_lin, prop_cell_lin):
 
 def test_relative_age(cell_lin, prop_cell_lin):
     """Test RelativeAge Calculator."""
-    calculator = RelativeAge(prop_cell_lin, time_prop_name="frame")
+    calculator = RelativeAge(prop_cell_lin, time_prop="frame")
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 0
     # Divisions.
@@ -177,7 +177,7 @@ def test_cell_cycle_completeness_cycle_lin(cycle_lin, prop_cycle_lin):
 
 def test_division_time(cell_lin, prop_cell_lin):
     """Test DivisionTime Calculator."""
-    calculator = DivisionTime(prop_cell_lin, time_prop_name="frame")
+    calculator = DivisionTime(prop_cell_lin, time_prop="frame")
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 1
     # Divisions.
@@ -199,7 +199,7 @@ def test_division_time_gap(cell_lin, prop_cell_lin):
     # Create a lineage with a gap.
     cell_lin.remove_nodes_from([3, 12, 13])
     cell_lin.add_edges_from([(2, 4), (11, 14)])
-    calculator = DivisionTime(prop_cell_lin, time_prop_name="frame")
+    calculator = DivisionTime(prop_cell_lin, time_prop="frame")
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 1
     # Divisions.
@@ -218,7 +218,7 @@ def test_division_time_gap(cell_lin, prop_cell_lin):
 
 def test_division_time_cycle_lin(cell_lin, prop_cycle_lin):
     """Test DivisionTime Calculator with CycleLineage."""
-    calculator = DivisionTime(prop_cycle_lin, time_prop_name="frame")
+    calculator = DivisionTime(prop_cycle_lin, time_prop="frame")
     data = Data({1: cell_lin})
     data._add_cycle_lineages(time_prop="frame", time_step=1)
     cycle_lin = data.cycle_data[1]
@@ -241,7 +241,7 @@ def test_division_time_cycle_lin(cell_lin, prop_cycle_lin):
 
 def test_division_rate(cell_lin, prop_cell_lin):
     """Test DivisionRate Calculator."""
-    calculator = DivisionRate(prop_cell_lin, time_prop_name="frame")
+    calculator = DivisionRate(prop_cell_lin, time_prop="frame")
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 1 / 1
     # Divisions.
@@ -263,7 +263,7 @@ def test_division_rate_gap(cell_lin, prop_cell_lin):
     # Create a lineage with a gap.
     cell_lin.remove_nodes_from([3, 12, 13])
     cell_lin.add_edges_from([(2, 4), (11, 14)])
-    calculator = DivisionRate(prop_cell_lin, time_prop_name="frame")
+    calculator = DivisionRate(prop_cell_lin, time_prop="frame")
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 1 / 1
     # Divisions.
@@ -280,42 +280,9 @@ def test_division_rate_gap(cell_lin, prop_cell_lin):
         calculator.compute(Data({}), cell_lin, nid=99)
 
 
-def test_division_rate_from_division_time(cell_lin, prop_cell_lin):
-    """Test DivisionRate Calculator from DivisionTime."""
-    calculator = DivisionRate(prop_cell_lin, time_prop_name="frame", use_div_time=True)
-    # Root.
-    nid = 1
-    cell_lin.nodes[nid]["division_time"] = 10
-    assert calculator.compute(Data({}), cell_lin, nid) == 1 / 10
-    # Divisions.
-    nid = 2
-    cell_lin.nodes[nid]["division_time"] = 20
-    assert calculator.compute(Data({}), cell_lin, nid) == 1 / 20
-    nid = 4
-    cell_lin.nodes[nid]["division_time"] = 40
-    assert calculator.compute(Data({}), cell_lin, nid) == 1 / 40
-    nid = 14
-    cell_lin.nodes[nid]["division_time"] = 140
-    assert calculator.compute(Data({}), cell_lin, nid) == 1 / 140
-    # Leaves.
-    nid = 6
-    cell_lin.nodes[nid]["division_time"] = 60
-    assert calculator.compute(Data({}), cell_lin, nid) == 1 / 60
-    nid = 10
-    cell_lin.nodes[nid]["division_time"] = 100
-    assert calculator.compute(Data({}), cell_lin, nid) == 1 / 100
-    # Intermediate nodes.
-    nid = 11
-    cell_lin.nodes[nid]["division_time"] = 110
-    assert calculator.compute(Data({}), cell_lin, nid) == 1 / 110
-    # Non-existent node.
-    with pytest.raises(KeyError, match="Cell 99 not in the lineage."):
-        calculator.compute(Data({}), cell_lin, nid=99)
-
-
 def test_division_rate_cycle_lin(cell_lin, prop_cycle_lin):
     """Test DivisionRate Calculator with CycleLineage."""
-    calculator = DivisionRate(prop_cycle_lin, time_prop_name="frame")
+    calculator = DivisionRate(prop_cycle_lin, time_prop="frame")
     data = Data({1: cell_lin})
     data._add_cycle_lineages(time_prop="frame", time_step=1)
     cycle_lin = data.cycle_data[1]

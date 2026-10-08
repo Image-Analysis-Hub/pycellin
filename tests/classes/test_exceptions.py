@@ -2,6 +2,8 @@
 
 """Unit test for exception classes from classes.exceptions."""
 
+import pytest
+
 from pycellin.classes.exceptions import MissingPropertyError
 
 # MissingPropertyError ########################################################
@@ -24,3 +26,11 @@ class TestMissingPropertyError:
         err = MissingPropertyError("cell_area", message="Add 'cell_area' first.")
         assert err.prop_name == "cell_area"
         assert err.message == "Add 'cell_area' first."
+
+    def test_str_is_message(self):
+        err = MissingPropertyError("cell_area", message="Add 'cell_area' first.")
+        assert str(err) == "Add 'cell_area' first."
+
+    def test_caught_as_key_error(self):
+        with pytest.raises(KeyError):
+            raise MissingPropertyError("cell_area")

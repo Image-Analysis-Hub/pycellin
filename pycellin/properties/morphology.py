@@ -23,7 +23,7 @@ from pycellin.classes.property_calculator import (
     NodeGlobalPropCalculator,
     NodeLocalPropCalculator,
 )
-from pycellin.properties.utils import _get_cycle_node_property_values
+from pycellin.properties.utils import _get_cycle_node_property_values, _nanmean
 
 
 def create_cell_polygon_property(
@@ -68,6 +68,7 @@ class CellPolygonFromLabelImg(NodeLocalPropCalculator):
 
     # The label image belongs to the model the calculator was created for.
     _USES_EXTERNAL_DATA = True
+    INPUT_PROPS = {"label_prop": ("node", "CellLineage")}
 
     def __init__(
         self,
@@ -84,8 +85,8 @@ class CellPolygonFromLabelImg(NodeLocalPropCalculator):
         self.force_recompute = force_recompute
 
     def compute(self, lineage, nid: int) -> np.ndarray:
-        if not self.force_recompute and "cell_polygon" in lineage.nodes[nid]:
-            return lineage.nodes[nid]["cell_polygon"]
+        if not self.force_recompute and self.prop.identifier in lineage.nodes[nid]:
+            return lineage.nodes[nid][self.prop.identifier]
 
         label = lineage.nodes[nid][self.label_prop]
         t = lineage.nodes[nid]["timepoint"]
@@ -116,14 +117,33 @@ def create_cell_area_property(
 
 
 class CellArea(NodeLocalPropCalculator):
+    """
+    Calculator to compute the area of a cell from its polygon.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    polygon_prop : str, optional
+        Identifier of the node property holding the cell shapes as
+        shapely.Polygon. Defaults to "cell_polygon".
+    """
+
+    INPUT_PROPS = {"polygon_prop": ("node", "CellLineage")}
+
+    def __init__(self, property: Property, polygon_prop: str = "cell_polygon"):
+        super().__init__(property)
+        self.polygon_prop = polygon_prop
+
     def compute(self, lineage, nid: int) -> float:
         try:
-            area = lineage.nodes[nid]["cell_polygon"].area
+            area = lineage.nodes[nid][self.polygon_prop].area
         except KeyError:
             msg = (
-                f"Cannot compute 'cell_area': missing 'cell_polygon' property "
-                f"for cell {nid}, lineage {lineage.graph['lineage_ID']}. "
-                f"Please compute the 'cell_polygon' property first."
+                f"Cannot compute '{self.prop.identifier}': missing "
+                f"'{self.polygon_prop}' property for cell {nid}, "
+                f"lineage {lineage.graph['lineage_ID']}. "
+                f"Please compute the '{self.polygon_prop}' property first."
             )
             raise KeyError(msg)
         return area
@@ -151,9 +171,24 @@ class CycleMeanArea(NodeGlobalPropCalculator):
     """
     Calculator to compute the mean area of a cell during a cell cycle.
 
-    The cycle mean area is defined as the mean of the 'cell_area' values
+    The cycle mean area is defined as the mean of the cell area values
     of all the cells of the cell cycle. NaN values are ignored.
+    It is NaN when no cell of the cell cycle has an area value.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    area_prop : str, optional
+        Identifier of the cell lineage node property holding the cell areas.
+        Defaults to "cell_area".
     """
+
+    INPUT_PROPS = {"area_prop": ("node", "CellLineage")}
+
+    def __init__(self, property: Property, area_prop: str = "cell_area"):
+        super().__init__(property)
+        self.area_prop = area_prop
 
     def compute(  # type: ignore[override]
         self, data: Data, lineage: CycleLineage, nid: int
@@ -173,10 +208,11 @@ class CycleMeanArea(NodeGlobalPropCalculator):
         Returns
         -------
         float
-            Mean area of the cell during the cell cycle.
+            Mean area of the cell during the cell cycle, or NaN if no cell
+            of the cell cycle has an area value.
         """
-        areas = _get_cycle_node_property_values("cell_area", data, lineage, nid)
-        return np.nanmean(areas).item()
+        areas = _get_cycle_node_property_values(self.area_prop, data, lineage, nid)
+        return _nanmean(areas)
 
 
 def create_birth_area_property(
@@ -202,10 +238,24 @@ class BirthArea(NodeGlobalPropCalculator):
     """
     Calculator to compute the area of a cell at birth.
 
-    The birth area is defined as the 'cell_area' value of the first cell
+    The birth area is defined as the cell area value of the first cell
     of the cell cycle. It is NaN for cell cycles starting at a root,
     since their birth was not observed.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    area_prop : str, optional
+        Identifier of the cell lineage node property holding the cell areas.
+        Defaults to "cell_area".
     """
+
+    INPUT_PROPS = {"area_prop": ("node", "CellLineage")}
+
+    def __init__(self, property: Property, area_prop: str = "cell_area"):
+        super().__init__(property)
+        self.area_prop = area_prop
 
     def compute(  # type: ignore[override]
         self, data: Data, lineage: CycleLineage, nid: int
@@ -230,7 +280,7 @@ class BirthArea(NodeGlobalPropCalculator):
         """
         if lineage.is_root(nid):
             return np.nan
-        return _get_cycle_node_property_values("cell_area", data, lineage, nid)[0]
+        return _get_cycle_node_property_values(self.area_prop, data, lineage, nid)[0]
 
 
 def create_division_area_property(
@@ -256,10 +306,24 @@ class DivisionArea(NodeGlobalPropCalculator):
     """
     Calculator to compute the area of a cell at division.
 
-    The division area is defined as the 'cell_area' value of the last cell
+    The division area is defined as the cell area value of the last cell
     of the cell cycle. It is NaN for cell cycles ending at a leaf,
     since their division was not observed.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    area_prop : str, optional
+        Identifier of the cell lineage node property holding the cell areas.
+        Defaults to "cell_area".
     """
+
+    INPUT_PROPS = {"area_prop": ("node", "CellLineage")}
+
+    def __init__(self, property: Property, area_prop: str = "cell_area"):
+        super().__init__(property)
+        self.area_prop = area_prop
 
     def compute(  # type: ignore[override]
         self, data: Data, lineage: CycleLineage, nid: int
@@ -284,7 +348,7 @@ class DivisionArea(NodeGlobalPropCalculator):
         """
         if lineage.is_leaf(nid):
             return np.nan
-        return _get_cycle_node_property_values("cell_area", data, lineage, nid)[-1]
+        return _get_cycle_node_property_values(self.area_prop, data, lineage, nid)[-1]
 
 
 def create_cell_contour_property(
@@ -308,24 +372,45 @@ def create_cell_contour_property(
 
 
 class CellContour(NodeLocalPropCalculator):
+    """
+    Calculator to compute the contour of a cell from its polygon, as coordinates
+    relative to the polygon centroid.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    force_recompute : bool, optional
+        Whether to force recomputation of the property when it has already been
+        computed, by default False.
+    polygon_prop : str, optional
+        Identifier of the node property holding the cell shapes as
+        shapely.Polygon. Defaults to "cell_polygon".
+    """
+
+    INPUT_PROPS = {"polygon_prop": ("node", "CellLineage")}
+
     def __init__(
         self,
         property: Property,
         force_recompute: bool = False,
+        polygon_prop: str = "cell_polygon",
     ):
         super().__init__(property)
         self.force_recompute = force_recompute
+        self.polygon_prop = polygon_prop
 
     def compute(self, lineage, nid: int) -> list[tuple[int, int]]:
-        if not self.force_recompute and "cell_contour" in lineage.nodes[nid]:
-            return lineage.nodes[nid]["cell_contour"]
+        if not self.force_recompute and self.prop.identifier in lineage.nodes[nid]:
+            return lineage.nodes[nid][self.prop.identifier]
         try:
-            poly = lineage.nodes[nid]["cell_polygon"]
+            poly = lineage.nodes[nid][self.polygon_prop]
         except KeyError:
             msg = (
-                f"Cannot compute 'cell_contour': missing 'cell_polygon' property "
-                f"for cell {nid}, lineage {lineage.graph['lineage_ID']}. "
-                f"Please compute the 'cell_polygon' property first."
+                f"Cannot compute '{self.prop.identifier}': missing "
+                f"'{self.polygon_prop}' property for cell {nid}, "
+                f"lineage {lineage.graph['lineage_ID']}. "
+                f"Please compute the '{self.polygon_prop}' property first."
             )
             raise KeyError(msg)
         return [
@@ -353,14 +438,33 @@ def create_cell_perimeter_property(
 
 
 class CellPerimeter(NodeLocalPropCalculator):
+    """
+    Calculator to compute the perimeter of a cell from its polygon.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    polygon_prop : str, optional
+        Identifier of the node property holding the cell shapes as
+        shapely.Polygon. Defaults to "cell_polygon".
+    """
+
+    INPUT_PROPS = {"polygon_prop": ("node", "CellLineage")}
+
+    def __init__(self, property: Property, polygon_prop: str = "cell_polygon"):
+        super().__init__(property)
+        self.polygon_prop = polygon_prop
+
     def compute(self, lineage, nid: int) -> float:
         try:
-            length = lineage.nodes[nid]["cell_polygon"].length
+            length = lineage.nodes[nid][self.polygon_prop].length
         except KeyError:
             msg = (
-                f"Cannot compute 'cell_perimeter': missing 'cell_polygon' property "
-                f"for cell {nid}, lineage {lineage.graph['lineage_ID']}. "
-                f"Please compute the 'cell_polygon' property first."
+                f"Cannot compute '{self.prop.identifier}': missing "
+                f"'{self.polygon_prop}' property for cell {nid}, "
+                f"lineage {lineage.graph['lineage_ID']}. "
+                f"Please compute the '{self.polygon_prop}' property first."
             )
             raise KeyError(msg)
         return length

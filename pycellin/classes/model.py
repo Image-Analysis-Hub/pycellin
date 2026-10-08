@@ -99,7 +99,7 @@ class Model:
         # Check that we have a reference_time_property.
         if reference_time_property is None:
             if model_metadata is None:
-                raise ValueError("`reference_time_property` must be provided.")
+                raise ValueError("'reference_time_property' must be provided.")
 
             # Extract from metadata regardless of type.
             if isinstance(model_metadata, dict):
@@ -111,7 +111,7 @@ class Model:
 
             if not reference_time_property:
                 raise ValueError(
-                    "`reference_time_property` must be provided in model_metadata "
+                    "'reference_time_property' must be provided in model_metadata "
                     "or as an explicit argument."
                 )
         self._reference_time_property = reference_time_property
@@ -139,10 +139,10 @@ class Model:
                 time_step = self._compute_time_step(variable_time_step)
             else:
                 msg = (
-                    "`time_step` is not defined in model metadata and there is no data "
+                    "'time_step' is not defined in model metadata and there is no data "
                     "in the model to infer it. Set the time_step manually with "
-                    "`model.set_time_step(your_timestep)`. Alternatively, you can set it "
-                    "automatically with `model.set_time_step()` once you have added data "
+                    "model.set_time_step(your_timestep). Alternatively, you can set it "
+                    "automatically with model.set_time_step() once you have added data "
                     "to the model."
                 )
                 warnings.warn(msg, UserWarning, stacklevel=2)
@@ -165,8 +165,8 @@ class Model:
             self.model_metadata = ModelMetadata.from_dict(metadata_dict)
         else:
             raise TypeError(
-                f"`model_metadata` must be None, ModelMetadata, or dict, "
-                f"got `{type(model_metadata).__name__}`."
+                f"'model_metadata' must be None, ModelMetadata, or dict, "
+                f"got '{type(model_metadata).__name__}'."
             )
 
         # Set the rest of the attributes.
@@ -582,12 +582,12 @@ class Model:
         (5, 'min')
         """
         if not factor > 0:
-            raise ValueError(f"`factor` must be strictly positive, got {factor}.")
+            raise ValueError(f"'factor' must be strictly positive, got {factor}.")
         time_prop = self.reference_time_property
         if time_prop == "timepoint":
             raise ValueError(
                 "Cannot rescale the 'timepoint' reference time property. Set another "
-                "reference time property first with `set_reference_time_property()`."
+                "reference time property first with set_reference_time_property()."
             )
         if time_prop in self._updater._calculators:
             warnings.warn(
@@ -676,11 +676,11 @@ class Model:
         ('µm', 0.2)
         """
         if not factor > 0:
-            raise ValueError(f"`factor` must be strictly positive, got {factor}.")
+            raise ValueError(f"'factor' must be strictly positive, got {factor}.")
         if z_factor is None:
             z_factor = factor
         elif not z_factor > 0:
-            raise ValueError(f"`z_factor` must be strictly positive, got {z_factor}.")
+            raise ValueError(f"'z_factor' must be strictly positive, got {z_factor}.")
 
         for axis in ("x", "y", "z"):
             axis_factor = z_factor if axis == "z" else factor
@@ -2064,22 +2064,101 @@ class Model:
         ValueError
             If the property is a cycle lineage property and cycle lineages
             have not been computed yet.
+        MissingPropertyError
+            If a property read by the calculator has not been declared in the model.
+        ValueError
+            If a property read by the calculator does not have the property type
+            or lineage type expected by the calculator.
         """
         if calculator.prop.lin_type == "CycleLineage" and not self.data.cycle_data:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+                "Please compute the cycle lineages first with model.add_cycle_data()."
             )
+        self._check_input_props(calculator)
         self.props_metadata._add_prop(calculator.prop)
         self._updater.register_calculator(calculator)
         self.prepare_full_data_update()
+
+    def _check_input_props(self, calculator: PropertyCalculator) -> None:
+        """
+        Check that the properties read by a calculator are declared in the model
+        with the expected property type and lineage type.
+
+        Parameters
+        ----------
+        calculator : PropertyCalculator
+            Calculator whose input properties to check.
+
+        Raises
+        ------
+        MissingPropertyError
+            If an input property has not been declared in the model.
+        ValueError
+            If an input property does not have the property type or lineage type
+            expected by the calculator.
+        """
+        prop_id = calculator.prop.identifier
+        for param, (input_id, prop_type, lin_type) in (
+            calculator.get_input_props().items()
+        ):
+            input_prop = self.get_property(input_id)
+            if input_prop is None:
+                pycellin_props = {
+                    **futils.get_pycellin_cell_lineage_properties(
+                        include_core_properties=False
+                    ),
+                    **futils.get_pycellin_cycle_lineage_properties(
+                        include_core_properties=False
+                    ),
+                }
+                fix = f"set '{param}' to the identifier of a declared property"
+                if input_id in pycellin_props:
+                    fix = f"add it first with model.add_{input_id}(), or {fix}"
+                raise MissingPropertyError(
+                    input_id,
+                    message=(
+                        f"'{prop_id}' requires the property '{input_id}', which has "
+                        f"not been declared. To fix this, {fix}."
+                    ),
+                )
+            if property_type_from_string(prop_type) not in input_prop.prop_type:
+                raise ValueError(
+                    f"'{prop_id}' requires '{param}' to be a property with "
+                    f"prop_type '{prop_type}', but '{input_id}' has prop_type "
+                    f"'{input_prop.prop_type}'."
+                )
+            if input_prop.lin_type not in (lin_type, "Lineage"):
+                raise ValueError(
+                    f"'{prop_id}' requires '{param}' to be a property with "
+                    f"lin_type '{lin_type}', but '{input_id}' has lin_type "
+                    f"'{input_prop.lin_type}'."
+                )
+
+    def _get_prop_unit(self, prop_identifier: str) -> str | None:
+        """
+        Return the unit of a property, or None if the property has no unit
+        or has not been declared.
+
+        Parameters
+        ----------
+        prop_identifier : str
+            Identifier of the property.
+
+        Returns
+        -------
+        str | None
+            Unit of the property, or None.
+        """
+        prop = self.get_property(prop_identifier)
+        return prop.unit if prop is not None else None
 
     # TODO: in case of data coming from a loader, there is no calculator associated
     # with the declared properties.
 
     def add_absolute_age(
         self,
-        custom_time_property: str | None = None,
+        time_prop: str | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2094,9 +2173,9 @@ class Model:
 
         Parameters
         ----------
-        custom_time_property : str, optional
-            Identifier of the time property to use for the computation.
-            If None, the reference time property of the model will be used.
+        time_prop : str, optional
+            Identifier of the cell lineage node property holding the time of the
+            cells. If None, the reference time property of the model is used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "absolute_age".
@@ -2108,29 +2187,23 @@ class Model:
 
         Raises
         ------
-        KeyError
-            If the specified time property has not been declared in the model.
+        MissingPropertyError
+            If `time_prop` has not been declared in the model.
+        ValueError
+            If `time_prop` is not a node property of cell lineages.
         """
-        if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(
-                self.model_metadata.reference_time_property
-            )
-        else:
-            time_prop = self.props_metadata.props.get(custom_time_property)
-        if time_prop is None:
-            time_prop = (
-                custom_time_property or self.model_metadata.reference_time_property
-            )
-            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+        time_prop = time_prop or self.reference_time_property
+        # If `time_prop` has not been declared, add_custom_property() raises below.
+        time = self.get_property(time_prop)
 
         prop = tracking.create_absolute_age_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            dtype=time_prop.dtype,
-            unit=time_prop.unit,
+            dtype=time.dtype if time else "float",
+            unit=time.unit if time else None,
         )
-        self.add_custom_property(tracking.AbsoluteAge(prop, time_prop.identifier))
+        self.add_custom_property(tracking.AbsoluteAge(prop, time_prop=time_prop))
 
     def add_turning_angle(
         self,
@@ -2168,6 +2241,7 @@ class Model:
 
     def add_cycle_mean_displacement(
         self,
+        displacement_prop: str = "cell_displacement",
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2180,6 +2254,10 @@ class Model:
 
         Parameters
         ----------
+        displacement_prop : str, optional
+            Identifier of the cell lineage edge property holding the cell
+            displacements. Defaults to "cell_displacement", added by
+            `add_cell_displacement()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cycle_mean_displacement".
@@ -2189,17 +2267,29 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Mean displacement of the cell during the cell cycle".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `displacement_prop` has not been declared in the model.
+        ValueError
+            If `displacement_prop` is not an edge property of cell lineages.
+        ValueError
+            If the cycle lineages have not been computed yet.
         """
         prop = motion.create_cycle_mean_displacement_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=self.model_metadata.space_unit or "pixel",
+            unit=self._get_prop_unit(displacement_prop),
         )
-        self.add_custom_property(motion.CycleMeanDisplacement(prop))
+        self.add_custom_property(
+            motion.CycleMeanDisplacement(prop, displacement_prop=displacement_prop)
+        )
 
     def add_cycle_mean_speed(
         self,
+        speed_prop: str = "cell_speed",
         include_incoming_edge: bool = False,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
@@ -2213,6 +2303,9 @@ class Model:
 
         Parameters
         ----------
+        speed_prop : str, optional
+            Identifier of the cell lineage edge property holding the cell speeds.
+            Defaults to "cell_speed", added by `add_cell_speed()`.
         include_incoming_edge : bool, optional
             Whether to include the distance between the first cell of the cycle
             and its predecessor. Default is False.
@@ -2225,19 +2318,33 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Mean speed of the cell during the cell cycle".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `speed_prop` has not been declared in the model.
+        ValueError
+            If `speed_prop` is not an edge property of cell lineages.
+        ValueError
+            If the cycle lineages have not been computed yet.
         """
-        space_unit = self.model_metadata.space_unit or "pixel"
-        time_unit = self.model_metadata.time_unit or "frame"
         prop = motion.create_cycle_mean_speed_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=f"{space_unit} / {time_unit}",
+            unit=self._get_prop_unit(speed_prop),
         )
-        self.add_custom_property(motion.CycleMeanSpeed(prop, include_incoming_edge))
+        self.add_custom_property(
+            motion.CycleMeanSpeed(
+                prop,
+                include_incoming_edge=include_incoming_edge,
+                speed_prop=speed_prop,
+            )
+        )
 
     def add_cycle_total_displacement(
         self,
+        displacement_prop: str = "cell_displacement",
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2250,6 +2357,10 @@ class Model:
 
         Parameters
         ----------
+        displacement_prop : str, optional
+            Identifier of the cell lineage edge property holding the cell
+            displacements. Defaults to "cell_displacement", added by
+            `add_cell_displacement()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cycle_total_displacement".
@@ -2259,17 +2370,29 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Displacement of the cell during the cell cycle".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `displacement_prop` has not been declared in the model.
+        ValueError
+            If `displacement_prop` is not an edge property of cell lineages.
+        ValueError
+            If the cycle lineages have not been computed yet.
         """
         prop = motion.create_cycle_total_displacement_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=self.model_metadata.space_unit or "pixel",
+            unit=self._get_prop_unit(displacement_prop),
         )
-        self.add_custom_property(motion.CycleTotalDisplacement(prop))
+        self.add_custom_property(
+            motion.CycleTotalDisplacement(prop, displacement_prop=displacement_prop)
+        )
 
     def add_cell_area(
         self,
+        polygon_prop: str = "cell_polygon",
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2277,11 +2400,14 @@ class Model:
         """
         Add the cell area property to the model.
 
-        "cell_polygon" needs to be present in the model for this property
-        to be computed.
+        The cell area is computed from the cell polygons.
 
         Parameters
         ----------
+        polygon_prop : str, optional
+            Identifier of the cell lineage node property holding the cell shapes
+            as shapely.Polygon. Defaults to "cell_polygon", added by
+            `add_cell_polygon()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cell_area".
@@ -2292,30 +2418,24 @@ class Model:
             default value (see :func:`pycellin.properties.morphology.create_cell_area_property`).
 
         Raises
-        -----
+        ------
         MissingPropertyError
-            If the 'cell_polygon' property is not present in the model. The
-            'cell_polygon' property is required for computing the cell area.
+            If `polygon_prop` has not been declared in the model.
+        ValueError
+            If `polygon_prop` is not a node property of cell lineages.
         """
-        cell_poly = self.get_property("cell_polygon")
-        if cell_poly is None:
-            raise MissingPropertyError(
-                "cell_polygon",
-                message=(
-                    "Property 'cell_polygon' is required for computing cell area. "
-                    "Please add it before adding 'cell_area'."
-                ),
-            )
+        polygon_unit = self._get_prop_unit(polygon_prop)
         prop = morpho.create_cell_area_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=f"{self.get_space_unit() or 'pixel'}^2",
+            unit=f"{polygon_unit}^2" if polygon_unit else None,
         )
-        self.add_custom_property(morpho.CellArea(prop))
+        self.add_custom_property(morpho.CellArea(prop, polygon_prop=polygon_prop))
 
     def add_cycle_mean_area(
         self,
+        area_prop: str = "cell_area",
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2324,11 +2444,13 @@ class Model:
         Add the cycle mean area property to the model.
 
         The cycle mean area is defined as the mean area of the cell
-        during the cell cycle. "cell_area" needs to be present in the model
-        for this property to be computed.
+        during the cell cycle, computed from the cell areas.
 
         Parameters
         ----------
+        area_prop : str, optional
+            Identifier of the cell lineage node property holding the cell areas.
+            Defaults to "cell_area", added by `add_cell_area()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cycle_mean_area".
@@ -2341,29 +2463,23 @@ class Model:
         Raises
         ------
         MissingPropertyError
-            If the 'cell_area' property is not present in the model.
+            If `area_prop` has not been declared in the model.
+        ValueError
+            If `area_prop` is not a node property of cell lineages.
         ValueError
             If the cycle lineages have not been computed yet.
         """
-        cell_area = self.get_property("cell_area")
-        if cell_area is None:
-            raise MissingPropertyError(
-                "cell_area",
-                message=(
-                    "Property 'cell_area' is required for computing cycle mean area. "
-                    "Please add it before adding 'cycle_mean_area'."
-                ),
-            )
         prop = morpho.create_cycle_mean_area_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=cell_area.unit,
+            unit=self._get_prop_unit(area_prop),
         )
-        self.add_custom_property(morpho.CycleMeanArea(prop))
+        self.add_custom_property(morpho.CycleMeanArea(prop, area_prop=area_prop))
 
     def add_birth_area(
         self,
+        area_prop: str = "cell_area",
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2373,11 +2489,13 @@ class Model:
 
         The birth area is defined as the area of the first cell of the cell cycle,
         i.e. right after division. It is NaN for cell cycles starting at a root,
-        since their birth was not observed. "cell_area" needs to be present
-        in the model for this property to be computed.
+        since their birth was not observed. It is computed from the cell areas.
 
         Parameters
         ----------
+        area_prop : str, optional
+            Identifier of the cell lineage node property holding the cell areas.
+            Defaults to "cell_area", added by `add_cell_area()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "birth_area".
@@ -2390,29 +2508,23 @@ class Model:
         Raises
         ------
         MissingPropertyError
-            If the 'cell_area' property is not present in the model.
+            If `area_prop` has not been declared in the model.
+        ValueError
+            If `area_prop` is not a node property of cell lineages.
         ValueError
             If the cycle lineages have not been computed yet.
         """
-        cell_area = self.get_property("cell_area")
-        if cell_area is None:
-            raise MissingPropertyError(
-                "cell_area",
-                message=(
-                    "Property 'cell_area' is required for computing birth area. "
-                    "Please add it before adding 'birth_area'."
-                ),
-            )
         prop = morpho.create_birth_area_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=cell_area.unit,
+            unit=self._get_prop_unit(area_prop),
         )
-        self.add_custom_property(morpho.BirthArea(prop))
+        self.add_custom_property(morpho.BirthArea(prop, area_prop=area_prop))
 
     def add_division_area(
         self,
+        area_prop: str = "cell_area",
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2422,11 +2534,14 @@ class Model:
 
         The division area is defined as the area of the last cell of the cell cycle,
         i.e. right before division. It is NaN for cell cycles ending at a leaf,
-        since their division was not observed. "cell_area" needs to be present
-        in the model for this property to be computed.
+        since their division was not observed. It is computed from the cell
+        areas.
 
         Parameters
         ----------
+        area_prop : str, optional
+            Identifier of the cell lineage node property holding the cell areas.
+            Defaults to "cell_area", added by `add_cell_area()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "division_area".
@@ -2439,29 +2554,23 @@ class Model:
         Raises
         ------
         MissingPropertyError
-            If the 'cell_area' property is not present in the model.
+            If `area_prop` has not been declared in the model.
+        ValueError
+            If `area_prop` is not a node property of cell lineages.
         ValueError
             If the cycle lineages have not been computed yet.
         """
-        cell_area = self.get_property("cell_area")
-        if cell_area is None:
-            raise MissingPropertyError(
-                "cell_area",
-                message=(
-                    "Property 'cell_area' is required for computing division area. "
-                    "Please add it before adding 'division_area'."
-                ),
-            )
         prop = morpho.create_division_area_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=cell_area.unit,
+            unit=self._get_prop_unit(area_prop),
         )
-        self.add_custom_property(morpho.DivisionArea(prop))
+        self.add_custom_property(morpho.DivisionArea(prop, area_prop=area_prop))
 
     def add_cell_perimeter(
         self,
+        polygon_prop: str = "cell_polygon",
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2469,11 +2578,14 @@ class Model:
         """
         Add the cell perimeter property to the model.
 
-        "cell_polygon" needs to be present in the model for this property
-        to be computed.
+        The cell perimeter is computed from the cell polygons.
 
         Parameters
         ----------
+        polygon_prop : str, optional
+            Identifier of the cell lineage node property holding the cell shapes
+            as shapely.Polygon. Defaults to "cell_polygon", added by
+            `add_cell_polygon()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cell_perimeter".
@@ -2484,31 +2596,23 @@ class Model:
             default value (see :func:`pycellin.properties.morphology.create_cell_perimeter_property`).
 
         Raises
-        -----
+        ------
         MissingPropertyError
-            If the 'cell_polygon' property is not present in the model. The
-            'cell_polygon' property is required for computing the cell perimeter.
+            If `polygon_prop` has not been declared in the model.
+        ValueError
+            If `polygon_prop` is not a node property of cell lineages.
         """
-        cell_poly = self.get_property("cell_polygon")
-        if cell_poly is None:
-            raise MissingPropertyError(
-                "cell_polygon",
-                message=(
-                    "Property 'cell_polygon' is required for computing cell perimeter. "
-                    "Please add it before adding 'cell_perimeter'."
-                ),
-            )
-
         prop = morpho.create_cell_perimeter_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=f"{self.get_space_unit() or 'pixel'}",
+            unit=self._get_prop_unit(polygon_prop),
         )
-        self.add_custom_property(morpho.CellPerimeter(prop))
+        self.add_custom_property(morpho.CellPerimeter(prop, polygon_prop=polygon_prop))
 
     def add_cell_contour(
         self,
+        polygon_prop: str = "cell_polygon",
         force_recompute: bool = False,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
@@ -2518,10 +2622,14 @@ class Model:
         Add the cell contour property to the model.
 
         The cell contour is the coordinates of the contour of the cell,
-        relative to the cell centroid.
+        relative to the cell centroid. It is computed from the cell polygons.
 
         Parameters
         ----------
+        polygon_prop : str, optional
+            Identifier of the cell lineage node property holding the cell shapes
+            as shapely.Polygon. Defaults to "cell_polygon", added by
+            `add_cell_polygon()`.
         force_recompute : bool
             Whether to force recomputation of the property when it has already been
             computed. Defaults to False.
@@ -2534,15 +2642,24 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will take its
             default value (see :func:`pycellin.properties.morphology.create_cell_contour_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If `polygon_prop` has not been declared in the model.
+        ValueError
+            If `polygon_prop` is not a node property of cell lineages.
         """
         prop = morpho.create_cell_contour_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=self.get_space_unit() or "pixel",
+            unit=self._get_prop_unit(polygon_prop),
         )
         self.add_custom_property(
-            morpho.CellContour(prop, force_recompute=force_recompute)
+            morpho.CellContour(
+                prop, force_recompute=force_recompute, polygon_prop=polygon_prop
+            )
         )
 
     def add_cycle_completeness(
@@ -2650,17 +2767,16 @@ class Model:
 
         Raises
         ------
-        KeyError
-            If the specified label property has not been declared in the model.
         ValueError
             If `label_img` and `label_img_path` are not provided nor defined in the
             model's metadata.
         ValueError
             If pixels are not isotropic in x and y.
+        MissingPropertyError
+            If `label_prop` has not been declared in the model.
+        ValueError
+            If `label_prop` is not a node property of cell lineages.
         """
-        if not self.props_metadata._has_prop(label_prop):
-            raise KeyError(f"The property '{label_prop}' has not been declared.")
-
         # Resolve label_img.
         if label_img is None:
             if label_img_path is None:
@@ -2676,8 +2792,8 @@ class Model:
                     label_img_path = self.model_metadata.label_img_path
                 else:
                     raise ValueError(
-                        "No label image provided. Please provide `label_img` or "
-                        "`label_img_path`, or set them in the model metadata."
+                        "No label image provided. Please provide 'label_img' or "
+                        "'label_img_path', or set them in the model metadata."
                     )
 
             if label_img is None:
@@ -2737,7 +2853,7 @@ class Model:
 
     def add_cell_speed(
         self,
-        custom_time_property: str | None = None,
+        time_prop: str | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2752,9 +2868,9 @@ class Model:
 
         Parameters
         ----------
-        custom_time_property : str, optional
-            Identifier of the time property to use for the computation.
-            If None, the reference time property of the model will be used.
+        time_prop : str, optional
+            Identifier of the cell lineage node property holding the time of the
+            cells. If None, the reference time property of the model is used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cell_speed".
@@ -2763,22 +2879,25 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Speed of the cell between two consecutive detections".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `time_prop` has not been declared in the model.
+        ValueError
+            If `time_prop` is not a node property of cell lineages.
         """
-        if custom_time_property is None:
-            time_prop = self.get_properties().get(self.reference_time_property)
-        else:
-            time_prop = self.get_properties().get(custom_time_property)
-        if time_prop is None:
-            time_prop_id = custom_time_property or self.reference_time_property
-            raise KeyError(f"The time property '{time_prop_id}' has not been declared.")
+        time_prop = time_prop or self.reference_time_property
+        space_unit = self.get_space_unit() or "pixel"
+        time_unit = self._get_prop_unit(time_prop)
 
         prop = motion.create_cell_speed_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=f"{self.get_space_unit()}/{time_prop.unit}",
+            unit=f"{space_unit}/{time_unit}" if time_unit else None,
         )
-        self.add_custom_property(motion.CellSpeed(prop, time_prop.identifier))
+        self.add_custom_property(motion.CellSpeed(prop, time_prop=time_prop))
 
     def add_rod_width(
         self,
@@ -2812,7 +2931,7 @@ class Model:
 
     def add_division_rate(
         self,
-        custom_time_property: str | None = None,
+        time_prop: str | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2827,9 +2946,9 @@ class Model:
 
         Parameters
         ----------
-        custom_time_property : str, optional
-            Identifier of the time property to use for the computation.
-            If None, the reference time property of the model will be used.
+        time_prop : str, optional
+            Identifier of the cell lineage node property holding the time of the
+            cells. If None, the reference time property of the model is used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "division_rate".
@@ -2838,30 +2957,28 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Number of divisions per time unit".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `time_prop` has not been declared in the model.
+        ValueError
+            If `time_prop` is not a node property of cell lineages.
         """
-        if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(
-                self.model_metadata.reference_time_property
-            )
-        else:
-            time_prop = self.props_metadata.props.get(custom_time_property)
-        if time_prop is None:
-            time_prop = (
-                custom_time_property or self.model_metadata.reference_time_property
-            )
-            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+        time_prop = time_prop or self.reference_time_property
+        time_unit = self._get_prop_unit(time_prop)
 
         prop = tracking.create_division_rate_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=f"1/{time_prop.unit}",
+            unit=f"1/{time_unit}" if time_unit else None,
         )
-        self.add_custom_property(tracking.DivisionRate(prop, time_prop.identifier))
+        self.add_custom_property(tracking.DivisionRate(prop, time_prop=time_prop))
 
     def add_division_time(
         self,
-        custom_time_property: str | None = None,
+        time_prop: str | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2875,9 +2992,9 @@ class Model:
 
         Parameters
         ----------
-        custom_time_property : str, optional
-            Identifier of the time property to use for the computation.
-            If None, the reference time property of the model will be used.
+        time_prop : str, optional
+            Identifier of the cell lineage node property holding the time of the
+            cells. If None, the reference time property of the model is used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "division_time".
@@ -2886,28 +3003,27 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Time elapsed between two successive divisions".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `time_prop` has not been declared in the model.
+        ValueError
+            If `time_prop` is not a node property of cell lineages.
         """
-        if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(
-                self.model_metadata.reference_time_property
-            )
-        else:
-            time_prop = self.props_metadata.props.get(custom_time_property)
-        if time_prop is None:
-            time_prop = (
-                custom_time_property or self.model_metadata.reference_time_property
-            )
-            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+        time_prop = time_prop or self.reference_time_property
+        # If `time_prop` has not been declared, add_custom_property() raises below.
+        time = self.get_property(time_prop)
 
         prop = tracking.create_division_time_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            dtype=time_prop.dtype,
-            unit=time_prop.unit,
+            dtype=time.dtype if time else "float",
+            unit=time.unit if time else None,
         )
 
-        self.add_custom_property(tracking.DivisionTime(prop, time_prop.identifier))
+        self.add_custom_property(tracking.DivisionTime(prop, time_prop=time_prop))
 
     def add_is_division(
         self,
@@ -3069,7 +3185,7 @@ class Model:
 
     def add_lineage_duration(
         self,
-        custom_time_property: str | None = None,
+        time_prop: str | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -3084,9 +3200,9 @@ class Model:
 
         Parameters
         ----------
-        custom_time_property : str, optional
-            Identifier of the time property to use for the computation.
-            If None, the reference time property of the model will be used.
+        time_prop : str, optional
+            Identifier of the cell lineage node property holding the time of the
+            cells. If None, the reference time property of the model is used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "lineage_duration".
@@ -3098,20 +3214,12 @@ class Model:
 
         Raises
         ------
-        KeyError
-            If the specified time property has not been declared in the model.
+        MissingPropertyError
+            If `time_prop` has not been declared in the model.
+        ValueError
+            If `time_prop` is not a node property of cell lineages.
         """
-        if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(
-                self.model_metadata.reference_time_property
-            )
-        else:
-            time_prop = self.props_metadata.props.get(custom_time_property)
-        if time_prop is None:
-            time_prop = (
-                custom_time_property or self.model_metadata.reference_time_property
-            )
-            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+        time_prop = time_prop or self.reference_time_property
 
         prop = topo.create_lineage_duration_property(
             custom_identifier=custom_identifier,
@@ -3119,7 +3227,7 @@ class Model:
             custom_description=custom_description,
         )
 
-        self.add_custom_property(topo.LineageDuration(prop, time_prop.identifier))
+        self.add_custom_property(topo.LineageDuration(prop, time_prop=time_prop))
 
     def add_location_tag(
         self,
@@ -3395,7 +3503,7 @@ class Model:
 
     def add_relative_age(
         self,
-        custom_time_property: str | None = None,
+        time_prop: str | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -3411,9 +3519,9 @@ class Model:
 
         Parameters
         ----------
-        custom_time_property : str, optional
-            Identifier of the time property to use for the computation.
-            If None, the reference time property of the model will be used.
+        time_prop : str, optional
+            Identifier of the cell lineage node property holding the time of the
+            cells. If None, the reference time property of the model is used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "relative_age".
@@ -3425,29 +3533,23 @@ class Model:
 
         Raises
         ------
-        KeyError
-            If the specified time property has not been declared in the model.
+        MissingPropertyError
+            If `time_prop` has not been declared in the model.
+        ValueError
+            If `time_prop` is not a node property of cell lineages.
         """
-        if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(
-                self.model_metadata.reference_time_property
-            )
-        else:
-            time_prop = self.props_metadata.props.get(custom_time_property)
-        if time_prop is None:
-            time_prop = (
-                custom_time_property or self.model_metadata.reference_time_property
-            )
-            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+        time_prop = time_prop or self.reference_time_property
+        # If `time_prop` has not been declared, add_custom_property() raises below.
+        time = self.get_property(time_prop)
 
         prop = tracking.create_relative_age_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            dtype=time_prop.dtype,
-            unit=time_prop.unit,
+            dtype=time.dtype if time else "float",
+            unit=time.unit if time else None,
         )
-        self.add_custom_property(tracking.RelativeAge(prop, time_prop.identifier))
+        self.add_custom_property(tracking.RelativeAge(prop, time_prop=time_prop))
 
     def add_straightness(
         self,
@@ -3548,7 +3650,7 @@ class Model:
             raise ValueError(
                 f"Property {prop_identifier} is a property of cycle lineages, "
                 "but the cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+                "Please compute the cycle lineages first with model.add_cycle_data()."
             )
         self._get_prop_method(prop_identifier)(**kwargs)
 
@@ -4026,7 +4128,7 @@ class Model:
         if not self.data.cycle_data:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+                "Please compute the cycle lineages first with model.add_cycle_data()."
             )
         if self._updater._update_required and update:
             self.update()
@@ -4200,12 +4302,12 @@ class Model:
         if forbidden_fields:
             raise ValueError(
                 f"Critical model metadata {forbidden_fields} cannot be set through "
-                "`new_metadata`."
+                "'new_metadata'."
             )
         if new_name is not None and "name" in new_metadata:
             raise ValueError(
-                "The name of the merged model is given both by `new_name` and by "
-                "`new_metadata`."
+                "The name of the merged model is given both by 'new_name' and by "
+                "'new_metadata'."
             )
 
         # Time origin. Timepoints are computed relative to the time origin stored in the
@@ -4780,7 +4882,7 @@ class Model:
         if not self.data.cycle_data:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+                "Please compute the cycle lineages first with model.add_cycle_data()."
             )
         for lin_ID, lineage in self.data.cycle_data.items():
             if lids and lin_ID not in lids:
