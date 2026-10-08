@@ -31,7 +31,7 @@ from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.classes.updater import ModelUpdater
 from pycellin.custom_types import Cell, Link, PropertyType, property_type_from_string
-from pycellin.properties import motion, tracking
+from pycellin.properties import intensity, motion, tracking
 from pycellin.properties.core import (
     Timepoint,
     create_timepoint_property,
@@ -2827,32 +2827,17 @@ class Model:
             If `label_prop` or `contour_prop` is not a node property of cell
             lineages.
         """
-        source_params = {
-            "label_img": {
-                "label_prop": label_prop,
-                "label_img": label_img,
-                "label_img_path": label_img_path,
+        self._check_source_params(
+            source,
+            {
+                "label_img": {
+                    "label_prop": label_prop,
+                    "label_img": label_img,
+                    "label_img_path": label_img_path,
+                },
+                "contour": {"contour_prop": contour_prop},
             },
-            "contour": {"contour_prop": contour_prop},
-        }
-        if source not in source_params:
-            raise ValueError(
-                f"'source' must be one of {', '.join(map(repr, source_params))}, "
-                f"got {source!r}."
-            )
-        unused = [
-            param
-            for other_source, params in source_params.items()
-            if other_source != source
-            for param, value in params.items()
-            if value is not None
-        ]
-        if unused:
-            raise ValueError(
-                f"{', '.join(map(repr, unused))} "
-                f"{'is' if len(unused) == 1 else 'are'} not used with "
-                f"source={source!r}."
-            )
+        )
 
         if source == "label_img":
             prop = morpho.create_cell_polygon_property(
@@ -2993,6 +2978,550 @@ class Model:
             force_recompute=force_recompute,
         )
         self.add_custom_property(calc)
+
+    def add_cell_total_intensity(
+        self,
+        intensity_img: np.ndarray | None = None,
+        intensity_img_path: str | None = None,
+        source: Literal["label_img", "polygon"] = "label_img",
+        label_prop: str | None = None,
+        label_img: np.ndarray | None = None,
+        label_img_path: str | None = None,
+        polygon_prop: str | None = None,
+        background: float = 0.0,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell total intensity property to the model.
+
+        The cell total intensity is the sum of the values of the pixels of the cell
+        in an intensity image, after subtracting `background` from each of them. It
+        measures the amount of fluorophore in the cell. The pixels of each cell are
+        taken from one of these sources:
+
+        - "label_img": the pixels of the cell label in a label image, with all the
+          pieces of the label and without its holes. Images can be 2D or 3D.
+        - "polygon": the pixels whose center is inside the cell shape, a
+          shapely.Polygon or shapely.MultiPolygon. A pixel whose center is exactly
+          on an edge is counted only if the edge is a left or top edge of the
+          shape, so that a pixel shared by two touching cells is counted once.
+          With the cell multipolygon (`add_cell_multipolygon()`), these are exactly
+          the pixels of the cell label. With the cell polygon, holes are included
+          and only the largest piece is kept. The intensity is NaN for cells
+          without a shape, or whose shape contains no pixel center. Images are 2D.
+
+        The intensity image has a single channel: to measure several channels, add
+        the property once per channel, each time with its own `custom_identifier`.
+
+        Parameters
+        ----------
+        intensity_img : np.ndarray, optional
+            The intensity image, with time as first axis: (t, y, x), or (t, z, y, x)
+            with source="label_img". Pass the same array to several intensity
+            properties to load the image only once.
+        intensity_img_path : str, optional
+            The path to the intensity image (tif stack). Only used if
+            `intensity_img` is None.
+        source : {"label_img", "polygon"}, optional
+            Source of the pixels of each cell. Defaults to "label_img".
+        label_prop : str, optional
+            Name of the property that stores cell labels. Must match the labels in
+            the label image. Defaults to "label". Only used with
+            source="label_img".
+        label_img : np.ndarray, optional
+            The label image, with the same shape as the intensity image. If None,
+            the method will fallback to `label_img_path` or attempt to find it in
+            the model's metadata. Only used with source="label_img".
+        label_img_path : str, optional
+            The path to the label image (tif stack). If None, the method will
+            attempt to find it in the model's metadata. Only used with
+            source="label_img".
+        polygon_prop : str, optional
+            Identifier of the cell lineage node property holding the cell shapes as
+            shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
+            The shapes are in the space unit of the model, or in pixels if the unit
+            of the property is "pixel". Only used with source="polygon".
+        background : float, optional
+            Value subtracted from each pixel value. Defaults to 0.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_total_intensity".
+        custom_name : str, optional
+            New name for the property. If None, the name will be
+            "Cell total intensity".
+        custom_description : str, optional
+            New description for the property. If None, the description says where
+            the pixels of each cell are taken from.
+
+        Raises
+        ------
+        ValueError
+            If `source` is not one of the sources above, or if a parameter
+            of another source is set.
+        ValueError
+            If `intensity_img` and `intensity_img_path` are not provided.
+        ValueError
+            If `label_img` and `label_img_path` are not provided nor defined in the
+            model's metadata.
+        ValueError
+            If the intensity image and the label image have different shapes, or if
+            the intensity image doesn't have 3 axes (t, y, x) with source="polygon".
+        ValueError
+            If pixels are not isotropic in x and y, with source="polygon".
+        MissingPropertyError
+            If `label_prop` or `polygon_prop` has not been declared in the model.
+        ValueError
+            If `label_prop` or `polygon_prop` is not a node property of cell
+            lineages.
+        """
+        prop = intensity.create_cell_total_intensity_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self._add_cell_intensity(
+            prop,
+            "total",
+            intensity_img,
+            intensity_img_path,
+            source,
+            label_prop,
+            label_img,
+            label_img_path,
+            polygon_prop,
+            background,
+            describe_pixels=custom_description is None,
+        )
+
+    def add_cell_mean_intensity(
+        self,
+        intensity_img: np.ndarray | None = None,
+        intensity_img_path: str | None = None,
+        source: Literal["label_img", "polygon"] = "label_img",
+        label_prop: str | None = None,
+        label_img: np.ndarray | None = None,
+        label_img_path: str | None = None,
+        polygon_prop: str | None = None,
+        background: float = 0.0,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell mean intensity property to the model.
+
+        The cell mean intensity is the mean of the values of the pixels of the cell
+        in an intensity image, after subtracting `background` from each of them. It
+        measures the concentration of fluorophore in the cell. The pixels of each
+        cell are taken from one of these sources:
+
+        - "label_img": the pixels of the cell label in a label image, with all the
+          pieces of the label and without its holes. Images can be 2D or 3D.
+        - "polygon": the pixels whose center is inside the cell shape, a
+          shapely.Polygon or shapely.MultiPolygon. A pixel whose center is exactly
+          on an edge is counted only if the edge is a left or top edge of the
+          shape, so that a pixel shared by two touching cells is counted once.
+          With the cell multipolygon (`add_cell_multipolygon()`), these are exactly
+          the pixels of the cell label. With the cell polygon, holes are included
+          and only the largest piece is kept. The intensity is NaN for cells
+          without a shape, or whose shape contains no pixel center. Images are 2D.
+
+        The intensity image has a single channel: to measure several channels, add
+        the property once per channel, each time with its own `custom_identifier`.
+
+        Parameters
+        ----------
+        intensity_img : np.ndarray, optional
+            The intensity image, with time as first axis: (t, y, x), or (t, z, y, x)
+            with source="label_img". Pass the same array to several intensity
+            properties to load the image only once.
+        intensity_img_path : str, optional
+            The path to the intensity image (tif stack). Only used if
+            `intensity_img` is None.
+        source : {"label_img", "polygon"}, optional
+            Source of the pixels of each cell. Defaults to "label_img".
+        label_prop : str, optional
+            Name of the property that stores cell labels. Must match the labels in
+            the label image. Defaults to "label". Only used with
+            source="label_img".
+        label_img : np.ndarray, optional
+            The label image, with the same shape as the intensity image. If None,
+            the method will fallback to `label_img_path` or attempt to find it in
+            the model's metadata. Only used with source="label_img".
+        label_img_path : str, optional
+            The path to the label image (tif stack). If None, the method will
+            attempt to find it in the model's metadata. Only used with
+            source="label_img".
+        polygon_prop : str, optional
+            Identifier of the cell lineage node property holding the cell shapes as
+            shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
+            The shapes are in the space unit of the model, or in pixels if the unit
+            of the property is "pixel". Only used with source="polygon".
+        background : float, optional
+            Value subtracted from each pixel value. Defaults to 0.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_mean_intensity".
+        custom_name : str, optional
+            New name for the property. If None, the name will be
+            "Cell mean intensity".
+        custom_description : str, optional
+            New description for the property. If None, the description says where
+            the pixels of each cell are taken from.
+
+        Raises
+        ------
+        ValueError
+            If `source` is not one of the sources above, or if a parameter
+            of another source is set.
+        ValueError
+            If `intensity_img` and `intensity_img_path` are not provided.
+        ValueError
+            If `label_img` and `label_img_path` are not provided nor defined in the
+            model's metadata.
+        ValueError
+            If the intensity image and the label image have different shapes, or if
+            the intensity image doesn't have 3 axes (t, y, x) with source="polygon".
+        ValueError
+            If pixels are not isotropic in x and y, with source="polygon".
+        MissingPropertyError
+            If `label_prop` or `polygon_prop` has not been declared in the model.
+        ValueError
+            If `label_prop` or `polygon_prop` is not a node property of cell
+            lineages.
+        """
+        prop = intensity.create_cell_mean_intensity_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self._add_cell_intensity(
+            prop,
+            "mean",
+            intensity_img,
+            intensity_img_path,
+            source,
+            label_prop,
+            label_img,
+            label_img_path,
+            polygon_prop,
+            background,
+            describe_pixels=custom_description is None,
+        )
+
+    def _add_cell_intensity(
+        self,
+        prop: Property,
+        statistic: Literal["total", "mean"],
+        intensity_img: np.ndarray | None,
+        intensity_img_path: str | None,
+        source: str,
+        label_prop: str | None,
+        label_img: np.ndarray | None,
+        label_img_path: str | None,
+        polygon_prop: str | None,
+        background: float,
+        describe_pixels: bool,
+    ) -> None:
+        """
+        Add a cell intensity property to the model.
+
+        Parameters
+        ----------
+        prop : Property
+            The cell intensity property to add.
+        statistic : {"total", "mean"}
+            Statistic computed on the pixel values of each cell.
+        intensity_img, intensity_img_path, source, label_prop
+            See `add_cell_total_intensity()`.
+        label_img, label_img_path, polygon_prop, background
+            See `add_cell_total_intensity()`.
+        describe_pixels : bool
+            True to add to the description of the property where the pixels of each
+            cell are taken from.
+
+        Raises
+        ------
+        ValueError, MissingPropertyError
+            See `add_cell_total_intensity()`.
+        """
+        self._check_source_params(
+            source,
+            {
+                "label_img": {
+                    "label_prop": label_prop,
+                    "label_img": label_img,
+                    "label_img_path": label_img_path,
+                },
+                "polygon": {"polygon_prop": polygon_prop},
+            },
+        )
+        img = self._resolve_intensity_img(intensity_img, intensity_img_path)
+
+        calc: intensity._CellIntensityCalculator
+        if source == "label_img":
+            labels = self._resolve_label_img(label_img, label_img_path)
+            if img.shape != labels.shape:
+                raise ValueError(
+                    "The intensity image and the label image must have the same "
+                    f"shape, but their shapes are {img.shape} and {labels.shape}."
+                )
+            calc = intensity.CellIntensityFromLabelImg(
+                prop,
+                statistic,
+                img,
+                label_prop="label" if label_prop is None else label_prop,
+                label_img=labels,
+                background=background,
+            )
+            pixels_txt = "taking the pixels of each cell from a label image"
+        else:
+            if img.ndim != 3:
+                raise ValueError(
+                    "With source='polygon', the intensity image must have 3 axes "
+                    f"(t, y, x), but it has {img.ndim}."
+                )
+            if polygon_prop is None:
+                polygon_prop = "cell_polygon"
+            if self._get_prop_unit(polygon_prop) == "pixel":
+                pixel_size = 1.0
+            else:
+                pixel_size = self._get_xy_pixel_size()
+            calc = intensity.CellIntensityFromPolygon(
+                prop,
+                statistic,
+                img,
+                polygon_prop=polygon_prop,
+                pixel_size=pixel_size,
+                background=background,
+            )
+            pixels_txt = f"taking the pixels whose center is inside '{polygon_prop}'"
+
+        if describe_pixels:
+            prop.description += f", {pixels_txt}"
+            if background:
+                prop.description += f", minus a background of {background} per pixel"
+        self.add_custom_property(calc)
+
+    def add_cycle_mean_intensity(
+        self,
+        intensity_prop: str = "cell_mean_intensity",
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cycle mean intensity property to the model.
+
+        The cycle mean intensity is defined as the mean intensity of the cell
+        during the cell cycle, computed from the cell intensities.
+
+        Parameters
+        ----------
+        intensity_prop : str, optional
+            Identifier of the cell lineage node property holding the cell
+            intensities. Defaults to "cell_mean_intensity", added by
+            `add_cell_mean_intensity()`.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cycle_mean_intensity".
+        custom_name : str, optional
+            New name for the property. If None, the name will be
+            "Cycle mean intensity".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.intensity.create_cycle_mean_intensity_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If `intensity_prop` has not been declared in the model.
+        ValueError
+            If `intensity_prop` is not a node property of cell lineages.
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        prop = intensity.create_cycle_mean_intensity_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self._get_prop_unit(intensity_prop),
+        )
+        self.add_custom_property(
+            intensity.CycleMeanIntensity(prop, intensity_prop=intensity_prop)
+        )
+
+    def add_birth_intensity(
+        self,
+        intensity_prop: str = "cell_total_intensity",
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the birth intensity property to the model.
+
+        The birth intensity is defined as the intensity of the first cell of the
+        cell cycle, right after division. It is NaN for cell cycles starting at a
+        root, since their birth was not observed.
+
+        Parameters
+        ----------
+        intensity_prop : str, optional
+            Identifier of the cell lineage node property holding the cell
+            intensities. Defaults to "cell_total_intensity", added by
+            `add_cell_total_intensity()`.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "birth_intensity".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Birth intensity".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.intensity.create_birth_intensity_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If `intensity_prop` has not been declared in the model.
+        ValueError
+            If `intensity_prop` is not a node property of cell lineages.
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        prop = intensity.create_birth_intensity_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self._get_prop_unit(intensity_prop),
+        )
+        self.add_custom_property(
+            intensity.BirthIntensity(prop, intensity_prop=intensity_prop)
+        )
+
+    def add_division_intensity(
+        self,
+        intensity_prop: str = "cell_total_intensity",
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the division intensity property to the model.
+
+        The division intensity is defined as the intensity of the last cell of the
+        cell cycle, right before division. It is NaN for cell cycles ending at a
+        leaf, since their division was not observed.
+
+        Parameters
+        ----------
+        intensity_prop : str, optional
+            Identifier of the cell lineage node property holding the cell
+            intensities. Defaults to "cell_total_intensity", added by
+            `add_cell_total_intensity()`.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "division_intensity".
+        custom_name : str, optional
+            New name for the property. If None, the name will be
+            "Division intensity".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.intensity.create_division_intensity_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If `intensity_prop` has not been declared in the model.
+        ValueError
+            If `intensity_prop` is not a node property of cell lineages.
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        prop = intensity.create_division_intensity_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self._get_prop_unit(intensity_prop),
+        )
+        self.add_custom_property(
+            intensity.DivisionIntensity(prop, intensity_prop=intensity_prop)
+        )
+
+    @staticmethod
+    def _check_source_params(
+        source: str, source_params: dict[str, dict[str, Any]]
+    ) -> None:
+        """
+        Check that a source is known, and that no parameter of another source is set.
+
+        Parameters
+        ----------
+        source : str
+            The chosen source.
+        source_params : dict[str, dict[str, Any]]
+            For each known source, the values of its specific parameters, by name.
+            A parameter is set when its value is not None.
+
+        Raises
+        ------
+        ValueError
+            If `source` is not a known source, or if a parameter of another source
+            is set.
+        """
+        if source not in source_params:
+            raise ValueError(
+                f"'source' must be one of {', '.join(map(repr, source_params))}, "
+                f"got {source!r}."
+            )
+        unused = [
+            param
+            for other_source, params in source_params.items()
+            if other_source != source
+            for param, value in params.items()
+            if value is not None
+        ]
+        if unused:
+            raise ValueError(
+                f"{', '.join(map(repr, unused))} "
+                f"{'is' if len(unused) == 1 else 'are'} not used with "
+                f"source={source!r}."
+            )
+
+    @staticmethod
+    def _resolve_intensity_img(
+        intensity_img: np.ndarray | None, intensity_img_path: str | None
+    ) -> np.ndarray:
+        """
+        Return the intensity image to use, from the array or from its path.
+
+        Parameters
+        ----------
+        intensity_img : np.ndarray | None
+            The intensity image. If None, `intensity_img_path` is used.
+        intensity_img_path : str | None
+            The path to the intensity image (tif stack).
+
+        Returns
+        -------
+        np.ndarray
+            The intensity image.
+
+        Raises
+        ------
+        ValueError
+            If `intensity_img` and `intensity_img_path` are not provided.
+        """
+        if intensity_img is not None:
+            return intensity_img
+        if intensity_img_path is None:
+            raise ValueError(
+                "No intensity image provided. Please provide 'intensity_img' or "
+                "'intensity_img_path'."
+            )
+        return tifffile.imread(intensity_img_path)
 
     def _resolve_label_img(
         self, label_img: np.ndarray | None, label_img_path: str | None

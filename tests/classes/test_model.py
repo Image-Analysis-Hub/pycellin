@@ -865,6 +865,191 @@ class TestAddCellMultipolygon:
             input_props_model.add_cell_multipolygon()
 
 
+@pytest.fixture()
+def intensity_model(input_props_model):
+    """
+    Add cell labels to input_props_model, and return it with a label image and an
+    intensity image. Cells 1, 2 and 3 have label 1, cell 4 has label 2. The value of
+    each pixel of the intensity image is 36 * t + 6 * row + column.
+    """
+    input_props_model.props_metadata._add_prop(
+        _create_test_property("label", "node", dtype="int")
+    )
+    lin = input_props_model.data.cell_data[1]
+    for nid, label in [(1, 1), (2, 1), (3, 1), (4, 2)]:
+        lin.nodes[nid]["label"] = label
+    # Cells 1 and 2 are at timepoints 0 and 1, cells 3 and 4 at timepoint 2.
+    label_img = np.zeros((3, 6, 6), dtype=np.uint32)
+    label_img[0, 0:2, 0:2] = 1
+    label_img[1, 1:3, 1:3] = 1
+    label_img[2, 0:2, 0:2] = 1
+    label_img[2, 3:5, 3:5] = 2
+    intensity_img = np.arange(108, dtype=np.float64).reshape(3, 6, 6)
+    return input_props_model, label_img, intensity_img
+
+
+class TestAddCellTotalIntensity:
+    """Test cases for Model.add_cell_total_intensity() method."""
+
+    def test_label_img_source(self, intensity_model):
+        model, label_img, intensity_img = intensity_model
+        model.add_cell_total_intensity(intensity_img, label_img=label_img)
+        model.update()
+        lin = model.data.cell_data[1]
+        # Cell 1: pixels of values 0, 1, 6 and 7.
+        assert lin.nodes[1]["cell_total_intensity"] == 14.0
+        # Cell 4: pixels of values 93, 94, 99 and 100.
+        assert lin.nodes[4]["cell_total_intensity"] == 386.0
+
+    def test_polygon_source_same_as_label_img(self, intensity_model):
+        model, label_img, intensity_img = intensity_model
+        model.model_metadata.space_unit = "um"
+        model.model_metadata.pixel_width = model.model_metadata.pixel_height = 2.0
+        model.add_cell_multipolygon(label_img=label_img)
+        model.add_cell_total_intensity(intensity_img, label_img=label_img)
+        model.add_cell_total_intensity(
+            intensity_img,
+            source="polygon",
+            polygon_prop="cell_multipolygon",
+            custom_identifier="total_from_shapes",
+        )
+        model.update()
+        for _, cell in model.data.cell_data[1].nodes(data=True):
+            assert cell["total_from_shapes"] == cell["cell_total_intensity"]
+
+    def test_polygon_source_in_pixels(self, intensity_model):
+        """Test that shapes in pixels are not scaled by the pixel size."""
+        model, _, intensity_img = intensity_model
+        model.model_metadata.pixel_width = model.model_metadata.pixel_height = 2.0
+        model.props_metadata._add_prop(
+            _create_test_property(
+                "pixel_shape", "node", dtype="shapely.Polygon", unit="pixel"
+            )
+        )
+        lin = model.data.cell_data[1]
+        for nid in lin.nodes:
+            # Contains the centers of the pixels (1, 1) and (1, 2).
+            lin.nodes[nid]["pixel_shape"] = Polygon(
+                [(0.5, 0.5), (2.5, 0.5), (2.5, 1.5), (0.5, 1.5)]
+            )
+        model.add_cell_total_intensity(
+            intensity_img, source="polygon", polygon_prop="pixel_shape"
+        )
+        model.update()
+        assert lin.nodes[1]["cell_total_intensity"] == 7.0 + 8.0
+
+    def test_intensity_img_path(self, intensity_model, tmp_path):
+        model, label_img, intensity_img = intensity_model
+        path = tmp_path / "intensity.tif"
+        tifffile.imwrite(path, intensity_img, photometric="minisblack")
+        model.add_cell_total_intensity(
+            intensity_img_path=str(path), label_img=label_img
+        )
+        model.update()
+        assert model.data.cell_data[1].nodes[1]["cell_total_intensity"] == 14.0
+
+    def test_description_says_where_pixels_come_from(self, intensity_model):
+        model, label_img, intensity_img = intensity_model
+        model.add_cell_total_intensity(
+            intensity_img, label_img=label_img, background=10
+        )
+        description = model.get_property("cell_total_intensity").description
+        assert description.endswith(
+            "from a label image, minus a background of 10 per pixel"
+        )
+
+    def test_no_intensity_image_raises(self, intensity_model):
+        model, label_img, _ = intensity_model
+        with pytest.raises(ValueError, match="No intensity image provided"):
+            model.add_cell_total_intensity(label_img=label_img)
+
+    def test_image_shape_mismatch_raises(self, intensity_model):
+        model, label_img, intensity_img = intensity_model
+        with pytest.raises(ValueError, match="must have the same shape"):
+            model.add_cell_total_intensity(intensity_img[:, :5], label_img=label_img)
+
+    def test_polygon_source_needs_3_axes(self, intensity_model):
+        model, _, intensity_img = intensity_model
+        with pytest.raises(ValueError, match="must have 3 axes"):
+            model.add_cell_total_intensity(
+                intensity_img[:, np.newaxis], source="polygon"
+            )
+
+    def test_label_img_param_with_polygon_source_raises(self, intensity_model):
+        model, label_img, intensity_img = intensity_model
+        with pytest.raises(
+            ValueError, match="'label_img' is not used with source='polygon'"
+        ):
+            model.add_cell_total_intensity(
+                intensity_img, source="polygon", label_img=label_img
+            )
+
+    def test_missing_polygon_prop_suggests_add_cell_polygon(self, intensity_model):
+        model, _, intensity_img = intensity_model
+        with pytest.raises(MissingPropertyError, match=r"model\.add_cell_polygon\(\)"):
+            model.add_cell_total_intensity(intensity_img, source="polygon")
+
+
+class TestAddCellMeanIntensity:
+    """Test cases for Model.add_cell_mean_intensity() method."""
+
+    def test_label_img_source(self, intensity_model):
+        model, label_img, intensity_img = intensity_model
+        model.add_cell_mean_intensity(intensity_img, label_img=label_img)
+        model.update()
+        lin = model.data.cell_data[1]
+        assert lin.nodes[1]["cell_mean_intensity"] == 3.5
+        assert lin.nodes[4]["cell_mean_intensity"] == 96.5
+
+
+class TestAddCycleMeanIntensity:
+    """Test cases for Model.add_cycle_mean_intensity() method."""
+
+    def test_missing_default_intensity_prop_raises(self, input_props_model):
+        with pytest.raises(MissingPropertyError, match="add_cell_mean_intensity"):
+            input_props_model.add_cycle_mean_intensity()
+
+    def test_custom_intensity_prop(self, input_props_model):
+        input_props_model.add_cycle_mean_intensity(intensity_prop="my_area")
+        input_props_model.update()
+        cycle_lin = input_props_model.data.cycle_data[1]
+        assert cycle_lin.nodes[2]["cycle_mean_intensity"] == 1.5
+
+    def test_unit_from_intensity_prop(self, input_props_model):
+        input_props_model.add_cycle_mean_intensity(intensity_prop="my_area")
+        assert input_props_model.get_property("cycle_mean_intensity").unit == "um^2"
+
+
+class TestAddBirthIntensity:
+    """Test cases for Model.add_birth_intensity() method."""
+
+    def test_missing_default_intensity_prop_raises(self, input_props_model):
+        with pytest.raises(MissingPropertyError, match="add_cell_total_intensity"):
+            input_props_model.add_birth_intensity()
+
+    def test_custom_intensity_prop(self, input_props_model):
+        input_props_model.add_birth_intensity(intensity_prop="my_area")
+        input_props_model.update()
+        cycle_lin = input_props_model.data.cycle_data[1]
+        assert cycle_lin.nodes[3]["birth_intensity"] == 3.0
+        assert np.isnan(cycle_lin.nodes[2]["birth_intensity"])
+
+
+class TestAddDivisionIntensity:
+    """Test cases for Model.add_division_intensity() method."""
+
+    def test_missing_default_intensity_prop_raises(self, input_props_model):
+        with pytest.raises(MissingPropertyError, match="add_cell_total_intensity"):
+            input_props_model.add_division_intensity()
+
+    def test_custom_intensity_prop(self, input_props_model):
+        input_props_model.add_division_intensity(intensity_prop="my_area")
+        input_props_model.update()
+        cycle_lin = input_props_model.data.cycle_data[1]
+        assert cycle_lin.nodes[2]["division_intensity"] == 2.0
+        assert np.isnan(cycle_lin.nodes[3]["division_intensity"])
+
+
 class TestAddAbsoluteAge:
     """Test cases for Model.add_absolute_age() method."""
 

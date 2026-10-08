@@ -214,25 +214,67 @@ class _LabelImgShapeCalculator(NodeLocalPropCalculator):
         if not self.force_recompute and self.prop.identifier in lineage.nodes[nid]:
             return lineage.nodes[nid][self.prop.identifier]
 
-        label = int(lineage.nodes[nid][self.label_prop])
-        t = lineage.nodes[nid]["timepoint"]
-        frame = self.label_img[t]
-        if t not in self._label_slices:
-            self._label_slices[t] = ndi.find_objects(frame)
-        slices = self._label_slices[t]
-        if not 0 < label <= len(slices) or slices[label - 1] is None:
-            raise ValueError(
-                f"Label {label} of cell {nid} (lineage "
-                f"{lineage.graph['lineage_ID']}) is not in timepoint {t} "
-                "of the label image."
-            )
-        rows, cols = slices[label - 1]
-        shape = self._shape_from_mask(frame[rows, cols] == label, lineage, nid)
+        _, (rows, cols), mask = _find_label(
+            self.label_img, self._label_slices, lineage, nid, self.label_prop
+        )
+        shape = self._shape_from_mask(mask, lineage, nid)
         # Move the shape from the bounding box to the frame, then scale it.
         size = self.pixel_size
         return affine_transform(
             shape, [size, 0, 0, size, size * cols.start, size * rows.start]
         )
+
+
+def _find_label(
+    label_img: np.ndarray,
+    label_slices: dict[int, list[tuple[slice, ...] | None]],
+    lineage: CellLineage,
+    nid: int,
+    label_prop: str,
+) -> tuple[int, tuple[slice, ...], np.ndarray]:
+    """
+    Find the pixels of the label of a cell in a label image.
+
+    Parameters
+    ----------
+    label_img : np.ndarray
+        The label image, with time as first axis.
+    label_slices : dict[int, list[tuple[slice, ...] | None]]
+        Bounding boxes of the labels of each timepoint, as returned by
+        scipy.ndimage.find_objects(). The bounding boxes of a timepoint are
+        computed and added on its first use.
+    lineage : CellLineage
+        Lineage graph containing the cell.
+    nid : int
+        Node ID of the cell.
+    label_prop : str
+        Name of the property that stores cell labels.
+
+    Returns
+    -------
+    tuple[int, tuple[slice, ...], np.ndarray]
+        The timepoint of the cell, the bounding box of its label in that
+        timepoint, and the binary mask of the label in the bounding box.
+
+    Raises
+    ------
+    ValueError
+        If the label of the cell is not in its timepoint of the label image.
+    """
+    label = int(lineage.nodes[nid][label_prop])
+    t = lineage.nodes[nid]["timepoint"]
+    frame = label_img[t]
+    if t not in label_slices:
+        label_slices[t] = ndi.find_objects(frame)
+    slices = label_slices[t]
+    if not 0 < label <= len(slices) or slices[label - 1] is None:
+        raise ValueError(
+            f"Label {label} of cell {nid} (lineage "
+            f"{lineage.graph['lineage_ID']}) is not in timepoint {t} "
+            "of the label image."
+        )
+    bbox = slices[label - 1]
+    return t, bbox, frame[bbox] == label
 
 
 class CellPolygonFromLabelImg(_LabelImgShapeCalculator):
