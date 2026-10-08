@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import inspect
 import pickle
 import warnings
 from copy import deepcopy
@@ -2114,7 +2115,13 @@ class Model:
                 }
                 fix = f"set '{param}' to the identifier of a declared property"
                 if input_id in pycellin_props:
-                    fix = f"add it first with model.add_{input_id}(), or {fix}"
+                    add_method = self._get_prop_method(input_id)
+                    parameters = inspect.signature(add_method).parameters.values()
+                    defaults = [parameter.default for parameter in parameters]
+                    # Don't suggest an add method that reads, by default, the property
+                    # being added, e.g. add_cell_contour() for a polygon from contours.
+                    if prop_id not in defaults:
+                        fix = f"add it first with model.add_{input_id}(), or {fix}"
                 raise MissingPropertyError(
                     input_id,
                     message=(
@@ -2402,6 +2409,7 @@ class Model:
 
         The cell area is computed from the cell polygons. For a
         shapely.MultiPolygon, it is the area of all the pieces, holes excluded.
+        It is NaN for cells whose polygon is None, such as cells without a contour.
 
         Parameters
         ----------
@@ -2581,6 +2589,7 @@ class Model:
 
         The cell perimeter is computed from the cell polygons. For a
         shapely.MultiPolygon, it includes all the pieces and the edges of their holes.
+        It is NaN for cells whose polygon is None, such as cells without a contour.
 
         Parameters
         ----------
@@ -2624,7 +2633,9 @@ class Model:
         Add the cell contour property to the model.
 
         The cell contour is the coordinates of the contour of the cell,
-        relative to the cell centroid. It is computed from the cell polygons.
+        relative to the cell centroid. It is computed from the cell polygons, and is
+        None for cells whose polygon is None. Don't use it on the contours that the
+        polygons are computed from (`add_cell_polygon(source="contour")`).
 
         Parameters
         ----------
@@ -2733,9 +2744,11 @@ class Model:
 
     def add_cell_polygon(
         self,
-        label_prop: str = "label",
+        source: Literal["label_img", "contour"] = "label_img",
+        label_prop: str | None = None,
         label_img: np.ndarray | None = None,
         label_img_path: str | None = None,
+        contour_prop: str | None = None,
         force_recompute: bool = False,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
@@ -2744,25 +2757,46 @@ class Model:
         """
         Add the cell polygon property to the model.
 
-        The cell polygon is the outline of the cell label in the label image,
-        as a shapely.Polygon. Holes are filled and, when a label is made of several
-        pieces, only the largest one is kept: a warning lists the cells concerned when
-        the model is updated. Pixels that touch only by a corner belong to the same
-        piece.
-        To keep all the pieces and holes, use the cell multipolygon property instead
-        (`add_cell_multipolygon()`).
+        The cell polygon is the shape of the cell as a shapely.Polygon. It is
+        computed from one of these sources:
+
+        - "label_img": the outline of the cell label in a label image. Holes are
+          filled and, when a label is made of several pieces, only the largest one
+          is kept: a warning lists the cells concerned when the model is updated.
+          Pixels that touch only by a corner belong to the same piece. To keep all
+          the pieces and holes, use the cell multipolygon property instead
+          (`add_cell_multipolygon()`).
+        - "contour": the cell contour, relative to the cell position (`cell_x`,
+          `cell_y`), like the contours loaded from TrackMate or Cell Tracking
+          Challenge data. The polygon is None for cells without a contour. An
+          invalid contour, such as a contour that crosses itself, is repaired: the
+          polygon is its largest piece with holes filled. A log message lists the
+          cells concerned when the model is updated. Since `add_cell_contour()`
+          computes contours from polygons, don't use it on the contours the
+          polygons are computed from.
+
+        For any other source, compute the polygons with your own calculator (see
+        `add_custom_property()`) and pass their identifier as `polygon_prop` to the
+        properties that read cell polygons, such as `add_cell_area()`.
 
         Parameters
         ----------
-        label_prop: str
+        source : {"label_img", "contour"}, optional
+            Source of the cell polygons. Defaults to "label_img".
+        label_prop : str, optional
             Name of the property that stores cell labels. Must match the labels in
-            the label image. Defaults to "label".
+            the label image. Defaults to "label". Only used with
+            source="label_img".
         label_img : np.ndarray, optional
             The label image. If None, the method will fallback to `label_img_path`
-            or attempt to find it in the model's metadata.
+            or attempt to find it in the model's metadata. Only used with
+            source="label_img".
         label_img_path: str, optional
             The path to the label image (tif stack). If None, the method will attempt
-            to find it in the model's metadata.
+            to find it in the model's metadata. Only used with source="label_img".
+        contour_prop : str, optional
+            Identifier of the cell lineage node property holding the cell contours.
+            Defaults to "cell_contour". Only used with source="contour".
         force_recompute : bool
             Whether to force recomputation of the property when it has already been
             computed. Defaults to False.
@@ -2770,38 +2804,125 @@ class Model:
             New identifier for the property. If None, the identifier will be
             "cell_polygon".
         custom_name : str, optional
-            New name for the property. If None, the name will be "Cell polygon from
-            label image".
+            New name for the property. If None, the name will be "Cell polygon".
         custom_description : str, optional
-            New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cell_polygon_property`).
+            New description for the property. If None, the description says which
+            source the polygons are computed from.
 
         Raises
         ------
+        ValueError
+            If `source` is not one of the sources above, or if a parameter
+            of another source is set.
         ValueError
             If `label_img` and `label_img_path` are not provided nor defined in the
             model's metadata.
         ValueError
             If pixels are not isotropic in x and y.
-        MissingPropertyError
-            If `label_prop` has not been declared in the model.
         ValueError
-            If `label_prop` is not a node property of cell lineages.
+            If the contours and the cell positions have different units.
+        MissingPropertyError
+            If `label_prop` or `contour_prop` has not been declared in the model.
+        ValueError
+            If `label_prop` or `contour_prop` is not a node property of cell
+            lineages.
         """
-        prop = morpho.create_cell_polygon_property(
-            custom_identifier=custom_identifier,
-            custom_name=custom_name,
-            custom_description=custom_description,
-            unit=self.model_metadata.space_unit or "pixel",
-        )
-        calc = morpho.CellPolygonFromLabelImg(
-            prop,
-            label_prop=label_prop,
-            label_img=self._resolve_label_img(label_img, label_img_path),
-            pixel_size=self._get_xy_pixel_size(),
-            force_recompute=force_recompute,
-        )
+        source_params = {
+            "label_img": {
+                "label_prop": label_prop,
+                "label_img": label_img,
+                "label_img_path": label_img_path,
+            },
+            "contour": {"contour_prop": contour_prop},
+        }
+        if source not in source_params:
+            raise ValueError(
+                f"'source' must be one of {', '.join(map(repr, source_params))}, "
+                f"got {source!r}."
+            )
+        unused = [
+            param
+            for other_source, params in source_params.items()
+            if other_source != source
+            for param, value in params.items()
+            if value is not None
+        ]
+        if unused:
+            raise ValueError(
+                f"{', '.join(map(repr, unused))} "
+                f"{'is' if len(unused) == 1 else 'are'} not used with "
+                f"source={source!r}."
+            )
+
+        if source == "label_img":
+            prop = morpho.create_cell_polygon_property(
+                custom_identifier=custom_identifier,
+                custom_name=custom_name,
+                custom_description=custom_description
+                or "Cell shape as a shapely.Polygon, computed from a label image",
+                unit=self.model_metadata.space_unit or "pixel",
+            )
+            calc = morpho.CellPolygonFromLabelImg(
+                prop,
+                label_prop="label" if label_prop is None else label_prop,
+                label_img=self._resolve_label_img(label_img, label_img_path),
+                pixel_size=self._get_xy_pixel_size(),
+                force_recompute=force_recompute,
+            )
+        else:
+            if contour_prop is None:
+                contour_prop = "cell_contour"
+            prop = morpho.create_cell_polygon_property(
+                custom_identifier=custom_identifier,
+                custom_name=custom_name,
+                custom_description=custom_description
+                or "Cell shape as a shapely.Polygon, computed from the cell contour "
+                f"('{contour_prop}') and position",
+                unit=self._get_contour_unit(contour_prop),
+            )
+            calc = morpho.CellPolygonFromContour(
+                prop, contour_prop=contour_prop, force_recompute=force_recompute
+            )
         self.add_custom_property(calc)
+
+    def _get_contour_unit(self, contour_prop: str) -> str | None:
+        """
+        Return the unit shared by cell contours and cell positions.
+
+        A contour is relative to the cell position, so both must have the same unit.
+        Undeclared properties and unknown units are not checked.
+
+        Parameters
+        ----------
+        contour_prop : str
+            Identifier of the property holding the cell contours.
+
+        Returns
+        -------
+        str | None
+            The shared unit, or the unit of the contours if no unit is known.
+
+        Raises
+        ------
+        ValueError
+            If the contours and the cell positions have different units.
+        """
+        units = {
+            identifier: self._get_prop_unit(identifier)
+            for identifier in (contour_prop, "cell_x", "cell_y")
+        }
+        known_units = {
+            prop: unit for prop, unit in units.items() if unit not in (None, "unknown")
+        }
+        if len(set(known_units.values())) > 1:
+            mismatch = ", ".join(
+                f"'{prop}' is in '{unit}'" for prop, unit in known_units.items()
+            )
+            raise ValueError(
+                "The contours and the cell positions must have the same unit, since "
+                f"contours are relative to the cell position, but {mismatch}."
+            )
+        return next(iter(known_units.values()), units[contour_prop])
 
     def add_cell_multipolygon(
         self,
@@ -2841,8 +2962,7 @@ class Model:
             New identifier for the property. If None, the identifier will be
             "cell_multipolygon".
         custom_name : str, optional
-            New name for the property. If None, the name will be "Cell multipolygon
-            from label image".
+            New name for the property. If None, the name will be "Cell multipolygon".
         custom_description : str, optional
             New description for the property. If None, the description will take its
             default value (see :func:`pycellin.properties.morphology.create_cell_multipolygon_property`).

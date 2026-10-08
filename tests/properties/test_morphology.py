@@ -2,13 +2,14 @@
 
 """Unit test for morphology property classes from pycellin.properties."""
 
+import logging
 import math
 import warnings
 
 import networkx as nx
 import numpy as np
 import pytest
-from shapely.geometry import MultiPolygon, Polygon
+from shapely.geometry import GeometryCollection, LineString, MultiPolygon, Polygon
 
 from pycellin.classes import CellLineage, Data, Property
 from pycellin.properties.morphology import (
@@ -17,9 +18,11 @@ from pycellin.properties.morphology import (
     CellContour,
     CellMultiPolygonFromLabelImg,
     CellPerimeter,
+    CellPolygonFromContour,
     CellPolygonFromLabelImg,
     CycleMeanArea,
     DivisionArea,
+    _largest_polygon,
     _mask_to_polygons,
 )
 
@@ -96,6 +99,18 @@ def label_img():
     img[0, 6:9, 6:9] = 5
     img[0, 7, 7] = 0
     return img
+
+
+@pytest.fixture
+def contour_lineage():
+    # All cells are at position (10, 20). Cell 1 has a 2x1 rectangle contour,
+    # cell 2 has no contour and the contour of cell 3 is None.
+    lineage = CellLineage()
+    lineage.add_nodes_from([1, 2, 3], cell_x=10.0, cell_y=20.0)
+    lineage.nodes[1]["cell_contour"] = [(-1, -0.5), (1, -0.5), (1, 0.5), (-1, 0.5)]
+    lineage.nodes[3]["cell_contour"] = None
+    lineage.graph["lineage_ID"] = 1
+    return lineage
 
 
 # _mask_to_polygons ###########################################################
@@ -300,6 +315,143 @@ class TestCellMultiPolygonFromLabelImg:
             calculator.enrich(Data({1: lineage}), [(1, 1)])
 
 
+# _largest_polygon ############################################################
+
+
+class TestLargestPolygon:
+    def test_polygon(self):
+        polygon = Polygon([(0, 0), (2, 0), (2, 1), (0, 1)])
+        assert _largest_polygon(polygon).equals(polygon)
+
+    def test_multipolygon(self):
+        multipolygon = MultiPolygon(
+            [
+                Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),
+                Polygon([(5, 5), (8, 5), (8, 6), (5, 6)]),
+            ]
+        )
+        assert _largest_polygon(multipolygon).area == 3.0
+
+    def test_nested_geometry_collection(self):
+        collection = GeometryCollection(
+            [
+                LineString([(0, 0), (9, 9)]),
+                MultiPolygon(
+                    [
+                        Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),
+                        Polygon([(5, 5), (7, 5), (7, 6), (5, 6)]),
+                    ]
+                ),
+            ]
+        )
+        assert _largest_polygon(collection).area == 2.0
+
+    def test_holes_filled(self):
+        ring = Polygon(
+            [(0, 0), (3, 0), (3, 3), (0, 3)], [[(1, 1), (2, 1), (2, 2), (1, 2)]]
+        )
+        assert _largest_polygon(ring).area == 9.0
+
+    def test_no_area(self):
+        assert _largest_polygon(LineString([(0, 0), (1, 1)])) is None
+
+
+# CellPolygonFromContour ######################################################
+
+
+class TestCellPolygonFromContour:
+    def test_compute_relative_to_position(self, contour_lineage, prop_cell_lin):
+        calculator = CellPolygonFromContour(prop_cell_lin)
+        polygon = calculator.compute(contour_lineage, nid=1)
+        assert polygon.bounds == (9.0, 19.5, 11.0, 20.5)
+
+    def test_compute_custom_contour_prop(self, contour_lineage, prop_cell_lin):
+        contour_lineage.nodes[2]["my_contour"] = [(0, 0), (3, 0), (3, 1)]
+        calculator = CellPolygonFromContour(prop_cell_lin, contour_prop="my_contour")
+        assert calculator.compute(contour_lineage, nid=2).area == 1.5
+
+    def test_compute_missing_contour(self, contour_lineage, prop_cell_lin):
+        calculator = CellPolygonFromContour(prop_cell_lin)
+        assert calculator.compute(contour_lineage, nid=2) is None
+
+    def test_compute_none_contour(self, contour_lineage, prop_cell_lin):
+        calculator = CellPolygonFromContour(prop_cell_lin)
+        assert calculator.compute(contour_lineage, nid=3) is None
+
+    def test_compute_crossing_contour_keeps_largest_piece(
+        self, contour_lineage, prop_cell_lin
+    ):
+        # A figure-eight whose two lobes have areas 1/3 and 4/3.
+        contour_lineage.nodes[1]["cell_contour"] = [(0, 0), (2, 2), (2, 0), (0, 1)]
+        calculator = CellPolygonFromContour(prop_cell_lin)
+        polygon = calculator.compute(contour_lineage, nid=1)
+        assert polygon.is_valid
+        assert math.isclose(polygon.area, 4 / 3)
+
+    def test_compute_contour_with_spike(self, contour_lineage, prop_cell_lin):
+        # A 2x2 square with a spike of zero width on its top side.
+        contour = [(0, 0), (2, 0), (2, 2), (1, 2), (1, 4), (1, 2), (0, 2)]
+        contour_lineage.nodes[1]["cell_contour"] = contour
+        calculator = CellPolygonFromContour(prop_cell_lin)
+        polygon = calculator.compute(contour_lineage, nid=1)
+        assert polygon.is_valid
+        assert polygon.area == 4.0
+
+    def test_compute_contour_too_short(self, contour_lineage, prop_cell_lin):
+        contour_lineage.nodes[1]["cell_contour"] = [(0, 0), (1, 1)]
+        calculator = CellPolygonFromContour(prop_cell_lin)
+        assert calculator.compute(contour_lineage, nid=1) is None
+
+    def test_compute_empty_contour(self, contour_lineage, prop_cell_lin):
+        contour_lineage.nodes[1]["cell_contour"] = []
+        calculator = CellPolygonFromContour(prop_cell_lin)
+        assert calculator.compute(contour_lineage, nid=1) is None
+
+    def test_existing_value_kept(self, contour_lineage, prop_cell_lin):
+        contour_lineage.nodes[1]["test_property"] = "existing"
+        calculator = CellPolygonFromContour(prop_cell_lin)
+        assert calculator.compute(contour_lineage, nid=1) == "existing"
+
+    def test_existing_value_recomputed_with_force_recompute(
+        self, contour_lineage, prop_cell_lin
+    ):
+        contour_lineage.nodes[1]["test_property"] = "existing"
+        calculator = CellPolygonFromContour(prop_cell_lin, force_recompute=True)
+        assert calculator.compute(contour_lineage, nid=1).area == 2.0
+
+    def test_enrich_logs_once(self, contour_lineage, prop_cell_lin, caplog):
+        contour_lineage.add_node(
+            4, cell_x=0.0, cell_y=0.0, cell_contour=[(0, 0), (2, 2), (2, 0), (0, 1)]
+        )
+        calculator = CellPolygonFromContour(prop_cell_lin)
+        nodes = [(nid, 1) for nid in [1, 2, 3, 4]]
+        with caplog.at_level(logging.WARNING, logger="pycellin.properties.morphology"):
+            calculator.enrich(Data({1: contour_lineage}), nodes)
+        assert len(caplog.records) == 1
+        message = caplog.records[0].getMessage()
+        assert message.startswith(
+            "In 'cell_contour', 2 cells have no value (cell 2 of lineage 1, "
+            "cell 3 of lineage 1) and 1 cell has an invalid contour (cell 4 of "
+            "lineage 1)."
+        )
+        assert contour_lineage.nodes[2]["test_property"] is None
+        assert contour_lineage.nodes[4]["test_property"].is_valid
+
+    def test_enrich_no_log_for_valid_contours(
+        self, contour_lineage, prop_cell_lin, caplog
+    ):
+        calculator = CellPolygonFromContour(prop_cell_lin)
+        with caplog.at_level(logging.WARNING, logger="pycellin.properties.morphology"):
+            calculator.enrich(Data({1: contour_lineage}), [(1, 1)])
+        assert caplog.records == []
+
+    def test_get_input_props(self, prop_cell_lin):
+        calculator = CellPolygonFromContour(prop_cell_lin, contour_prop="my_contour")
+        assert calculator.get_input_props() == {
+            "contour_prop": ("my_contour", "node", "CellLineage")
+        }
+
+
 # CellArea ####################################################################
 
 
@@ -327,6 +479,11 @@ class TestCellArea:
         with pytest.raises(KeyError, match="missing 'cell_polygon' property"):
             calculator.compute(polygon_lineage, nid=2)
 
+    def test_compute_none_polygon(self, polygon_lineage, prop_cell_lin):
+        polygon_lineage.nodes[2]["cell_polygon"] = None
+        calculator = CellArea(prop_cell_lin)
+        assert math.isnan(calculator.compute(polygon_lineage, nid=2))
+
     def test_get_input_props(self, prop_cell_lin):
         calculator = CellArea(prop_cell_lin, polygon_prop="my_polygon")
         assert calculator.get_input_props() == {
@@ -346,6 +503,11 @@ class TestCellPerimeter:
         calculator = CellPerimeter(prop_cell_lin, polygon_prop="my_polygon")
         assert calculator.compute(polygon_lineage, nid=2) == 8.0
 
+    def test_compute_none_polygon(self, polygon_lineage, prop_cell_lin):
+        polygon_lineage.nodes[2]["cell_polygon"] = None
+        calculator = CellPerimeter(prop_cell_lin)
+        assert math.isnan(calculator.compute(polygon_lineage, nid=2))
+
 
 # CellContour #################################################################
 
@@ -363,6 +525,11 @@ class TestCellContour:
         calculator = CellContour(prop_cell_lin, polygon_prop="my_multipolygon")
         with pytest.raises(TypeError, match="a contour needs a Polygon"):
             calculator.compute(polygon_lineage, nid=1)
+
+    def test_compute_none_polygon(self, polygon_lineage, prop_cell_lin):
+        polygon_lineage.nodes[2]["cell_polygon"] = None
+        calculator = CellContour(prop_cell_lin)
+        assert calculator.compute(polygon_lineage, nid=2) is None
 
     def test_existing_value_kept_with_custom_identifier(
         self, polygon_lineage, prop_cell_lin

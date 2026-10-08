@@ -735,6 +735,103 @@ class TestAddCycleMeanSpeed:
         assert input_props_model.get_property("cycle_mean_speed").unit == "um/frame"
 
 
+@pytest.fixture()
+def contour_model(input_props_model):
+    """
+    Add cell positions and contours to input_props_model. Each cell is a 2x1
+    rectangle centered on (cell_ID, 0).
+    """
+    for identifier, dtype in [
+        ("cell_x", "float"),
+        ("cell_y", "float"),
+        ("cell_contour", "list[tuple[float, float]]"),
+    ]:
+        input_props_model.props_metadata._add_prop(
+            _create_test_property(identifier, "node", dtype=dtype, unit="um")
+        )
+    for nid, cell in input_props_model.data.cell_data[1].nodes(data=True):
+        cell["cell_x"] = float(nid)
+        cell["cell_y"] = 0.0
+        cell["cell_contour"] = [(-1, -0.5), (1, -0.5), (1, 0.5), (-1, 0.5)]
+    return input_props_model
+
+
+class TestAddCellPolygon:
+    """Test cases for Model.add_cell_polygon() method."""
+
+    def test_label_img_source(self, input_props_model):
+        input_props_model.props_metadata._add_prop(
+            _create_test_property("label", "node", dtype="int")
+        )
+        lin = input_props_model.data.cell_data[1]
+        for nid in lin.nodes:
+            lin.nodes[nid]["label"] = 1
+        label_img = np.zeros((3, 6, 6), dtype=np.uint32)
+        label_img[:, 1:3, 1:4] = 1
+        input_props_model.add_cell_polygon(label_img=label_img)
+        input_props_model.update()
+        assert lin.nodes[1]["cell_polygon"].bounds == (0.5, 0.5, 3.5, 2.5)
+        description = input_props_model.get_property("cell_polygon").description
+        assert description.endswith("computed from a label image")
+
+    def test_contour_source(self, contour_model):
+        contour_model.add_cell_polygon(source="contour")
+        contour_model.update()
+        polygon = contour_model.data.cell_data[1].nodes[3]["cell_polygon"]
+        assert polygon.bounds == (2.0, -0.5, 4.0, 0.5)
+        prop = contour_model.get_property("cell_polygon")
+        assert prop.unit == "um"
+        assert "computed from the cell contour ('cell_contour')" in prop.description
+
+    def test_contour_source_feeds_cell_area(self, contour_model):
+        contour_model.add_cell_polygon(source="contour")
+        contour_model.add_cell_area()
+        contour_model.update()
+        assert contour_model.data.cell_data[1].nodes[3]["cell_area"] == 2.0
+
+    def test_contour_source_through_add_pycellin_property(self, contour_model):
+        contour_model.add_pycellin_property("cell_polygon", source="contour")
+        contour_model.update()
+        polygon = contour_model.data.cell_data[1].nodes[1]["cell_polygon"]
+        assert polygon.area == 2.0
+
+    def test_contour_source_missing_contour_prop_raises(self, input_props_model):
+        with pytest.raises(MissingPropertyError, match="set 'contour_prop'") as exc:
+            input_props_model.add_cell_polygon(source="contour")
+        # add_cell_contour() computes contours from cell polygons.
+        assert "add_cell_contour" not in str(exc.value)
+
+    def test_contour_source_unit_mismatch_raises(self, contour_model):
+        contour_model.get_property("cell_x").unit = "pixel"
+        with pytest.raises(ValueError, match="'cell_x' is in 'pixel'"):
+            contour_model.add_cell_polygon(source="contour")
+
+    def test_contour_source_unknown_unit_not_checked(self, contour_model):
+        contour_model.get_property("cell_contour").unit = None
+        contour_model.get_property("cell_y").unit = "unknown"
+        contour_model.add_cell_polygon(source="contour")
+        assert contour_model.get_property("cell_polygon").unit == "um"
+
+    def test_unknown_source_raises(self, contour_model):
+        with pytest.raises(ValueError, match="'source' must be one of"):
+            contour_model.add_cell_polygon(source="contours")
+
+    def test_label_img_param_with_contour_source_raises(self, contour_model):
+        with pytest.raises(
+            ValueError,
+            match="'label_prop', 'label_img_path' are not used with source='contour'",
+        ):
+            contour_model.add_cell_polygon(
+                source="contour", label_prop="label", label_img_path="labels.tif"
+            )
+
+    def test_contour_param_with_label_img_source_raises(self, contour_model):
+        with pytest.raises(
+            ValueError, match="'contour_prop' is not used with source='label_img'"
+        ):
+            contour_model.add_cell_polygon(contour_prop="cell_contour")
+
+
 class TestAddCellMultipolygon:
     """Test cases for Model.add_cell_multipolygon() method."""
 
