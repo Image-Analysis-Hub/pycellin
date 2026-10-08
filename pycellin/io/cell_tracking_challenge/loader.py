@@ -15,6 +15,7 @@ References:
 https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content%20conventions.pdf
 """
 
+import logging
 import re
 from itertools import pairwise
 from pathlib import Path
@@ -22,9 +23,10 @@ from typing import Any
 
 import networkx as nx
 import tifffile
-from skimage.measure import find_contours, regionprops
+from skimage.measure import regionprops
 
 from pycellin.classes import Data, Model, PropsMetadata
+from pycellin.io.utils import _split_graph_into_lineages
 from pycellin.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
@@ -33,9 +35,11 @@ from pycellin.properties.core import (
     create_time_property,
 )
 from pycellin.properties.morphology import (
+    _mask_to_polygons,
     create_cell_contour_property,
 )
-from pycellin.io.utils import _split_graph_into_lineages
+
+logger = logging.getLogger(__name__)
 
 # TODO: what if the first frame is empty...?
 
@@ -369,20 +373,30 @@ def _extract_seg_data(
     labels = []
     centroids = []
     contours = []
+    fragmented_labels = []
     for props in regions:
         # Label.
         labels.append(props.label)
         # Centroid.
         y0, x0 = props.centroid  # skimage returns (row, column) format
         centroids.append([x0, y0])
-        # Contours.
-        contour = find_contours(label_img == props.label, level=0.5)
-        assert len(contour) == 1, "Expected exactly one contour."
-        # The contours need to be given:
-        # - relatively to the label centroid
-        # - in the format (x, y) and not the default (row, column) yielded by skimage.
-        contour = [(float(x - x0), float(y - y0)) for y, x in contour[0]]
+        # Contour: outline of the largest piece of the label, holes filled.
+        polygons = _mask_to_polygons(props.image)
+        if len(polygons) > 1:
+            fragmented_labels.append(props.label)
+        # The polygon is in (x, y) coordinates of the label bounding box,
+        # but the contours need to be given relatively to the label centroid.
+        min_row, min_col = props.bbox[:2]
+        contour = [
+            (float(x + min_col - x0), float(y + min_row - y0))
+            for x, y in polygons[0].exterior.coords
+        ]
         contours.append(contour)
+    if fragmented_labels:
+        logger.warning(
+            f"Labels {fragmented_labels} of '{label_img_path}' are made of several "
+            "pieces: their contour only covers the largest piece."
+        )
     return labels, centroids, contours
 
 

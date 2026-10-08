@@ -19,6 +19,7 @@ from pycellin.properties.morphology import (
     CellPolygonFromLabelImg,
     CycleMeanArea,
     DivisionArea,
+    _mask_to_polygons,
 )
 
 # Fixtures ####################################################################
@@ -82,6 +83,54 @@ def prop_cell_lin():
     )
 
 
+@pytest.fixture
+def label_img():
+    # Timepoint 0: label 3 is a 2x3 rectangle (rows 2-3, columns 5-7). Label 4 is
+    # made of a 3x3 square (rows 6-8, columns 1-3) and of a single pixel.
+    img = np.zeros((1, 10, 12), dtype=np.uint32)
+    img[0, 2:4, 5:8] = 3
+    img[0, 6:9, 1:4] = 4
+    img[0, 9, 10] = 4
+    return img
+
+
+# _mask_to_polygons ###########################################################
+
+
+class TestMaskToPolygons:
+    def test_single_piece(self):
+        mask = np.zeros((6, 7), dtype=bool)
+        mask[1:4, 2:6] = True
+        polygons = _mask_to_polygons(mask)
+        assert len(polygons) == 1
+        assert polygons[0].area == 11.5
+
+    def test_pieces_sorted_by_decreasing_area(self):
+        mask = np.zeros((8, 8), dtype=bool)
+        mask[0, 0] = True
+        mask[4:7, 4:7] = True
+        assert [polygon.area for polygon in _mask_to_polygons(mask)] == [8.5, 0.5]
+
+    def test_corner_connected_pixels_are_one_piece(self):
+        mask = np.zeros((5, 5), dtype=bool)
+        mask[1, 1] = mask[2, 2] = mask[3, 3] = True
+        assert len(_mask_to_polygons(mask)) == 1
+
+    def test_holes_filled(self):
+        mask = np.zeros((7, 7), dtype=bool)
+        mask[1:6, 1:6] = True
+        mask[3, 3] = False
+        assert _mask_to_polygons(mask)[0].area == 24.5
+
+    def test_piece_on_mask_border_is_closed(self):
+        polygon = _mask_to_polygons(np.ones((3, 3), dtype=bool))[0]
+        assert polygon.area == 8.5
+        assert polygon.bounds == (-0.5, -0.5, 2.5, 2.5)
+
+    def test_empty_mask(self):
+        assert _mask_to_polygons(np.zeros((3, 3), dtype=bool)) == []
+
+
 # CellPolygonFromLabelImg #####################################################
 
 
@@ -94,6 +143,63 @@ class TestCellPolygonFromLabelImg:
             prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
         )
         assert calculator.compute(lineage, nid=1) == "existing"
+
+    def test_compute_position_and_pixel_size(self, label_img, prop_cell_lin):
+        lineage = CellLineage()
+        lineage.add_node(1, label=3, timepoint=0)
+        calculator = CellPolygonFromLabelImg(
+            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=2.0
+        )
+        polygon = calculator.compute(lineage, nid=1)
+        assert polygon.bounds == (9.0, 3.0, 15.0, 7.0)
+        assert polygon.area == 22.0
+
+    def test_compute_keeps_largest_piece(self, label_img, prop_cell_lin):
+        lineage = CellLineage()
+        lineage.add_node(1, label=4, timepoint=0)
+        lineage.graph["lineage_ID"] = 1
+        calculator = CellPolygonFromLabelImg(
+            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        )
+        polygon = calculator.compute(lineage, nid=1)
+        assert polygon.area == 8.5
+        assert polygon.bounds == (0.5, 5.5, 3.5, 8.5)
+
+    def test_compute_missing_label_raises(self, label_img, prop_cell_lin):
+        lineage = CellLineage()
+        lineage.add_node(1, label=5, timepoint=0)
+        lineage.graph["lineage_ID"] = 1
+        calculator = CellPolygonFromLabelImg(
+            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        )
+        with pytest.raises(ValueError, match="Label 5 of cell 1"):
+            calculator.compute(lineage, nid=1)
+
+    def test_enrich_warns_once_for_fragmented_labels(self, label_img, prop_cell_lin):
+        lineage = CellLineage()
+        lineage.add_node(1, label=3, timepoint=0)
+        lineage.add_node(2, label=4, timepoint=0)
+        lineage.graph["lineage_ID"] = 1
+        calculator = CellPolygonFromLabelImg(
+            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        )
+        with pytest.warns(UserWarning, match="1 cell has a label") as record:
+            calculator.enrich(Data({1: lineage}), [(1, 1), (2, 1)])
+        assert len(record) == 1
+        assert "cell 2 of lineage 1" in str(record[0].message)
+
+    def test_enrich_no_warning_without_fragmented_label(
+        self, label_img, prop_cell_lin
+    ):
+        lineage = CellLineage()
+        lineage.add_node(1, label=3, timepoint=0)
+        lineage.graph["lineage_ID"] = 1
+        calculator = CellPolygonFromLabelImg(
+            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            calculator.enrich(Data({1: lineage}), [(1, 1)])
 
     def test_get_input_props(self, prop_cell_lin):
         calculator = CellPolygonFromLabelImg(

@@ -5,13 +5,16 @@ A collection of diverse morphology properties that can be added to
 lineage graphs.
 """
 
+import warnings
 from itertools import combinations, product
 from operator import itemgetter
+from typing import ClassVar
 
 import networkx as nx
 import numpy as np
 from PIL import Image, ImageDraw
 from scipy import ndimage as ndi
+from shapely.affinity import affine_transform
 from shapely.geometry import LineString, Point, Polygon
 from skimage.measure import find_contours
 from skimage.morphology import skeletonize
@@ -46,10 +49,48 @@ def create_cell_polygon_property(
     )
 
 
+def _mask_to_polygons(mask: np.ndarray) -> list[Polygon]:
+    """
+    Convert a 2D binary mask into one polygon per piece of the mask.
+
+    Pieces are 8-connected: pixels that touch only by a corner belong to the same
+    piece. Holes are filled, so each polygon is the outline of its piece. The mask
+    is padded before tracing the contours, so that pieces touching the border
+    of the mask get closed outlines.
+
+    Parameters
+    ----------
+    mask : np.ndarray
+        2D binary mask.
+
+    Returns
+    -------
+    list[Polygon]
+        Polygons in (x, y) pixel coordinates of the mask, sorted by decreasing area.
+        Empty if the mask is empty.
+    """
+    pieces, n_pieces = ndi.label(mask, structure=np.ones((3, 3), dtype=bool))
+    polygons = []
+    for piece_id in range(1, n_pieces + 1):
+        # binary_fill_holes() treats the background as 4-connected, which matches
+        # the 8-connectivity of the pieces.
+        piece = np.pad(ndi.binary_fill_holes(pieces == piece_id), 1)
+        # A filled 8-connected piece has a single contour.
+        contour = find_contours(piece, 0.5, fully_connected="high")[0]
+        # Undo the padding and switch from (row, col) to (x, y).
+        polygons.append(Polygon(contour[:, ::-1] - 1))
+    return sorted(polygons, key=lambda polygon: polygon.area, reverse=True)
+
+
 class CellPolygonFromLabelImg(NodeLocalPropCalculator):
     """
     A calculator for the cell polygon property, which computes the cell shape as a
     shapely.Polygon from a label image.
+
+    The polygon is the outline of the cell label: holes are filled and, when the
+    label is made of several pieces, only the largest one is kept. A warning lists
+    such cells at the end of each update. Pixels that touch only by a corner belong
+    to the same piece.
 
     Parameters
     ----------
@@ -68,7 +109,9 @@ class CellPolygonFromLabelImg(NodeLocalPropCalculator):
 
     # The label image belongs to the model the calculator was created for.
     _USES_EXTERNAL_DATA = True
-    INPUT_PROPS = {"label_prop": ("node", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "label_prop": ("node", "CellLineage")
+    }
 
     def __init__(
         self,
@@ -83,18 +126,72 @@ class CellPolygonFromLabelImg(NodeLocalPropCalculator):
         self.label_img = label_img
         self.pixel_size = pixel_size
         self.force_recompute = force_recompute
+        # Bounding boxes of the labels of each timepoint, computed on first use.
+        self._label_slices: dict[int, list[tuple[slice, slice] | None]] = {}
+        # (cell ID, lineage ID) of the cells whose label is in several pieces.
+        self._fragmented_cells: list[tuple[int, int]] = []
 
-    def compute(self, lineage, nid: int) -> np.ndarray:
+    def enrich(
+        self, data: Data, nodes_to_enrich: list[tuple[int, int]], **kwargs
+    ) -> None:
+        """
+        Enrich the data with the cell polygons of a list of nodes.
+
+        Parameters
+        ----------
+        data : Data
+            Data object containing the lineages.
+        nodes_to_enrich : list of tuple[int, int]
+            List of tuples containing the node ID and the lineage ID of the nodes
+            to enrich with the property value.
+
+        Warns
+        -----
+        UserWarning
+            If the label of some cells is made of several pieces.
+        """
+        self._fragmented_cells = []
+        super().enrich(data, nodes_to_enrich, **kwargs)
+        if self._fragmented_cells:
+            n_cells = len(self._fragmented_cells)
+            examples = ", ".join(
+                f"cell {nid} of lineage {lin_ID}"
+                for nid, lin_ID in self._fragmented_cells[:5]
+            )
+            if n_cells > 5:
+                examples += ", ..."
+            cells_txt = "1 cell has" if n_cells == 1 else f"{n_cells} cells have"
+            warnings.warn(
+                f"{cells_txt} a label made of several pieces in the label image "
+                f"({examples}). '{self.prop.identifier}' only keeps the largest "
+                "piece of each label."
+            )
+
+    def compute(self, lineage, nid: int) -> Polygon:
         if not self.force_recompute and self.prop.identifier in lineage.nodes[nid]:
             return lineage.nodes[nid][self.prop.identifier]
 
-        label = lineage.nodes[nid][self.label_prop]
+        label = int(lineage.nodes[nid][self.label_prop])
         t = lineage.nodes[nid]["timepoint"]
-        binary_mask = self.label_img[t] == label
-        contours_px = find_contours(binary_mask)
-        # find_contours returns (row, col) = (y, x) so flip to (x, y) for Shapely.
-        contours_xy = contours_px[0][:, ::-1] * self.pixel_size
-        return Polygon(contours_xy)
+        frame = self.label_img[t]
+        if t not in self._label_slices:
+            self._label_slices[t] = ndi.find_objects(frame)
+        slices = self._label_slices[t]
+        if not 0 < label <= len(slices) or slices[label - 1] is None:
+            raise ValueError(
+                f"Label {label} of cell {nid} (lineage "
+                f"{lineage.graph['lineage_ID']}) is not in timepoint {t} "
+                "of the label image."
+            )
+        rows, cols = slices[label - 1]
+        polygons = _mask_to_polygons(frame[rows, cols] == label)
+        if len(polygons) > 1:
+            self._fragmented_cells.append((nid, lineage.graph["lineage_ID"]))
+        # Move the polygon from the bounding box to the frame, then scale it.
+        size = self.pixel_size
+        return affine_transform(
+            polygons[0], [size, 0, 0, size, size * cols.start, size * rows.start]
+        )
 
 
 def create_cell_area_property(
@@ -129,7 +226,9 @@ class CellArea(NodeLocalPropCalculator):
         shapely.Polygon. Defaults to "cell_polygon".
     """
 
-    INPUT_PROPS = {"polygon_prop": ("node", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "polygon_prop": ("node", "CellLineage")
+    }
 
     def __init__(self, property: Property, polygon_prop: str = "cell_polygon"):
         super().__init__(property)
@@ -184,7 +283,9 @@ class CycleMeanArea(NodeGlobalPropCalculator):
         Defaults to "cell_area".
     """
 
-    INPUT_PROPS = {"area_prop": ("node", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "area_prop": ("node", "CellLineage")
+    }
 
     def __init__(self, property: Property, area_prop: str = "cell_area"):
         super().__init__(property)
@@ -251,7 +352,9 @@ class BirthArea(NodeGlobalPropCalculator):
         Defaults to "cell_area".
     """
 
-    INPUT_PROPS = {"area_prop": ("node", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "area_prop": ("node", "CellLineage")
+    }
 
     def __init__(self, property: Property, area_prop: str = "cell_area"):
         super().__init__(property)
@@ -319,7 +422,9 @@ class DivisionArea(NodeGlobalPropCalculator):
         Defaults to "cell_area".
     """
 
-    INPUT_PROPS = {"area_prop": ("node", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "area_prop": ("node", "CellLineage")
+    }
 
     def __init__(self, property: Property, area_prop: str = "cell_area"):
         super().__init__(property)
@@ -388,7 +493,9 @@ class CellContour(NodeLocalPropCalculator):
         shapely.Polygon. Defaults to "cell_polygon".
     """
 
-    INPUT_PROPS = {"polygon_prop": ("node", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "polygon_prop": ("node", "CellLineage")
+    }
 
     def __init__(
         self,
@@ -450,7 +557,9 @@ class CellPerimeter(NodeLocalPropCalculator):
         shapely.Polygon. Defaults to "cell_polygon".
     """
 
-    INPUT_PROPS = {"polygon_prop": ("node", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "polygon_prop": ("node", "CellLineage")
+    }
 
     def __init__(self, property: Property, polygon_prop: str = "cell_polygon"):
         super().__init__(property)

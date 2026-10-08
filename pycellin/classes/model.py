@@ -2741,6 +2741,11 @@ class Model:
         """
         Add the cell polygon property to the model.
 
+        The cell polygon is the outline of the cell label in the label image,
+        as a shapely.Polygon. Holes are filled and, when a label is made of several
+        pieces, only the largest one is kept: a warning lists such cells when the
+        model is updated. Pixels that touch only by a corner belong to the same piece.
+
         Parameters
         ----------
         label_prop: str
