@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, ClassVar
 
 from pycellin.classes.data import Data
 from pycellin.classes.lineage import Lineage
@@ -52,7 +52,9 @@ class PropertyCalculator(ABC):
     # a property to the property type and lineage type the property must have,
     # e.g. {"area_prop": ("node", "CellLineage")}.
     # Model.add_custom_property() checks that these properties are declared.
-    INPUT_PROPS: dict[str, tuple[str, str]] = {}
+    # Subclasses repeat the ClassVar annotation, without which Ruff warns about
+    # a mutable class attribute (RUF012).
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {}
 
     def __init__(self, property: Property):
         self.prop = property

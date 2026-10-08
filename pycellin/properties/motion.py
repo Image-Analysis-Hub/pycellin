@@ -6,7 +6,7 @@ A collection of properties related to cell mobility/motility.
 
 import math
 from itertools import pairwise
-from typing import Literal
+from typing import ClassVar, Literal
 
 import numpy as np
 
@@ -115,7 +115,9 @@ class CycleTotalDisplacement(NodeGlobalPropCalculator):
     no link with a displacement value, e.g. a cell cycle of a single cell.
     """
 
-    INPUT_PROPS = {"displacement_prop": ("edge", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "displacement_prop": ("edge", "CellLineage")
+    }
 
     def __init__(
         self,
@@ -195,7 +197,9 @@ class CycleMeanDisplacement(NodeGlobalPropCalculator):
     no link with a displacement value, e.g. a cell cycle of a single cell.
     """
 
-    INPUT_PROPS = {"displacement_prop": ("edge", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "displacement_prop": ("edge", "CellLineage")
+    }
 
     def __init__(
         self,
@@ -275,7 +279,9 @@ class CellSpeed(EdgeLocalPropCalculator):
     and the time property, not from the cell displacement property.
     """
 
-    INPUT_PROPS = {"time_prop": ("node", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
 
     def __init__(self, property: Property, time_prop: str):
         """
@@ -345,7 +351,9 @@ class CycleMeanSpeed(NodeGlobalPropCalculator):
     has no link with a speed value, e.g. a cell cycle of a single cell.
     """
 
-    INPUT_PROPS = {"speed_prop": ("edge", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "speed_prop": ("edge", "CellLineage")
+    }
 
     def __init__(
         self,

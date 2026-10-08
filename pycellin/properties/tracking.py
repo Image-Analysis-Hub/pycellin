@@ -29,6 +29,8 @@ Vocabulary:
   If we take the previous example, the only complete generation is [2, 4, 6].
 """
 
+from typing import ClassVar
+
 import numpy as np
 
 from pycellin.classes.data import Data
@@ -71,7 +73,9 @@ class AbsoluteAge(NodeGlobalPropCalculator):
     (e.g. "frame", "time", etc.).
     """
 
-    INPUT_PROPS = {"time_prop": ("node", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
 
     def __init__(self, property: Property, time_prop: str):
         """
@@ -152,7 +156,9 @@ class RelativeAge(NodeGlobalPropCalculator):
     to the time unit of the model if specified.
     """
 
-    INPUT_PROPS = {"time_prop": ("node", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
 
     def __init__(self, property: Property, time_prop: str):
         """
@@ -392,7 +398,9 @@ class DivisionTime(NodeGlobalPropCalculator):
     (e.g. "frame", "time", etc.).
     """
 
-    INPUT_PROPS = {"time_prop": ("node", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
 
     def __init__(self, property: Property, time_prop: str):
         """
@@ -476,7 +484,9 @@ class DivisionRate(NodeGlobalPropCalculator):
     (e.g. "frame", "time", etc.).
     """
 
-    INPUT_PROPS = {"time_prop": ("node", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
 
     def __init__(self, property: Property, time_prop: str):
         """

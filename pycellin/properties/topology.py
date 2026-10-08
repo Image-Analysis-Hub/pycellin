@@ -4,6 +4,7 @@
 
 import logging
 import warnings
+from typing import ClassVar
 
 import numpy as np
 
@@ -429,7 +430,9 @@ class LineageDuration(LineageLocalPropCalculator):
         of the cells (e.g. "frame", "POSITION_T").
     """
 
-    INPUT_PROPS = {"time_prop": ("node", "CellLineage")}
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
 
     def __init__(self, property: Property, time_prop: str):
         super().__init__(property)
