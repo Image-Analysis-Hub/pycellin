@@ -2065,6 +2065,8 @@ class Model:
         ValueError
             If the property is a cycle lineage property and cycle lineages
             have not been computed yet.
+        TypeError
+            If the identifier of a property read by the calculator is not a string.
         MissingPropertyError
             If a property read by the calculator has not been declared in the model.
         ValueError
@@ -2093,6 +2095,8 @@ class Model:
 
         Raises
         ------
+        TypeError
+            If the identifier of an input property is not a string, e.g. a Property.
         MissingPropertyError
             If an input property has not been declared in the model.
         ValueError
@@ -2103,6 +2107,14 @@ class Model:
         for param, (input_id, prop_type, lin_type) in (
             calculator.get_input_props().items()
         ):
+            if not isinstance(input_id, str):
+                msg = (
+                    f"'{param}' must be the identifier of a property (str), "
+                    f"got {type(input_id).__name__}."
+                )
+                if isinstance(input_id, Property):
+                    msg += f" Pass its identifier instead: '{input_id.identifier}'."
+                raise TypeError(msg)
             input_prop = self.get_property(input_id)
             if input_prop is None:
                 pycellin_props = {
@@ -2142,22 +2154,44 @@ class Model:
                     f"'{input_prop.lin_type}'."
                 )
 
-    def _get_prop_unit(self, prop_identifier: str) -> str | None:
+    def _get_input_prop(self, prop_identifier: Any) -> Property | None:
         """
-        Return the unit of a property, or None if the property has no unit
-        or has not been declared.
+        Return the declaration of an input property, without raising.
+
+        Unlike `get_property()`, accept any value, so that `add_*()` methods can
+        read an input property before `_check_input_props()` checks it.
 
         Parameters
         ----------
-        prop_identifier : str
-            Identifier of the property.
+        prop_identifier : Any
+            Identifier of the property, as given by the user.
+
+        Returns
+        -------
+        Property | None
+            Declaration of the property, or None if `prop_identifier` is not a
+            string or the property has not been declared.
+        """
+        if not isinstance(prop_identifier, str):
+            return None
+        return self.get_property(prop_identifier)
+
+    def _get_prop_unit(self, prop_identifier: Any) -> str | None:
+        """
+        Return the unit of a property, without raising.
+
+        Parameters
+        ----------
+        prop_identifier : Any
+            Identifier of the property, as given by the user.
 
         Returns
         -------
         str | None
-            Unit of the property, or None.
+            Unit of the property, or None if the property has no unit, has not
+            been declared, or `prop_identifier` is not a string.
         """
-        prop = self.get_property(prop_identifier)
+        prop = self._get_input_prop(prop_identifier)
         return prop.unit if prop is not None else None
 
     # TODO: in case of data coming from a loader, there is no calculator associated
@@ -2200,8 +2234,8 @@ class Model:
             If `time_prop` is not a node property of cell lineages.
         """
         time_prop = time_prop or self.reference_time_property
-        # If `time_prop` has not been declared, add_custom_property() raises below.
-        time = self.get_property(time_prop)
+        # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
+        time = self._get_input_prop(time_prop)
 
         prop = tracking.create_absolute_age_property(
             custom_identifier=custom_identifier,
@@ -3772,8 +3806,8 @@ class Model:
             If `time_prop` is not a node property of cell lineages.
         """
         time_prop = time_prop or self.reference_time_property
-        # If `time_prop` has not been declared, add_custom_property() raises below.
-        time = self.get_property(time_prop)
+        # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
+        time = self._get_input_prop(time_prop)
 
         prop = tracking.create_division_time_property(
             custom_identifier=custom_identifier,
@@ -4299,8 +4333,8 @@ class Model:
             If `time_prop` is not a node property of cell lineages.
         """
         time_prop = time_prop or self.reference_time_property
-        # If `time_prop` has not been declared, add_custom_property() raises below.
-        time = self.get_property(time_prop)
+        # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
+        time = self._get_input_prop(time_prop)
 
         prop = tracking.create_relative_age_property(
             custom_identifier=custom_identifier,

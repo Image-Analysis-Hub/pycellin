@@ -663,6 +663,31 @@ class TestCheckInputProps:
         )
         input_props_model._check_input_props(calc)
 
+    def test_property_object_raises(self, input_props_model):
+        area_prop = input_props_model.get_property("my_area")
+        calc = CycleMeanArea(create_cycle_mean_area_property(), area_prop=area_prop)
+        with pytest.raises(TypeError, match="Pass its identifier instead: 'my_area'"):
+            input_props_model._check_input_props(calc)
+
+    def test_non_string_input_raises(self, input_props_model):
+        calc = CycleMeanArea(create_cycle_mean_area_property(), area_prop=1)
+        with pytest.raises(TypeError, match="'area_prop' must be the identifier"):
+            input_props_model._check_input_props(calc)
+
+
+class TestGetInputProp:
+    """Test cases for Model._get_input_prop() method."""
+
+    def test_declared_prop(self, input_props_model):
+        assert input_props_model._get_input_prop("my_area").identifier == "my_area"
+
+    def test_undeclared_prop_returns_none(self, input_props_model):
+        assert input_props_model._get_input_prop("unknown") is None
+
+    def test_property_object_returns_none(self, input_props_model):
+        area_prop = input_props_model.get_property("my_area")
+        assert input_props_model._get_input_prop(area_prop) is None
+
 
 class TestAddCustomProperty:
     """Test cases for Model.add_custom_property() method."""
@@ -1067,6 +1092,12 @@ class TestAddAbsoluteAge:
         with pytest.raises(MissingPropertyError, match="set 'time_prop'"):
             input_props_model.add_absolute_age(time_prop="unknown")
 
+    def test_property_object_time_prop_raises(self, input_props_model):
+        time_prop = input_props_model.get_property("time")
+        with pytest.raises(TypeError, match="Pass its identifier instead: 'time'"):
+            input_props_model.add_absolute_age(time_prop=time_prop)
+        assert input_props_model.get_property("absolute_age") is None
+
 
 class TestAddCellSpeed:
     """Test cases for Model.add_cell_speed() method."""
@@ -1078,3 +1109,9 @@ class TestAddCellSpeed:
     def test_wrong_time_prop_type_raises(self, input_props_model):
         with pytest.raises(ValueError, match="prop_type 'node'"):
             input_props_model.add_cell_speed(time_prop="my_speed")
+
+    def test_property_object_time_prop_raises(self, input_props_model):
+        time_prop = input_props_model.get_property("time")
+        with pytest.raises(TypeError, match="Pass its identifier instead: 'time'"):
+            input_props_model.add_cell_speed(time_prop=time_prop)
+        assert input_props_model.get_property("cell_speed") is None
