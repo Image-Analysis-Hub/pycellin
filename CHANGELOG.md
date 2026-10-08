@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 7cb9f42. Update from there with: git log 7cb9f42..dev -->
+<!-- Planned v0.6.0. Covers commits up to f9cb606, plus the uncommitted changes that let tree plots take a y_prop identifier and reject non-string input properties. Update from there with: git log f9cb606..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -19,6 +19,9 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** rename the `angle` property to `turning_angle` (`add_angle()` → `add_turning_angle()`)
 - **Properties:** rename the `ROI_coords` node property to `cell_contour` (TrackMate and CTC loaders, all exporters, sample GEFF data)
 - **Properties:** `cycle_duration` values change: it is now the time elapsed between the first and last cells of the cycle, in the reference time unit. It was previously off by one frame and scaled by the time step a second time
+- **Properties:** `cycle_total_displacement` is NaN instead of 0 for cell cycles without links, such as a cycle of a single cell
+- **Properties:** rename the `custom_time_property` argument of `add_absolute_age()`, `add_cell_speed()`, `add_division_rate()`, `add_division_time()` and `add_relative_age()` to `time_prop`. Their calculators' `time_prop_name` argument is renamed to `time_prop` too, and the `use_div_time` argument of the `DivisionRate` calculator is removed
+- **Properties:** `add_cycle_mean_displacement()`, `add_cycle_total_displacement()` and `add_cycle_mean_speed()` raise `MissingPropertyError` when the property they're computed from (`cell_displacement` or `cell_speed`) isn't declared yet: add it first. `add_cycle_mean_speed()` now takes `speed_prop` as first argument, so pass `include_incoming_edge` by keyword
 - **Properties:** `Property` setters raise `TypeError` instead of `ValueError` when given a non-string value
 - **Model:** remove the `Model.recompute_property()` and `Model.export()` stubs, which did nothing. Use the `pycellin.export_*()` functions
 - **Plotting:** rename `node_color_scale` to `node_colormap` in `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()`
@@ -48,8 +51,14 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** `Property.get_incompatibilities()` to compare two property declarations
 - **Properties:** `pycellin.properties` now exposes the 13 core property factories (`create_cell_id_property()`, `create_time_property()`, ...), to declare properties when building a model from scratch or writing a loader
 - **Properties:** `time` core property with its calculator
-- **Properties:** morphology properties `cell_polygon` (computed from a label image), `cell_contour`, `cell_area` and `cell_perimeter`
+- **Properties:** morphology properties `cell_polygon`, `cell_multipolygon`, `cell_contour`, `cell_area` and `cell_perimeter`
+  - `cell_polygon` is computed from a label image or from cell contours (e.g. loaded from TrackMate or CTC data). From a label image, it keeps the largest piece of each label and fills its holes, with a warning listing the cells concerned
+  - `cell_multipolygon` is computed from a label image and keeps every piece and hole of each label
 - **Properties:** morphology properties `cycle_mean_area`, `birth_area` and `division_area`
+- **Properties:** intensity properties `cell_total_intensity` and `cell_mean_intensity`, measured in an intensity image over the pixels of each cell, taken from a label image or from the cell polygons. Add them once per channel to measure several channels
+- **Properties:** intensity properties `cycle_mean_intensity`, `birth_intensity` and `division_intensity`
+- **Properties:** the `add_*()` methods of properties computed from another property take its identifier as an argument (`polygon_prop`, `area_prop`, `displacement_prop`, `speed_prop`, `intensity_prop`), e.g. to compute `cell_area` from your own polygons. The unit of the new property is taken from that property
+- **Properties:** `INPUT_PROPS` class attribute on calculators, to list the properties they read. `add_custom_property()` checks that these properties are declared with the expected property and lineage types, for custom calculators too
 - **Properties:** topology lineage properties `num_cells`, `num_cycles`, `num_divs`, `num_gaps` and `num_leaves`
 - **Properties:** topology lineage properties `lineage_cell_depth`, `lineage_cycle_depth` and `lineage_duration`
 - **Properties:** `location_tag`, a cell property read from a mask image. `mask_path_metadata_field` reads the mask path from the model metadata, and a `tag_names` dict maps pixel values to region names
@@ -62,6 +71,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Plotting:** `CellLineage.get_branch_lineage()` and `CellLineage.get_branch_lineage_highlight()` to extract or highlight the branch leading to a cell
 - **Plotting:** branch highlights in `CellLineage.plot()` and `get_tree_figure()`, with `target_cells`, `source_cells`, `generations` and `highlight_prop` arguments
 - **Plotting:** support for single-cell lineages
+- **Plotting:** `y_prop` of `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()` also accepts a property identifier, used as axis label. With a `Property`, the hover text now shows its unit too
 - **Plotting:** `node_colormap` also accepts a dict for discrete color maps
 - **Plotting:** nodes can be styled individually through `node_marker_style`
 - **TrackMate:** `ref_time_prop` argument to `load_TrackMate_XML()`
@@ -90,14 +100,18 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** `add_lineage()` silently replaced a lineage that already had the same ID. It now raises `ValueError`
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was recomputed for every lineage at each update, as its calculator was global instead of local
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells
+- **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning
 - **TrackMate:** `turning_angle` (`angle` in 0.5.1) in degrees was exported as a TrackMate angle, which TrackMate reads as radians
+- **TrackMate:** with `keep_all_spots=True`, spots without a track got lineage IDs already used by tracks, so some lineages were silently lost. Their lineage ID is now -cell ID
+- **GEFF:** the loader silently kept only one lineage when several disconnected parts of the graph had the same lineage ID. It now raises `ValueError`
 - **GEFF:** the exporter didn't write the metadata of properties with several types (`LINEAGE | NODE`, `LINEAGE | EDGE`)
 - **CTC:** the loader gave cells no `timepoint`, although it was the reference time property, and no `lineage_ID`. Reading the pixel size from label images (`labels_path`) failed
+- **CTC:** the loader failed on labels with holes or made of several pieces. Their contour is now the outline of the largest piece, holes filled, and a warning lists them
 - **trackpy:** the loader failed when given a `time_step`, which it applied to frames, and gave cells no `lineage_ID`
 
 ### Maintenance
 
-- **Tests:** new tests for model merging and splitting, the new properties, plotting, exceptions and utils
+- **Tests:** new tests for model merging and splitting, the new properties, plotting, exceptions, utils and the CTC loader
 - **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks
 - **Packaging:** find packages automatically in `pyproject.toml`
 - **Packaging:** declare the license as an SPDX expression (`BSD-3-Clause`) instead of the deprecated classifier. Building pycellin now needs setuptools >= 77
