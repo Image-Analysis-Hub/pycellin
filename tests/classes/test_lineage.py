@@ -15,6 +15,7 @@ from pycellin.classes.exceptions import (
 )
 from pycellin.classes.lineage import HIGHLIGHT_COLORS, UNSELECTED_HIGHLIGHT_COLOR
 from pycellin.custom_types import PropertyType
+from pycellin.properties.core import create_time_property, create_timepoint_property
 from pycellin.styling import PYCELLIN_PURPLE
 
 # CellLineage fixtures ########################################################
@@ -1192,8 +1193,43 @@ class TestCellLineageGetBranchLineageHighlight:
             cell_lin.get_branch_lineage_highlight([6, 16], source_cells=[4])
 
 
+class TestGetPropIdAndLabel:
+    """Test cases for Lineage._get_prop_id_and_label() method."""
+
+    def test_identifier_is_its_own_label(self):
+        assert CellLineage._get_prop_id_and_label("time") == ("time", "time")
+
+    def test_property_with_unit(self):
+        prop = create_time_property(unit="min")
+        assert CellLineage._get_prop_id_and_label(prop) == ("time", "Time (min)")
+
+    def test_property_without_unit(self):
+        prop = create_timepoint_property()
+        assert CellLineage._get_prop_id_and_label(prop) == ("timepoint", "Timepoint")
+
+
 class TestCellLineageGetTreeFigure:
     """Test cases for CellLineage.get_tree_figure() method."""
+
+    def test_y_prop_identifier(self, cell_lin):
+        """Test that a property identifier is plotted and used as axis label."""
+        for nid in cell_lin.nodes:
+            cell_lin.nodes[nid]["time"] = 5 * cell_lin.nodes[nid]["timepoint"]
+        fig = cell_lin.get_tree_figure(y_prop="time")
+
+        assert fig.layout.yaxis.title.text == "time"
+        assert sorted(set(fig.data[1].y)) == [0, 5, 10, 15, 20, 25, 30]
+        assert all("<br>time: " in text for text in fig.data[1].text)
+
+    def test_y_prop_property(self, cell_lin):
+        """Test that a Property supplies the axis label and the hover label."""
+        for nid in cell_lin.nodes:
+            cell_lin.nodes[nid]["time"] = 5 * cell_lin.nodes[nid]["timepoint"]
+        fig = cell_lin.get_tree_figure(y_prop=create_time_property(unit="min"))
+
+        assert fig.layout.yaxis.title.text == "Time (min)"
+        assert sorted(set(fig.data[1].y)) == [0, 5, 10, 15, 20, 25, 30]
+        assert all("<br>Time (min): " in text for text in fig.data[1].text)
 
     def test_default_template_axis_lines_and_ticks_hidden(self, cell_lin):
         """Test that the default template hides axis lines and ticks."""

@@ -515,7 +515,12 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         }
 
     def _build_node_hover_text(
-        self, G: Graph, ID_prop: str, y_prop: Property, node_hover_props: list[str] | None
+        self,
+        G: Graph,
+        ID_prop: str,
+        y_prop_id: str,
+        y_label: str,
+        node_hover_props: list[str] | None,
     ) -> list[str]:
         """Build hover text for nodes."""
         if node_hover_props:
@@ -532,9 +537,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 node_hover_text.append(text)
         else:
             node_hover_text = [
-                (
-                    f"{ID_prop}: {node[ID_prop]}<br>{y_prop.name}: {node[y_prop.identifier]}"
-                )
+                f"{ID_prop}: {node[ID_prop]}<br>{y_label}: {node[y_prop_id]}"
                 for node in G.vs
             ]
         return node_hover_text
@@ -545,10 +548,26 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             return f"lineage_ID: {G['lineage_ID']}"
         return ""
 
-    def _construct_y_legend(self, y_prop: Property) -> str:
-        if y_prop.unit:
-            return f"{y_prop.name} ({y_prop.unit})"
-        return y_prop.name
+    @staticmethod
+    def _get_prop_id_and_label(prop: str | Property) -> tuple[str, str]:
+        """
+        Return the identifier of a property to plot and the label to display for it.
+
+        Parameters
+        ----------
+        prop : str | Property
+            Identifier of the property, or its declaration.
+
+        Returns
+        -------
+        tuple[str, str]
+            The identifier of the property, and its label: the name and unit of
+            a Property, or the identifier itself.
+        """
+        if isinstance(prop, Property):
+            label = f"{prop.name} ({prop.unit})" if prop.unit else prop.name
+            return prop.identifier, label
+        return prop, prop
 
     def _build_edge_hover_text(
         self, G: Graph, index_to_nx_id: dict, edge_hover_props: list[str] | None
@@ -574,7 +593,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     def get_tree_figure(
         self,
         ID_prop: str,
-        y_prop: Property,
+        y_prop: str | Property,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -603,9 +622,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ----------
         ID_prop : str
             The property of the nodes to use as identifier.
-        y_prop : Property
-            The Property to use for the y-axis. The legend is automatically
-            constructed from Property.name and Property.unit.
+        y_prop : str or Property
+            Node property to plot on the y-axis. A Property also supplies the
+            axis label (its name and unit); a plain string is used as-is.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -691,13 +710,14 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # - axes
         # - color mapping node/edge attributes?     OK nodes
 
+        y_prop_id, y_label = self._get_prop_id_and_label(y_prop)
         G, index_to_nx_id = self._create_deterministic_igraph()
         nodes_count = G.vcount()
         tree_layout = G.layout("rt")  # Reingold-Tilford layout
         # Updating the layout so the y position of the nodes is given
         # by the value of y_prop.
         tree_layout = [
-            (tree_layout[k][0], G.vs[y_prop.identifier][k]) for k in range(nodes_count)
+            (tree_layout[k][0], G.vs[y_prop_id][k]) for k in range(nodes_count)
         ]
 
         # Computing the exact positions of nodes and edges.
@@ -738,7 +758,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # https://plotly.com/python/text-and-annotations/#styling-and-coloring-annotations
         # Text when hovering on a node.
         node_hover_text = self._build_node_hover_text(
-            G, ID_prop, y_prop, node_hover_props
+            G, ID_prop, y_prop_id, y_label, node_hover_props
         )
         graph_name = self._get_graph_name(G)
 
@@ -796,7 +816,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             ticks="",
             showgrid=show_horizontal_grid,
             zeroline=show_horizontal_grid,
-            title=self._construct_y_legend(y_prop),
+            title=y_label,
         )
         return fig
 
@@ -804,13 +824,13 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     def plot(
         self,
         ID_prop: str,
-        y_prop: Property,
+        y_prop: str | Property,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
-        node_colormap_prop: str | None = None,  # TODO: node_cmap_prop
-        node_color_scale: str | None = None,  # TODO: node_cmap
+        node_colormap_prop: str | None = None,
+        node_colormap: str | dict[Any, str] | None = None,
         node_hover_props: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
         edge_hover_props: list[str] | None = None,
@@ -830,9 +850,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ----------
         ID_prop : str
             The property of the nodes to use as identifier.
-        y_prop : Property
-            The Property to use for the y-axis. The legend is automatically
-            constructed from Property.name and Property.unit.
+        y_prop : str or Property
+            Node property to plot on the y-axis. A Property also supplies the
+            axis label (its name and unit); a plain string is used as-is.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -848,8 +868,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_colormap_prop : str, optional
             The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
-        node_color_scale : str, optional
-            The color scale to use for coloring the nodes. If None,
+        node_colormap : str | dict[Any, str] | None, optional
+            The color map to use for coloring the nodes. If None,
             defaults to current Plotly template.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
@@ -888,7 +908,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             node_text_font=node_text_font,
             node_marker_style=node_marker_style,
             node_colormap_prop=node_colormap_prop,
-            node_colormap=node_color_scale,
+            node_colormap=node_colormap,
             node_hover_props=node_hover_props,
             edge_line_style=edge_line_style,
             edge_hover_props=edge_hover_props,
@@ -1798,7 +1818,7 @@ class CellLineage(Lineage):
     def get_tree_figure(
         self,
         ID_prop: str = "cell_ID",
-        y_prop: Property | None = None,
+        y_prop: str | Property | None = None,
         title: str | None = None,
         target_cells: int | list[int] | None = None,
         source_cells: int | list[int] | None = None,
@@ -1831,10 +1851,10 @@ class CellLineage(Lineage):
         ----------
         ID_prop : str, optional
             The property of the nodes to use as the node ID. "cell_ID" by default.
-        y_prop : Property, optional
-            The Property to use for the y-axis. If None, defaults to
-            "timepoint" property. The legend is automatically constructed from
-            Property.name and Property.unit.
+        y_prop : str or Property, optional
+            Node property to plot on the y-axis, "timepoint" by default. A
+            Property also supplies the axis label (its name and unit); a plain
+            string is used as-is.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         target_cells : int or list[int], optional
@@ -1977,7 +1997,7 @@ class CellLineage(Lineage):
     def plot(
         self,
         ID_prop: str = "cell_ID",
-        y_prop: Property | None = None,
+        y_prop: str | Property | None = None,
         title: str | None = None,
         target_cells: int | list[int] | None = None,
         source_cells: int | list[int] | None = None,
@@ -2005,10 +2025,10 @@ class CellLineage(Lineage):
         ----------
         ID_prop : str, optional
             The property of the nodes to use as the node ID. "cell_ID" by default.
-        y_prop : Property, optional
-            The Property to use for the y-axis. If None, defaults to
-            "timepoint" property. The legend is automatically constructed from
-            Property.name and Property.unit.
+        y_prop : str or Property, optional
+            Node property to plot on the y-axis, "timepoint" by default. A
+            Property also supplies the axis label (its name and unit); a plain
+            string is used as-is.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         target_cells : int or list[int], optional
@@ -2276,18 +2296,10 @@ class CellLineage(Lineage):
         )
         """
 
-        def _prop_info(prop: str | Property) -> tuple[str, str]:
-            if isinstance(prop, Property):
-                label = prop.name
-                if prop.unit:
-                    label = f"{label} ({prop.unit})"
-                return prop.identifier, label
-            return prop, prop
-
         # Accept either property identifiers or Property objects, but use plain
         # identifiers for data access and readable labels for axes/hover text.
-        x_prop_id, x_label = _prop_info(x_prop)
-        y_prop_id, y_label = _prop_info(y_prop)
+        x_prop_id, x_label = self._get_prop_id_and_label(x_prop)
+        y_prop_id, y_label = self._get_prop_id_and_label(y_prop)
 
         # Treat a single target and several targets the same while plotting:
         # each target cell becomes one trace, paired with one source cell.
@@ -2722,7 +2734,7 @@ class CycleLineage(Lineage):
     def get_tree_figure(
         self,
         ID_prop: str = "cycle_ID",
-        y_prop: Property | None = None,
+        y_prop: str | Property | None = None,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -2751,10 +2763,10 @@ class CycleLineage(Lineage):
         ----------
         ID_prop : str, optional
             The property of the nodes to use as the node ID. "cycle_ID" by default.
-        y_prop : Property, optional
-            The Property to use for the y-axis. If None, defaults to
-            "level" property. The legend is automatically constructed from
-            Property.name and Property.unit.
+        y_prop : str or Property, optional
+            Node property to plot on the y-axis, "level" by default. A
+            Property also supplies the axis label (its name and unit); a plain
+            string is used as-is.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -2837,7 +2849,7 @@ class CycleLineage(Lineage):
     def plot(
         self,
         ID_prop: str = "cycle_ID",
-        y_prop: Property | None = None,
+        y_prop: str | Property | None = None,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -2861,10 +2873,10 @@ class CycleLineage(Lineage):
         ----------
         ID_prop : str, optional
             The property of the nodes to use as the node ID. "cycle_ID" by default.
-        y_prop : Property, optional
-            The Property to use for the y-axis. If None, defaults to
-            "level" property. The legend is automatically constructed from
-            Property.name and Property.unit.
+        y_prop : str or Property, optional
+            Node property to plot on the y-axis, "level" by default. A
+            Property also supplies the axis label (its name and unit); a plain
+            string is used as-is.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
