@@ -24,13 +24,17 @@ from pycellin.io.geff.loader import (
     _extract_lin_props_metadata,
     _extract_props_metadata,
     _fallback_to_node_keys,
+    _get_cell_id_problem,
     _get_prop_unit,
     _identify_lin_id_prop,
     _identify_space_props,
     _identify_time_prop,
+    _lin_ids_match_components,
+    _rename_reserved_prop,
     _resolve_prop_key,
     _standardize_properties_data,
     _standardize_props_metadata,
+    load_GEFF,
 )
 
 # Fixtures ####################################################################
@@ -154,6 +158,20 @@ def graph_with_3d_coords():
     g.add_node(0, frame=0, position_x=1.0, position_y=2.0, position_z=3.0)
     g.add_node(1, frame=1, position_x=4.0, position_y=5.0, position_z=6.0)
     return g
+
+
+@pytest.fixture
+def prop_geff_cell_id():
+    """A Property for a 'cell_id' node property declared in a GEFF file."""
+    return Property(
+        identifier="cell_id",
+        name="cell_id",
+        description="cell_id",
+        provenance="geff",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="int64",
+    )
 
 
 @pytest.fixture
@@ -378,7 +396,76 @@ def lineages_with_nonstandard_keys() -> list[CellLineage]:
     return [lin_a, lin_b]
 
 
+@pytest.fixture
+def geff_valid_ids(tmp_path):
+    """GEFF file whose 'cell_id' and 'lineage_id' properties can identify cells
+    and lineages, without track_node_props."""
+    g = nx.DiGraph()
+    g.add_node(0, t=0, cell_id=10, lineage_id=1)
+    g.add_node(1, t=1, cell_id=11, lineage_id=1)
+    g.add_node(2, t=0, cell_id=20, lineage_id=2)
+    g.add_node(3, t=1, cell_id=21, lineage_id=2)
+    g.add_edges_from([(0, 1), (2, 3)])
+    path = tmp_path / "valid_ids.geff"
+    geff.write(g, path, axis_names=["t"], axis_types=["time"])
+    return path
+
+
+@pytest.fixture
+def geff_clashing_ids(tmp_path):
+    """GEFF file whose 'cell_id' and 'lineage_id' properties cannot identify cells
+    and lineages: duplicate cell IDs, and one lineage ID for two tracks."""
+    g = nx.DiGraph()
+    g.add_node(0, t=0, cell_id=1, lineage_id=5)
+    g.add_node(1, t=1, cell_id=1, lineage_id=5)
+    g.add_node(2, t=0, cell_id=2, lineage_id=5)
+    g.add_node(3, t=1, cell_id=3, lineage_id=5)
+    g.add_edges_from([(0, 1), (2, 3)])
+    path = tmp_path / "clashing_ids.geff"
+    geff.write(g, path, axis_names=["t"], axis_types=["time"])
+    return path
+
+
 # Test Classes ################################################################
+
+
+class TestLinIdsMatchComponents:
+    """Test cases for _lin_ids_match_components function."""
+
+    def test_one_id_per_component(self):
+        """When each connected component has its own ID, return True."""
+        g = nx.DiGraph()
+        g.add_node(0, lin=1)
+        g.add_node(1, lin=1)
+        g.add_node(2, lin=2)
+        g.add_edge(0, 1)
+        assert _lin_ids_match_components(g, "lin")
+
+    def test_id_shared_by_components(self):
+        """When two connected components have the same ID, return False."""
+        g = nx.DiGraph()
+        g.add_node(0, lin=1)
+        g.add_node(1, lin=1)
+        g.add_node(2, lin=1)
+        g.add_edge(0, 1)
+        assert not _lin_ids_match_components(g, "lin")
+
+    def test_ids_differ_within_component(self):
+        """When the nodes of a connected component have different IDs, return False."""
+        g = nx.DiGraph()
+        g.add_node(0, lin=1)
+        g.add_node(1, lin=2)
+        g.add_edge(0, 1)
+        assert not _lin_ids_match_components(g, "lin")
+
+    def test_missing_ids_are_ignored(self):
+        """Nodes without an ID or with a None ID don't make the IDs invalid."""
+        g = nx.DiGraph()
+        g.add_node(0, lin=1)
+        g.add_node(1)
+        g.add_node(2, lin=None)
+        g.add_edges_from([(0, 1), (1, 2)])
+        assert _lin_ids_match_components(g, "lin")
 
 
 class TestIdentifyLinIdProp:
@@ -447,11 +534,19 @@ class TestIdentifyLinIdProp:
 
         assert result == "my_lin_id"
 
-    def test_none_prop_with_track_node_props_no_lineage_key(self, graph_lin_id):
+    def test_none_prop_with_track_node_props_no_lineage_key(
+        self, caplog, graph_lin_id
+    ):
         """When lin_id_prop is None and geff_track_node_props has no 'lineage' key,
-        return None (dict.get default)."""
-        result = _identify_lin_id_prop(None, {"tracklet": "tracklet_id"}, graph_lin_id)
-        assert result is None
+        fall back to 'lineage_id' if present in graph and log."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
+            result = _identify_lin_id_prop(
+                None, {"tracklet": "tracklet_id"}, graph_lin_id
+            )
+        assert len(caplog.records) == 1
+        assert "inferred from existing graph property" in caplog.records[0].message
+
+        assert result == "lineage_id"
 
     def test_none_prop_no_track_node_props_graph_has_lineage_id(
         self, caplog, graph_lin_id
@@ -465,6 +560,20 @@ class TestIdentifyLinIdProp:
         assert "inferred from existing graph property" in caplog.records[0].message
 
         assert result == "lineage_id"
+
+    def test_none_prop_lineage_id_not_matching_components(self, caplog):
+        """When lin_id_prop is None, geff_track_node_props is None, and the graph
+        'lineage_id' doesn't match its connected components, log and return None."""
+        g = nx.DiGraph()
+        g.add_node(0, lineage_id=1)
+        g.add_node(1, lineage_id=1)
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
+            result = _identify_lin_id_prop(None, None, g)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "cannot be used as lineage identifier" in caplog.records[0].message
+
+        assert result is None
 
     def test_none_prop_no_track_node_props_no_lineage_id_in_graph(
         self, caplog, graph_no_lin_id
@@ -1528,13 +1637,72 @@ class TestBuildGenericMetadata:
         assert "space_unit" not in result
 
 
+class TestRenameReservedProp:
+    """Test cases for _rename_reserved_prop function."""
+
+    def test_missing_prop_does_nothing(self, graph_no_lin_id, prop_cell_position_x):
+        """When no node has the property, the graph and metadata are unchanged."""
+        props_md = {"cell_position_x": prop_cell_position_x}
+        _rename_reserved_prop(graph_no_lin_id, props_md, "cell_id")
+        assert graph_no_lin_id.nodes[0] == {"frame": 0}
+        assert list(props_md) == ["cell_position_x"]
+
+    def test_renames_values_and_metadata(self, caplog, prop_geff_cell_id):
+        """The values and the declaration of the property get the 'geff_' prefix."""
+        g = nx.DiGraph()
+        g.add_node(0, cell_id=5)
+        g.add_node(1)
+        props_md = {"cell_id": prop_geff_cell_id}
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
+            _rename_reserved_prop(g, props_md, "cell_id")
+        assert len(caplog.records) == 1
+        assert "renamed to 'geff_cell_id'" in caplog.records[0].message
+
+        assert g.nodes[0] == {"geff_cell_id": 5}
+        assert g.nodes[1] == {}
+        assert list(props_md) == ["geff_cell_id"]
+        assert props_md["geff_cell_id"].identifier == "geff_cell_id"
+
+    def test_new_name_already_exists_raises(self):
+        """When the GEFF file already has a 'geff_<key>' property, raise."""
+        g = nx.DiGraph()
+        g.add_node(0, lineage_id=1, geff_lineage_id=2)
+        with pytest.raises(ValueError, match="'geff_lineage_id' already exists"):
+            _rename_reserved_prop(g, {}, "lineage_id")
+
+
+class TestGetCellIdProblem:
+    """Test cases for _get_cell_id_problem function."""
+
+    def test_valid_ids(self):
+        """When the values are unique non-negative integers, return None."""
+        g = nx.DiGraph()
+        g.add_node(0, id=0)
+        g.add_node(1, id=7)
+        assert _get_cell_id_problem(g, "id") is None
+
+    def test_not_integers(self):
+        """When a value is not an integer, explain it."""
+        g = nx.DiGraph()
+        g.add_node(0, id=0)
+        g.add_node(1, id=1.5)
+        assert "not all positive integers" in _get_cell_id_problem(g, "id")
+
+    def test_duplicates(self):
+        """When two nodes have the same value, explain it."""
+        g = nx.DiGraph()
+        g.add_node(0, id=3)
+        g.add_node(1, id=3)
+        assert "Duplicate values found" in _get_cell_id_problem(g, "id")
+
+
 class TestFallbackToNodeKeys:
     """Test cases for _fallback_to_node_keys function."""
 
     def test_sets_cell_id_from_node_keys(self, caplog, graph_no_lin_id):
         """When falling back, each node gets a cell_id equal to its node key."""
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            _fallback_to_node_keys(graph_no_lin_id, "fallback reason")
+            _fallback_to_node_keys(graph_no_lin_id, "fallback reason", {})
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "fallback" in caplog.records[0].message
@@ -1544,6 +1712,15 @@ class TestFallbackToNodeKeys:
         assert graph_no_lin_id.nodes[0]["frame"] == 0
         assert graph_no_lin_id.nodes[1]["frame"] == 1
 
+    def test_existing_cell_id_is_renamed(self):
+        """A 'cell_id' property of the graph is kept as 'geff_cell_id'."""
+        g = nx.DiGraph()
+        g.add_node(0, cell_id=7)
+        g.add_node(1, cell_id=7)
+        _fallback_to_node_keys(g, "fallback reason", {})
+        assert g.nodes[0] == {"geff_cell_id": 7, "cell_id": 0}
+        assert g.nodes[1] == {"geff_cell_id": 7, "cell_id": 1}
+
 
 class TestEnsureValidCellID:
     """Test cases for _ensure_valid_cell_id function."""
@@ -1551,7 +1728,7 @@ class TestEnsureValidCellID:
     def test_none_key_falls_back_to_node_keys(self, caplog, graph_no_lin_id):
         """When cell_id_key is None, create cell_id from node keys and log."""
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _ensure_valid_cell_id(graph_no_lin_id, None)
+            result = _ensure_valid_cell_id(graph_no_lin_id, None, {})
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "No cell identifier property provided" in caplog.records[0].message
@@ -1568,7 +1745,7 @@ class TestEnsureValidCellID:
         g.add_node(0, id=0)
         g.add_node(1)
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _ensure_valid_cell_id(g, "id")
+            result = _ensure_valid_cell_id(g, "id", {})
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "not present on all nodes" in caplog.records[0].message
@@ -1583,7 +1760,7 @@ class TestEnsureValidCellID:
         g.add_node(0, id=0)
         g.add_node(1, id=-1)
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _ensure_valid_cell_id(g, "id")
+            result = _ensure_valid_cell_id(g, "id", {})
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "not all positive integers" in caplog.records[0].message
@@ -1598,7 +1775,7 @@ class TestEnsureValidCellID:
         g.add_node(0, id=0)
         g.add_node(1, id="1")
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _ensure_valid_cell_id(g, "id")
+            result = _ensure_valid_cell_id(g, "id", {})
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "not all positive integers" in caplog.records[0].message
@@ -1613,7 +1790,7 @@ class TestEnsureValidCellID:
         g.add_node(0, id=0)
         g.add_node(1, id=True)
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _ensure_valid_cell_id(g, "id")
+            result = _ensure_valid_cell_id(g, "id", {})
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "not all positive integers" in caplog.records[0].message
@@ -1628,7 +1805,7 @@ class TestEnsureValidCellID:
         g.add_node(0, id=0)
         g.add_node(1, id=None)
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _ensure_valid_cell_id(g, "id")
+            result = _ensure_valid_cell_id(g, "id", {})
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "not all positive integers" in caplog.records[0].message
@@ -1643,7 +1820,7 @@ class TestEnsureValidCellID:
         g.add_node(0, id=1)
         g.add_node(1, id=1)
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _ensure_valid_cell_id(g, "id")
+            result = _ensure_valid_cell_id(g, "id", {})
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "Duplicate values found" in caplog.records[0].message
@@ -1657,7 +1834,7 @@ class TestEnsureValidCellID:
         g = nx.Graph()
         g.add_node(1, id=10)
         g.add_node(2, id=11)
-        result = _ensure_valid_cell_id(g, "id")
+        result = _ensure_valid_cell_id(g, "id", {})
         assert result == "id"
         assert set(g.nodes) == {10, 11}
         assert g.nodes[10]["id"] == 10
@@ -1665,15 +1842,64 @@ class TestEnsureValidCellID:
         assert "cell_id" not in g.nodes[10]
         assert "cell_id" not in g.nodes[11]
 
+    def test_none_key_uses_valid_cell_id(self, caplog):
+        """When cell_id_key is None and the graph 'cell_id' is valid, use it to
+        relabel nodes and log."""
+        g = nx.DiGraph()
+        g.add_node(1, cell_id=10)
+        g.add_node(2, cell_id=11)
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
+            result = _ensure_valid_cell_id(g, None, {})
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "INFO"
+        assert "inferred from existing graph property" in caplog.records[0].message
+
+        assert result == "cell_id"
+        assert set(g.nodes) == {10, 11}
+        assert g.nodes[10] == {"cell_id": 10}
+
+    def test_none_key_invalid_cell_id_is_renamed(self, caplog, prop_geff_cell_id):
+        """When cell_id_key is None and the graph 'cell_id' is invalid, keep it as
+        'geff_cell_id' and create cell_id from node keys."""
+        g = nx.DiGraph()
+        g.add_node(0, cell_id=1)
+        g.add_node(1, cell_id=1)
+        props_md = {"cell_id": prop_geff_cell_id}
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
+            result = _ensure_valid_cell_id(g, None, props_md)
+        assert len(caplog.records) == 2
+        assert "Duplicate values found" in caplog.records[0].message
+        assert "renamed to 'geff_cell_id'" in caplog.records[1].message
+
+        assert result == "cell_id"
+        assert g.nodes[0] == {"geff_cell_id": 1, "cell_id": 0}
+        assert g.nodes[1] == {"geff_cell_id": 1, "cell_id": 1}
+        assert list(props_md) == ["geff_cell_id"]
+
+    def test_provided_key_renames_cell_id(self, caplog):
+        """When cell_id_key is valid and the graph also has a 'cell_id', keep the
+        latter as 'geff_cell_id'."""
+        g = nx.DiGraph()
+        g.add_node(1, id=10, cell_id=0)
+        g.add_node(2, id=11, cell_id=0)
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
+            result = _ensure_valid_cell_id(g, "id", {})
+        assert len(caplog.records) == 1
+        assert "renamed to 'geff_cell_id'" in caplog.records[0].message
+
+        assert result == "id"
+        assert g.nodes[10] == {"id": 10, "geff_cell_id": 0}
+        assert g.nodes[11] == {"id": 11, "geff_cell_id": 0}
+
     def test_empty_graph(self):
         """When graph is empty, return the cell_id_key without modification."""
         g = nx.Graph()
 
-        result = _ensure_valid_cell_id(g, "id")
+        result = _ensure_valid_cell_id(g, "id", {})
         assert result == "id"
         assert len(g.nodes) == 0
 
-        result = _ensure_valid_cell_id(g, None)
+        result = _ensure_valid_cell_id(g, None, {})
         assert result == "cell_id"
         assert len(g.nodes) == 0
 
@@ -2146,3 +2372,45 @@ class TestStandardizePropsMetadata:
         assert "cell_x" in props_md
         assert props_md["cell_x"].identifier == "cell_x"
         assert props_md["cell_x"].unit == "um"
+
+
+class TestLoadGEFF:
+    """Test cases for load_GEFF function."""
+
+    def test_valid_ids_are_used(self, geff_valid_ids):
+        """The 'cell_id' and 'lineage_id' properties of the file identify cells and
+        lineages when they can."""
+        model = load_GEFF(geff_valid_ids)
+
+        assert set(model.data.cell_data) == {1, 2}
+        lin = model.data.cell_data[1]
+        assert set(lin.nodes) == {10, 11}
+        assert all(lin.nodes[n]["cell_id"] == n for n in lin.nodes)
+        assert all(lin.nodes[n]["lineage_id"] == 1 for n in lin.nodes)
+        assert not any(prop.startswith("geff_") for prop in model.props_metadata.props)
+
+    def test_clashing_ids_are_kept(self, geff_clashing_ids):
+        """The 'cell_id' and 'lineage_id' properties of the file that cannot
+        identify cells and lineages are kept as 'geff_cell_id' and 'geff_lineage_id'."""
+        model = load_GEFF(geff_clashing_ids)
+
+        assert len(model.data.cell_data) == 2
+        nodes = {
+            n: data
+            for lin in model.data.cell_data.values()
+            for n, data in lin.nodes(data=True)
+        }
+        assert {n: data["geff_cell_id"] for n, data in nodes.items()} == {
+            0: 1,
+            1: 1,
+            2: 2,
+            3: 3,
+        }
+        assert all(data["geff_lineage_id"] == 5 for data in nodes.values())
+        assert all(data["cell_id"] == n for n, data in nodes.items())
+        assert nodes[0]["lineage_id"] == nodes[1]["lineage_id"]
+        assert nodes[0]["lineage_id"] != nodes[2]["lineage_id"]
+        props = model.props_metadata.props
+        assert props["geff_cell_id"].identifier == "geff_cell_id"
+        assert props["geff_lineage_id"].identifier == "geff_lineage_id"
+        assert props["cell_id"].provenance == "geff"

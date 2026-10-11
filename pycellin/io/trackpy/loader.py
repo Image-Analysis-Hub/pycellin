@@ -248,9 +248,10 @@ def load_trackpy_dataframe(
     ------
     ValueError
         If `df` has both a trackpy coordinate column and its pycellin counterpart
-        (e.g. 'x' and 'cell_x'), or if `computed_time_prop` is already a column
-        of `df` or is a property written by pycellin ('cell_id', 'lineage_id',
-        'timepoint' or a renamed coordinate).
+        (e.g. 'x' and 'cell_x'), if it has a 'cell_id', 'lineage_id' or
+        'timepoint' column, which pycellin creates, or if `computed_time_prop` is
+        already a column of `df` or is a property written by pycellin ('cell_id',
+        'lineage_id', 'timepoint' or a renamed coordinate).
     """
     coord_props = {f"cell_{axis}" for axis in ("x", "y", "z") if axis in df.columns}
     conflicting_columns = sorted(coord_props & set(df.columns))
@@ -259,7 +260,15 @@ def load_trackpy_dataframe(
             f"Cannot rename the trackpy coordinates: the DataFrame already has the "
             f"column(s) {conflicting_columns}. Rename or drop them before loading."
         )
-    reserved_props = {"cell_id", "lineage_id", "timepoint"} | coord_props
+    pycellin_props = {"cell_id", "lineage_id", "timepoint"}
+    conflicting_columns = sorted(pycellin_props & set(df.columns))
+    if conflicting_columns:
+        raise ValueError(
+            f"The DataFrame has the column(s) {conflicting_columns}, but pycellin "
+            "creates its own properties with these names. Rename or drop them "
+            "before loading."
+        )
+    reserved_props = pycellin_props | coord_props
     if computed_time_prop in df.columns or computed_time_prop in reserved_props:
         raise ValueError(
             f"Cannot build the time property '{computed_time_prop}': a column or "
