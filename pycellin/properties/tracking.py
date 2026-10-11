@@ -320,7 +320,7 @@ def create_cycle_completeness_property(
     )
 
 
-class CycleCompleteness(NodeGlobalPropCalculator):
+class CycleCompleteness(NodeLocalPropCalculator):
     """
     Calculator to compute the cell cycle completeness.
 
@@ -333,15 +333,13 @@ class CycleCompleteness(NodeGlobalPropCalculator):
     """
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage | CycleLineage, nid: int
+        self, lineage: CellLineage | CycleLineage, nid: int
     ) -> bool:
         """
         Compute the cell cycle completeness of a given cell or cell cycle.
 
         Parameters
         ----------
-        data : Data
-            Data object containing the lineage.
         lineage : CellLineage | CycleLineage
             Lineage graph containing the node (cell or cell cycle) of interest.
         nid : int

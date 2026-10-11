@@ -210,36 +210,36 @@ def test_cell_cycle_completeness_cell_lin(cell_lin, prop_cell_lin):
     """Test CycleCompleteness Calculator with CellLineage."""
     calculator = CycleCompleteness(prop_cell_lin)
     # Complete cell cycles.
-    assert calculator.compute(Data({}), cell_lin, nid=4) is True  # division
-    assert calculator.compute(Data({}), cell_lin, nid=14) is True  # division
-    assert calculator.compute(Data({}), cell_lin, nid=7) is True  # intermediate
-    assert calculator.compute(Data({}), cell_lin, nid=13) is True  # intermediate
+    assert calculator.compute(cell_lin, nid=4) is True  # division
+    assert calculator.compute(cell_lin, nid=14) is True  # division
+    assert calculator.compute(cell_lin, nid=7) is True  # intermediate
+    assert calculator.compute(cell_lin, nid=13) is True  # intermediate
     # Incomplete cell cycles.
-    assert calculator.compute(Data({}), cell_lin, nid=1) is False  # root
-    assert calculator.compute(Data({}), cell_lin, nid=6) is False  # leaf
-    assert calculator.compute(Data({}), cell_lin, nid=10) is False  # leaf
-    assert calculator.compute(Data({}), cell_lin, nid=2) is False  # division
-    assert calculator.compute(Data({}), cell_lin, nid=5) is False  # intermediate
+    assert calculator.compute(cell_lin, nid=1) is False  # root
+    assert calculator.compute(cell_lin, nid=6) is False  # leaf
+    assert calculator.compute(cell_lin, nid=10) is False  # leaf
+    assert calculator.compute(cell_lin, nid=2) is False  # division
+    assert calculator.compute(cell_lin, nid=5) is False  # intermediate
     # Non-existent node.
     with pytest.raises(KeyError, match="Cell 99 not in the lineage."):
-        calculator.compute(Data({}), cell_lin, nid=99)
+        calculator.compute(cell_lin, nid=99)
 
 
 def test_cell_cycle_completeness_cycle_lin(cycle_lin, prop_cycle_lin):
     """Test CycleCompleteness Calculator with CycleLineage."""
     calculator = CycleCompleteness(prop_cycle_lin)
     # Complete cell cycles.
-    assert calculator.compute(Data({}), cycle_lin, nid=4) is True  # division
-    assert calculator.compute(Data({}), cycle_lin, nid=8) is True  # division
-    assert calculator.compute(Data({}), cycle_lin, nid=14) is True  # division
+    assert calculator.compute(cycle_lin, nid=4) is True  # division
+    assert calculator.compute(cycle_lin, nid=8) is True  # division
+    assert calculator.compute(cycle_lin, nid=14) is True  # division
     # Incomplete cell cycles.
-    assert calculator.compute(Data({}), cycle_lin, nid=2) is False  # division
-    assert calculator.compute(Data({}), cycle_lin, nid=6) is False  # leaf
-    assert calculator.compute(Data({}), cycle_lin, nid=10) is False  # leaf
-    assert calculator.compute(Data({}), cycle_lin, nid=15) is False  # leaf
+    assert calculator.compute(cycle_lin, nid=2) is False  # division
+    assert calculator.compute(cycle_lin, nid=6) is False  # leaf
+    assert calculator.compute(cycle_lin, nid=10) is False  # leaf
+    assert calculator.compute(cycle_lin, nid=15) is False  # leaf
     # Non-existent node.
     with pytest.raises(KeyError, match="Cycle 99 not in the lineage."):
-        calculator.compute(Data({}), cycle_lin, nid=99)
+        calculator.compute(cycle_lin, nid=99)
 
 
 # DivisionTime ################################################################

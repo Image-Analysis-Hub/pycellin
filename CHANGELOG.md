@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to e41208c, plus the uncommitted changes that add the mother_cycle, daughter_cycles, sister_cycles and cousin_cycles properties, fix missing values in DataFrames and TrackMate files, and refresh the property listings of the Managing properties notebook (covered by the Maintenance "Docs" entry). Update from there with: git log e41208c..dev -->
+<!-- Planned v0.6.0. Covers commits up to 0af12ee, plus the uncommitted changes that make the cycle_completeness calculator local and give to_link_dataframe() a stable column order, with the link DataFrame example of the Getting started notebook and its CSV in sample_data/results regenerated (covered by the Maintenance "Docs" entry). Update from there with: git log 0af12ee..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -103,7 +103,8 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** changing the time step with `set_time_step()` corrupted the `timepoint` values
 - **Model:** `add_lineage()` failed with `with_CycleLineage=True` or with a lineage that had no lineage ID, and ignored its `lid` argument when given a lineage
 - **Model:** `add_lineage()` silently replaced a lineage that already had the same ID. It now raises `ValueError`
-- **Model:** `to_cell_dataframe()` and `to_cycle_dataframe()` raised a pandas `FutureWarning` when a numeric property was None on all the cells or cell cycles of a lineage. With no lineage to export, they now raise a `ValueError` that says so
+- **Model:** `to_cell_dataframe()`, `to_link_dataframe()` and `to_cycle_dataframe()` raised a pandas `FutureWarning` when a numeric property was None on all the cells, links or cell cycles of a lineage. With no lineage to export, they now raise a `ValueError` that says so
+- **Model:** the columns of `to_link_dataframe()` came in a different order in each Python session. They now keep the order in which the link properties were added
 - **Properties:** `turning_angle` (`angle` in 0.5.1), `absolute_age` and `relative_age` were recomputed for every lineage at each update, as their calculators were global instead of local
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells
 - **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning
@@ -120,6 +121,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 
 - **Tests:** new tests for model merging and splitting, the new properties, plotting, exceptions, utils and the CTC loader
 - **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks, and explain when a calculator should be local or global
+- **Properties:** make the `cycle_completeness` calculator local, since it only reads its own lineage. Its values and update cost are unchanged
 - **Packaging:** find packages automatically in `pyproject.toml`
 - **Packaging:** declare the license as an SPDX expression (`BSD-3-Clause`) instead of the deprecated classifier. Building pycellin now needs setuptools >= 77
 - **Packaging:** between releases, the version on `dev` ends with `.dev0` (e.g. `0.6.0.dev0`), so models made with development code say so in their `pycellin_version` metadata
