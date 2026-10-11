@@ -374,7 +374,7 @@ class CellIntensityFromPolygon(_CellIntensityCalculator):
             raise KeyError(
                 f"Cannot compute '{self.prop.identifier}': missing "
                 f"'{self.polygon_prop}' property for cell {nid}, "
-                f"lineage {lineage.graph['lineage_ID']}. "
+                f"lineage {lineage.graph['lineage_id']}. "
                 f"Please compute the '{self.polygon_prop}' property first."
             )
         if shape is None:
@@ -442,7 +442,7 @@ class CycleMeanIntensity(NodeGlobalPropCalculator):
         lineage : CycleLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cycle_ID) of the cell cycle of interest.
+            Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
         -------
@@ -515,7 +515,7 @@ class BirthIntensity(NodeGlobalPropCalculator):
         lineage : CycleLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cycle_ID) of the cell cycle of interest.
+            Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
         -------
@@ -589,7 +589,7 @@ class DivisionIntensity(NodeGlobalPropCalculator):
         lineage : CycleLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cycle_ID) of the cell cycle of interest.
+            Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
         -------

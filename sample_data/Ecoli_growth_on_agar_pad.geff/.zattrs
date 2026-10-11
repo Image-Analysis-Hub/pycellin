@@ -391,10 +391,10 @@
                 "unit": null,
                 "varlength": false
             },
-            "cell_ID": {
+            "cell_id": {
                 "description": "Unique identifier of the cell",
                 "dtype": "int64",
-                "identifier": "cell_ID",
+                "identifier": "cell_id",
                 "name": "Cell ID",
                 "unit": null,
                 "varlength": false
@@ -439,10 +439,10 @@
                 "unit": "micrometer",
                 "varlength": false
             },
-            "lineage_ID": {
+            "lineage_id": {
                 "description": null,
                 "dtype": "int64",
-                "identifier": "lineage_ID",
+                "identifier": "lineage_id",
                 "name": null,
                 "unit": null,
                 "varlength": false
@@ -459,7 +459,7 @@
         "related_objects": null,
         "sphere": null,
         "track_node_props": {
-            "lineage": "lineage_ID"
+            "lineage": "lineage_id"
         }
     }
 }

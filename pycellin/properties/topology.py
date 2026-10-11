@@ -46,7 +46,7 @@ class IsDivision(NodeLocalPropCalculator):
         lineage : Lineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -86,7 +86,7 @@ class IsLeaf(NodeLocalPropCalculator):
         lineage : Lineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -126,7 +126,7 @@ class IsRoot(NodeLocalPropCalculator):
         lineage : Lineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -605,7 +605,7 @@ class LocationTag(NodeLocalPropCalculator):
         lineage : CellLineage
             Lineage graph containing the cell of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -664,7 +664,7 @@ class MotherCycle(NodeLocalPropCalculator):
         lineage : CycleLineage
             Lineage graph containing the cell cycle of interest.
         nid : int
-            Node ID (cycle_ID) of the cell cycle of interest.
+            Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
         -------
@@ -703,7 +703,7 @@ class DaughterCycles(NodeLocalPropCalculator):
         lineage : CycleLineage
             Lineage graph containing the cell cycle of interest.
         nid : int
-            Node ID (cycle_ID) of the cell cycle of interest.
+            Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
         -------
@@ -742,7 +742,7 @@ class SisterCycles(NodeLocalPropCalculator):
         lineage : CycleLineage
             Lineage graph containing the cell cycle of interest.
         nid : int
-            Node ID (cycle_ID) of the cell cycle of interest.
+            Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
         -------
@@ -809,7 +809,7 @@ class CousinCycles(NodeLocalPropCalculator):
         lineage : CycleLineage
             Lineage graph containing the cell cycle of interest.
         nid : int
-            Node ID (cycle_ID) of the cell cycle of interest.
+            Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
         -------

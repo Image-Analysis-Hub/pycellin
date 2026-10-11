@@ -216,11 +216,11 @@ def _create_PropsMetadata(seg_data: bool, time_unit: str | None) -> PropsMetadat
         identification properties, and with the frame and time properties.
     """
     props_md = PropsMetadata()
-    cell_ID_prop = create_cell_id_property()
+    cell_id_prop = create_cell_id_property()
     frame_prop = create_frame_property(provenance="CTC")
     time_prop = create_time_property(unit=time_unit, provenance="CTC")
-    lin_ID_prop = create_lineage_id_property()
-    for prop in [cell_ID_prop, frame_prop, time_prop, lin_ID_prop]:
+    lin_id_prop = create_lineage_id_property()
+    for prop in [cell_id_prop, frame_prop, time_prop, lin_id_prop]:
         props_md._add_prop(prop)
     if seg_data:
         # TODO: deal with z dimension
@@ -264,7 +264,7 @@ def _read_track_line(
     nodes = []
     for frame in range(start_frame, end_frame + 1):
         node_attrs = {
-            "cell_ID": current_node_id,
+            "cell_id": current_node_id,
             "frame": frame,
             "TRACK": track_id,
             "PARENT": parent_track,
@@ -571,7 +571,7 @@ def load_CTC_file(
 
     # One lineage per connected component of the graph.
     lineages = _split_graph_into_lineages(graph)
-    data = {lin.graph["lineage_ID"]: lin for lin in lineages if len(lin) > 0}
+    data = {lin.graph["lineage_id"]: lin for lin in lineages if len(lin) > 0}
 
     props_md = _create_PropsMetadata(labels_path is not None, md["time_unit"])
     model = Model(

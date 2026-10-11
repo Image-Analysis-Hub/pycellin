@@ -47,9 +47,9 @@ def data():
     )
     for n in lineage.nodes:
         lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 1, n)
-        lineage.nodes[n]["cell_ID"] = n
+        lineage.nodes[n]["cell_id"] = n
         lineage.nodes[n]["cell_area"] = float(n)
-    lineage.graph["lineage_ID"] = 1
+    lineage.graph["lineage_id"] = 1
     data = Data({1: lineage})
     data._add_cycle_lineages(time_prop="frame", time_step=1)
     return data
@@ -78,7 +78,7 @@ def polygon_lineage():
     lineage.nodes[1]["cell_polygon"] = Polygon([(0, 0), (2, 0), (2, 1), (0, 1)])
     lineage.nodes[1]["my_polygon"] = Polygon([(0, 0), (2, 0), (2, 1), (0, 1)])
     lineage.nodes[2]["my_polygon"] = Polygon([(0, 0), (3, 0), (3, 1), (0, 1)])
-    lineage.graph["lineage_ID"] = 1
+    lineage.graph["lineage_id"] = 1
     return lineage
 
 
@@ -117,7 +117,7 @@ def contour_lineage():
     lineage.add_nodes_from([1, 2, 3], cell_x=10.0, cell_y=20.0)
     lineage.nodes[1]["cell_contour"] = [(-1, -0.5), (1, -0.5), (1, 0.5), (-1, 0.5)]
     lineage.nodes[3]["cell_contour"] = None
-    lineage.graph["lineage_ID"] = 1
+    lineage.graph["lineage_id"] = 1
     return lineage
 
 
@@ -202,7 +202,7 @@ class TestCellPolygonFromLabelImg:
     def test_compute_keeps_largest_piece(self, label_img, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=4, timepoint=0)
-        lineage.graph["lineage_ID"] = 1
+        lineage.graph["lineage_id"] = 1
         calculator = CellPolygonFromLabelImg(
             prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
         )
@@ -213,7 +213,7 @@ class TestCellPolygonFromLabelImg:
     def test_compute_missing_label_raises(self, label_img, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=7, timepoint=0)
-        lineage.graph["lineage_ID"] = 1
+        lineage.graph["lineage_id"] = 1
         calculator = CellPolygonFromLabelImg(
             prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
         )
@@ -224,7 +224,7 @@ class TestCellPolygonFromLabelImg:
         lineage = CellLineage()
         lineage.add_node(1, label=3, timepoint=0)
         lineage.add_node(2, label=4, timepoint=0)
-        lineage.graph["lineage_ID"] = 1
+        lineage.graph["lineage_id"] = 1
         calculator = CellPolygonFromLabelImg(
             prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
         )
@@ -237,7 +237,7 @@ class TestCellPolygonFromLabelImg:
     def test_enrich_warns_for_holes(self, label_img, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=5, timepoint=0)
-        lineage.graph["lineage_ID"] = 1
+        lineage.graph["lineage_id"] = 1
         calculator = CellPolygonFromLabelImg(
             prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
         )
@@ -251,7 +251,7 @@ class TestCellPolygonFromLabelImg:
         lineage = CellLineage()
         lineage.add_node(1, label=4, timepoint=0)
         lineage.add_node(2, label=5, timepoint=0)
-        lineage.graph["lineage_ID"] = 1
+        lineage.graph["lineage_id"] = 1
         calculator = CellPolygonFromLabelImg(
             prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
         )
@@ -267,7 +267,7 @@ class TestCellPolygonFromLabelImg:
     ):
         lineage = CellLineage()
         lineage.add_node(1, label=3, timepoint=0)
-        lineage.graph["lineage_ID"] = 1
+        lineage.graph["lineage_id"] = 1
         calculator = CellPolygonFromLabelImg(
             prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
         )
@@ -314,7 +314,7 @@ class TestCellMultiPolygonFromLabelImg:
     def test_enrich_no_warning_for_fragmented_labels(self, label_img, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=4, timepoint=0)
-        lineage.graph["lineage_ID"] = 1
+        lineage.graph["lineage_id"] = 1
         calculator = CellMultiPolygonFromLabelImg(
             prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
         )

@@ -162,8 +162,8 @@ def _build_CTC_tracks(
             cell_cycles = lineage.get_cell_cycles()
         except FusionError as err:
             raise FusionError(
-                err.node_ID,
-                lineage.graph["lineage_ID"],
+                err.node_id,
+                lineage.graph["lineage_id"],
                 f"CTC do not support fusion events. {err.message}",
             ) from err
         for cc in cell_cycles:
@@ -220,7 +220,7 @@ def _add_parent_track(
     assert_msg = (
         f"Node {track_info['B_node']} has more than 1 parent node "
         f"({len(parent_nodes)} nodes) in lineage of ID "
-        f"{lineage.graph['lineage_ID']}. Incorrect lineage topology: "
+        f"{lineage.graph['lineage_id']}. Incorrect lineage topology: "
         f"pycellin and CTC do not support fusion events."
     )
     assert len(parent_nodes) <= 1, assert_msg

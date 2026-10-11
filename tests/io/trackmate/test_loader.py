@@ -630,7 +630,7 @@ def test_add_all_nodes_several_attributes():
     assert is_equal(obtained, expected)
 
 
-def test_add_all_nodes_only_ID_attribute():
+def test_add_all_nodes_only_id_attribute():
     xml_data = '<data>   <frame>       <Spot ID="1000" />       <Spot ID="1001" />   </frame></data>'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
@@ -730,7 +730,7 @@ def test_add_edge():
     assert is_equal(obtained, expected)
 
 
-def test_add_edge_no_node_ID():
+def test_add_edge_no_node_id():
     xml_data = '<data SPOT_SOURCE_ID="1" x="20" y="25" />'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
@@ -910,7 +910,7 @@ def test_build_tracks_several_attributes():
     assert obtained_tracks_attrib == expected_tracks_attrib
 
 
-def test_build_tracks_no_nodes_ID():
+def test_build_tracks_no_nodes_id():
     xml_data = (
         "<data>"
         '   <Track TRACK_ID="1" name="blob">'
@@ -1004,7 +1004,7 @@ def test_build_tracks_no_edges():
     assert obtained_tracks_attrib == expected_tracks_attrib
 
 
-def test_build_tracks_no_track_ID():
+def test_build_tracks_no_track_id():
     xml_data = (
         "<data>"
         '   <Track name="blob">'
@@ -1067,33 +1067,33 @@ def test_build_tracks_no_track_ID():
         tml._build_tracks(it, element, props_md, obtained)
 
 
-# _get_filtered_tracks_ID #####################################################
+# _get_filtered_tracks_id #####################################################
 
 
-def test_get_filtered_tracks_ID():
+def test_get_filtered_tracks_id():
     xml_data = '<data>   <TrackID TRACK_ID="0" />   <TrackID TRACK_ID="1" /></data>'
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
-    obtained_ID = tml._get_filtered_tracks_ID(it, element)
-    expected_ID = [0, 1]
-    assert obtained_ID.sort() == expected_ID.sort()
+    obtained_id = tml._get_filtered_tracks_id(it, element)
+    expected_id = [0, 1]
+    assert obtained_id.sort() == expected_id.sort()
 
 
-def test_get_filtered_tracks_ID_no_ID():
+def test_get_filtered_tracks_id_no_id():
     xml_data = "<data>   <TrackID />   <TrackID /></data>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    obtained_ID = tml._get_filtered_tracks_ID(it, element)
-    assert not obtained_ID
+    obtained_id = tml._get_filtered_tracks_id(it, element)
+    assert not obtained_id
 
 
-def test_get_filtered_tracks_ID_no_tracks():
+def test_get_filtered_tracks_id_no_tracks():
     xml_data = "<data>   <tag />   <tag /></data>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
-    obtained_ID = tml._get_filtered_tracks_ID(it, element)
-    assert not obtained_ID
+    obtained_id = tml._get_filtered_tracks_id(it, element)
+    assert not obtained_id
 
 
 # _update_location_related_props ###########################################
@@ -1145,7 +1145,7 @@ def test_parse_model_tag_keep_all_spots_and_tracks():
     )
 
     # 107 spots: 96 in 7 tracks that keep their TrackMate ID, and 11 lone spots
-    # whose lineage ID is -cell_ID.
+    # whose lineage ID is -cell_id.
     track_sizes = {
         lin_id: len(lin) for lin_id, lin in data.cell_data.items() if lin_id >= 0
     }
@@ -1156,8 +1156,8 @@ def test_parse_model_tag_keep_all_spots_and_tracks():
         assert list(lin.nodes) == [-lin_id]
     # The lineage ID of each lineage and of its cells matches its key in the data.
     for lin_id, lin in data.cell_data.items():
-        assert lin.graph["lineage_ID"] == lin_id
-        cell_lin_ids = {cell_lin_id for _, cell_lin_id in lin.nodes(data="lineage_ID")}
+        assert lin.graph["lineage_id"] == lin_id
+        cell_lin_ids = {cell_lin_id for _, cell_lin_id in lin.nodes(data="lineage_id")}
         assert cell_lin_ids == {lin_id}
 
 

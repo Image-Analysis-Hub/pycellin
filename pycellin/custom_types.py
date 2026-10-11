@@ -116,8 +116,8 @@ def property_type_to_strings(value: PropertyType) -> str | list[str]:
 # TODO: should I force the user to use the Cell and Link named tuples?
 # Would impact the signature of a lot of methods, but would make these
 # signatures more structured and consistent (looking at you, add_cell()).
-Cell = namedtuple("Cell", ["cell_ID", "lineage_ID"])
+Cell = namedtuple("Cell", ["cell_id", "lineage_id"])
 Link = namedtuple(
     "Link",
-    ["source_cell_ID", "target_cell_ID", "lineage_ID"],
+    ["source_cell_id", "target_cell_id", "lineage_id"],
 )

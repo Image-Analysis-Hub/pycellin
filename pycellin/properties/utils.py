@@ -30,7 +30,7 @@ def _get_cycle_node_property_values(
     lineage : CycleLineage
         Lineage graph containing the node of interest.
     nid : int
-        Node ID (cycle_ID) of the cell cycle of interest.
+        Node ID (cycle_id) of the cell cycle of interest.
 
     Returns
     -------
@@ -42,13 +42,13 @@ def _get_cycle_node_property_values(
     KeyError
         If the property does not exist in the cell lineage.
     """
-    lin_ID = lineage.graph["lineage_ID"]
-    cell_lin = data.cell_data[lin_ID]
+    lin_id = lineage.graph["lineage_id"]
+    cell_lin = data.cell_data[lin_id]
     try:
         values = [cell_lin.nodes[cid][prop_name] for cid in lineage.nodes[nid]["cells"]]
     except KeyError:
         raise KeyError(
-            f"Property '{prop_name}' does not exist in the cell lineage '{lin_ID}'."
+            f"Property '{prop_name}' does not exist in the cell lineage '{lin_id}'."
         )
     return values
 
@@ -72,7 +72,7 @@ def _get_cycle_edge_property_values(
     lineage : CycleLineage
         Lineage graph containing the node of interest.
     nid : int
-        Node ID (cycle_ID) of the cell of interest.
+        Node ID (cycle_id) of the cell of interest.
     include_incoming_edge : bool
         Whether to include the incoming edge of the first cell of the cell cycle.
 
@@ -86,8 +86,8 @@ def _get_cycle_edge_property_values(
     KeyError
         If the property does not exist in the cell lineage.
     """
-    lin_ID = lineage.graph["lineage_ID"]
-    cell_lin = data.cell_data[lin_ID]
+    lin_id = lineage.graph["lineage_id"]
+    cell_lin = data.cell_data[lin_id]
     try:
         values = [
             cell_lin.edges[edge][prop_name]
@@ -95,7 +95,7 @@ def _get_cycle_edge_property_values(
         ]
     except KeyError:
         raise KeyError(
-            f"Property '{prop_name}' does not exist in the cell lineage '{lin_ID}'."
+            f"Property '{prop_name}' does not exist in the cell lineage '{lin_id}'."
         )
 
     if include_incoming_edge:
@@ -105,7 +105,7 @@ def _get_cycle_edge_property_values(
             edge = (predecessors[0], first_cell)
             values.append(cell_lin.edges[edge][prop_name])
         elif len(predecessors) > 1:
-            raise FusionError(first_cell, lin_ID)
+            raise FusionError(first_cell, lin_id)
 
     return values
 

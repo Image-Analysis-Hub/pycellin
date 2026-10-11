@@ -36,7 +36,7 @@ def lineage1():
     lin = CellLineage()
     lin.add_nodes_from([1, 2, 3, 4, 5])
     lin.add_edges_from([(1, 2), (2, 3), (3, 4), (3, 5)])
-    lin.graph["lineage_ID"] = 0
+    lin.graph["lineage_id"] = 0
     return lin
 
 
@@ -45,7 +45,7 @@ def lineage2():
     lin = CellLineage()
     lin.add_nodes_from([10, 11, 12, 13])
     lin.add_edges_from([(10, 11), (11, 12), (12, 13)])
-    lin.graph["lineage_ID"] = 1
+    lin.graph["lineage_id"] = 1
     return lin
 
 
@@ -54,7 +54,7 @@ def lineage3():
     lin = CellLineage()
     lin.add_nodes_from([20, 21, 22])
     lin.add_edges_from([(20, 21), (21, 22)])
-    lin.graph["lineage_ID"] = 2
+    lin.graph["lineage_id"] = 2
     return lin
 
 
@@ -121,7 +121,7 @@ def mixed_props():
         "link_x": create_link_coord_property(axis="x", unit="micrometer"),
         "cell_displacement": create_cell_displacement_property(unit="micrometer"),
         # Lineage property.
-        "lineage_ID": create_lineage_id_property(),
+        "lineage_id": create_lineage_id_property(),
     }
 
 
@@ -144,16 +144,16 @@ def var_length_prop():
 def simple_model():
     """Create a simple model for testing."""
     lin1 = CellLineage()
-    lin1.add_node(1, timepoint=0, cell_x=10.0, lineage_ID=0)
-    lin1.add_node(2, timepoint=1, cell_x=12.0, lineage_ID=0)
+    lin1.add_node(1, timepoint=0, cell_x=10.0, lineage_id=0)
+    lin1.add_node(2, timepoint=1, cell_x=12.0, lineage_id=0)
     lin1.add_edge(1, 2, link_x=2.0)
-    lin1.graph["lineage_ID"] = 0
+    lin1.graph["lineage_id"] = 0
 
     lin2 = CellLineage()
-    lin2.add_node(3, timepoint=0, cell_x=20.0, lineage_ID=1)
-    lin2.add_node(4, timepoint=1, cell_x=22.0, lineage_ID=1)
+    lin2.add_node(3, timepoint=0, cell_x=20.0, lineage_id=1)
+    lin2.add_node(4, timepoint=1, cell_x=22.0, lineage_id=1)
     lin2.add_edge(3, 4, link_x=2.0)
-    lin2.graph["lineage_ID"] = 1
+    lin2.graph["lineage_id"] = 1
 
     cell_data = {0: lin1, 1: lin2}
     data = Data(cell_data)
@@ -243,7 +243,7 @@ class TestGetNextAvailableId:
     def test_single_empty_lineage(self):
         """Test with a single empty lineage."""
         lineage = CellLineage()
-        lineage.graph["lineage_ID"] = 0
+        lineage.graph["lineage_id"] = 0
         next_id = _get_next_available_id([lineage])
         assert next_id == 0
 
@@ -475,19 +475,19 @@ class TestBuildPropsMetadata:
         """Test building metadata with node and edge properties."""
         node_props_md, edge_props_md = _build_props_metadata(mixed_props)
 
-        # Node properties, including the node and lineage property lineage_ID.
+        # Node properties, including the node and lineage property lineage_id.
         assert len(node_props_md) == 5
         assert "timepoint" in node_props_md
         assert "cell_x" in node_props_md
         assert "absolute_age" in node_props_md
         assert "label" in node_props_md
-        assert "lineage_ID" in node_props_md
+        assert "lineage_id" in node_props_md
 
         # Edge properties.
         assert len(edge_props_md) == 2
         assert "link_x" in edge_props_md
         assert "cell_displacement" in edge_props_md
-        assert "lineage_ID" not in edge_props_md
+        assert "lineage_id" not in edge_props_md
 
     def test_lineage_only_property_excluded(self, mixed_props):
         """Test that lineage-only properties are excluded (requires geffception)."""
@@ -603,7 +603,7 @@ class TestBuildGeffMetadata:
         metadata = _build_geff_metadata(simple_model)
 
         assert "lineage" in metadata.track_node_props
-        assert metadata.track_node_props["lineage"] == "lineage_ID"
+        assert metadata.track_node_props["lineage"] == "lineage_id"
         assert "tracklet" not in metadata.track_node_props
 
     def test_node_and_edge_props_metadata(self, simple_model):
@@ -695,7 +695,7 @@ class TestExportGEFF:
     def test_export_cleans_metadata(self, simple_model, tmp_path):
         """Test that export_GEFF cleans metadata by removing orphaned properties.
 
-        Also validates that multi-type properties (like lineage_ID with NODE | LINEAGE)
+        Also validates that multi-type properties (like lineage_id with NODE | LINEAGE)
         are preserved when they have actual data in the lineages.
         """
         geff_out = str(tmp_path / "test.geff")
@@ -705,7 +705,7 @@ class TestExportGEFF:
         exported_model = export_GEFF(simple_model, geff_out)
 
         # The absolute_age property is orphaned (no data in lineages), so it's removed.
-        # All other properties are preserved, including multi-type ones (lineage_ID).
+        # All other properties are preserved, including multi-type ones (lineage_id).
         expected_props = {
             k: v for k, v in simple_model.get_properties().items() if k != "absolute_age"
         }

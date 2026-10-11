@@ -343,9 +343,9 @@ def _build_geff_metadata(
     node_props_md, edge_props_md = _build_props_metadata(props, var_length_props)
 
     # Define identifiers of lineage and cell cycle.
-    track_node_props = {"lineage": "lineage_ID"}
+    track_node_props = {"lineage": "lineage_id"}
     if model.has_cycle_data():
-        track_node_props["tracklet"] = "cycle_ID"
+        track_node_props["tracklet"] = "cycle_id"
 
     return geff.GeffMetadata(
         directed=True,

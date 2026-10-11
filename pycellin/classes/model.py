@@ -94,7 +94,7 @@ class Model:
 
         Notes
         -----
-        The core properties "cell_ID", "lineage_ID", "timepoint" and the reference
+        The core properties "cell_id", "lineage_id", "timepoint" and the reference
         time property are protected whenever they are declared.
         """
         # Check that we have a reference_time_property.
@@ -191,8 +191,8 @@ class Model:
 
         # Core properties are protected whenever they are declared.
         core_props = (
-            "cell_ID",
-            "lineage_ID",
+            "cell_id",
+            "lineage_id",
             "timepoint",
             self.reference_time_property,
         )
@@ -466,13 +466,13 @@ class Model:
                 if time_prop not in lin.nodes[source_node]:
                     raise ValueError(
                         f"Reference time property '{time_prop}' not found in node {source_node} "
-                        f"of lineage {lin.graph.get('lineage_ID', 'of unknown ID')}."
+                        f"of lineage {lin.graph.get('lineage_id', 'of unknown ID')}."
                     )
                 source_time = lin.nodes[source_node][time_prop]
                 if time_prop not in lin.nodes[target_node]:
                     raise ValueError(
                         f"Reference time property '{time_prop}' not found in node {target_node} "
-                        f"of lineage {lin.graph.get('lineage_ID', 'of unknown ID')}."
+                        f"of lineage {lin.graph.get('lineage_id', 'of unknown ID')}."
                     )
                 target_time = lin.nodes[target_node][time_prop]
                 time_diff = abs(target_time - source_time)
@@ -1059,7 +1059,7 @@ class Model:
         else:
             return list(self.data.cycle_data.values())
 
-    def get_cell_lineage_from_ID(self, lid: int) -> CellLineage | None:
+    def get_cell_lineage_from_id(self, lid: int) -> CellLineage | None:
         """
         Return the cell lineage with the specified ID.
 
@@ -1078,7 +1078,7 @@ class Model:
         else:
             return None
 
-    def get_cell_lineages_from_IDs(
+    def get_cell_lineages_from_ids(
         self, lids: list[int], ignore_missing: bool = True
     ) -> list[CellLineage | None]:
         """
@@ -1098,12 +1098,12 @@ class Model:
         list[CellLineage | None]
             The cell lineages with the specified IDs.
         """
-        lins = [self.get_cell_lineage_from_ID(lid) for lid in lids]
+        lins = [self.get_cell_lineage_from_id(lid) for lid in lids]
         if ignore_missing:
             lins = [lin for lin in lins if lin is not None]
         return lins
 
-    def get_cycle_lineage_from_ID(self, lid: int) -> CycleLineage | None:
+    def get_cycle_lineage_from_id(self, lid: int) -> CycleLineage | None:
         """
         Return the cycle lineage with the specified ID.
 
@@ -1122,7 +1122,7 @@ class Model:
         else:
             return None
 
-    def get_cycle_lineages_from_IDs(
+    def get_cycle_lineages_from_ids(
         self, lids: list[int], ignore_missing: bool = True
     ) -> list[CycleLineage | None]:
         """
@@ -1142,7 +1142,7 @@ class Model:
         list[CycleLineage | None]
             The cycle lineages with the specified IDs.
         """
-        lins = [self.get_cycle_lineage_from_ID(lid) for lid in lids]
+        lins = [self.get_cycle_lineage_from_id(lid) for lid in lids]
         if ignore_missing:
             lins = [lin for lin in lins if lin is not None]
         return lins
@@ -1222,7 +1222,7 @@ class Model:
             list(self.data.cycle_data.values()), lin_prop, lin_prop_value
         )
 
-    def get_cell_lineage_IDs(self) -> list[int]:
+    def get_cell_lineage_ids(self) -> list[int]:
         """
         Return the IDs of the cell lineages present in the model.
 
@@ -1233,10 +1233,10 @@ class Model:
         """
         return list(self.data.cell_data.keys())
 
-    get_lineage_IDs = get_cell_lineage_IDs
-    get_lineage_IDs.__doc__ = "Alias for get_cell_lineage_IDs"
+    get_lineage_ids = get_cell_lineage_ids
+    get_lineage_ids.__doc__ = "Alias for get_cell_lineage_ids"
 
-    def get_cycle_lineage_IDs(self) -> list[int]:
+    def get_cycle_lineage_ids(self) -> list[int]:
         """
         Return the IDs of the cycle lineages present in the model.
 
@@ -1249,7 +1249,7 @@ class Model:
             return []
         return list(self.data.cycle_data.keys())
 
-    def get_next_available_lineage_ID(self, positive: bool = True) -> int:
+    def get_next_available_lineage_id(self, positive: bool = True) -> int:
         """
         Return the next available lineage ID, positive by default.
 
@@ -1279,7 +1279,7 @@ class Model:
         Negative lineage IDs should be used for lineages with a single cell,
         and are equal to the negative of the cell ID.
         """
-        return self.data._get_next_available_lineage_ID(positive)
+        return self.data._get_next_available_lineage_id(positive)
 
     def has_property(
         self,
@@ -1311,11 +1311,11 @@ class Model:
             return
         self._updater._full_data_update = True
         self._updater._update_required = True
-        for lin_ID, lin in self.data.cell_data.items():
+        for lin_id, lin in self.data.cell_data.items():
             for nid in lin.nodes:
-                self._updater._added_cells.add(Cell(nid, lin_ID))
+                self._updater._added_cells.add(Cell(nid, lin_id))
             for edge in lin.edges:
-                self._updater._added_links.add(Link(edge[0], edge[1], lin_ID))
+                self._updater._added_links.add(Link(edge[0], edge[1], lin_id))
         self._updater._added_lineages = set(self.data.cell_data.keys())
 
     def is_update_required(self) -> bool:
@@ -1448,12 +1448,12 @@ class Model:
         lid : int, optional
             ID to assign to the lineage (default is None). Resolution order:
                 1. Use `lid` if provided.
-                2. Fall back to the lineage's internal `lineage_ID` property.
+                2. Fall back to the lineage's internal `lineage_id` property.
                 3. Generate a new ID if neither is available.
         overwrite_lid: bool, optional
-            If True, overwrite the lineage's internal `lineage_ID` with
+            If True, overwrite the lineage's internal `lineage_id` with
             the provided `lid`. If False, raise a ValueError if `lid` conflicts with
-            the lineage's existing internal `lineage_ID` (default is False).
+            the lineage's existing internal `lineage_id` (default is False).
         with_CycleLineage : bool, optional
             True to compute the cycle lineage, False otherwise (default is False).
 
@@ -1466,7 +1466,7 @@ class Model:
         ------
         ValueError
             If `lid` is provided and conflicts with the lineage's existing
-            internal `lineage_ID` and `overwrite_lid` is True.
+            internal `lineage_id` and `overwrite_lid` is True.
             If `lid` is already in use by another lineage in the model.
 
         Warns
@@ -1479,10 +1479,10 @@ class Model:
         # Determine the lineage ID to use.
         if lineage is None:
             if lid is None:
-                lid = self.get_next_available_lineage_ID()
+                lid = self.get_next_available_lineage_id()
             lineage = CellLineage(lid=lid)
         else:
-            inferred_lid = lineage.graph.get("lineage_ID")
+            inferred_lid = lineage.graph.get("lineage_id")
             if (
                 lid is not None
                 and inferred_lid is not None
@@ -1491,21 +1491,21 @@ class Model:
             ):
                 raise ValueError(
                     f"Provided lid={lid} conflicts with the lineage's "
-                    f"internal lineage_ID={inferred_lid}."
+                    f"internal lineage_id={inferred_lid}."
                 )
             if lid is None:
                 lid = inferred_lid
             if lid is None:
-                lid = self.get_next_available_lineage_ID()
+                lid = self.get_next_available_lineage_id()
 
-        if lid in self.get_cell_lineage_IDs():
+        if lid in self.get_cell_lineage_ids():
             raise ValueError(f"Lineage with ID {lid} already exists in the model.")
 
         # Update the data.
         self.data.cell_data[lid] = lineage
-        if lineage.graph.get("lineage_ID") != lid:
-            lineage.graph["lineage_ID"] = lid
-            nx.set_node_attributes(lineage, lid, "lineage_ID")
+        if lineage.graph.get("lineage_id") != lid:
+            lineage.graph["lineage_id"] = lid
+            nx.set_node_attributes(lineage, lid, "lineage_id")
 
         if with_CycleLineage:
             if self.data.cycle_data is None:
@@ -1633,8 +1633,8 @@ class Model:
         # Create the new lineage.
         new_lineage = lineage._split_from_cell(cid, split)
         if new_lid is None:
-            new_lid = self.get_next_available_lineage_ID()
-        new_lineage.graph["lineage_ID"] = new_lid
+            new_lid = self.get_next_available_lineage_id()
+        new_lineage.graph["lineage_id"] = new_lid
 
         # Update the model data.
         self.data.cell_data[new_lid] = new_lineage
@@ -1706,7 +1706,7 @@ class Model:
                     raise KeyError(f"The property {prop} has not been declared.")
         else:
             prop_values = {}
-        prop_values["lineage_ID"] = lid
+        prop_values["lineage_id"] = lid
 
         # Is the time value consistent with the time step of the model?
         time_step = self.model_metadata.time_step
@@ -1719,17 +1719,17 @@ class Model:
 
         if global_cid is True:
             if cid is None:
-                # Determine the next available global cell_ID.
+                # Determine the next available global cell_id.
                 next_cids = [
-                    lin._get_next_available_node_ID() for lin in self.get_cell_lineages()
+                    lin._get_next_available_node_id() for lin in self.get_cell_lineages()
                 ]
                 cid = max(next_cids)
             else:
-                # Check if the specified cell_ID is already used in the model.
+                # Check if the specified cell_id is already used in the model.
                 for lin in self.get_cell_lineages():
                     if cid in lin.nodes:
                         raise ValueError(
-                            f"Cell ID {cid} is already used in lineage {lin.graph['lineage_ID']}."
+                            f"Cell ID {cid} is already used in lineage {lin.graph['lineage_id']}."
                         )
 
         cid = lineage._add_cell(
@@ -1814,7 +1814,7 @@ class Model:
 
         current_id = start_id
         for lin in sorted(
-            self.get_cell_lineages(), key=lambda graph: graph.graph["lineage_ID"]
+            self.get_cell_lineages(), key=lambda graph: graph.graph["lineage_id"]
         ):
             if not unique_ids:
                 current_id = start_id
@@ -1833,7 +1833,7 @@ class Model:
             nx.relabel_nodes(lin, final_mapping, copy=False)
 
             for cid in lin.nodes():
-                lin.nodes[cid]["cell_ID"] = cid
+                lin.nodes[cid]["cell_id"] = cid
 
         # Full update in case of CycleLineages or of properties depending on cell IDs.
         self.prepare_full_data_update()
@@ -1992,7 +1992,7 @@ class Model:
         -------
         list[Cell]
             List of the fusion cells. Each cell is a named tuple:
-            (cell_ID, lineage_ID).
+            (cell_id, lineage_id).
 
         Raises
         ------
@@ -2002,15 +2002,15 @@ class Model:
         fusions = []
         if lids is None:
             lids = list(self.data.cell_data.keys())
-        for lin_ID in lids:
+        for lin_id in lids:
             try:
-                lineage = self.data.cell_data[lin_ID]
+                lineage = self.data.cell_data[lin_id]
             except KeyError as err:
-                msg = f"Lineage with ID {lin_ID} does not exist."
+                msg = f"Lineage with ID {lin_id} does not exist."
                 raise KeyError(msg) from err
             tmp = lineage.get_fusions()
             if tmp:
-                fusions.extend([Cell(cell_ID, lin_ID) for cell_ID in tmp])
+                fusions.extend([Cell(cell_id, lin_id) for cell_id in tmp])
         return fusions
 
     def get_divisions(self, lids: list[int] | None = None) -> list[Cell]:
@@ -2027,7 +2027,7 @@ class Model:
         -------
         list[Cell]
             List of the division cells. Each cell is a named tuple:
-            (cell_ID, lineage_ID).
+            (cell_id, lineage_id).
 
         Raises
         ------
@@ -2037,15 +2037,15 @@ class Model:
         divisions = []
         if lids is None:
             lids = list(self.data.cell_data.keys())
-        for lin_ID in lids:
+        for lin_id in lids:
             try:
-                lineage = self.data.cell_data[lin_ID]
+                lineage = self.data.cell_data[lin_id]
             except KeyError as err:
-                msg = f"Lineage with ID {lin_ID} does not exist."
+                msg = f"Lineage with ID {lin_id} does not exist."
                 raise KeyError(msg) from err
             tmp = lineage.get_divisions()
             if tmp:
-                divisions.extend([Cell(cell_ID, lin_ID) for cell_ID in tmp])
+                divisions.extend([Cell(cell_id, lin_id) for cell_id in tmp])
         return divisions
 
     def add_custom_property(
@@ -5110,7 +5110,7 @@ class Model:
         """
         propagated = set()
         for edge in clin.edges:
-            cycle = clin.nodes[edge[1]]["cycle_ID"]
+            cycle = clin.nodes[edge[1]]["cycle_id"]
             cells = clin.nodes[cycle]["cells"]
 
             # Intracycle edges.
@@ -5126,7 +5126,7 @@ class Model:
             # Intercycle edge.
             incoming_edges = list(lin.in_edges(cells[0]))
             if len(incoming_edges) > 1:
-                raise FusionError(cells[0], lin.graph["lineage_ID"])
+                raise FusionError(cells[0], lin.graph["lineage_id"])
             for prop in edge_props:
                 try:
                     lin.edges[incoming_edges[0]][prop] = clin.edges[edge][prop]
@@ -5241,9 +5241,9 @@ class Model:
         )  # to keep track of which properties were actually propagated
 
         # Propagation.
-        for lin_ID in self.data.cell_data:
-            lin = self.data.cell_data[lin_ID]
-            clin = self.data.cycle_data[lin_ID]
+        for lin_id in self.data.cell_data:
+            lin = self.data.cell_data[lin_id]
+            clin = self.data.cycle_data[lin_id]
             if node_props:
                 propagated_props.update(
                     Model._propagate_cycle_node_props(node_props, clin, lin)
@@ -5487,10 +5487,10 @@ class Model:
         # Single-cell lineages keep the convention lineage ID = -cell ID: if that ID is
         # not available, their cell is renumbered, as when splitting lineages in
         # ModelUpdater._update(). Only model2, a copy, is modified here.
-        used_lids = set(model1.get_cell_lineage_IDs())
+        used_lids = set(model1.get_cell_lineage_ids())
         lineages_to_add = []
         for lin in model2.get_cell_lineages():
-            lid = lin.graph.get("lineage_ID")
+            lid = lin.graph.get("lineage_id")
             if lid is None or lid in used_lids:
                 if len(lin) == 1:
                     cid = next(iter(lin.nodes))
@@ -5498,7 +5498,7 @@ class Model:
                     if lid >= 0 or lid in used_lids:
                         lid = min(min(used_lids, default=0) - 1, -1)
                         nx.relabel_nodes(lin, {cid: -lid}, copy=False)
-                        lin.nodes[-lid]["cell_ID"] = -lid
+                        lin.nodes[-lid]["cell_id"] = -lid
                 else:
                     lid = max(max(used_lids, default=0) + 1, 1)
             used_lids.add(lid)
@@ -5528,7 +5528,7 @@ class Model:
                 lineages += [(lin, lid) for lid, lin in model1.data.cell_data.items()]
             for lin, lid in lineages:
                 cycle_lin = CycleLineage(time_prop, time_step, lin)
-                cycle_lin.graph["lineage_ID"] = lid
+                cycle_lin.graph["lineage_id"] = lid
                 cycle_lineages_to_add[lid] = cycle_lin
 
         # Model metadata of the merged model. Fields shared by both models are kept,
@@ -5686,7 +5686,7 @@ class Model:
 
             # Set values on lineages.
             for lin in model1.get_cell_lineages():
-                from_model2 = lin.graph["lineage_ID"] in new_lids
+                from_model2 = lin.graph["lineage_id"] in new_lids
                 value = (md2_values if from_model2 else md1_values).get(field)
                 stored_fields = merge_props2 if from_model2 else merge_props1
                 if value is not None and field not in stored_fields:
@@ -5720,7 +5720,7 @@ class Model:
             List of models created from the specified lineage ID groups.
         """
         models = []
-        model_ids = set(self.get_cell_lineage_IDs())
+        model_ids = set(self.get_cell_lineage_ids())
         for name, lids in lin_id_groups.items():
             model = deepcopy(self)  # TODO: this is heavy...
             to_remove = list(model_ids - set(lids))
@@ -5736,14 +5736,14 @@ class Model:
         """
         Add cell lineage properties as columns of a DataFrame.
 
-        Each row gets the value of the cell lineage matching its `lineage_ID`, or NaN
-        if that lineage has no value. `lineage_ID` is skipped since it is already
+        Each row gets the value of the cell lineage matching its `lineage_id`, or NaN
+        if that lineage has no value. `lineage_id` is skipped since it is already
         a column.
 
         Parameters
         ----------
         df : pd.DataFrame
-            DataFrame with a `lineage_ID` column.
+            DataFrame with a `lineage_id` column.
         lineage_props : list[str] | None
             Identifiers of the cell lineage properties to add. If None or empty,
             the DataFrame is returned unchanged.
@@ -5760,7 +5760,7 @@ class Model:
             declared in the model.
             If a property has the same identifier as an existing column.
         """
-        props = [prop for prop in lineage_props or [] if prop != "lineage_ID"]
+        props = [prop for prop in lineage_props or [] if prop != "lineage_id"]
         if not props:
             return df
 
@@ -5787,11 +5787,11 @@ class Model:
         new_columns = {}
         for prop in props:
             values = {
-                lin_ID: lin.graph[prop]
-                for lin_ID, lin in self.data.cell_data.items()
+                lin_id: lin.graph[prop]
+                for lin_id, lin in self.data.cell_data.items()
                 if prop in lin.graph
             }
-            new_columns[prop] = df["lineage_ID"].map(values)
+            new_columns[prop] = df["lineage_id"].map(values)
         return df.assign(**new_columns)
 
     def to_cell_dataframe(
@@ -5819,15 +5819,15 @@ class Model:
         ------
         ValueError
             If the model has no lineages, or none with an ID in `lids`.
-            If the `lineage_ID`, `frame` or `cell_ID` property is not found in the model.
+            If the `lineage_id`, `frame` or `cell_id` property is not found in the model.
             If a property of `lineage_props` is not a lineage property of cell
             lineages, is not declared in the model, or clashes with an existing
             column.
         """
         records = [
-            {**cell_props, "lineage_ID": lin_ID}
-            for lin_ID, lineage in self.data.cell_data.items()
-            if not lids or lin_ID in lids
+            {**cell_props, "lineage_id": lin_id}
+            for lin_id, lineage in self.data.cell_data.items()
+            if not lids or lin_id in lids
             for cell_props in lineage.nodes.values()
         ]
         if not records:
@@ -5841,7 +5841,7 @@ class Model:
 
         # Reoder the columns to have pycellin mandatory properties first.
         time_prop = self.model_metadata.reference_time_property
-        mandatory_columns = ["lineage_ID", time_prop, "cell_ID"]
+        mandatory_columns = ["lineage_id", time_prop, "cell_id"]
         missing_columns = [col for col in mandatory_columns if col not in df.columns]
         if missing_columns:
             missing_str = ", ".join(repr(col) for col in missing_columns)
@@ -5853,7 +5853,7 @@ class Model:
         ]
         df = df[columns]
         df.sort_values(
-            ["lineage_ID", time_prop, "cell_ID"], ignore_index=True, inplace=True
+            ["lineage_id", time_prop, "cell_id"], ignore_index=True, inplace=True
         )
 
         return self._add_lineage_props_to_df(df, lineage_props)
@@ -5888,9 +5888,9 @@ class Model:
             column.
         """
         lineages = [
-            (lin_ID, lineage)
-            for lin_ID, lineage in self.data.cell_data.items()
-            if not lids or lin_ID in lids
+            (lin_id, lineage)
+            for lin_id, lineage in self.data.cell_data.items()
+            if not lids or lin_id in lids
         ]
         if not lineages:
             raise ValueError(
@@ -5903,14 +5903,14 @@ class Model:
         records = [
             {
                 **link_props,
-                "lineage_ID": lin_ID,
-                "source_cell_ID": source,
-                "target_cell_ID": target,
+                "lineage_id": lin_id,
+                "source_cell_id": source,
+                "target_cell_id": target,
             }
-            for lin_ID, lineage in lineages
+            for lin_id, lineage in lineages
             for source, target, link_props in lineage.edges(data=True)
         ]
-        mandatory_columns = ["lineage_ID", "source_cell_ID", "target_cell_ID"]
+        mandatory_columns = ["lineage_id", "source_cell_id", "target_cell_id"]
         if records:
             df = pd.DataFrame(records)
         else:
@@ -5922,7 +5922,7 @@ class Model:
             col for col in df.columns if col not in mandatory_columns
         ]
         df = df[columns]
-        df.sort_values("lineage_ID", ignore_index=True, inplace=True)
+        df.sort_values("lineage_id", ignore_index=True, inplace=True)
 
         return self._add_lineage_props_to_df(df, lineage_props)
 
@@ -5945,12 +5945,12 @@ class Model:
         ------
         ValueError
             If the model has no lineages, or none with an ID in `lids`.
-            If the `lineage_ID` is not found in the model.
+            If the `lineage_id` is not found in the model.
         """
         records = [
             lineage.graph
-            for lin_ID, lineage in self.data.cell_data.items()
-            if not lids or lin_ID in lids
+            for lin_id, lineage in self.data.cell_data.items()
+            if not lids or lin_id in lids
         ]
         if not records:
             raise ValueError(
@@ -5962,15 +5962,15 @@ class Model:
         df = pd.DataFrame(records)
 
         # Reoder the columns to have pycellin mandatory properties first.
-        if "lineage_ID" not in df.columns:
+        if "lineage_id" not in df.columns:
             raise ValueError(
-                "Mandatory lineage property not found in the model: 'lineage_ID'."
+                "Mandatory lineage property not found in the model: 'lineage_id'."
             )
         columns = df.columns.tolist()
-        columns.remove("lineage_ID")
-        columns = ["lineage_ID"] + columns
+        columns.remove("lineage_id")
+        columns = ["lineage_id"] + columns
         df = df[columns]
-        df.sort_values("lineage_ID", ignore_index=True, inplace=True)
+        df.sort_values("lineage_id", ignore_index=True, inplace=True)
 
         return df
 
@@ -6000,7 +6000,7 @@ class Model:
         ValueError
             If the cycle lineages have not been computed yet.
             If the model has no lineages, or none with an ID in `lids`.
-            If the `lineage_ID`, `level` or `cycle_ID` property is not found
+            If the `lineage_id`, `level` or `cycle_id` property is not found
             in the model.
             If a property of `lineage_props` is not a lineage property of cell
             lineages, is not declared in the model, or clashes with an existing
@@ -6012,9 +6012,9 @@ class Model:
                 "Please compute the cycle lineages first with model.add_cycle_data()."
             )
         records = [
-            {**cycle_props, "lineage_ID": lin_ID}
-            for lin_ID, lineage in self.data.cycle_data.items()
-            if not lids or lin_ID in lids
+            {**cycle_props, "lineage_id": lin_id}
+            for lin_id, lineage in self.data.cycle_data.items()
+            if not lids or lin_id in lids
             for cycle_props in lineage.nodes.values()
         ]
         if not records:
@@ -6029,13 +6029,13 @@ class Model:
 
         # Reoder the columns to have pycellin mandatory properties first.
         columns = df.columns.tolist()
-        columns.remove("lineage_ID")
+        columns.remove("lineage_id")
         columns.remove("level")
-        columns.remove("cycle_ID")
-        columns = ["lineage_ID", "level", "cycle_ID"] + columns
+        columns.remove("cycle_id")
+        columns = ["lineage_id", "level", "cycle_id"] + columns
         df = df[columns]
         df.sort_values(
-            ["lineage_ID", "level", "cycle_ID"], ignore_index=True, inplace=True
+            ["lineage_id", "level", "cycle_id"], ignore_index=True, inplace=True
         )
 
         return self._add_lineage_props_to_df(df, lineage_props)
@@ -6198,11 +6198,11 @@ class Model:
             for lin_dict in subset:
                 for lin_id, cell_ids in lin_dict.items():
                     if cell_ids:
-                        mask |= (df_cells["lineage_ID"] == lin_id) & (
-                            df_cells["cell_ID"].isin(cell_ids)
+                        mask |= (df_cells["lineage_id"] == lin_id) & (
+                            df_cells["cell_id"].isin(cell_ids)
                         )
                     else:
-                        mask |= df_cells["lineage_ID"] == lin_id
+                        mask |= df_cells["lineage_id"] == lin_id
             df_cells = df_cells[mask]
             if df_cells.empty:
                 raise ValueError("No cells match the subset criteria.")

@@ -27,10 +27,10 @@ def data():
     lineage.add_edges_from([(1, 2), (2, 3), (3, 4), (3, 5)])
     for n in lineage.nodes:
         lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 1, n)
-        lineage.nodes[n]["cell_ID"] = n
+        lineage.nodes[n]["cell_id"] = n
     for source, target in lineage.edges:
         lineage.edges[source, target]["my_motion"] = float(target)
-    lineage.graph["lineage_ID"] = 1
+    lineage.graph["lineage_id"] = 1
     data = Data({1: lineage})
     data._add_cycle_lineages(time_prop="frame", time_step=1)
     return data

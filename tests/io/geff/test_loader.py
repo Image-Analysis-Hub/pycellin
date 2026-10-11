@@ -18,7 +18,7 @@ from pycellin.properties.core import (
 from pycellin.io.geff.loader import (
     _build_generic_metadata,
     _build_props_metadata,
-    _ensure_valid_cell_ID,
+    _ensure_valid_cell_id,
     _extract_axes_metadata,
     _extract_generic_metadata,
     _extract_lin_props_metadata,
@@ -124,8 +124,8 @@ def geff_md_3d_axes(geff_node_props_md):
 def graph_lin_id():
     """Graph with standard and custom lineage ID properties."""
     g = nx.Graph()
-    g.add_node(0, frame=0, lineage_ID=0, my_lin_id=0)
-    g.add_node(1, frame=1, lineage_ID=1, my_lin_id=1)
+    g.add_node(0, frame=0, lineage_id=0, my_lin_id=0)
+    g.add_node(1, frame=1, lineage_id=1, my_lin_id=1)
     return g
 
 
@@ -273,8 +273,8 @@ def prop_speed():
 def pycellin_standard_md():
     """"""
     props_md = {
-        "lineage_ID": create_lineage_id_property(provenance="test"),
-        "cell_ID": create_cell_id_property(provenance="test"),
+        "lineage_id": create_lineage_id_property(provenance="test"),
+        "cell_id": create_cell_id_property(provenance="test"),
         "cell_x": create_cell_coord_property(unit="um", axis="x", provenance="test"),
     }
     return props_md
@@ -412,7 +412,7 @@ class TestIdentifyLinIdProp:
         self, caplog, graph_lin_id
     ):
         """When lin_id_prop is not in graph and geff_track_node_props is None,
-        fall back to 'lineage_ID' if present in graph and log."""
+        fall back to 'lineage_id' if present in graph and log."""
         with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop("missing_key", None, graph_lin_id)
         assert len(caplog.records) == 2
@@ -421,11 +421,11 @@ class TestIdentifyLinIdProp:
         assert caplog.records[1].levelname == "INFO"
         assert "inferred from existing graph property" in caplog.records[1].message
 
-        assert result == "lineage_ID"
+        assert result == "lineage_id"
 
     def test_provided_key_not_in_graph_no_fallback(self, caplog, graph_no_lin_id):
         """When lin_id_prop is not in graph, geff_track_node_props is None,
-        and graph has no 'lineage_ID', log and return None."""
+        and graph has no 'lineage_id', log and return None."""
         with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop("missing_key", None, graph_no_lin_id)
         assert len(caplog.records) == 2
@@ -457,20 +457,20 @@ class TestIdentifyLinIdProp:
         self, caplog, graph_lin_id
     ):
         """When lin_id_prop is None, geff_track_node_props is None,
-        and graph has 'lineage_ID', return 'lineage_ID' and log."""
+        and graph has 'lineage_id', return 'lineage_id' and log."""
         with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop(None, None, graph_lin_id)
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "INFO"
         assert "inferred from existing graph property" in caplog.records[0].message
 
-        assert result == "lineage_ID"
+        assert result == "lineage_id"
 
     def test_none_prop_no_track_node_props_no_lineage_id_in_graph(
         self, caplog, graph_no_lin_id
     ):
         """When lin_id_prop is None, geff_track_node_props is None,
-        and graph has no 'lineage_ID', log and return None."""
+        and graph has no 'lineage_id', log and return None."""
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             result = _identify_lin_id_prop(None, None, graph_no_lin_id)
         assert len(caplog.records) == 1
@@ -1532,33 +1532,33 @@ class TestFallbackToNodeKeys:
     """Test cases for _fallback_to_node_keys function."""
 
     def test_sets_cell_id_from_node_keys(self, caplog, graph_no_lin_id):
-        """When falling back, each node gets a cell_ID equal to its node key."""
+        """When falling back, each node gets a cell_id equal to its node key."""
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             _fallback_to_node_keys(graph_no_lin_id, "fallback reason")
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "fallback" in caplog.records[0].message
 
-        assert graph_no_lin_id.nodes[0]["cell_ID"] == 0
-        assert graph_no_lin_id.nodes[1]["cell_ID"] == 1
+        assert graph_no_lin_id.nodes[0]["cell_id"] == 0
+        assert graph_no_lin_id.nodes[1]["cell_id"] == 1
         assert graph_no_lin_id.nodes[0]["frame"] == 0
         assert graph_no_lin_id.nodes[1]["frame"] == 1
 
 
 class TestEnsureValidCellID:
-    """Test cases for _ensure_valid_cell_ID function."""
+    """Test cases for _ensure_valid_cell_id function."""
 
     def test_none_key_falls_back_to_node_keys(self, caplog, graph_no_lin_id):
-        """When cell_id_key is None, create cell_ID from node keys and log."""
+        """When cell_id_key is None, create cell_id from node keys and log."""
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _ensure_valid_cell_ID(graph_no_lin_id, None)
+            result = _ensure_valid_cell_id(graph_no_lin_id, None)
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "No cell identifier property provided" in caplog.records[0].message
 
-        assert result == "cell_ID"
-        assert graph_no_lin_id.nodes[0]["cell_ID"] == 0
-        assert graph_no_lin_id.nodes[1]["cell_ID"] == 1
+        assert result == "cell_id"
+        assert graph_no_lin_id.nodes[0]["cell_id"] == 0
+        assert graph_no_lin_id.nodes[1]["cell_id"] == 1
         assert graph_no_lin_id.nodes[0]["frame"] == 0
         assert graph_no_lin_id.nodes[1]["frame"] == 1
 
@@ -1568,14 +1568,14 @@ class TestEnsureValidCellID:
         g.add_node(0, id=0)
         g.add_node(1)
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _ensure_valid_cell_ID(g, "id")
+            result = _ensure_valid_cell_id(g, "id")
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "not present on all nodes" in caplog.records[0].message
 
-        assert result == "cell_ID"
-        assert g.nodes[0]["cell_ID"] == 0
-        assert g.nodes[1]["cell_ID"] == 1
+        assert result == "cell_id"
+        assert g.nodes[0]["cell_id"] == 0
+        assert g.nodes[1]["cell_id"] == 1
 
     def test_negative_value_fall_back(self, caplog):
         """When cell_id_key has a negative value, fall back and log."""
@@ -1583,14 +1583,14 @@ class TestEnsureValidCellID:
         g.add_node(0, id=0)
         g.add_node(1, id=-1)
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _ensure_valid_cell_ID(g, "id")
+            result = _ensure_valid_cell_id(g, "id")
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "not all positive integers" in caplog.records[0].message
 
-        assert result == "cell_ID"
-        assert g.nodes[0]["cell_ID"] == 0
-        assert g.nodes[1]["cell_ID"] == 1
+        assert result == "cell_id"
+        assert g.nodes[0]["cell_id"] == 0
+        assert g.nodes[1]["cell_id"] == 1
 
     def test_string_value_fall_back(self, caplog):
         """When cell_id_key has a string value, fall back and log."""
@@ -1598,14 +1598,14 @@ class TestEnsureValidCellID:
         g.add_node(0, id=0)
         g.add_node(1, id="1")
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _ensure_valid_cell_ID(g, "id")
+            result = _ensure_valid_cell_id(g, "id")
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "not all positive integers" in caplog.records[0].message
 
-        assert result == "cell_ID"
-        assert g.nodes[0]["cell_ID"] == 0
-        assert g.nodes[1]["cell_ID"] == 1
+        assert result == "cell_id"
+        assert g.nodes[0]["cell_id"] == 0
+        assert g.nodes[1]["cell_id"] == 1
 
     def test_bool_value_fall_back(self, caplog):
         """When cell_id_key has a boolean value, fall back and log."""
@@ -1613,14 +1613,14 @@ class TestEnsureValidCellID:
         g.add_node(0, id=0)
         g.add_node(1, id=True)
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _ensure_valid_cell_ID(g, "id")
+            result = _ensure_valid_cell_id(g, "id")
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "not all positive integers" in caplog.records[0].message
 
-        assert result == "cell_ID"
-        assert g.nodes[0]["cell_ID"] == 0
-        assert g.nodes[1]["cell_ID"] == 1
+        assert result == "cell_id"
+        assert g.nodes[0]["cell_id"] == 0
+        assert g.nodes[1]["cell_id"] == 1
 
     def test_none_value_fall_back(self, caplog):
         """When cell_id_key has a None value, fall back and log."""
@@ -1628,14 +1628,14 @@ class TestEnsureValidCellID:
         g.add_node(0, id=0)
         g.add_node(1, id=None)
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _ensure_valid_cell_ID(g, "id")
+            result = _ensure_valid_cell_id(g, "id")
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "not all positive integers" in caplog.records[0].message
 
-        assert result == "cell_ID"
-        assert g.nodes[0]["cell_ID"] == 0
-        assert g.nodes[1]["cell_ID"] == 1
+        assert result == "cell_id"
+        assert g.nodes[0]["cell_id"] == 0
+        assert g.nodes[1]["cell_id"] == 1
 
     def test_duplicate_prop_values_fall_back(self, caplog):
         """When cell_id_key has duplicate values, fall back and log."""
@@ -1643,38 +1643,38 @@ class TestEnsureValidCellID:
         g.add_node(0, id=1)
         g.add_node(1, id=1)
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _ensure_valid_cell_ID(g, "id")
+            result = _ensure_valid_cell_id(g, "id")
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "Duplicate values found" in caplog.records[0].message
 
-        assert result == "cell_ID"
-        assert g.nodes[0]["cell_ID"] == 0
-        assert g.nodes[1]["cell_ID"] == 1
+        assert result == "cell_id"
+        assert g.nodes[0]["cell_id"] == 0
+        assert g.nodes[1]["cell_id"] == 1
 
     def test_valid_prop_relabels_nodes(self):
         """When cell_id_key is valid, relabel nodes to match property values."""
         g = nx.Graph()
         g.add_node(1, id=10)
         g.add_node(2, id=11)
-        result = _ensure_valid_cell_ID(g, "id")
+        result = _ensure_valid_cell_id(g, "id")
         assert result == "id"
         assert set(g.nodes) == {10, 11}
         assert g.nodes[10]["id"] == 10
         assert g.nodes[11]["id"] == 11
-        assert "cell_ID" not in g.nodes[10]
-        assert "cell_ID" not in g.nodes[11]
+        assert "cell_id" not in g.nodes[10]
+        assert "cell_id" not in g.nodes[11]
 
     def test_empty_graph(self):
         """When graph is empty, return the cell_id_key without modification."""
         g = nx.Graph()
 
-        result = _ensure_valid_cell_ID(g, "id")
+        result = _ensure_valid_cell_id(g, "id")
         assert result == "id"
         assert len(g.nodes) == 0
 
-        result = _ensure_valid_cell_ID(g, None)
-        assert result == "cell_ID"
+        result = _ensure_valid_cell_id(g, None)
+        assert result == "cell_id"
         assert len(g.nodes) == 0
 
 
@@ -1707,8 +1707,8 @@ class TestStandardizePropertiesData:
             assert "pos_y" not in data
             assert "pos_z" not in data
             assert "old_node_key" not in data
-            assert "lineage_ID" in data
-            assert "cell_ID" in data
+            assert "lineage_id" in data
+            assert "cell_id" in data
             assert "cell_x" in data
             assert "cell_y" in data
             assert "cell_z" in data
@@ -1722,8 +1722,8 @@ class TestStandardizePropertiesData:
             assert "pos_y" not in data
             assert "pos_z" not in data
             assert "old_node_key" not in data
-            assert "lineage_ID" in data
-            assert "cell_ID" in data
+            assert "lineage_id" in data
+            assert "cell_id" in data
             assert "cell_x" in data
             assert "cell_y" in data
             assert "cell_z" in data
@@ -1734,8 +1734,8 @@ class TestStandardizePropertiesData:
         assert lin_a.edges[(0, 1)]["new_edge_key"] == 0.5
 
         # Lineage-level updates.
-        assert lin_a.graph["lineage_ID"] == 11
-        assert lin_b.graph["lineage_ID"] == 12
+        assert lin_a.graph["lineage_id"] == 11
+        assert lin_b.graph["lineage_id"] == 12
         assert "custom_lin_id" not in lin_a.graph
         assert "custom_lin_id" not in lin_b.graph
         assert "old_lin_key" not in lin_a.graph
@@ -1762,8 +1762,8 @@ class TestStandardizePropertiesData:
         )
 
         lin_a, _ = lineages_with_nonstandard_keys
-        assert lin_a.nodes[0]["cell_ID"] == 100
-        assert lin_a.nodes[0]["lineage_ID"] == 11
+        assert lin_a.nodes[0]["cell_id"] == 100
+        assert lin_a.nodes[0]["lineage_id"] == 11
         assert "pos_x" in lin_a.nodes[0]
         assert "pos_y" in lin_a.nodes[0]
         assert "pos_z" in lin_a.nodes[0]
@@ -1772,21 +1772,21 @@ class TestStandardizePropertiesData:
         assert "cell_z" not in lin_a.nodes[0]
 
     def test_keeps_graph_lin_id_when_already_standard(self, standardize_rename_map):
-        """When lin_id_key is already 'lineage_ID', lineage graph IDs are preserved."""
+        """When lin_id_key is already 'lineage_id', lineage graph IDs are preserved."""
         lin = CellLineage()
         lin.add_node(
             1,
-            lineage_ID=0,
+            lineage_id=0,
             custom_cell_id=11,
             pos_x=2.0,
             old_node_key="node",
         )
-        lin.graph["lineage_ID"] = 0
+        lin.graph["lineage_id"] = 0
         lin.graph["old_lin_key"] = "lineage"
 
         _standardize_properties_data(
             [lin],
-            lin_id_key="lineage_ID",
+            lin_id_key="lineage_id",
             cell_id_key="custom_cell_id",
             cell_x_key="pos_x",
             cell_y_key=None,
@@ -1794,19 +1794,19 @@ class TestStandardizePropertiesData:
             rename_map=standardize_rename_map,
         )
 
-        assert lin.graph["lineage_ID"] == 0
-        assert lin.nodes[1]["lineage_ID"] == 0
+        assert lin.graph["lineage_id"] == 0
+        assert lin.nodes[1]["lineage_id"] == 0
 
     def test_skips_standard_cell_id_rename(self):
-        """When cell_id_key is already 'cell_ID', node cell IDs are preserved."""
+        """When cell_id_key is already 'cell_id', node cell IDs are preserved."""
         lin = CellLineage()
-        lin.add_node(1, lineage_ID=0, cell_ID=11)
-        lin.graph["lineage_ID"] = 0
+        lin.add_node(1, lineage_id=0, cell_id=11)
+        lin.graph["lineage_id"] = 0
 
         _standardize_properties_data(
             [lin],
-            lin_id_key="lineage_ID",
-            cell_id_key="cell_ID",
+            lin_id_key="lineage_id",
+            cell_id_key="cell_id",
             cell_x_key=None,
             cell_y_key=None,
             cell_z_key=None,
@@ -1817,18 +1817,18 @@ class TestStandardizePropertiesData:
             },
         )
 
-        assert lin.nodes[1]["cell_ID"] == 11
+        assert lin.nodes[1]["cell_id"] == 11
 
     def test_skips_standard_coordinate_renames(self):
         """When x/y/z keys are already 'cell_x', 'cell_y', 'cell_z', they are left unchanged."""
         lin = CellLineage()
-        lin.add_node(1, lineage_ID=0, cell_ID=11, cell_x=1.0, cell_y=2.0, cell_z=3.0)
-        lin.graph["lineage_ID"] = 0
+        lin.add_node(1, lineage_id=0, cell_id=11, cell_x=1.0, cell_y=2.0, cell_z=3.0)
+        lin.graph["lineage_id"] = 0
 
         _standardize_properties_data(
             [lin],
-            lin_id_key="lineage_ID",
-            cell_id_key="cell_ID",
+            lin_id_key="lineage_id",
+            cell_id_key="cell_id",
             cell_x_key="cell_x",
             cell_y_key="cell_y",
             cell_z_key="cell_z",
@@ -1862,7 +1862,7 @@ class TestStandardizePropertiesData:
             },
         )
 
-        assert lin.graph["lineage_ID"] == -1
+        assert lin.graph["lineage_id"] == -1
 
     def test_assigns_fallback_lineage_id_for_multi_node_lineage_without_key(self):
         """When lin_id_key is absent from a multi-node lineage graph, next available id is used."""
@@ -1889,19 +1889,19 @@ class TestStandardizePropertiesData:
             },
         )
 
-        assert lin_with_id.graph["lineage_ID"] == 10
-        assert lin_without_id.graph["lineage_ID"] == 11
+        assert lin_with_id.graph["lineage_id"] == 10
+        assert lin_without_id.graph["lineage_id"] == 11
 
 
 class TestStandardizePropsMetadata:
     """Test cases for _standardize_props_metadata function."""
 
     def test_lin_id_standard_key_preserved(self, pycellin_standard_md, rename_map):
-        """When lineage_id_key is already 'lineage_ID', key and metadata are preserved."""
+        """When lineage_id_key is already 'lineage_id', key and metadata are preserved."""
         nb_props = len(pycellin_standard_md)
         _standardize_props_metadata(
             pycellin_standard_md,
-            lin_id_key="lineage_ID",
+            lin_id_key="lineage_id",
             cell_id_key=None,
             cell_x_key=None,
             cell_y_key=None,
@@ -1910,12 +1910,12 @@ class TestStandardizePropsMetadata:
             rename_map=rename_map,
         )
         assert len(pycellin_standard_md) == nb_props
-        assert "lineage_ID" in pycellin_standard_md
-        assert pycellin_standard_md["lineage_ID"].identifier == "lineage_ID"
-        assert pycellin_standard_md["lineage_ID"].provenance == "test"
+        assert "lineage_id" in pycellin_standard_md
+        assert pycellin_standard_md["lineage_id"].identifier == "lineage_id"
+        assert pycellin_standard_md["lineage_id"].provenance == "test"
 
     def test_lin_id_nonstandard_renamed(self, pycellin_non_standard_md, rename_map):
-        """When lineage_id_key is present but not 'lineage_ID', it is renamed to 'lineage_ID',
+        """When lineage_id_key is present but not 'lineage_id', it is renamed to 'lineage_id',
         and its identifier is updated but metadata is preserved."""
         _standardize_props_metadata(
             pycellin_non_standard_md,
@@ -1928,12 +1928,12 @@ class TestStandardizePropsMetadata:
             rename_map=rename_map,
         )
         assert "track_id" not in pycellin_non_standard_md
-        assert "lineage_ID" in pycellin_non_standard_md
-        assert pycellin_non_standard_md["lineage_ID"].identifier == "lineage_ID"
-        assert pycellin_non_standard_md["lineage_ID"].provenance == "test"
+        assert "lineage_id" in pycellin_non_standard_md
+        assert pycellin_non_standard_md["lineage_id"].identifier == "lineage_id"
+        assert pycellin_non_standard_md["lineage_id"].provenance == "test"
 
     def test_lin_id_absent_creates_default(self, rename_map):
-        """When lineage_id_key is None, a default 'lineage_ID' property with provenance
+        """When lineage_id_key is None, a default 'lineage_id' property with provenance
         'geff' is created."""
         props_md = {}
         _standardize_props_metadata(
@@ -1946,17 +1946,17 @@ class TestStandardizePropsMetadata:
             space_unit=None,
             rename_map=rename_map,
         )
-        assert "lineage_ID" in props_md
-        assert props_md["lineage_ID"].identifier == "lineage_ID"
-        assert props_md["lineage_ID"].provenance == "geff"
+        assert "lineage_id" in props_md
+        assert props_md["lineage_id"].identifier == "lineage_id"
+        assert props_md["lineage_id"].provenance == "geff"
 
     def test_cell_id_standard_key_preserved(self, pycellin_standard_md, rename_map):
-        """When cell_id_key is already 'cell_ID', key and metadata are preserved."""
+        """When cell_id_key is already 'cell_id', key and metadata are preserved."""
         nb_props = len(pycellin_standard_md)
         _standardize_props_metadata(
             pycellin_standard_md,
             lin_id_key=None,
-            cell_id_key="cell_ID",
+            cell_id_key="cell_id",
             cell_x_key=None,
             cell_y_key=None,
             cell_z_key=None,
@@ -1964,12 +1964,12 @@ class TestStandardizePropsMetadata:
             rename_map=rename_map,
         )
         assert len(pycellin_standard_md) == nb_props
-        assert "cell_ID" in pycellin_standard_md
-        assert pycellin_standard_md["cell_ID"].identifier == "cell_ID"
-        assert pycellin_standard_md["cell_ID"].provenance == "test"
+        assert "cell_id" in pycellin_standard_md
+        assert pycellin_standard_md["cell_id"].identifier == "cell_id"
+        assert pycellin_standard_md["cell_id"].provenance == "test"
 
     def test_cell_id_nonstandard_renamed(self, pycellin_non_standard_md, rename_map):
-        """When cell_id_key is present but not 'cell_ID', it is renamed to 'cell_ID',
+        """When cell_id_key is present but not 'cell_id', it is renamed to 'cell_id',
         and its identifier is updated but metadata is preserved."""
         _standardize_props_metadata(
             pycellin_non_standard_md,
@@ -1982,12 +1982,12 @@ class TestStandardizePropsMetadata:
             rename_map=rename_map,
         )
         assert "node_id" not in pycellin_non_standard_md
-        assert "cell_ID" in pycellin_non_standard_md
-        assert pycellin_non_standard_md["cell_ID"].identifier == "cell_ID"
-        assert pycellin_non_standard_md["cell_ID"].provenance == "test"
+        assert "cell_id" in pycellin_non_standard_md
+        assert pycellin_non_standard_md["cell_id"].identifier == "cell_id"
+        assert pycellin_non_standard_md["cell_id"].provenance == "test"
 
     def test_cell_id_absent_creates_default(self, rename_map):
-        """When cell_id_key is None, a default 'cell_ID' property with provenance
+        """When cell_id_key is None, a default 'cell_id' property with provenance
         'geff' is created."""
         props_md = {}
         _standardize_props_metadata(
@@ -2000,9 +2000,9 @@ class TestStandardizePropsMetadata:
             space_unit=None,
             rename_map=rename_map,
         )
-        assert "cell_ID" in props_md
-        assert props_md["cell_ID"].identifier == "cell_ID"
-        assert props_md["cell_ID"].provenance == "geff"
+        assert "cell_id" in props_md
+        assert props_md["cell_id"].identifier == "cell_id"
+        assert props_md["cell_id"].provenance == "geff"
 
     def test_coord_none_skips_all_coord_keys(self, rename_map):
         """When all coord props are None, no standard coordinate key is added to props_md."""
@@ -2093,9 +2093,9 @@ class TestStandardizePropsMetadata:
             rename_map=rename_map,
         )
         assert "custom_lineage_id" not in props_md
-        assert "lineage_ID" in props_md
-        assert props_md["lineage_ID"].identifier == "lineage_ID"
-        assert props_md["lineage_ID"].provenance == "geff"
+        assert "lineage_id" in props_md
+        assert props_md["lineage_id"].identifier == "lineage_id"
+        assert props_md["lineage_id"].provenance == "geff"
 
     def test_cell_id_not_none_but_not_in_props_md_creates_default(self, rename_map):
         """When cell_id_key is provided but not in props_md, a default should be created
@@ -2112,9 +2112,9 @@ class TestStandardizePropsMetadata:
             rename_map=rename_map,
         )
         assert "custom_cell_id" not in props_md
-        assert "cell_ID" in props_md
-        assert props_md["cell_ID"].identifier == "cell_ID"
-        assert props_md["cell_ID"].provenance == "geff"
+        assert "cell_id" in props_md
+        assert props_md["cell_id"].identifier == "cell_id"
+        assert props_md["cell_id"].provenance == "geff"
 
     def test_coord_with_rename_map_transformation(self, prop_position_x_node, rename_map):
         """When a coordinate key is transformed by rename_map, the transformed key

@@ -218,8 +218,8 @@ class NodeLocalPropCalculator(LocalPropCalculator):
             to enrich with the property value.
         """
         lineages = _get_lin_data_from_lin_type(data, self.prop.lin_type)
-        for nid, lin_ID in nodes_to_enrich:
-            lin = lineages[lin_ID]
+        for nid, lin_id in nodes_to_enrich:
+            lin = lineages[lin_id]
             lin.nodes[nid][self.prop.identifier] = self.compute(lin, nid)
 
 
@@ -260,9 +260,9 @@ class EdgeLocalPropCalculator(LocalPropCalculator):
             the lineage ID of the edges to enrich with the property value.
         """
         lineages = _get_lin_data_from_lin_type(data, self.prop.lin_type)
-        for source, target, lin_ID in edges_to_enrich:
+        for source, target, lin_id in edges_to_enrich:
             link = (source, target)
-            lin = lineages[lin_ID]
+            lin = lineages[lin_id]
             lin.edges[link][self.prop.identifier] = self.compute(lin, link)
 
 
@@ -296,8 +296,8 @@ class LineageLocalPropCalculator(LocalPropCalculator):
             Data object containing the lineages.
         """
         lineages = _get_lin_data_from_lin_type(data, self.prop.lin_type)
-        for lin_ID in lineages_to_enrich:
-            lin = lineages[lin_ID]
+        for lin_id in lineages_to_enrich:
+            lin = lineages[lin_id]
             lin.graph[self.prop.identifier] = self.compute(lin)
 
 

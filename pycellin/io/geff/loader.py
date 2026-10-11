@@ -33,7 +33,7 @@ from pycellin.io.utils import (
     _split_graph_into_lineages,
     _update_edge_prop_key,
     _update_lineage_prop_key,
-    _update_lineages_IDs_key,
+    _update_lineages_ids_key,
     _update_node_prop_key,
     check_fusions,
 )
@@ -82,7 +82,7 @@ def _identify_lin_id_prop(
     If ``lin_id_key`` is provided, the function will check that the property exists
     in all nodes of the graph. If not provided, the function will try to infer it
     from the GEFF track_node_props. If that fails, the function will create a new
-    'lineage_ID' property.
+    'lineage_id' property.
 
     Parameters
     ----------
@@ -127,11 +127,11 @@ def _identify_lin_id_prop(
                 stacklevel=error_stack_level,
             )
         else:
-            if _graph_has_node_prop(geff_graph, "lineage_ID"):
-                valid_lin_id_key = "lineage_ID"
+            if _graph_has_node_prop(geff_graph, "lineage_id"):
+                valid_lin_id_key = "lineage_id"
                 logger.info(
                     "Lineage identifier inferred from existing graph property: "
-                    "'lineage_ID'.",
+                    "'lineage_id'.",
                     stacklevel=error_stack_level,
                 )
             else:
@@ -874,17 +874,17 @@ def _fallback_to_node_keys(geff_graph: nx.DiGraph, reason: str) -> None:
     """
     logger.warning(reason, stacklevel=3)
     for node in geff_graph.nodes:
-        geff_graph.nodes[node]["cell_ID"] = node
+        geff_graph.nodes[node]["cell_id"] = node
 
 
-def _ensure_valid_cell_ID(geff_graph: nx.DiGraph, cell_id_key: str | None) -> str:
+def _ensure_valid_cell_id(geff_graph: nx.DiGraph, cell_id_key: str | None) -> str:
     """
     Ensure that a valid cell ID property exists and is consistent with graph node IDs.
 
-    If ``cell_id_key`` is None, the function creates a ``cell_ID`` property from
+    If ``cell_id_key`` is None, the function creates a ``cell_id`` property from
     the NetworkX node keys. If ``cell_id_key`` is provided, it verifies uniqueness of
     the property, that it exists on all nodes and is a positive integer. If not,
-    it falls back to creating a ``cell_ID`` property from node keys. If the provided
+    it falls back to creating a ``cell_id`` property from node keys. If the provided
     property is valid but its values differ from node keys, the graph node keys are
     updated to match the provided IDs to avoid later inconsistencies.
 
@@ -905,25 +905,25 @@ def _ensure_valid_cell_ID(geff_graph: nx.DiGraph, cell_id_key: str | None) -> st
     -----
     UserWarning
         If ``cell_id_key`` is provided but missing on some nodes, triggering a
-        fallback to generated ``cell_ID`` values from node keys.
+        fallback to generated ``cell_id`` values from node keys.
         If ``cell_id_key`` is provided but contains duplicate values across
-        nodes, triggering a fallback to generated ``cell_ID`` values from node keys.
+        nodes, triggering a fallback to generated ``cell_id`` values from node keys.
     """
     if cell_id_key is None:
         _fallback_to_node_keys(
             geff_graph,
             "No cell identifier property provided. "
-            "A 'cell_ID' property will be created from node keys instead.",
+            "A 'cell_id' property will be created from node keys instead.",
         )
-        return "cell_ID"
+        return "cell_id"
 
     if not _graph_has_node_prop(geff_graph, cell_id_key):
         _fallback_to_node_keys(
             geff_graph,
             f"The provided property '{cell_id_key}' is not present on all nodes of "
-            "the GEFF graph. A 'cell_ID' property will be created from node keys instead.",
+            "the GEFF graph. A 'cell_id' property will be created from node keys instead.",
         )
-        return "cell_ID"
+        return "cell_id"
 
     cell_ids = [geff_graph.nodes[node][cell_id_key] for node in geff_graph.nodes]
     if not all(
@@ -934,18 +934,18 @@ def _ensure_valid_cell_ID(geff_graph: nx.DiGraph, cell_id_key: str | None) -> st
             geff_graph,
             f"Values in property '{cell_id_key}' are not all positive integers. "
             "This property cannot be used as cell identifier. "
-            "A 'cell_ID' property will be created from node keys instead.",
+            "A 'cell_id' property will be created from node keys instead.",
         )
-        return "cell_ID"
+        return "cell_id"
 
     if len(set(cell_ids)) != len(cell_ids):
         _fallback_to_node_keys(
             geff_graph,
             f"Duplicate values found in property '{cell_id_key}' across graph nodes. "
             "This property cannot be used as cell identifier. "
-            "A 'cell_ID' property will be created from node keys instead.",
+            "A 'cell_id' property will be created from node keys instead.",
         )
-        return "cell_ID"
+        return "cell_id"
 
     mapping = {node: geff_graph.nodes[node][cell_id_key] for node in geff_graph.nodes}
     nx.relabel_nodes(geff_graph, mapping, copy=False)
@@ -965,7 +965,7 @@ def _standardize_properties_data(
     Standardize properties data in lineages to match pycellin conventions.
 
     This function updates the property keys in lineage node data to use
-    standardized pycellin naming conventions (e.g., 'cell_ID', 'cell_x').
+    standardized pycellin naming conventions (e.g., 'cell_id', 'cell_x').
     It also applies any key renames recorded in *rename_map* during metadata
     extraction so that the graph data stays consistent with the metadata.
 
@@ -974,7 +974,7 @@ def _standardize_properties_data(
     lineages : list[CellLineage]
         List of CellLineage objects to standardize.
     lin_id_key : str
-        The current lineage ID key name. If not "lineage_ID", this property will be
+        The current lineage ID key name. If not "lineage_id", this property will be
         renamed in two places: (1) as a node attribute on all nodes within each
         lineage, and (2) as a graph attribute for each lineage object.
     cell_id_key : str
@@ -1001,10 +1001,10 @@ def _standardize_properties_data(
             _update_lineage_prop_key(lin, old_key=old_key, new_key=new_key)
 
         # Standard pycellin property renames.
-        if lin_id_key != "lineage_ID":
-            _update_node_prop_key(lin, old_key=lin_id_key, new_key="lineage_ID")
-        if cell_id_key != "cell_ID":
-            _update_node_prop_key(lin, old_key=cell_id_key, new_key="cell_ID")
+        if lin_id_key != "lineage_id":
+            _update_node_prop_key(lin, old_key=lin_id_key, new_key="lineage_id")
+        if cell_id_key != "cell_id":
+            _update_node_prop_key(lin, old_key=cell_id_key, new_key="cell_id")
         if cell_x_key is not None and cell_x_key != "cell_x":
             _update_node_prop_key(lin, old_key=cell_x_key, new_key="cell_x")
         if cell_y_key is not None and cell_y_key != "cell_y":
@@ -1012,8 +1012,8 @@ def _standardize_properties_data(
         if cell_z_key is not None and cell_z_key != "cell_z":
             _update_node_prop_key(lin, old_key=cell_z_key, new_key="cell_z")
 
-    if lin_id_key != "lineage_ID":
-        _update_lineages_IDs_key(lineages, lin_id_key)
+    if lin_id_key != "lineage_id":
+        _update_lineages_ids_key(lineages, lin_id_key)
 
 
 def _standardize_props_metadata(
@@ -1056,19 +1056,19 @@ def _standardize_props_metadata(
     """
     # Ensure standard pycellin properties exist and are properly named.
     if lin_id_key in props_md:
-        if lin_id_key != "lineage_ID":
-            props_md["lineage_ID"] = props_md.pop(lin_id_key)
-        props_md["lineage_ID"].identifier = "lineage_ID"
-        props_md["lineage_ID"].prop_type = PropertyType.NODE | PropertyType.LINEAGE
+        if lin_id_key != "lineage_id":
+            props_md["lineage_id"] = props_md.pop(lin_id_key)
+        props_md["lineage_id"].identifier = "lineage_id"
+        props_md["lineage_id"].prop_type = PropertyType.NODE | PropertyType.LINEAGE
     else:
-        props_md["lineage_ID"] = create_lineage_id_property(provenance="geff")
+        props_md["lineage_id"] = create_lineage_id_property(provenance="geff")
 
     if cell_id_key in props_md:
-        if cell_id_key != "cell_ID":
-            props_md["cell_ID"] = props_md.pop(cell_id_key)
-        props_md["cell_ID"].identifier = "cell_ID"
+        if cell_id_key != "cell_id":
+            props_md["cell_id"] = props_md.pop(cell_id_key)
+        props_md["cell_id"].identifier = "cell_id"
     else:
-        props_md["cell_ID"] = create_cell_id_property(provenance="geff")
+        props_md["cell_id"] = create_cell_id_property(provenance="geff")
 
     # Create or standardize coordinate property keys.
     for axis, geff_key in [
@@ -1116,7 +1116,7 @@ def load_GEFF(
         or autogenerate it based on weakly connected components.
     cell_id_prop : str | None, optional
         Name of the property that identifies cells in the GEFF file.
-        If None, the default property 'cell_ID' will be created and populated based
+        If None, the default property 'cell_id' will be created and populated based
         on GEFF IDs array (graph node IDs).
     cell_x_prop : str | None, optional
         Name of the node property that contains the x-coordinate. Provide this
@@ -1193,10 +1193,10 @@ def load_GEFF(
     props_md = _build_props_metadata(geff_md, rename_map)
 
     # Split the graph into lineages.
-    cell_id_prop = _ensure_valid_cell_ID(geff_graph, cell_id_prop)
-    lineages = _split_graph_into_lineages(geff_graph, lineage_ID_key=lineage_id_prop)
+    cell_id_prop = _ensure_valid_cell_id(geff_graph, cell_id_prop)
+    lineages = _split_graph_into_lineages(geff_graph, lineage_id_key=lineage_id_prop)
     if lineage_id_prop is None:
-        lineage_id_prop = "lineage_ID"
+        lineage_id_prop = "lineage_id"
 
     # Rename properties to match pycellin conventions.
     _standardize_properties_data(
@@ -1223,7 +1223,7 @@ def load_GEFF(
     model = Model(
         model_metadata=generic_md,
         props_metadata=PropsMetadata(props=props_md),
-        data=Data({lin.graph["lineage_ID"]: lin for lin in lineages}),
+        data=Data({lin.graph["lineage_id"]: lin for lin in lineages}),
     )
     check_fusions(model)  # pycellin DOES NOT support fusion events
 
@@ -1245,8 +1245,8 @@ if __name__ == "__main__":
     )
     model = load_GEFF(
         geff_in,
-        lineage_id_prop="lineage_ID",
-        cell_id_prop="cell_ID",
+        lineage_id_prop="lineage_id",
+        cell_id_prop="cell_id",
         time_prop="POSITION_T",
     )
 

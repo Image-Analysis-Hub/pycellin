@@ -73,7 +73,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         super().__init__(incoming_graph_data=nx_digraph)
         if lid is not None:
             assert isinstance(lid, int), "The lineage ID must be an integer."
-            self.graph["lineage_ID"] = lid
+            self.graph["lineage_id"] = lid
 
     def _remove_prop(self, prop_name: str, prop_type: PropertyType | None = None) -> None:
         """
@@ -405,7 +405,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         parents = list(self.predecessors(cycle_id))
         if len(parents) > 1:
-            raise FusionError(cycle_id, self.graph.get("lineage_ID"))
+            raise FusionError(cycle_id, self.graph.get("lineage_id"))
         return parents[0] if parents else None
 
     def _get_daughter_cycles(self, cycle_id: int) -> list[int]:
@@ -604,7 +604,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         G = Graph(directed=True)
         G.add_vertices(len(node_order))
 
-        # Copy graph attributes (like lineage_ID) from nx to igraph.
+        # Copy graph attributes (like lineage_id) from nx to igraph.
         for attr, value in self.graph.items():
             G[attr] = value
 
@@ -739,7 +739,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     def _build_node_hover_text(
         self,
         G: Graph,
-        ID_prop: str,
+        id_prop: str,
         y_prop_id: str,
         y_label: str,
         node_hover_props: list[str] | None,
@@ -759,15 +759,15 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 node_hover_text.append(text)
         else:
             node_hover_text = [
-                f"{ID_prop}: {node[ID_prop]}<br>{y_label}: {node[y_prop_id]}"
+                f"{id_prop}: {node[id_prop]}<br>{y_label}: {node[y_prop_id]}"
                 for node in G.vs
             ]
         return node_hover_text
 
     def _get_graph_name(self, G: Graph) -> str:
         """Extract graph name from lineage ID if available."""
-        if "lineage_ID" in G.attributes():
-            return f"lineage_ID: {G['lineage_ID']}"
+        if "lineage_id" in G.attributes():
+            return f"lineage_id: {G['lineage_id']}"
         return ""
 
     @staticmethod
@@ -799,7 +799,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         for edge in G.es:
             source_id = index_to_nx_id[edge.source]
             target_id = index_to_nx_id[edge.target]
-            text = f"Source cell_ID: {source_id}<br>Target cell_ID: {target_id}<br>"
+            text = f"Source cell_id: {source_id}<br>Target cell_id: {target_id}<br>"
             if edge_hover_props:
                 for prop in edge_hover_props:
                     if prop not in edge.attributes():
@@ -814,7 +814,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     @abstractmethod
     def get_tree_figure(
         self,
-        ID_prop: str,
+        id_prop: str,
         y_prop: str | Property,
         title: str | None = None,
         node_text: str | None = None,
@@ -842,7 +842,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        ID_prop : str
+        id_prop : str
             The property of the nodes to use as identifier.
         y_prop : str or Property
             Node property to plot on the y-axis. A Property also supplies the
@@ -867,7 +867,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             defaults to current Plotly template.
         node_hover_props : list[str], optional
             The node properties to display on hover. If None, defaults to
-            displaying `cell_ID` and the value of the y_prop.
+            displaying `cell_id` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
@@ -980,7 +980,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # https://plotly.com/python/text-and-annotations/#styling-and-coloring-annotations
         # Text when hovering on a node.
         node_hover_text = self._build_node_hover_text(
-            G, ID_prop, y_prop_id, y_label, node_hover_props
+            G, id_prop, y_prop_id, y_label, node_hover_props
         )
         graph_name = self._get_graph_name(G)
 
@@ -1045,7 +1045,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     @abstractmethod
     def plot(
         self,
-        ID_prop: str,
+        id_prop: str,
         y_prop: str | Property,
         title: str | None = None,
         node_text: str | None = None,
@@ -1070,7 +1070,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        ID_prop : str
+        id_prop : str
             The property of the nodes to use as identifier.
         y_prop : str or Property
             Node property to plot on the y-axis. A Property also supplies the
@@ -1095,7 +1095,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             defaults to current Plotly template.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_prop.
+            displaying `cell_id` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
@@ -1123,7 +1123,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         get_tree_figure : Generate the figure without displaying it.
         """
         fig = self.get_tree_figure(
-            ID_prop=ID_prop,
+            id_prop=id_prop,
             y_prop=y_prop,
             title=title,
             node_text=node_text,
@@ -1174,12 +1174,12 @@ class CellLineage(Lineage):
     def __str__(self) -> str:
         name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
         txt = (
-            f"CellLineage of ID {self.graph['lineage_ID']}{name_txt}"
+            f"CellLineage of ID {self.graph['lineage_id']}{name_txt}"
             f" with {len(self)} cells and {len(self.edges())} links."
         )
         return txt
 
-    def _get_next_available_node_ID(self) -> int:
+    def _get_next_available_node_id(self) -> int:
         """
         Return the next available node ID in the lineage.
 
@@ -1231,13 +1231,13 @@ class CellLineage(Lineage):
             If the cell already exists in the lineage.
         """
         if nid is None:
-            nid = self._get_next_available_node_ID()
+            nid = self._get_next_available_node_id()
         elif nid in self.nodes():
-            _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
+            _, txt = CellLineage._get_lineage_id_and_err_msg(self)
             msg = f"Cell {nid} already exists{txt}."
             raise ValueError(msg)
         self.add_node(nid, **cell_props)
-        self.nodes[nid]["cell_ID"] = nid
+        self.nodes[nid]["cell_id"] = nid
         self.nodes[nid][time_prop] = time_prop_value
         if timepoint is not None:
             self.nodes[nid]["timepoint"] = timepoint
@@ -1267,7 +1267,7 @@ class CellLineage(Lineage):
         try:
             cell_props = self.nodes[nid]
         except KeyError as err:
-            _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
+            _, txt = CellLineage._get_lineage_id_and_err_msg(self)
             msg = f"Cell {nid} does not exist{txt}."
             raise KeyError(msg) from err
         self.remove_node(nid)
@@ -1305,7 +1305,7 @@ class CellLineage(Lineage):
         Returns
         -------
         dict[int, int] or None
-            A dictionary of renamed cells {old_ID : new_ID} from
+            A dictionary of renamed cells {old_id : new_id} from
             the target lineage when it had conflicting cell IDs with the
             source lineage. None otherwise.
 
@@ -1319,10 +1319,10 @@ class CellLineage(Lineage):
         TimeFlowError
             If the target cell happens before the source cell.
         """
-        source_lid, txt_src = CellLineage._get_lineage_ID_and_err_msg(self)
+        source_lid, txt_src = CellLineage._get_lineage_id_and_err_msg(self)
 
         if target_lineage is not None:
-            target_lid, txt_tgt = CellLineage._get_lineage_ID_and_err_msg(target_lineage)
+            target_lid, txt_tgt = CellLineage._get_lineage_id_and_err_msg(target_lineage)
         else:
             target_lineage = self
             target_lid = source_lid
@@ -1360,13 +1360,13 @@ class CellLineage(Lineage):
             )
 
         conflicting_ids = None
-        ids_mapping = {}  # a dict of {old_ID : new_ID}
+        ids_mapping = {}  # a dict of {old_id : new_id}
         if target_lineage != self:
             # Identify cell ID conflict between lineages.
             target_descendants = nx.descendants(target_lineage, target_nid) | {target_nid}
             conflicting_ids = set(self.nodes()) & set(target_descendants)
             if conflicting_ids:
-                next_id = self._get_next_available_node_ID()
+                next_id = self._get_next_available_node_id()
                 for id in conflicting_ids:
                     ids_mapping[id] = next_id
                     next_id += 1
@@ -1377,7 +1377,7 @@ class CellLineage(Lineage):
             if conflicting_ids:
                 nx.relabel_nodes(tmp_lineage, ids_mapping, copy=False)
                 for id, new_id in ids_mapping.items():
-                    tmp_lineage.nodes[new_id]["cell_ID"] = new_id
+                    tmp_lineage.nodes[new_id]["cell_id"] = new_id
                 if target_nid in ids_mapping:
                     target_nid = ids_mapping[target_nid]
                 assert tmp_lineage.get_root() == target_nid
@@ -1421,7 +1421,7 @@ class CellLineage(Lineage):
         KeyError
             If the link does not exist in the lineage.
         """
-        _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
+        _, txt = CellLineage._get_lineage_id_and_err_msg(self)
         if source_nid not in self.nodes():
             raise ValueError(f"Source cell (ID {source_nid}) does not exist{txt}.")
         if target_nid not in self.nodes():
@@ -1466,7 +1466,7 @@ class CellLineage(Lineage):
             If the cell does not exist in the lineage.
             If the split parameter is not "upstream" or "downstream"
         """
-        _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
+        _, txt = CellLineage._get_lineage_id_and_err_msg(self)
         if nid not in self.nodes():
             raise ValueError(f"Source cell (ID {nid}) does not exist{txt}.")
 
@@ -1610,10 +1610,10 @@ class CellLineage(Lineage):
             branch.add_node(node, **self.nodes[node])
         for source, target in pairwise(selected_path):
             branch.add_edge(source, target, **self.edges[source, target])
-        branch.graph["source_lineage_ID"] = self.graph.get("lineage_ID")
-        branch.graph["target_cell_ID"] = target_cell
+        branch.graph["source_lineage_id"] = self.graph.get("lineage_id")
+        branch.graph["target_cell_id"] = target_cell
         branch.graph["included_generations"] = generations
-        branch.graph["source_cell_ID"] = source_cell
+        branch.graph["source_cell_id"] = source_cell
         return branch
 
     def get_branch_lineage_highlight(
@@ -1695,16 +1695,16 @@ class CellLineage(Lineage):
         nx.set_node_attributes(highlighted_lineage, highlight_values, highlight_prop)
 
         if is_single_target:
-            highlighted_lineage.graph["target_cell_ID"] = target_cells
+            highlighted_lineage.graph["target_cell_id"] = target_cells
         else:
-            highlighted_lineage.graph["target_cell_IDs"] = list(target_cells)
+            highlighted_lineage.graph["target_cell_ids"] = list(target_cells)
 
         highlighted_lineage.graph["included_generations"] = generations
 
         if isinstance(source_cells, list):
-            highlighted_lineage.graph["source_cell_IDs"] = list(source_cells)
+            highlighted_lineage.graph["source_cell_ids"] = list(source_cells)
         else:
-            highlighted_lineage.graph["source_cell_ID"] = source_cells
+            highlighted_lineage.graph["source_cell_id"] = source_cells
 
         highlighted_lineage.graph["highlight_prop"] = highlight_prop
         highlighted_lineage.graph["highlight_group_count"] = len(selected_components)
@@ -1756,7 +1756,7 @@ class CellLineage(Lineage):
                 group = self.nodes[cid][highlight_prop]
             except KeyError:
                 raise MissingPropertyError(
-                    highlight_prop, nid=cid, lineage_ID=self.graph.get("lineage_ID")
+                    highlight_prop, nid=cid, lineage_id=self.graph.get("lineage_id")
                 ) from None
             colors.append(get_highlight_color(group))
         return colors
@@ -1854,7 +1854,7 @@ class CellLineage(Lineage):
             If the given cell has more than one predecessor.
         """
         # TODO: factorize
-        lid, _ = CellLineage._get_lineage_ID_and_err_msg(self)
+        lid, _ = CellLineage._get_lineage_id_and_err_msg(self)
         cell_cycle = [cid]
         start = False
         end = False
@@ -2083,7 +2083,7 @@ class CellLineage(Lineage):
 
     def get_tree_figure(
         self,
-        ID_prop: str = "cell_ID",
+        id_prop: str = "cell_id",
         y_prop: str | Property | None = None,
         title: str | None = None,
         target_cells: int | list[int] | None = None,
@@ -2115,8 +2115,8 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        ID_prop : str, optional
-            The property of the nodes to use as the node ID. "cell_ID" by default.
+        id_prop : str, optional
+            The property of the nodes to use as the node ID. "cell_id" by default.
         y_prop : str or Property, optional
             Node property to plot on the y-axis, "timepoint" by default. A
             Property also supplies the axis label (its name and unit); a plain
@@ -2164,7 +2164,7 @@ class CellLineage(Lineage):
             color and trigger a warning.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_prop.
+            displaying `cell_id` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
@@ -2241,7 +2241,7 @@ class CellLineage(Lineage):
         # Bind the base implementation to the (possibly highlighted) copy rather
         # than to self, since it reads the graph it is called on.
         return super(CellLineage, lineage_to_plot).get_tree_figure(
-            ID_prop=ID_prop,
+            id_prop=id_prop,
             y_prop=y_prop,
             title=title,
             node_text=node_text,
@@ -2262,7 +2262,7 @@ class CellLineage(Lineage):
 
     def plot(
         self,
-        ID_prop: str = "cell_ID",
+        id_prop: str = "cell_id",
         y_prop: str | Property | None = None,
         title: str | None = None,
         target_cells: int | list[int] | None = None,
@@ -2289,8 +2289,8 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        ID_prop : str, optional
-            The property of the nodes to use as the node ID. "cell_ID" by default.
+        id_prop : str, optional
+            The property of the nodes to use as the node ID. "cell_id" by default.
         y_prop : str or Property, optional
             Node property to plot on the y-axis, "timepoint" by default. A
             Property also supplies the axis label (its name and unit); a plain
@@ -2338,7 +2338,7 @@ class CellLineage(Lineage):
             color and trigger a warning.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_prop.
+            displaying `cell_id` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
@@ -2387,7 +2387,7 @@ class CellLineage(Lineage):
         get_tree_figure : Generate the figure without displaying it.
         """
         fig = self.get_tree_figure(
-            ID_prop=ID_prop,
+            id_prop=id_prop,
             y_prop=y_prop,
             title=title,
             target_cells=target_cells,
@@ -2601,7 +2601,7 @@ class CellLineage(Lineage):
             node_hover_text = []
             for node, x_value, y_value in zip(nodes, x_nodes, y_nodes):
                 text = (
-                    f"cell_ID: {lineage.nodes[node].get('cell_ID', node)}<br>"
+                    f"cell_id: {lineage.nodes[node].get('cell_id', node)}<br>"
                     f"{x_label}: {x_value}<br>{y_label}: {y_value}"
                 )
                 if node_hover_props:
@@ -2610,7 +2610,7 @@ class CellLineage(Lineage):
                             raise MissingPropertyError(
                                 prop_name=prop,
                                 nid=node,
-                                lineage_ID=lineage.graph["lineage_ID"],
+                                lineage_id=lineage.graph["lineage_id"],
                             )
                         text += f"<br>{prop}: {lineage.nodes[node][prop]}"
                 node_hover_text.append(text)
@@ -2842,7 +2842,7 @@ class CellLineage(Lineage):
     # TODO: I don't think this function is good design, even if it factorises code.
     # actually y_prop (prop name) and y_legend should be replaced by the Property y_prop
     # so we can access name and unit to display in the axis legend.
-    def _get_lineage_ID_and_err_msg(lineage):
+    def _get_lineage_id_and_err_msg(lineage):
         """
         Return the lineage ID and a text to display in error messages.
 
@@ -2859,7 +2859,7 @@ class CellLineage(Lineage):
             The text to display in error messages.
         """
         try:
-            lid = lineage.graph["lineage_ID"]
+            lid = lineage.graph["lineage_id"]
             txt = f" in lineage {lid}"
         except KeyError:
             lid = None
@@ -2888,12 +2888,12 @@ class CycleLineage(Lineage):
             nx.freeze(self)
 
             # Adding node and graph props.
-            self.graph["lineage_ID"] = cell_lineage.graph["lineage_ID"]
+            self.graph["lineage_id"] = cell_lineage.graph["lineage_id"]
             for n in divs + leaves:
                 cells_in_cycle = cell_lineage.get_cell_cycle(n)
                 first = cells_in_cycle[0]
                 last = cells_in_cycle[-1]
-                self.nodes[n]["cycle_ID"] = n
+                self.nodes[n]["cycle_id"] = n
                 self.nodes[n]["cells"] = cells_in_cycle
                 # How many cells in the cycle?
                 self.nodes[n]["cycle_length"] = len(cells_in_cycle)
@@ -2914,7 +2914,7 @@ class CycleLineage(Lineage):
     def __str__(self) -> str:
         name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
         txt = (
-            f"CycleLineage of ID {self.graph['lineage_ID']}{name_txt}"
+            f"CycleLineage of ID {self.graph['lineage_id']}{name_txt}"
             f" with {len(self)} cell cycles and {len(self.edges())} links."
         )
         return txt
@@ -3001,7 +3001,7 @@ class CycleLineage(Lineage):
 
     def get_tree_figure(
         self,
-        ID_prop: str = "cycle_ID",
+        id_prop: str = "cycle_id",
         y_prop: str | Property | None = None,
         title: str | None = None,
         node_text: str | None = None,
@@ -3029,8 +3029,8 @@ class CycleLineage(Lineage):
 
         Parameters
         ----------
-        ID_prop : str, optional
-            The property of the nodes to use as the node ID. "cycle_ID" by default.
+        id_prop : str, optional
+            The property of the nodes to use as the node ID. "cycle_id" by default.
         y_prop : str or Property, optional
             Node property to plot on the y-axis, "level" by default. A
             Property also supplies the axis label (its name and unit); a plain
@@ -3055,7 +3055,7 @@ class CycleLineage(Lineage):
             defaults to current Plotly template.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_prop.
+            displaying `cell_id` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
@@ -3095,7 +3095,7 @@ class CycleLineage(Lineage):
             y_prop = create_level_property()
 
         return super().get_tree_figure(
-            ID_prop=ID_prop,
+            id_prop=id_prop,
             y_prop=y_prop,
             title=title,
             node_text=node_text,
@@ -3116,7 +3116,7 @@ class CycleLineage(Lineage):
 
     def plot(
         self,
-        ID_prop: str = "cycle_ID",
+        id_prop: str = "cycle_id",
         y_prop: str | Property | None = None,
         title: str | None = None,
         node_text: str | None = None,
@@ -3139,8 +3139,8 @@ class CycleLineage(Lineage):
 
         Parameters
         ----------
-        ID_prop : str, optional
-            The property of the nodes to use as the node ID. "cycle_ID" by default.
+        id_prop : str, optional
+            The property of the nodes to use as the node ID. "cycle_id" by default.
         y_prop : str or Property, optional
             Node property to plot on the y-axis, "level" by default. A
             Property also supplies the axis label (its name and unit); a plain
@@ -3165,7 +3165,7 @@ class CycleLineage(Lineage):
             defaults to current Plotly template.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_prop.
+            displaying `cell_id` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
@@ -3215,7 +3215,7 @@ class CycleLineage(Lineage):
         get_tree_figure : Generate the figure without displaying it.
         """
         fig = self.get_tree_figure(
-            ID_prop=ID_prop,
+            id_prop=id_prop,
             y_prop=y_prop,
             title=title,
             node_text=node_text,

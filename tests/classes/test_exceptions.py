@@ -11,7 +11,7 @@ from pycellin.classes.exceptions import MissingPropertyError
 
 class TestMissingPropertyError:
     def test_default_message_with_node_and_lineage(self):
-        err = MissingPropertyError("cell_area", nid=3, lineage_ID=1)
+        err = MissingPropertyError("cell_area", nid=3, lineage_id=1)
         assert err.nid == 3
         assert err.message == (
             "Required property 'cell_area' is missing for node 3 in lineage 1."

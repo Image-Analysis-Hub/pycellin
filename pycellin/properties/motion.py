@@ -64,7 +64,7 @@ class CellDisplacement(EdgeLocalPropCalculator):
         lineage : CellLineage
             Lineage graph containing the node of interest.
         edge : tuple of int
-            A tuple of cell_ID that defines the edge of interest.
+            A tuple of cell_id that defines the edge of interest.
 
         Returns
         -------
@@ -155,7 +155,7 @@ class CycleTotalDisplacement(NodeGlobalPropCalculator):
         lineage : CycleLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cycle_ID) of the cell cycle of interest.
+            Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
         -------
@@ -237,7 +237,7 @@ class CycleMeanDisplacement(NodeGlobalPropCalculator):
         lineage : CycleLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cycle_ID) of the cell cycle of interest.
+            Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
         -------
@@ -307,7 +307,7 @@ class CellSpeed(EdgeLocalPropCalculator):
         lineage : CellLineage
             Lineage graph containing the node of interest.
         edge : tuple of int
-            A tuple of cell_ID that defines the edge of interest.
+            A tuple of cell_id that defines the edge of interest.
 
         Returns
         -------
@@ -391,7 +391,7 @@ class CycleMeanSpeed(NodeGlobalPropCalculator):
         lineage : CycleLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cycle_ID) of the cell cycle of interest.
+            Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
         -------
@@ -458,7 +458,7 @@ class Straightness(NodeGlobalPropCalculator):
         lineage : CycleLineage
             Lineage graph containing the node of interest.
         node : int
-            Node ID (cycle_ID) of the cell cycle of interest.
+            Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
         -------
@@ -466,8 +466,8 @@ class Straightness(NodeGlobalPropCalculator):
             Straightness of the displacement.
             Returns NaN if the total distance traveled is null.
         """
-        lin_ID = cycle_lin.graph["lineage_ID"]
-        cell_lin = data.cell_data[lin_ID]
+        lin_id = cycle_lin.graph["lineage_id"]
+        cell_lin = data.cell_data[lin_id]
         cells = cycle_lin.nodes[nid]["cells"]
         distances = [
             math.dist(
@@ -503,7 +503,7 @@ class Straightness(NodeGlobalPropCalculator):
                 )
                 distances.append(dist)
             elif len(preds) > 1:
-                raise FusionError(first_cell, lin_ID)
+                raise FusionError(first_cell, lin_id)
 
         if sum(distances) == 0:
             return math.nan
@@ -573,7 +573,7 @@ class TurningAngle(NodeLocalPropCalculator):
         lineage : CellLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -592,7 +592,7 @@ class TurningAngle(NodeLocalPropCalculator):
             # - a dividing node (more than one outgoing edges).
             return math.nan
         elif len(predecessors) > 1:
-            raise FusionError(nid, lineage.graph["lineage_ID"])
+            raise FusionError(nid, lineage.graph["lineage_id"])
 
         # Compute the angle between the incoming and outgoing edges.
         in_coords = (

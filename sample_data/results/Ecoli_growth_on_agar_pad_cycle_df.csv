@@ -1,4 +1,4 @@
-lineage_ID,level,cycle_ID,cells,cycle_length,cycle_duration,cycle_start_time,cycle_end_time
+lineage_id,level,cycle_id,cells,cycle_length,cycle_duration,cycle_start_time,cycle_end_time
 -9511,0,9511,[9511],1,0.0,5.0,5.0
 -9510,0,9510,[9510],1,0.0,5.0,5.0
 0,0,8993,[8993],1,0.0,0.0,0.0

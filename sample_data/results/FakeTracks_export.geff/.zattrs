@@ -319,20 +319,20 @@
                 "unit": null,
                 "varlength": false
             },
-            "cell_ID": {
-                "description": "Unique identifier of the cell",
-                "dtype": "int64",
-                "identifier": "cell_ID",
-                "name": "Cell ID",
-                "unit": null,
-                "varlength": false
-            },
             "cell_contour": {
                 "description": "List of coordinates of the cell's contour, relative to its centroid",
                 "dtype": "float64",
                 "identifier": "cell_contour",
                 "name": "Cell contour",
                 "unit": "micrometer",
+                "varlength": false
+            },
+            "cell_id": {
+                "description": "Unique identifier of the cell",
+                "dtype": "int64",
+                "identifier": "cell_id",
+                "name": "Cell ID",
+                "unit": null,
                 "varlength": false
             },
             "cell_name": {
@@ -367,10 +367,10 @@
                 "unit": "micrometer",
                 "varlength": false
             },
-            "lineage_ID": {
+            "lineage_id": {
                 "description": "Unique identifier of the lineage",
                 "dtype": "int64",
-                "identifier": "lineage_ID",
+                "identifier": "lineage_id",
                 "name": "Track ID",
                 "unit": null,
                 "varlength": false
@@ -388,7 +388,7 @@
         "related_objects": null,
         "sphere": null,
         "track_node_props": {
-            "lineage": "lineage_ID"
+            "lineage": "lineage_id"
         }
     }
 }

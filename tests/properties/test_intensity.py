@@ -76,7 +76,7 @@ def cell_lineage():
     lineage = CellLineage()
     lineage.add_node(1, label=3, timepoint=0)
     lineage.add_node(2, label=4, timepoint=0)
-    lineage.graph["lineage_ID"] = 1
+    lineage.graph["lineage_id"] = 1
     return lineage
 
 
@@ -90,10 +90,10 @@ def data():
     )
     for n in lineage.nodes:
         lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 1, n)
-        lineage.nodes[n]["cell_ID"] = n
+        lineage.nodes[n]["cell_id"] = n
         lineage.nodes[n]["cell_mean_intensity"] = float(n)
         lineage.nodes[n]["cell_total_intensity"] = 10.0 * n
-    lineage.graph["lineage_ID"] = 1
+    lineage.graph["lineage_id"] = 1
     data = Data({1: lineage})
     data._add_cycle_lineages(time_prop="frame", time_step=1)
     return data

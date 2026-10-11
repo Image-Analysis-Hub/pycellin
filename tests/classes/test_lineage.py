@@ -24,7 +24,7 @@ from pycellin.styling import PYCELLIN_PURPLE
 @pytest.fixture
 def empty_cell_lin():
     lineage = CellLineage()
-    lineage.graph["lineage_ID"] = 1
+    lineage.graph["lineage_id"] = 1
     return lineage
 
 
@@ -32,7 +32,7 @@ def empty_cell_lin():
 def one_node_cell_lin():
     lineage = CellLineage()
     lineage.add_node(1, timepoint=0)
-    lineage.graph["lineage_ID"] = 1
+    lineage.graph["lineage_id"] = 1
     return lineage
 
 
@@ -61,9 +61,9 @@ def cell_lin():
     )
     for n in lineage.nodes:
         lineage.nodes[n]["timepoint"] = nx.shortest_path_length(lineage, 1, n)
-        lineage.nodes[n]["cell_ID"] = n
+        lineage.nodes[n]["cell_id"] = n
         lineage.nodes[n]["multitype_prop"] = "value"
-    lineage.graph["lineage_ID"] = 1
+    lineage.graph["lineage_id"] = 1
     lineage.graph["multitype_prop"] = "value"
     return lineage
 
@@ -105,8 +105,8 @@ def cell_lin_successive_divs_and_root():
     )
     for n in lineage.nodes:
         lineage.nodes[n]["timepoint"] = nx.shortest_path_length(lineage, 2, n) + 1
-        lineage.nodes[n]["cell_ID"] = n
-    lineage.graph["lineage_ID"] = 2
+        lineage.nodes[n]["cell_id"] = n
+    lineage.graph["lineage_id"] = 2
     return lineage
 
 
@@ -123,18 +123,18 @@ def cell_lin_triple_div(cell_lin):
 @pytest.fixture
 def cell_lin_unconnected_node(cell_lin):
     new_lin = cell_lin.copy()
-    new_lin.add_node(17, timepoint=1, cell_ID=17)
-    new_lin.graph["lineage_ID"] = 2
+    new_lin.add_node(17, timepoint=1, cell_id=17)
+    new_lin.graph["lineage_id"] = 2
     return new_lin
 
 
 @pytest.fixture
 def cell_lin_unconnected_component(cell_lin):
     new_lin = cell_lin.copy()
-    new_lin.add_node(17, timepoint=1, cell_ID=17)
-    new_lin.add_node(18, timepoint=2, cell_ID=18)
+    new_lin.add_node(17, timepoint=1, cell_id=17)
+    new_lin.add_node(18, timepoint=2, cell_id=18)
     new_lin.add_edge(17, 18)
-    new_lin.graph["lineage_ID"] = 2
+    new_lin.graph["lineage_id"] = 2
     return new_lin
 
 
@@ -161,8 +161,8 @@ def cell_lin_balanced():
     lineage.add_edges_from([(cell, cell + 8) for cell in range(8, 16)])
     for n in lineage.nodes:
         lineage.nodes[n]["timepoint"] = nx.shortest_path_length(lineage, 1, n)
-        lineage.nodes[n]["cell_ID"] = n
-    lineage.graph["lineage_ID"] = 1
+        lineage.nodes[n]["cell_id"] = n
+    lineage.graph["lineage_id"] = 1
     return lineage
 
 
@@ -237,8 +237,8 @@ class TestLineageRemoveProp:
 
     def test_lineage_property_removal(self, cell_lin):
         """Test removing property from lineage graph only."""
-        cell_lin._remove_prop("lineage_ID", PropertyType.LINEAGE)
-        assert "lineage_ID" not in cell_lin.graph
+        cell_lin._remove_prop("lineage_id", PropertyType.LINEAGE)
+        assert "lineage_id" not in cell_lin.graph
 
     def test_remove_from_all_locations_when_no_type_specified(self, cell_lin):
         """Test that property is removed from all locations when prop_type is None."""
@@ -800,31 +800,31 @@ class TestLineageGetFusions:
 
 
 class TestCellLineageGetNextAvailableNodeID:
-    """Test cases for CellLineage._get_next_available_node_ID method."""
+    """Test cases for CellLineage._get_next_available_node_id method."""
 
     def test_normal_lineage(self, cell_lin):
-        """Test _get_next_available_node_ID on normal lineage."""
-        assert cell_lin._get_next_available_node_ID() == 17
+        """Test _get_next_available_node_id on normal lineage."""
+        assert cell_lin._get_next_available_node_id() == 17
 
     def test_empty_lineage(self, empty_cell_lin):
-        """Test _get_next_available_node_ID on empty lineage."""
-        assert empty_cell_lin._get_next_available_node_ID() == 0
+        """Test _get_next_available_node_id on empty lineage."""
+        assert empty_cell_lin._get_next_available_node_id() == 0
 
     def test_single_node(self, one_node_cell_lin):
-        """Test _get_next_available_node_ID on single node lineage."""
-        assert one_node_cell_lin._get_next_available_node_ID() == 2
+        """Test _get_next_available_node_id on single node lineage."""
+        assert one_node_cell_lin._get_next_available_node_id() == 2
 
     def test_lineage_with_gap(self, cell_lin_gap):
-        """Test _get_next_available_node_ID on lineage with gaps."""
-        assert cell_lin_gap._get_next_available_node_ID() == 17
+        """Test _get_next_available_node_id on lineage with gaps."""
+        assert cell_lin_gap._get_next_available_node_id() == 17
 
     def test_unconnected_node(self, cell_lin_unconnected_node):
-        """Test _get_next_available_node_ID on lineage with unconnected node."""
-        assert cell_lin_unconnected_node._get_next_available_node_ID() == 18
+        """Test _get_next_available_node_id on lineage with unconnected node."""
+        assert cell_lin_unconnected_node._get_next_available_node_id() == 18
 
     def test_unconnected_component(self, cell_lin_unconnected_component):
-        """Test _get_next_available_node_ID on lineage with unconnected component."""
-        assert cell_lin_unconnected_component._get_next_available_node_ID() == 19
+        """Test _get_next_available_node_id on lineage with unconnected component."""
+        assert cell_lin_unconnected_component._get_next_available_node_id() == 19
 
 
 class TestCellLineageAddCell:
@@ -832,31 +832,31 @@ class TestCellLineageAddCell:
 
     def test_no_arguments(self, cell_lin):
         """Test _add_cell with no arguments."""
-        next_id = cell_lin._get_next_available_node_ID()
+        next_id = cell_lin._get_next_available_node_id()
         assert cell_lin._add_cell() == next_id
-        assert cell_lin.nodes[next_id]["cell_ID"] == next_id
+        assert cell_lin.nodes[next_id]["cell_id"] == next_id
         assert cell_lin.nodes[next_id]["timepoint"] == 0
 
     def test_with_id(self, cell_lin):
         """Test _add_cell with specific ID."""
         assert cell_lin._add_cell(nid=20) == 20
-        assert cell_lin.nodes[20]["cell_ID"] == 20
+        assert cell_lin.nodes[20]["cell_id"] == 20
         assert cell_lin.nodes[20]["timepoint"] == 0
 
     def test_with_timepoint(self, cell_lin):
         """Test _add_cell with specific timepoint."""
-        next_id = cell_lin._get_next_available_node_ID()
+        next_id = cell_lin._get_next_available_node_id()
         assert (
             cell_lin._add_cell(time_prop="timepoint", time_prop_value=5) == next_id
         )
-        assert cell_lin.nodes[next_id]["cell_ID"] == next_id
+        assert cell_lin.nodes[next_id]["cell_id"] == next_id
         assert cell_lin.nodes[next_id]["timepoint"] == 5
 
     def test_with_properties(self, cell_lin):
         """Test _add_cell with additional properties."""
         cell_id = 20
         assert cell_lin._add_cell(20, color="red", size=10) == cell_id
-        assert cell_lin.nodes[cell_id]["cell_ID"] == cell_id
+        assert cell_lin.nodes[cell_id]["cell_id"] == cell_id
         assert cell_lin.nodes[cell_id]["timepoint"] == 0
         assert cell_lin.nodes[cell_id]["color"] == "red"
         assert cell_lin.nodes[cell_id]["size"] == 10
@@ -869,13 +869,13 @@ class TestCellLineageAddCell:
     def test_empty_lineage(self, empty_cell_lin):
         """Test _add_cell on empty lineage."""
         assert empty_cell_lin._add_cell() == 0
-        assert empty_cell_lin.nodes[0]["cell_ID"] == 0
+        assert empty_cell_lin.nodes[0]["cell_id"] == 0
         assert empty_cell_lin.nodes[0]["timepoint"] == 0
 
     def test_single_node(self, one_node_cell_lin):
         """Test _add_cell on single node lineage."""
         assert one_node_cell_lin._add_cell() == 2
-        assert one_node_cell_lin.nodes[2]["cell_ID"] == 2
+        assert one_node_cell_lin.nodes[2]["cell_id"] == 2
         assert one_node_cell_lin.nodes[2]["timepoint"] == 0
 
 
@@ -956,16 +956,16 @@ class TestCellLineageAddLink:
     def test_normal_lineage(self, cell_lin):
         """Test _add_link on normal lineage."""
         # Add a valid link.
-        cell_lin.add_node(17, timepoint=6, cell_ID=17)
+        cell_lin.add_node(17, timepoint=6, cell_id=17)
         cell_lin._add_link(6, 17)
         assert cell_lin.has_edge(6, 17)
-        assert cell_lin.nodes[17]["cell_ID"] == 17
+        assert cell_lin.nodes[17]["cell_id"] == 17
         assert cell_lin.nodes[17]["timepoint"] == 6
         # Add a link that creates a division.
-        cell_lin.add_node(18, timepoint=1, cell_ID=18)
+        cell_lin.add_node(18, timepoint=1, cell_id=18)
         cell_lin._add_link(1, 18)
         assert cell_lin.has_edge(1, 18)
-        assert cell_lin.nodes[18]["cell_ID"] == 18
+        assert cell_lin.nodes[18]["cell_id"] == 18
         assert cell_lin.nodes[18]["timepoint"] == 1
 
     def test_existing_edge_raises_error(self, cell_lin):
@@ -991,23 +991,23 @@ class TestCellLineageAddLink:
 
     def test_time_flow_error(self, cell_lin):
         """Test _add_link raises TimeFlowError for time flow violations."""
-        cell_lin.add_node(17, timepoint=1, cell_ID=17)
+        cell_lin.add_node(17, timepoint=1, cell_id=17)
         with pytest.raises(TimeFlowError):
             cell_lin._add_link(6, 17)
-        cell_lin.add_node(18, timepoint=0, cell_ID=18)
+        cell_lin.add_node(18, timepoint=0, cell_id=18)
         with pytest.raises(TimeFlowError):
             cell_lin._add_link(1, 18)
 
     def test_different_lineages(self, cell_lin):
         """Test _add_link between different lineages."""
         new_lin = CellLineage(lid=2)
-        new_lin.add_node(19, timepoint=1, cell_ID=19)
-        new_lin.add_node(20, timepoint=2, cell_ID=20)
-        new_lin.add_node(21, timepoint=3, cell_ID=21)
+        new_lin.add_node(19, timepoint=1, cell_id=19)
+        new_lin.add_node(20, timepoint=2, cell_id=20)
+        new_lin.add_node(21, timepoint=3, cell_id=21)
         new_lin.add_edges_from([(19, 20), (20, 21)])
         cell_lin._add_link(1, 19, target_lineage=new_lin)
         assert cell_lin.has_node(19)
-        assert cell_lin.nodes[19]["cell_ID"] == 19
+        assert cell_lin.nodes[19]["cell_id"] == 19
         assert cell_lin.nodes[19]["timepoint"] == 1
         assert cell_lin.has_edge(1, 19)
         assert cell_lin.has_node(20)
@@ -1021,7 +1021,7 @@ class TestCellLineageAddLink:
         cell_lin._add_link(1, 17, target_lineage=cell_lin_unconnected_node)
         assert cell_lin.has_node(17)
         assert cell_lin.has_edge(1, 17)
-        assert cell_lin.nodes[17]["cell_ID"] == 17
+        assert cell_lin.nodes[17]["cell_id"] == 17
         assert cell_lin.nodes[17]["timepoint"] == 1
         assert not cell_lin_unconnected_node.has_node(17)
 
@@ -1034,36 +1034,36 @@ class TestCellLineageAddLink:
         assert cell_lin.has_node(18)
         assert cell_lin.has_edge(1, 17)
         assert cell_lin.has_edge(17, 18)
-        assert cell_lin.nodes[17]["cell_ID"] == 17
+        assert cell_lin.nodes[17]["cell_id"] == 17
         assert cell_lin.nodes[17]["timepoint"] == 1
-        assert cell_lin.nodes[18]["cell_ID"] == 18
+        assert cell_lin.nodes[18]["cell_id"] == 18
         assert cell_lin.nodes[18]["timepoint"] == 2
         assert not cell_lin_unconnected_component.has_node(17)
         assert not cell_lin_unconnected_component.has_node(18)
 
-    def test_conflicting_ID(self, cell_lin):
+    def test_conflicting_id(self, cell_lin):
         """Test _add_link between different lineages with a conflicting ID."""
         new_lin = CellLineage(lid=2)
-        new_lin.add_node(5, timepoint=1, cell_ID=5)
-        IDs_mapping = cell_lin._add_link(1, 5, target_lineage=new_lin)
-        assert IDs_mapping == {5: 17}
+        new_lin.add_node(5, timepoint=1, cell_id=5)
+        ids_mapping = cell_lin._add_link(1, 5, target_lineage=new_lin)
+        assert ids_mapping == {5: 17}
         # Cell 5 is removed from the target lineage.
         assert not new_lin.has_node(5)
         assert not new_lin.has_node(17)
         # Cell 17 is added with the new edge.
         assert cell_lin.has_node(17)
         assert cell_lin.has_edge(1, 17)
-        assert cell_lin.nodes[17]["cell_ID"] == 17
+        assert cell_lin.nodes[17]["cell_id"] == 17
         assert cell_lin.nodes[17]["timepoint"] == 1
         # Cell 5 is untouched.
         assert cell_lin.has_node(5)
-        assert cell_lin.nodes[5]["cell_ID"] == 5
+        assert cell_lin.nodes[5]["cell_id"] == 5
         assert cell_lin.nodes[5]["timepoint"] == 4
 
-    def test_conflicting_IDs(self, cell_lin, cell_lin_successive_divs_and_root):
+    def test_conflicting_ids(self, cell_lin, cell_lin_successive_divs_and_root):
         """Test _add_link between different lineages with multiple conflicting IDs."""
-        IDs_mapping = cell_lin._add_link(1, 2, cell_lin_successive_divs_and_root)
-        assert IDs_mapping == {
+        ids_mapping = cell_lin._add_link(1, 2, cell_lin_successive_divs_and_root)
+        assert ids_mapping == {
             2: 17,
             3: 18,
             4: 19,
@@ -1079,33 +1079,33 @@ class TestCellLineageAddLink:
         assert len(cell_lin_successive_divs_and_root.nodes) == 0
         # Cells are added with the new edges.
         assert cell_lin.has_edge(1, 17)
-        assert cell_lin.nodes[17]["cell_ID"] == 17
+        assert cell_lin.nodes[17]["cell_id"] == 17
         assert cell_lin.nodes[17]["timepoint"] == 1
         assert cell_lin.has_edge(17, 18)
-        assert cell_lin.nodes[18]["cell_ID"] == 18
+        assert cell_lin.nodes[18]["cell_id"] == 18
         assert cell_lin.nodes[18]["timepoint"] == 2
         # Cells are untouched.
         assert cell_lin.has_node(2)
-        assert cell_lin.nodes[2]["cell_ID"] == 2
+        assert cell_lin.nodes[2]["cell_id"] == 2
         assert cell_lin.nodes[2]["timepoint"] == 1
 
-    def test_same_IDs(self, cell_lin):
+    def test_same_ids(self, cell_lin):
         """Test _add_link between different lineages with the same single ID."""
         new_lin = CellLineage(lid=2)
-        new_lin.add_node(1, timepoint=1, cell_ID=1)
-        IDs_mapping = cell_lin._add_link(1, 1, new_lin)
-        assert IDs_mapping == {1: 17}
+        new_lin.add_node(1, timepoint=1, cell_id=1)
+        ids_mapping = cell_lin._add_link(1, 1, new_lin)
+        assert ids_mapping == {1: 17}
         # Cell 1 is removed from the target lineage.
         assert not new_lin.has_node(1)
         assert not new_lin.has_node(17)
         # Cell 17 is added with the new edge.
         assert cell_lin.has_node(17)
         assert cell_lin.has_edge(1, 17)
-        assert cell_lin.nodes[17]["cell_ID"] == 17
+        assert cell_lin.nodes[17]["cell_id"] == 17
         assert cell_lin.nodes[17]["timepoint"] == 1
         # Cell 1 is untouched.
         assert cell_lin.has_node(1)
-        assert cell_lin.nodes[1]["cell_ID"] == 1
+        assert cell_lin.nodes[1]["cell_id"] == 1
         assert cell_lin.nodes[1]["timepoint"] == 0
 
 
@@ -1196,7 +1196,7 @@ class TestCellLineageGetBranchLineageHighlight:
         ]
 
         assert sorted(selected) == [4, 5, 6, 14, 16]
-        assert highlighted.graph["source_cell_IDs"] == [4, 14]
+        assert highlighted.graph["source_cell_ids"] == [4, 14]
         assert highlighted.graph["highlight_group_count"] == 2
         first_branch_values = {
             highlighted.nodes[node]["selected_branch"] for node in [4, 5, 6]
@@ -2403,20 +2403,20 @@ class TestCycleLineageInit:
             time_prop="timepoint", time_step=1, cell_lineage=cell_lin
         )
         assert sorted(cycle_lin.nodes()) == [2, 4, 6, 8, 9, 10, 14, 15, 16]
-        assert cycle_lin.graph["lineage_ID"] == 1
-        assert cycle_lin.nodes[2]["cycle_ID"] == 2
+        assert cycle_lin.graph["lineage_id"] == 1
+        assert cycle_lin.nodes[2]["cycle_id"] == 2
         assert cycle_lin.nodes[2]["cells"] == [1, 2]
         assert cycle_lin.nodes[2]["cycle_length"] == 2
         assert cycle_lin.nodes[2]["cycle_start_time"] == 0
         assert cycle_lin.nodes[2]["cycle_end_time"] == 1
         assert cycle_lin.nodes[2]["level"] == 0
-        assert cycle_lin.nodes[9]["cycle_ID"] == 9
+        assert cycle_lin.nodes[9]["cycle_id"] == 9
         assert cycle_lin.nodes[9]["cells"] == [9]
         assert cycle_lin.nodes[9]["cycle_length"] == 1
         assert cycle_lin.nodes[9]["cycle_start_time"] == 6
         assert cycle_lin.nodes[9]["cycle_end_time"] == 6
         assert cycle_lin.nodes[9]["level"] == 3
-        assert cycle_lin.nodes[14]["cycle_ID"] == 14
+        assert cycle_lin.nodes[14]["cycle_id"] == 14
         assert cycle_lin.nodes[14]["cells"] == [11, 12, 13, 14]
         assert cycle_lin.nodes[14]["cycle_length"] == 4
         assert cycle_lin.nodes[14]["cycle_start_time"] == 2
@@ -2429,7 +2429,7 @@ class TestCycleLineageInit:
             time_prop="timepoint", time_step=1, cell_lineage=empty_cell_lin
         )
         assert len(cycle_lin) == 0
-        assert cycle_lin.graph["lineage_ID"] == 1
+        assert cycle_lin.graph["lineage_id"] == 1
 
     def test_single_node(self, one_node_cell_lin):
         """Test CycleLineage creation on single node lineage."""
@@ -2437,8 +2437,8 @@ class TestCycleLineageInit:
             time_prop="timepoint", time_step=1, cell_lineage=one_node_cell_lin
         )
         assert len(cycle_lin) == 1
-        assert cycle_lin.graph["lineage_ID"] == 1
-        assert cycle_lin.nodes[1]["cycle_ID"] == 1
+        assert cycle_lin.graph["lineage_id"] == 1
+        assert cycle_lin.nodes[1]["cycle_id"] == 1
         assert cycle_lin.nodes[1]["cells"] == [1]
         assert cycle_lin.nodes[1]["cycle_length"] == 1
         assert cycle_lin.nodes[1]["cycle_start_time"] == 0
@@ -2451,20 +2451,20 @@ class TestCycleLineageInit:
             time_prop="timepoint", time_step=1, cell_lineage=cell_lin_gap
         )
         assert sorted(cycle_lin.nodes()) == [2, 4, 6, 8, 9, 10, 14, 15, 16]
-        assert cycle_lin.graph["lineage_ID"] == 1
-        assert cycle_lin.nodes[2]["cycle_ID"] == 2
+        assert cycle_lin.graph["lineage_id"] == 1
+        assert cycle_lin.nodes[2]["cycle_id"] == 2
         assert cycle_lin.nodes[2]["cells"] == [1, 2]
         assert cycle_lin.nodes[2]["cycle_length"] == 2
         assert cycle_lin.nodes[2]["cycle_start_time"] == 0
         assert cycle_lin.nodes[2]["cycle_end_time"] == 1
         assert cycle_lin.nodes[2]["level"] == 0
-        assert cycle_lin.nodes[9]["cycle_ID"] == 9
+        assert cycle_lin.nodes[9]["cycle_id"] == 9
         assert cycle_lin.nodes[9]["cells"] == [9]
         assert cycle_lin.nodes[9]["cycle_length"] == 1
         assert cycle_lin.nodes[9]["cycle_start_time"] == 6
         assert cycle_lin.nodes[9]["cycle_end_time"] == 6
         assert cycle_lin.nodes[9]["level"] == 3
-        assert cycle_lin.nodes[14]["cycle_ID"] == 14
+        assert cycle_lin.nodes[14]["cycle_id"] == 14
         assert cycle_lin.nodes[14]["cells"] == [11, 14]
         assert cycle_lin.nodes[14]["cycle_length"] == 2
         assert cycle_lin.nodes[14]["cycle_start_time"] == 2
@@ -2477,14 +2477,14 @@ class TestCycleLineageInit:
             time_prop="timepoint", time_step=1, cell_lineage=cell_lin_div_root
         )
         assert sorted(cycle_lin.nodes()) == [1, 2, 4, 6, 8, 9, 10, 14, 15, 16, 17]
-        assert cycle_lin.graph["lineage_ID"] == 1
-        assert cycle_lin.nodes[1]["cycle_ID"] == 1
+        assert cycle_lin.graph["lineage_id"] == 1
+        assert cycle_lin.nodes[1]["cycle_id"] == 1
         assert cycle_lin.nodes[1]["cells"] == [1]
         assert cycle_lin.nodes[1]["cycle_length"] == 1
         assert cycle_lin.nodes[1]["cycle_start_time"] == 0
         assert cycle_lin.nodes[1]["cycle_end_time"] == 0
         assert cycle_lin.nodes[1]["level"] == 0
-        assert cycle_lin.nodes[17]["cycle_ID"] == 17
+        assert cycle_lin.nodes[17]["cycle_id"] == 17
         assert cycle_lin.nodes[17]["cells"] == [17]
         assert cycle_lin.nodes[17]["cycle_length"] == 1
         assert cycle_lin.nodes[17]["cycle_start_time"] == 1
@@ -2499,14 +2499,14 @@ class TestCycleLineageInit:
             cell_lineage=cell_lin_successive_divs_and_root,
         )
         assert sorted(cycle_lin.nodes()) == [2, 3, 5, 6, 7, 8, 9, 10, 11]
-        assert cycle_lin.graph["lineage_ID"] == 2
-        assert cycle_lin.nodes[3]["cycle_ID"] == 3
+        assert cycle_lin.graph["lineage_id"] == 2
+        assert cycle_lin.nodes[3]["cycle_id"] == 3
         assert cycle_lin.nodes[3]["cells"] == [3]
         assert cycle_lin.nodes[3]["cycle_length"] == 1
         assert cycle_lin.nodes[3]["cycle_start_time"] == 2
         assert cycle_lin.nodes[3]["cycle_end_time"] == 2
         assert cycle_lin.nodes[3]["level"] == 1
-        assert cycle_lin.nodes[5]["cycle_ID"] == 5
+        assert cycle_lin.nodes[5]["cycle_id"] == 5
         assert cycle_lin.nodes[5]["cells"] == [4, 5]
         assert cycle_lin.nodes[5]["cycle_length"] == 2
         assert cycle_lin.nodes[5]["cycle_start_time"] == 3
@@ -2519,14 +2519,14 @@ class TestCycleLineageInit:
             time_prop="timepoint", time_step=1, cell_lineage=cell_lin_triple_div
         )
         assert sorted(cycle_lin.nodes()) == [2, 4, 6, 8, 9, 10, 14, 15, 16, 18]
-        assert cycle_lin.graph["lineage_ID"] == 1
-        assert cycle_lin.nodes[4]["cycle_ID"] == 4
+        assert cycle_lin.graph["lineage_id"] == 1
+        assert cycle_lin.nodes[4]["cycle_id"] == 4
         assert cycle_lin.nodes[4]["cells"] == [3, 4]
         assert cycle_lin.nodes[4]["cycle_length"] == 2
         assert cycle_lin.nodes[4]["cycle_start_time"] == 2
         assert cycle_lin.nodes[4]["cycle_end_time"] == 3
         assert cycle_lin.nodes[4]["level"] == 1
-        assert cycle_lin.nodes[18]["cycle_ID"] == 18
+        assert cycle_lin.nodes[18]["cycle_id"] == 18
         assert cycle_lin.nodes[18]["cells"] == [17, 18]
         assert cycle_lin.nodes[18]["cycle_length"] == 2
         assert cycle_lin.nodes[18]["cycle_start_time"] == 4
@@ -2556,7 +2556,7 @@ class TestCycleLineageGetAncestors:
     """Test cases for CycleLineage.get_ancestors method."""
 
     def test_key_error(self, cycle_lin):
-        """Test get_ancestors raises KeyError for non-existing cycle_ID."""
+        """Test get_ancestors raises KeyError for non-existing cycle_id."""
         with pytest.raises(KeyError):
             cycle_lin.get_ancestors(0)
 

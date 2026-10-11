@@ -23,7 +23,7 @@ from pycellin.classes.model import Model
 from pycellin.io.utils import _identify_frame_prop
 
 
-def safekeep_original_lineage_IDs(model: Model) -> None:
+def safekeep_original_lineage_ids(model: Model) -> None:
     """
     Add original lineage IDs to the nodes of the model.
 
@@ -35,9 +35,9 @@ def safekeep_original_lineage_IDs(model: Model) -> None:
     model : Model
         The pycellin model to modify.
     """
-    for lin_ID, lin in model.data.cell_data.items():
+    for lin_id, lin in model.data.cell_data.items():
         for node in lin.nodes():
-            lin.nodes[node]["lineage_ID_Pycellin"] = lin_ID
+            lin.nodes[node]["lineage_id_pycellin"] = lin_id
 
 
 def remove_division_events(model: Model) -> None:
@@ -53,11 +53,11 @@ def remove_division_events(model: Model) -> None:
         divs = lin.get_divisions()
         div_edges = [edge for div in divs for edge in lin.out_edges(div)]
         for edge in div_edges:
-            model.remove_link(*edge, lin.graph["lineage_ID"])
+            model.remove_link(*edge, lin.graph["lineage_id"])
     model.update()
 
 
-def renumber_negative_lineage_IDs(model: Model) -> None:
+def renumber_negative_lineage_ids(model: Model) -> None:
     """
     Ensure lineage IDs are positive.
 
@@ -69,20 +69,20 @@ def renumber_negative_lineage_IDs(model: Model) -> None:
     model : Model
         The pycellin model to modify.
     """
-    one_node_lin_IDs = [
-        lin.graph["lineage_ID"]
+    one_node_lin_ids = [
+        lin.graph["lineage_id"]
         for lin in model.get_cell_lineages()
-        if lin.graph["lineage_ID"] < 0
+        if lin.graph["lineage_id"] < 0
     ]
-    for lin_ID in one_node_lin_IDs:
-        lin = model.get_cell_lineage_from_ID(lin_ID)
+    for lin_id in one_node_lin_ids:
+        lin = model.get_cell_lineage_from_id(lin_id)
         assert lin is not None
-        new_lin_ID = model.get_next_available_lineage_ID()
+        new_lin_id = model.get_next_available_lineage_id()
         # Update the lineage ID in the graph.
-        lin.graph["lineage_ID"] = new_lin_ID
+        lin.graph["lineage_id"] = new_lin_id
         # Update the lineage ID in the cell data.
-        model.data.cell_data.pop(lin_ID)
-        model.data.cell_data[new_lin_ID] = lin
+        model.data.cell_data.pop(lin_id)
+        model.data.cell_data[new_lin_id] = lin
 
 
 def rename_columns_if_exist(df, columns_map):
@@ -137,7 +137,7 @@ def format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
     drop_columns_if_exist(df, ["cell_contour", "particle"])
     # If we already have the "particle" column, it means the data is coming from
     # trackpy, but it might not be up to date. Safer to remove it then recreate
-    # it from "lineage_ID".
+    # it from "lineage_id".
 
     # Rename columns to match trackpy format.
     rename_columns_if_exist(
@@ -146,7 +146,7 @@ def format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
             "cell_x": "x",
             "cell_y": "y",
             "cell_z": "z",
-            "lineage_ID": "particle",
+            "lineage_id": "particle",
             frame_prop: "frame",
         },
     )
@@ -185,9 +185,9 @@ def export_trackpy_dataframe(model: Model) -> pd.DataFrame:
     """
     # Prepare the model for export.
     model_copy = copy.deepcopy(model)  # Don't want to modify the original model.
-    safekeep_original_lineage_IDs(model_copy)
+    safekeep_original_lineage_ids(model_copy)
     remove_division_events(model_copy)  # Trackpy does not support division events.
-    renumber_negative_lineage_IDs(model_copy)
+    renumber_negative_lineage_ids(model_copy)
 
     # Creation of the trackpy DataFrame.
     df = model_copy.to_cell_dataframe()

@@ -144,7 +144,7 @@ class Time(NodeLocalPropCalculator):
         lineage : CellLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -157,7 +157,7 @@ class Time(NodeLocalPropCalculator):
         if self.time_prop not in lineage.nodes[nid]:
             raise KeyError(
                 f"Time property '{self.time_prop}' not found "
-                f"in node {nid} of lineage {lineage.graph['lineage_ID']}."
+                f"in node {nid} of lineage {lineage.graph['lineage_id']}."
             )
         return lineage.nodes[nid][self.time_prop] * self.factor
 
@@ -218,13 +218,13 @@ class Timepoint(NodeLocalPropCalculator):
             root = lin.get_root()
             if isinstance(root, list):
                 raise UpdateRequiredError(
-                    f"Lineage {lin.graph['lineage_ID']} has several root nodes. "
+                    f"Lineage {lin.graph['lineage_id']} has several root nodes. "
                     f"Timepoint calculation requires a single root node."
                 )
             if self.ref_time_prop not in lin.nodes[root]:
                 raise ValueError(
                     f"Reference time property '{self.ref_time_prop}' not found in root node {root} "
-                    f"of lineage {lin.graph.get('lineage_ID', 'of unknown ID')}."
+                    f"of lineage {lin.graph.get('lineage_id', 'of unknown ID')}."
                 )
             time = lin.nodes[root][self.ref_time_prop]
             if min_time is None or time < min_time:
@@ -244,7 +244,7 @@ class Timepoint(NodeLocalPropCalculator):
         lineage : CellLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -259,7 +259,7 @@ class Timepoint(NodeLocalPropCalculator):
         if self.ref_time_prop not in lineage.nodes[nid]:
             raise KeyError(
                 f"Reference time property '{self.ref_time_prop}' not found "
-                f"in node {nid} of lineage {lineage.graph['lineage_ID']}."
+                f"in node {nid} of lineage {lineage.graph['lineage_id']}."
             )
 
         time = lineage.nodes[nid][self.ref_time_prop]
@@ -269,7 +269,7 @@ class Timepoint(NodeLocalPropCalculator):
         if not math.isclose(timepoint, rounded_timepoint, rel_tol=1e-9, abs_tol=1e-9):
             raise ValueError(
                 f"Computed timepoint {timepoint} for node {nid} "
-                f"of lineage {lineage.graph['lineage_ID']} is not close to an integer. "
+                f"of lineage {lineage.graph['lineage_id']} is not close to an integer. "
                 f"Check time step and reference time values."
             )
 
@@ -278,9 +278,9 @@ class Timepoint(NodeLocalPropCalculator):
 
 def create_cell_id_property(provenance: str = "pycellin") -> Property:
     """
-    Create the declaration of the `cell_ID` core property.
+    Create the declaration of the `cell_id` core property.
 
-    `cell_ID` is the unique identifier of the cell within its lineage. It is a
+    `cell_id` is the unique identifier of the cell within its lineage. It is a
     node property of cell lineages, and is used as the node ID of `CellLineage`
     graphs.
 
@@ -293,10 +293,10 @@ def create_cell_id_property(provenance: str = "pycellin") -> Property:
     Returns
     -------
     Property
-        Declaration of the `cell_ID` property.
+        Declaration of the `cell_id` property.
     """
     return Property(
-        identifier="cell_ID",
+        identifier="cell_id",
         name="Cell ID",
         description="Unique identifier of the cell",
         provenance=provenance,
@@ -308,9 +308,9 @@ def create_cell_id_property(provenance: str = "pycellin") -> Property:
 
 def create_lineage_id_property(provenance: str = "pycellin") -> Property:
     """
-    Create the declaration of the `lineage_ID` core property.
+    Create the declaration of the `lineage_id` core property.
 
-    `lineage_ID` is the unique identifier of the lineage. It is both a node and
+    `lineage_id` is the unique identifier of the lineage. It is both a node and
     a lineage property, and is defined on cell and cycle lineages alike.
 
     Parameters
@@ -322,10 +322,10 @@ def create_lineage_id_property(provenance: str = "pycellin") -> Property:
     Returns
     -------
     Property
-        Declaration of the `lineage_ID` property.
+        Declaration of the `lineage_id` property.
     """
     return Property(
-        identifier="lineage_ID",
+        identifier="lineage_id",
         name="Lineage ID",
         description="Unique identifier of the lineage",
         provenance=provenance,
@@ -495,9 +495,9 @@ def _create_generic_lineage_coord_property() -> Property:
 
 def create_cycle_id_property(provenance: str = "pycellin") -> Property:
     """
-    Create the declaration of the `cycle_ID` core property.
+    Create the declaration of the `cycle_id` core property.
 
-    `cycle_ID` is the unique identifier of the cell cycle, i.e. the cell_ID of
+    `cycle_id` is the unique identifier of the cell cycle, i.e. the cell_id of
     its last cell. It is a node property of cycle lineages, and is used as the
     node ID of `CycleLineage` graphs.
 
@@ -510,13 +510,13 @@ def create_cycle_id_property(provenance: str = "pycellin") -> Property:
     Returns
     -------
     Property
-        Declaration of the `cycle_ID` property.
+        Declaration of the `cycle_id` property.
     """
     return Property(
-        identifier="cycle_ID",
+        identifier="cycle_id",
         name="Cycle ID",
         description=(
-            "Unique identifier of the cell cycle, i.e. cell_ID of the last cell in the cell cycle"
+            "Unique identifier of the cell cycle, i.e. cell_id of the last cell in the cell cycle"
         ),
         provenance=provenance,
         prop_type="node",
@@ -529,7 +529,7 @@ def create_cells_property(provenance: str = "pycellin") -> Property:
     """
     Create the declaration of the `cells` core property.
 
-    `cells` holds the cell_IDs of the cells of the cell cycle, in chronological
+    `cells` holds the cell_ids of the cells of the cell cycle, in chronological
     order. It is a node property of cycle lineages.
 
     Parameters
@@ -546,7 +546,7 @@ def create_cells_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cells",
         name="Cells",
-        description="cell_IDs of the cells in the cell cycle, in chronological order",
+        description="cell_ids of the cells in the cell cycle, in chronological order",
         provenance=provenance,
         prop_type="node",
         lin_type="CycleLineage",

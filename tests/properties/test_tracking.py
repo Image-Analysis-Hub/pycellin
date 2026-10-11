@@ -48,8 +48,8 @@ def cell_lin():
     )
     for n in lineage.nodes:
         lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 1, n)
-        lineage.nodes[n]["cell_ID"] = n
-    lineage.graph["lineage_ID"] = 1
+        lineage.nodes[n]["cell_id"] = n
+    lineage.graph["lineage_id"] = 1
     return lineage
 
 

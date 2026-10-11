@@ -104,7 +104,7 @@ class AbsoluteAge(NodeLocalPropCalculator):
         lineage : CellLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -185,7 +185,7 @@ class RelativeAge(NodeLocalPropCalculator):
         lineage : CellLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -275,7 +275,7 @@ class NormalizedAge(NodeLocalPropCalculator):
         lineage : CellLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -385,7 +385,7 @@ def _get_cell_lin_timepoints(
     lineage : CellLineage
         Lineage graph containing the node of interest.
     nid : int
-        Node ID (cell_ID) of the cell of interest.
+        Node ID (cell_id) of the cell of interest.
     time_prop : str
         The name of the time property (e.g. "frame", "time", etc.) to use
         for calculation.
@@ -408,7 +408,7 @@ def _get_cell_lin_timepoints(
     frame_current_div = lineage.nodes[cells[-1]][time_prop]
     ancestors = list(lineage.predecessors(cells[0]))
     if len(ancestors) > 1:
-        raise FusionError(nid, lineage.graph["lineage_ID"])
+        raise FusionError(nid, lineage.graph["lineage_id"])
     elif len(ancestors) == 0:
         frame_prev_div = lineage.nodes[cells[0]][time_prop]
     else:
@@ -431,7 +431,7 @@ def _get_cycle_lin_timepoints(
     lineage : CycleLineage
         Lineage graph containing the node of interest.
     nid : int
-        Node ID (cell_ID) of the cell of interest.
+        Node ID (cell_id) of the cell of interest.
 
     Returns
     -------
@@ -448,11 +448,11 @@ def _get_cycle_lin_timepoints(
     if nid not in lineage.nodes:
         raise KeyError(f"Cycle {nid} not in the lineage.")
     cells = lineage.nodes[nid]["cells"]
-    cell_lin = data.cell_data[lineage.graph["lineage_ID"]]
+    cell_lin = data.cell_data[lineage.graph["lineage_id"]]
     frame_current_div = cell_lin.nodes[cells[-1]][time_prop]
     ancestors = list(lineage.predecessors(nid))
     if len(ancestors) > 1:
-        raise FusionError(nid, lineage.graph["lineage_ID"])
+        raise FusionError(nid, lineage.graph["lineage_id"])
     elif len(ancestors) == 0:
         frame_prev_div = cell_lin.nodes[cells[0]][time_prop]
     else:
@@ -662,7 +662,7 @@ class DivisionRate(NodeGlobalPropCalculator):
 #         lineage : CellLineage
 #             Lineage graph containing the cell of interest.
 #         nid : int
-#             Node ID (cell_ID) of the cell of interest.
+#             Node ID (cell_id) of the cell of interest.
 
 #         Returns
 #         -------

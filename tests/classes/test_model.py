@@ -169,16 +169,16 @@ def lineage_props_model():
     of lineage, node and node-and-lineage types.
     """
     lin = CellLineage(lid=1)
-    lin.add_node(1, cell_ID=1, frame=0, node_prop=10, mixed_prop="node1")
-    lin.add_node(2, cell_ID=2, frame=1, node_prop=20, mixed_prop="node2")
-    lin.add_node(3, cell_ID=3, frame=1, node_prop=30, mixed_prop="node3")
+    lin.add_node(1, cell_id=1, frame=0, node_prop=10, mixed_prop="node1")
+    lin.add_node(2, cell_id=2, frame=1, node_prop=20, mixed_prop="node2")
+    lin.add_node(3, cell_id=3, frame=1, node_prop=30, mixed_prop="node3")
     lin.add_edge(1, 2)
     lin.add_edge(1, 3)
     lin.graph["lin_prop"] = 1.5
     lin.graph["shared_prop"] = "a"
     lin.graph["mixed_prop"] = "lineage1"
     single_lin = CellLineage(lid=-4)
-    single_lin.add_node(4, cell_ID=4, frame=0, node_prop=40, mixed_prop="node4")
+    single_lin.add_node(4, cell_id=4, frame=0, node_prop=40, mixed_prop="node4")
     single_lin.graph["lin_prop"] = 2.5
     single_lin.graph["mixed_prop"] = "lineage-4"
 
@@ -220,8 +220,8 @@ class TestToCellDataframe:
             lineage_props=["lin_prop", "shared_prop"]
         )
 
-        lin_rows = df[df["lineage_ID"] == 1]
-        single_rows = df[df["lineage_ID"] == -4]
+        lin_rows = df[df["lineage_id"] == 1]
+        single_rows = df[df["lineage_id"] == -4]
         assert len(lin_rows) == 3
         assert (lin_rows["lin_prop"] == 1.5).all()
         assert (lin_rows["shared_prop"] == "a").all()
@@ -234,8 +234,8 @@ class TestToCellDataframe:
         assert "lin_prop" not in df.columns
         assert "shared_prop" not in df.columns
 
-    def test_lineage_ID_lineage_prop_is_skipped(self, lineage_props_model):
-        df = lineage_props_model.to_cell_dataframe(lineage_props=["lineage_ID"])
+    def test_lineage_id_lineage_prop_is_skipped(self, lineage_props_model):
+        df = lineage_props_model.to_cell_dataframe(lineage_props=["lineage_id"])
 
         assert df.equals(lineage_props_model.to_cell_dataframe())
 
@@ -262,8 +262,8 @@ class TestToCellDataframe:
     def test_missing_mandatory_cell_prop_raises(self, lineage_props_model):
         for lin in lineage_props_model.data.cell_data.values():
             for nid in lin.nodes:
-                del lin.nodes[nid]["cell_ID"]
-        with pytest.raises(ValueError, match="not found in the model: 'cell_ID'"):
+                del lin.nodes[nid]["cell_id"]
+        with pytest.raises(ValueError, match="not found in the model: 'cell_id'"):
             lineage_props_model.to_cell_dataframe()
 
     def test_no_matching_lineage_raises(self, lineage_props_model):
@@ -305,14 +305,14 @@ class TestToLinkDataframe:
             lin.edges[source, target].update({prop: 1.0 for prop in props})
         df = lineage_props_model.to_link_dataframe()
 
-        expected = ["lineage_ID", "source_cell_ID", "target_cell_ID", *props]
+        expected = ["lineage_id", "source_cell_id", "target_cell_id", *props]
         assert df.columns.tolist() == expected
 
     def test_lineages_without_links_give_empty_dataframe(self, lineage_props_model):
         df = lineage_props_model.to_link_dataframe(lids=[-4])
 
         assert df.empty
-        assert df.columns.tolist() == ["lineage_ID", "source_cell_ID", "target_cell_ID"]
+        assert df.columns.tolist() == ["lineage_id", "source_cell_id", "target_cell_id"]
 
     def test_no_matching_lineage_raises(self, lineage_props_model):
         with pytest.raises(ValueError, match="No links to export"):
@@ -322,10 +322,10 @@ class TestToLinkDataframe:
 class TestToLineageDataframe:
     """Test cases for Model.to_lineage_dataframe() method."""
 
-    def test_missing_lineage_ID_raises(self, lineage_props_model):
+    def test_missing_lineage_id_raises(self, lineage_props_model):
         for lin in lineage_props_model.data.cell_data.values():
-            del lin.graph["lineage_ID"]
-        with pytest.raises(ValueError, match="not found in the model: 'lineage_ID'"):
+            del lin.graph["lineage_id"]
+        with pytest.raises(ValueError, match="not found in the model: 'lineage_id'"):
             lineage_props_model.to_lineage_dataframe()
 
     def test_no_matching_lineage_raises(self, lineage_props_model):
@@ -348,10 +348,10 @@ class TestToCycleDataframe:
         model.add_cycle_data()
         df = model.to_cycle_dataframe(lineage_props=["lin_prop"])
 
-        lin_rows = df[df["lineage_ID"] == 1]
+        lin_rows = df[df["lineage_id"] == 1]
         assert len(lin_rows) == 3
         assert (lin_rows["lin_prop"] == 1.5).all()
-        assert df.loc[df["lineage_ID"] == -4, "lin_prop"].tolist() == [2.5]
+        assert df.loc[df["lineage_id"] == -4, "lin_prop"].tolist() == [2.5]
 
     def test_no_matching_lineage_raises(self, lineage_props_model):
         lineage_props_model.add_cycle_data()
@@ -377,10 +377,10 @@ def frame_time_model():
     given in frames, with a time origin different from 0.
     """
     lin = CellLineage(lid=1)
-    lin.add_node(1, cell_ID=1, time=3)
-    lin.add_node(2, cell_ID=2, time=4)
-    lin.add_node(3, cell_ID=3, time=5)
-    lin.add_node(4, cell_ID=4, time=5)
+    lin.add_node(1, cell_id=1, time=3)
+    lin.add_node(2, cell_id=2, time=4)
+    lin.add_node(3, cell_id=3, time=5)
+    lin.add_node(4, cell_id=4, time=5)
     lin.add_edge(1, 2)
     lin.add_edge(2, 3)
     lin.add_edge(2, 4)
@@ -512,8 +512,8 @@ def pixel_space_model():
     are given in pixels.
     """
     lin = CellLineage(lid=1)
-    lin.add_node(1, cell_ID=1, frame=0, cell_x=10, cell_y=20, cell_z=2)
-    lin.add_node(2, cell_ID=2, frame=1, cell_x=30, cell_y=40, cell_z=4)
+    lin.add_node(1, cell_id=1, frame=0, cell_x=10, cell_y=20, cell_z=2)
+    lin.add_node(2, cell_id=2, frame=1, cell_x=30, cell_y=40, cell_z=4)
     lin.add_edge(1, 2, link_x=20, link_y=30, link_z=3)
     lin.graph.update(lineage_x=20, lineage_y=30, lineage_z=3)
 
@@ -675,7 +675,7 @@ def input_props_model():
     for nid, time in [(1, 0), (2, 1), (3, 2), (4, 2)]:
         lin.add_node(
             nid,
-            cell_ID=nid,
+            cell_id=nid,
             time=time,
             my_area=float(nid),
             my_polygon=Polygon([(0, 0), (nid, 0), (nid, 1), (0, 1)]),
@@ -886,7 +886,7 @@ class TestAddCycleMeanSpeed:
 def contour_model(input_props_model):
     """
     Add cell positions and contours to input_props_model. Each cell is a 2x1
-    rectangle centered on (cell_ID, 0).
+    rectangle centered on (cell_id, 0).
     """
     for identifier, dtype in [
         ("cell_x", "float"),

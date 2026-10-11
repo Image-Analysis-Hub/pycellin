@@ -5,12 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to ed6acb8, plus the uncommitted changes that give to_link_dataframe() a stable column order, with the link DataFrame example of the Getting started notebook and its CSV in sample_data/results regenerated (covered by the Maintenance "Docs" entry), and build to_lineage_dataframe() in one go like the other DataFrames. Update from there with: git log ed6acb8..dev -->
+<!-- Planned v0.6.0. Covers commits up to 52c09f3, plus the uncommitted rename of ID to id in all names (pass 1 of 3 of the naming change, covered by the "Naming" breaking change). Update from there with: git log 52c09f3..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
 ### ⚠️ Breaking changes
 
+- **Naming:** `ID` is now written in lowercase in all pycellin names, following PEP 8:
+  - the core properties `cell_ID`, `lineage_ID` and `cycle_ID` are renamed `cell_id`, `lineage_id` and `cycle_id`, in DataFrames and exported files too. So are the `source_cell_ID` and `target_cell_ID` columns of `to_link_dataframe()`, the `pycellin_cell_ID` property of TrackMate exports and the `lineage_ID_Pycellin` column of trackpy exports
+  - `Model` methods: `get_cell_lineage_from_ID()` → `get_cell_lineage_from_id()`, and likewise `get_cycle_lineage_from_ID()`, `get_cell_lineage_IDs()`, `get_lineage_IDs()`, `get_cycle_lineage_IDs()` and `get_next_available_lineage_ID()`
+  - the `ID_prop` argument of `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()` → `id_prop`
+  - the fields of the `Cell` and `Link` named tuples (e.g. returned by `get_divisions()`), and the `node_ID`, `lineage_ID`, `source_lineage_ID` and `target_lineage_ID` arguments and attributes of exceptions
+  - models pickled with an earlier version keep the old names
 - **Properties:** `pycellin.graph.properties` moved to `pycellin.properties`. The `pycellin.graph` package no longer exists
 - **Properties:** rename the `branch_*` properties to `cycle_*`, along with their `add_*()` methods, factories and calculators:
   - `branch_total_displacement` → `cycle_total_displacement`
@@ -44,7 +50,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** `remove_lineages()`
 - **Model:** `relabel_cells()` to give cells consecutive IDs, optionally unique across the whole model
 - **Model:** `remove_intercycle_links()` to remove the outgoing links of division cells
-- **Model:** `get_cell_lineages_from_IDs()` and `get_cycle_lineages_from_IDs()`
+- **Model:** `get_cell_lineages_from_ids()` and `get_cycle_lineages_from_ids()`
 - **Model:** `overwrite_lid` argument to `add_lineage()`
 - **Model:** `lineage_props` argument to `to_cell_dataframe()`, `to_link_dataframe()` and `to_cycle_dataframe()` to include lineage properties in the DataFrame
 - **Metadata:** `label_img` and `label_img_path` standard metadata fields
@@ -87,7 +93,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 
 ### Changed
 
-- **Model:** core properties (`cell_ID`, `lineage_ID`, `timepoint` and the reference time property) are protected whenever they are declared
+- **Model:** core properties (`cell_id`, `lineage_id`, `timepoint` and the reference time property) are protected whenever they are declared
 - **Model:** timepoint handling is centralized in the updater: the `timepoint` calculator is always present and up to date
 - **Model:** enforce the single-cell lineage convention (lineage ID = -cell ID)
 - **Properties:** data types are compared after normalizing their spelling (e.g. `float` and `float64`)
@@ -113,9 +119,9 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **TrackMate:** the exporter wrote missing values (None) as the string 'None', which TrackMate can't read. They are now written as NaN, which the loader reads back as None for integer properties instead of failing
 - **GEFF:** the loader silently kept only one lineage when several disconnected parts of the graph had the same lineage ID. It now raises `ValueError`
 - **GEFF:** the exporter didn't write the metadata of properties with several types (`LINEAGE | NODE`, `LINEAGE | EDGE`)
-- **CTC:** the loader gave cells no `timepoint`, although it was the reference time property, and no `lineage_ID`. Reading the pixel size from label images (`labels_path`) failed
+- **CTC:** the loader gave cells no `timepoint`, although it was the reference time property, and no `lineage_id`. Reading the pixel size from label images (`labels_path`) failed
 - **CTC:** the loader failed on labels with holes or made of several pieces. Their contour is now the outline of the largest piece, holes filled, and a warning lists them
-- **trackpy:** the loader failed when given a `time_step`, which it applied to frames, and gave cells no `lineage_ID`
+- **trackpy:** the loader failed when given a `time_step`, which it applied to frames, and gave cells no `lineage_id`
 
 ### Maintenance
 

@@ -20,7 +20,7 @@ from pycellin.properties.morphology import create_cell_contour_property
 from pycellin.io.utils import (
     _split_graph_into_lineages,
     _update_lineage_prop_key,
-    _update_lineages_IDs_key,
+    _update_lineages_ids_key,
     _update_node_prop_key,
     check_fusions,
 )
@@ -584,7 +584,7 @@ def _build_tracks(
     return tracks_attributes
 
 
-def _get_filtered_tracks_ID(
+def _get_filtered_tracks_id(
     iterator: ET.iterparse,
     ancestor: ET._Element,
 ) -> list[int]:
@@ -609,11 +609,11 @@ def _get_filtered_tracks_ID(
         If the "TRACK_ID" attribute is not found
         in the attributes of the current element.
     """
-    filtered_tracks_ID = []
+    filtered_tracks_id = []
     event, element = next(iterator)
     attribs = deepcopy(element.attrib)
     try:
-        filtered_tracks_ID.append(int(attribs["TRACK_ID"]))
+        filtered_tracks_id.append(int(attribs["TRACK_ID"]))
     except KeyError as err:
         msg = (
             f"No key {err} in the attributes of current element "
@@ -626,7 +626,7 @@ def _get_filtered_tracks_ID(
         if element.tag == "TrackID" and event == "start":
             attribs = deepcopy(element.attrib)
             try:
-                filtered_tracks_ID.append(int(attribs["TRACK_ID"]))
+                filtered_tracks_id.append(int(attribs["TRACK_ID"]))
             except KeyError as err:
                 msg = (
                     f"No key {err} in the attributes of current element "
@@ -634,7 +634,7 @@ def _get_filtered_tracks_ID(
                 )
                 logger.warning(msg)
 
-    return filtered_tracks_ID
+    return filtered_tracks_id
 
 
 def _update_props_metadata(
@@ -656,8 +656,8 @@ def _update_props_metadata(
         True if the model has segmentation data, False otherwise.
     """
     # Node properties.
-    prop_cell_ID = create_cell_id_property("TrackMate")
-    props_md._add_prop(prop_cell_ID)
+    prop_cell_id = create_cell_id_property("TrackMate")
+    props_md._add_prop(prop_cell_id)
     for axis in ["x", "y", "z"]:
         props_md._change_prop_identifier(f"POSITION_{axis.upper()}", f"cell_{axis}")
         props_md._change_prop_description(
@@ -680,9 +680,9 @@ def _update_props_metadata(
             props_md._change_prop_description(f"link_{axis}", desc)
 
     # Lineage properties.
-    props_md._change_prop_identifier("TRACK_ID", "lineage_ID")
-    props_md._change_prop_description("lineage_ID", "Unique identifier of the lineage")
-    props_md.props["lineage_ID"].prop_type = PropertyType.NODE | PropertyType.LINEAGE
+    props_md._change_prop_identifier("TRACK_ID", "lineage_id")
+    props_md._change_prop_description("lineage_id", "Unique identifier of the lineage")
+    props_md.props["lineage_id"].prop_type = PropertyType.NODE | PropertyType.LINEAGE
     prop_filtered_track = Property(
         identifier="FilteredTrack",
         name="FilteredTrack",
@@ -837,7 +837,7 @@ def _parse_model_tag(
         # Filtering out tracks and adding tracks attribute.
         if element.tag == "FilteredTracks" and event == "start":
             # Removal of filtered tracks.
-            id_to_keep = _get_filtered_tracks_ID(it, element)
+            id_to_keep = _get_filtered_tracks_id(it, element)
             if not keep_all_tracks:
                 to_remove = [
                     n for n, t in graph.nodes(data="TRACK_ID") if t not in id_to_keep
@@ -852,18 +852,18 @@ def _parse_model_tag(
     lineages = _split_graph_into_lineages(
         graph,
         lin_props=tracks_attributes,
-        lineage_ID_key="TRACK_ID",
+        lineage_id_key="TRACK_ID",
     )
 
     # For pycellin compatibility, some TrackMate properties have to be renamed.
     # We only rename properties that are either essential to the functioning of
     # pycellin or confusing (e.g. "name" is a spot and a track property).
     _update_props_metadata(props_md, units, segmentation)
-    _update_lineages_IDs_key(lineages, "TRACK_ID")
+    _update_lineages_ids_key(lineages, "TRACK_ID")
     for lin in lineages:
         for key_name, new_key in [
-            ("TRACK_ID", "lineage_ID"),  # mandatory
-            ("ID", "cell_ID"),  # mandatory
+            ("TRACK_ID", "lineage_id"),  # mandatory
+            ("ID", "cell_id"),  # mandatory
             ("name", "cell_name"),  # confusing
         ]:
             _update_node_prop_key(lin, key_name, new_key)
@@ -873,12 +873,12 @@ def _parse_model_tag(
         # Adding if each track was present in the 'FilteredTracks' tag
         # because this info is needed when reconstructing TrackMate XMLs
         # from graphs.
-        if lin.graph["lineage_ID"] in id_to_keep:
+        if lin.graph["lineage_id"] in id_to_keep:
             lin.graph["FilteredTrack"] = True
         else:
             lin.graph["FilteredTrack"] = False
 
-    return units, props_md, Data({lin.graph["lineage_ID"]: lin for lin in lineages})
+    return units, props_md, Data({lin.graph["lineage_id"]: lin for lin in lineages})
 
 
 def _get_specific_tags(

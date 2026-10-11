@@ -270,7 +270,7 @@ def _find_label(
     if not 0 < label <= len(slices) or slices[label - 1] is None:
         raise ValueError(
             f"Label {label} of cell {nid} (lineage "
-            f"{lineage.graph['lineage_ID']}) is not in timepoint {t} "
+            f"{lineage.graph['lineage_id']}) is not in timepoint {t} "
             "of the label image."
         )
     bbox = slices[label - 1]
@@ -358,9 +358,9 @@ class CellPolygonFromLabelImg(_LabelImgShapeCalculator):
     def _shape_from_mask(self, mask: np.ndarray, lineage, nid: int) -> Polygon:
         polygons = _mask_to_polygons(mask)
         if len(polygons) > 1:
-            self._fragmented_cells.append((nid, lineage.graph["lineage_ID"]))
+            self._fragmented_cells.append((nid, lineage.graph["lineage_id"]))
         if (ndi.binary_fill_holes(mask) & ~mask).any():
-            self._cells_with_holes.append((nid, lineage.graph["lineage_ID"]))
+            self._cells_with_holes.append((nid, lineage.graph["lineage_id"]))
         return polygons[0]
 
 
@@ -381,7 +381,7 @@ def _describe_cells(cells: list[tuple[int, int]], what: str) -> str:
         Description such as "2 cells have a label with holes (cell 3 of lineage 1,
         cell 8 of lineage 2)".
     """
-    examples = ", ".join(f"cell {nid} of lineage {lin_ID}" for nid, lin_ID in cells[:5])
+    examples = ", ".join(f"cell {nid} of lineage {lin_id}" for nid, lin_id in cells[:5])
     if len(cells) > 5:
         examples += ", ..."
     cells_txt = "1 cell has" if len(cells) == 1 else f"{len(cells)} cells have"
@@ -532,7 +532,7 @@ class CellPolygonFromContour(NodeLocalPropCalculator):
         cell = lineage.nodes[nid]
         contour = cell.get(self.contour_prop)
         if contour is None:
-            self._cells_without_contour.append((nid, lineage.graph["lineage_ID"]))
+            self._cells_without_contour.append((nid, lineage.graph["lineage_id"]))
             return None
         x, y = cell["cell_x"], cell["cell_y"]
         try:
@@ -541,7 +541,7 @@ class CellPolygonFromContour(NodeLocalPropCalculator):
             polygon = None
         if polygon is not None and polygon.is_valid and not polygon.is_empty:
             return polygon
-        self._cells_with_invalid_contour.append((nid, lineage.graph["lineage_ID"]))
+        self._cells_with_invalid_contour.append((nid, lineage.graph["lineage_id"]))
         return _largest_polygon(make_valid(polygon)) if polygon is not None else None
 
 
@@ -595,7 +595,7 @@ class CellArea(NodeLocalPropCalculator):
             msg = (
                 f"Cannot compute '{self.prop.identifier}': missing "
                 f"'{self.polygon_prop}' property for cell {nid}, "
-                f"lineage {lineage.graph['lineage_ID']}. "
+                f"lineage {lineage.graph['lineage_id']}. "
                 f"Please compute the '{self.polygon_prop}' property first."
             )
             raise KeyError(msg)
@@ -658,7 +658,7 @@ class CycleMeanArea(NodeGlobalPropCalculator):
         lineage : CycleLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cycle_ID) of the cell cycle of interest.
+            Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
         -------
@@ -727,7 +727,7 @@ class BirthArea(NodeGlobalPropCalculator):
         lineage : CycleLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cycle_ID) of the cell cycle of interest.
+            Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
         -------
@@ -797,7 +797,7 @@ class DivisionArea(NodeGlobalPropCalculator):
         lineage : CycleLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cycle_ID) of the cell cycle of interest.
+            Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
         -------
@@ -871,7 +871,7 @@ class CellContour(NodeLocalPropCalculator):
             msg = (
                 f"Cannot compute '{self.prop.identifier}': missing "
                 f"'{self.polygon_prop}' property for cell {nid}, "
-                f"lineage {lineage.graph['lineage_ID']}. "
+                f"lineage {lineage.graph['lineage_id']}. "
                 f"Please compute the '{self.polygon_prop}' property first."
             )
             raise KeyError(msg)
@@ -880,7 +880,7 @@ class CellContour(NodeLocalPropCalculator):
         if not isinstance(poly, Polygon):
             raise TypeError(
                 f"Cannot compute '{self.prop.identifier}' for cell {nid}, lineage "
-                f"{lineage.graph['lineage_ID']}: '{self.polygon_prop}' holds a "
+                f"{lineage.graph['lineage_id']}: '{self.polygon_prop}' holds a "
                 f"{type(poly).__name__}, but a contour needs a Polygon."
             )
         return [
@@ -939,7 +939,7 @@ class CellPerimeter(NodeLocalPropCalculator):
             msg = (
                 f"Cannot compute '{self.prop.identifier}': missing "
                 f"'{self.polygon_prop}' property for cell {nid}, "
-                f"lineage {lineage.graph['lineage_ID']}. "
+                f"lineage {lineage.graph['lineage_id']}. "
                 f"Please compute the '{self.polygon_prop}' property first."
             )
             raise KeyError(msg)
@@ -1000,7 +1000,7 @@ class CellCircularity(NodeLocalPropCalculator):
             msg = (
                 f"Cannot compute '{self.prop.identifier}': missing "
                 f"'{self.polygon_prop}' property for cell {nid}, "
-                f"lineage {lineage.graph['lineage_ID']}. "
+                f"lineage {lineage.graph['lineage_id']}. "
                 f"Please compute the '{self.polygon_prop}' property first."
             )
             raise KeyError(msg)
@@ -1061,7 +1061,7 @@ class CellSolidity(NodeLocalPropCalculator):
             msg = (
                 f"Cannot compute '{self.prop.identifier}': missing "
                 f"'{self.polygon_prop}' property for cell {nid}, "
-                f"lineage {lineage.graph['lineage_ID']}. "
+                f"lineage {lineage.graph['lineage_id']}. "
                 f"Please compute the '{self.polygon_prop}' property first."
             )
             raise KeyError(msg)
@@ -1172,7 +1172,7 @@ def get_width_and_length(
     Parameters
     ----------
     nid : int
-        Node ID (cell_ID) of the cell of interest.
+        Node ID (cell_id) of the cell of interest.
     lineage : CellLineage
         Lineage graph containing the node of interest.
     pixel_size : float
@@ -1296,7 +1296,7 @@ def get_width_and_length(
         # is probably roundish. The method for mesuring length is not
         # adapted to this kind of morphology.
         try:
-            track_ID = lineage.nodes[nid]["TRACK_ID"]
+            track_id = lineage.nodes[nid]["TRACK_ID"]
         except KeyError:
             print(
                 f"WARNING: One pixel skeleton on node {nid}! "
@@ -1307,7 +1307,7 @@ def get_width_and_length(
         else:
             print(
                 f"WARNING: One pixel skeleton on node {nid} of track "
-                f"{track_ID}! The object is probably roundish and the radius"
+                f"{track_id}! The object is probably roundish and the radius"
                 f" is a better metric in that case. Setting the length and "
                 f"width to NaN."
             )
@@ -1318,7 +1318,7 @@ def get_width_and_length(
         # probably roundish. The method for mesuring length is not adapted to
         # this kind of morphology.
         try:
-            track_ID = lineage.nodes[nid]["TRACK_ID"]
+            track_id = lineage.nodes[nid]["TRACK_ID"]
         except KeyError:
             print(
                 f"WARNING: One pixel skeleton on node {nid}! "
@@ -1329,7 +1329,7 @@ def get_width_and_length(
         else:
             print(
                 f"WARNING: Circular skeleton on node {nid} of track "
-                f"{track_ID}! The object is probably roundish and the radius "
+                f"{track_id}! The object is probably roundish and the radius "
                 f"is a better metric in that case. Setting the length and "
                 f"width to NaN."
             )
@@ -1472,7 +1472,7 @@ def get_width_and_length(
 
             ax[1, 0].remove()
             plt.show()
-            lin_id = lineage.nodes[nid]["lineage_ID"]
+            lin_id = lineage.nodes[nid]["lineage_id"]
             file = f"{debug_folder}/Lineage{lin_id}_Node{nid}_{skel_algo}"
             plt.savefig(file)
             plt.close()
@@ -1604,7 +1604,7 @@ class RodLength(NodeLocalPropCalculator):
 #     Parameters
 #     ----------
 #     nid : int
-#         Node ID (cell_ID) of the cell of interest.
+#         Node ID (cell_id) of the cell of interest.
 #     lineage : CellLineage
 #         Lineage graph containing the node of interest.
 
