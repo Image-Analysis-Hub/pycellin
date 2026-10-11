@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 0af12ee, plus the uncommitted changes that make the cycle_completeness calculator local and give to_link_dataframe() a stable column order, with the link DataFrame example of the Getting started notebook and its CSV in sample_data/results regenerated (covered by the Maintenance "Docs" entry). Update from there with: git log 0af12ee..dev -->
+<!-- Planned v0.6.0. Covers commits up to ed6acb8, plus the uncommitted changes that give to_link_dataframe() a stable column order, with the link DataFrame example of the Getting started notebook and its CSV in sample_data/results regenerated (covered by the Maintenance "Docs" entry), and build to_lineage_dataframe() in one go like the other DataFrames. Update from there with: git log ed6acb8..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -103,7 +103,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** changing the time step with `set_time_step()` corrupted the `timepoint` values
 - **Model:** `add_lineage()` failed with `with_CycleLineage=True` or with a lineage that had no lineage ID, and ignored its `lid` argument when given a lineage
 - **Model:** `add_lineage()` silently replaced a lineage that already had the same ID. It now raises `ValueError`
-- **Model:** `to_cell_dataframe()`, `to_link_dataframe()` and `to_cycle_dataframe()` raised a pandas `FutureWarning` when a numeric property was None on all the cells, links or cell cycles of a lineage. With no lineage to export, they now raise a `ValueError` that says so
+- **Model:** `to_cell_dataframe()`, `to_link_dataframe()`, `to_cycle_dataframe()` and `to_lineage_dataframe()` raised a pandas `FutureWarning` when a numeric property was None everywhere in a lineage. With no lineage to export, they now raise a `ValueError` that says so
 - **Model:** the columns of `to_link_dataframe()` came in a different order in each Python session. They now keep the order in which the link properties were added
 - **Properties:** `turning_angle` (`angle` in 0.5.1), `absolute_age` and `relative_age` were recomputed for every lineage at each update, as their calculators were global instead of local
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells

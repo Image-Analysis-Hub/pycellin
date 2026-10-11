@@ -298,6 +298,26 @@ class TestToLinkDataframe:
         with pytest.raises(ValueError, match="declared in the model: 'node_prop'"):
             lineage_props_model.to_link_dataframe(lineage_props=["node_prop"])
 
+    def test_columns_follow_link_props_order(self, lineage_props_model):
+        props = ["speed", "angle", "time", "cost", "distance"]
+        lin = lineage_props_model.data.cell_data[1]
+        for source, target in lin.edges:
+            lin.edges[source, target].update({prop: 1.0 for prop in props})
+        df = lineage_props_model.to_link_dataframe()
+
+        expected = ["lineage_ID", "source_cell_ID", "target_cell_ID", *props]
+        assert df.columns.tolist() == expected
+
+    def test_lineages_without_links_give_empty_dataframe(self, lineage_props_model):
+        df = lineage_props_model.to_link_dataframe(lids=[-4])
+
+        assert df.empty
+        assert df.columns.tolist() == ["lineage_ID", "source_cell_ID", "target_cell_ID"]
+
+    def test_no_matching_lineage_raises(self, lineage_props_model):
+        with pytest.raises(ValueError, match="No links to export"):
+            lineage_props_model.to_link_dataframe(lids=[99])
+
 
 class TestToLineageDataframe:
     """Test cases for Model.to_lineage_dataframe() method."""
@@ -307,6 +327,17 @@ class TestToLineageDataframe:
             del lin.graph["lineage_ID"]
         with pytest.raises(ValueError, match="not found in the model: 'lineage_ID'"):
             lineage_props_model.to_lineage_dataframe()
+
+    def test_no_matching_lineage_raises(self, lineage_props_model):
+        with pytest.raises(ValueError, match="No lineages to export"):
+            lineage_props_model.to_lineage_dataframe(lids=[99])
+
+    def test_prop_none_in_a_lineage_does_not_warn(self, lineage_props_model):
+        lineage_props_model.data.cell_data[-4].graph["lin_prop"] = None
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            df = lineage_props_model.to_lineage_dataframe()
+        assert df["lin_prop"].isna().tolist() == [True, False]
 
 
 class TestToCycleDataframe:

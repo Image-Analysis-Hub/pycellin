@@ -5882,30 +5882,45 @@ class Model:
         Raises
         ------
         ValueError
+            If the model has no lineages, or none with an ID in `lids`.
             If a property of `lineage_props` is not a lineage property of cell
             lineages, is not declared in the model, or clashes with an existing
             column.
         """
-        list_df = []
-        nb_edges = 0
-        for lin_ID, lineage in self.data.cell_data.items():
-            if lids and lin_ID not in lids:
-                continue
-            nb_edges += len(lineage.edges)
-            tmp_df = nx.to_pandas_edgelist(
-                lineage, source="source_cell_ID", target="target_cell_ID"
+        lineages = [
+            (lin_ID, lineage)
+            for lin_ID, lineage in self.data.cell_data.items()
+            if not lids or lin_ID in lids
+        ]
+        if not lineages:
+            raise ValueError(
+                "No links to export: the model has no lineages, "
+                "or none with an ID in 'lids'."
             )
-            tmp_df["source_cell_ID"] = tmp_df["source_cell_ID"].astype(int)
-            tmp_df["target_cell_ID"] = tmp_df["target_cell_ID"].astype(int)
-            tmp_df["lineage_ID"] = lin_ID
-            list_df.append(tmp_df)
-        df = pd.concat(list_df, ignore_index=True)
-        assert nb_edges == len(df)
+        # A single DataFrame for all the lineages, built from the link properties
+        # rather than with networkx's to_pandas_edgelist(), which puts them in a
+        # different order in each Python session.
+        records = [
+            {
+                **link_props,
+                "lineage_ID": lin_ID,
+                "source_cell_ID": source,
+                "target_cell_ID": target,
+            }
+            for lin_ID, lineage in lineages
+            for source, target, link_props in lineage.edges(data=True)
+        ]
+        mandatory_columns = ["lineage_ID", "source_cell_ID", "target_cell_ID"]
+        if records:
+            df = pd.DataFrame(records)
+        else:
+            # Lineages without links, e.g. single-cell lineages.
+            df = pd.DataFrame(columns=mandatory_columns, dtype=int)
 
         # Reoder the columns to have pycellin mandatory properties first.
-        columns = df.columns.tolist()
-        columns.remove("lineage_ID")
-        columns = ["lineage_ID"] + columns
+        columns = mandatory_columns + [
+            col for col in df.columns if col not in mandatory_columns
+        ]
         df = df[columns]
         df.sort_values("lineage_ID", ignore_index=True, inplace=True)
 
@@ -5929,15 +5944,22 @@ class Model:
         Raises
         ------
         ValueError
+            If the model has no lineages, or none with an ID in `lids`.
             If the `lineage_ID` is not found in the model.
         """
-        list_df = []
-        for lin_ID, lineage in self.data.cell_data.items():
-            if lids and lin_ID not in lids:
-                continue
-            tmp_df = pd.DataFrame([lineage.graph])
-            list_df.append(tmp_df)
-        df = pd.concat(list_df, ignore_index=True)
+        records = [
+            lineage.graph
+            for lin_ID, lineage in self.data.cell_data.items()
+            if not lids or lin_ID in lids
+        ]
+        if not records:
+            raise ValueError(
+                "No lineages to export: the model has no lineages, "
+                "or none with an ID in 'lids'."
+            )
+        # A single DataFrame for all the lineages: concatenating one DataFrame per
+        # lineage makes pandas warn when a property is None in a lineage.
+        df = pd.DataFrame(records)
 
         # Reoder the columns to have pycellin mandatory properties first.
         if "lineage_ID" not in df.columns:
