@@ -174,6 +174,7 @@ def _unit_to_dimension(
         "division_time": "TIME",
         "division_rate": "TIME",  # TODO: check if this is correct
         "level": "NONE",
+        "mother_cycle": "NONE",
         "straightness": "NONE",
         # Lineage features.
         "num_cells": "NONE",
@@ -403,7 +404,8 @@ def _value_to_str(
 
     Indeed, ET.write() method only accepts to write strings.
     However, TrackMate is only able to read Spot, Edge and Track
-    features that can be parsed as numeric by Java.
+    features that can be parsed as numeric by Java. A missing value (None)
+    is thus written as NaN, like TrackMate does.
 
     Parameters
     ----------
@@ -415,7 +417,9 @@ def _value_to_str(
     str
         The string equivalent of `value`.
     """
-    if isinstance(value, bool):
+    if value is None:
+        return "NaN"
+    elif isinstance(value, bool):
         return "1" if value else "0"
     elif isinstance(value, numbers.Number):
         if math.isnan(value):

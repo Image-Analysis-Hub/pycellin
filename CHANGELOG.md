@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to b868a8b, plus the uncommitted changes that rename get_sister_cells() to get_sisters() and add get_cousins(), and the fix of the descendant cycles example in the Getting started notebook (covered by the Maintenance "Docs" entry). Update from there with: git log b868a8b..dev -->
+<!-- Planned v0.6.0. Covers commits up to e41208c, plus the uncommitted changes that add the mother_cycle, daughter_cycles, sister_cycles and cousin_cycles properties, fix missing values in DataFrames and TrackMate files, and refresh the property listings of the Managing properties notebook (covered by the Maintenance "Docs" entry). Update from there with: git log e41208c..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -63,6 +63,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** `INPUT_PROPS` class attribute on calculators, to list the properties they read. `add_custom_property()` checks that these properties are declared with the expected property and lineage types, for custom calculators too
 - **Properties:** topology lineage properties `num_cells`, `num_cycles`, `num_divs`, `num_gaps` and `num_leaves`
 - **Properties:** topology lineage properties `lineage_cell_depth`, `lineage_cycle_depth` and `lineage_duration`
+- **Properties:** topology cycle properties `mother_cycle`, `daughter_cycles`, `sister_cycles` and `cousin_cycles`, the IDs of the mother, daughter, sister and cousin cell cycles of each cell cycle. `mother_cycle` is None for root cycles, and `add_cousin_cycles()` takes a `degree`, like `get_cousins()`
 - **Properties:** `location_tag`, a cell property read from a mask image. `mask_path_metadata_field` reads the mask path from the model metadata, and a `tag_names` dict maps pixel values to region names
 - **Properties:** `normalized_age`, the relative age of a cell divided by the duration of its cell cycle, from 0 at the first cell of the cycle to 1 at the last one. With `ignore_incomplete_cycles=True`, the cells of cycles that start at the root or end with a leaf get NaN
 - **Properties:** `uses_external_data()` class method on calculators
@@ -102,11 +103,13 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** changing the time step with `set_time_step()` corrupted the `timepoint` values
 - **Model:** `add_lineage()` failed with `with_CycleLineage=True` or with a lineage that had no lineage ID, and ignored its `lid` argument when given a lineage
 - **Model:** `add_lineage()` silently replaced a lineage that already had the same ID. It now raises `ValueError`
+- **Model:** `to_cell_dataframe()` and `to_cycle_dataframe()` raised a pandas `FutureWarning` when a numeric property was None on all the cells or cell cycles of a lineage. With no lineage to export, they now raise a `ValueError` that says so
 - **Properties:** `turning_angle` (`angle` in 0.5.1), `absolute_age` and `relative_age` were recomputed for every lineage at each update, as their calculators were global instead of local
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells
 - **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning
 - **TrackMate:** `turning_angle` (`angle` in 0.5.1) in degrees was exported as a TrackMate angle, which TrackMate reads as radians
 - **TrackMate:** with `keep_all_spots=True`, spots without a track got lineage IDs already used by tracks, so some lineages were silently lost. Their lineage ID is now -cell ID
+- **TrackMate:** the exporter wrote missing values (None) as the string 'None', which TrackMate can't read. They are now written as NaN, which the loader reads back as None for integer properties instead of failing
 - **GEFF:** the loader silently kept only one lineage when several disconnected parts of the graph had the same lineage ID. It now raises `ValueError`
 - **GEFF:** the exporter didn't write the metadata of properties with several types (`LINEAGE | NODE`, `LINEAGE | EDGE`)
 - **CTC:** the loader gave cells no `timepoint`, although it was the reference time property, and no `lineage_ID`. Reading the pixel size from label images (`labels_path`) failed

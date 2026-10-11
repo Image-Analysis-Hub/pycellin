@@ -289,7 +289,9 @@ def _convert_attributes(
         if key in props:
             match props[key].dtype:
                 case "int":
-                    attributes[key] = int(value)  # type: ignore
+                    # Missing values are written as NaN, which int() can't parse.
+                    int_value = None if value == "NaN" else int(value)
+                    attributes[key] = int_value  # type: ignore
                 case "float":
                     attributes[key] = float(value)  # type: ignore
                 case "string":

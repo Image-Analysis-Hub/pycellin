@@ -7,8 +7,18 @@ import logging
 import numpy as np
 import pytest
 
-from pycellin.classes import CellLineage, Property
-from pycellin.properties.topology import LocationTag
+from pycellin.classes import CellLineage, CycleLineage, Property
+from pycellin.properties.topology import (
+    CousinCycles,
+    DaughterCycles,
+    LocationTag,
+    MotherCycle,
+    SisterCycles,
+    create_cousin_cycles_property,
+    create_daughter_cycles_property,
+    create_mother_cycle_property,
+    create_sister_cycles_property,
+)
 
 # Fixtures ####################################################################
 
@@ -36,6 +46,16 @@ def mask():
 def make_lineage(x: float, y: float, t: int) -> CellLineage:
     lineage = CellLineage()
     lineage.add_node(1, cell_x=x, cell_y=y, timepoint=t)
+    return lineage
+
+
+@pytest.fixture
+def cycle_lin():
+    # Three rounds of divisions numbered like a binary heap: cell cycle n divides
+    # into cell cycles 2n and 2n + 1, from 1 -> (2, 3) to 7 -> (14, 15).
+    lineage = CycleLineage(time_prop="timepoint", time_step=1)
+    for mother in range(1, 8):
+        lineage.add_edges_from([(mother, 2 * mother), (mother, 2 * mother + 1)])
     return lineage
 
 
@@ -136,3 +156,67 @@ class TestLocationTag:
             )
         assert len(recwarn) == 0
         assert caplog.text == ""
+
+
+# MotherCycle #################################################################
+
+
+class TestMotherCycle:
+    def test_compute(self, cycle_lin):
+        calculator = MotherCycle(create_mother_cycle_property())
+        assert calculator.compute(cycle_lin, 5) == 2
+
+    def test_compute_root_is_none(self, cycle_lin):
+        calculator = MotherCycle(create_mother_cycle_property())
+        assert calculator.compute(cycle_lin, 1) is None
+
+
+# DaughterCycles ##############################################################
+
+
+class TestDaughterCycles:
+    def test_compute(self, cycle_lin):
+        calculator = DaughterCycles(create_daughter_cycles_property())
+        assert calculator.compute(cycle_lin, 2) == [4, 5]
+
+    def test_compute_leaf_is_empty(self, cycle_lin):
+        calculator = DaughterCycles(create_daughter_cycles_property())
+        assert calculator.compute(cycle_lin, 8) == []
+
+
+# SisterCycles ################################################################
+
+
+class TestSisterCycles:
+    def test_compute(self, cycle_lin):
+        calculator = SisterCycles(create_sister_cycles_property())
+        assert calculator.compute(cycle_lin, 4) == [5]
+
+    def test_compute_root_is_empty(self, cycle_lin):
+        calculator = SisterCycles(create_sister_cycles_property())
+        assert calculator.compute(cycle_lin, 1) == []
+
+
+# CousinCycles ################################################################
+
+
+class TestCousinCycles:
+    def test_compute_first_cousins_by_default(self, cycle_lin):
+        calculator = CousinCycles(create_cousin_cycles_property())
+        assert calculator.compute(cycle_lin, 8) == [10, 11]
+
+    def test_compute_second_cousins(self, cycle_lin):
+        calculator = CousinCycles(create_cousin_cycles_property(), degree=2)
+        assert calculator.compute(cycle_lin, 8) == [12, 13, 14, 15]
+
+    def test_compute_all_degrees_closest_first(self, cycle_lin):
+        calculator = CousinCycles(create_cousin_cycles_property(), degree=None)
+        assert calculator.compute(cycle_lin, 8) == [10, 11, 12, 13, 14, 15]
+
+    def test_compute_without_grandmother_is_empty(self, cycle_lin):
+        calculator = CousinCycles(create_cousin_cycles_property())
+        assert calculator.compute(cycle_lin, 2) == []
+
+    def test_degree_lower_than_1_raises(self):
+        with pytest.raises(ValueError, match="at least 1 or None, got 0"):
+            CousinCycles(create_cousin_cycles_property(), degree=0)

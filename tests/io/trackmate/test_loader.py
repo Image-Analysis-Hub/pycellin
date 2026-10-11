@@ -466,6 +466,25 @@ def test_convert_attributes_specific_keys():
     assert obtained_attr == expected_attr
 
 
+def test_convert_attributes_int_nan_is_none():
+    props = {
+        "prop_int": Property(
+            identifier="prop_int",
+            name="",
+            description="",
+            provenance="",
+            prop_type="node",
+            lin_type="CellLineage",
+            dtype="int",
+        )
+    }
+    attributes = {"prop_int": "NaN"}
+
+    tml._convert_attributes(attributes, props, "node")
+
+    assert attributes == {"prop_int": None}
+
+
 def test_convert_attributes_ValueError():
     props = {
         "prop_int": Property(

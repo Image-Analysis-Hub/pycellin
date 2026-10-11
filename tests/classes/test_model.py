@@ -2,6 +2,7 @@
 
 """Unit tests for Model class from model.py module."""
 
+import warnings
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -265,6 +266,20 @@ class TestToCellDataframe:
         with pytest.raises(ValueError, match="not found in the model: 'cell_ID'"):
             lineage_props_model.to_cell_dataframe()
 
+    def test_no_matching_lineage_raises(self, lineage_props_model):
+        with pytest.raises(ValueError, match="No cells to export"):
+            lineage_props_model.to_cell_dataframe(lids=[99])
+
+    def test_column_all_none_in_a_lineage_does_not_warn(self, lineage_props_model):
+        # Like a propagated mother_cycle: None on root cells, so on all the cells
+        # of the single-cell lineage -4.
+        for lid, nid in [(1, 1), (-4, 4)]:
+            lineage_props_model.data.cell_data[lid].nodes[nid]["node_prop"] = None
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            df = lineage_props_model.to_cell_dataframe()
+        assert df["node_prop"].isna().tolist() == [True, True, False, False]
+
 
 class TestToLinkDataframe:
     """Test cases for Model.to_link_dataframe() method."""
@@ -306,6 +321,22 @@ class TestToCycleDataframe:
         assert len(lin_rows) == 3
         assert (lin_rows["lin_prop"] == 1.5).all()
         assert df.loc[df["lineage_ID"] == -4, "lin_prop"].tolist() == [2.5]
+
+    def test_no_matching_lineage_raises(self, lineage_props_model):
+        lineage_props_model.add_cycle_data()
+        with pytest.raises(ValueError, match="No cell cycles to export"):
+            lineage_props_model.to_cycle_dataframe(lids=[99])
+
+    def test_column_all_none_in_a_lineage_does_not_warn(self, lineage_props_model):
+        # Lineage -4 has a single cell cycle, which has no mother cycle.
+        model = lineage_props_model
+        model.add_cycle_data()
+        model.add_mother_cycle()
+        model.update()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            df = model.to_cycle_dataframe()
+        assert df["mother_cycle"].isna().tolist() == [True, True, False, False]
 
 
 @pytest.fixture()
@@ -1232,3 +1263,65 @@ class TestAddCellSpeed:
         with pytest.raises(TypeError, match="Pass its identifier instead: 'time'"):
             input_props_model.add_cell_speed(time_prop=time_prop)
         assert input_props_model.get_property("cell_speed") is None
+
+
+class TestAddMotherCycle:
+    """Test cases for Model.add_mother_cycle() method."""
+
+    def test_values(self, input_props_model):
+        input_props_model.add_mother_cycle()
+        input_props_model.update()
+        cycle_lin = input_props_model.data.cycle_data[1]
+        assert cycle_lin.nodes[2]["mother_cycle"] is None
+        assert cycle_lin.nodes[3]["mother_cycle"] == 2
+        assert cycle_lin.nodes[4]["mother_cycle"] == 2
+
+
+class TestAddDaughterCycles:
+    """Test cases for Model.add_daughter_cycles() method."""
+
+    def test_values(self, input_props_model):
+        input_props_model.add_daughter_cycles()
+        input_props_model.update()
+        cycle_lin = input_props_model.data.cycle_data[1]
+        assert dict(cycle_lin.nodes(data="daughter_cycles")) == {
+            2: [3, 4],
+            3: [],
+            4: [],
+        }
+
+
+class TestAddSisterCycles:
+    """Test cases for Model.add_sister_cycles() method."""
+
+    def test_values(self, input_props_model):
+        input_props_model.add_sister_cycles()
+        input_props_model.update()
+        cycle_lin = input_props_model.data.cycle_data[1]
+        assert dict(cycle_lin.nodes(data="sister_cycles")) == {2: [], 3: [4], 4: [3]}
+
+
+class TestAddCousinCycles:
+    """Test cases for Model.add_cousin_cycles() method."""
+
+    def test_degree(self, input_props_model):
+        # Cells 3 and 4 divide into cells 5, 6 and 7, 8: cycles 5 and 7 are first
+        # cousins, and there are no second cousins.
+        for mother, daughter in [(3, 5), (3, 6), (4, 7), (4, 8)]:
+            input_props_model.add_cell(lid=1, cid=daughter, time_value=3)
+            input_props_model.add_link(
+                source_cid=mother, source_lid=1, target_cid=daughter
+            )
+        input_props_model.add_cousin_cycles()
+        input_props_model.add_cousin_cycles(
+            degree=2, custom_identifier="second_cousin_cycles"
+        )
+        input_props_model.update()
+        cycle_lin = input_props_model.data.cycle_data[1]
+        assert cycle_lin.nodes[5]["cousin_cycles"] == [7, 8]
+        assert cycle_lin.nodes[5]["second_cousin_cycles"] == []
+
+    def test_degree_lower_than_1_raises(self, input_props_model):
+        with pytest.raises(ValueError, match="at least 1 or None, got 0"):
+            input_props_model.add_cousin_cycles(degree=0)
+        assert input_props_model.get_property("cousin_cycles") is None

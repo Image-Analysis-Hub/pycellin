@@ -16,6 +16,7 @@ from pycellin.properties.core import (
 from pycellin.io.trackmate.exporter import (
     _relabel_nodes,
     _remove_non_numeric_props,
+    _value_to_str,
 )
 
 # Fixtures ####################################################################
@@ -225,6 +226,14 @@ def list_prop():
 
 
 # Test Classes ################################################################
+
+
+class TestValueToStr:
+    """Test cases for _value_to_str function."""
+
+    def test_none_is_nan(self):
+        """Test that a missing value is written as NaN, which TrackMate can read."""
+        assert _value_to_str(None) == "NaN"
 
 
 class TestRemoveNonNumericProps:

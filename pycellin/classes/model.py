@@ -3824,6 +3824,87 @@ class Model:
         )
         self.add_custom_property(calc)
 
+    def add_cousin_cycles(
+        self,
+        degree: int | None = 1,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cousin cycles property to the model.
+
+        The cousin cycles of a cell cycle are the cell cycles of the same generation
+        that share an ancestor with it, but not its mother. First cousins share the
+        same grandmother: their mothers are sisters. More generally, cousins of
+        degree n share an ancestor n + 1 generations up, but no closer one. To add
+        several degrees, call this method once per degree with a different
+        `custom_identifier`.
+
+        Parameters
+        ----------
+        degree : int | None, optional
+            Degree of the cousins: 1 for first cousins, 2 for second cousins, and
+            so on. If None, the cousins of all degrees are listed, closest first.
+            1 by default.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cousin_cycles".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cousin cycles".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.topology.create_cousin_cycles_property`).
+
+        Raises
+        ------
+        ValueError
+            If `degree` is lower than 1.
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        prop = topo.create_cousin_cycles_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self.add_custom_property(topo.CousinCycles(prop, degree=degree))
+
+    def add_daughter_cycles(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the daughter cycles property to the model.
+
+        The daughter cycles of a cell cycle are the cell cycles born from the
+        division ending it. A cell cycle that ends with a leaf has none.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "daughter_cycles".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Daughter cycles".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.topology.create_daughter_cycles_property`).
+
+        Raises
+        ------
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        prop = topo.create_daughter_cycles_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self.add_custom_property(topo.DaughterCycles(prop))
+
     def add_division_rate(
         self,
         time_prop: str | None = None,
@@ -4241,6 +4322,41 @@ class Model:
             )
         )
 
+    def add_mother_cycle(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the mother cycle property to the model.
+
+        The mother cycle of a cell cycle is the cell cycle whose division gave birth
+        to it. The root cell cycle has none: its mother cycle is None.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "mother_cycle".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Mother cycle".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.topology.create_mother_cycle_property`).
+
+        Raises
+        ------
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        prop = topo.create_mother_cycle_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self.add_custom_property(topo.MotherCycle(prop))
+
     def add_normalized_age(
         self,
         time_prop: str | None = None,
@@ -4501,6 +4617,41 @@ class Model:
             unit=time.unit if time else None,
         )
         self.add_custom_property(tracking.RelativeAge(prop, time_prop=time_prop))
+
+    def add_sister_cycles(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the sister cycles property to the model.
+
+        The sister cycles of a cell cycle are the other cell cycles born from the
+        same division. The root cell cycle has none.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "sister_cycles".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Sister cycles".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.topology.create_sister_cycles_property`).
+
+        Raises
+        ------
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        prop = topo.create_sister_cycles_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self.add_custom_property(topo.SisterCycles(prop))
 
     def add_straightness(
         self,
@@ -5667,22 +5818,26 @@ class Model:
         Raises
         ------
         ValueError
+            If the model has no lineages, or none with an ID in `lids`.
             If the `lineage_ID`, `frame` or `cell_ID` property is not found in the model.
             If a property of `lineage_props` is not a lineage property of cell
             lineages, is not declared in the model, or clashes with an existing
             column.
         """
-        list_df = []
-        nb_nodes = 0
-        for lin_ID, lineage in self.data.cell_data.items():
-            if lids and lin_ID not in lids:
-                continue
-            nb_nodes += len(lineage)
-            tmp_df = pd.DataFrame(dict(lineage.nodes(data=True)).values())
-            tmp_df["lineage_ID"] = lin_ID
-            list_df.append(tmp_df)
-        df = pd.concat(list_df, ignore_index=True)
-        assert nb_nodes == len(df)
+        records = [
+            {**cell_props, "lineage_ID": lin_ID}
+            for lin_ID, lineage in self.data.cell_data.items()
+            if not lids or lin_ID in lids
+            for cell_props in lineage.nodes.values()
+        ]
+        if not records:
+            raise ValueError(
+                "No cells to export: the model has no lineages, "
+                "or none with an ID in 'lids'."
+            )
+        # A single DataFrame for all the lineages: concatenating one DataFrame per
+        # lineage makes pandas warn when a column is all None in a lineage.
+        df = pd.DataFrame(records)
 
         # Reoder the columns to have pycellin mandatory properties first.
         time_prop = self.model_metadata.reference_time_property
@@ -5822,28 +5977,33 @@ class Model:
         ------
         ValueError
             If the cycle lineages have not been computed yet.
+            If the model has no lineages, or none with an ID in `lids`.
             If the `lineage_ID`, `level` or `cycle_ID` property is not found
             in the model.
             If a property of `lineage_props` is not a lineage property of cell
             lineages, is not declared in the model, or clashes with an existing
             column.
         """
-        list_df = []  # type: list[pd.DataFrame]
-        nb_nodes = 0
         if not self.data.cycle_data:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with model.add_cycle_data()."
             )
-        for lin_ID, lineage in self.data.cycle_data.items():
-            if lids and lin_ID not in lids:
-                continue
-            nb_nodes += len(lineage)
-            tmp_df = pd.DataFrame(dict(lineage.nodes(data=True)).values())
-            tmp_df["lineage_ID"] = lin_ID
-            list_df.append(tmp_df)
-        df = pd.concat(list_df, ignore_index=True)
-        assert nb_nodes == len(df)
+        records = [
+            {**cycle_props, "lineage_ID": lin_ID}
+            for lin_ID, lineage in self.data.cycle_data.items()
+            if not lids or lin_ID in lids
+            for cycle_props in lineage.nodes.values()
+        ]
+        if not records:
+            raise ValueError(
+                "No cell cycles to export: the model has no lineages, "
+                "or none with an ID in 'lids'."
+            )
+        # A single DataFrame for all the lineages: concatenating one DataFrame per
+        # lineage makes pandas warn when a column is all None in a lineage, e.g.
+        # mother_cycle in a lineage of a single cell cycle.
+        df = pd.DataFrame(records)
 
         # Reoder the columns to have pycellin mandatory properties first.
         columns = df.columns.tolist()
