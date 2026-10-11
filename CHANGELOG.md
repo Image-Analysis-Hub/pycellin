@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 4becd13, plus the uncommitted fixes to the text of the Custom properties notebook (Property fields, which question prop_type answers), covered by the Maintenance "Docs" entry. Update from there with: git log 4becd13..dev -->
+<!-- Planned v0.6.0. Covers commits up to b868a8b, plus the uncommitted changes that rename get_sister_cells() to get_sisters() and add get_cousins(), and the fix of the descendant cycles example in the Getting started notebook (covered by the Maintenance "Docs" entry). Update from there with: git log b868a8b..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -24,6 +24,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** `add_cycle_mean_displacement()`, `add_cycle_total_displacement()` and `add_cycle_mean_speed()` raise `MissingPropertyError` when the property they're computed from (`cell_displacement` or `cell_speed`) isn't declared yet: add it first. `add_cycle_mean_speed()` now takes `speed_prop` as first argument, so pass `include_incoming_edge` by keyword
 - **Properties:** `Property` setters raise `TypeError` instead of `ValueError` when given a non-string value
 - **Model:** remove the `Model.recompute_property()` and `Model.export()` stubs, which did nothing. Use the `pycellin.export_*()` functions
+- **Lineages:** rename `CellLineage.get_sister_cells()` to `get_sisters()`, which also works on cycle lineages, where it returns the sister cell cycles
 - **Plotting:** rename `node_color_scale` to `node_colormap` in `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()`
 - **CTC:** the loader now uses a new `time` property as the reference time property, instead of `timepoint`
 - **trackpy:** the loader now uses a new `time` property (frame × time step) as the reference time property, instead of `frame`, and renames the trackpy coordinates `x`, `y`, `z` to `cell_x`, `cell_y`, `cell_z`
@@ -67,6 +68,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** `uses_external_data()` class method on calculators
 - **Exceptions:** `MissingPropertyError` (a `KeyError`), raised when a required property is missing from a node, an edge or the model
 - **Lineages:** `Lineage.get_depth()`, `CellLineage.get_gaps()` and `CellLineage.get_duration()`
+- **Lineages:** `get_cousins()` on cell and cycle lineages: first cousins (same grandmother, different mother) by default, more distant ones with `degree`, or all of them with `degree=None`. In cell lineages, only the cousin cells at the same timepoint are returned
 - **Plotting:** `pycellin.styling` module with pycellin colors and two Plotly templates, `pycellin_white` (the new default) and `pycellin_dark`
 - **Plotting:** `Model.plot_mean_cell_prop_over_time()` and `Model.get_mean_cell_prop_over_time_fig()` to plot the mean and std of a cell property over time
 - **Plotting:** `CellLineage.plot_branch_profile()` and `CellLineage.get_branch_profile_figure()` to plot a cell property along one or several branches, with per-branch styling of markers and lines

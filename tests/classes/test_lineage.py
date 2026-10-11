@@ -150,6 +150,22 @@ def cell_lin_unconnected_component_div(cell_lin_unconnected_component):
     return new_lin
 
 
+@pytest.fixture
+def cell_lin_balanced():
+    # Three rounds of divisions numbered like a binary heap: cell n divides into
+    # cells 2n and 2n + 1, from 1 -> (2, 3) to 7 -> (14, 15). Then cells 8 to 15
+    # each live one more timepoint, as cells 16 to 23.
+    lineage = CellLineage()
+    for mother in range(1, 8):
+        lineage.add_edges_from([(mother, 2 * mother), (mother, 2 * mother + 1)])
+    lineage.add_edges_from([(cell, cell + 8) for cell in range(8, 16)])
+    for n in lineage.nodes:
+        lineage.nodes[n]["timepoint"] = nx.shortest_path_length(lineage, 1, n)
+        lineage.nodes[n]["cell_ID"] = n
+    lineage.graph["lineage_ID"] = 1
+    return lineage
+
+
 # CycleLineage fixtures #######################################################
 
 
@@ -188,6 +204,15 @@ def cycle_lin_triple_div(cycle_lin):
     cycle_lin.add_node(6, level=2)
     cycle_lin.add_edge(2, 6)
     return cycle_lin
+
+
+@pytest.fixture
+def cycle_lin_balanced(cell_lin_balanced):
+    # Cell cycles of cell_lin_balanced, identified by their last cell:
+    # 1 to 7, then 16 to 23 for the cell cycles [8, 16] to [15, 23].
+    return CycleLineage(
+        time_prop="timepoint", time_step=1, cell_lineage=cell_lin_balanced
+    )
 
 
 # Test classes ###############################################################
@@ -2103,109 +2128,171 @@ class TestCellLineageGetCellCycles:
             cell_lin.get_cell_cycles()
 
 
-class TestCellLineageGetSisterCells:
-    """Test cases for CellLineage.get_sister_cells method."""
+class TestCellLineageGetSisters:
+    """Test cases for Lineage.get_sisters method on cell lineages."""
 
     def test_normal_lin(self, cell_lin):
-        """Test get_sister_cells on normal lineage."""
+        """Test get_sisters on normal lineage."""
         # Root.
-        assert cell_lin.get_sister_cells(1) == []
+        assert cell_lin.get_sisters(1) == []
         # Divisions.
-        assert cell_lin.get_sister_cells(2) == []
-        assert cell_lin.get_sister_cells(4) == [12]
-        assert cell_lin.get_sister_cells(8) == [6]
-        assert cell_lin.get_sister_cells(14) == []
+        assert cell_lin.get_sisters(2) == []
+        assert cell_lin.get_sisters(4) == [12]
+        assert cell_lin.get_sisters(8) == [6]
+        assert cell_lin.get_sisters(14) == []
         # Just after division.
-        assert cell_lin.get_sister_cells(3) == [11]
-        assert cell_lin.get_sister_cells(5) == [7]
-        assert cell_lin.get_sister_cells(12) == [4]
-        assert cell_lin.get_sister_cells(13) == []
+        assert cell_lin.get_sisters(3) == [11]
+        assert cell_lin.get_sisters(5) == [7]
+        assert cell_lin.get_sisters(12) == [4]
+        assert cell_lin.get_sisters(13) == []
         # Leaves.
-        assert cell_lin.get_sister_cells(6) == [8]
-        assert cell_lin.get_sister_cells(9) == [10]
-        assert cell_lin.get_sister_cells(10) == [9]
-        assert cell_lin.get_sister_cells(15) == [16]
+        assert cell_lin.get_sisters(6) == [8]
+        assert cell_lin.get_sisters(9) == [10]
+        assert cell_lin.get_sisters(10) == [9]
+        assert cell_lin.get_sisters(15) == [16]
 
     def test_single_node(self, one_node_cell_lin):
-        """Test get_sister_cells on single node lineage."""
-        assert one_node_cell_lin.get_sister_cells(1) == []
+        """Test get_sisters on single node lineage."""
+        assert one_node_cell_lin.get_sisters(1) == []
 
     def test_gap(self, cell_lin_gap):
-        """Test get_sister_cells on lineage with gaps."""
+        """Test get_sisters on lineage with gaps."""
         # Root.
-        assert cell_lin_gap.get_sister_cells(1) == []
+        assert cell_lin_gap.get_sisters(1) == []
         # Divisions.
-        assert cell_lin_gap.get_sister_cells(2) == []
-        assert cell_lin_gap.get_sister_cells(4) == []
-        assert cell_lin_gap.get_sister_cells(8) == [6]
-        assert cell_lin_gap.get_sister_cells(14) == []
+        assert cell_lin_gap.get_sisters(2) == []
+        assert cell_lin_gap.get_sisters(4) == []
+        assert cell_lin_gap.get_sisters(8) == [6]
+        assert cell_lin_gap.get_sisters(14) == []
         # Just after division.
-        assert cell_lin_gap.get_sister_cells(3) == [11]
+        assert cell_lin_gap.get_sisters(3) == [11]
         # Leaves.
-        assert cell_lin_gap.get_sister_cells(6) == [8]
-        assert cell_lin_gap.get_sister_cells(9) == [10]
-        assert cell_lin_gap.get_sister_cells(10) == [9]
-        assert cell_lin_gap.get_sister_cells(15) == [16]
+        assert cell_lin_gap.get_sisters(6) == [8]
+        assert cell_lin_gap.get_sisters(9) == [10]
+        assert cell_lin_gap.get_sisters(10) == [9]
+        assert cell_lin_gap.get_sisters(15) == [16]
 
     def test_div_root(self, cell_lin_div_root):
-        """Test get_sister_cells on division root."""
-        assert cell_lin_div_root.get_sister_cells(1) == []
-        assert cell_lin_div_root.get_sister_cells(2) == [17]
-        assert cell_lin_div_root.get_sister_cells(17) == [2]
+        """Test get_sisters on division root."""
+        assert cell_lin_div_root.get_sisters(1) == []
+        assert cell_lin_div_root.get_sisters(2) == [17]
+        assert cell_lin_div_root.get_sisters(17) == [2]
 
     def test_successive_divs_and_root(self, cell_lin_successive_divs_and_root):
-        """Test get_sister_cells on lineage with successive divisions and division root."""
-        assert cell_lin_successive_divs_and_root.get_sister_cells(2) == []
-        assert cell_lin_successive_divs_and_root.get_sister_cells(3) == [11]
-        assert cell_lin_successive_divs_and_root.get_sister_cells(4) == [8]
-        assert cell_lin_successive_divs_and_root.get_sister_cells(5) == []
-        assert cell_lin_successive_divs_and_root.get_sister_cells(6) == [7]
-        assert cell_lin_successive_divs_and_root.get_sister_cells(7) == [6]
-        assert cell_lin_successive_divs_and_root.get_sister_cells(8) == [4]
-        assert cell_lin_successive_divs_and_root.get_sister_cells(9) == [10]
-        assert cell_lin_successive_divs_and_root.get_sister_cells(10) == [9]
-        assert cell_lin_successive_divs_and_root.get_sister_cells(11) == [3]
+        """Test get_sisters on lineage with successive divisions and division root."""
+        assert cell_lin_successive_divs_and_root.get_sisters(2) == []
+        assert cell_lin_successive_divs_and_root.get_sisters(3) == [11]
+        assert cell_lin_successive_divs_and_root.get_sisters(4) == [8]
+        assert cell_lin_successive_divs_and_root.get_sisters(5) == []
+        assert cell_lin_successive_divs_and_root.get_sisters(6) == [7]
+        assert cell_lin_successive_divs_and_root.get_sisters(7) == [6]
+        assert cell_lin_successive_divs_and_root.get_sisters(8) == [4]
+        assert cell_lin_successive_divs_and_root.get_sisters(9) == [10]
+        assert cell_lin_successive_divs_and_root.get_sisters(10) == [9]
+        assert cell_lin_successive_divs_and_root.get_sisters(11) == [3]
 
     def test_triple_div(self, cell_lin_triple_div):
-        """Test get_sister_cells on lineage with triple division."""
-        assert cell_lin_triple_div.get_sister_cells(1) == []
-        assert cell_lin_triple_div.get_sister_cells(2) == []
-        assert cell_lin_triple_div.get_sister_cells(4) == [12]
-        assert cell_lin_triple_div.get_sister_cells(5) == [7, 17]
-        assert cell_lin_triple_div.get_sister_cells(6) == [8, 18]
-        assert cell_lin_triple_div.get_sister_cells(7) == [5, 17]
-        assert cell_lin_triple_div.get_sister_cells(8) == [6, 18]
-        assert cell_lin_triple_div.get_sister_cells(13) == []
-        assert cell_lin_triple_div.get_sister_cells(14) == []
+        """Test get_sisters on lineage with triple division."""
+        assert cell_lin_triple_div.get_sisters(1) == []
+        assert cell_lin_triple_div.get_sisters(2) == []
+        assert cell_lin_triple_div.get_sisters(4) == [12]
+        assert cell_lin_triple_div.get_sisters(5) == [7, 17]
+        assert cell_lin_triple_div.get_sisters(6) == [8, 18]
+        assert cell_lin_triple_div.get_sisters(7) == [5, 17]
+        assert cell_lin_triple_div.get_sisters(8) == [6, 18]
+        assert cell_lin_triple_div.get_sisters(13) == []
+        assert cell_lin_triple_div.get_sisters(14) == []
 
     def test_unconnected_node(self, cell_lin_unconnected_node):
-        """Test get_sister_cells on unconnected node."""
-        assert cell_lin_unconnected_node.get_sister_cells(1) == []
-        assert cell_lin_unconnected_node.get_sister_cells(17) == []
+        """Test get_sisters on unconnected node."""
+        assert cell_lin_unconnected_node.get_sisters(1) == []
+        assert cell_lin_unconnected_node.get_sisters(17) == []
 
     def test_unconnected_component(self, cell_lin_unconnected_component):
-        """Test get_sister_cells on unconnected component."""
-        assert cell_lin_unconnected_component.get_sister_cells(1) == []
-        assert cell_lin_unconnected_component.get_sister_cells(2) == []
-        assert cell_lin_unconnected_component.get_sister_cells(17) == []
-        assert cell_lin_unconnected_component.get_sister_cells(18) == []
+        """Test get_sisters on unconnected component."""
+        assert cell_lin_unconnected_component.get_sisters(1) == []
+        assert cell_lin_unconnected_component.get_sisters(2) == []
+        assert cell_lin_unconnected_component.get_sisters(17) == []
+        assert cell_lin_unconnected_component.get_sisters(18) == []
 
     def test_unconnected_component_div(self, cell_lin_unconnected_component_div):
-        """Test get_sister_cells on unconnected component with divisions."""
-        assert cell_lin_unconnected_component_div.get_sister_cells(1) == []
-        assert cell_lin_unconnected_component_div.get_sister_cells(2) == []
-        assert cell_lin_unconnected_component_div.get_sister_cells(17) == []
-        assert cell_lin_unconnected_component_div.get_sister_cells(18) == [19]
-        assert cell_lin_unconnected_component_div.get_sister_cells(19) == [18]
-        assert cell_lin_unconnected_component_div.get_sister_cells(20) == [22]
-        assert cell_lin_unconnected_component_div.get_sister_cells(22) == [20]
-        assert cell_lin_unconnected_component_div.get_sister_cells(21) == []
+        """Test get_sisters on unconnected component with divisions."""
+        assert cell_lin_unconnected_component_div.get_sisters(1) == []
+        assert cell_lin_unconnected_component_div.get_sisters(2) == []
+        assert cell_lin_unconnected_component_div.get_sisters(17) == []
+        assert cell_lin_unconnected_component_div.get_sisters(18) == [19]
+        assert cell_lin_unconnected_component_div.get_sisters(19) == [18]
+        assert cell_lin_unconnected_component_div.get_sisters(20) == [22]
+        assert cell_lin_unconnected_component_div.get_sisters(22) == [20]
+        assert cell_lin_unconnected_component_div.get_sisters(21) == []
 
     def test_fusion_error(self, cell_lin):
-        """Test get_sister_cells raises FusionError for fusion event."""
+        """Test get_sisters raises FusionError for fusion event."""
         cell_lin.add_edge(3, 12)
         with pytest.raises(FusionError):
-            cell_lin.get_sister_cells(12)
+            cell_lin.get_sisters(12)
+
+    def test_missing_cell(self, cell_lin):
+        """Test get_sisters raises KeyError for a cell not in the lineage."""
+        with pytest.raises(KeyError, match="Node 99 is not in the lineage"):
+            cell_lin.get_sisters(99)
+
+
+class TestCellLineageGetCousins:
+    """Test cases for Lineage.get_cousins method on cell lineages."""
+
+    def test_first_cousins(self, cell_lin_balanced):
+        """Test get_cousins with the default degree."""
+        assert cell_lin_balanced.get_cousins(4) == [6, 7]
+        assert cell_lin_balanced.get_cousins(8) == [10, 11]
+        assert cell_lin_balanced.get_cousins(13) == [14, 15]
+
+    def test_first_cousins_at_same_timepoint(self, cell_lin_balanced):
+        """Test get_cousins only returns the cousin cells at the same timepoint."""
+        # Cell cycles [8, 16], [10, 18] and [11, 19].
+        assert cell_lin_balanced.get_cousins(16) == [18, 19]
+
+    def test_second_cousins(self, cell_lin_balanced):
+        """Test get_cousins with degree 2."""
+        assert cell_lin_balanced.get_cousins(8, degree=2) == [12, 13, 14, 15]
+        assert cell_lin_balanced.get_cousins(16, degree=2) == [20, 21, 22, 23]
+
+    def test_all_degrees(self, cell_lin_balanced):
+        """Test get_cousins returns all degrees, closest first, when degree is None."""
+        assert cell_lin_balanced.get_cousins(4, degree=None) == [6, 7]
+        cousins = cell_lin_balanced.get_cousins(16, degree=None)
+        # First cousins, then second cousins.
+        assert cousins == [18, 19, 20, 21, 22, 23]
+
+    def test_no_common_ancestor(self, cell_lin_balanced):
+        """Test get_cousins when no ancestor is far enough up."""
+        assert cell_lin_balanced.get_cousins(1) == []
+        assert cell_lin_balanced.get_cousins(2) == []
+        assert cell_lin_balanced.get_cousins(8, degree=3) == []
+        assert cell_lin_balanced.get_cousins(1, degree=None) == []
+        assert cell_lin_balanced.get_cousins(2, degree=None) == []
+
+    def test_cousin_cycles_without_contemporaries(self, cell_lin):
+        """Test get_cousins when the cousin cell cycles end before the cell."""
+        # Cell cycles [5, 6] and [7, 8] are first cousins of cell cycle [15],
+        # but they have no cell at its timepoint.
+        assert cell_lin.get_cousins(15) == []
+
+    def test_degree_lower_than_one(self, cell_lin_balanced):
+        """Test get_cousins raises ValueError for a degree lower than 1."""
+        with pytest.raises(ValueError, match="'degree' must be at least 1"):
+            cell_lin_balanced.get_cousins(8, degree=0)
+
+    def test_missing_cell(self, cell_lin_balanced):
+        """Test get_cousins raises KeyError for a cell not in the lineage."""
+        with pytest.raises(KeyError, match="Node 99 is not in the lineage"):
+            cell_lin_balanced.get_cousins(99)
+
+    def test_fusion_error(self, cell_lin):
+        """Test get_cousins raises FusionError for fusion event."""
+        cell_lin.add_edge(3, 12)
+        with pytest.raises(FusionError):
+            cell_lin.get_cousins(12)
 
 
 class TestCellLineageIsDivision:
@@ -2480,6 +2567,72 @@ class TestCycleLineageGetAncestors:
         msg = "No 'level' property to order the cell cycles."
         with pytest.warns(UserWarning, match=msg):
             cycle_lin.get_ancestors(5)
+
+
+class TestCycleLineageGetSisters:
+    """Test cases for Lineage.get_sisters method on cycle lineages."""
+
+    def test_normal_lin(self, cycle_lin):
+        """Test get_sisters on normal lineage."""
+        assert cycle_lin.get_sisters(1) == []
+        assert cycle_lin.get_sisters(2) == [3]
+        assert cycle_lin.get_sisters(3) == [2]
+        assert cycle_lin.get_sisters(4) == [5]
+        assert cycle_lin.get_sisters(5) == [4]
+
+    def test_single_node(self, one_node_cycle_lin):
+        """Test get_sisters on single node lineage."""
+        assert one_node_cycle_lin.get_sisters(1) == []
+
+    def test_triple_div(self, cycle_lin_triple_div):
+        """Test get_sisters on lineage with triple division."""
+        assert cycle_lin_triple_div.get_sisters(4) == [5, 6]
+        assert cycle_lin_triple_div.get_sisters(6) == [4, 5]
+
+    def test_missing_cycle(self, cycle_lin):
+        """Test get_sisters raises KeyError for a cell cycle not in the lineage."""
+        with pytest.raises(KeyError, match="Node 99 is not in the lineage"):
+            cycle_lin.get_sisters(99)
+
+
+class TestCycleLineageGetCousins:
+    """Test cases for Lineage.get_cousins method on cycle lineages."""
+
+    def test_first_cousins(self, cycle_lin_balanced):
+        """Test get_cousins with the default degree."""
+        assert cycle_lin_balanced.get_cousins(4) == [6, 7]
+        assert cycle_lin_balanced.get_cousins(16) == [18, 19]
+
+    def test_second_cousins(self, cycle_lin_balanced):
+        """Test get_cousins with degree 2."""
+        assert cycle_lin_balanced.get_cousins(16, degree=2) == [20, 21, 22, 23]
+
+    def test_all_degrees(self, cycle_lin_balanced):
+        """Test get_cousins returns all degrees, closest first, when degree is None."""
+        cousins = cycle_lin_balanced.get_cousins(16, degree=None)
+        # First cousins, then second cousins.
+        assert cousins == [18, 19, 20, 21, 22, 23]
+
+    def test_no_common_ancestor(self, cycle_lin):
+        """Test get_cousins when no ancestor is far enough up."""
+        assert cycle_lin.get_cousins(2) == []
+        # Cell cycle 3, the only aunt of 4 and 5, has no daughters.
+        assert cycle_lin.get_cousins(4) == []
+        assert cycle_lin.get_cousins(4, degree=None) == []
+
+    def test_no_time_constraint(self, cell_lin):
+        """Test get_cousins returns cousin cycles whatever their timepoints."""
+        cycle_lin = CycleLineage(
+            time_prop="timepoint", time_step=1, cell_lineage=cell_lin
+        )
+        # The cells of cell cycles [5, 6] and [7, 8] end before the cell of [15]
+        # starts, but they are still its cousins.
+        assert cycle_lin.get_cousins(15) == [6, 8]
+
+    def test_degree_lower_than_one(self, cycle_lin_balanced):
+        """Test get_cousins raises ValueError for a degree lower than 1."""
+        with pytest.raises(ValueError, match="'degree' must be at least 1"):
+            cycle_lin_balanced.get_cousins(16, degree=0)
 
 
 class TestCycleLineageGetLinksWithinCycle:

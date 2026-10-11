@@ -225,6 +225,228 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         descendants = nx.descendants(self, nid)
         return list(descendants)
 
+    def get_sisters(self, node_id: int) -> list[int]:
+        """
+        Return the sisters of a given node.
+
+        Sisters are born from the same division: they share the same mother.
+        In a cell lineage, the sisters of a cell are the cells of its sister cell
+        cycles that are at the same timepoint as the cell. In a cycle lineage,
+        the sisters of a cell cycle are the other cell cycles born from the same
+        division.
+
+        Parameters
+        ----------
+        node_id : int
+            ID of the node (cell or cell cycle) for which to find the sisters.
+
+        Returns
+        -------
+        list[int]
+            IDs of the sisters of the node.
+
+        Raises
+        ------
+        KeyError
+            If the node is not in the lineage.
+        FusionError
+            If a node on the way up to the mother has more than one parent.
+        """
+        return self._get_relatives(node_id, degree=0)
+
+    def get_cousins(self, node_id: int, degree: int | None = 1) -> list[int]:
+        """
+        Return the cousins of a given node.
+
+        First cousins share the same grandmother but not the same mother: their
+        mothers are sisters. More generally, cousins of degree n share an ancestor
+        n + 1 generations up, but no closer one: second cousins share the same
+        great-grandmother, and so on. Generations are counted in cell cycles.
+        In a cell lineage, only the cells at the same timepoint as the given cell
+        are returned. In a cycle lineage, cousins are cell cycles.
+
+        Parameters
+        ----------
+        node_id : int
+            ID of the node (cell or cell cycle) for which to find the cousins.
+        degree : int | None, optional
+            Degree of the cousins: 1 for first cousins, 2 for second cousins, and
+            so on. If None, the cousins of all degrees are returned, closest first.
+            1 by default.
+
+        Returns
+        -------
+        list[int]
+            IDs of the cousins of the node.
+
+        Raises
+        ------
+        ValueError
+            If `degree` is lower than 1.
+        KeyError
+            If the node is not in the lineage.
+        FusionError
+            If a node on the way up to the common ancestor has more than one
+            parent.
+        """
+        if degree is not None and degree < 1:
+            raise ValueError(f"'degree' must be at least 1 or None, got {degree}.")
+        return self._get_relatives(node_id, degree)
+
+    def _get_relatives(self, node_id: int, degree: int | None) -> list[int]:
+        """
+        Return the relatives of a node that share an ancestor degree + 1
+        generations up, but no closer one.
+
+        Degree 0 gives the sisters of the node, degree 1 its first cousins, and so
+        on. Generations are counted in cell cycles, through the `_get_cycle()`,
+        `_get_parent_cycle()`, `_get_daughter_cycles()` and `_get_matching_nodes()`
+        methods.
+
+        Parameters
+        ----------
+        node_id : int
+            ID of the node (cell or cell cycle) for which to find the relatives.
+        degree : int | None
+            Degree of the relatives, or None for all the degrees from 1,
+            closest first.
+
+        Returns
+        -------
+        list[int]
+            IDs of the relatives of the node.
+
+        Raises
+        ------
+        KeyError
+            If the node is not in the lineage.
+        FusionError
+            If a node on the way up to the common ancestor has more than one
+            parent.
+        """
+        if node_id not in self:
+            raise KeyError(f"Node {node_id} is not in the lineage.")
+        # Cell cycles from the one of the node up to the farthest common ancestor
+        # needed: path[d + 1] is the common ancestor of the relatives of degree d.
+        path = [self._get_cycle(node_id)]
+        while degree is None or len(path) < degree + 2:
+            parent = self._get_parent_cycle(path[-1])
+            if parent is None:
+                break
+            path.append(parent)
+        if degree is None:
+            degrees = range(1, len(path) - 1)
+        elif degree + 1 < len(path):
+            degrees = range(degree, degree + 1)
+        else:
+            return []
+
+        relatives = []
+        for d in degrees:
+            # Daughters of the common ancestor, except the one leading to the node,
+            # then their descendants down to the generation of the node.
+            cycles = [
+                cycle
+                for cycle in self._get_daughter_cycles(path[d + 1])
+                if cycle != path[d]
+            ]
+            for _ in range(d):
+                cycles = [
+                    daughter
+                    for cycle in cycles
+                    for daughter in self._get_daughter_cycles(cycle)
+                ]
+            relatives.extend(
+                matching_node
+                for cycle in cycles
+                for matching_node in self._get_matching_nodes(cycle, node_id)
+            )
+        return relatives
+
+    def _get_cycle(self, node_id: int) -> int:
+        """
+        Return the ID of the cell cycle holding a given node.
+
+        Cell cycles are identified as in cycle lineages, by the ID of their last
+        cell. Here, each node is its own cell cycle, as in a cycle lineage.
+
+        Parameters
+        ----------
+        node_id : int
+            ID of the node.
+
+        Returns
+        -------
+        int
+            ID of the cell cycle holding the node.
+        """
+        return node_id
+
+    def _get_parent_cycle(self, cycle_id: int) -> int | None:
+        """
+        Return the mother cycle of a given cell cycle.
+
+        Here, each node is its own cell cycle, as in a cycle lineage.
+
+        Parameters
+        ----------
+        cycle_id : int
+            ID of the cell cycle.
+
+        Returns
+        -------
+        int | None
+            ID of the mother cycle, or None if the cell cycle starts at the root.
+
+        Raises
+        ------
+        FusionError
+            If the cell cycle has more than one parent.
+        """
+        parents = list(self.predecessors(cycle_id))
+        if len(parents) > 1:
+            raise FusionError(cycle_id, self.graph.get("lineage_ID"))
+        return parents[0] if parents else None
+
+    def _get_daughter_cycles(self, cycle_id: int) -> list[int]:
+        """
+        Return the daughter cycles of a given cell cycle.
+
+        Here, each node is its own cell cycle, as in a cycle lineage.
+
+        Parameters
+        ----------
+        cycle_id : int
+            ID of the cell cycle.
+
+        Returns
+        -------
+        list[int]
+            IDs of the cell cycles born from the division ending the cell cycle.
+        """
+        return list(self.successors(cycle_id))
+
+    def _get_matching_nodes(self, cycle_id: int, node_id: int) -> list[int]:
+        """
+        Return the nodes of a cell cycle to report as relatives of a given node.
+
+        Here, each node is its own cell cycle, as in a cycle lineage, so it is the
+        cell cycle itself.
+
+        Parameters
+        ----------
+        cycle_id : int
+            ID of the cell cycle of the relative.
+        node_id : int
+            ID of the node whose relatives are searched.
+
+        Returns
+        -------
+        list[int]
+            IDs of the nodes to report.
+        """
+        return [cycle_id]
+
     def get_depth(self) -> int:
         """
         Return the depth of the lineage.
@@ -1707,49 +1929,93 @@ class CellLineage(Lineage):
 
         return cell_cycles
 
-    def get_sister_cells(self, cid: int) -> list[int]:
+    def _get_cycle(self, node_id: int) -> int:
         """
-        Return the sister cells of a given cell.
+        Return the ID of the cell cycle holding a given cell.
 
-        Sister cells are cells that are on the same timepoint
-        and share the same parent cell.
+        Cell cycles are identified as in cycle lineages, by the ID of their last
+        cell.
 
         Parameters
         ----------
-        cid : int
-            ID of the cell for which to find the sister cells.
+        node_id : int
+            ID of the cell.
 
         Returns
         -------
-        list[int]
-            The list of cell IDs of the sister cells of the given cell.
+        int
+            ID of the cell cycle holding the cell.
 
         Raises
         ------
         FusionError
-            If the given cell has more than one parent cell.
+            If a cell of the cell cycle has more than one parent.
         """
-        sister_cells = []
-        current_tp = self.nodes[cid]["timepoint"]
-        if not self.is_root(cid):
-            current_cell_cycle = self.get_cell_cycle(cid)
-            parents = list(self.predecessors(current_cell_cycle[0]))
-            if len(parents) == 1:
-                children = list(self.successors(parents[0]))
-                children.remove(current_cell_cycle[0])
-                for child in children:
-                    sister_cell_cycle = self.get_cell_cycle(child)
-                    sister_cells.extend(
-                        [
-                            n
-                            for n in sister_cell_cycle
-                            if self.nodes[n]["timepoint"] == current_tp
-                        ]
-                    )
-            elif len(parents) > 1:
-                lid, _ = CellLineage._get_lineage_ID_and_err_msg(self)
-                raise FusionError(cid, lid)
-        return sister_cells
+        return self.get_cell_cycle(node_id)[-1]
+
+    def _get_parent_cycle(self, cycle_id: int) -> int | None:
+        """
+        Return the mother cycle of a given cell cycle.
+
+        The mother cycle ends with the division that gave birth to the first cell
+        of the cell cycle, so its ID is the ID of that dividing cell.
+
+        Parameters
+        ----------
+        cycle_id : int
+            ID of the cell cycle, i.e. of its last cell.
+
+        Returns
+        -------
+        int | None
+            ID of the mother cycle, or None if the cell cycle starts at the root.
+
+        Raises
+        ------
+        FusionError
+            If a cell of the cell cycle has more than one parent.
+        """
+        return super()._get_parent_cycle(self.get_cell_cycle(cycle_id)[0])
+
+    def _get_daughter_cycles(self, cycle_id: int) -> list[int]:
+        """
+        Return the daughter cycles of a given cell cycle.
+
+        Parameters
+        ----------
+        cycle_id : int
+            ID of the cell cycle, i.e. of its last cell.
+
+        Returns
+        -------
+        list[int]
+            IDs of the cell cycles born from the division ending the cell cycle,
+            or an empty list if the cell cycle ends with a leaf.
+        """
+        return [self._get_cycle(daughter) for daughter in self.successors(cycle_id)]
+
+    def _get_matching_nodes(self, cycle_id: int, node_id: int) -> list[int]:
+        """
+        Return the cells of a cell cycle at the same timepoint as a given cell.
+
+        Parameters
+        ----------
+        cycle_id : int
+            ID of the cell cycle of the relative, i.e. of its last cell.
+        node_id : int
+            ID of the cell whose relatives are searched.
+
+        Returns
+        -------
+        list[int]
+            IDs of the cells of the cell cycle at the same timepoint as the cell.
+        """
+        timepoint = self.nodes[node_id]["timepoint"]
+        return [
+            cell_id
+            for cell_id in self.get_cell_cycle(cycle_id)
+            if self.nodes[cell_id]["timepoint"] == timepoint
+        ]
 
     def is_division(self, cid: int) -> bool:
         """
