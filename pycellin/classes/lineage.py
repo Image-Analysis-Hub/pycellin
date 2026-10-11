@@ -2636,6 +2636,8 @@ class CycleLineage(Lineage):
                     cell_lineage.nodes[last][time_prop]
                     - cell_lineage.nodes[first][time_prop]
                 )
+                self.nodes[n]["cycle_start_time"] = cell_lineage.nodes[first][time_prop]
+                self.nodes[n]["cycle_end_time"] = cell_lineage.nodes[last][time_prop]
                 root = self.get_root()
                 if isinstance(root, list):
                     raise LineageStructureError(

@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to f9cb606, plus the uncommitted changes that let tree plots take a y_prop identifier and reject non-string input properties. Update from there with: git log f9cb606..dev -->
+<!-- Planned v0.6.0. Covers commits up to 3808974, plus the uncommitted changes that add the cycle_start_time and cycle_end_time properties. Update from there with: git log 3808974..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -49,9 +49,10 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Metadata:** `label_img` and `label_img_path` standard metadata fields
 - **Metadata:** `ModelMetadata.diff()` to list the metadata fields that differ between two models
 - **Properties:** `Property.get_incompatibilities()` to compare two property declarations
-- **Properties:** `pycellin.properties` now exposes the 13 core property factories (`create_cell_id_property()`, `create_time_property()`, ...), to declare properties when building a model from scratch or writing a loader
+- **Properties:** `pycellin.properties` now exposes the 15 core property factories (`create_cell_id_property()`, `create_time_property()`, ...), to declare properties when building a model from scratch or writing a loader
 - **Properties:** `time` core property with its calculator
-- **Properties:** morphology properties `cell_polygon`, `cell_multipolygon`, `cell_contour`, `cell_area` and `cell_perimeter`
+- **Properties:** `cycle_start_time` and `cycle_end_time` core properties, the times of the first and last cells of the cycle in the reference time unit. Like `cycle_duration`, they are computed by `add_cycle_data()`
+- **Properties:** morphology properties `cell_polygon`, `cell_multipolygon`, `cell_contour`, `cell_area`, `cell_perimeter`, `cell_circularity` and `cell_solidity`
   - `cell_polygon` is computed from a label image or from cell contours (e.g. loaded from TrackMate or CTC data). From a label image, it keeps the largest piece of each label and fills its holes, with a warning listing the cells concerned
   - `cell_multipolygon` is computed from a label image and keeps every piece and hole of each label
 - **Properties:** morphology properties `cycle_mean_area`, `birth_area` and `division_area`

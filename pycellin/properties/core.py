@@ -617,6 +617,74 @@ def create_cycle_duration_property(
     )
 
 
+def create_cycle_start_time_property(
+    time_unit: str | None, provenance: str = "pycellin"
+) -> Property:
+    """
+    Create the declaration of the `cycle_start_time` core property.
+
+    `cycle_start_time` is the time of the first cell of the cell cycle, expressed
+    in `time_unit`. It is a node property of cycle lineages.
+
+    Parameters
+    ----------
+    time_unit : str or None
+        Unit of the time, e.g. "min".
+    provenance : str, optional
+        Origin of the property, e.g. the name of the format it was loaded from.
+        "pycellin" by default.
+
+    Returns
+    -------
+    Property
+        Declaration of the `cycle_start_time` property.
+    """
+    return Property(
+        identifier="cycle_start_time",
+        name="Cycle start time",
+        description="Time of the first cell in the cell cycle",
+        provenance=provenance,
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=time_unit,
+    )
+
+
+def create_cycle_end_time_property(
+    time_unit: str | None, provenance: str = "pycellin"
+) -> Property:
+    """
+    Create the declaration of the `cycle_end_time` core property.
+
+    `cycle_end_time` is the time of the last cell of the cell cycle, expressed in
+    `time_unit`. It is a node property of cycle lineages.
+
+    Parameters
+    ----------
+    time_unit : str or None
+        Unit of the time, e.g. "min".
+    provenance : str, optional
+        Origin of the property, e.g. the name of the format it was loaded from.
+        "pycellin" by default.
+
+    Returns
+    -------
+    Property
+        Declaration of the `cycle_end_time` property.
+    """
+    return Property(
+        identifier="cycle_end_time",
+        name="Cycle end time",
+        description="Time of the last cell in the cell cycle",
+        provenance=provenance,
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=time_unit,
+    )
+
+
 def create_level_property(provenance: str = "pycellin") -> Property:
     """
     Create the declaration of the `level` core property.

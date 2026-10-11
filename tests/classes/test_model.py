@@ -398,6 +398,30 @@ class TestRescaleTime:
         }
         assert frame_time_model.get_property("cycle_duration").unit == "min"
 
+    def test_cycle_start_time_rescaled(self, frame_time_model):
+        frame_time_model.add_cycle_data()
+        cycle_lin = frame_time_model.data.cycle_data[1]
+        start_times = dict(cycle_lin.nodes(data="cycle_start_time"))
+        frame_time_model.rescale_time(5, time_unit="min")
+        frame_time_model.update()
+        cycle_lin = frame_time_model.data.cycle_data[1]
+        assert dict(cycle_lin.nodes(data="cycle_start_time")) == {
+            cid: start_time * 5 for cid, start_time in start_times.items()
+        }
+        assert frame_time_model.get_property("cycle_start_time").unit == "min"
+
+    def test_cycle_end_time_rescaled(self, frame_time_model):
+        frame_time_model.add_cycle_data()
+        cycle_lin = frame_time_model.data.cycle_data[1]
+        end_times = dict(cycle_lin.nodes(data="cycle_end_time"))
+        frame_time_model.rescale_time(5, time_unit="min")
+        frame_time_model.update()
+        cycle_lin = frame_time_model.data.cycle_data[1]
+        assert dict(cycle_lin.nodes(data="cycle_end_time")) == {
+            cid: end_time * 5 for cid, end_time in end_times.items()
+        }
+        assert frame_time_model.get_property("cycle_end_time").unit == "min"
+
     def test_zero_factor_raises(self, frame_time_model):
         with pytest.raises(ValueError, match="strictly positive"):
             frame_time_model.rescale_time(0)

@@ -537,8 +537,9 @@ class Model:
 
         Use this method to convert the time of the model into another unit, e.g. from
         frames to minutes when the data was loaded without time calibration. The
-        reference time values are rescaled immediately. The "timepoint" property and
-        the other properties with a calculator are recomputed at the next `update()`.
+        reference time values are rescaled immediately. The cycle lineages, the
+        "timepoint" property and the other properties with a calculator are
+        recomputed at the next `update()`.
 
         Parameters
         ----------
@@ -549,7 +550,8 @@ class Model:
         time_unit : str | None, optional
             New time unit, e.g. "min". It is set as the time unit of the model, as
             the unit of the reference time property and, if declared, as the unit of
-            the "cycle_duration" property. If None (default), units are unchanged.
+            the "cycle_duration", "cycle_start_time" and "cycle_end_time" properties.
+            If None (default), units are unchanged.
 
         Raises
         ------
@@ -600,12 +602,15 @@ class Model:
         self._multiply_prop_values(time_prop, PropertyType.NODE, factor)
         if time_unit is not None:
             self.model_metadata.time_unit = time_unit
-            prop = self.props_metadata.props.get(time_prop)
-            if prop is not None:
-                prop.unit = time_unit
-            cycle_duration_prop = self.props_metadata.props.get("cycle_duration")
-            if cycle_duration_prop is not None:
-                cycle_duration_prop.unit = time_unit
+            for prop_id in (
+                time_prop,
+                "cycle_duration",
+                "cycle_start_time",
+                "cycle_end_time",
+            ):
+                prop = self.props_metadata.props.get(prop_id)
+                if prop is not None:
+                    prop.unit = time_unit
 
         time_step = self.model_metadata.time_step
         if time_step is not None:

@@ -2320,14 +2320,20 @@ class TestCycleLineageInit:
         assert cycle_lin.nodes[2]["cycle_ID"] == 2
         assert cycle_lin.nodes[2]["cells"] == [1, 2]
         assert cycle_lin.nodes[2]["cycle_length"] == 2
+        assert cycle_lin.nodes[2]["cycle_start_time"] == 0
+        assert cycle_lin.nodes[2]["cycle_end_time"] == 1
         assert cycle_lin.nodes[2]["level"] == 0
         assert cycle_lin.nodes[9]["cycle_ID"] == 9
         assert cycle_lin.nodes[9]["cells"] == [9]
         assert cycle_lin.nodes[9]["cycle_length"] == 1
+        assert cycle_lin.nodes[9]["cycle_start_time"] == 6
+        assert cycle_lin.nodes[9]["cycle_end_time"] == 6
         assert cycle_lin.nodes[9]["level"] == 3
         assert cycle_lin.nodes[14]["cycle_ID"] == 14
         assert cycle_lin.nodes[14]["cells"] == [11, 12, 13, 14]
         assert cycle_lin.nodes[14]["cycle_length"] == 4
+        assert cycle_lin.nodes[14]["cycle_start_time"] == 2
+        assert cycle_lin.nodes[14]["cycle_end_time"] == 5
         assert cycle_lin.nodes[14]["level"] == 1
 
     def test_empty_lin(self, empty_cell_lin):
@@ -2348,6 +2354,8 @@ class TestCycleLineageInit:
         assert cycle_lin.nodes[1]["cycle_ID"] == 1
         assert cycle_lin.nodes[1]["cells"] == [1]
         assert cycle_lin.nodes[1]["cycle_length"] == 1
+        assert cycle_lin.nodes[1]["cycle_start_time"] == 0
+        assert cycle_lin.nodes[1]["cycle_end_time"] == 0
         assert cycle_lin.nodes[1]["level"] == 0
 
     def test_gap(self, cell_lin_gap):
@@ -2360,14 +2368,20 @@ class TestCycleLineageInit:
         assert cycle_lin.nodes[2]["cycle_ID"] == 2
         assert cycle_lin.nodes[2]["cells"] == [1, 2]
         assert cycle_lin.nodes[2]["cycle_length"] == 2
+        assert cycle_lin.nodes[2]["cycle_start_time"] == 0
+        assert cycle_lin.nodes[2]["cycle_end_time"] == 1
         assert cycle_lin.nodes[2]["level"] == 0
         assert cycle_lin.nodes[9]["cycle_ID"] == 9
         assert cycle_lin.nodes[9]["cells"] == [9]
         assert cycle_lin.nodes[9]["cycle_length"] == 1
+        assert cycle_lin.nodes[9]["cycle_start_time"] == 6
+        assert cycle_lin.nodes[9]["cycle_end_time"] == 6
         assert cycle_lin.nodes[9]["level"] == 3
         assert cycle_lin.nodes[14]["cycle_ID"] == 14
         assert cycle_lin.nodes[14]["cells"] == [11, 14]
         assert cycle_lin.nodes[14]["cycle_length"] == 2
+        assert cycle_lin.nodes[14]["cycle_start_time"] == 2
+        assert cycle_lin.nodes[14]["cycle_end_time"] == 5
         assert cycle_lin.nodes[14]["level"] == 1
 
     def test_div_root(self, cell_lin_div_root):
@@ -2380,10 +2394,14 @@ class TestCycleLineageInit:
         assert cycle_lin.nodes[1]["cycle_ID"] == 1
         assert cycle_lin.nodes[1]["cells"] == [1]
         assert cycle_lin.nodes[1]["cycle_length"] == 1
+        assert cycle_lin.nodes[1]["cycle_start_time"] == 0
+        assert cycle_lin.nodes[1]["cycle_end_time"] == 0
         assert cycle_lin.nodes[1]["level"] == 0
         assert cycle_lin.nodes[17]["cycle_ID"] == 17
         assert cycle_lin.nodes[17]["cells"] == [17]
         assert cycle_lin.nodes[17]["cycle_length"] == 1
+        assert cycle_lin.nodes[17]["cycle_start_time"] == 1
+        assert cycle_lin.nodes[17]["cycle_end_time"] == 1
         assert cycle_lin.nodes[17]["level"] == 1
 
     def test_successive_divs_and_root(self, cell_lin_successive_divs_and_root):
@@ -2398,10 +2416,14 @@ class TestCycleLineageInit:
         assert cycle_lin.nodes[3]["cycle_ID"] == 3
         assert cycle_lin.nodes[3]["cells"] == [3]
         assert cycle_lin.nodes[3]["cycle_length"] == 1
+        assert cycle_lin.nodes[3]["cycle_start_time"] == 2
+        assert cycle_lin.nodes[3]["cycle_end_time"] == 2
         assert cycle_lin.nodes[3]["level"] == 1
         assert cycle_lin.nodes[5]["cycle_ID"] == 5
         assert cycle_lin.nodes[5]["cells"] == [4, 5]
         assert cycle_lin.nodes[5]["cycle_length"] == 2
+        assert cycle_lin.nodes[5]["cycle_start_time"] == 3
+        assert cycle_lin.nodes[5]["cycle_end_time"] == 4
         assert cycle_lin.nodes[5]["level"] == 2
 
     def test_triple_div(self, cell_lin_triple_div):
@@ -2414,10 +2436,14 @@ class TestCycleLineageInit:
         assert cycle_lin.nodes[4]["cycle_ID"] == 4
         assert cycle_lin.nodes[4]["cells"] == [3, 4]
         assert cycle_lin.nodes[4]["cycle_length"] == 2
+        assert cycle_lin.nodes[4]["cycle_start_time"] == 2
+        assert cycle_lin.nodes[4]["cycle_end_time"] == 3
         assert cycle_lin.nodes[4]["level"] == 1
         assert cycle_lin.nodes[18]["cycle_ID"] == 18
         assert cycle_lin.nodes[18]["cells"] == [17, 18]
         assert cycle_lin.nodes[18]["cycle_length"] == 2
+        assert cycle_lin.nodes[18]["cycle_start_time"] == 4
+        assert cycle_lin.nodes[18]["cycle_end_time"] == 5
         assert cycle_lin.nodes[18]["level"] == 2
 
     def test_unconnected_node(self, cell_lin_unconnected_node):

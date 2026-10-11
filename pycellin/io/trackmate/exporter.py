@@ -166,8 +166,10 @@ def _unit_to_dimension(
         "cells": "NONE",  # not float nor int so won't be exported anyway
         "cycle_completeness": "NONE",
         "cycle_duration": "TIME",
+        "cycle_end_time": "TIME",
         "cycle_ID": "NONE",
         "cycle_length": "NONE",
+        "cycle_start_time": "TIME",
         "division_time": "TIME",
         "division_rate": "TIME",  # TODO: check if this is correct
         "level": "NONE",
