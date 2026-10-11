@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 90ced5f, plus the uncommitted changes that make the absolute_age and relative_age calculators local and explain when a calculator should be local or global. Update from there with: git log 90ced5f..dev -->
+<!-- Planned v0.6.0. Covers commits up to 4becd13, plus the uncommitted fixes to the text of the Custom properties notebook (Property fields, which question prop_type answers), covered by the Maintenance "Docs" entry. Update from there with: git log 4becd13..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
