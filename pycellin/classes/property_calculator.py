@@ -135,15 +135,19 @@ class LocalPropCalculator(PropertyCalculator):
     """
     Abstract class to compute local property values and add them to lineages.
 
-    Local properties are properties that only need data from the current object
-    to be computed.
+    Local properties only need data from the lineage holding the object they
+    describe: the object itself, but also any other node, edge or graph attribute
+    of that lineage. At each update, they are only recomputed for the objects of
+    the lineages added or modified since the previous update.
     Examples:
-    - cell area (node property) only need data from the cell itself
+    - cell area (node property) only needs data from the cell itself
       (coordinates of boundary points);
-    - cell speed (edge property) only need data from the edge itself
-      (time and space location of the two nodes);
-    - lineage duration (lineage property) only need data from the lineage itself
-      (number of timepoints).
+    - absolute age (node property) needs the time of the cell and of the root
+      of its lineage;
+    - cell speed (edge property) needs the time and space location of the two
+      nodes of the edge;
+    - lineage duration (lineage property) needs the time of all the cells
+      of the lineage.
     """
 
     _LOCAL_PROPERTY = True
@@ -301,11 +305,17 @@ class GlobalPropCalculator(PropertyCalculator):
     """
     Abstract class to compute global property values and add them to lineages.
 
-    Global properties are properties that need data from other objects to be computed.
+    Global properties need data from lineages other than the one holding the object
+    they describe, typically a cycle lineage property computed from the cells of
+    the matching cell lineage. At each update, they are recomputed for all the
+    objects of all the lineages, so use a local property when the lineage holding
+    the object is enough. Cycle lineages are rebuilt at each update, so their
+    properties are recomputed for all cell cycles in both cases.
     Examples:
-    - cell age (node property) needs data from all its ancestor cells in the lineage;
-    - TODO: edge property, find relevant example?
-    - TODO: lineage property, find relevant example?
+    - cycle mean area (cycle lineage node property) needs the area of the cells
+      of the cell cycle, which are stored in the cell lineage;
+    - the number of cells present at the same time in the whole model (cell
+      lineage node property) needs the cells of all the lineages.
     """
 
     _LOCAL_PROPERTY = False

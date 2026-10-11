@@ -99,19 +99,19 @@ def test_absolute_age(cell_lin, prop_cell_lin):
     """Test AbsoluteAge Calculator."""
     calculator = AbsoluteAge(prop_cell_lin, time_prop="frame")
     # Root.
-    assert calculator.compute(Data({}), cell_lin, nid=1) == 0
+    assert calculator.compute(cell_lin, nid=1) == 0
     # Divisions.
-    assert calculator.compute(Data({}), cell_lin, nid=2) == 1
-    assert calculator.compute(Data({}), cell_lin, nid=4) == 3
+    assert calculator.compute(cell_lin, nid=2) == 1
+    assert calculator.compute(cell_lin, nid=4) == 3
     # Leaves.
-    assert calculator.compute(Data({}), cell_lin, nid=6) == 5
-    assert calculator.compute(Data({}), cell_lin, nid=10) == 6
+    assert calculator.compute(cell_lin, nid=6) == 5
+    assert calculator.compute(cell_lin, nid=10) == 6
     # Intermediate nodes.
-    assert calculator.compute(Data({}), cell_lin, nid=3) == 2
-    assert calculator.compute(Data({}), cell_lin, nid=13) == 4
+    assert calculator.compute(cell_lin, nid=3) == 2
+    assert calculator.compute(cell_lin, nid=13) == 4
     # Non-existent node.
     with pytest.raises(KeyError):
-        calculator.compute(Data({}), cell_lin, nid=99)
+        calculator.compute(cell_lin, nid=99)
 
 
 # RelativeAge #################################################################
@@ -121,19 +121,19 @@ def test_relative_age(cell_lin, prop_cell_lin):
     """Test RelativeAge Calculator."""
     calculator = RelativeAge(prop_cell_lin, time_prop="frame")
     # Root.
-    assert calculator.compute(Data({}), cell_lin, nid=1) == 0
+    assert calculator.compute(cell_lin, nid=1) == 0
     # Divisions.
-    assert calculator.compute(Data({}), cell_lin, nid=2) == 1
-    assert calculator.compute(Data({}), cell_lin, nid=4) == 1
+    assert calculator.compute(cell_lin, nid=2) == 1
+    assert calculator.compute(cell_lin, nid=4) == 1
     # Leaves.
-    assert calculator.compute(Data({}), cell_lin, nid=6) == 1
-    assert calculator.compute(Data({}), cell_lin, nid=10) == 0
+    assert calculator.compute(cell_lin, nid=6) == 1
+    assert calculator.compute(cell_lin, nid=10) == 0
     # Intermediate nodes.
-    assert calculator.compute(Data({}), cell_lin, nid=3) == 0
-    assert calculator.compute(Data({}), cell_lin, nid=13) == 2
+    assert calculator.compute(cell_lin, nid=3) == 0
+    assert calculator.compute(cell_lin, nid=13) == 2
     # Non-existent node.
     with pytest.raises(KeyError):
-        calculator.compute(Data({}), cell_lin, nid=99)
+        calculator.compute(cell_lin, nid=99)
 
 
 # NormalizedAge ###############################################################

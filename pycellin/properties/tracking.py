@@ -66,7 +66,7 @@ def create_absolute_age_property(
     )
 
 
-class AbsoluteAge(NodeGlobalPropCalculator):
+class AbsoluteAge(NodeLocalPropCalculator):
     """
     Calculator to compute the absolute age of cells.
 
@@ -94,15 +94,13 @@ class AbsoluteAge(NodeGlobalPropCalculator):
         self.time_prop = time_prop
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage, nid: int
+        self, lineage: CellLineage, nid: int
     ) -> int | float:
         """
         Compute the absolute age of a given cell.
 
         Parameters
         ----------
-        data : Data
-            Data object containing the lineage.
         lineage : CellLineage
             Lineage graph containing the node of interest.
         nid : int
@@ -148,15 +146,15 @@ def create_relative_age_property(
     )
 
 
-class RelativeAge(NodeGlobalPropCalculator):
+class RelativeAge(NodeLocalPropCalculator):
     """
     Calculator to compute the relative age of cells.
 
     The relative age of a cell is defined as the time elapsed since
     the start of the cell cycle (i.e. previous division, or beginning
     of the lineage). Relative age of the first cell of a cell cycle is 0.
-    It is given in frames by default, but can be converted
-    to the time unit of the model if specified.
+    It is computed in the same unit as the time property given as input
+    (e.g. "frame", "time", etc.).
     """
 
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
@@ -177,15 +175,13 @@ class RelativeAge(NodeGlobalPropCalculator):
         self.time_prop = time_prop
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage, nid: int
+        self, lineage: CellLineage, nid: int
     ) -> int | float:
         """
         Compute the relative age of a given cell.
 
         Parameters
         ----------
-        data : Data
-            Data object containing the lineage.
         lineage : CellLineage
             Lineage graph containing the node of interest.
         nid : int

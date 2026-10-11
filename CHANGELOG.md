@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 3808974, plus the uncommitted changes that add the cycle_start_time, cycle_end_time and normalized_age properties. Update from there with: git log 3808974..dev -->
+<!-- Planned v0.6.0. Covers commits up to 90ced5f, plus the uncommitted changes that make the absolute_age and relative_age calculators local and explain when a calculator should be local or global. Update from there with: git log 90ced5f..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -100,7 +100,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** changing the time step with `set_time_step()` corrupted the `timepoint` values
 - **Model:** `add_lineage()` failed with `with_CycleLineage=True` or with a lineage that had no lineage ID, and ignored its `lid` argument when given a lineage
 - **Model:** `add_lineage()` silently replaced a lineage that already had the same ID. It now raises `ValueError`
-- **Properties:** `turning_angle` (`angle` in 0.5.1) was recomputed for every lineage at each update, as its calculator was global instead of local
+- **Properties:** `turning_angle` (`angle` in 0.5.1), `absolute_age` and `relative_age` were recomputed for every lineage at each update, as their calculators were global instead of local
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells
 - **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning
 - **TrackMate:** `turning_angle` (`angle` in 0.5.1) in degrees was exported as a TrackMate angle, which TrackMate reads as radians
@@ -114,7 +114,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 ### Maintenance
 
 - **Tests:** new tests for model merging and splitting, the new properties, plotting, exceptions, utils and the CTC loader
-- **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks
+- **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks, and explain when a calculator should be local or global
 - **Packaging:** find packages automatically in `pyproject.toml`
 - **Packaging:** declare the license as an SPDX expression (`BSD-3-Clause`) instead of the deprecated classifier. Building pycellin now needs setuptools >= 77
 - **Packaging:** between releases, the version on `dev` ends with `.dev0` (e.g. `0.6.0.dev0`), so models made with development code say so in their `pycellin_version` metadata

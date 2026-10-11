@@ -1148,6 +1148,15 @@ class TestAddAbsoluteAge:
         prop = input_props_model.get_property("absolute_age")
         assert (prop.dtype, prop.unit) == ("int", "frame")
 
+    def test_new_root_updates_all_cells(self, input_props_model):
+        input_props_model.add_absolute_age()
+        input_props_model.update()
+        input_props_model.add_cell(lid=1, cid=5, time_value=-1)
+        input_props_model.add_link(source_cid=5, source_lid=1, target_cid=1)
+        input_props_model.update()
+        lin = input_props_model.data.cell_data[1]
+        assert dict(lin.nodes(data="absolute_age")) == {1: 1, 2: 2, 3: 3, 4: 3, 5: 0}
+
     def test_missing_time_prop_raises(self, input_props_model):
         with pytest.raises(MissingPropertyError, match="set 'time_prop'"):
             input_props_model.add_absolute_age(time_prop="unknown")
@@ -1191,6 +1200,20 @@ class TestAddNormalizedAge:
         with pytest.raises(TypeError, match="Pass its identifier instead: 'time'"):
             input_props_model.add_normalized_age(time_prop=time_prop)
         assert input_props_model.get_property("normalized_age") is None
+
+
+class TestAddRelativeAge:
+    """Test cases for Model.add_relative_age() method."""
+
+    def test_new_division_updates_its_cycle(self, input_props_model):
+        input_props_model.add_relative_age()
+        input_props_model.update()
+        assert input_props_model.data.cell_data[1].nodes[2]["relative_age"] == 1
+        # Cell 1 divides into cells 2 and 5: cycle [1, 2] becomes [1] and [2].
+        input_props_model.add_cell(lid=1, cid=5, time_value=1)
+        input_props_model.add_link(source_cid=1, source_lid=1, target_cid=5)
+        input_props_model.update()
+        assert input_props_model.data.cell_data[1].nodes[2]["relative_age"] == 0
 
 
 class TestAddCellSpeed:
