@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 3808974, plus the uncommitted changes that add the cycle_start_time and cycle_end_time properties. Update from there with: git log 3808974..dev -->
+<!-- Planned v0.6.0. Covers commits up to 3808974, plus the uncommitted changes that add the cycle_start_time, cycle_end_time and normalized_age properties. Update from there with: git log 3808974..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -63,6 +63,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** topology lineage properties `num_cells`, `num_cycles`, `num_divs`, `num_gaps` and `num_leaves`
 - **Properties:** topology lineage properties `lineage_cell_depth`, `lineage_cycle_depth` and `lineage_duration`
 - **Properties:** `location_tag`, a cell property read from a mask image. `mask_path_metadata_field` reads the mask path from the model metadata, and a `tag_names` dict maps pixel values to region names
+- **Properties:** `normalized_age`, the relative age of a cell divided by the duration of its cell cycle, from 0 at the first cell of the cycle to 1 at the last one. With `ignore_incomplete_cycles=True`, the cells of cycles that start at the root or end with a leaf get NaN
 - **Properties:** `uses_external_data()` class method on calculators
 - **Exceptions:** `MissingPropertyError` (a `KeyError`), raised when a required property is missing from a node, an edge or the model
 - **Lineages:** `Lineage.get_depth()`, `CellLineage.get_gaps()` and `CellLineage.get_duration()`

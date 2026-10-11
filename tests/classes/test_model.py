@@ -1159,6 +1159,40 @@ class TestAddAbsoluteAge:
         assert input_props_model.get_property("absolute_age") is None
 
 
+class TestAddNormalizedAge:
+    """Test cases for Model.add_normalized_age() method."""
+
+    def test_default_time_prop_is_reference(self, input_props_model):
+        input_props_model.add_normalized_age()
+        input_props_model.update()
+        lin = input_props_model.data.cell_data[1]
+        # Cycle 2 = [1, 2] goes from time 0 to time 1, cycle 3 = [3] is a single cell.
+        assert lin.nodes[1]["normalized_age"] == 0
+        assert lin.nodes[2]["normalized_age"] == 1
+        assert np.isnan(lin.nodes[3]["normalized_age"])
+
+    def test_ignore_incomplete_cycles(self, input_props_model):
+        input_props_model.add_normalized_age(ignore_incomplete_cycles=True)
+        input_props_model.update()
+        # Cycle 2 = [1, 2] starts at the root.
+        assert np.isnan(input_props_model.data.cell_data[1].nodes[1]["normalized_age"])
+
+    def test_float_dtype_and_no_unit(self, input_props_model):
+        input_props_model.add_normalized_age()
+        prop = input_props_model.get_property("normalized_age")
+        assert (prop.dtype, prop.unit) == ("float", None)
+
+    def test_missing_time_prop_raises(self, input_props_model):
+        with pytest.raises(MissingPropertyError, match="set 'time_prop'"):
+            input_props_model.add_normalized_age(time_prop="unknown")
+
+    def test_property_object_time_prop_raises(self, input_props_model):
+        time_prop = input_props_model.get_property("time")
+        with pytest.raises(TypeError, match="Pass its identifier instead: 'time'"):
+            input_props_model.add_normalized_age(time_prop=time_prop)
+        assert input_props_model.get_property("normalized_age") is None
+
+
 class TestAddCellSpeed:
     """Test cases for Model.add_cell_speed() method."""
 

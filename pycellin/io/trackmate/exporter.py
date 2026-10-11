@@ -154,6 +154,7 @@ def _unit_to_dimension(
         "is_leaf": "NONE",
         "is_root": "NONE",
         "location_tag": "NONE",
+        "normalized_age": "NONE",
         "pycellin_cell_ID": "NONE",
         "rod_length": "LENGTH",
         "rod_width": "LENGTH",

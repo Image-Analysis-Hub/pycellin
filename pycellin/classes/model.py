@@ -4241,6 +4241,62 @@ class Model:
             )
         )
 
+    def add_normalized_age(
+        self,
+        time_prop: str | None = None,
+        ignore_incomplete_cycles: bool = False,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell normalized age property to the model.
+
+        The normalized age of a cell is its relative age divided by the duration of
+        its cell cycle. It is 0 for the first cell of a cell cycle and 1 for the
+        last one. By default, incomplete cell cycles, which start at the root or
+        end with a leaf, are normalized over their observed part: 0 and 1 then
+        don't mark a birth and a division. The normalized age is NaN for the cells
+        of a cell cycle that lasts no time, such as a cell cycle of a single cell.
+
+        Parameters
+        ----------
+        time_prop : str, optional
+            Identifier of the cell lineage node property holding the time of the
+            cells. If None, the reference time property of the model is used.
+        ignore_incomplete_cycles : bool, optional
+            True to give NaN to the cells of incomplete cell cycles, False to
+            normalize them over their observed part. False by default.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "normalized_age".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Normalized age".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.tracking.create_normalized_age_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If `time_prop` has not been declared in the model.
+        ValueError
+            If `time_prop` is not a node property of cell lineages.
+        """
+        time_prop = time_prop or self.reference_time_property
+        prop = tracking.create_normalized_age_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self.add_custom_property(
+            tracking.NormalizedAge(
+                prop,
+                time_prop=time_prop,
+                ignore_incomplete_cycles=ignore_incomplete_cycles,
+            )
+        )
+
     def add_num_cells(
         self,
         custom_identifier: str | None = None,

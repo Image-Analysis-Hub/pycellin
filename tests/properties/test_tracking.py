@@ -3,6 +3,8 @@
 
 """Unit test for tracking property classes from pycellin.properties."""
 
+import math
+
 import pytest
 
 import networkx as nx
@@ -10,6 +12,7 @@ import networkx as nx
 from pycellin.properties.tracking import (
     AbsoluteAge,
     RelativeAge,
+    NormalizedAge,
     CycleCompleteness,
     DivisionTime,
     DivisionRate,
@@ -131,6 +134,73 @@ def test_relative_age(cell_lin, prop_cell_lin):
     # Non-existent node.
     with pytest.raises(KeyError):
         calculator.compute(Data({}), cell_lin, nid=99)
+
+
+# NormalizedAge ###############################################################
+
+
+class TestNormalizedAge:
+    def test_compute_first_cell_of_cycle(self, cell_lin, prop_cell_lin):
+        calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
+        # Root, then a cell born from a division.
+        assert calculator.compute(cell_lin, nid=1) == 0
+        assert calculator.compute(cell_lin, nid=11) == 0
+
+    def test_compute_last_cell_of_cycle(self, cell_lin, prop_cell_lin):
+        calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
+        # Division, then leaf.
+        assert calculator.compute(cell_lin, nid=14) == 1
+        assert calculator.compute(cell_lin, nid=6) == 1
+
+    def test_compute_intermediate_cells(self, cell_lin, prop_cell_lin):
+        calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
+        # Cycle [11, 12, 13, 14], from frame 2 to frame 5.
+        assert calculator.compute(cell_lin, nid=12) == pytest.approx(1 / 3)
+        assert calculator.compute(cell_lin, nid=13) == pytest.approx(2 / 3)
+
+    def test_compute_gap(self, cell_lin, prop_cell_lin):
+        cell_lin.remove_node(12)
+        cell_lin.add_edge(11, 13)
+        calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
+        # Cycle [11, 13, 14], from frame 2 to frame 5: normalized by time, not by
+        # position in the cycle.
+        assert calculator.compute(cell_lin, nid=13) == pytest.approx(2 / 3)
+
+    def test_compute_single_cell_cycle(self, cell_lin, prop_cell_lin):
+        calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
+        assert math.isnan(calculator.compute(cell_lin, nid=9))
+
+    def test_compute_ignored_cycle_starting_at_root(self, cell_lin, prop_cell_lin):
+        calculator = NormalizedAge(
+            prop_cell_lin, time_prop="frame", ignore_incomplete_cycles=True
+        )
+        # Cycle [1, 2].
+        assert math.isnan(calculator.compute(cell_lin, nid=1))
+
+    def test_compute_ignored_cycle_ending_with_leaf(self, cell_lin, prop_cell_lin):
+        calculator = NormalizedAge(
+            prop_cell_lin, time_prop="frame", ignore_incomplete_cycles=True
+        )
+        # Cycle [5, 6].
+        assert math.isnan(calculator.compute(cell_lin, nid=5))
+
+    def test_compute_complete_cycle_not_ignored(self, cell_lin, prop_cell_lin):
+        calculator = NormalizedAge(
+            prop_cell_lin, time_prop="frame", ignore_incomplete_cycles=True
+        )
+        # Cycle [11, 12, 13, 14], from a division to a division.
+        assert calculator.compute(cell_lin, nid=12) == pytest.approx(1 / 3)
+
+    def test_compute_missing_cell(self, cell_lin, prop_cell_lin):
+        calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
+        with pytest.raises(KeyError):
+            calculator.compute(cell_lin, nid=99)
+
+    def test_get_input_props(self, prop_cell_lin):
+        calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
+        assert calculator.get_input_props() == {
+            "time_prop": ("frame", "node", "CellLineage")
+        }
 
 
 # CellCycleCompleteness #######################################################

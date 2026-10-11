@@ -37,7 +37,10 @@ from pycellin.classes.data import Data
 from pycellin.classes.exceptions import FusionError
 from pycellin.classes.lineage import CellLineage, CycleLineage
 from pycellin.classes.property import Property
-from pycellin.classes.property_calculator import NodeGlobalPropCalculator
+from pycellin.classes.property_calculator import (
+    NodeGlobalPropCalculator,
+    NodeLocalPropCalculator,
+)
 
 # TODO: should I add the word Calc or Calculator to the class names?
 # TODO: add calculator for mandatory cycle lineage properties (e.g. cycle length)
@@ -206,6 +209,101 @@ class RelativeAge(NodeGlobalPropCalculator):
             - lineage.nodes[first_cell][self.time_prop]
         )
         return age
+
+
+def create_normalized_age_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "normalized_age",
+        name=custom_name or "Normalized age",
+        description=custom_description
+        or "Relative age of the cell divided by the duration of its cell cycle: "
+        "0 for the first cell of the cycle, 1 for the last one",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float",
+    )
+
+
+class NormalizedAge(NodeLocalPropCalculator):
+    """
+    Calculator to compute the normalized age of cells.
+
+    The normalized age of a cell is its relative age divided by the duration of
+    its cell cycle, both computed from the time property given as input. It is 0
+    for the first cell of a cell cycle and 1 for the last one. Incomplete cell
+    cycles, which start at the root or end with a leaf, are normalized over their
+    observed part, unless `ignore_incomplete_cycles` is True: their cells then get
+    NaN. The normalized age is also NaN for the cells of a cell cycle that lasts
+    no time, such as a cell cycle of a single cell.
+    """
+
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
+
+    def __init__(
+        self,
+        property: Property,
+        time_prop: str,
+        ignore_incomplete_cycles: bool = False,
+    ):
+        """
+        Parameters
+        ----------
+        property : Property
+            Property object to which the calculator is associated.
+        time_prop : str
+            Identifier of the cell lineage node property holding the time
+            of the cells (e.g. "frame", "POSITION_T").
+        ignore_incomplete_cycles : bool, optional
+            True to give NaN to the cells of incomplete cell cycles, False to
+            normalize them over their observed part. False by default.
+        """
+        super().__init__(property)
+        self.time_prop = time_prop
+        self.ignore_incomplete_cycles = ignore_incomplete_cycles
+
+    def compute(  # type: ignore[override]
+        self, lineage: CellLineage, nid: int
+    ) -> float:
+        """
+        Compute the normalized age of a given cell.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage graph containing the node of interest.
+        nid : int
+            Node ID (cell_ID) of the cell of interest.
+
+        Returns
+        -------
+        float
+            Normalized age of the cell, or NaN if its cell cycle lasts no time
+            or is an ignored incomplete cell cycle.
+
+        Raises
+        ------
+        KeyError
+            If the cell is not in the lineage.
+        """
+        if nid not in lineage.nodes:
+            raise KeyError(f"Cell {nid} not in the lineage.")
+        cells = lineage.get_cell_cycle(nid)
+        if self.ignore_incomplete_cycles and (
+            lineage.is_root(cells[0]) or lineage.is_leaf(cells[-1])
+        ):
+            return np.nan
+        start_time = lineage.nodes[cells[0]][self.time_prop]
+        duration = lineage.nodes[cells[-1]][self.time_prop] - start_time
+        if duration == 0:
+            return np.nan
+        return (lineage.nodes[nid][self.time_prop] - start_time) / duration
 
 
 def create_cycle_completeness_property(
