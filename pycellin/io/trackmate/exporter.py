@@ -144,9 +144,11 @@ def _unit_to_dimension(
     pycellin_props = {
         # Cell features.
         "cell_area": "AREA",
+        "cell_circularity": "NONE",
         "cell_displacement": "LENGTH",
         "cell_perimeter": "LENGTH",
         "cell_polygon": "NONE",  # not float nor int so won't be exported anyway
+        "cell_solidity": "NONE",
         "cell_speed": "VELOCITY",
         "is_division": "NONE",
         "is_leaf": "NONE",

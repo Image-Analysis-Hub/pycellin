@@ -716,6 +716,42 @@ class TestAddCellArea:
         assert input_props_model.get_property("cell_area").unit == "um^2"
 
 
+class TestAddCellCircularity:
+    """Test cases for Model.add_cell_circularity() method."""
+
+    def test_missing_default_polygon_prop_raises(self, input_props_model):
+        with pytest.raises(MissingPropertyError, match="add_cell_polygon"):
+            input_props_model.add_cell_circularity()
+
+    def test_custom_polygon_prop(self, input_props_model):
+        input_props_model.add_cell_circularity(polygon_prop="my_polygon")
+        input_props_model.update()
+        circularity = input_props_model.data.cell_data[1].nodes[3]["cell_circularity"]
+        # 3x1 rectangle: area 3, perimeter 8.
+        assert circularity == pytest.approx(4 * np.pi * 3 / 8**2)
+
+    def test_no_unit(self, input_props_model):
+        input_props_model.add_cell_circularity(polygon_prop="my_polygon")
+        assert input_props_model.get_property("cell_circularity").unit is None
+
+
+class TestAddCellSolidity:
+    """Test cases for Model.add_cell_solidity() method."""
+
+    def test_missing_default_polygon_prop_raises(self, input_props_model):
+        with pytest.raises(MissingPropertyError, match="add_cell_polygon"):
+            input_props_model.add_cell_solidity()
+
+    def test_custom_polygon_prop(self, input_props_model):
+        input_props_model.add_cell_solidity(polygon_prop="my_polygon")
+        input_props_model.update()
+        assert input_props_model.data.cell_data[1].nodes[3]["cell_solidity"] == 1.0
+
+    def test_no_unit(self, input_props_model):
+        input_props_model.add_cell_solidity(polygon_prop="my_polygon")
+        assert input_props_model.get_property("cell_solidity").unit is None
+
+
 class TestAddCycleMeanArea:
     """Test cases for Model.add_cycle_mean_area() method."""
 

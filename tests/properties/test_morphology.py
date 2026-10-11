@@ -9,17 +9,25 @@ import warnings
 import networkx as nx
 import numpy as np
 import pytest
-from shapely.geometry import GeometryCollection, LineString, MultiPolygon, Polygon
+from shapely.geometry import (
+    GeometryCollection,
+    LineString,
+    MultiPolygon,
+    Point,
+    Polygon,
+)
 
 from pycellin.classes import CellLineage, Data, Property
 from pycellin.properties.morphology import (
     BirthArea,
     CellArea,
+    CellCircularity,
     CellContour,
     CellMultiPolygonFromLabelImg,
     CellPerimeter,
     CellPolygonFromContour,
     CellPolygonFromLabelImg,
+    CellSolidity,
     CycleMeanArea,
     DivisionArea,
     _largest_polygon,
@@ -507,6 +515,117 @@ class TestCellPerimeter:
         polygon_lineage.nodes[2]["cell_polygon"] = None
         calculator = CellPerimeter(prop_cell_lin)
         assert math.isnan(calculator.compute(polygon_lineage, nid=2))
+
+
+# CellCircularity #############################################################
+
+
+class TestCellCircularity:
+    def test_compute_default_polygon_prop(self, polygon_lineage, prop_cell_lin):
+        calculator = CellCircularity(prop_cell_lin)
+        # Area 2, perimeter 6.
+        expected = 4 * math.pi * 2 / 6**2
+        assert calculator.compute(polygon_lineage, nid=1) == pytest.approx(expected)
+
+    def test_compute_custom_polygon_prop(self, polygon_lineage, prop_cell_lin):
+        calculator = CellCircularity(prop_cell_lin, polygon_prop="my_polygon")
+        # Area 3, perimeter 8.
+        expected = 4 * math.pi * 3 / 8**2
+        assert calculator.compute(polygon_lineage, nid=2) == pytest.approx(expected)
+
+    def test_compute_disk_close_to_one(self, polygon_lineage, prop_cell_lin):
+        polygon_lineage.nodes[2]["cell_polygon"] = Point(0, 0).buffer(5)
+        calculator = CellCircularity(prop_cell_lin)
+        assert 0.999 < calculator.compute(polygon_lineage, nid=2) < 1
+
+    def test_compute_multipolygon(self, polygon_lineage, prop_cell_lin):
+        polygon_lineage.nodes[1]["my_multipolygon"] = MultiPolygon(
+            [
+                Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),
+                Polygon([(5, 5), (6, 5), (6, 6), (5, 6)]),
+            ]
+        )
+        calculator = CellCircularity(prop_cell_lin, polygon_prop="my_multipolygon")
+        # Area 2, perimeter 8.
+        expected = 4 * math.pi * 2 / 8**2
+        assert calculator.compute(polygon_lineage, nid=1) == pytest.approx(expected)
+
+    def test_compute_missing_polygon(self, polygon_lineage, prop_cell_lin):
+        calculator = CellCircularity(prop_cell_lin)
+        with pytest.raises(KeyError, match="missing 'cell_polygon' property"):
+            calculator.compute(polygon_lineage, nid=2)
+
+    def test_compute_none_polygon(self, polygon_lineage, prop_cell_lin):
+        polygon_lineage.nodes[2]["cell_polygon"] = None
+        calculator = CellCircularity(prop_cell_lin)
+        assert math.isnan(calculator.compute(polygon_lineage, nid=2))
+
+    def test_compute_empty_polygon(self, polygon_lineage, prop_cell_lin):
+        polygon_lineage.nodes[2]["cell_polygon"] = Polygon()
+        calculator = CellCircularity(prop_cell_lin)
+        assert math.isnan(calculator.compute(polygon_lineage, nid=2))
+
+    def test_get_input_props(self, prop_cell_lin):
+        calculator = CellCircularity(prop_cell_lin, polygon_prop="my_polygon")
+        assert calculator.get_input_props() == {
+            "polygon_prop": ("my_polygon", "node", "CellLineage")
+        }
+
+
+# CellSolidity ################################################################
+
+
+class TestCellSolidity:
+    def test_compute_convex_polygon(self, polygon_lineage, prop_cell_lin):
+        calculator = CellSolidity(prop_cell_lin)
+        assert calculator.compute(polygon_lineage, nid=1) == 1.0
+
+    def test_compute_concave_polygon(self, polygon_lineage, prop_cell_lin):
+        # L shape of area 3, whose convex hull cuts a corner of a 2x2 square.
+        polygon_lineage.nodes[2]["my_polygon"] = Polygon(
+            [(0, 0), (2, 0), (2, 1), (1, 1), (1, 2), (0, 2)]
+        )
+        calculator = CellSolidity(prop_cell_lin, polygon_prop="my_polygon")
+        assert calculator.compute(polygon_lineage, nid=2) == pytest.approx(3 / 3.5)
+
+    def test_compute_polygon_with_hole(self, polygon_lineage, prop_cell_lin):
+        polygon_lineage.nodes[2]["cell_polygon"] = Polygon(
+            [(0, 0), (3, 0), (3, 3), (0, 3)], [[(1, 1), (2, 1), (2, 2), (1, 2)]]
+        )
+        calculator = CellSolidity(prop_cell_lin)
+        assert calculator.compute(polygon_lineage, nid=2) == pytest.approx(8 / 9)
+
+    def test_compute_multipolygon(self, polygon_lineage, prop_cell_lin):
+        # The convex hull of the two unit squares is a 3x1 rectangle.
+        polygon_lineage.nodes[1]["my_multipolygon"] = MultiPolygon(
+            [
+                Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),
+                Polygon([(2, 0), (3, 0), (3, 1), (2, 1)]),
+            ]
+        )
+        calculator = CellSolidity(prop_cell_lin, polygon_prop="my_multipolygon")
+        assert calculator.compute(polygon_lineage, nid=1) == pytest.approx(2 / 3)
+
+    def test_compute_missing_polygon(self, polygon_lineage, prop_cell_lin):
+        calculator = CellSolidity(prop_cell_lin)
+        with pytest.raises(KeyError, match="missing 'cell_polygon' property"):
+            calculator.compute(polygon_lineage, nid=2)
+
+    def test_compute_none_polygon(self, polygon_lineage, prop_cell_lin):
+        polygon_lineage.nodes[2]["cell_polygon"] = None
+        calculator = CellSolidity(prop_cell_lin)
+        assert math.isnan(calculator.compute(polygon_lineage, nid=2))
+
+    def test_compute_empty_polygon(self, polygon_lineage, prop_cell_lin):
+        polygon_lineage.nodes[2]["cell_polygon"] = Polygon()
+        calculator = CellSolidity(prop_cell_lin)
+        assert math.isnan(calculator.compute(polygon_lineage, nid=2))
+
+    def test_get_input_props(self, prop_cell_lin):
+        calculator = CellSolidity(prop_cell_lin, polygon_prop="my_polygon")
+        assert calculator.get_input_props() == {
+            "polygon_prop": ("my_polygon", "node", "CellLineage")
+        }
 
 
 # CellContour #################################################################

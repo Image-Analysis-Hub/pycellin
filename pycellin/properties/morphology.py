@@ -946,6 +946,131 @@ class CellPerimeter(NodeLocalPropCalculator):
         return np.nan if polygon is None else polygon.length
 
 
+def create_cell_circularity_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "cell_circularity",
+        name=custom_name or "Cell circularity",
+        description=custom_description
+        or "Circularity of the cell, 4 pi times its area divided by its squared "
+        "perimeter: 1 for a disk, closer to 0 for an elongated or irregular cell",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float",
+    )
+
+
+class CellCircularity(NodeLocalPropCalculator):
+    """
+    Calculator to compute the circularity of a cell from its polygon.
+
+    The circularity is 4 pi times the area of the polygon divided by its squared
+    perimeter. It is 1 for a disk and gets closer to 0 as the cell gets elongated
+    or its outline irregular. Polygons always have a circularity below 1, even
+    regular polygons with many sides. The circularity of a shapely.MultiPolygon is
+    computed from the area and perimeter of all its pieces, as in `CellArea` and
+    `CellPerimeter`, so pieces and holes lower it. The circularity is NaN for cells
+    whose polygon is None, such as cells without a contour, or has no perimeter.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    polygon_prop : str, optional
+        Identifier of the node property holding the cell shapes as
+        shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
+    """
+
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "polygon_prop": ("node", "CellLineage")
+    }
+
+    def __init__(self, property: Property, polygon_prop: str = "cell_polygon"):
+        super().__init__(property)
+        self.polygon_prop = polygon_prop
+
+    def compute(self, lineage, nid: int) -> float:
+        try:
+            polygon = lineage.nodes[nid][self.polygon_prop]
+        except KeyError:
+            msg = (
+                f"Cannot compute '{self.prop.identifier}': missing "
+                f"'{self.polygon_prop}' property for cell {nid}, "
+                f"lineage {lineage.graph['lineage_ID']}. "
+                f"Please compute the '{self.polygon_prop}' property first."
+            )
+            raise KeyError(msg)
+        if polygon is None or polygon.length == 0:
+            return np.nan
+        return 4 * np.pi * polygon.area / polygon.length**2
+
+
+def create_cell_solidity_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "cell_solidity",
+        name=custom_name or "Cell solidity",
+        description=custom_description
+        or "Solidity of the cell, its area divided by the area of its convex hull: "
+        "1 for a convex cell, closer to 0 for a more concave cell",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float",
+    )
+
+
+class CellSolidity(NodeLocalPropCalculator):
+    """
+    Calculator to compute the solidity of a cell from its polygon.
+
+    The solidity is the area of the polygon divided by the area of its convex hull.
+    It is 1 for a convex cell and gets closer to 0 as the outline of the cell gets
+    more concave. For a shapely.MultiPolygon, the convex hull encloses all the
+    pieces, and holes are excluded from the area. The solidity is NaN for cells
+    whose polygon is None, such as cells without a contour, or has no area.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    polygon_prop : str, optional
+        Identifier of the node property holding the cell shapes as
+        shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
+    """
+
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "polygon_prop": ("node", "CellLineage")
+    }
+
+    def __init__(self, property: Property, polygon_prop: str = "cell_polygon"):
+        super().__init__(property)
+        self.polygon_prop = polygon_prop
+
+    def compute(self, lineage, nid: int) -> float:
+        try:
+            polygon = lineage.nodes[nid][self.polygon_prop]
+        except KeyError:
+            msg = (
+                f"Cannot compute '{self.prop.identifier}': missing "
+                f"'{self.polygon_prop}' property for cell {nid}, "
+                f"lineage {lineage.graph['lineage_ID']}. "
+                f"Please compute the '{self.polygon_prop}' property first."
+            )
+            raise KeyError(msg)
+        if polygon is None:
+            return np.nan
+        hull_area = polygon.convex_hull.area
+        return np.nan if hull_area == 0 else polygon.area / hull_area
+
+
 # TODO on rod length and width:
 # - remove debug code
 # - always return a value even if weird skeleton shape (but put a warning in that case)

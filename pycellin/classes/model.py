@@ -2655,6 +2655,102 @@ class Model:
         )
         self.add_custom_property(morpho.CellPerimeter(prop, polygon_prop=polygon_prop))
 
+    def add_cell_circularity(
+        self,
+        polygon_prop: str = "cell_polygon",
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell circularity property to the model.
+
+        The cell circularity is 4 pi times the area of the cell divided by its
+        squared perimeter, both computed from the cell polygons. It is 1 for a disk
+        and gets closer to 0 as the cell gets elongated or its outline irregular.
+        Polygons always have a circularity below 1, even regular polygons with many
+        sides. For a shapely.MultiPolygon, it is computed from the area and
+        perimeter of all the pieces, as in `add_cell_area()` and
+        `add_cell_perimeter()`, so pieces and holes lower it. It is NaN for cells
+        whose polygon is None, such as cells without a contour.
+
+        Parameters
+        ----------
+        polygon_prop : str, optional
+            Identifier of the cell lineage node property holding the cell shapes
+            as shapely.Polygon or shapely.MultiPolygon. Defaults to
+            "cell_polygon", added by `add_cell_polygon()`.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_circularity".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cell circularity".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.morphology.create_cell_circularity_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If `polygon_prop` has not been declared in the model.
+        ValueError
+            If `polygon_prop` is not a node property of cell lineages.
+        """
+        prop = morpho.create_cell_circularity_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self.add_custom_property(
+            morpho.CellCircularity(prop, polygon_prop=polygon_prop)
+        )
+
+    def add_cell_solidity(
+        self,
+        polygon_prop: str = "cell_polygon",
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell solidity property to the model.
+
+        The cell solidity is the area of the cell divided by the area of its convex
+        hull, both computed from the cell polygons. It is 1 for a convex cell and
+        gets closer to 0 as the outline of the cell gets more concave. For a
+        shapely.MultiPolygon, the convex hull encloses all the pieces, and holes are
+        excluded from the area. It is NaN for cells whose polygon is None, such as
+        cells without a contour.
+
+        Parameters
+        ----------
+        polygon_prop : str, optional
+            Identifier of the cell lineage node property holding the cell shapes
+            as shapely.Polygon or shapely.MultiPolygon. Defaults to
+            "cell_polygon", added by `add_cell_polygon()`.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_solidity".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cell solidity".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.morphology.create_cell_solidity_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If `polygon_prop` has not been declared in the model.
+        ValueError
+            If `polygon_prop` is not a node property of cell lineages.
+        """
+        prop = morpho.create_cell_solidity_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self.add_custom_property(morpho.CellSolidity(prop, polygon_prop=polygon_prop))
+
     def add_cell_contour(
         self,
         polygon_prop: str = "cell_polygon",
