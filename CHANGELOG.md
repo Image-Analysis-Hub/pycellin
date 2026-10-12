@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 261a852, plus the uncommitted handling of GEFF and trackpy properties named like the cell_id / lineage_id properties pycellin creates (covered by the GEFF "Changed" entry, the GEFF "Fixed" entries and the trackpy "Fixed" entry). Update from there with: git log 261a852..dev -->
+<!-- Planned v0.6.0. Covers commits up to 261a852, plus the uncommitted handling of GEFF and trackpy properties named like the cell_id / lineage_id properties pycellin creates (covered by the GEFF "Changed" entry, the GEFF "Fixed" entries and the trackpy "Fixed" entry), and the uncommitted Model.to_cycle_pair_dataframe() (its "Added" entry). Update from there with: git log 261a852..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -53,6 +53,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** `get_cell_lineages_from_ids()` and `get_cycle_lineages_from_ids()`
 - **Model:** `overwrite_lid` argument to `add_lineage()`
 - **Model:** `lineage_props` argument to `to_cell_dataframe()`, `to_link_dataframe()` and `to_cycle_dataframe()` to include lineage properties in the DataFrame
+- **Model:** `to_cycle_pair_dataframe()` to export pairs of related cell cycles with the properties of both side by side, e.g. to correlate the area at birth of mothers and daughters. The relation is any cycle property listing related cell cycles: `mother_cycle`, `daughter_cycles`, `sister_cycles`, `cousin_cycles`, or a user-defined one. `unique_pairs=True` keeps a single row for pairs listed from both sides, such as sisters
 - **Metadata:** `label_img` and `label_img_path` standard metadata fields
 - **Metadata:** `ModelMetadata.diff()` to list the metadata fields that differ between two models
 - **Properties:** `Property.get_incompatibilities()` to compare two property declarations

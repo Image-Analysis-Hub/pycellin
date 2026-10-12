@@ -6040,6 +6040,213 @@ class Model:
 
         return self._add_lineage_props_to_df(df, lineage_props)
 
+    def to_cycle_pair_dataframe(
+        self,
+        relation_prop: str,
+        props: list[str] | None = None,
+        lids: list[int] | None = None,
+        lineage_props: list[str] | None = None,
+        unique_pairs: bool = False,
+        suffixes: tuple[str, str] = ("_1", "_2"),
+    ) -> pd.DataFrame:
+        """
+        Return pairs of related cell cycles and their properties as a pandas DataFrame.
+
+        Each row is a pair of cell cycles of the same lineage: a cell cycle, and one
+        of the cell cycles listed in its `relation_prop` property, e.g. its mother
+        with "mother_cycle", or one of its sisters with "sister_cycles". The
+        properties of both cell cycles are side by side, to compare or correlate
+        them, e.g. the area at birth of mothers and daughters.
+
+        Parameters
+        ----------
+        relation_prop : str
+            Identifier of the node property of cycle lineages that lists the related
+            cell cycles: a cell cycle ID or None (e.g. "mother_cycle"), or a list of
+            cell cycle IDs (e.g. "daughter_cycles", "sister_cycles",
+            "cousin_cycles"). A user-defined property works too, as long as the
+            related cell cycles belong to the same lineage.
+        props : list[str], optional
+            Identifiers of the node properties of cycle lineages to export for both
+            cell cycles of each pair (default is None). If None, all of them are
+            exported.
+        lids : list[int], optional
+            List of IDs of the lineages to export (default is None).
+            If None, all lineages are exported.
+        lineage_props : list[str], optional
+            Identifiers of cell lineage properties to add as columns, e.g. an
+            experimental condition stored on lineages (default is None). Each row
+            gets the value of its lineage, or NaN if the lineage has no value.
+        unique_pairs : bool, optional
+            True to keep a single row for the pairs whose cell cycles list each
+            other, such as sisters or cousins: the row whose first cell cycle has the
+            lower ID. False to keep both rows (default is False), which makes
+            correlations between the two columns of a property symmetric. Pairs
+            listed from one side only, such as a daughter and its mother, are
+            always kept.
+        suffixes : tuple[str, str], optional
+            Suffixes of the `cycle_id` and property columns: the first one for the
+            cell cycle that lists the relation, the second one for the related cell
+            cycle (default is ("_1", "_2")). E.g. ("", "_mother") with
+            "mother_cycle".
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per pair: the lineage ID, the IDs of both cell cycles, then each
+            property for both cell cycles.
+
+        Raises
+        ------
+        ValueError
+            If the cycle lineages have not been computed yet.
+            If the model has no lineages, or none with an ID in `lids`.
+            If the two suffixes are the same, or give the same name to two columns.
+            If `relation_prop` or a property of `props` is not a node property of
+            cycle lineages, or is not declared in the model.
+            If no cell cycle has a value for `relation_prop`.
+            If a related cell cycle is not in the lineage of the cell cycle that
+            lists it.
+            If a property of `lineage_props` is not a lineage property of cell
+            lineages, is not declared in the model, or clashes with an existing
+            column.
+
+        Notes
+        -----
+        No cell cycle is left out. The first cell cycle of a lineage starts with the
+        tracking, not at a division, and the last ones can end with it: add
+        "cycle_completeness" to `props` to keep the pairs of complete cell cycles,
+        e.g. to compare areas at birth or division times.
+
+        Examples
+        --------
+        The area at birth of each cell cycle and of its mother, side by side, once
+        the mother cycles are computed (model.add_mother_cycle(), model.update()):
+
+        >>> pairs = model.to_cycle_pair_dataframe(
+        ...     "mother_cycle", props=["birth_area"], suffixes=("_daughter", "_mother")
+        ... )
+        >>> pairs["birth_area_mother"].corr(pairs["birth_area_daughter"])
+
+        Sisters list each other, so each pair comes twice, once in each order. One
+        row per pair, i.e. per division into two daughters:
+
+        >>> model.to_cycle_pair_dataframe(
+        ...     "sister_cycles", props=["birth_area"], unique_pairs=True
+        ... )
+        """
+        # Also checks that there are cycle lineages to export.
+        df = self.to_cycle_dataframe(lids)
+        first, second = suffixes
+        if first == second:
+            raise ValueError(f"The two suffixes must differ, got {suffixes!r}.")
+
+        # The IDs are columns already.
+        id_props = ["lineage_id", "cycle_id"]
+        if props is None:
+            props = [col for col in df.columns if col not in id_props]
+        else:
+            props = [prop for prop in props if prop not in id_props]
+        available_props = {
+            prop_id
+            for prop_id, prop in self.get_cycle_lineage_properties().items()
+            if PropertyType.NODE in prop.prop_type
+        }
+        invalid_props = [
+            prop for prop in [relation_prop, *props] if prop not in available_props
+        ]
+        if invalid_props:
+            invalid_str = ", ".join(repr(prop) for prop in invalid_props)
+            raise ValueError(
+                "Not node properties of cycle lineages, or not declared in the "
+                f"model: {invalid_str}."
+            )
+
+        # One row per cell cycle and related cell cycle, read from the lineages
+        # rather than from the DataFrame, where None turns integer IDs into floats.
+        lineages = [
+            (lin_id, lineage)
+            for lin_id, lineage in self.data.cycle_data.items()
+            if not lids or lin_id in lids
+        ]
+        has_values = False
+        pairs = []
+        for lin_id, lineage in lineages:
+            for cycle_id, cycle_props in lineage.nodes(data=True):
+                if relation_prop not in cycle_props:
+                    continue
+                has_values = True
+                related_ids = self._get_related_cycle_ids(cycle_props[relation_prop])
+                for related_id in related_ids:
+                    if related_id not in lineage:
+                        raise ValueError(
+                            f"Cell cycle {related_id}, listed in property "
+                            f"'{relation_prop}' of cell cycle {cycle_id}, is not in "
+                            f"lineage {lin_id}."
+                        )
+                    pairs.append((lin_id, cycle_id, related_id))
+        if not has_values:
+            raise ValueError(
+                f"No cell cycle has a value for property '{relation_prop}': "
+                "compute it with model.update()."
+            )
+        if unique_pairs:
+            # Pairs listed from both sides keep the row with the lower ID first.
+            listed = set(pairs)
+            pairs = [
+                (lin_id, cycle_id, related_id)
+                for lin_id, cycle_id, related_id in pairs
+                if cycle_id < related_id or (lin_id, related_id, cycle_id) not in listed
+            ]
+
+        # The properties of both cell cycles, side by side.
+        id_columns = ["lineage_id", f"cycle_id{first}", f"cycle_id{second}"]
+        columns = id_columns + [
+            f"{prop}{suffix}" for prop in props for suffix in suffixes
+        ]
+        if len(set(columns)) < len(columns):
+            raise ValueError(
+                f"The suffixes {suffixes!r} give the same name to two columns."
+            )
+        pairs_df = pd.DataFrame(pairs, columns=id_columns)
+        values = df.reindex(columns=[*id_props, *props])
+        for suffix in suffixes:
+            pairs_df = pairs_df.merge(
+                values.rename(
+                    columns={prop: f"{prop}{suffix}" for prop in ["cycle_id", *props]}
+                ),
+                on=["lineage_id", f"cycle_id{suffix}"],
+                how="left",
+            )
+        pairs_df = pairs_df[columns]
+        pairs_df.sort_values(id_columns, ignore_index=True, inplace=True)
+
+        return self._add_lineage_props_to_df(pairs_df, lineage_props)
+
+    @staticmethod
+    def _get_related_cycle_ids(value: Any) -> list[int]:
+        """
+        Return the cell cycle IDs held by a value of a relation property.
+
+        Parameters
+        ----------
+        value : Any
+            Value of a relation property for one cell cycle: a cell cycle ID, None
+            or NaN for no related cell cycle, or a collection of cell cycle IDs.
+
+        Returns
+        -------
+        list[int]
+            The related cell cycle IDs, empty if there are none.
+        """
+        if value is None:
+            return []
+        if isinstance(value, list | tuple | set | np.ndarray):
+            return [int(cycle_id) for cycle_id in value]
+        if isinstance(value, float) and np.isnan(value):
+            return []
+        return [int(value)]
+
     def save_to_pickle(self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL) -> None:
         """
         Save the model to a file by pickling it.

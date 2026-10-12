@@ -13,6 +13,7 @@ from shapely.geometry import MultiPolygon, Polygon
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.classes.exceptions import MissingPropertyError
+from pycellin.classes.property_calculator import NodeLocalPropCalculator
 from pycellin.custom_types import PropertyType
 from pycellin.properties.core import (
     Time,
@@ -368,6 +369,266 @@ class TestToCycleDataframe:
             warnings.simplefilter("error")
             df = model.to_cycle_dataframe()
         assert df["mother_cycle"].isna().tolist() == [True, True, False, False]
+
+
+@pytest.fixture()
+def relatives_model():
+    """
+    Create a model with a lineage of three generations of cell cycles, a single-cell
+    lineage, and the mother, daughter, sister and cousin cycles of each cell cycle.
+
+    Cell cycles of lineage 1 (ID = last cell): 2 (cells 1-2) divides into 5 (cells 3
+    and 5) and 8 (cells 4 and 8); 5 divides into 6 and 7, 8 into 9 and 10.
+    """
+    lin = CellLineage(lid=1)
+    for cell_id, frame in [(1, 0), (2, 1), (3, 2), (4, 2), (5, 3), (8, 3)]:
+        lin.add_node(cell_id, cell_id=cell_id, frame=frame)
+    for cell_id in [6, 7, 9, 10]:
+        lin.add_node(cell_id, cell_id=cell_id, frame=4)
+    for source, target in [(1, 2), (2, 3), (2, 4), (3, 5), (4, 8)]:
+        lin.add_edge(source, target)
+    for source, target in [(5, 6), (5, 7), (8, 9), (8, 10)]:
+        lin.add_edge(source, target)
+    lin.graph["lin_prop"] = 1.5
+    single_lin = CellLineage(lid=-11)
+    single_lin.add_node(11, cell_id=11, frame=0)
+    single_lin.graph["lin_prop"] = 2.5
+
+    lin_prop = Property(
+        identifier="lin_prop",
+        name="lin_prop",
+        description="lin_prop for testing",
+        provenance="test",
+        prop_type=PropertyType.LINEAGE,
+        lin_type="CellLineage",
+        dtype="float",
+    )
+    model = Model(
+        model_metadata={"time_step": 1},
+        props_metadata=PropsMetadata(props={"lin_prop": lin_prop}),
+        data=Data({1: lin, -11: single_lin}),
+        reference_time_property="frame",
+    )
+    model.add_cycle_data()
+    model.add_mother_cycle()
+    model.add_daughter_cycles()
+    model.add_sister_cycles()
+    model.add_cousin_cycles()
+    model.update()
+    return model
+
+
+class RootRelation(NodeLocalPropCalculator):
+    """
+    User-defined relation: the root cell cycle of lineage 1 lists the given cell
+    cycle IDs.
+    """
+
+    def __init__(self, property, cycle_ids):
+        super().__init__(property)
+        self.cycle_ids = cycle_ids
+
+    def compute(self, lineage, nid):
+        is_root = lineage.in_degree(nid) == 0
+        return self.cycle_ids if is_root and lineage.graph["lineage_id"] == 1 else []
+
+
+def root_relation_property():
+    """Declaration of the RootRelation property, as "root_relation"."""
+    return Property(
+        identifier="root_relation",
+        name="root relation",
+        description="Cell cycles listed by the root cell cycle, for testing",
+        provenance="test",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="list[int]",
+    )
+
+
+class TestToCyclePairDataframe:
+    """Test cases for Model.to_cycle_pair_dataframe() method."""
+
+    def test_mother_pairs(self, relatives_model):
+        df = relatives_model.to_cycle_pair_dataframe("mother_cycle", props=[])
+        pairs = list(zip(df["cycle_id_1"], df["cycle_id_2"]))
+        assert pairs == [(5, 2), (6, 5), (7, 5), (8, 2), (9, 8), (10, 8)]
+        assert (df["lineage_id"] == 1).all()
+
+    def test_daughter_pairs(self, relatives_model):
+        df = relatives_model.to_cycle_pair_dataframe("daughter_cycles", props=[])
+        pairs = list(zip(df["cycle_id_1"], df["cycle_id_2"]))
+        assert pairs == [(2, 5), (2, 8), (5, 6), (5, 7), (8, 9), (8, 10)]
+
+    def test_sister_pairs_in_both_orders(self, relatives_model):
+        df = relatives_model.to_cycle_pair_dataframe("sister_cycles", props=[])
+        pairs = list(zip(df["cycle_id_1"], df["cycle_id_2"]))
+        assert pairs == [(5, 8), (6, 7), (7, 6), (8, 5), (9, 10), (10, 9)]
+
+    def test_cousin_pairs(self, relatives_model):
+        df = relatives_model.to_cycle_pair_dataframe("cousin_cycles", props=[])
+        pairs = list(zip(df["cycle_id_1"], df["cycle_id_2"]))
+        assert pairs == [
+            (6, 9), (6, 10), (7, 9), (7, 10), (9, 6), (9, 7), (10, 6), (10, 7)
+        ]  # fmt: skip
+
+    def test_unique_pairs_keep_lower_id_first(self, relatives_model):
+        df = relatives_model.to_cycle_pair_dataframe(
+            "sister_cycles", props=[], unique_pairs=True
+        )
+        pairs = list(zip(df["cycle_id_1"], df["cycle_id_2"]))
+        assert pairs == [(5, 8), (6, 7), (9, 10)]
+
+    def test_unique_pairs_keep_pairs_listed_from_one_side(self, relatives_model):
+        df = relatives_model.to_cycle_pair_dataframe(
+            "mother_cycle", props=[], unique_pairs=True
+        )
+        pairs = list(zip(df["cycle_id_1"], df["cycle_id_2"]))
+        assert pairs == [(5, 2), (6, 5), (7, 5), (8, 2), (9, 8), (10, 8)]
+
+    def test_props_of_both_cycles(self, relatives_model):
+        df = relatives_model.to_cycle_pair_dataframe(
+            "mother_cycle", props=["cycle_length", "level"]
+        )
+        assert df.columns.tolist() == [
+            "lineage_id",
+            "cycle_id_1",
+            "cycle_id_2",
+            "cycle_length_1",
+            "cycle_length_2",
+            "level_1",
+            "level_2",
+        ]
+        row = df[df["cycle_id_1"] == 6].iloc[0]
+        assert (row["cycle_length_1"], row["cycle_length_2"]) == (1, 2)
+        assert (row["level_1"], row["level_2"]) == (2, 1)
+
+    def test_all_props_by_default(self, relatives_model):
+        df = relatives_model.to_cycle_pair_dataframe("mother_cycle")
+        cycle_columns = relatives_model.to_cycle_dataframe().columns
+        props = [col for col in cycle_columns if col not in ["lineage_id", "cycle_id"]]
+        expected = [f"{prop}{suffix}" for prop in props for suffix in ["_1", "_2"]]
+        assert df.columns.tolist()[3:] == expected
+
+    def test_list_values_kept(self, relatives_model):
+        df = relatives_model.to_cycle_pair_dataframe("mother_cycle", props=["cells"])
+        row = df[df["cycle_id_1"] == 5].iloc[0]
+        assert row["cells_1"] == [3, 5]
+        assert row["cells_2"] == [1, 2]
+
+    def test_custom_suffixes(self, relatives_model):
+        df = relatives_model.to_cycle_pair_dataframe(
+            "mother_cycle", props=["cycle_length"], suffixes=("", "_mother")
+        )
+        assert df.columns.tolist() == [
+            "lineage_id",
+            "cycle_id",
+            "cycle_id_mother",
+            "cycle_length",
+            "cycle_length_mother",
+        ]
+
+    def test_id_props_not_repeated(self, relatives_model):
+        df = relatives_model.to_cycle_pair_dataframe(
+            "mother_cycle", props=["lineage_id", "cycle_id", "level"]
+        )
+        assert df.columns.tolist() == [
+            "lineage_id",
+            "cycle_id_1",
+            "cycle_id_2",
+            "level_1",
+            "level_2",
+        ]
+
+    def test_lineage_without_pairs_gives_empty_dataframe(self, relatives_model):
+        df = relatives_model.to_cycle_pair_dataframe(
+            "mother_cycle", props=["level"], lids=[-11]
+        )
+        assert df.empty
+        assert df.columns.tolist() == [
+            "lineage_id",
+            "cycle_id_1",
+            "cycle_id_2",
+            "level_1",
+            "level_2",
+        ]
+
+    def test_lids(self, relatives_model):
+        df = relatives_model.to_cycle_pair_dataframe("sister_cycles", lids=[1])
+        assert (df["lineage_id"] == 1).all()
+        assert len(df) == 6
+
+    def test_lineage_props_added_as_columns(self, relatives_model):
+        df = relatives_model.to_cycle_pair_dataframe(
+            "mother_cycle", props=[], lineage_props=["lin_prop"]
+        )
+        assert df.columns.tolist()[-1] == "lin_prop"
+        assert (df["lin_prop"] == 1.5).all()
+
+    def test_user_defined_relation(self, relatives_model):
+        prop = root_relation_property()
+        relatives_model.add_custom_property(RootRelation(prop, [6, 10]))
+        relatives_model.update()
+        df = relatives_model.to_cycle_pair_dataframe("root_relation", props=[])
+        pairs = list(zip(df["lineage_id"], df["cycle_id_1"], df["cycle_id_2"]))
+        assert pairs == [(1, 2, 6), (1, 2, 10)]
+
+    def test_related_cycle_not_in_lineage_raises(self, relatives_model):
+        prop = root_relation_property()
+        relatives_model.add_custom_property(RootRelation(prop, [99]))
+        relatives_model.update()
+        with pytest.raises(ValueError, match="Cell cycle 99, listed in property"):
+            relatives_model.to_cycle_pair_dataframe("root_relation")
+
+    def test_relation_without_values_raises(self, relatives_model):
+        # Declared, but not computed: no update since.
+        prop = root_relation_property()
+        relatives_model.add_custom_property(RootRelation(prop, [6]))
+        with pytest.raises(ValueError, match="No cell cycle has a value"):
+            relatives_model.to_cycle_pair_dataframe("root_relation")
+
+    def test_undeclared_relation_prop_raises(self, relatives_model):
+        with pytest.raises(ValueError, match="'grandmother_cycle'"):
+            relatives_model.to_cycle_pair_dataframe("grandmother_cycle")
+
+    def test_relation_prop_of_cell_lineages_raises(self, relatives_model):
+        with pytest.raises(ValueError, match="'lin_prop'"):
+            relatives_model.to_cycle_pair_dataframe("lin_prop")
+
+    def test_undeclared_prop_raises(self, relatives_model):
+        with pytest.raises(ValueError, match="'cell_area'"):
+            relatives_model.to_cycle_pair_dataframe(
+                "mother_cycle", props=["level", "cell_area"]
+            )
+
+    def test_same_suffixes_raise(self, relatives_model):
+        with pytest.raises(ValueError, match="The two suffixes must differ"):
+            relatives_model.to_cycle_pair_dataframe(
+                "mother_cycle", suffixes=("_a", "_a")
+            )
+
+    def test_suffixes_giving_same_column_name_raise(self, relatives_model):
+        # "cycle_length" with the suffix "_mother" is named like this property.
+        clashing = Property(
+            identifier="cycle_length_mother",
+            name="clashing",
+            description="Named like a suffixed column",
+            provenance="test",
+            prop_type="node",
+            lin_type="CycleLineage",
+            dtype="int",
+        )
+        relatives_model.props_metadata._add_prop(clashing)
+        with pytest.raises(ValueError, match="give the same name to two columns"):
+            relatives_model.to_cycle_pair_dataframe(
+                "mother_cycle",
+                props=["cycle_length", "cycle_length_mother"],
+                suffixes=("", "_mother"),
+            )
+
+    def test_no_cycle_data_raises(self, lineage_props_model):
+        with pytest.raises(ValueError, match="Cycle lineages have not been computed"):
+            lineage_props_model.to_cycle_pair_dataframe("mother_cycle")
 
 
 @pytest.fixture()
