@@ -173,6 +173,8 @@ def _unit_to_dimension(
         "cycle_start_time": "TIME",
         "division_time": "TIME",
         "division_rate": "TIME",  # TODO: check if this is correct
+        "first_cell": "NONE",
+        "last_cell": "NONE",
         "level": "NONE",
         "mother_cycle": "NONE",
         "straightness": "NONE",

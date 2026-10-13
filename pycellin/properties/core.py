@@ -554,6 +554,65 @@ def create_cells_property(provenance: str = "pycellin") -> Property:
     )
 
 
+def create_first_cell_property(provenance: str = "pycellin") -> Property:
+    """
+    Create the declaration of the `first_cell` core property.
+
+    `first_cell` is the cell_id of the first cell of the cell cycle. It is a node
+    property of cycle lineages.
+
+    Parameters
+    ----------
+    provenance : str, optional
+        Origin of the property, e.g. the name of the format it was loaded from.
+        "pycellin" by default.
+
+    Returns
+    -------
+    Property
+        Declaration of the `first_cell` property.
+    """
+    return Property(
+        identifier="first_cell",
+        name="First cell",
+        description="cell_id of the first cell in the cell cycle",
+        provenance=provenance,
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="int",
+    )
+
+
+def create_last_cell_property(provenance: str = "pycellin") -> Property:
+    """
+    Create the declaration of the `last_cell` core property.
+
+    `last_cell` is the cell_id of the last cell of the cell cycle. It has the same
+    value as `cycle_id`, but says what this value is. It is a node property of
+    cycle lineages.
+
+    Parameters
+    ----------
+    provenance : str, optional
+        Origin of the property, e.g. the name of the format it was loaded from.
+        "pycellin" by default.
+
+    Returns
+    -------
+    Property
+        Declaration of the `last_cell` property.
+    """
+    return Property(
+        identifier="last_cell",
+        name="Last cell",
+        description="cell_id of the last cell in the cell cycle, i.e. its cycle_id",
+        provenance=provenance,
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="int",
+    )
+
+
 def create_cycle_length_property(provenance: str = "pycellin") -> Property:
     """
     Create the declaration of the `cycle_length` core property.

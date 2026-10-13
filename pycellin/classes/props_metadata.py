@@ -13,6 +13,8 @@ from pycellin.properties.core import (
     create_cycle_id_property,
     create_cycle_length_property,
     create_cycle_start_time_property,
+    create_first_cell_property,
+    create_last_cell_property,
     create_level_property,
 )
 from pycellin.utils import check_literal_type
@@ -298,6 +300,8 @@ class PropsMetadata:
         props = [
             create_cycle_id_property(),
             create_cells_property(),
+            create_first_cell_property(),
+            create_last_cell_property(),
             create_cycle_length_property(),
             create_cycle_duration_property(time_unit),
             create_cycle_start_time_property(time_unit),

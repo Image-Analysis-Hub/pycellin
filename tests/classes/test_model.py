@@ -341,6 +341,27 @@ class TestToLineageDataframe:
         assert df["lin_prop"].isna().tolist() == [True, False]
 
 
+class TestAddCycleData:
+    """Test cases for Model.add_cycle_data() method."""
+
+    def test_first_and_last_cell_declared_and_protected(self, lineage_props_model):
+        model = lineage_props_model
+        model.add_cycle_data()
+        protected_props = model.props_metadata._get_protected_props()
+        for prop_id in ["first_cell", "last_cell"]:
+            prop = model.get_property(prop_id)
+            assert prop.prop_type == PropertyType.NODE
+            assert prop.lin_type == "CycleLineage"
+            assert prop.dtype == "int"
+            assert prop_id in protected_props
+
+    def test_first_and_last_cell_bound_the_cycle(self, relatives_model):
+        df = relatives_model.to_cycle_dataframe()
+        assert df["first_cell"].tolist() == df["cells"].str[0].tolist()
+        assert df["last_cell"].tolist() == df["cells"].str[-1].tolist()
+        assert df["last_cell"].tolist() == df["cycle_id"].tolist()
+
+
 class TestToCycleDataframe:
     """Test cases for Model.to_cycle_dataframe() method."""
 

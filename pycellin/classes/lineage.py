@@ -2895,6 +2895,8 @@ class CycleLineage(Lineage):
                 last = cells_in_cycle[-1]
                 self.nodes[n]["cycle_id"] = n
                 self.nodes[n]["cells"] = cells_in_cycle
+                self.nodes[n]["first_cell"] = first
+                self.nodes[n]["last_cell"] = last
                 # How many cells in the cycle?
                 self.nodes[n]["cycle_length"] = len(cells_in_cycle)
                 # How long does the cycle last?
