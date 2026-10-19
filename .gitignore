@@ -18,4 +18,5 @@ cov.xml
 
 # Data
 sample_data/FakeTracks.tif
+sample_data/Ecoli_growth_on_agar_pad_label+raw.tif
 

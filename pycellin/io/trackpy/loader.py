@@ -42,7 +42,7 @@ def _add_nodes(graph: nx.DiGraph, df: pd.DataFrame) -> None:
 
     One node is created per row of the DataFrame. Its attributes are the row values,
     with 'frame' and 'particle' cast to int and the trackpy coordinates 'x', 'y'
-    and 'z' renamed to 'cell_x', 'cell_y' and 'cell_z'. A 'cell_ID' equal to the
+    and 'z' renamed to 'cell_x', 'cell_y' and 'cell_z'. A 'cell_id' equal to the
     position of the row in the DataFrame is added, and also used as node ID.
 
     Parameters
@@ -60,7 +60,7 @@ def _add_nodes(graph: nx.DiGraph, df: pd.DataFrame) -> None:
             if axis in row_dict:
                 row_dict[f"cell_{axis}"] = row_dict.pop(axis)
         graph.add_node(i, **row_dict)
-        graph.nodes[i]["cell_ID"] = i
+        graph.nodes[i]["cell_id"] = i
 
 
 def _add_edges(graph: nx.DiGraph, particles: list) -> None:
@@ -169,13 +169,13 @@ def _create_PropsMetadata(
     props_md = PropsMetadata()
 
     # Pycellin mandatory properties.
-    cell_ID_prop = create_cell_id_property()
+    cell_id_prop = create_cell_id_property()
     frame_prop = create_frame_property(provenance="trackpy")
     time_prop_md = create_time_property(
         unit=metadata["time_unit"], provenance="trackpy", custom_identifier=time_prop
     )
-    lin_ID_prop = create_lineage_id_property()
-    for prop in [cell_ID_prop, frame_prop, time_prop_md, lin_ID_prop]:
+    lin_id_prop = create_lineage_id_property()
+    for prop in [cell_id_prop, frame_prop, time_prop_md, lin_id_prop]:
         props_md._add_prop(prop)
 
     # Trackpy properties.
@@ -248,9 +248,10 @@ def load_trackpy_dataframe(
     ------
     ValueError
         If `df` has both a trackpy coordinate column and its pycellin counterpart
-        (e.g. 'x' and 'cell_x'), or if `computed_time_prop` is already a column
-        of `df` or is a property written by pycellin ('cell_ID', 'lineage_ID',
-        'timepoint' or a renamed coordinate).
+        (e.g. 'x' and 'cell_x'), if it has a 'cell_id', 'lineage_id' or
+        'timepoint' column, which pycellin creates, or if `computed_time_prop` is
+        already a column of `df` or is a property written by pycellin ('cell_id',
+        'lineage_id', 'timepoint' or a renamed coordinate).
     """
     coord_props = {f"cell_{axis}" for axis in ("x", "y", "z") if axis in df.columns}
     conflicting_columns = sorted(coord_props & set(df.columns))
@@ -259,12 +260,20 @@ def load_trackpy_dataframe(
             f"Cannot rename the trackpy coordinates: the DataFrame already has the "
             f"column(s) {conflicting_columns}. Rename or drop them before loading."
         )
-    reserved_props = {"cell_ID", "lineage_ID", "timepoint"} | coord_props
+    pycellin_props = {"cell_id", "lineage_id", "timepoint"}
+    conflicting_columns = sorted(pycellin_props & set(df.columns))
+    if conflicting_columns:
+        raise ValueError(
+            f"The DataFrame has the column(s) {conflicting_columns}, but pycellin "
+            "creates its own properties with these names. Rename or drop them "
+            "before loading."
+        )
+    reserved_props = pycellin_props | coord_props
     if computed_time_prop in df.columns or computed_time_prop in reserved_props:
         raise ValueError(
             f"Cannot build the time property '{computed_time_prop}': a column or "
             f"a pycellin property with this name already exists. Use the "
-            f"`computed_time_prop` argument to choose another name."
+            f"'computed_time_prop' argument to choose another name."
         )
 
     # Build the lineages.
@@ -286,7 +295,7 @@ def load_trackpy_dataframe(
     # Split the graph into lineages.
     lineages = _split_graph_into_lineages(graph)
     del graph  # Redundant with the subgraphs.
-    data = {lin.graph["lineage_ID"]: lin for lin in lineages if len(lin) > 0}
+    data = {lin.graph["lineage_id"]: lin for lin in lineages if len(lin) > 0}
 
     # Create a pycellin model.
     props_md = _create_PropsMetadata(props, md, computed_time_prop)

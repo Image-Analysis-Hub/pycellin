@@ -136,11 +136,11 @@ class ModelMetadata:
 
         # Validate that pixel dimensions are positive, if provided.
         if self.pixel_width is not None and self.pixel_width <= 0:
-            raise ValueError("`pixel_width` must be positive.")
+            raise ValueError("'pixel_width' must be positive.")
         if self.pixel_height is not None and self.pixel_height <= 0:
-            raise ValueError("`pixel_height` must be positive.")
+            raise ValueError("'pixel_height' must be positive.")
         if self.pixel_depth is not None and self.pixel_depth <= 0:
-            raise ValueError("`pixel_depth` must be positive.")
+            raise ValueError("'pixel_depth' must be positive.")
 
     def __delattr__(self, name: str) -> None:
         """

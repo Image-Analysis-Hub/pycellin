@@ -4,6 +4,7 @@
 
 import logging
 import warnings
+from typing import ClassVar
 
 import numpy as np
 
@@ -45,7 +46,7 @@ class IsDivision(NodeLocalPropCalculator):
         lineage : Lineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -85,7 +86,7 @@ class IsLeaf(NodeLocalPropCalculator):
         lineage : Lineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -125,7 +126,7 @@ class IsRoot(NodeLocalPropCalculator):
         lineage : Lineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -424,14 +425,18 @@ class LineageDuration(LineageLocalPropCalculator):
     ----------
     property : Property
         Property object to which the calculator is associated.
-    time_prop_name : str
-        The name of the time property (e.g. "frame", "time", etc.) to use
-        for calculation.)
+    time_prop : str
+        Identifier of the cell lineage node property holding the time
+        of the cells (e.g. "frame", "POSITION_T").
     """
 
-    def __init__(self, property: Property, time_prop_name: str):
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
+
+    def __init__(self, property: Property, time_prop: str):
         super().__init__(property)
-        self.time_prop_name = time_prop_name
+        self.time_prop = time_prop
 
     def compute(self, lineage) -> float:
         """
@@ -447,7 +452,7 @@ class LineageDuration(LineageLocalPropCalculator):
         float
             The total lifespan of the lineage.
         """
-        return lineage.get_duration(time_prop=self.time_prop_name)
+        return lineage.get_duration(time_prop=self.time_prop)
 
 
 def create_location_tag_property(
@@ -600,7 +605,7 @@ class LocationTag(NodeLocalPropCalculator):
         lineage : CellLineage
             Lineage graph containing the cell of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -627,3 +632,188 @@ class LocationTag(NodeLocalPropCalculator):
         if self.tag_names is None:
             return value
         return self.tag_names.get(value)
+
+
+def create_mother_cycle_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "mother_cycle",
+        name=custom_name or "Mother cycle",
+        description=custom_description
+        or "ID of the cell cycle whose division gave birth to the cell cycle, "
+        "or None for the root cell cycle",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="int",
+    )
+
+
+class MotherCycle(NodeLocalPropCalculator):
+    """Calculator for the mother_cycle property."""
+
+    def compute(self, lineage, nid: int) -> int | None:
+        """
+        Compute the mother cycle of a given cell cycle.
+
+        Parameters
+        ----------
+        lineage : CycleLineage
+            Lineage graph containing the cell cycle of interest.
+        nid : int
+            Node ID (cycle_id) of the cell cycle of interest.
+
+        Returns
+        -------
+        int | None
+            ID of the mother cycle, or None if the cell cycle is the root.
+        """
+        return next(lineage.predecessors(nid), None)
+
+
+def create_daughter_cycles_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "daughter_cycles",
+        name=custom_name or "Daughter cycles",
+        description=custom_description
+        or "IDs of the cell cycles born from the division ending the cell cycle",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="list[int]",
+    )
+
+
+class DaughterCycles(NodeLocalPropCalculator):
+    """Calculator for the daughter_cycles property."""
+
+    def compute(self, lineage, nid: int) -> list[int]:
+        """
+        Compute the daughter cycles of a given cell cycle.
+
+        Parameters
+        ----------
+        lineage : CycleLineage
+            Lineage graph containing the cell cycle of interest.
+        nid : int
+            Node ID (cycle_id) of the cell cycle of interest.
+
+        Returns
+        -------
+        list[int]
+            IDs of the daughter cycles, empty if the cell cycle is a leaf.
+        """
+        return list(lineage.successors(nid))
+
+
+def create_sister_cycles_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "sister_cycles",
+        name=custom_name or "Sister cycles",
+        description=custom_description
+        or "IDs of the other cell cycles born from the same division as the cell cycle",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="list[int]",
+    )
+
+
+class SisterCycles(NodeLocalPropCalculator):
+    """Calculator for the sister_cycles property."""
+
+    def compute(self, lineage, nid: int) -> list[int]:
+        """
+        Compute the sister cycles of a given cell cycle.
+
+        Parameters
+        ----------
+        lineage : CycleLineage
+            Lineage graph containing the cell cycle of interest.
+        nid : int
+            Node ID (cycle_id) of the cell cycle of interest.
+
+        Returns
+        -------
+        list[int]
+            IDs of the sister cycles, empty if the cell cycle is the root.
+        """
+        return lineage.get_sisters(nid)
+
+
+def create_cousin_cycles_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "cousin_cycles",
+        name=custom_name or "Cousin cycles",
+        description=custom_description
+        or "IDs of the cousin cell cycles: cell cycles of the same generation that "
+        "share an ancestor with the cell cycle, but not its mother",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="list[int]",
+    )
+
+
+class CousinCycles(NodeLocalPropCalculator):
+    """
+    Calculator for the cousin_cycles property.
+
+    First cousins share the same grandmother but not the same mother: their
+    mothers are sisters. More generally, cousins of degree n share an ancestor
+    n + 1 generations up, but no closer one.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    degree : int | None, optional
+        Degree of the cousins: 1 for first cousins, 2 for second cousins, and
+        so on. If None, the cousins of all degrees are listed, closest first.
+        1 by default.
+
+    Raises
+    ------
+    ValueError
+        If `degree` is lower than 1.
+    """
+
+    def __init__(self, property: Property, degree: int | None = 1):
+        super().__init__(property)
+        # Checked here rather than by get_cousins() at update time.
+        if degree is not None and degree < 1:
+            raise ValueError(f"'degree' must be at least 1 or None, got {degree}.")
+        self.degree = degree
+
+    def compute(self, lineage, nid: int) -> list[int]:
+        """
+        Compute the cousin cycles of a given cell cycle.
+
+        Parameters
+        ----------
+        lineage : CycleLineage
+            Lineage graph containing the cell cycle of interest.
+        nid : int
+            Node ID (cycle_id) of the cell cycle of interest.
+
+        Returns
+        -------
+        list[int]
+            IDs of the cousin cycles of the requested degree.
+        """
+        return lineage.get_cousins(nid, degree=self.degree)

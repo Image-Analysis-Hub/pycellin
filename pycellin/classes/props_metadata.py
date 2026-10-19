@@ -9,8 +9,12 @@ from pycellin.custom_types import LineageType, PropertyType, property_type_from_
 from pycellin.properties.core import (
     create_cells_property,
     create_cycle_duration_property,
+    create_cycle_end_time_property,
     create_cycle_id_property,
     create_cycle_length_property,
+    create_cycle_start_time_property,
+    create_first_cell_property,
+    create_last_cell_property,
     create_level_property,
 )
 from pycellin.utils import check_literal_type
@@ -293,12 +297,18 @@ class PropsMetadata:
         time_unit : str | None
             The unit of the time property (e.g. 'frame', 'minute', 'hour', etc.).
         """
-        prop_ID = create_cycle_id_property()
-        prop_cells = create_cells_property()
-        prop_length = create_cycle_length_property()
-        prop_duration = create_cycle_duration_property(time_unit)
-        prop_level = create_level_property()
-        for prop in [prop_ID, prop_cells, prop_length, prop_duration, prop_level]:
+        props = [
+            create_cycle_id_property(),
+            create_cells_property(),
+            create_first_cell_property(),
+            create_last_cell_property(),
+            create_cycle_length_property(),
+            create_cycle_duration_property(time_unit),
+            create_cycle_start_time_property(time_unit),
+            create_cycle_end_time_property(time_unit),
+            create_level_property(),
+        ]
+        for prop in props:
             if prop.identifier not in self.props:
                 self._add_prop(prop)
                 self._protect_prop(prop.identifier)

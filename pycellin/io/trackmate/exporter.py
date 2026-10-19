@@ -144,15 +144,18 @@ def _unit_to_dimension(
     pycellin_props = {
         # Cell features.
         "cell_area": "AREA",
+        "cell_circularity": "NONE",
         "cell_displacement": "LENGTH",
         "cell_perimeter": "LENGTH",
         "cell_polygon": "NONE",  # not float nor int so won't be exported anyway
+        "cell_solidity": "NONE",
         "cell_speed": "VELOCITY",
         "is_division": "NONE",
         "is_leaf": "NONE",
         "is_root": "NONE",
         "location_tag": "NONE",
-        "pycellin_cell_ID": "NONE",
+        "normalized_age": "NONE",
+        "pycellin_cell_id": "NONE",
         "rod_length": "LENGTH",
         "rod_width": "LENGTH",
         "timepoint": "NONE",
@@ -164,11 +167,16 @@ def _unit_to_dimension(
         "cells": "NONE",  # not float nor int so won't be exported anyway
         "cycle_completeness": "NONE",
         "cycle_duration": "TIME",
-        "cycle_ID": "NONE",
+        "cycle_end_time": "TIME",
+        "cycle_id": "NONE",
         "cycle_length": "NONE",
+        "cycle_start_time": "TIME",
         "division_time": "TIME",
         "division_rate": "TIME",  # TODO: check if this is correct
+        "first_cell": "NONE",
+        "last_cell": "NONE",
         "level": "NONE",
+        "mother_cycle": "NONE",
         "straightness": "NONE",
         # Lineage features.
         "num_cells": "NONE",
@@ -295,6 +303,8 @@ def _transform_name(name: str) -> str:
 
         def transform_word(match):
             word = match.group(0)
+            if word == "id":
+                return "ID"
             return word if word in exceptions else word.lower()
 
         new_name = re.sub(r"\b\w+\b", transform_word, name)
@@ -398,7 +408,8 @@ def _value_to_str(
 
     Indeed, ET.write() method only accepts to write strings.
     However, TrackMate is only able to read Spot, Edge and Track
-    features that can be parsed as numeric by Java.
+    features that can be parsed as numeric by Java. A missing value (None)
+    is thus written as NaN, like TrackMate does.
 
     Parameters
     ----------
@@ -410,7 +421,9 @@ def _value_to_str(
     str
         The string equivalent of `value`.
     """
-    if isinstance(value, bool):
+    if value is None:
+        return "NaN"
+    elif isinstance(value, bool):
         return "1" if value else "0"
     elif isinstance(value, numbers.Number):
         if math.isnan(value):
@@ -624,13 +637,13 @@ def _update_nodes(lin: CellLineage, frame_prop: str) -> set[int]:
     nodes_with_missing_pos = set()
 
     for node, data in lin.nodes(data=True):
-        data["ID"] = data.pop("cell_ID")
+        data["ID"] = data.pop("cell_id")
         data["FRAME"] = data.pop(frame_prop)
         data["VISIBILITY"] = 1
         try:
-            data.pop("lineage_ID")  # TM needs it only on the tracks, not on the spots
+            data.pop("lineage_id")  # TM needs it only on the tracks, not on the spots
         except KeyError:
-            pass  # lineage_ID should be present, but better be safe than sorry
+            pass  # lineage_id should be present, but better be safe than sorry
         try:
             data.pop("timepoint")  # internal pycellin property
         except KeyError:
@@ -694,7 +707,7 @@ def _update_lineages(lin: CellLineage) -> None:
         Lineage whose graph to update.
     """
     # Mandatory TrackMate property.
-    lin.graph["TRACK_ID"] = lin.graph.pop("lineage_ID")
+    lin.graph["TRACK_ID"] = lin.graph.pop("lineage_id")
 
     try:
         lin.graph["name"] = lin.graph.pop("lineage_name")
@@ -724,13 +737,13 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
     If some cells are missing x and/or y coordinates, in which case they are set
     to 0.0 by default.
     """
-    # Track cells with missing position properties: {lineage_ID: set of node IDs}.
+    # Track cells with missing position properties: {lineage_id: set of node IDs}.
     missing_positions = {}
 
     for lin in model.data.cell_data.values():
         nodes_with_missing_pos = _update_nodes(lin, frame_prop)
         if nodes_with_missing_pos:
-            missing_positions[lin.graph["lineage_ID"]] = nodes_with_missing_pos
+            missing_positions[lin.graph["lineage_id"]] = nodes_with_missing_pos
         _update_edges(lin)
         _update_lineages(lin)
 
@@ -802,8 +815,8 @@ def _rename_props(props_md: PropsMetadata, frame_prop: str) -> None:
     frame_prop : str
         Name of the property corresponding to the frame/timepoint.
     """
-    props_md._unprotect_prop("lineage_ID")
-    props_md._change_prop_identifier("lineage_ID", "TRACK_ID")
+    props_md._unprotect_prop("lineage_id")
+    props_md._change_prop_identifier("lineage_id", "TRACK_ID")
     props_md._change_prop_description("TRACK_ID", "Track ID")
 
     if frame_prop != "FRAME":
@@ -826,8 +839,8 @@ def _remove_props(props_md: PropsMetadata) -> None:
     case renaming comes later), they are absent from the FeatureDeclarations tag
     in the TrackMate XML file.
     """
-    props_md._unprotect_prop("cell_ID")
-    props_md._remove_prop("cell_ID")
+    props_md._unprotect_prop("cell_id")
+    props_md._remove_prop("cell_id")
     if props_md._has_prop("timepoint"):
         # If no frame-like properties were found in _rename_props(), the timepoint
         # property is used and renamed to FRAME. So no need to remove it in this case.
@@ -959,7 +972,7 @@ def _update_props_metadata(model: Model, frame_prop: str) -> None:
     """
     _rename_props(model.props_metadata, frame_prop)
     _remove_props(model.props_metadata)
-    # TRACK_ID comes from lineage_ID which is stored both as a node property
+    # TRACK_ID comes from lineage_id which is stored both as a node property
     # and a lineage property. TrackMate only needs it on the lineages so we update
     # the property type.
     model.props_metadata.props["TRACK_ID"].prop_type = PropertyType.LINEAGE
@@ -1062,7 +1075,7 @@ def _relabel_nodes(model) -> dict[int, dict[int, int]]:
     logger.debug(f"Duplicate node IDs found: {dupes}")
     logger.warning(
         "Relabeling nodes to ensure unique IDs across all lineages export. "
-        "Previous IDs are preserved in 'pycellin_cell_ID' for reference."
+        "Previous IDs are preserved in 'pycellin_cell_id' for reference."
     )
     for lin_id, lin in model.data.cell_data.items():
         mapping: dict[int, int] = {}  # {old_node_id: new_node_id}
@@ -1072,10 +1085,10 @@ def _relabel_nodes(model) -> dict[int, dict[int, int]]:
             new_id += 1
         nx.relabel_nodes(lin, mapping, copy=False)
 
-        # The relabeling must be propagated to the cell_ID property.
+        # The relabeling must be propagated to the cell_id property.
         for node in lin.nodes():
-            lin.nodes[node]["pycellin_cell_ID"] = lin.nodes[node]["cell_ID"]
-            lin.nodes[node]["cell_ID"] = node
+            lin.nodes[node]["pycellin_cell_id"] = lin.nodes[node]["cell_id"]
+            lin.nodes[node]["cell_id"] = node
 
         # SPOT_SOURCE_ID and SPOT_TARGET_ID are updated / created later
         # in _update_edges().
@@ -1086,15 +1099,15 @@ def _relabel_nodes(model) -> dict[int, dict[int, int]]:
         for lin_id, lin in model.data.cell_data.items():
             for node in lin.nodes():
                 if "cell_name" in lin.nodes[node]:
-                    old_id = lin.nodes[node]["pycellin_cell_ID"]
-                    new_id = lin.nodes[node]["cell_ID"]
+                    old_id = lin.nodes[node]["pycellin_cell_id"]
+                    new_id = lin.nodes[node]["cell_id"]
                     if lin.nodes[node]["cell_name"] == f"ID{old_id}":
                         lin.nodes[node]["cell_name"] = f"ID{new_id}"
 
     # Update of the model in case some other properties refer
-    # to the node IDs (for example cycle_IDs).
+    # to the node IDs (for example cycle_ids).
     prop = Property(
-        identifier="pycellin_cell_ID",
+        identifier="pycellin_cell_id",
         name="Pycellin cell ID",
         description="Original cell ID before relabeling for TrackMate export",
         provenance="pycellin",
@@ -1418,8 +1431,8 @@ if __name__ == "__main__":
     )
     model = load_GEFF(
         geff_in,
-        lineage_id_prop="lineage_ID",
-        cell_id_prop="cell_ID",
+        lineage_id_prop="lineage_id",
+        cell_id_prop="cell_id",
         time_prop="POSITION_T",
     )
 

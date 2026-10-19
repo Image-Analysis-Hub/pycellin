@@ -16,6 +16,8 @@ from pycellin.properties.core import (
 from pycellin.io.trackmate.exporter import (
     _relabel_nodes,
     _remove_non_numeric_props,
+    _transform_name,
+    _value_to_str,
 )
 
 # Fixtures ####################################################################
@@ -25,10 +27,10 @@ from pycellin.io.trackmate.exporter import (
 def simple_model():
     """Create a simple model for testing."""
     lin = CellLineage()
-    lin.add_node(1, timepoint=0, cell_x=1.0, cell_y=1.5, lineage_ID=0, cell_ID=1)
-    lin.add_node(2, timepoint=1, cell_x=2.0, cell_y=2.5, lineage_ID=0, cell_ID=2)
+    lin.add_node(1, timepoint=0, cell_x=1.0, cell_y=1.5, lineage_id=0, cell_id=1)
+    lin.add_node(2, timepoint=1, cell_x=2.0, cell_y=2.5, lineage_id=0, cell_id=2)
     lin.add_edge(1, 2, SPOT_SOURCE_ID=1, SPOT_TARGET_ID=2)
-    lin.graph["lineage_ID"] = 0
+    lin.graph["lineage_id"] = 0
 
     cell_data = {0: lin}
     data = Data(cell_data)
@@ -51,11 +53,11 @@ def simple_model():
 def model_unique_ids(simple_model):
     """Create a model with all unique node IDs across lineages."""
     lin = CellLineage()
-    lin.add_node(3, timepoint=0, cell_x=1.0, cell_y=1.5, lineage_ID=1, cell_ID=3)
-    lin.add_node(4, timepoint=1, cell_x=2.0, cell_y=2.5, lineage_ID=1, cell_ID=4)
-    lin.add_node(5, timepoint=2, cell_x=3.0, cell_y=3.5, lineage_ID=1, cell_ID=5)
-    lin.add_node(6, timepoint=3, cell_x=4.0, cell_y=4.5, lineage_ID=1, cell_ID=6)
-    lin.add_node(8, timepoint=3, cell_x=6.0, cell_y=6.5, lineage_ID=1, cell_ID=8)
+    lin.add_node(3, timepoint=0, cell_x=1.0, cell_y=1.5, lineage_id=1, cell_id=3)
+    lin.add_node(4, timepoint=1, cell_x=2.0, cell_y=2.5, lineage_id=1, cell_id=4)
+    lin.add_node(5, timepoint=2, cell_x=3.0, cell_y=3.5, lineage_id=1, cell_id=5)
+    lin.add_node(6, timepoint=3, cell_x=4.0, cell_y=4.5, lineage_id=1, cell_id=6)
+    lin.add_node(8, timepoint=3, cell_x=6.0, cell_y=6.5, lineage_id=1, cell_id=8)
     lin.add_edges_from(
         [
             (3, 4, {"SPOT_SOURCE_ID": 3, "SPOT_TARGET_ID": 4}),
@@ -64,7 +66,7 @@ def model_unique_ids(simple_model):
             (6, 8, {"SPOT_SOURCE_ID": 6, "SPOT_TARGET_ID": 8}),
         ]
     )
-    lin.graph["lineage_ID"] = 1
+    lin.graph["lineage_id"] = 1
     simple_model.data.cell_data[1] = lin
     return simple_model
 
@@ -73,11 +75,11 @@ def model_unique_ids(simple_model):
 def model_non_unique_ids(simple_model):
     """Create a model with duplicate node IDs across lineages."""
     lin = CellLineage()
-    lin.add_node(1, timepoint=0, cell_x=1.0, cell_y=1.5, lineage_ID=1, cell_ID=1)
-    lin.add_node(2, timepoint=1, cell_x=2.0, cell_y=2.5, lineage_ID=1, cell_ID=2)
-    lin.add_node(3, timepoint=2, cell_x=3.0, cell_y=3.5, lineage_ID=1, cell_ID=3)
-    lin.add_node(4, timepoint=3, cell_x=4.0, cell_y=4.5, lineage_ID=1, cell_ID=4)
-    lin.add_node(6, timepoint=3, cell_x=6.0, cell_y=6.5, lineage_ID=1, cell_ID=6)
+    lin.add_node(1, timepoint=0, cell_x=1.0, cell_y=1.5, lineage_id=1, cell_id=1)
+    lin.add_node(2, timepoint=1, cell_x=2.0, cell_y=2.5, lineage_id=1, cell_id=2)
+    lin.add_node(3, timepoint=2, cell_x=3.0, cell_y=3.5, lineage_id=1, cell_id=3)
+    lin.add_node(4, timepoint=3, cell_x=4.0, cell_y=4.5, lineage_id=1, cell_id=4)
+    lin.add_node(6, timepoint=3, cell_x=6.0, cell_y=6.5, lineage_id=1, cell_id=6)
     lin.add_edges_from(
         [
             (1, 2, {"SPOT_SOURCE_ID": 1, "SPOT_TARGET_ID": 2}),
@@ -86,7 +88,7 @@ def model_non_unique_ids(simple_model):
             (4, 6, {"SPOT_SOURCE_ID": 4, "SPOT_TARGET_ID": 6}),
         ]
     )
-    lin.graph["lineage_ID"] = 1
+    lin.graph["lineage_id"] = 1
     simple_model.data.cell_data[1] = lin
 
     cell_name_prop = Property(
@@ -227,6 +229,27 @@ def list_prop():
 # Test Classes ################################################################
 
 
+class TestTransformName:
+    """Test cases for _transform_name function."""
+
+    def test_pycellin_id_is_uppercase(self):
+        """Test that 'id' in a pycellin identifier is displayed as 'ID'."""
+        assert _transform_name("cycle_id") == "Cycle ID"
+        assert _transform_name("pycellin_cell_id") == "Pycellin cell ID"
+
+    def test_trackmate_id_is_kept(self):
+        """Test that 'ID' in a TrackMate feature name stays uppercase."""
+        assert _transform_name("TRACK_ID") == "Track ID"
+
+
+class TestValueToStr:
+    """Test cases for _value_to_str function."""
+
+    def test_none_is_nan(self):
+        """Test that a missing value is written as NaN, which TrackMate can read."""
+        assert _value_to_str(None) == "NaN"
+
+
 class TestRemoveNonNumericProps:
     """Test cases for _remove_non_numeric_props function."""
 
@@ -312,14 +335,14 @@ class TestRelabelNodes:
         """Test that nodes with unique IDs are not relabeled."""
         lin = model_unique_ids.data.cell_data[0]
         original_nodes = set(lin.nodes())
-        original_cell_ids = {node: lin.nodes[node]["cell_ID"] for node in lin.nodes()}
+        original_cell_ids = {node: lin.nodes[node]["cell_id"] for node in lin.nodes()}
 
         _relabel_nodes(model_unique_ids)
 
         # Nodes should remain unchanged
         assert set(lin.nodes()) == original_nodes
         for node in lin.nodes():
-            assert lin.nodes[node]["cell_ID"] == original_cell_ids[node]
+            assert lin.nodes[node]["cell_id"] == original_cell_ids[node]
 
     def test_non_unique_ids_across_lineages(self, model_non_unique_ids):
         """Test that nodes with duplicate IDs across lineages are relabeled uniquely."""
@@ -337,35 +360,35 @@ class TestRelabelNodes:
         assert len(new_ids) == len(set(new_ids))
 
     def test_original_cell_id_preserved(self, model_non_unique_ids):
-        """Test that original cell_ID is preserved in pycellin_cell_ID."""
-        # Collect original cell_IDs for each lineage before relabeling
+        """Test that original cell_id is preserved in pycellin_cell_id."""
+        # Collect original cell_ids for each lineage before relabeling
         original_cell_ids_by_lin = {}
         for lin_id, lin in model_non_unique_ids.data.cell_data.items():
-            # Store the cell_IDs in the order nodes appear
+            # Store the cell_ids in the order nodes appear
             original_cell_ids_by_lin[lin_id] = [
-                lin.nodes[node]["cell_ID"] for node in lin.nodes()
+                lin.nodes[node]["cell_id"] for node in lin.nodes()
             ]
 
         _relabel_nodes(model_non_unique_ids)
 
-        # After relabeling, verify that pycellin_cell_ID matches original cell_IDs
+        # After relabeling, verify that pycellin_cell_id matches original cell_ids
         for lin_id, lin in model_non_unique_ids.data.cell_data.items():
             for node in lin.nodes():
-                assert "pycellin_cell_ID" in lin.nodes[node]
-                # The pycellin_cell_ID should be one of the original cell_IDs
+                assert "pycellin_cell_id" in lin.nodes[node]
+                # The pycellin_cell_id should be one of the original cell_ids
                 assert (
-                    lin.nodes[node]["pycellin_cell_ID"]
+                    lin.nodes[node]["pycellin_cell_id"]
                     in original_cell_ids_by_lin[lin_id]
                 )
 
     def test_new_cell_id_updated(self, model_non_unique_ids):
-        """Test that cell_ID is updated to the new node ID after relabeling."""
+        """Test that cell_id is updated to the new node ID after relabeling."""
         _relabel_nodes(model_non_unique_ids)
 
-        # After relabeling, cell_ID should match the new node ID
+        # After relabeling, cell_id should match the new node ID
         for lin in model_non_unique_ids.data.cell_data.values():
             for node in lin.nodes():
-                assert lin.nodes[node]["cell_ID"] == node
+                assert lin.nodes[node]["cell_id"] == node
 
     def test_with_cycle_lins(self, model_non_unique_ids):
         """Test that cycle lineage nodes are also relabeled.."""

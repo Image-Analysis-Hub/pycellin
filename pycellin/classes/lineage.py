@@ -73,7 +73,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         super().__init__(incoming_graph_data=nx_digraph)
         if lid is not None:
             assert isinstance(lid, int), "The lineage ID must be an integer."
-            self.graph["lineage_ID"] = lid
+            self.graph["lineage_id"] = lid
 
     def _remove_prop(self, prop_name: str, prop_type: PropertyType | None = None) -> None:
         """
@@ -224,6 +224,228 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         descendants = nx.descendants(self, nid)
         return list(descendants)
+
+    def get_sisters(self, node_id: int) -> list[int]:
+        """
+        Return the sisters of a given node.
+
+        Sisters are born from the same division: they share the same mother.
+        In a cell lineage, the sisters of a cell are the cells of its sister cell
+        cycles that are at the same timepoint as the cell. In a cycle lineage,
+        the sisters of a cell cycle are the other cell cycles born from the same
+        division.
+
+        Parameters
+        ----------
+        node_id : int
+            ID of the node (cell or cell cycle) for which to find the sisters.
+
+        Returns
+        -------
+        list[int]
+            IDs of the sisters of the node.
+
+        Raises
+        ------
+        KeyError
+            If the node is not in the lineage.
+        FusionError
+            If a node on the way up to the mother has more than one parent.
+        """
+        return self._get_relatives(node_id, degree=0)
+
+    def get_cousins(self, node_id: int, degree: int | None = 1) -> list[int]:
+        """
+        Return the cousins of a given node.
+
+        First cousins share the same grandmother but not the same mother: their
+        mothers are sisters. More generally, cousins of degree n share an ancestor
+        n + 1 generations up, but no closer one: second cousins share the same
+        great-grandmother, and so on. Generations are counted in cell cycles.
+        In a cell lineage, only the cells at the same timepoint as the given cell
+        are returned. In a cycle lineage, cousins are cell cycles.
+
+        Parameters
+        ----------
+        node_id : int
+            ID of the node (cell or cell cycle) for which to find the cousins.
+        degree : int | None, optional
+            Degree of the cousins: 1 for first cousins, 2 for second cousins, and
+            so on. If None, the cousins of all degrees are returned, closest first.
+            1 by default.
+
+        Returns
+        -------
+        list[int]
+            IDs of the cousins of the node.
+
+        Raises
+        ------
+        ValueError
+            If `degree` is lower than 1.
+        KeyError
+            If the node is not in the lineage.
+        FusionError
+            If a node on the way up to the common ancestor has more than one
+            parent.
+        """
+        if degree is not None and degree < 1:
+            raise ValueError(f"'degree' must be at least 1 or None, got {degree}.")
+        return self._get_relatives(node_id, degree)
+
+    def _get_relatives(self, node_id: int, degree: int | None) -> list[int]:
+        """
+        Return the relatives of a node that share an ancestor degree + 1
+        generations up, but no closer one.
+
+        Degree 0 gives the sisters of the node, degree 1 its first cousins, and so
+        on. Generations are counted in cell cycles, through the `_get_cycle()`,
+        `_get_parent_cycle()`, `_get_daughter_cycles()` and `_get_matching_nodes()`
+        methods.
+
+        Parameters
+        ----------
+        node_id : int
+            ID of the node (cell or cell cycle) for which to find the relatives.
+        degree : int | None
+            Degree of the relatives, or None for all the degrees from 1,
+            closest first.
+
+        Returns
+        -------
+        list[int]
+            IDs of the relatives of the node.
+
+        Raises
+        ------
+        KeyError
+            If the node is not in the lineage.
+        FusionError
+            If a node on the way up to the common ancestor has more than one
+            parent.
+        """
+        if node_id not in self:
+            raise KeyError(f"Node {node_id} is not in the lineage.")
+        # Cell cycles from the one of the node up to the farthest common ancestor
+        # needed: path[d + 1] is the common ancestor of the relatives of degree d.
+        path = [self._get_cycle(node_id)]
+        while degree is None or len(path) < degree + 2:
+            parent = self._get_parent_cycle(path[-1])
+            if parent is None:
+                break
+            path.append(parent)
+        if degree is None:
+            degrees = range(1, len(path) - 1)
+        elif degree + 1 < len(path):
+            degrees = range(degree, degree + 1)
+        else:
+            return []
+
+        relatives = []
+        for d in degrees:
+            # Daughters of the common ancestor, except the one leading to the node,
+            # then their descendants down to the generation of the node.
+            cycles = [
+                cycle
+                for cycle in self._get_daughter_cycles(path[d + 1])
+                if cycle != path[d]
+            ]
+            for _ in range(d):
+                cycles = [
+                    daughter
+                    for cycle in cycles
+                    for daughter in self._get_daughter_cycles(cycle)
+                ]
+            relatives.extend(
+                matching_node
+                for cycle in cycles
+                for matching_node in self._get_matching_nodes(cycle, node_id)
+            )
+        return relatives
+
+    def _get_cycle(self, node_id: int) -> int:
+        """
+        Return the ID of the cell cycle holding a given node.
+
+        Cell cycles are identified as in cycle lineages, by the ID of their last
+        cell. Here, each node is its own cell cycle, as in a cycle lineage.
+
+        Parameters
+        ----------
+        node_id : int
+            ID of the node.
+
+        Returns
+        -------
+        int
+            ID of the cell cycle holding the node.
+        """
+        return node_id
+
+    def _get_parent_cycle(self, cycle_id: int) -> int | None:
+        """
+        Return the mother cycle of a given cell cycle.
+
+        Here, each node is its own cell cycle, as in a cycle lineage.
+
+        Parameters
+        ----------
+        cycle_id : int
+            ID of the cell cycle.
+
+        Returns
+        -------
+        int | None
+            ID of the mother cycle, or None if the cell cycle starts at the root.
+
+        Raises
+        ------
+        FusionError
+            If the cell cycle has more than one parent.
+        """
+        parents = list(self.predecessors(cycle_id))
+        if len(parents) > 1:
+            raise FusionError(cycle_id, self.graph.get("lineage_id"))
+        return parents[0] if parents else None
+
+    def _get_daughter_cycles(self, cycle_id: int) -> list[int]:
+        """
+        Return the daughter cycles of a given cell cycle.
+
+        Here, each node is its own cell cycle, as in a cycle lineage.
+
+        Parameters
+        ----------
+        cycle_id : int
+            ID of the cell cycle.
+
+        Returns
+        -------
+        list[int]
+            IDs of the cell cycles born from the division ending the cell cycle.
+        """
+        return list(self.successors(cycle_id))
+
+    def _get_matching_nodes(self, cycle_id: int, node_id: int) -> list[int]:
+        """
+        Return the nodes of a cell cycle to report as relatives of a given node.
+
+        Here, each node is its own cell cycle, as in a cycle lineage, so it is the
+        cell cycle itself.
+
+        Parameters
+        ----------
+        cycle_id : int
+            ID of the cell cycle of the relative.
+        node_id : int
+            ID of the node whose relatives are searched.
+
+        Returns
+        -------
+        list[int]
+            IDs of the nodes to report.
+        """
+        return [cycle_id]
 
     def get_depth(self) -> int:
         """
@@ -382,7 +604,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         G = Graph(directed=True)
         G.add_vertices(len(node_order))
 
-        # Copy graph attributes (like lineage_ID) from nx to igraph.
+        # Copy graph attributes (like lineage_id) from nx to igraph.
         for attr, value in self.graph.items():
             G[attr] = value
 
@@ -515,7 +737,12 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         }
 
     def _build_node_hover_text(
-        self, G: Graph, ID_prop: str, y_prop: Property, node_hover_props: list[str] | None
+        self,
+        G: Graph,
+        id_prop: str,
+        y_prop_id: str,
+        y_label: str,
+        node_hover_props: list[str] | None,
     ) -> list[str]:
         """Build hover text for nodes."""
         if node_hover_props:
@@ -532,23 +759,37 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 node_hover_text.append(text)
         else:
             node_hover_text = [
-                (
-                    f"{ID_prop}: {node[ID_prop]}<br>{y_prop.name}: {node[y_prop.identifier]}"
-                )
+                f"{id_prop}: {node[id_prop]}<br>{y_label}: {node[y_prop_id]}"
                 for node in G.vs
             ]
         return node_hover_text
 
     def _get_graph_name(self, G: Graph) -> str:
         """Extract graph name from lineage ID if available."""
-        if "lineage_ID" in G.attributes():
-            return f"lineage_ID: {G['lineage_ID']}"
+        if "lineage_id" in G.attributes():
+            return f"lineage_id: {G['lineage_id']}"
         return ""
 
-    def _construct_y_legend(self, y_prop: Property) -> str:
-        if y_prop.unit:
-            return f"{y_prop.name} ({y_prop.unit})"
-        return y_prop.name
+    @staticmethod
+    def _get_prop_id_and_label(prop: str | Property) -> tuple[str, str]:
+        """
+        Return the identifier of a property to plot and the label to display for it.
+
+        Parameters
+        ----------
+        prop : str | Property
+            Identifier of the property, or its declaration.
+
+        Returns
+        -------
+        tuple[str, str]
+            The identifier of the property, and its label: the name and unit of
+            a Property, or the identifier itself.
+        """
+        if isinstance(prop, Property):
+            label = f"{prop.name} ({prop.unit})" if prop.unit else prop.name
+            return prop.identifier, label
+        return prop, prop
 
     def _build_edge_hover_text(
         self, G: Graph, index_to_nx_id: dict, edge_hover_props: list[str] | None
@@ -558,7 +799,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         for edge in G.es:
             source_id = index_to_nx_id[edge.source]
             target_id = index_to_nx_id[edge.target]
-            text = f"Source cell_ID: {source_id}<br>Target cell_ID: {target_id}<br>"
+            text = f"Source cell_id: {source_id}<br>Target cell_id: {target_id}<br>"
             if edge_hover_props:
                 for prop in edge_hover_props:
                     if prop not in edge.attributes():
@@ -573,8 +814,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     @abstractmethod
     def get_tree_figure(
         self,
-        ID_prop: str,
-        y_prop: Property,
+        id_prop: str,
+        y_prop: str | Property,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -601,11 +842,11 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        ID_prop : str
+        id_prop : str
             The property of the nodes to use as identifier.
-        y_prop : Property
-            The Property to use for the y-axis. The legend is automatically
-            constructed from Property.name and Property.unit.
+        y_prop : str or Property
+            Node property to plot on the y-axis. A Property also supplies the
+            axis label (its name and unit); a plain string is used as-is.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -626,7 +867,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             defaults to current Plotly template.
         node_hover_props : list[str], optional
             The node properties to display on hover. If None, defaults to
-            displaying `cell_ID` and the value of the y_prop.
+            displaying `cell_id` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
@@ -691,13 +932,14 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # - axes
         # - color mapping node/edge attributes?     OK nodes
 
+        y_prop_id, y_label = self._get_prop_id_and_label(y_prop)
         G, index_to_nx_id = self._create_deterministic_igraph()
         nodes_count = G.vcount()
         tree_layout = G.layout("rt")  # Reingold-Tilford layout
         # Updating the layout so the y position of the nodes is given
         # by the value of y_prop.
         tree_layout = [
-            (tree_layout[k][0], G.vs[y_prop.identifier][k]) for k in range(nodes_count)
+            (tree_layout[k][0], G.vs[y_prop_id][k]) for k in range(nodes_count)
         ]
 
         # Computing the exact positions of nodes and edges.
@@ -738,7 +980,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         # https://plotly.com/python/text-and-annotations/#styling-and-coloring-annotations
         # Text when hovering on a node.
         node_hover_text = self._build_node_hover_text(
-            G, ID_prop, y_prop, node_hover_props
+            G, id_prop, y_prop_id, y_label, node_hover_props
         )
         graph_name = self._get_graph_name(G)
 
@@ -796,21 +1038,21 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             ticks="",
             showgrid=show_horizontal_grid,
             zeroline=show_horizontal_grid,
-            title=self._construct_y_legend(y_prop),
+            title=y_label,
         )
         return fig
 
     @abstractmethod
     def plot(
         self,
-        ID_prop: str,
-        y_prop: Property,
+        id_prop: str,
+        y_prop: str | Property,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
         node_marker_style: dict[str, Any] | None = None,
-        node_colormap_prop: str | None = None,  # TODO: node_cmap_prop
-        node_color_scale: str | None = None,  # TODO: node_cmap
+        node_colormap_prop: str | None = None,
+        node_colormap: str | dict[Any, str] | None = None,
         node_hover_props: list[str] | None = None,
         edge_line_style: dict[str, Any] | None = None,
         edge_hover_props: list[str] | None = None,
@@ -828,11 +1070,11 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        ID_prop : str
+        id_prop : str
             The property of the nodes to use as identifier.
-        y_prop : Property
-            The Property to use for the y-axis. The legend is automatically
-            constructed from Property.name and Property.unit.
+        y_prop : str or Property
+            Node property to plot on the y-axis. A Property also supplies the
+            axis label (its name and unit); a plain string is used as-is.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -848,12 +1090,12 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_colormap_prop : str, optional
             The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
-        node_color_scale : str, optional
-            The color scale to use for coloring the nodes. If None,
+        node_colormap : str | dict[Any, str] | None, optional
+            The color map to use for coloring the nodes. If None,
             defaults to current Plotly template.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_prop.
+            displaying `cell_id` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
@@ -881,14 +1123,14 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         get_tree_figure : Generate the figure without displaying it.
         """
         fig = self.get_tree_figure(
-            ID_prop=ID_prop,
+            id_prop=id_prop,
             y_prop=y_prop,
             title=title,
             node_text=node_text,
             node_text_font=node_text_font,
             node_marker_style=node_marker_style,
             node_colormap_prop=node_colormap_prop,
-            node_colormap=node_color_scale,
+            node_colormap=node_colormap,
             node_hover_props=node_hover_props,
             edge_line_style=edge_line_style,
             edge_hover_props=edge_hover_props,
@@ -932,12 +1174,12 @@ class CellLineage(Lineage):
     def __str__(self) -> str:
         name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
         txt = (
-            f"CellLineage of ID {self.graph['lineage_ID']}{name_txt}"
+            f"CellLineage of ID {self.graph['lineage_id']}{name_txt}"
             f" with {len(self)} cells and {len(self.edges())} links."
         )
         return txt
 
-    def _get_next_available_node_ID(self) -> int:
+    def _get_next_available_node_id(self) -> int:
         """
         Return the next available node ID in the lineage.
 
@@ -954,7 +1196,7 @@ class CellLineage(Lineage):
     def _add_cell(
         self,
         nid: int | None = None,
-        time_prop_name: str = "timepoint",
+        time_prop: str = "timepoint",
         time_prop_value: float = 0,
         timepoint: int | None = None,
         **cell_props,
@@ -967,7 +1209,7 @@ class CellLineage(Lineage):
         nid : int, optional
             The node ID to assign to the new cell. If None, the next
             available node ID is used.
-        time_prop_name : str, optional
+        time_prop : str, optional
             The name of the time property. Default is "timepoint".
         time_prop_value : float, optional
             The value of the time property. Default is 0.
@@ -989,14 +1231,14 @@ class CellLineage(Lineage):
             If the cell already exists in the lineage.
         """
         if nid is None:
-            nid = self._get_next_available_node_ID()
+            nid = self._get_next_available_node_id()
         elif nid in self.nodes():
-            _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
+            _, txt = CellLineage._get_lineage_id_and_err_msg(self)
             msg = f"Cell {nid} already exists{txt}."
             raise ValueError(msg)
         self.add_node(nid, **cell_props)
-        self.nodes[nid]["cell_ID"] = nid
-        self.nodes[nid][time_prop_name] = time_prop_value
+        self.nodes[nid]["cell_id"] = nid
+        self.nodes[nid][time_prop] = time_prop_value
         if timepoint is not None:
             self.nodes[nid]["timepoint"] = timepoint
         return nid
@@ -1025,7 +1267,7 @@ class CellLineage(Lineage):
         try:
             cell_props = self.nodes[nid]
         except KeyError as err:
-            _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
+            _, txt = CellLineage._get_lineage_id_and_err_msg(self)
             msg = f"Cell {nid} does not exist{txt}."
             raise KeyError(msg) from err
         self.remove_node(nid)
@@ -1036,7 +1278,7 @@ class CellLineage(Lineage):
         source_nid: int,
         target_nid: int,
         target_lineage: CellLineage | None = None,
-        time_prop_name: str = "timepoint",
+        time_prop: str = "timepoint",
         **link_props,
     ) -> dict[int, int] | None:
         """
@@ -1055,7 +1297,7 @@ class CellLineage(Lineage):
         target_lineage : CellLineage, optional
             The lineage of the target cell. If None, the target cell is
             assumed to be in the same lineage as the source cell.
-        time_prop_name : str, optional
+        time_prop : str, optional
             The name of the time property. Default is "timepoint".
         **link_props
             Property values to set for the edge.
@@ -1063,7 +1305,7 @@ class CellLineage(Lineage):
         Returns
         -------
         dict[int, int] or None
-            A dictionary of renamed cells {old_ID : new_ID} from
+            A dictionary of renamed cells {old_id : new_id} from
             the target lineage when it had conflicting cell IDs with the
             source lineage. None otherwise.
 
@@ -1077,10 +1319,10 @@ class CellLineage(Lineage):
         TimeFlowError
             If the target cell happens before the source cell.
         """
-        source_lid, txt_src = CellLineage._get_lineage_ID_and_err_msg(self)
+        source_lid, txt_src = CellLineage._get_lineage_id_and_err_msg(self)
 
         if target_lineage is not None:
-            target_lid, txt_tgt = CellLineage._get_lineage_ID_and_err_msg(target_lineage)
+            target_lid, txt_tgt = CellLineage._get_lineage_id_and_err_msg(target_lineage)
         else:
             target_lineage = self
             target_lid = source_lid
@@ -1107,8 +1349,8 @@ class CellLineage(Lineage):
 
         # Check that the link respects the flow of time.
         if (
-            self.nodes[source_nid][time_prop_name]
-            >= target_lineage.nodes[target_nid][time_prop_name]
+            self.nodes[source_nid][time_prop]
+            >= target_lineage.nodes[target_nid][time_prop]
         ):
             raise TimeFlowError(
                 source_nid,
@@ -1118,13 +1360,13 @@ class CellLineage(Lineage):
             )
 
         conflicting_ids = None
-        ids_mapping = {}  # a dict of {old_ID : new_ID}
+        ids_mapping = {}  # a dict of {old_id : new_id}
         if target_lineage != self:
             # Identify cell ID conflict between lineages.
             target_descendants = nx.descendants(target_lineage, target_nid) | {target_nid}
             conflicting_ids = set(self.nodes()) & set(target_descendants)
             if conflicting_ids:
-                next_id = self._get_next_available_node_ID()
+                next_id = self._get_next_available_node_id()
                 for id in conflicting_ids:
                     ids_mapping[id] = next_id
                     next_id += 1
@@ -1135,7 +1377,7 @@ class CellLineage(Lineage):
             if conflicting_ids:
                 nx.relabel_nodes(tmp_lineage, ids_mapping, copy=False)
                 for id, new_id in ids_mapping.items():
-                    tmp_lineage.nodes[new_id]["cell_ID"] = new_id
+                    tmp_lineage.nodes[new_id]["cell_id"] = new_id
                 if target_nid in ids_mapping:
                     target_nid = ids_mapping[target_nid]
                 assert tmp_lineage.get_root() == target_nid
@@ -1179,7 +1421,7 @@ class CellLineage(Lineage):
         KeyError
             If the link does not exist in the lineage.
         """
-        _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
+        _, txt = CellLineage._get_lineage_id_and_err_msg(self)
         if source_nid not in self.nodes():
             raise ValueError(f"Source cell (ID {source_nid}) does not exist{txt}.")
         if target_nid not in self.nodes():
@@ -1224,7 +1466,7 @@ class CellLineage(Lineage):
             If the cell does not exist in the lineage.
             If the split parameter is not "upstream" or "downstream"
         """
-        _, txt = CellLineage._get_lineage_ID_and_err_msg(self)
+        _, txt = CellLineage._get_lineage_id_and_err_msg(self)
         if nid not in self.nodes():
             raise ValueError(f"Source cell (ID {nid}) does not exist{txt}.")
 
@@ -1368,10 +1610,10 @@ class CellLineage(Lineage):
             branch.add_node(node, **self.nodes[node])
         for source, target in pairwise(selected_path):
             branch.add_edge(source, target, **self.edges[source, target])
-        branch.graph["source_lineage_ID"] = self.graph.get("lineage_ID")
-        branch.graph["target_cell_ID"] = target_cell
+        branch.graph["source_lineage_id"] = self.graph.get("lineage_id")
+        branch.graph["target_cell_id"] = target_cell
         branch.graph["included_generations"] = generations
-        branch.graph["source_cell_ID"] = source_cell
+        branch.graph["source_cell_id"] = source_cell
         return branch
 
     def get_branch_lineage_highlight(
@@ -1453,16 +1695,16 @@ class CellLineage(Lineage):
         nx.set_node_attributes(highlighted_lineage, highlight_values, highlight_prop)
 
         if is_single_target:
-            highlighted_lineage.graph["target_cell_ID"] = target_cells
+            highlighted_lineage.graph["target_cell_id"] = target_cells
         else:
-            highlighted_lineage.graph["target_cell_IDs"] = list(target_cells)
+            highlighted_lineage.graph["target_cell_ids"] = list(target_cells)
 
         highlighted_lineage.graph["included_generations"] = generations
 
         if isinstance(source_cells, list):
-            highlighted_lineage.graph["source_cell_IDs"] = list(source_cells)
+            highlighted_lineage.graph["source_cell_ids"] = list(source_cells)
         else:
-            highlighted_lineage.graph["source_cell_ID"] = source_cells
+            highlighted_lineage.graph["source_cell_id"] = source_cells
 
         highlighted_lineage.graph["highlight_prop"] = highlight_prop
         highlighted_lineage.graph["highlight_group_count"] = len(selected_components)
@@ -1514,7 +1756,7 @@ class CellLineage(Lineage):
                 group = self.nodes[cid][highlight_prop]
             except KeyError:
                 raise MissingPropertyError(
-                    highlight_prop, nid=cid, lineage_ID=self.graph.get("lineage_ID")
+                    highlight_prop, nid=cid, lineage_id=self.graph.get("lineage_id")
                 ) from None
             colors.append(get_highlight_color(group))
         return colors
@@ -1612,7 +1854,7 @@ class CellLineage(Lineage):
             If the given cell has more than one predecessor.
         """
         # TODO: factorize
-        lid, _ = CellLineage._get_lineage_ID_and_err_msg(self)
+        lid, _ = CellLineage._get_lineage_id_and_err_msg(self)
         cell_cycle = [cid]
         start = False
         end = False
@@ -1687,49 +1929,93 @@ class CellLineage(Lineage):
 
         return cell_cycles
 
-    def get_sister_cells(self, cid: int) -> list[int]:
+    def _get_cycle(self, node_id: int) -> int:
         """
-        Return the sister cells of a given cell.
+        Return the ID of the cell cycle holding a given cell.
 
-        Sister cells are cells that are on the same timepoint
-        and share the same parent cell.
+        Cell cycles are identified as in cycle lineages, by the ID of their last
+        cell.
 
         Parameters
         ----------
-        cid : int
-            ID of the cell for which to find the sister cells.
+        node_id : int
+            ID of the cell.
 
         Returns
         -------
-        list[int]
-            The list of cell IDs of the sister cells of the given cell.
+        int
+            ID of the cell cycle holding the cell.
 
         Raises
         ------
         FusionError
-            If the given cell has more than one parent cell.
+            If a cell of the cell cycle has more than one parent.
         """
-        sister_cells = []
-        current_tp = self.nodes[cid]["timepoint"]
-        if not self.is_root(cid):
-            current_cell_cycle = self.get_cell_cycle(cid)
-            parents = list(self.predecessors(current_cell_cycle[0]))
-            if len(parents) == 1:
-                children = list(self.successors(parents[0]))
-                children.remove(current_cell_cycle[0])
-                for child in children:
-                    sister_cell_cycle = self.get_cell_cycle(child)
-                    sister_cells.extend(
-                        [
-                            n
-                            for n in sister_cell_cycle
-                            if self.nodes[n]["timepoint"] == current_tp
-                        ]
-                    )
-            elif len(parents) > 1:
-                lid, _ = CellLineage._get_lineage_ID_and_err_msg(self)
-                raise FusionError(cid, lid)
-        return sister_cells
+        return self.get_cell_cycle(node_id)[-1]
+
+    def _get_parent_cycle(self, cycle_id: int) -> int | None:
+        """
+        Return the mother cycle of a given cell cycle.
+
+        The mother cycle ends with the division that gave birth to the first cell
+        of the cell cycle, so its ID is the ID of that dividing cell.
+
+        Parameters
+        ----------
+        cycle_id : int
+            ID of the cell cycle, i.e. of its last cell.
+
+        Returns
+        -------
+        int | None
+            ID of the mother cycle, or None if the cell cycle starts at the root.
+
+        Raises
+        ------
+        FusionError
+            If a cell of the cell cycle has more than one parent.
+        """
+        return super()._get_parent_cycle(self.get_cell_cycle(cycle_id)[0])
+
+    def _get_daughter_cycles(self, cycle_id: int) -> list[int]:
+        """
+        Return the daughter cycles of a given cell cycle.
+
+        Parameters
+        ----------
+        cycle_id : int
+            ID of the cell cycle, i.e. of its last cell.
+
+        Returns
+        -------
+        list[int]
+            IDs of the cell cycles born from the division ending the cell cycle,
+            or an empty list if the cell cycle ends with a leaf.
+        """
+        return [self._get_cycle(daughter) for daughter in self.successors(cycle_id)]
+
+    def _get_matching_nodes(self, cycle_id: int, node_id: int) -> list[int]:
+        """
+        Return the cells of a cell cycle at the same timepoint as a given cell.
+
+        Parameters
+        ----------
+        cycle_id : int
+            ID of the cell cycle of the relative, i.e. of its last cell.
+        node_id : int
+            ID of the cell whose relatives are searched.
+
+        Returns
+        -------
+        list[int]
+            IDs of the cells of the cell cycle at the same timepoint as the cell.
+        """
+        timepoint = self.nodes[node_id]["timepoint"]
+        return [
+            cell_id
+            for cell_id in self.get_cell_cycle(cycle_id)
+            if self.nodes[cell_id]["timepoint"] == timepoint
+        ]
 
     def is_division(self, cid: int) -> bool:
         """
@@ -1797,8 +2083,8 @@ class CellLineage(Lineage):
 
     def get_tree_figure(
         self,
-        ID_prop: str = "cell_ID",
-        y_prop: Property | None = None,
+        id_prop: str = "cell_id",
+        y_prop: str | Property | None = None,
         title: str | None = None,
         target_cells: int | list[int] | None = None,
         source_cells: int | list[int] | None = None,
@@ -1829,12 +2115,12 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        ID_prop : str, optional
-            The property of the nodes to use as the node ID. "cell_ID" by default.
-        y_prop : Property, optional
-            The Property to use for the y-axis. If None, defaults to
-            "timepoint" property. The legend is automatically constructed from
-            Property.name and Property.unit.
+        id_prop : str, optional
+            The property of the nodes to use as the node ID. "cell_id" by default.
+        y_prop : str or Property, optional
+            Node property to plot on the y-axis, "timepoint" by default. A
+            Property also supplies the axis label (its name and unit); a plain
+            string is used as-is.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         target_cells : int or list[int], optional
@@ -1878,7 +2164,7 @@ class CellLineage(Lineage):
             color and trigger a warning.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_prop.
+            displaying `cell_id` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
@@ -1955,7 +2241,7 @@ class CellLineage(Lineage):
         # Bind the base implementation to the (possibly highlighted) copy rather
         # than to self, since it reads the graph it is called on.
         return super(CellLineage, lineage_to_plot).get_tree_figure(
-            ID_prop=ID_prop,
+            id_prop=id_prop,
             y_prop=y_prop,
             title=title,
             node_text=node_text,
@@ -1976,8 +2262,8 @@ class CellLineage(Lineage):
 
     def plot(
         self,
-        ID_prop: str = "cell_ID",
-        y_prop: Property | None = None,
+        id_prop: str = "cell_id",
+        y_prop: str | Property | None = None,
         title: str | None = None,
         target_cells: int | list[int] | None = None,
         source_cells: int | list[int] | None = None,
@@ -2003,12 +2289,12 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        ID_prop : str, optional
-            The property of the nodes to use as the node ID. "cell_ID" by default.
-        y_prop : Property, optional
-            The Property to use for the y-axis. If None, defaults to
-            "timepoint" property. The legend is automatically constructed from
-            Property.name and Property.unit.
+        id_prop : str, optional
+            The property of the nodes to use as the node ID. "cell_id" by default.
+        y_prop : str or Property, optional
+            Node property to plot on the y-axis, "timepoint" by default. A
+            Property also supplies the axis label (its name and unit); a plain
+            string is used as-is.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         target_cells : int or list[int], optional
@@ -2052,7 +2338,7 @@ class CellLineage(Lineage):
             color and trigger a warning.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_prop.
+            displaying `cell_id` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
@@ -2101,7 +2387,7 @@ class CellLineage(Lineage):
         get_tree_figure : Generate the figure without displaying it.
         """
         fig = self.get_tree_figure(
-            ID_prop=ID_prop,
+            id_prop=id_prop,
             y_prop=y_prop,
             title=title,
             target_cells=target_cells,
@@ -2276,18 +2562,10 @@ class CellLineage(Lineage):
         )
         """
 
-        def _prop_info(prop: str | Property) -> tuple[str, str]:
-            if isinstance(prop, Property):
-                label = prop.name
-                if prop.unit:
-                    label = f"{label} ({prop.unit})"
-                return prop.identifier, label
-            return prop, prop
-
         # Accept either property identifiers or Property objects, but use plain
         # identifiers for data access and readable labels for axes/hover text.
-        x_prop_id, x_label = _prop_info(x_prop)
-        y_prop_id, y_label = _prop_info(y_prop)
+        x_prop_id, x_label = self._get_prop_id_and_label(x_prop)
+        y_prop_id, y_label = self._get_prop_id_and_label(y_prop)
 
         # Treat a single target and several targets the same while plotting:
         # each target cell becomes one trace, paired with one source cell.
@@ -2323,7 +2601,7 @@ class CellLineage(Lineage):
             node_hover_text = []
             for node, x_value, y_value in zip(nodes, x_nodes, y_nodes):
                 text = (
-                    f"cell_ID: {lineage.nodes[node].get('cell_ID', node)}<br>"
+                    f"cell_id: {lineage.nodes[node].get('cell_id', node)}<br>"
                     f"{x_label}: {x_value}<br>{y_label}: {y_value}"
                 )
                 if node_hover_props:
@@ -2332,7 +2610,7 @@ class CellLineage(Lineage):
                             raise MissingPropertyError(
                                 prop_name=prop,
                                 nid=node,
-                                lineage_ID=lineage.graph["lineage_ID"],
+                                lineage_id=lineage.graph["lineage_id"],
                             )
                         text += f"<br>{prop}: {lineage.nodes[node][prop]}"
                 node_hover_text.append(text)
@@ -2564,7 +2842,7 @@ class CellLineage(Lineage):
     # TODO: I don't think this function is good design, even if it factorises code.
     # actually y_prop (prop name) and y_legend should be replaced by the Property y_prop
     # so we can access name and unit to display in the axis legend.
-    def _get_lineage_ID_and_err_msg(lineage):
+    def _get_lineage_id_and_err_msg(lineage):
         """
         Return the lineage ID and a text to display in error messages.
 
@@ -2581,7 +2859,7 @@ class CellLineage(Lineage):
             The text to display in error messages.
         """
         try:
-            lid = lineage.graph["lineage_ID"]
+            lid = lineage.graph["lineage_id"]
             txt = f" in lineage {lid}"
         except KeyError:
             lid = None
@@ -2610,13 +2888,15 @@ class CycleLineage(Lineage):
             nx.freeze(self)
 
             # Adding node and graph props.
-            self.graph["lineage_ID"] = cell_lineage.graph["lineage_ID"]
+            self.graph["lineage_id"] = cell_lineage.graph["lineage_id"]
             for n in divs + leaves:
                 cells_in_cycle = cell_lineage.get_cell_cycle(n)
                 first = cells_in_cycle[0]
                 last = cells_in_cycle[-1]
-                self.nodes[n]["cycle_ID"] = n
+                self.nodes[n]["cycle_id"] = n
                 self.nodes[n]["cells"] = cells_in_cycle
+                self.nodes[n]["first_cell"] = first
+                self.nodes[n]["last_cell"] = last
                 # How many cells in the cycle?
                 self.nodes[n]["cycle_length"] = len(cells_in_cycle)
                 # How long does the cycle last?
@@ -2624,6 +2904,8 @@ class CycleLineage(Lineage):
                     cell_lineage.nodes[last][time_prop]
                     - cell_lineage.nodes[first][time_prop]
                 )
+                self.nodes[n]["cycle_start_time"] = cell_lineage.nodes[first][time_prop]
+                self.nodes[n]["cycle_end_time"] = cell_lineage.nodes[last][time_prop]
                 root = self.get_root()
                 if isinstance(root, list):
                     raise LineageStructureError(
@@ -2634,7 +2916,7 @@ class CycleLineage(Lineage):
     def __str__(self) -> str:
         name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
         txt = (
-            f"CycleLineage of ID {self.graph['lineage_ID']}{name_txt}"
+            f"CycleLineage of ID {self.graph['lineage_id']}{name_txt}"
             f" with {len(self)} cell cycles and {len(self.edges())} links."
         )
         return txt
@@ -2721,8 +3003,8 @@ class CycleLineage(Lineage):
 
     def get_tree_figure(
         self,
-        ID_prop: str = "cycle_ID",
-        y_prop: Property | None = None,
+        id_prop: str = "cycle_id",
+        y_prop: str | Property | None = None,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -2749,12 +3031,12 @@ class CycleLineage(Lineage):
 
         Parameters
         ----------
-        ID_prop : str, optional
-            The property of the nodes to use as the node ID. "cycle_ID" by default.
-        y_prop : Property, optional
-            The Property to use for the y-axis. If None, defaults to
-            "level" property. The legend is automatically constructed from
-            Property.name and Property.unit.
+        id_prop : str, optional
+            The property of the nodes to use as the node ID. "cycle_id" by default.
+        y_prop : str or Property, optional
+            Node property to plot on the y-axis, "level" by default. A
+            Property also supplies the axis label (its name and unit); a plain
+            string is used as-is.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -2775,7 +3057,7 @@ class CycleLineage(Lineage):
             defaults to current Plotly template.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_prop.
+            displaying `cell_id` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
@@ -2815,7 +3097,7 @@ class CycleLineage(Lineage):
             y_prop = create_level_property()
 
         return super().get_tree_figure(
-            ID_prop=ID_prop,
+            id_prop=id_prop,
             y_prop=y_prop,
             title=title,
             node_text=node_text,
@@ -2836,8 +3118,8 @@ class CycleLineage(Lineage):
 
     def plot(
         self,
-        ID_prop: str = "cycle_ID",
-        y_prop: Property | None = None,
+        id_prop: str = "cycle_id",
+        y_prop: str | Property | None = None,
         title: str | None = None,
         node_text: str | None = None,
         node_text_font: dict[str, Any] | None = None,
@@ -2859,12 +3141,12 @@ class CycleLineage(Lineage):
 
         Parameters
         ----------
-        ID_prop : str, optional
-            The property of the nodes to use as the node ID. "cycle_ID" by default.
-        y_prop : Property, optional
-            The Property to use for the y-axis. If None, defaults to
-            "level" property. The legend is automatically constructed from
-            Property.name and Property.unit.
+        id_prop : str, optional
+            The property of the nodes to use as the node ID. "cycle_id" by default.
+        y_prop : str or Property, optional
+            Node property to plot on the y-axis, "level" by default. A
+            Property also supplies the axis label (its name and unit); a plain
+            string is used as-is.
         title : str, optional
             The title of the plot. If None, no title is displayed.
         node_text : str, optional
@@ -2885,7 +3167,7 @@ class CycleLineage(Lineage):
             defaults to current Plotly template.
         node_hover_props : list[str], optional
             The hover template for the nodes. If None, defaults to
-            displaying `cell_ID` and the value of the y_prop.
+            displaying `cell_id` and the value of the y_prop.
         edge_line_style : dict, optional
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
@@ -2935,7 +3217,7 @@ class CycleLineage(Lineage):
         get_tree_figure : Generate the figure without displaying it.
         """
         fig = self.get_tree_figure(
-            ID_prop=ID_prop,
+            id_prop=id_prop,
             y_prop=y_prop,
             title=title,
             node_text=node_text,

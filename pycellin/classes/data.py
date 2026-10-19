@@ -188,7 +188,7 @@ class Data:
             warnings.warn(msg)
         return len(self.cell_data)
 
-    def _get_next_available_lineage_ID(self, positive: bool) -> int:
+    def _get_next_available_lineage_id(self, positive: bool) -> int:
         """
         Return the next available lineage ID, either positive or negative.
 
@@ -385,5 +385,5 @@ class Data:
     #     # Parameter to define sort order? By default closest to farthest
     #     # Need to implement get_distance() between 2 nodes, not necessarily
     #     # from the same lineage...
-    #     # To identify a node, need to have lineage_ID and cell_ID
+    #     # To identify a node, need to have lineage_id and cell_id
     #     pass

@@ -2,6 +2,9 @@
 
 """Unit test for helper functions from pycellin.properties.utils."""
 
+import math
+import warnings
+
 import networkx as nx
 import pytest
 
@@ -9,6 +12,8 @@ from pycellin.classes import CellLineage, Data
 from pycellin.properties.utils import (
     _get_cycle_edge_property_values,
     _get_cycle_node_property_values,
+    _nanmean,
+    _nansum,
 )
 
 # Fixtures ####################################################################
@@ -21,11 +26,11 @@ def data():
     lineage.add_edges_from([(1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (4, 7)])
     for n in lineage.nodes:
         lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 1, n)
-        lineage.nodes[n]["cell_ID"] = n
+        lineage.nodes[n]["cell_id"] = n
         lineage.nodes[n]["cell_area"] = float(n)
     for u, v in lineage.edges:
         lineage.edges[u, v]["cell_speed"] = float(v)
-    lineage.graph["lineage_ID"] = 1
+    lineage.graph["lineage_id"] = 1
     data = Data({1: lineage})
     data._add_cycle_lineages(time_prop="frame", time_step=1)
     return data
@@ -89,3 +94,41 @@ class TestGetCycleEdgePropertyValues:
             _get_cycle_edge_property_values(
                 "cell_displacement", data, cycle_lin, 4, include_incoming_edge=False
             )
+
+
+# _nanmean ####################################################################
+
+
+class TestNanmean:
+    def test_ignores_nan_and_none(self):
+        assert _nanmean([1.0, math.nan, 3.0, None]) == 2.0
+
+    def test_returns_python_float(self):
+        assert type(_nanmean([1, 2])) is float
+
+    def test_all_nan_returns_nan_without_warning(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            assert math.isnan(_nanmean([math.nan, None]))
+
+    def test_empty_returns_nan_without_warning(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            assert math.isnan(_nanmean([]))
+
+
+# _nansum #####################################################################
+
+
+class TestNansum:
+    def test_ignores_nan_and_none(self):
+        assert _nansum([1.0, math.nan, 3.0, None]) == 4.0
+
+    def test_returns_python_float(self):
+        assert type(_nansum([1, 2])) is float
+
+    def test_all_nan_returns_nan(self):
+        assert math.isnan(_nansum([math.nan, None]))
+
+    def test_empty_returns_nan(self):
+        assert math.isnan(_nansum([]))

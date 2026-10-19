@@ -29,13 +29,18 @@ Vocabulary:
   If we take the previous example, the only complete generation is [2, 4, 6].
 """
 
+from typing import ClassVar
+
 import numpy as np
 
 from pycellin.classes.data import Data
 from pycellin.classes.exceptions import FusionError
 from pycellin.classes.lineage import CellLineage, CycleLineage
 from pycellin.classes.property import Property
-from pycellin.classes.property_calculator import NodeGlobalPropCalculator
+from pycellin.classes.property_calculator import (
+    NodeGlobalPropCalculator,
+    NodeLocalPropCalculator,
+)
 
 # TODO: should I add the word Calc or Calculator to the class names?
 # TODO: add calculator for mandatory cycle lineage properties (e.g. cycle length)
@@ -61,7 +66,7 @@ def create_absolute_age_property(
     )
 
 
-class AbsoluteAge(NodeGlobalPropCalculator):
+class AbsoluteAge(NodeLocalPropCalculator):
     """
     Calculator to compute the absolute age of cells.
 
@@ -71,33 +76,35 @@ class AbsoluteAge(NodeGlobalPropCalculator):
     (e.g. "frame", "time", etc.).
     """
 
-    def __init__(self, property: Property, time_prop_name: str):
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
+
+    def __init__(self, property: Property, time_prop: str):
         """
         Parameters
         ----------
         property : Property
             Property object to which the calculator is associated.
-        time_prop_name : str
-            The name of the time property (e.g. "frame", "time", etc.) to use
-            for calculation.
+        time_prop : str
+            Identifier of the cell lineage node property holding the time
+            of the cells (e.g. "frame", "POSITION_T").
         """
         super().__init__(property)
-        self.time_prop_name = time_prop_name
+        self.time_prop = time_prop
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage, nid: int
+        self, lineage: CellLineage, nid: int
     ) -> int | float:
         """
         Compute the absolute age of a given cell.
 
         Parameters
         ----------
-        data : Data
-            Data object containing the lineage.
         lineage : CellLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -113,8 +120,8 @@ class AbsoluteAge(NodeGlobalPropCalculator):
             raise KeyError(f"Cell {nid} not in the lineage.")
         root = lineage.get_root()
         age = (
-            lineage.nodes[nid][self.time_prop_name]
-            - lineage.nodes[root][self.time_prop_name]
+            lineage.nodes[nid][self.time_prop]
+            - lineage.nodes[root][self.time_prop]
         )
         return age
 
@@ -139,43 +146,46 @@ def create_relative_age_property(
     )
 
 
-class RelativeAge(NodeGlobalPropCalculator):
+class RelativeAge(NodeLocalPropCalculator):
     """
     Calculator to compute the relative age of cells.
 
     The relative age of a cell is defined as the time elapsed since
     the start of the cell cycle (i.e. previous division, or beginning
     of the lineage). Relative age of the first cell of a cell cycle is 0.
-    It is given in frames by default, but can be converted
-    to the time unit of the model if specified.
+    It is computed in the same unit as the time property given as input
+    (e.g. "frame", "time", etc.).
     """
 
-    def __init__(self, property: Property, time_prop_name: str):
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
+
+    def __init__(self, property: Property, time_prop: str):
         """
         Parameters
         ----------
         property : Property
             Property object to which the calculator is associated.
-        time_step : int | float, optional
-            Time step between 2 frames, in time unit. Default is 1.
+        time_prop : str
+            Identifier of the cell lineage node property holding the time
+            of the cells (e.g. "frame", "POSITION_T").
         """
         super().__init__(property)
-        self.time_prop_name = time_prop_name
+        self.time_prop = time_prop
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage, nid: int
+        self, lineage: CellLineage, nid: int
     ) -> int | float:
         """
         Compute the relative age of a given cell.
 
         Parameters
         ----------
-        data : Data
-            Data object containing the lineage.
         lineage : CellLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -191,10 +201,105 @@ class RelativeAge(NodeGlobalPropCalculator):
             raise KeyError(f"Cell {nid} not in the lineage.")
         first_cell = lineage.get_cell_cycle(nid)[0]
         age = (
-            lineage.nodes[nid][self.time_prop_name]
-            - lineage.nodes[first_cell][self.time_prop_name]
+            lineage.nodes[nid][self.time_prop]
+            - lineage.nodes[first_cell][self.time_prop]
         )
         return age
+
+
+def create_normalized_age_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    return Property(
+        identifier=custom_identifier or "normalized_age",
+        name=custom_name or "Normalized age",
+        description=custom_description
+        or "Relative age of the cell divided by the duration of its cell cycle: "
+        "0 for the first cell of the cycle, 1 for the last one",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float",
+    )
+
+
+class NormalizedAge(NodeLocalPropCalculator):
+    """
+    Calculator to compute the normalized age of cells.
+
+    The normalized age of a cell is its relative age divided by the duration of
+    its cell cycle, both computed from the time property given as input. It is 0
+    for the first cell of a cell cycle and 1 for the last one. Incomplete cell
+    cycles, which start at the root or end with a leaf, are normalized over their
+    observed part, unless `ignore_incomplete_cycles` is True: their cells then get
+    NaN. The normalized age is also NaN for the cells of a cell cycle that lasts
+    no time, such as a cell cycle of a single cell.
+    """
+
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
+
+    def __init__(
+        self,
+        property: Property,
+        time_prop: str,
+        ignore_incomplete_cycles: bool = False,
+    ):
+        """
+        Parameters
+        ----------
+        property : Property
+            Property object to which the calculator is associated.
+        time_prop : str
+            Identifier of the cell lineage node property holding the time
+            of the cells (e.g. "frame", "POSITION_T").
+        ignore_incomplete_cycles : bool, optional
+            True to give NaN to the cells of incomplete cell cycles, False to
+            normalize them over their observed part. False by default.
+        """
+        super().__init__(property)
+        self.time_prop = time_prop
+        self.ignore_incomplete_cycles = ignore_incomplete_cycles
+
+    def compute(  # type: ignore[override]
+        self, lineage: CellLineage, nid: int
+    ) -> float:
+        """
+        Compute the normalized age of a given cell.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage graph containing the node of interest.
+        nid : int
+            Node ID (cell_id) of the cell of interest.
+
+        Returns
+        -------
+        float
+            Normalized age of the cell, or NaN if its cell cycle lasts no time
+            or is an ignored incomplete cell cycle.
+
+        Raises
+        ------
+        KeyError
+            If the cell is not in the lineage.
+        """
+        if nid not in lineage.nodes:
+            raise KeyError(f"Cell {nid} not in the lineage.")
+        cells = lineage.get_cell_cycle(nid)
+        if self.ignore_incomplete_cycles and (
+            lineage.is_root(cells[0]) or lineage.is_leaf(cells[-1])
+        ):
+            return np.nan
+        start_time = lineage.nodes[cells[0]][self.time_prop]
+        duration = lineage.nodes[cells[-1]][self.time_prop] - start_time
+        if duration == 0:
+            return np.nan
+        return (lineage.nodes[nid][self.time_prop] - start_time) / duration
 
 
 def create_cycle_completeness_property(
@@ -215,7 +320,7 @@ def create_cycle_completeness_property(
     )
 
 
-class CycleCompleteness(NodeGlobalPropCalculator):
+class CycleCompleteness(NodeLocalPropCalculator):
     """
     Calculator to compute the cell cycle completeness.
 
@@ -228,15 +333,13 @@ class CycleCompleteness(NodeGlobalPropCalculator):
     """
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage | CycleLineage, nid: int
+        self, lineage: CellLineage | CycleLineage, nid: int
     ) -> bool:
         """
         Compute the cell cycle completeness of a given cell or cell cycle.
 
         Parameters
         ----------
-        data : Data
-            Data object containing the lineage.
         lineage : CellLineage | CycleLineage
             Lineage graph containing the node (cell or cell cycle) of interest.
         nid : int
@@ -270,7 +373,7 @@ class CycleCompleteness(NodeGlobalPropCalculator):
 
 
 def _get_cell_lin_timepoints(
-    lineage: CellLineage, nid: int, time_prop_name: str
+    lineage: CellLineage, nid: int, time_prop: str
 ) -> tuple[int, int]:
     """
     Get the timepoints of the divisions defining the cell cycle.
@@ -282,8 +385,8 @@ def _get_cell_lin_timepoints(
     lineage : CellLineage
         Lineage graph containing the node of interest.
     nid : int
-        Node ID (cell_ID) of the cell of interest.
-    time_prop_name : str
+        Node ID (cell_id) of the cell of interest.
+    time_prop : str
         The name of the time property (e.g. "frame", "time", etc.) to use
         for calculation.
 
@@ -302,19 +405,19 @@ def _get_cell_lin_timepoints(
     if nid not in lineage.nodes:
         raise KeyError(f"Cell {nid} not in the lineage.")
     cells = lineage.get_cell_cycle(nid)
-    frame_current_div = lineage.nodes[cells[-1]][time_prop_name]
+    frame_current_div = lineage.nodes[cells[-1]][time_prop]
     ancestors = list(lineage.predecessors(cells[0]))
     if len(ancestors) > 1:
-        raise FusionError(nid, lineage.graph["lineage_ID"])
+        raise FusionError(nid, lineage.graph["lineage_id"])
     elif len(ancestors) == 0:
-        frame_prev_div = lineage.nodes[cells[0]][time_prop_name]
+        frame_prev_div = lineage.nodes[cells[0]][time_prop]
     else:
-        frame_prev_div = lineage.nodes[ancestors[0]][time_prop_name]
+        frame_prev_div = lineage.nodes[ancestors[0]][time_prop]
     return frame_current_div, frame_prev_div
 
 
 def _get_cycle_lin_timepoints(
-    data: Data, lineage: CycleLineage, nid: int, time_prop_name: str
+    data: Data, lineage: CycleLineage, nid: int, time_prop: str
 ) -> tuple[int, int]:
     """
     Get the timepoints of the divisions defining the cell cycle.
@@ -328,7 +431,7 @@ def _get_cycle_lin_timepoints(
     lineage : CycleLineage
         Lineage graph containing the node of interest.
     nid : int
-        Node ID (cell_ID) of the cell of interest.
+        Node ID (cell_id) of the cell of interest.
 
     Returns
     -------
@@ -345,16 +448,16 @@ def _get_cycle_lin_timepoints(
     if nid not in lineage.nodes:
         raise KeyError(f"Cycle {nid} not in the lineage.")
     cells = lineage.nodes[nid]["cells"]
-    cell_lin = data.cell_data[lineage.graph["lineage_ID"]]
-    frame_current_div = cell_lin.nodes[cells[-1]][time_prop_name]
+    cell_lin = data.cell_data[lineage.graph["lineage_id"]]
+    frame_current_div = cell_lin.nodes[cells[-1]][time_prop]
     ancestors = list(lineage.predecessors(nid))
     if len(ancestors) > 1:
-        raise FusionError(nid, lineage.graph["lineage_ID"])
+        raise FusionError(nid, lineage.graph["lineage_id"])
     elif len(ancestors) == 0:
-        frame_prev_div = cell_lin.nodes[cells[0]][time_prop_name]
+        frame_prev_div = cell_lin.nodes[cells[0]][time_prop]
     else:
         prev_cells = lineage.nodes[ancestors[0]]["cells"]
-        frame_prev_div = cell_lin.nodes[prev_cells[-1]][time_prop_name]
+        frame_prev_div = cell_lin.nodes[prev_cells[-1]][time_prop]
     return frame_current_div, frame_prev_div
 
 
@@ -387,18 +490,22 @@ class DivisionTime(NodeGlobalPropCalculator):
     (e.g. "frame", "time", etc.).
     """
 
-    def __init__(self, property: Property, time_prop_name: str):
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
+
+    def __init__(self, property: Property, time_prop: str):
         """
         Parameters
         ----------
         property : Property
             Property object to which the calculator is associated.
-        time_prop_name : str
-            The name of the time property (e.g. "frame", "time", etc.) to use
-            for calculation.
+        time_prop : str
+            Identifier of the cell lineage node property holding the time
+            of the cells (e.g. "frame", "POSITION_T").
         """
         super().__init__(property)
-        self.time_prop_name = time_prop_name
+        self.time_prop = time_prop
 
     def compute(  # type: ignore[override]
         self, data: Data, lineage: CellLineage | CycleLineage, nid: int
@@ -427,11 +534,11 @@ class DivisionTime(NodeGlobalPropCalculator):
         """
         if isinstance(lineage, CellLineage):
             timepoint_curr_div, timepoint_prev_div = _get_cell_lin_timepoints(
-                lineage, nid, self.time_prop_name
+                lineage, nid, self.time_prop
             )
         elif isinstance(lineage, CycleLineage):
             timepoint_curr_div, timepoint_prev_div = _get_cycle_lin_timepoints(
-                data, lineage, nid, self.time_prop_name
+                data, lineage, nid, self.time_prop
             )
         else:
             raise TypeError(
@@ -469,30 +576,22 @@ class DivisionRate(NodeGlobalPropCalculator):
     (e.g. "frame", "time", etc.).
     """
 
-    def __init__(
-        self, property: Property, time_prop_name: str, use_div_time: bool = False
-    ):
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
+
+    def __init__(self, property: Property, time_prop: str):
         """
         Parameters
         ----------
         property : Property
             Property object to which the calculator is associated.
-        time_prop_name : str
-            The name of the time property (e.g. "frame", "time", etc.) to use
-            for calculation.
-        use_div_time : bool, optional
-            If True, use the division time already computed in the lineage.
-            If False, compute the division time from the lineage. Default is False.
-            The first option is faster but you need to ensure that the division time
-            is computed and updated BEFORE division rate. This can be ensured
-            by adding to the model the division time property before the division
-            rate property. Moreover, if `use_div_time` is True, `time_step` will be
-            ignored: division rate will use the division time unit (e.g. if division
-            time is in frames, division rate will be in divisions per frame).
+        time_prop : str
+            Identifier of the cell lineage node property holding the time
+            of the cells (e.g. "frame", "POSITION_T").
         """
         super().__init__(property)
-        self.time_prop_name = time_prop_name
-        self.use_div_time = use_div_time
+        self.time_prop = time_prop
 
     def compute(  # type: ignore[override]
         self, data: Data, lineage: CellLineage | CycleLineage, nid: int
@@ -519,36 +618,13 @@ class DivisionRate(NodeGlobalPropCalculator):
         KeyError
             If the cell or cycle is not in the lineage.
         """
-        if self.use_div_time:
-            if nid not in lineage.nodes:
-                if isinstance(lineage, CellLineage):
-                    lin_txt = "Cell"
-                elif isinstance(lineage, CycleLineage):
-                    lin_txt = "Cycle"
-                else:
-                    raise TypeError(
-                        f"Lineage must be of type CellLineage or CycleLineage, not {type(lineage)}."
-                    )
-                raise KeyError(f"{lin_txt} {nid} not in the lineage.")
-            try:
-                div_time = lineage.nodes[nid]["division_time"]
-            except KeyError:
-                raise KeyError(
-                    f"Division time not present for cell {nid} in lineage "
-                    f"{lineage.graph['lineage_ID']}."
-                )
-            if div_time == 0:
-                return np.nan
-            else:
-                return 1 / div_time
-
         if isinstance(lineage, CellLineage):
             timepoint_curr_div, timepoint_prev_div = _get_cell_lin_timepoints(
-                lineage, nid, self.time_prop_name
+                lineage, nid, self.time_prop
             )
         elif isinstance(lineage, CycleLineage):
             timepoint_curr_div, timepoint_prev_div = _get_cycle_lin_timepoints(
-                data, lineage, nid, self.time_prop_name
+                data, lineage, nid, self.time_prop
             )
         else:
             raise TypeError(
@@ -586,7 +662,7 @@ class DivisionRate(NodeGlobalPropCalculator):
 #         lineage : CellLineage
 #             Lineage graph containing the cell of interest.
 #         nid : int
-#             Node ID (cell_ID) of the cell of interest.
+#             Node ID (cell_id) of the cell of interest.
 
 #         Returns
 #         -------

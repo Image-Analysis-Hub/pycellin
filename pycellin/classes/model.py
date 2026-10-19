@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import inspect
 import pickle
 import warnings
 from copy import deepcopy
@@ -30,7 +31,7 @@ from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.classes.updater import ModelUpdater
 from pycellin.custom_types import Cell, Link, PropertyType, property_type_from_string
-from pycellin.properties import motion, tracking
+from pycellin.properties import intensity, motion, tracking
 from pycellin.properties.core import (
     Timepoint,
     create_timepoint_property,
@@ -93,13 +94,13 @@ class Model:
 
         Notes
         -----
-        The core properties "cell_ID", "lineage_ID", "timepoint" and the reference
+        The core properties "cell_id", "lineage_id", "timepoint" and the reference
         time property are protected whenever they are declared.
         """
         # Check that we have a reference_time_property.
         if reference_time_property is None:
             if model_metadata is None:
-                raise ValueError("`reference_time_property` must be provided.")
+                raise ValueError("'reference_time_property' must be provided.")
 
             # Extract from metadata regardless of type.
             if isinstance(model_metadata, dict):
@@ -111,7 +112,7 @@ class Model:
 
             if not reference_time_property:
                 raise ValueError(
-                    "`reference_time_property` must be provided in model_metadata "
+                    "'reference_time_property' must be provided in model_metadata "
                     "or as an explicit argument."
                 )
         self._reference_time_property = reference_time_property
@@ -139,10 +140,10 @@ class Model:
                 time_step = self._compute_time_step(variable_time_step)
             else:
                 msg = (
-                    "`time_step` is not defined in model metadata and there is no data "
+                    "'time_step' is not defined in model metadata and there is no data "
                     "in the model to infer it. Set the time_step manually with "
-                    "`model.set_time_step(your_timestep)`. Alternatively, you can set it "
-                    "automatically with `model.set_time_step()` once you have added data "
+                    "model.set_time_step(your_timestep). Alternatively, you can set it "
+                    "automatically with model.set_time_step() once you have added data "
                     "to the model."
                 )
                 warnings.warn(msg, UserWarning, stacklevel=2)
@@ -165,8 +166,8 @@ class Model:
             self.model_metadata = ModelMetadata.from_dict(metadata_dict)
         else:
             raise TypeError(
-                f"`model_metadata` must be None, ModelMetadata, or dict, "
-                f"got `{type(model_metadata).__name__}`."
+                f"'model_metadata' must be None, ModelMetadata, or dict, "
+                f"got '{type(model_metadata).__name__}'."
             )
 
         # Set the rest of the attributes.
@@ -190,8 +191,8 @@ class Model:
 
         # Core properties are protected whenever they are declared.
         core_props = (
-            "cell_ID",
-            "lineage_ID",
+            "cell_id",
+            "lineage_id",
             "timepoint",
             self.reference_time_property,
         )
@@ -465,13 +466,13 @@ class Model:
                 if time_prop not in lin.nodes[source_node]:
                     raise ValueError(
                         f"Reference time property '{time_prop}' not found in node {source_node} "
-                        f"of lineage {lin.graph.get('lineage_ID', 'of unknown ID')}."
+                        f"of lineage {lin.graph.get('lineage_id', 'of unknown ID')}."
                     )
                 source_time = lin.nodes[source_node][time_prop]
                 if time_prop not in lin.nodes[target_node]:
                     raise ValueError(
                         f"Reference time property '{time_prop}' not found in node {target_node} "
-                        f"of lineage {lin.graph.get('lineage_ID', 'of unknown ID')}."
+                        f"of lineage {lin.graph.get('lineage_id', 'of unknown ID')}."
                     )
                 target_time = lin.nodes[target_node][time_prop]
                 time_diff = abs(target_time - source_time)
@@ -536,8 +537,9 @@ class Model:
 
         Use this method to convert the time of the model into another unit, e.g. from
         frames to minutes when the data was loaded without time calibration. The
-        reference time values are rescaled immediately. The "timepoint" property and
-        the other properties with a calculator are recomputed at the next `update()`.
+        reference time values are rescaled immediately. The cycle lineages, the
+        "timepoint" property and the other properties with a calculator are
+        recomputed at the next `update()`.
 
         Parameters
         ----------
@@ -548,7 +550,8 @@ class Model:
         time_unit : str | None, optional
             New time unit, e.g. "min". It is set as the time unit of the model, as
             the unit of the reference time property and, if declared, as the unit of
-            the "cycle_duration" property. If None (default), units are unchanged.
+            the "cycle_duration", "cycle_start_time" and "cycle_end_time" properties.
+            If None (default), units are unchanged.
 
         Raises
         ------
@@ -582,12 +585,12 @@ class Model:
         (5, 'min')
         """
         if not factor > 0:
-            raise ValueError(f"`factor` must be strictly positive, got {factor}.")
+            raise ValueError(f"'factor' must be strictly positive, got {factor}.")
         time_prop = self.reference_time_property
         if time_prop == "timepoint":
             raise ValueError(
                 "Cannot rescale the 'timepoint' reference time property. Set another "
-                "reference time property first with `set_reference_time_property()`."
+                "reference time property first with set_reference_time_property()."
             )
         if time_prop in self._updater._calculators:
             warnings.warn(
@@ -599,12 +602,15 @@ class Model:
         self._multiply_prop_values(time_prop, PropertyType.NODE, factor)
         if time_unit is not None:
             self.model_metadata.time_unit = time_unit
-            prop = self.props_metadata.props.get(time_prop)
-            if prop is not None:
-                prop.unit = time_unit
-            cycle_duration_prop = self.props_metadata.props.get("cycle_duration")
-            if cycle_duration_prop is not None:
-                cycle_duration_prop.unit = time_unit
+            for prop_id in (
+                time_prop,
+                "cycle_duration",
+                "cycle_start_time",
+                "cycle_end_time",
+            ):
+                prop = self.props_metadata.props.get(prop_id)
+                if prop is not None:
+                    prop.unit = time_unit
 
         time_step = self.model_metadata.time_step
         if time_step is not None:
@@ -676,11 +682,11 @@ class Model:
         ('µm', 0.2)
         """
         if not factor > 0:
-            raise ValueError(f"`factor` must be strictly positive, got {factor}.")
+            raise ValueError(f"'factor' must be strictly positive, got {factor}.")
         if z_factor is None:
             z_factor = factor
         elif not z_factor > 0:
-            raise ValueError(f"`z_factor` must be strictly positive, got {z_factor}.")
+            raise ValueError(f"'z_factor' must be strictly positive, got {z_factor}.")
 
         for axis in ("x", "y", "z"):
             axis_factor = z_factor if axis == "z" else factor
@@ -1053,7 +1059,7 @@ class Model:
         else:
             return list(self.data.cycle_data.values())
 
-    def get_cell_lineage_from_ID(self, lid: int) -> CellLineage | None:
+    def get_cell_lineage_from_id(self, lid: int) -> CellLineage | None:
         """
         Return the cell lineage with the specified ID.
 
@@ -1072,7 +1078,7 @@ class Model:
         else:
             return None
 
-    def get_cell_lineages_from_IDs(
+    def get_cell_lineages_from_ids(
         self, lids: list[int], ignore_missing: bool = True
     ) -> list[CellLineage | None]:
         """
@@ -1092,12 +1098,12 @@ class Model:
         list[CellLineage | None]
             The cell lineages with the specified IDs.
         """
-        lins = [self.get_cell_lineage_from_ID(lid) for lid in lids]
+        lins = [self.get_cell_lineage_from_id(lid) for lid in lids]
         if ignore_missing:
             lins = [lin for lin in lins if lin is not None]
         return lins
 
-    def get_cycle_lineage_from_ID(self, lid: int) -> CycleLineage | None:
+    def get_cycle_lineage_from_id(self, lid: int) -> CycleLineage | None:
         """
         Return the cycle lineage with the specified ID.
 
@@ -1116,7 +1122,7 @@ class Model:
         else:
             return None
 
-    def get_cycle_lineages_from_IDs(
+    def get_cycle_lineages_from_ids(
         self, lids: list[int], ignore_missing: bool = True
     ) -> list[CycleLineage | None]:
         """
@@ -1136,7 +1142,7 @@ class Model:
         list[CycleLineage | None]
             The cycle lineages with the specified IDs.
         """
-        lins = [self.get_cycle_lineage_from_ID(lid) for lid in lids]
+        lins = [self.get_cycle_lineage_from_id(lid) for lid in lids]
         if ignore_missing:
             lins = [lin for lin in lins if lin is not None]
         return lins
@@ -1216,7 +1222,7 @@ class Model:
             list(self.data.cycle_data.values()), lin_prop, lin_prop_value
         )
 
-    def get_cell_lineage_IDs(self) -> list[int]:
+    def get_cell_lineage_ids(self) -> list[int]:
         """
         Return the IDs of the cell lineages present in the model.
 
@@ -1227,10 +1233,10 @@ class Model:
         """
         return list(self.data.cell_data.keys())
 
-    get_lineage_IDs = get_cell_lineage_IDs
-    get_lineage_IDs.__doc__ = "Alias for get_cell_lineage_IDs"
+    get_lineage_ids = get_cell_lineage_ids
+    get_lineage_ids.__doc__ = "Alias for get_cell_lineage_ids"
 
-    def get_cycle_lineage_IDs(self) -> list[int]:
+    def get_cycle_lineage_ids(self) -> list[int]:
         """
         Return the IDs of the cycle lineages present in the model.
 
@@ -1243,7 +1249,7 @@ class Model:
             return []
         return list(self.data.cycle_data.keys())
 
-    def get_next_available_lineage_ID(self, positive: bool = True) -> int:
+    def get_next_available_lineage_id(self, positive: bool = True) -> int:
         """
         Return the next available lineage ID, positive by default.
 
@@ -1273,7 +1279,7 @@ class Model:
         Negative lineage IDs should be used for lineages with a single cell,
         and are equal to the negative of the cell ID.
         """
-        return self.data._get_next_available_lineage_ID(positive)
+        return self.data._get_next_available_lineage_id(positive)
 
     def has_property(
         self,
@@ -1305,11 +1311,11 @@ class Model:
             return
         self._updater._full_data_update = True
         self._updater._update_required = True
-        for lin_ID, lin in self.data.cell_data.items():
+        for lin_id, lin in self.data.cell_data.items():
             for nid in lin.nodes:
-                self._updater._added_cells.add(Cell(nid, lin_ID))
+                self._updater._added_cells.add(Cell(nid, lin_id))
             for edge in lin.edges:
-                self._updater._added_links.add(Link(edge[0], edge[1], lin_ID))
+                self._updater._added_links.add(Link(edge[0], edge[1], lin_id))
         self._updater._added_lineages = set(self.data.cell_data.keys())
 
     def is_update_required(self) -> bool:
@@ -1442,12 +1448,12 @@ class Model:
         lid : int, optional
             ID to assign to the lineage (default is None). Resolution order:
                 1. Use `lid` if provided.
-                2. Fall back to the lineage's internal `lineage_ID` property.
+                2. Fall back to the lineage's internal `lineage_id` property.
                 3. Generate a new ID if neither is available.
         overwrite_lid: bool, optional
-            If True, overwrite the lineage's internal `lineage_ID` with
+            If True, overwrite the lineage's internal `lineage_id` with
             the provided `lid`. If False, raise a ValueError if `lid` conflicts with
-            the lineage's existing internal `lineage_ID` (default is False).
+            the lineage's existing internal `lineage_id` (default is False).
         with_CycleLineage : bool, optional
             True to compute the cycle lineage, False otherwise (default is False).
 
@@ -1460,7 +1466,7 @@ class Model:
         ------
         ValueError
             If `lid` is provided and conflicts with the lineage's existing
-            internal `lineage_ID` and `overwrite_lid` is True.
+            internal `lineage_id` and `overwrite_lid` is True.
             If `lid` is already in use by another lineage in the model.
 
         Warns
@@ -1473,10 +1479,10 @@ class Model:
         # Determine the lineage ID to use.
         if lineage is None:
             if lid is None:
-                lid = self.get_next_available_lineage_ID()
+                lid = self.get_next_available_lineage_id()
             lineage = CellLineage(lid=lid)
         else:
-            inferred_lid = lineage.graph.get("lineage_ID")
+            inferred_lid = lineage.graph.get("lineage_id")
             if (
                 lid is not None
                 and inferred_lid is not None
@@ -1485,21 +1491,21 @@ class Model:
             ):
                 raise ValueError(
                     f"Provided lid={lid} conflicts with the lineage's "
-                    f"internal lineage_ID={inferred_lid}."
+                    f"internal lineage_id={inferred_lid}."
                 )
             if lid is None:
                 lid = inferred_lid
             if lid is None:
-                lid = self.get_next_available_lineage_ID()
+                lid = self.get_next_available_lineage_id()
 
-        if lid in self.get_cell_lineage_IDs():
+        if lid in self.get_cell_lineage_ids():
             raise ValueError(f"Lineage with ID {lid} already exists in the model.")
 
         # Update the data.
         self.data.cell_data[lid] = lineage
-        if lineage.graph.get("lineage_ID") != lid:
-            lineage.graph["lineage_ID"] = lid
-            nx.set_node_attributes(lineage, lid, "lineage_ID")
+        if lineage.graph.get("lineage_id") != lid:
+            lineage.graph["lineage_id"] = lid
+            nx.set_node_attributes(lineage, lid, "lineage_id")
 
         if with_CycleLineage:
             if self.data.cycle_data is None:
@@ -1627,8 +1633,8 @@ class Model:
         # Create the new lineage.
         new_lineage = lineage._split_from_cell(cid, split)
         if new_lid is None:
-            new_lid = self.get_next_available_lineage_ID()
-        new_lineage.graph["lineage_ID"] = new_lid
+            new_lid = self.get_next_available_lineage_id()
+        new_lineage.graph["lineage_id"] = new_lid
 
         # Update the model data.
         self.data.cell_data[new_lid] = new_lineage
@@ -1700,7 +1706,7 @@ class Model:
                     raise KeyError(f"The property {prop} has not been declared.")
         else:
             prop_values = {}
-        prop_values["lineage_ID"] = lid
+        prop_values["lineage_id"] = lid
 
         # Is the time value consistent with the time step of the model?
         time_step = self.model_metadata.time_step
@@ -1713,22 +1719,22 @@ class Model:
 
         if global_cid is True:
             if cid is None:
-                # Determine the next available global cell_ID.
+                # Determine the next available global cell_id.
                 next_cids = [
-                    lin._get_next_available_node_ID() for lin in self.get_cell_lineages()
+                    lin._get_next_available_node_id() for lin in self.get_cell_lineages()
                 ]
                 cid = max(next_cids)
             else:
-                # Check if the specified cell_ID is already used in the model.
+                # Check if the specified cell_id is already used in the model.
                 for lin in self.get_cell_lineages():
                     if cid in lin.nodes:
                         raise ValueError(
-                            f"Cell ID {cid} is already used in lineage {lin.graph['lineage_ID']}."
+                            f"Cell ID {cid} is already used in lineage {lin.graph['lineage_id']}."
                         )
 
         cid = lineage._add_cell(
             cid,
-            time_prop_name=self.model_metadata.reference_time_property,
+            time_prop=self.model_metadata.reference_time_property,
             time_prop_value=time_value,
             **prop_values,
         )
@@ -1808,7 +1814,7 @@ class Model:
 
         current_id = start_id
         for lin in sorted(
-            self.get_cell_lineages(), key=lambda graph: graph.graph["lineage_ID"]
+            self.get_cell_lineages(), key=lambda graph: graph.graph["lineage_id"]
         ):
             if not unique_ids:
                 current_id = start_id
@@ -1827,7 +1833,7 @@ class Model:
             nx.relabel_nodes(lin, final_mapping, copy=False)
 
             for cid in lin.nodes():
-                lin.nodes[cid]["cell_ID"] = cid
+                lin.nodes[cid]["cell_id"] = cid
 
         # Full update in case of CycleLineages or of properties depending on cell IDs.
         self.prepare_full_data_update()
@@ -1889,7 +1895,7 @@ class Model:
             source_cid,
             target_cid,
             target_lineage,
-            time_prop_name=self.model_metadata.reference_time_property,
+            time_prop=self.model_metadata.reference_time_property,
             **prop_values,
         )
 
@@ -1986,7 +1992,7 @@ class Model:
         -------
         list[Cell]
             List of the fusion cells. Each cell is a named tuple:
-            (cell_ID, lineage_ID).
+            (cell_id, lineage_id).
 
         Raises
         ------
@@ -1996,15 +2002,15 @@ class Model:
         fusions = []
         if lids is None:
             lids = list(self.data.cell_data.keys())
-        for lin_ID in lids:
+        for lin_id in lids:
             try:
-                lineage = self.data.cell_data[lin_ID]
+                lineage = self.data.cell_data[lin_id]
             except KeyError as err:
-                msg = f"Lineage with ID {lin_ID} does not exist."
+                msg = f"Lineage with ID {lin_id} does not exist."
                 raise KeyError(msg) from err
             tmp = lineage.get_fusions()
             if tmp:
-                fusions.extend([Cell(cell_ID, lin_ID) for cell_ID in tmp])
+                fusions.extend([Cell(cell_id, lin_id) for cell_id in tmp])
         return fusions
 
     def get_divisions(self, lids: list[int] | None = None) -> list[Cell]:
@@ -2021,7 +2027,7 @@ class Model:
         -------
         list[Cell]
             List of the division cells. Each cell is a named tuple:
-            (cell_ID, lineage_ID).
+            (cell_id, lineage_id).
 
         Raises
         ------
@@ -2031,15 +2037,15 @@ class Model:
         divisions = []
         if lids is None:
             lids = list(self.data.cell_data.keys())
-        for lin_ID in lids:
+        for lin_id in lids:
             try:
-                lineage = self.data.cell_data[lin_ID]
+                lineage = self.data.cell_data[lin_id]
             except KeyError as err:
-                msg = f"Lineage with ID {lin_ID} does not exist."
+                msg = f"Lineage with ID {lin_id} does not exist."
                 raise KeyError(msg) from err
             tmp = lineage.get_divisions()
             if tmp:
-                divisions.extend([Cell(cell_ID, lin_ID) for cell_ID in tmp])
+                divisions.extend([Cell(cell_id, lin_id) for cell_id in tmp])
         return divisions
 
     def add_custom_property(
@@ -2064,22 +2070,141 @@ class Model:
         ValueError
             If the property is a cycle lineage property and cycle lineages
             have not been computed yet.
+        TypeError
+            If the identifier of a property read by the calculator is not a string.
+        MissingPropertyError
+            If a property read by the calculator has not been declared in the model.
+        ValueError
+            If a property read by the calculator does not have the property type
+            or lineage type expected by the calculator.
         """
         if calculator.prop.lin_type == "CycleLineage" and not self.data.cycle_data:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+                "Please compute the cycle lineages first with model.add_cycle_data()."
             )
+        self._check_input_props(calculator)
         self.props_metadata._add_prop(calculator.prop)
         self._updater.register_calculator(calculator)
         self.prepare_full_data_update()
+
+    def _check_input_props(self, calculator: PropertyCalculator) -> None:
+        """
+        Check that the properties read by a calculator are declared in the model
+        with the expected property type and lineage type.
+
+        Parameters
+        ----------
+        calculator : PropertyCalculator
+            Calculator whose input properties to check.
+
+        Raises
+        ------
+        TypeError
+            If the identifier of an input property is not a string, e.g. a Property.
+        MissingPropertyError
+            If an input property has not been declared in the model.
+        ValueError
+            If an input property does not have the property type or lineage type
+            expected by the calculator.
+        """
+        prop_id = calculator.prop.identifier
+        for param, (input_id, prop_type, lin_type) in (
+            calculator.get_input_props().items()
+        ):
+            if not isinstance(input_id, str):
+                msg = (
+                    f"'{param}' must be the identifier of a property (str), "
+                    f"got {type(input_id).__name__}."
+                )
+                if isinstance(input_id, Property):
+                    msg += f" Pass its identifier instead: '{input_id.identifier}'."
+                raise TypeError(msg)
+            input_prop = self.get_property(input_id)
+            if input_prop is None:
+                pycellin_props = {
+                    **futils.get_pycellin_cell_lineage_properties(
+                        include_core_properties=False
+                    ),
+                    **futils.get_pycellin_cycle_lineage_properties(
+                        include_core_properties=False
+                    ),
+                }
+                fix = f"set '{param}' to the identifier of a declared property"
+                if input_id in pycellin_props:
+                    add_method = self._get_prop_method(input_id)
+                    parameters = inspect.signature(add_method).parameters.values()
+                    defaults = [parameter.default for parameter in parameters]
+                    # Don't suggest an add method that reads, by default, the property
+                    # being added, e.g. add_cell_contour() for a polygon from contours.
+                    if prop_id not in defaults:
+                        fix = f"add it first with model.add_{input_id}(), or {fix}"
+                raise MissingPropertyError(
+                    input_id,
+                    message=(
+                        f"'{prop_id}' requires the property '{input_id}', which has "
+                        f"not been declared. To fix this, {fix}."
+                    ),
+                )
+            if property_type_from_string(prop_type) not in input_prop.prop_type:
+                raise ValueError(
+                    f"'{prop_id}' requires '{param}' to be a property with "
+                    f"prop_type '{prop_type}', but '{input_id}' has prop_type "
+                    f"'{input_prop.prop_type}'."
+                )
+            if input_prop.lin_type not in (lin_type, "Lineage"):
+                raise ValueError(
+                    f"'{prop_id}' requires '{param}' to be a property with "
+                    f"lin_type '{lin_type}', but '{input_id}' has lin_type "
+                    f"'{input_prop.lin_type}'."
+                )
+
+    def _get_input_prop(self, prop_identifier: Any) -> Property | None:
+        """
+        Return the declaration of an input property, without raising.
+
+        Unlike `get_property()`, accept any value, so that `add_*()` methods can
+        read an input property before `_check_input_props()` checks it.
+
+        Parameters
+        ----------
+        prop_identifier : Any
+            Identifier of the property, as given by the user.
+
+        Returns
+        -------
+        Property | None
+            Declaration of the property, or None if `prop_identifier` is not a
+            string or the property has not been declared.
+        """
+        if not isinstance(prop_identifier, str):
+            return None
+        return self.get_property(prop_identifier)
+
+    def _get_prop_unit(self, prop_identifier: Any) -> str | None:
+        """
+        Return the unit of a property, without raising.
+
+        Parameters
+        ----------
+        prop_identifier : Any
+            Identifier of the property, as given by the user.
+
+        Returns
+        -------
+        str | None
+            Unit of the property, or None if the property has no unit, has not
+            been declared, or `prop_identifier` is not a string.
+        """
+        prop = self._get_input_prop(prop_identifier)
+        return prop.unit if prop is not None else None
 
     # TODO: in case of data coming from a loader, there is no calculator associated
     # with the declared properties.
 
     def add_absolute_age(
         self,
-        custom_time_property: str | None = None,
+        time_prop: str | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2094,9 +2219,9 @@ class Model:
 
         Parameters
         ----------
-        custom_time_property : str, optional
-            Identifier of the time property to use for the computation.
-            If None, the reference time property of the model will be used.
+        time_prop : str, optional
+            Identifier of the cell lineage node property holding the time of the
+            cells. If None, the reference time property of the model is used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "absolute_age".
@@ -2108,29 +2233,23 @@ class Model:
 
         Raises
         ------
-        KeyError
-            If the specified time property has not been declared in the model.
+        MissingPropertyError
+            If `time_prop` has not been declared in the model.
+        ValueError
+            If `time_prop` is not a node property of cell lineages.
         """
-        if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(
-                self.model_metadata.reference_time_property
-            )
-        else:
-            time_prop = self.props_metadata.props.get(custom_time_property)
-        if time_prop is None:
-            time_prop = (
-                custom_time_property or self.model_metadata.reference_time_property
-            )
-            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+        time_prop = time_prop or self.reference_time_property
+        # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
+        time = self._get_input_prop(time_prop)
 
         prop = tracking.create_absolute_age_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            dtype=time_prop.dtype,
-            unit=time_prop.unit,
+            dtype=time.dtype if time else "float",
+            unit=time.unit if time else None,
         )
-        self.add_custom_property(tracking.AbsoluteAge(prop, time_prop.identifier))
+        self.add_custom_property(tracking.AbsoluteAge(prop, time_prop=time_prop))
 
     def add_turning_angle(
         self,
@@ -2168,6 +2287,7 @@ class Model:
 
     def add_cycle_mean_displacement(
         self,
+        displacement_prop: str = "cell_displacement",
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2180,6 +2300,10 @@ class Model:
 
         Parameters
         ----------
+        displacement_prop : str, optional
+            Identifier of the cell lineage edge property holding the cell
+            displacements. Defaults to "cell_displacement", added by
+            `add_cell_displacement()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cycle_mean_displacement".
@@ -2189,17 +2313,29 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Mean displacement of the cell during the cell cycle".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `displacement_prop` has not been declared in the model.
+        ValueError
+            If `displacement_prop` is not an edge property of cell lineages.
+        ValueError
+            If the cycle lineages have not been computed yet.
         """
         prop = motion.create_cycle_mean_displacement_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=self.model_metadata.space_unit or "pixel",
+            unit=self._get_prop_unit(displacement_prop),
         )
-        self.add_custom_property(motion.CycleMeanDisplacement(prop))
+        self.add_custom_property(
+            motion.CycleMeanDisplacement(prop, displacement_prop=displacement_prop)
+        )
 
     def add_cycle_mean_speed(
         self,
+        speed_prop: str = "cell_speed",
         include_incoming_edge: bool = False,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
@@ -2213,6 +2349,9 @@ class Model:
 
         Parameters
         ----------
+        speed_prop : str, optional
+            Identifier of the cell lineage edge property holding the cell speeds.
+            Defaults to "cell_speed", added by `add_cell_speed()`.
         include_incoming_edge : bool, optional
             Whether to include the distance between the first cell of the cycle
             and its predecessor. Default is False.
@@ -2225,19 +2364,33 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Mean speed of the cell during the cell cycle".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `speed_prop` has not been declared in the model.
+        ValueError
+            If `speed_prop` is not an edge property of cell lineages.
+        ValueError
+            If the cycle lineages have not been computed yet.
         """
-        space_unit = self.model_metadata.space_unit or "pixel"
-        time_unit = self.model_metadata.time_unit or "frame"
         prop = motion.create_cycle_mean_speed_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=f"{space_unit} / {time_unit}",
+            unit=self._get_prop_unit(speed_prop),
         )
-        self.add_custom_property(motion.CycleMeanSpeed(prop, include_incoming_edge))
+        self.add_custom_property(
+            motion.CycleMeanSpeed(
+                prop,
+                include_incoming_edge=include_incoming_edge,
+                speed_prop=speed_prop,
+            )
+        )
 
     def add_cycle_total_displacement(
         self,
+        displacement_prop: str = "cell_displacement",
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2250,6 +2403,10 @@ class Model:
 
         Parameters
         ----------
+        displacement_prop : str, optional
+            Identifier of the cell lineage edge property holding the cell
+            displacements. Defaults to "cell_displacement", added by
+            `add_cell_displacement()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cycle_total_displacement".
@@ -2259,17 +2416,29 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Displacement of the cell during the cell cycle".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `displacement_prop` has not been declared in the model.
+        ValueError
+            If `displacement_prop` is not an edge property of cell lineages.
+        ValueError
+            If the cycle lineages have not been computed yet.
         """
         prop = motion.create_cycle_total_displacement_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=self.model_metadata.space_unit or "pixel",
+            unit=self._get_prop_unit(displacement_prop),
         )
-        self.add_custom_property(motion.CycleTotalDisplacement(prop))
+        self.add_custom_property(
+            motion.CycleTotalDisplacement(prop, displacement_prop=displacement_prop)
+        )
 
     def add_cell_area(
         self,
+        polygon_prop: str = "cell_polygon",
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2277,11 +2446,16 @@ class Model:
         """
         Add the cell area property to the model.
 
-        "cell_polygon" needs to be present in the model for this property
-        to be computed.
+        The cell area is computed from the cell polygons. For a
+        shapely.MultiPolygon, it is the area of all the pieces, holes excluded.
+        It is NaN for cells whose polygon is None, such as cells without a contour.
 
         Parameters
         ----------
+        polygon_prop : str, optional
+            Identifier of the cell lineage node property holding the cell shapes
+            as shapely.Polygon or shapely.MultiPolygon. Defaults to
+            "cell_polygon", added by `add_cell_polygon()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cell_area".
@@ -2292,30 +2466,24 @@ class Model:
             default value (see :func:`pycellin.properties.morphology.create_cell_area_property`).
 
         Raises
-        -----
+        ------
         MissingPropertyError
-            If the 'cell_polygon' property is not present in the model. The
-            'cell_polygon' property is required for computing the cell area.
+            If `polygon_prop` has not been declared in the model.
+        ValueError
+            If `polygon_prop` is not a node property of cell lineages.
         """
-        cell_poly = self.get_property("cell_polygon")
-        if cell_poly is None:
-            raise MissingPropertyError(
-                "cell_polygon",
-                message=(
-                    "Property 'cell_polygon' is required for computing cell area. "
-                    "Please add it before adding 'cell_area'."
-                ),
-            )
+        polygon_unit = self._get_prop_unit(polygon_prop)
         prop = morpho.create_cell_area_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=f"{self.get_space_unit() or 'pixel'}^2",
+            unit=f"{polygon_unit}^2" if polygon_unit else None,
         )
-        self.add_custom_property(morpho.CellArea(prop))
+        self.add_custom_property(morpho.CellArea(prop, polygon_prop=polygon_prop))
 
     def add_cycle_mean_area(
         self,
+        area_prop: str = "cell_area",
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2324,11 +2492,13 @@ class Model:
         Add the cycle mean area property to the model.
 
         The cycle mean area is defined as the mean area of the cell
-        during the cell cycle. "cell_area" needs to be present in the model
-        for this property to be computed.
+        during the cell cycle, computed from the cell areas.
 
         Parameters
         ----------
+        area_prop : str, optional
+            Identifier of the cell lineage node property holding the cell areas.
+            Defaults to "cell_area", added by `add_cell_area()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cycle_mean_area".
@@ -2341,29 +2511,23 @@ class Model:
         Raises
         ------
         MissingPropertyError
-            If the 'cell_area' property is not present in the model.
+            If `area_prop` has not been declared in the model.
+        ValueError
+            If `area_prop` is not a node property of cell lineages.
         ValueError
             If the cycle lineages have not been computed yet.
         """
-        cell_area = self.get_property("cell_area")
-        if cell_area is None:
-            raise MissingPropertyError(
-                "cell_area",
-                message=(
-                    "Property 'cell_area' is required for computing cycle mean area. "
-                    "Please add it before adding 'cycle_mean_area'."
-                ),
-            )
         prop = morpho.create_cycle_mean_area_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=cell_area.unit,
+            unit=self._get_prop_unit(area_prop),
         )
-        self.add_custom_property(morpho.CycleMeanArea(prop))
+        self.add_custom_property(morpho.CycleMeanArea(prop, area_prop=area_prop))
 
     def add_birth_area(
         self,
+        area_prop: str = "cell_area",
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2373,11 +2537,13 @@ class Model:
 
         The birth area is defined as the area of the first cell of the cell cycle,
         i.e. right after division. It is NaN for cell cycles starting at a root,
-        since their birth was not observed. "cell_area" needs to be present
-        in the model for this property to be computed.
+        since their birth was not observed. It is computed from the cell areas.
 
         Parameters
         ----------
+        area_prop : str, optional
+            Identifier of the cell lineage node property holding the cell areas.
+            Defaults to "cell_area", added by `add_cell_area()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "birth_area".
@@ -2390,29 +2556,23 @@ class Model:
         Raises
         ------
         MissingPropertyError
-            If the 'cell_area' property is not present in the model.
+            If `area_prop` has not been declared in the model.
+        ValueError
+            If `area_prop` is not a node property of cell lineages.
         ValueError
             If the cycle lineages have not been computed yet.
         """
-        cell_area = self.get_property("cell_area")
-        if cell_area is None:
-            raise MissingPropertyError(
-                "cell_area",
-                message=(
-                    "Property 'cell_area' is required for computing birth area. "
-                    "Please add it before adding 'birth_area'."
-                ),
-            )
         prop = morpho.create_birth_area_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=cell_area.unit,
+            unit=self._get_prop_unit(area_prop),
         )
-        self.add_custom_property(morpho.BirthArea(prop))
+        self.add_custom_property(morpho.BirthArea(prop, area_prop=area_prop))
 
     def add_division_area(
         self,
+        area_prop: str = "cell_area",
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2422,11 +2582,14 @@ class Model:
 
         The division area is defined as the area of the last cell of the cell cycle,
         i.e. right before division. It is NaN for cell cycles ending at a leaf,
-        since their division was not observed. "cell_area" needs to be present
-        in the model for this property to be computed.
+        since their division was not observed. It is computed from the cell
+        areas.
 
         Parameters
         ----------
+        area_prop : str, optional
+            Identifier of the cell lineage node property holding the cell areas.
+            Defaults to "cell_area", added by `add_cell_area()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "division_area".
@@ -2439,29 +2602,23 @@ class Model:
         Raises
         ------
         MissingPropertyError
-            If the 'cell_area' property is not present in the model.
+            If `area_prop` has not been declared in the model.
+        ValueError
+            If `area_prop` is not a node property of cell lineages.
         ValueError
             If the cycle lineages have not been computed yet.
         """
-        cell_area = self.get_property("cell_area")
-        if cell_area is None:
-            raise MissingPropertyError(
-                "cell_area",
-                message=(
-                    "Property 'cell_area' is required for computing division area. "
-                    "Please add it before adding 'division_area'."
-                ),
-            )
         prop = morpho.create_division_area_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=cell_area.unit,
+            unit=self._get_prop_unit(area_prop),
         )
-        self.add_custom_property(morpho.DivisionArea(prop))
+        self.add_custom_property(morpho.DivisionArea(prop, area_prop=area_prop))
 
     def add_cell_perimeter(
         self,
+        polygon_prop: str = "cell_polygon",
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2469,11 +2626,16 @@ class Model:
         """
         Add the cell perimeter property to the model.
 
-        "cell_polygon" needs to be present in the model for this property
-        to be computed.
+        The cell perimeter is computed from the cell polygons. For a
+        shapely.MultiPolygon, it includes all the pieces and the edges of their holes.
+        It is NaN for cells whose polygon is None, such as cells without a contour.
 
         Parameters
         ----------
+        polygon_prop : str, optional
+            Identifier of the cell lineage node property holding the cell shapes
+            as shapely.Polygon or shapely.MultiPolygon. Defaults to
+            "cell_polygon", added by `add_cell_polygon()`.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cell_perimeter".
@@ -2484,31 +2646,119 @@ class Model:
             default value (see :func:`pycellin.properties.morphology.create_cell_perimeter_property`).
 
         Raises
-        -----
+        ------
         MissingPropertyError
-            If the 'cell_polygon' property is not present in the model. The
-            'cell_polygon' property is required for computing the cell perimeter.
+            If `polygon_prop` has not been declared in the model.
+        ValueError
+            If `polygon_prop` is not a node property of cell lineages.
         """
-        cell_poly = self.get_property("cell_polygon")
-        if cell_poly is None:
-            raise MissingPropertyError(
-                "cell_polygon",
-                message=(
-                    "Property 'cell_polygon' is required for computing cell perimeter. "
-                    "Please add it before adding 'cell_perimeter'."
-                ),
-            )
-
         prop = morpho.create_cell_perimeter_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=f"{self.get_space_unit() or 'pixel'}",
+            unit=self._get_prop_unit(polygon_prop),
         )
-        self.add_custom_property(morpho.CellPerimeter(prop))
+        self.add_custom_property(morpho.CellPerimeter(prop, polygon_prop=polygon_prop))
+
+    def add_cell_circularity(
+        self,
+        polygon_prop: str = "cell_polygon",
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell circularity property to the model.
+
+        The cell circularity is 4 pi times the area of the cell divided by its
+        squared perimeter, both computed from the cell polygons. It is 1 for a disk
+        and gets closer to 0 as the cell gets elongated or its outline irregular.
+        Polygons always have a circularity below 1, even regular polygons with many
+        sides. For a shapely.MultiPolygon, it is computed from the area and
+        perimeter of all the pieces, as in `add_cell_area()` and
+        `add_cell_perimeter()`, so pieces and holes lower it. It is NaN for cells
+        whose polygon is None, such as cells without a contour.
+
+        Parameters
+        ----------
+        polygon_prop : str, optional
+            Identifier of the cell lineage node property holding the cell shapes
+            as shapely.Polygon or shapely.MultiPolygon. Defaults to
+            "cell_polygon", added by `add_cell_polygon()`.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_circularity".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cell circularity".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.morphology.create_cell_circularity_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If `polygon_prop` has not been declared in the model.
+        ValueError
+            If `polygon_prop` is not a node property of cell lineages.
+        """
+        prop = morpho.create_cell_circularity_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self.add_custom_property(
+            morpho.CellCircularity(prop, polygon_prop=polygon_prop)
+        )
+
+    def add_cell_solidity(
+        self,
+        polygon_prop: str = "cell_polygon",
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell solidity property to the model.
+
+        The cell solidity is the area of the cell divided by the area of its convex
+        hull, both computed from the cell polygons. It is 1 for a convex cell and
+        gets closer to 0 as the outline of the cell gets more concave. For a
+        shapely.MultiPolygon, the convex hull encloses all the pieces, and holes are
+        excluded from the area. It is NaN for cells whose polygon is None, such as
+        cells without a contour.
+
+        Parameters
+        ----------
+        polygon_prop : str, optional
+            Identifier of the cell lineage node property holding the cell shapes
+            as shapely.Polygon or shapely.MultiPolygon. Defaults to
+            "cell_polygon", added by `add_cell_polygon()`.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_solidity".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cell solidity".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.morphology.create_cell_solidity_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If `polygon_prop` has not been declared in the model.
+        ValueError
+            If `polygon_prop` is not a node property of cell lineages.
+        """
+        prop = morpho.create_cell_solidity_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self.add_custom_property(morpho.CellSolidity(prop, polygon_prop=polygon_prop))
 
     def add_cell_contour(
         self,
+        polygon_prop: str = "cell_polygon",
         force_recompute: bool = False,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
@@ -2518,10 +2768,17 @@ class Model:
         Add the cell contour property to the model.
 
         The cell contour is the coordinates of the contour of the cell,
-        relative to the cell centroid.
+        relative to the cell centroid. It is computed from the cell polygons, and is
+        None for cells whose polygon is None. Don't use it on the contours that the
+        polygons are computed from (`add_cell_polygon(source="contour")`).
 
         Parameters
         ----------
+        polygon_prop : str, optional
+            Identifier of the cell lineage node property holding the cell shapes
+            as shapely.Polygon. A shapely.MultiPolygon is not accepted, since it has
+            no single contour. Defaults to "cell_polygon", added by
+            `add_cell_polygon()`.
         force_recompute : bool
             Whether to force recomputation of the property when it has already been
             computed. Defaults to False.
@@ -2534,15 +2791,24 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will take its
             default value (see :func:`pycellin.properties.morphology.create_cell_contour_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If `polygon_prop` has not been declared in the model.
+        ValueError
+            If `polygon_prop` is not a node property of cell lineages.
         """
         prop = morpho.create_cell_contour_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=self.get_space_unit() or "pixel",
+            unit=self._get_prop_unit(polygon_prop),
         )
         self.add_custom_property(
-            morpho.CellContour(prop, force_recompute=force_recompute)
+            morpho.CellContour(
+                prop, force_recompute=force_recompute, polygon_prop=polygon_prop
+            )
         )
 
     def add_cycle_completeness(
@@ -2613,6 +2879,173 @@ class Model:
 
     def add_cell_polygon(
         self,
+        source: Literal["label_img", "contour"] = "label_img",
+        label_prop: str | None = None,
+        label_img: np.ndarray | None = None,
+        label_img_path: str | None = None,
+        contour_prop: str | None = None,
+        force_recompute: bool = False,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell polygon property to the model.
+
+        The cell polygon is the shape of the cell as a shapely.Polygon. It is
+        computed from one of these sources:
+
+        - "label_img": the outline of the cell label in a label image. Holes are
+          filled and, when a label is made of several pieces, only the largest one
+          is kept: a warning lists the cells concerned when the model is updated.
+          Pixels that touch only by a corner belong to the same piece. To keep all
+          the pieces and holes, use the cell multipolygon property instead
+          (`add_cell_multipolygon()`).
+        - "contour": the cell contour, relative to the cell position (`cell_x`,
+          `cell_y`), like the contours loaded from TrackMate or Cell Tracking
+          Challenge data. The polygon is None for cells without a contour. An
+          invalid contour, such as a contour that crosses itself, is repaired: the
+          polygon is its largest piece with holes filled. A log message lists the
+          cells concerned when the model is updated. Since `add_cell_contour()`
+          computes contours from polygons, don't use it on the contours the
+          polygons are computed from.
+
+        For any other source, compute the polygons with your own calculator (see
+        `add_custom_property()`) and pass their identifier as `polygon_prop` to the
+        properties that read cell polygons, such as `add_cell_area()`.
+
+        Parameters
+        ----------
+        source : {"label_img", "contour"}, optional
+            Source of the cell polygons. Defaults to "label_img".
+        label_prop : str, optional
+            Name of the property that stores cell labels. Must match the labels in
+            the label image. Defaults to "label". Only used with
+            source="label_img".
+        label_img : np.ndarray, optional
+            The label image. If None, the method will fallback to `label_img_path`
+            or attempt to find it in the model's metadata. Only used with
+            source="label_img".
+        label_img_path: str, optional
+            The path to the label image (tif stack). If None, the method will attempt
+            to find it in the model's metadata. Only used with source="label_img".
+        contour_prop : str, optional
+            Identifier of the cell lineage node property holding the cell contours.
+            Defaults to "cell_contour". Only used with source="contour".
+        force_recompute : bool
+            Whether to force recomputation of the property when it has already been
+            computed. Defaults to False.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_polygon".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cell polygon".
+        custom_description : str, optional
+            New description for the property. If None, the description says which
+            source the polygons are computed from.
+
+        Raises
+        ------
+        ValueError
+            If `source` is not one of the sources above, or if a parameter
+            of another source is set.
+        ValueError
+            If `label_img` and `label_img_path` are not provided nor defined in the
+            model's metadata.
+        ValueError
+            If pixels are not isotropic in x and y.
+        ValueError
+            If the contours and the cell positions have different units.
+        MissingPropertyError
+            If `label_prop` or `contour_prop` has not been declared in the model.
+        ValueError
+            If `label_prop` or `contour_prop` is not a node property of cell
+            lineages.
+        """
+        self._check_source_params(
+            source,
+            {
+                "label_img": {
+                    "label_prop": label_prop,
+                    "label_img": label_img,
+                    "label_img_path": label_img_path,
+                },
+                "contour": {"contour_prop": contour_prop},
+            },
+        )
+
+        if source == "label_img":
+            prop = morpho.create_cell_polygon_property(
+                custom_identifier=custom_identifier,
+                custom_name=custom_name,
+                custom_description=custom_description
+                or "Cell shape as a shapely.Polygon, computed from a label image",
+                unit=self.model_metadata.space_unit or "pixel",
+            )
+            calc = morpho.CellPolygonFromLabelImg(
+                prop,
+                label_prop="label" if label_prop is None else label_prop,
+                label_img=self._resolve_label_img(label_img, label_img_path),
+                pixel_size=self._get_xy_pixel_size(),
+                force_recompute=force_recompute,
+            )
+        else:
+            if contour_prop is None:
+                contour_prop = "cell_contour"
+            prop = morpho.create_cell_polygon_property(
+                custom_identifier=custom_identifier,
+                custom_name=custom_name,
+                custom_description=custom_description
+                or "Cell shape as a shapely.Polygon, computed from the cell contour "
+                f"('{contour_prop}') and position",
+                unit=self._get_contour_unit(contour_prop),
+            )
+            calc = morpho.CellPolygonFromContour(
+                prop, contour_prop=contour_prop, force_recompute=force_recompute
+            )
+        self.add_custom_property(calc)
+
+    def _get_contour_unit(self, contour_prop: str) -> str | None:
+        """
+        Return the unit shared by cell contours and cell positions.
+
+        A contour is relative to the cell position, so both must have the same unit.
+        Undeclared properties and unknown units are not checked.
+
+        Parameters
+        ----------
+        contour_prop : str
+            Identifier of the property holding the cell contours.
+
+        Returns
+        -------
+        str | None
+            The shared unit, or the unit of the contours if no unit is known.
+
+        Raises
+        ------
+        ValueError
+            If the contours and the cell positions have different units.
+        """
+        units = {
+            identifier: self._get_prop_unit(identifier)
+            for identifier in (contour_prop, "cell_x", "cell_y")
+        }
+        known_units = {
+            prop: unit for prop, unit in units.items() if unit not in (None, "unknown")
+        }
+        if len(set(known_units.values())) > 1:
+            mismatch = ", ".join(
+                f"'{prop}' is in '{unit}'" for prop, unit in known_units.items()
+            )
+            raise ValueError(
+                "The contours and the cell positions must have the same unit, since "
+                f"contours are relative to the cell position, but {mismatch}."
+            )
+        return next(iter(known_units.values()), units[contour_prop])
+
+    def add_cell_multipolygon(
+        self,
         label_prop: str = "label",
         label_img: np.ndarray | None = None,
         label_img_path: str | None = None,
@@ -2622,7 +3055,14 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the cell polygon property to the model.
+        Add the cell multipolygon property to the model.
+
+        The cell multipolygon is the shape of the cell label in the label image,
+        as a shapely.MultiPolygon. It holds one polygon per piece of the label,
+        sorted by decreasing area, with the holes of each piece as interior rings.
+        Pixels that touch only by a corner belong to the same piece. For labels
+        made of a single piece without holes, prefer the cell polygon property
+        (`add_cell_polygon()`), which more properties accept as input.
 
         Parameters
         ----------
@@ -2640,70 +3080,641 @@ class Model:
             computed. Defaults to False.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
-            "cell_polygon".
+            "cell_multipolygon".
         custom_name : str, optional
-            New name for the property. If None, the name will be "Cell polygon from
-            label image".
+            New name for the property. If None, the name will be "Cell multipolygon".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cell_polygon_property`).
+            default value (see :func:`pycellin.properties.morphology.create_cell_multipolygon_property`).
 
         Raises
         ------
-        KeyError
-            If the specified label property has not been declared in the model.
         ValueError
             If `label_img` and `label_img_path` are not provided nor defined in the
             model's metadata.
         ValueError
             If pixels are not isotropic in x and y.
+        MissingPropertyError
+            If `label_prop` has not been declared in the model.
+        ValueError
+            If `label_prop` is not a node property of cell lineages.
         """
-        if not self.props_metadata._has_prop(label_prop):
-            raise KeyError(f"The property '{label_prop}' has not been declared.")
-
-        # Resolve label_img.
-        if label_img is None:
-            if label_img_path is None:
-                if (
-                    hasattr(self.model_metadata, "label_img")
-                    and self.model_metadata.label_img is not None
-                ):
-                    label_img = self.model_metadata.label_img
-                elif (
-                    hasattr(self.model_metadata, "label_img_path")
-                    and self.model_metadata.label_img_path is not None
-                ):
-                    label_img_path = self.model_metadata.label_img_path
-                else:
-                    raise ValueError(
-                        "No label image provided. Please provide `label_img` or "
-                        "`label_img_path`, or set them in the model metadata."
-                    )
-
-            if label_img is None:
-                label_img = tifffile.imread(label_img_path).astype(np.uint32)
-
-        # Resolve pixel size.
-        size_x = self.get_pixel_width() or 1.0
-        size_y = self.get_pixel_height() or 1.0
-        if size_x != size_y:
-            raise ValueError("Pixels must be isotropic in x and y.")
-
-        prop = morpho.create_cell_polygon_property(
+        prop = morpho.create_cell_multipolygon_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-
-        calc = morpho.CellPolygonFromLabelImg(
+        calc = morpho.CellMultiPolygonFromLabelImg(
             prop,
             label_prop=label_prop,
-            label_img=label_img,
-            pixel_size=size_x,
+            label_img=self._resolve_label_img(label_img, label_img_path),
+            pixel_size=self._get_xy_pixel_size(),
             force_recompute=force_recompute,
         )
         self.add_custom_property(calc)
+
+    def add_cell_total_intensity(
+        self,
+        intensity_img: np.ndarray | None = None,
+        intensity_img_path: str | None = None,
+        source: Literal["label_img", "polygon"] = "label_img",
+        label_prop: str | None = None,
+        label_img: np.ndarray | None = None,
+        label_img_path: str | None = None,
+        polygon_prop: str | None = None,
+        background: float = 0.0,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell total intensity property to the model.
+
+        The cell total intensity is the sum of the values of the pixels of the cell
+        in an intensity image, after subtracting `background` from each of them. It
+        measures the amount of fluorophore in the cell. The pixels of each cell are
+        taken from one of these sources:
+
+        - "label_img": the pixels of the cell label in a label image, with all the
+          pieces of the label and without its holes. Images can be 2D or 3D.
+        - "polygon": the pixels whose center is inside the cell shape, a
+          shapely.Polygon or shapely.MultiPolygon. A pixel whose center is exactly
+          on an edge is counted only if the edge is a left or top edge of the
+          shape, so that a pixel shared by two touching cells is counted once.
+          With the cell multipolygon (`add_cell_multipolygon()`), these are exactly
+          the pixels of the cell label. With the cell polygon, holes are included
+          and only the largest piece is kept. The intensity is NaN for cells
+          without a shape, or whose shape contains no pixel center. Images are 2D.
+
+        The intensity image has a single channel: to measure several channels, add
+        the property once per channel, each time with its own `custom_identifier`.
+
+        Parameters
+        ----------
+        intensity_img : np.ndarray, optional
+            The intensity image, with time as first axis: (t, y, x), or (t, z, y, x)
+            with source="label_img". Pass the same array to several intensity
+            properties to load the image only once.
+        intensity_img_path : str, optional
+            The path to the intensity image (tif stack). Only used if
+            `intensity_img` is None.
+        source : {"label_img", "polygon"}, optional
+            Source of the pixels of each cell. Defaults to "label_img".
+        label_prop : str, optional
+            Name of the property that stores cell labels. Must match the labels in
+            the label image. Defaults to "label". Only used with
+            source="label_img".
+        label_img : np.ndarray, optional
+            The label image, with the same shape as the intensity image. If None,
+            the method will fallback to `label_img_path` or attempt to find it in
+            the model's metadata. Only used with source="label_img".
+        label_img_path : str, optional
+            The path to the label image (tif stack). If None, the method will
+            attempt to find it in the model's metadata. Only used with
+            source="label_img".
+        polygon_prop : str, optional
+            Identifier of the cell lineage node property holding the cell shapes as
+            shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
+            The shapes are in the space unit of the model, or in pixels if the unit
+            of the property is "pixel". Only used with source="polygon".
+        background : float, optional
+            Value subtracted from each pixel value. Defaults to 0.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_total_intensity".
+        custom_name : str, optional
+            New name for the property. If None, the name will be
+            "Cell total intensity".
+        custom_description : str, optional
+            New description for the property. If None, the description says where
+            the pixels of each cell are taken from.
+
+        Raises
+        ------
+        ValueError
+            If `source` is not one of the sources above, or if a parameter
+            of another source is set.
+        ValueError
+            If `intensity_img` and `intensity_img_path` are not provided.
+        ValueError
+            If `label_img` and `label_img_path` are not provided nor defined in the
+            model's metadata.
+        ValueError
+            If the intensity image and the label image have different shapes, or if
+            the intensity image doesn't have 3 axes (t, y, x) with source="polygon".
+        ValueError
+            If pixels are not isotropic in x and y, with source="polygon".
+        MissingPropertyError
+            If `label_prop` or `polygon_prop` has not been declared in the model.
+        ValueError
+            If `label_prop` or `polygon_prop` is not a node property of cell
+            lineages.
+        """
+        prop = intensity.create_cell_total_intensity_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self._add_cell_intensity(
+            prop,
+            "total",
+            intensity_img,
+            intensity_img_path,
+            source,
+            label_prop,
+            label_img,
+            label_img_path,
+            polygon_prop,
+            background,
+            describe_pixels=custom_description is None,
+        )
+
+    def add_cell_mean_intensity(
+        self,
+        intensity_img: np.ndarray | None = None,
+        intensity_img_path: str | None = None,
+        source: Literal["label_img", "polygon"] = "label_img",
+        label_prop: str | None = None,
+        label_img: np.ndarray | None = None,
+        label_img_path: str | None = None,
+        polygon_prop: str | None = None,
+        background: float = 0.0,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell mean intensity property to the model.
+
+        The cell mean intensity is the mean of the values of the pixels of the cell
+        in an intensity image, after subtracting `background` from each of them. It
+        measures the concentration of fluorophore in the cell. The pixels of each
+        cell are taken from one of these sources:
+
+        - "label_img": the pixels of the cell label in a label image, with all the
+          pieces of the label and without its holes. Images can be 2D or 3D.
+        - "polygon": the pixels whose center is inside the cell shape, a
+          shapely.Polygon or shapely.MultiPolygon. A pixel whose center is exactly
+          on an edge is counted only if the edge is a left or top edge of the
+          shape, so that a pixel shared by two touching cells is counted once.
+          With the cell multipolygon (`add_cell_multipolygon()`), these are exactly
+          the pixels of the cell label. With the cell polygon, holes are included
+          and only the largest piece is kept. The intensity is NaN for cells
+          without a shape, or whose shape contains no pixel center. Images are 2D.
+
+        The intensity image has a single channel: to measure several channels, add
+        the property once per channel, each time with its own `custom_identifier`.
+
+        Parameters
+        ----------
+        intensity_img : np.ndarray, optional
+            The intensity image, with time as first axis: (t, y, x), or (t, z, y, x)
+            with source="label_img". Pass the same array to several intensity
+            properties to load the image only once.
+        intensity_img_path : str, optional
+            The path to the intensity image (tif stack). Only used if
+            `intensity_img` is None.
+        source : {"label_img", "polygon"}, optional
+            Source of the pixels of each cell. Defaults to "label_img".
+        label_prop : str, optional
+            Name of the property that stores cell labels. Must match the labels in
+            the label image. Defaults to "label". Only used with
+            source="label_img".
+        label_img : np.ndarray, optional
+            The label image, with the same shape as the intensity image. If None,
+            the method will fallback to `label_img_path` or attempt to find it in
+            the model's metadata. Only used with source="label_img".
+        label_img_path : str, optional
+            The path to the label image (tif stack). If None, the method will
+            attempt to find it in the model's metadata. Only used with
+            source="label_img".
+        polygon_prop : str, optional
+            Identifier of the cell lineage node property holding the cell shapes as
+            shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
+            The shapes are in the space unit of the model, or in pixels if the unit
+            of the property is "pixel". Only used with source="polygon".
+        background : float, optional
+            Value subtracted from each pixel value. Defaults to 0.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cell_mean_intensity".
+        custom_name : str, optional
+            New name for the property. If None, the name will be
+            "Cell mean intensity".
+        custom_description : str, optional
+            New description for the property. If None, the description says where
+            the pixels of each cell are taken from.
+
+        Raises
+        ------
+        ValueError
+            If `source` is not one of the sources above, or if a parameter
+            of another source is set.
+        ValueError
+            If `intensity_img` and `intensity_img_path` are not provided.
+        ValueError
+            If `label_img` and `label_img_path` are not provided nor defined in the
+            model's metadata.
+        ValueError
+            If the intensity image and the label image have different shapes, or if
+            the intensity image doesn't have 3 axes (t, y, x) with source="polygon".
+        ValueError
+            If pixels are not isotropic in x and y, with source="polygon".
+        MissingPropertyError
+            If `label_prop` or `polygon_prop` has not been declared in the model.
+        ValueError
+            If `label_prop` or `polygon_prop` is not a node property of cell
+            lineages.
+        """
+        prop = intensity.create_cell_mean_intensity_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self._add_cell_intensity(
+            prop,
+            "mean",
+            intensity_img,
+            intensity_img_path,
+            source,
+            label_prop,
+            label_img,
+            label_img_path,
+            polygon_prop,
+            background,
+            describe_pixels=custom_description is None,
+        )
+
+    def _add_cell_intensity(
+        self,
+        prop: Property,
+        statistic: Literal["total", "mean"],
+        intensity_img: np.ndarray | None,
+        intensity_img_path: str | None,
+        source: str,
+        label_prop: str | None,
+        label_img: np.ndarray | None,
+        label_img_path: str | None,
+        polygon_prop: str | None,
+        background: float,
+        describe_pixels: bool,
+    ) -> None:
+        """
+        Add a cell intensity property to the model.
+
+        Parameters
+        ----------
+        prop : Property
+            The cell intensity property to add.
+        statistic : {"total", "mean"}
+            Statistic computed on the pixel values of each cell.
+        intensity_img, intensity_img_path, source, label_prop
+            See `add_cell_total_intensity()`.
+        label_img, label_img_path, polygon_prop, background
+            See `add_cell_total_intensity()`.
+        describe_pixels : bool
+            True to add to the description of the property where the pixels of each
+            cell are taken from.
+
+        Raises
+        ------
+        ValueError, MissingPropertyError
+            See `add_cell_total_intensity()`.
+        """
+        self._check_source_params(
+            source,
+            {
+                "label_img": {
+                    "label_prop": label_prop,
+                    "label_img": label_img,
+                    "label_img_path": label_img_path,
+                },
+                "polygon": {"polygon_prop": polygon_prop},
+            },
+        )
+        img = self._resolve_intensity_img(intensity_img, intensity_img_path)
+
+        calc: intensity._CellIntensityCalculator
+        if source == "label_img":
+            labels = self._resolve_label_img(label_img, label_img_path)
+            if img.shape != labels.shape:
+                raise ValueError(
+                    "The intensity image and the label image must have the same "
+                    f"shape, but their shapes are {img.shape} and {labels.shape}."
+                )
+            calc = intensity.CellIntensityFromLabelImg(
+                prop,
+                statistic,
+                img,
+                label_prop="label" if label_prop is None else label_prop,
+                label_img=labels,
+                background=background,
+            )
+            pixels_txt = "taking the pixels of each cell from a label image"
+        else:
+            if img.ndim != 3:
+                raise ValueError(
+                    "With source='polygon', the intensity image must have 3 axes "
+                    f"(t, y, x), but it has {img.ndim}."
+                )
+            if polygon_prop is None:
+                polygon_prop = "cell_polygon"
+            if self._get_prop_unit(polygon_prop) == "pixel":
+                pixel_size = 1.0
+            else:
+                pixel_size = self._get_xy_pixel_size()
+            calc = intensity.CellIntensityFromPolygon(
+                prop,
+                statistic,
+                img,
+                polygon_prop=polygon_prop,
+                pixel_size=pixel_size,
+                background=background,
+            )
+            pixels_txt = f"taking the pixels whose center is inside '{polygon_prop}'"
+
+        if describe_pixels:
+            prop.description += f", {pixels_txt}"
+            if background:
+                prop.description += f", minus a background of {background} per pixel"
+        self.add_custom_property(calc)
+
+    def add_cycle_mean_intensity(
+        self,
+        intensity_prop: str = "cell_mean_intensity",
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cycle mean intensity property to the model.
+
+        The cycle mean intensity is defined as the mean intensity of the cell
+        during the cell cycle, computed from the cell intensities.
+
+        Parameters
+        ----------
+        intensity_prop : str, optional
+            Identifier of the cell lineage node property holding the cell
+            intensities. Defaults to "cell_mean_intensity", added by
+            `add_cell_mean_intensity()`.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cycle_mean_intensity".
+        custom_name : str, optional
+            New name for the property. If None, the name will be
+            "Cycle mean intensity".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.intensity.create_cycle_mean_intensity_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If `intensity_prop` has not been declared in the model.
+        ValueError
+            If `intensity_prop` is not a node property of cell lineages.
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        prop = intensity.create_cycle_mean_intensity_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self._get_prop_unit(intensity_prop),
+        )
+        self.add_custom_property(
+            intensity.CycleMeanIntensity(prop, intensity_prop=intensity_prop)
+        )
+
+    def add_birth_intensity(
+        self,
+        intensity_prop: str = "cell_total_intensity",
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the birth intensity property to the model.
+
+        The birth intensity is defined as the intensity of the first cell of the
+        cell cycle, right after division. It is NaN for cell cycles starting at a
+        root, since their birth was not observed.
+
+        Parameters
+        ----------
+        intensity_prop : str, optional
+            Identifier of the cell lineage node property holding the cell
+            intensities. Defaults to "cell_total_intensity", added by
+            `add_cell_total_intensity()`.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "birth_intensity".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Birth intensity".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.intensity.create_birth_intensity_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If `intensity_prop` has not been declared in the model.
+        ValueError
+            If `intensity_prop` is not a node property of cell lineages.
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        prop = intensity.create_birth_intensity_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self._get_prop_unit(intensity_prop),
+        )
+        self.add_custom_property(
+            intensity.BirthIntensity(prop, intensity_prop=intensity_prop)
+        )
+
+    def add_division_intensity(
+        self,
+        intensity_prop: str = "cell_total_intensity",
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the division intensity property to the model.
+
+        The division intensity is defined as the intensity of the last cell of the
+        cell cycle, right before division. It is NaN for cell cycles ending at a
+        leaf, since their division was not observed.
+
+        Parameters
+        ----------
+        intensity_prop : str, optional
+            Identifier of the cell lineage node property holding the cell
+            intensities. Defaults to "cell_total_intensity", added by
+            `add_cell_total_intensity()`.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "division_intensity".
+        custom_name : str, optional
+            New name for the property. If None, the name will be
+            "Division intensity".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.intensity.create_division_intensity_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If `intensity_prop` has not been declared in the model.
+        ValueError
+            If `intensity_prop` is not a node property of cell lineages.
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        prop = intensity.create_division_intensity_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+            unit=self._get_prop_unit(intensity_prop),
+        )
+        self.add_custom_property(
+            intensity.DivisionIntensity(prop, intensity_prop=intensity_prop)
+        )
+
+    @staticmethod
+    def _check_source_params(
+        source: str, source_params: dict[str, dict[str, Any]]
+    ) -> None:
+        """
+        Check that a source is known, and that no parameter of another source is set.
+
+        Parameters
+        ----------
+        source : str
+            The chosen source.
+        source_params : dict[str, dict[str, Any]]
+            For each known source, the values of its specific parameters, by name.
+            A parameter is set when its value is not None.
+
+        Raises
+        ------
+        ValueError
+            If `source` is not a known source, or if a parameter of another source
+            is set.
+        """
+        if source not in source_params:
+            raise ValueError(
+                f"'source' must be one of {', '.join(map(repr, source_params))}, "
+                f"got {source!r}."
+            )
+        unused = [
+            param
+            for other_source, params in source_params.items()
+            if other_source != source
+            for param, value in params.items()
+            if value is not None
+        ]
+        if unused:
+            raise ValueError(
+                f"{', '.join(map(repr, unused))} "
+                f"{'is' if len(unused) == 1 else 'are'} not used with "
+                f"source={source!r}."
+            )
+
+    @staticmethod
+    def _resolve_intensity_img(
+        intensity_img: np.ndarray | None, intensity_img_path: str | None
+    ) -> np.ndarray:
+        """
+        Return the intensity image to use, from the array or from its path.
+
+        Parameters
+        ----------
+        intensity_img : np.ndarray | None
+            The intensity image. If None, `intensity_img_path` is used.
+        intensity_img_path : str | None
+            The path to the intensity image (tif stack).
+
+        Returns
+        -------
+        np.ndarray
+            The intensity image.
+
+        Raises
+        ------
+        ValueError
+            If `intensity_img` and `intensity_img_path` are not provided.
+        """
+        if intensity_img is not None:
+            return intensity_img
+        if intensity_img_path is None:
+            raise ValueError(
+                "No intensity image provided. Please provide 'intensity_img' or "
+                "'intensity_img_path'."
+            )
+        return tifffile.imread(intensity_img_path)
+
+    def _resolve_label_img(
+        self, label_img: np.ndarray | None, label_img_path: str | None
+    ) -> np.ndarray:
+        """
+        Return the label image to use, from the arguments or the model metadata.
+
+        Parameters
+        ----------
+        label_img : np.ndarray | None
+            The label image. If None, `label_img_path` is used.
+        label_img_path : str | None
+            The path to the label image (tif stack). If None as well, the label
+            image or its path is taken from the model metadata.
+
+        Returns
+        -------
+        np.ndarray
+            The label image.
+
+        Raises
+        ------
+        ValueError
+            If `label_img` and `label_img_path` are not provided nor defined in the
+            model's metadata.
+        """
+        if label_img is not None:
+            return label_img
+        if label_img_path is None:
+            if getattr(self.model_metadata, "label_img", None) is not None:
+                return self.model_metadata.label_img
+            label_img_path = getattr(self.model_metadata, "label_img_path", None)
+            if label_img_path is None:
+                raise ValueError(
+                    "No label image provided. Please provide 'label_img' or "
+                    "'label_img_path', or set them in the model metadata."
+                )
+        return tifffile.imread(label_img_path).astype(np.uint32)
+
+    def _get_xy_pixel_size(self) -> float:
+        """
+        Return the pixel size in x and y, which must be the same.
+
+        Returns
+        -------
+        float
+            The pixel size in x and y, or 1.0 if it is not defined.
+
+        Raises
+        ------
+        ValueError
+            If pixels are not isotropic in x and y.
+        """
+        size_x = self.get_pixel_width() or 1.0
+        size_y = self.get_pixel_height() or 1.0
+        if size_x != size_y:
+            raise ValueError("Pixels must be isotropic in x and y.")
+        return size_x
 
     def add_rod_length(
         self,
@@ -2737,7 +3748,7 @@ class Model:
 
     def add_cell_speed(
         self,
-        custom_time_property: str | None = None,
+        time_prop: str | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2752,9 +3763,9 @@ class Model:
 
         Parameters
         ----------
-        custom_time_property : str, optional
-            Identifier of the time property to use for the computation.
-            If None, the reference time property of the model will be used.
+        time_prop : str, optional
+            Identifier of the cell lineage node property holding the time of the
+            cells. If None, the reference time property of the model is used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "cell_speed".
@@ -2763,22 +3774,25 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Speed of the cell between two consecutive detections".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `time_prop` has not been declared in the model.
+        ValueError
+            If `time_prop` is not a node property of cell lineages.
         """
-        if custom_time_property is None:
-            time_prop = self.get_properties().get(self.reference_time_property)
-        else:
-            time_prop = self.get_properties().get(custom_time_property)
-        if time_prop is None:
-            time_prop_id = custom_time_property or self.reference_time_property
-            raise KeyError(f"The time property '{time_prop_id}' has not been declared.")
+        time_prop = time_prop or self.reference_time_property
+        space_unit = self.get_space_unit() or "pixel"
+        time_unit = self._get_prop_unit(time_prop)
 
         prop = motion.create_cell_speed_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=f"{self.get_space_unit()}/{time_prop.unit}",
+            unit=f"{space_unit}/{time_unit}" if time_unit else None,
         )
-        self.add_custom_property(motion.CellSpeed(prop, time_prop.identifier))
+        self.add_custom_property(motion.CellSpeed(prop, time_prop=time_prop))
 
     def add_rod_width(
         self,
@@ -2810,9 +3824,90 @@ class Model:
         )
         self.add_custom_property(calc)
 
+    def add_cousin_cycles(
+        self,
+        degree: int | None = 1,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cousin cycles property to the model.
+
+        The cousin cycles of a cell cycle are the cell cycles of the same generation
+        that share an ancestor with it, but not its mother. First cousins share the
+        same grandmother: their mothers are sisters. More generally, cousins of
+        degree n share an ancestor n + 1 generations up, but no closer one. To add
+        several degrees, call this method once per degree with a different
+        `custom_identifier`.
+
+        Parameters
+        ----------
+        degree : int | None, optional
+            Degree of the cousins: 1 for first cousins, 2 for second cousins, and
+            so on. If None, the cousins of all degrees are listed, closest first.
+            1 by default.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "cousin_cycles".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Cousin cycles".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.topology.create_cousin_cycles_property`).
+
+        Raises
+        ------
+        ValueError
+            If `degree` is lower than 1.
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        prop = topo.create_cousin_cycles_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self.add_custom_property(topo.CousinCycles(prop, degree=degree))
+
+    def add_daughter_cycles(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the daughter cycles property to the model.
+
+        The daughter cycles of a cell cycle are the cell cycles born from the
+        division ending it. A cell cycle that ends with a leaf has none.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "daughter_cycles".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Daughter cycles".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.topology.create_daughter_cycles_property`).
+
+        Raises
+        ------
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        prop = topo.create_daughter_cycles_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self.add_custom_property(topo.DaughterCycles(prop))
+
     def add_division_rate(
         self,
-        custom_time_property: str | None = None,
+        time_prop: str | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2827,9 +3922,9 @@ class Model:
 
         Parameters
         ----------
-        custom_time_property : str, optional
-            Identifier of the time property to use for the computation.
-            If None, the reference time property of the model will be used.
+        time_prop : str, optional
+            Identifier of the cell lineage node property holding the time of the
+            cells. If None, the reference time property of the model is used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "division_rate".
@@ -2838,30 +3933,28 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Number of divisions per time unit".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `time_prop` has not been declared in the model.
+        ValueError
+            If `time_prop` is not a node property of cell lineages.
         """
-        if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(
-                self.model_metadata.reference_time_property
-            )
-        else:
-            time_prop = self.props_metadata.props.get(custom_time_property)
-        if time_prop is None:
-            time_prop = (
-                custom_time_property or self.model_metadata.reference_time_property
-            )
-            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+        time_prop = time_prop or self.reference_time_property
+        time_unit = self._get_prop_unit(time_prop)
 
         prop = tracking.create_division_rate_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            unit=f"1/{time_prop.unit}",
+            unit=f"1/{time_unit}" if time_unit else None,
         )
-        self.add_custom_property(tracking.DivisionRate(prop, time_prop.identifier))
+        self.add_custom_property(tracking.DivisionRate(prop, time_prop=time_prop))
 
     def add_division_time(
         self,
-        custom_time_property: str | None = None,
+        time_prop: str | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -2875,9 +3968,9 @@ class Model:
 
         Parameters
         ----------
-        custom_time_property : str, optional
-            Identifier of the time property to use for the computation.
-            If None, the reference time property of the model will be used.
+        time_prop : str, optional
+            Identifier of the cell lineage node property holding the time of the
+            cells. If None, the reference time property of the model is used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "division_time".
@@ -2886,28 +3979,27 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Time elapsed between two successive divisions".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `time_prop` has not been declared in the model.
+        ValueError
+            If `time_prop` is not a node property of cell lineages.
         """
-        if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(
-                self.model_metadata.reference_time_property
-            )
-        else:
-            time_prop = self.props_metadata.props.get(custom_time_property)
-        if time_prop is None:
-            time_prop = (
-                custom_time_property or self.model_metadata.reference_time_property
-            )
-            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+        time_prop = time_prop or self.reference_time_property
+        # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
+        time = self._get_input_prop(time_prop)
 
         prop = tracking.create_division_time_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            dtype=time_prop.dtype,
-            unit=time_prop.unit,
+            dtype=time.dtype if time else "float",
+            unit=time.unit if time else None,
         )
 
-        self.add_custom_property(tracking.DivisionTime(prop, time_prop.identifier))
+        self.add_custom_property(tracking.DivisionTime(prop, time_prop=time_prop))
 
     def add_is_division(
         self,
@@ -3069,7 +4161,7 @@ class Model:
 
     def add_lineage_duration(
         self,
-        custom_time_property: str | None = None,
+        time_prop: str | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -3084,9 +4176,9 @@ class Model:
 
         Parameters
         ----------
-        custom_time_property : str, optional
-            Identifier of the time property to use for the computation.
-            If None, the reference time property of the model will be used.
+        time_prop : str, optional
+            Identifier of the cell lineage node property holding the time of the
+            cells. If None, the reference time property of the model is used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "lineage_duration".
@@ -3098,20 +4190,12 @@ class Model:
 
         Raises
         ------
-        KeyError
-            If the specified time property has not been declared in the model.
+        MissingPropertyError
+            If `time_prop` has not been declared in the model.
+        ValueError
+            If `time_prop` is not a node property of cell lineages.
         """
-        if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(
-                self.model_metadata.reference_time_property
-            )
-        else:
-            time_prop = self.props_metadata.props.get(custom_time_property)
-        if time_prop is None:
-            time_prop = (
-                custom_time_property or self.model_metadata.reference_time_property
-            )
-            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+        time_prop = time_prop or self.reference_time_property
 
         prop = topo.create_lineage_duration_property(
             custom_identifier=custom_identifier,
@@ -3119,7 +4203,7 @@ class Model:
             custom_description=custom_description,
         )
 
-        self.add_custom_property(topo.LineageDuration(prop, time_prop.identifier))
+        self.add_custom_property(topo.LineageDuration(prop, time_prop=time_prop))
 
     def add_location_tag(
         self,
@@ -3235,6 +4319,97 @@ class Model:
         self.add_custom_property(
             topo.LocationTag(
                 prop, mask_img=mask_img, pixel_size=size_x, tag_names=tag_names
+            )
+        )
+
+    def add_mother_cycle(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the mother cycle property to the model.
+
+        The mother cycle of a cell cycle is the cell cycle whose division gave birth
+        to it. The root cell cycle has none: its mother cycle is None.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "mother_cycle".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Mother cycle".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.topology.create_mother_cycle_property`).
+
+        Raises
+        ------
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        prop = topo.create_mother_cycle_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self.add_custom_property(topo.MotherCycle(prop))
+
+    def add_normalized_age(
+        self,
+        time_prop: str | None = None,
+        ignore_incomplete_cycles: bool = False,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the cell normalized age property to the model.
+
+        The normalized age of a cell is its relative age divided by the duration of
+        its cell cycle. It is 0 for the first cell of a cell cycle and 1 for the
+        last one. By default, incomplete cell cycles, which start at the root or
+        end with a leaf, are normalized over their observed part: 0 and 1 then
+        don't mark a birth and a division. The normalized age is NaN for the cells
+        of a cell cycle that lasts no time, such as a cell cycle of a single cell.
+
+        Parameters
+        ----------
+        time_prop : str, optional
+            Identifier of the cell lineage node property holding the time of the
+            cells. If None, the reference time property of the model is used.
+        ignore_incomplete_cycles : bool, optional
+            True to give NaN to the cells of incomplete cell cycles, False to
+            normalize them over their observed part. False by default.
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "normalized_age".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Normalized age".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.tracking.create_normalized_age_property`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If `time_prop` has not been declared in the model.
+        ValueError
+            If `time_prop` is not a node property of cell lineages.
+        """
+        time_prop = time_prop or self.reference_time_property
+        prop = tracking.create_normalized_age_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self.add_custom_property(
+            tracking.NormalizedAge(
+                prop,
+                time_prop=time_prop,
+                ignore_incomplete_cycles=ignore_incomplete_cycles,
             )
         )
 
@@ -3395,7 +4570,7 @@ class Model:
 
     def add_relative_age(
         self,
-        custom_time_property: str | None = None,
+        time_prop: str | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
@@ -3411,9 +4586,9 @@ class Model:
 
         Parameters
         ----------
-        custom_time_property : str, optional
-            Identifier of the time property to use for the computation.
-            If None, the reference time property of the model will be used.
+        time_prop : str, optional
+            Identifier of the cell lineage node property holding the time of the
+            cells. If None, the reference time property of the model is used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
             "relative_age".
@@ -3425,29 +4600,58 @@ class Model:
 
         Raises
         ------
-        KeyError
-            If the specified time property has not been declared in the model.
+        MissingPropertyError
+            If `time_prop` has not been declared in the model.
+        ValueError
+            If `time_prop` is not a node property of cell lineages.
         """
-        if custom_time_property is None:
-            time_prop = self.props_metadata.props.get(
-                self.model_metadata.reference_time_property
-            )
-        else:
-            time_prop = self.props_metadata.props.get(custom_time_property)
-        if time_prop is None:
-            time_prop = (
-                custom_time_property or self.model_metadata.reference_time_property
-            )
-            raise KeyError(f"The time property '{time_prop}' has not been declared.")
+        time_prop = time_prop or self.reference_time_property
+        # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
+        time = self._get_input_prop(time_prop)
 
         prop = tracking.create_relative_age_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
-            dtype=time_prop.dtype,
-            unit=time_prop.unit,
+            dtype=time.dtype if time else "float",
+            unit=time.unit if time else None,
         )
-        self.add_custom_property(tracking.RelativeAge(prop, time_prop.identifier))
+        self.add_custom_property(tracking.RelativeAge(prop, time_prop=time_prop))
+
+    def add_sister_cycles(
+        self,
+        custom_identifier: str | None = None,
+        custom_name: str | None = None,
+        custom_description: str | None = None,
+    ) -> None:
+        """
+        Add the sister cycles property to the model.
+
+        The sister cycles of a cell cycle are the other cell cycles born from the
+        same division. The root cell cycle has none.
+
+        Parameters
+        ----------
+        custom_identifier : str, optional
+            New identifier for the property. If None, the identifier will be
+            "sister_cycles".
+        custom_name : str, optional
+            New name for the property. If None, the name will be "Sister cycles".
+        custom_description : str, optional
+            New description for the property. If None, the description will take its
+            default value (see :func:`pycellin.properties.topology.create_sister_cycles_property`).
+
+        Raises
+        ------
+        ValueError
+            If the cycle lineages have not been computed yet.
+        """
+        prop = topo.create_sister_cycles_property(
+            custom_identifier=custom_identifier,
+            custom_name=custom_name,
+            custom_description=custom_description,
+        )
+        self.add_custom_property(topo.SisterCycles(prop))
 
     def add_straightness(
         self,
@@ -3548,7 +4752,7 @@ class Model:
             raise ValueError(
                 f"Property {prop_identifier} is a property of cycle lineages, "
                 "but the cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+                "Please compute the cycle lineages first with model.add_cycle_data()."
             )
         self._get_prop_method(prop_identifier)(**kwargs)
 
@@ -3906,7 +5110,7 @@ class Model:
         """
         propagated = set()
         for edge in clin.edges:
-            cycle = clin.nodes[edge[1]]["cycle_ID"]
+            cycle = clin.nodes[edge[1]]["cycle_id"]
             cells = clin.nodes[cycle]["cells"]
 
             # Intracycle edges.
@@ -3922,7 +5126,7 @@ class Model:
             # Intercycle edge.
             incoming_edges = list(lin.in_edges(cells[0]))
             if len(incoming_edges) > 1:
-                raise FusionError(cells[0], lin.graph["lineage_ID"])
+                raise FusionError(cells[0], lin.graph["lineage_id"])
             for prop in edge_props:
                 try:
                     lin.edges[incoming_edges[0]][prop] = clin.edges[edge][prop]
@@ -4026,7 +5230,7 @@ class Model:
         if not self.data.cycle_data:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+                "Please compute the cycle lineages first with model.add_cycle_data()."
             )
         if self._updater._update_required and update:
             self.update()
@@ -4037,9 +5241,9 @@ class Model:
         )  # to keep track of which properties were actually propagated
 
         # Propagation.
-        for lin_ID in self.data.cell_data:
-            lin = self.data.cell_data[lin_ID]
-            clin = self.data.cycle_data[lin_ID]
+        for lin_id in self.data.cell_data:
+            lin = self.data.cell_data[lin_id]
+            clin = self.data.cycle_data[lin_id]
             if node_props:
                 propagated_props.update(
                     Model._propagate_cycle_node_props(node_props, clin, lin)
@@ -4200,12 +5404,12 @@ class Model:
         if forbidden_fields:
             raise ValueError(
                 f"Critical model metadata {forbidden_fields} cannot be set through "
-                "`new_metadata`."
+                "'new_metadata'."
             )
         if new_name is not None and "name" in new_metadata:
             raise ValueError(
-                "The name of the merged model is given both by `new_name` and by "
-                "`new_metadata`."
+                "The name of the merged model is given both by 'new_name' and by "
+                "'new_metadata'."
             )
 
         # Time origin. Timepoints are computed relative to the time origin stored in the
@@ -4283,10 +5487,10 @@ class Model:
         # Single-cell lineages keep the convention lineage ID = -cell ID: if that ID is
         # not available, their cell is renumbered, as when splitting lineages in
         # ModelUpdater._update(). Only model2, a copy, is modified here.
-        used_lids = set(model1.get_cell_lineage_IDs())
+        used_lids = set(model1.get_cell_lineage_ids())
         lineages_to_add = []
         for lin in model2.get_cell_lineages():
-            lid = lin.graph.get("lineage_ID")
+            lid = lin.graph.get("lineage_id")
             if lid is None or lid in used_lids:
                 if len(lin) == 1:
                     cid = next(iter(lin.nodes))
@@ -4294,7 +5498,7 @@ class Model:
                     if lid >= 0 or lid in used_lids:
                         lid = min(min(used_lids, default=0) - 1, -1)
                         nx.relabel_nodes(lin, {cid: -lid}, copy=False)
-                        lin.nodes[-lid]["cell_ID"] = -lid
+                        lin.nodes[-lid]["cell_id"] = -lid
                 else:
                     lid = max(max(used_lids, default=0) + 1, 1)
             used_lids.add(lid)
@@ -4324,7 +5528,7 @@ class Model:
                 lineages += [(lin, lid) for lid, lin in model1.data.cell_data.items()]
             for lin, lid in lineages:
                 cycle_lin = CycleLineage(time_prop, time_step, lin)
-                cycle_lin.graph["lineage_ID"] = lid
+                cycle_lin.graph["lineage_id"] = lid
                 cycle_lineages_to_add[lid] = cycle_lin
 
         # Model metadata of the merged model. Fields shared by both models are kept,
@@ -4482,7 +5686,7 @@ class Model:
 
             # Set values on lineages.
             for lin in model1.get_cell_lineages():
-                from_model2 = lin.graph["lineage_ID"] in new_lids
+                from_model2 = lin.graph["lineage_id"] in new_lids
                 value = (md2_values if from_model2 else md1_values).get(field)
                 stored_fields = merge_props2 if from_model2 else merge_props1
                 if value is not None and field not in stored_fields:
@@ -4516,7 +5720,7 @@ class Model:
             List of models created from the specified lineage ID groups.
         """
         models = []
-        model_ids = set(self.get_cell_lineage_IDs())
+        model_ids = set(self.get_cell_lineage_ids())
         for name, lids in lin_id_groups.items():
             model = deepcopy(self)  # TODO: this is heavy...
             to_remove = list(model_ids - set(lids))
@@ -4532,14 +5736,14 @@ class Model:
         """
         Add cell lineage properties as columns of a DataFrame.
 
-        Each row gets the value of the cell lineage matching its `lineage_ID`, or NaN
-        if that lineage has no value. `lineage_ID` is skipped since it is already
+        Each row gets the value of the cell lineage matching its `lineage_id`, or NaN
+        if that lineage has no value. `lineage_id` is skipped since it is already
         a column.
 
         Parameters
         ----------
         df : pd.DataFrame
-            DataFrame with a `lineage_ID` column.
+            DataFrame with a `lineage_id` column.
         lineage_props : list[str] | None
             Identifiers of the cell lineage properties to add. If None or empty,
             the DataFrame is returned unchanged.
@@ -4556,7 +5760,7 @@ class Model:
             declared in the model.
             If a property has the same identifier as an existing column.
         """
-        props = [prop for prop in lineage_props or [] if prop != "lineage_ID"]
+        props = [prop for prop in lineage_props or [] if prop != "lineage_id"]
         if not props:
             return df
 
@@ -4583,11 +5787,11 @@ class Model:
         new_columns = {}
         for prop in props:
             values = {
-                lin_ID: lin.graph[prop]
-                for lin_ID, lin in self.data.cell_data.items()
+                lin_id: lin.graph[prop]
+                for lin_id, lin in self.data.cell_data.items()
                 if prop in lin.graph
             }
-            new_columns[prop] = df["lineage_ID"].map(values)
+            new_columns[prop] = df["lineage_id"].map(values)
         return df.assign(**new_columns)
 
     def to_cell_dataframe(
@@ -4614,26 +5818,30 @@ class Model:
         Raises
         ------
         ValueError
-            If the `lineage_ID`, `frame` or `cell_ID` property is not found in the model.
+            If the model has no lineages, or none with an ID in `lids`.
+            If the `lineage_id`, `frame` or `cell_id` property is not found in the model.
             If a property of `lineage_props` is not a lineage property of cell
             lineages, is not declared in the model, or clashes with an existing
             column.
         """
-        list_df = []
-        nb_nodes = 0
-        for lin_ID, lineage in self.data.cell_data.items():
-            if lids and lin_ID not in lids:
-                continue
-            nb_nodes += len(lineage)
-            tmp_df = pd.DataFrame(dict(lineage.nodes(data=True)).values())
-            tmp_df["lineage_ID"] = lin_ID
-            list_df.append(tmp_df)
-        df = pd.concat(list_df, ignore_index=True)
-        assert nb_nodes == len(df)
+        records = [
+            {**cell_props, "lineage_id": lin_id}
+            for lin_id, lineage in self.data.cell_data.items()
+            if not lids or lin_id in lids
+            for cell_props in lineage.nodes.values()
+        ]
+        if not records:
+            raise ValueError(
+                "No cells to export: the model has no lineages, "
+                "or none with an ID in 'lids'."
+            )
+        # A single DataFrame for all the lineages: concatenating one DataFrame per
+        # lineage makes pandas warn when a column is all None in a lineage.
+        df = pd.DataFrame(records)
 
         # Reoder the columns to have pycellin mandatory properties first.
         time_prop = self.model_metadata.reference_time_property
-        mandatory_columns = ["lineage_ID", time_prop, "cell_ID"]
+        mandatory_columns = ["lineage_id", time_prop, "cell_id"]
         missing_columns = [col for col in mandatory_columns if col not in df.columns]
         if missing_columns:
             missing_str = ", ".join(repr(col) for col in missing_columns)
@@ -4645,7 +5853,7 @@ class Model:
         ]
         df = df[columns]
         df.sort_values(
-            ["lineage_ID", time_prop, "cell_ID"], ignore_index=True, inplace=True
+            ["lineage_id", time_prop, "cell_id"], ignore_index=True, inplace=True
         )
 
         return self._add_lineage_props_to_df(df, lineage_props)
@@ -4674,32 +5882,47 @@ class Model:
         Raises
         ------
         ValueError
+            If the model has no lineages, or none with an ID in `lids`.
             If a property of `lineage_props` is not a lineage property of cell
             lineages, is not declared in the model, or clashes with an existing
             column.
         """
-        list_df = []
-        nb_edges = 0
-        for lin_ID, lineage in self.data.cell_data.items():
-            if lids and lin_ID not in lids:
-                continue
-            nb_edges += len(lineage.edges)
-            tmp_df = nx.to_pandas_edgelist(
-                lineage, source="source_cell_ID", target="target_cell_ID"
+        lineages = [
+            (lin_id, lineage)
+            for lin_id, lineage in self.data.cell_data.items()
+            if not lids or lin_id in lids
+        ]
+        if not lineages:
+            raise ValueError(
+                "No links to export: the model has no lineages, "
+                "or none with an ID in 'lids'."
             )
-            tmp_df["source_cell_ID"] = tmp_df["source_cell_ID"].astype(int)
-            tmp_df["target_cell_ID"] = tmp_df["target_cell_ID"].astype(int)
-            tmp_df["lineage_ID"] = lin_ID
-            list_df.append(tmp_df)
-        df = pd.concat(list_df, ignore_index=True)
-        assert nb_edges == len(df)
+        # A single DataFrame for all the lineages, built from the link properties
+        # rather than with networkx's to_pandas_edgelist(), which puts them in a
+        # different order in each Python session.
+        records = [
+            {
+                **link_props,
+                "lineage_id": lin_id,
+                "source_cell_id": source,
+                "target_cell_id": target,
+            }
+            for lin_id, lineage in lineages
+            for source, target, link_props in lineage.edges(data=True)
+        ]
+        mandatory_columns = ["lineage_id", "source_cell_id", "target_cell_id"]
+        if records:
+            df = pd.DataFrame(records)
+        else:
+            # Lineages without links, e.g. single-cell lineages.
+            df = pd.DataFrame(columns=mandatory_columns, dtype=int)
 
         # Reoder the columns to have pycellin mandatory properties first.
-        columns = df.columns.tolist()
-        columns.remove("lineage_ID")
-        columns = ["lineage_ID"] + columns
+        columns = mandatory_columns + [
+            col for col in df.columns if col not in mandatory_columns
+        ]
         df = df[columns]
-        df.sort_values("lineage_ID", ignore_index=True, inplace=True)
+        df.sort_values("lineage_id", ignore_index=True, inplace=True)
 
         return self._add_lineage_props_to_df(df, lineage_props)
 
@@ -4721,26 +5944,33 @@ class Model:
         Raises
         ------
         ValueError
-            If the `lineage_ID` is not found in the model.
+            If the model has no lineages, or none with an ID in `lids`.
+            If the `lineage_id` is not found in the model.
         """
-        list_df = []
-        for lin_ID, lineage in self.data.cell_data.items():
-            if lids and lin_ID not in lids:
-                continue
-            tmp_df = pd.DataFrame([lineage.graph])
-            list_df.append(tmp_df)
-        df = pd.concat(list_df, ignore_index=True)
+        records = [
+            lineage.graph
+            for lin_id, lineage in self.data.cell_data.items()
+            if not lids or lin_id in lids
+        ]
+        if not records:
+            raise ValueError(
+                "No lineages to export: the model has no lineages, "
+                "or none with an ID in 'lids'."
+            )
+        # A single DataFrame for all the lineages: concatenating one DataFrame per
+        # lineage makes pandas warn when a property is None in a lineage.
+        df = pd.DataFrame(records)
 
         # Reoder the columns to have pycellin mandatory properties first.
-        if "lineage_ID" not in df.columns:
+        if "lineage_id" not in df.columns:
             raise ValueError(
-                "Mandatory lineage property not found in the model: 'lineage_ID'."
+                "Mandatory lineage property not found in the model: 'lineage_id'."
             )
         columns = df.columns.tolist()
-        columns.remove("lineage_ID")
-        columns = ["lineage_ID"] + columns
+        columns.remove("lineage_id")
+        columns = ["lineage_id"] + columns
         df = df[columns]
-        df.sort_values("lineage_ID", ignore_index=True, inplace=True)
+        df.sort_values("lineage_id", ignore_index=True, inplace=True)
 
         return df
 
@@ -4769,41 +5999,253 @@ class Model:
         ------
         ValueError
             If the cycle lineages have not been computed yet.
-            If the `lineage_ID`, `level` or `cycle_ID` property is not found
+            If the model has no lineages, or none with an ID in `lids`.
+            If the `lineage_id`, `level` or `cycle_id` property is not found
             in the model.
             If a property of `lineage_props` is not a lineage property of cell
             lineages, is not declared in the model, or clashes with an existing
             column.
         """
-        list_df = []  # type: list[pd.DataFrame]
-        nb_nodes = 0
         if not self.data.cycle_data:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with `model.add_cycle_data()`."
+                "Please compute the cycle lineages first with model.add_cycle_data()."
             )
-        for lin_ID, lineage in self.data.cycle_data.items():
-            if lids and lin_ID not in lids:
-                continue
-            nb_nodes += len(lineage)
-            tmp_df = pd.DataFrame(dict(lineage.nodes(data=True)).values())
-            tmp_df["lineage_ID"] = lin_ID
-            list_df.append(tmp_df)
-        df = pd.concat(list_df, ignore_index=True)
-        assert nb_nodes == len(df)
+        records = [
+            {**cycle_props, "lineage_id": lin_id}
+            for lin_id, lineage in self.data.cycle_data.items()
+            if not lids or lin_id in lids
+            for cycle_props in lineage.nodes.values()
+        ]
+        if not records:
+            raise ValueError(
+                "No cell cycles to export: the model has no lineages, "
+                "or none with an ID in 'lids'."
+            )
+        # A single DataFrame for all the lineages: concatenating one DataFrame per
+        # lineage makes pandas warn when a column is all None in a lineage, e.g.
+        # mother_cycle in a lineage of a single cell cycle.
+        df = pd.DataFrame(records)
 
         # Reoder the columns to have pycellin mandatory properties first.
         columns = df.columns.tolist()
-        columns.remove("lineage_ID")
+        columns.remove("lineage_id")
         columns.remove("level")
-        columns.remove("cycle_ID")
-        columns = ["lineage_ID", "level", "cycle_ID"] + columns
+        columns.remove("cycle_id")
+        columns = ["lineage_id", "level", "cycle_id"] + columns
         df = df[columns]
         df.sort_values(
-            ["lineage_ID", "level", "cycle_ID"], ignore_index=True, inplace=True
+            ["lineage_id", "level", "cycle_id"], ignore_index=True, inplace=True
         )
 
         return self._add_lineage_props_to_df(df, lineage_props)
+
+    def to_cycle_pair_dataframe(
+        self,
+        relation_prop: str,
+        props: list[str] | None = None,
+        lids: list[int] | None = None,
+        lineage_props: list[str] | None = None,
+        unique_pairs: bool = False,
+        suffixes: tuple[str, str] = ("_1", "_2"),
+    ) -> pd.DataFrame:
+        """
+        Return pairs of related cell cycles and their properties as a pandas DataFrame.
+
+        Each row is a pair of cell cycles of the same lineage: a cell cycle, and one
+        of the cell cycles listed in its `relation_prop` property, e.g. its mother
+        with "mother_cycle", or one of its sisters with "sister_cycles". The
+        properties of both cell cycles are side by side, to compare or correlate
+        them, e.g. the area at birth of mothers and daughters.
+
+        Parameters
+        ----------
+        relation_prop : str
+            Identifier of the node property of cycle lineages that lists the related
+            cell cycles: a cell cycle ID or None (e.g. "mother_cycle"), or a list of
+            cell cycle IDs (e.g. "daughter_cycles", "sister_cycles",
+            "cousin_cycles"). A user-defined property works too, as long as the
+            related cell cycles belong to the same lineage.
+        props : list[str], optional
+            Identifiers of the node properties of cycle lineages to export for both
+            cell cycles of each pair (default is None). If None, all of them are
+            exported.
+        lids : list[int], optional
+            List of IDs of the lineages to export (default is None).
+            If None, all lineages are exported.
+        lineage_props : list[str], optional
+            Identifiers of cell lineage properties to add as columns, e.g. an
+            experimental condition stored on lineages (default is None). Each row
+            gets the value of its lineage, or NaN if the lineage has no value.
+        unique_pairs : bool, optional
+            True to keep a single row for the pairs whose cell cycles list each
+            other, such as sisters or cousins: the row whose first cell cycle has the
+            lower ID. False to keep both rows (default is False), which makes
+            correlations between the two columns of a property symmetric. Pairs
+            listed from one side only, such as a daughter and its mother, are
+            always kept.
+        suffixes : tuple[str, str], optional
+            Suffixes of the `cycle_id` and property columns: the first one for the
+            cell cycle that lists the relation, the second one for the related cell
+            cycle (default is ("_1", "_2")). E.g. ("", "_mother") with
+            "mother_cycle".
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per pair: the lineage ID, the IDs of both cell cycles, then each
+            property for both cell cycles.
+
+        Raises
+        ------
+        ValueError
+            If the cycle lineages have not been computed yet.
+            If the model has no lineages, or none with an ID in `lids`.
+            If the two suffixes are the same, or give the same name to two columns.
+            If `relation_prop` or a property of `props` is not a node property of
+            cycle lineages, or is not declared in the model.
+            If no cell cycle has a value for `relation_prop`.
+            If a related cell cycle is not in the lineage of the cell cycle that
+            lists it.
+            If a property of `lineage_props` is not a lineage property of cell
+            lineages, is not declared in the model, or clashes with an existing
+            column.
+
+        Notes
+        -----
+        No cell cycle is left out. The first cell cycle of a lineage starts with the
+        tracking, not at a division, and the last ones can end with it: add
+        "cycle_completeness" to `props` to keep the pairs of complete cell cycles,
+        e.g. to compare areas at birth or division times.
+
+        Examples
+        --------
+        The area at birth of each cell cycle and of its mother, side by side, once
+        the mother cycles are computed (model.add_mother_cycle(), model.update()):
+
+        >>> pairs = model.to_cycle_pair_dataframe(
+        ...     "mother_cycle", props=["birth_area"], suffixes=("_daughter", "_mother")
+        ... )
+        >>> pairs["birth_area_mother"].corr(pairs["birth_area_daughter"])
+
+        Sisters list each other, so each pair comes twice, once in each order. One
+        row per pair, i.e. per division into two daughters:
+
+        >>> model.to_cycle_pair_dataframe(
+        ...     "sister_cycles", props=["birth_area"], unique_pairs=True
+        ... )
+        """
+        # Also checks that there are cycle lineages to export.
+        df = self.to_cycle_dataframe(lids)
+        first, second = suffixes
+        if first == second:
+            raise ValueError(f"The two suffixes must differ, got {suffixes!r}.")
+
+        # The IDs are columns already.
+        id_props = ["lineage_id", "cycle_id"]
+        if props is None:
+            props = [col for col in df.columns if col not in id_props]
+        else:
+            props = [prop for prop in props if prop not in id_props]
+        available_props = {
+            prop_id
+            for prop_id, prop in self.get_cycle_lineage_properties().items()
+            if PropertyType.NODE in prop.prop_type
+        }
+        invalid_props = [
+            prop for prop in [relation_prop, *props] if prop not in available_props
+        ]
+        if invalid_props:
+            invalid_str = ", ".join(repr(prop) for prop in invalid_props)
+            raise ValueError(
+                "Not node properties of cycle lineages, or not declared in the "
+                f"model: {invalid_str}."
+            )
+
+        # One row per cell cycle and related cell cycle, read from the lineages
+        # rather than from the DataFrame, where None turns integer IDs into floats.
+        lineages = [
+            (lin_id, lineage)
+            for lin_id, lineage in self.data.cycle_data.items()
+            if not lids or lin_id in lids
+        ]
+        has_values = False
+        pairs = []
+        for lin_id, lineage in lineages:
+            for cycle_id, cycle_props in lineage.nodes(data=True):
+                if relation_prop not in cycle_props:
+                    continue
+                has_values = True
+                related_ids = self._get_related_cycle_ids(cycle_props[relation_prop])
+                for related_id in related_ids:
+                    if related_id not in lineage:
+                        raise ValueError(
+                            f"Cell cycle {related_id}, listed in property "
+                            f"'{relation_prop}' of cell cycle {cycle_id}, is not in "
+                            f"lineage {lin_id}."
+                        )
+                    pairs.append((lin_id, cycle_id, related_id))
+        if not has_values:
+            raise ValueError(
+                f"No cell cycle has a value for property '{relation_prop}': "
+                "compute it with model.update()."
+            )
+        if unique_pairs:
+            # Pairs listed from both sides keep the row with the lower ID first.
+            listed = set(pairs)
+            pairs = [
+                (lin_id, cycle_id, related_id)
+                for lin_id, cycle_id, related_id in pairs
+                if cycle_id < related_id or (lin_id, related_id, cycle_id) not in listed
+            ]
+
+        # The properties of both cell cycles, side by side.
+        id_columns = ["lineage_id", f"cycle_id{first}", f"cycle_id{second}"]
+        columns = id_columns + [
+            f"{prop}{suffix}" for prop in props for suffix in suffixes
+        ]
+        if len(set(columns)) < len(columns):
+            raise ValueError(
+                f"The suffixes {suffixes!r} give the same name to two columns."
+            )
+        pairs_df = pd.DataFrame(pairs, columns=id_columns)
+        values = df.reindex(columns=[*id_props, *props])
+        for suffix in suffixes:
+            pairs_df = pairs_df.merge(
+                values.rename(
+                    columns={prop: f"{prop}{suffix}" for prop in ["cycle_id", *props]}
+                ),
+                on=["lineage_id", f"cycle_id{suffix}"],
+                how="left",
+            )
+        pairs_df = pairs_df[columns]
+        pairs_df.sort_values(id_columns, ignore_index=True, inplace=True)
+
+        return self._add_lineage_props_to_df(pairs_df, lineage_props)
+
+    @staticmethod
+    def _get_related_cycle_ids(value: Any) -> list[int]:
+        """
+        Return the cell cycle IDs held by a value of a relation property.
+
+        Parameters
+        ----------
+        value : Any
+            Value of a relation property for one cell cycle: a cell cycle ID, None
+            or NaN for no related cell cycle, or a collection of cell cycle IDs.
+
+        Returns
+        -------
+        list[int]
+            The related cell cycle IDs, empty if there are none.
+        """
+        if value is None:
+            return []
+        if isinstance(value, list | tuple | set | np.ndarray):
+            return [int(cycle_id) for cycle_id in value]
+        if isinstance(value, float) and np.isnan(value):
+            return []
+        return [int(value)]
 
     def save_to_pickle(self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL) -> None:
         """
@@ -4963,11 +6405,11 @@ class Model:
             for lin_dict in subset:
                 for lin_id, cell_ids in lin_dict.items():
                     if cell_ids:
-                        mask |= (df_cells["lineage_ID"] == lin_id) & (
-                            df_cells["cell_ID"].isin(cell_ids)
+                        mask |= (df_cells["lineage_id"] == lin_id) & (
+                            df_cells["cell_id"].isin(cell_ids)
                         )
                     else:
-                        mask |= df_cells["lineage_ID"] == lin_id
+                        mask |= df_cells["lineage_id"] == lin_id
             df_cells = df_cells[mask]
             if df_cells.empty:
                 raise ValueError("No cells match the subset criteria.")

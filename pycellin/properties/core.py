@@ -3,6 +3,7 @@
 """Core property functions to create standard Property instances."""
 
 import math
+from typing import ClassVar
 
 from pycellin.classes.data import Data
 from pycellin.classes.exceptions import UpdateRequiredError
@@ -93,17 +94,18 @@ class Time(NodeLocalPropCalculator):
     ----------
     property : Property
         Property instance containing the time property metadata.
-    base_time_prop : str
-        Name of the base time property to use for time calculation.
+    time_prop : str
+        Identifier of the cell lineage node property holding the time
+        of the cells that the new time property is computed from.
     factor : float
-        Factor to multiply the base time property by to get the new time property.
+        Factor to multiply `time_prop` by to get the new time property.
     force_recompute : bool
         If True, forces the recomputation of the time property even if it already
         exists in the lineage graph. Defaults to False.
 
     Warnings
     --------
-    As a general rule, do not use 'timepoint' as the base time property if the
+    As a general rule, do not use 'timepoint' as `time_prop` if the
     calculator is associated with the reference time property of the model. To convert
     the reference time property into another unit, use `Model.rescale_time()` instead.
     This is due to 'timepoint' being derived from the reference time property,
@@ -112,10 +114,14 @@ class Time(NodeLocalPropCalculator):
     lead to incorrect time values.
     """
 
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "time_prop": ("node", "CellLineage")
+    }
+
     def __init__(
         self,
         property: Property,
-        base_time_prop: str,
+        time_prop: str,
         factor: float,
         force_recompute: bool = False,
     ):
@@ -125,7 +131,7 @@ class Time(NodeLocalPropCalculator):
             raise ValueError(
                 "'factor' cannot be None nor zero for time property calculation."
             )
-        self.base_time_prop = base_time_prop
+        self.time_prop = time_prop
         self.factor = factor
         self.force_recompute = force_recompute
 
@@ -138,7 +144,7 @@ class Time(NodeLocalPropCalculator):
         lineage : CellLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -148,12 +154,12 @@ class Time(NodeLocalPropCalculator):
         if not self.force_recompute and self.prop.identifier in lineage.nodes[nid]:
             return lineage.nodes[nid][self.prop.identifier]
 
-        if self.base_time_prop not in lineage.nodes[nid]:
+        if self.time_prop not in lineage.nodes[nid]:
             raise KeyError(
-                f"Base time property '{self.base_time_prop}' not found "
-                f"in node {nid} of lineage {lineage.graph['lineage_ID']}."
+                f"Time property '{self.time_prop}' not found "
+                f"in node {nid} of lineage {lineage.graph['lineage_id']}."
             )
-        return lineage.nodes[nid][self.base_time_prop] * self.factor
+        return lineage.nodes[nid][self.time_prop] * self.factor
 
 
 def create_timepoint_property(provenance: str = "pycellin") -> Property:
@@ -212,13 +218,13 @@ class Timepoint(NodeLocalPropCalculator):
             root = lin.get_root()
             if isinstance(root, list):
                 raise UpdateRequiredError(
-                    f"Lineage {lin.graph['lineage_ID']} has several root nodes. "
+                    f"Lineage {lin.graph['lineage_id']} has several root nodes. "
                     f"Timepoint calculation requires a single root node."
                 )
             if self.ref_time_prop not in lin.nodes[root]:
                 raise ValueError(
                     f"Reference time property '{self.ref_time_prop}' not found in root node {root} "
-                    f"of lineage {lin.graph.get('lineage_ID', 'of unknown ID')}."
+                    f"of lineage {lin.graph.get('lineage_id', 'of unknown ID')}."
                 )
             time = lin.nodes[root][self.ref_time_prop]
             if min_time is None or time < min_time:
@@ -238,7 +244,7 @@ class Timepoint(NodeLocalPropCalculator):
         lineage : CellLineage
             Lineage graph containing the node of interest.
         nid : int
-            Node ID (cell_ID) of the cell of interest.
+            Node ID (cell_id) of the cell of interest.
 
         Returns
         -------
@@ -253,7 +259,7 @@ class Timepoint(NodeLocalPropCalculator):
         if self.ref_time_prop not in lineage.nodes[nid]:
             raise KeyError(
                 f"Reference time property '{self.ref_time_prop}' not found "
-                f"in node {nid} of lineage {lineage.graph['lineage_ID']}."
+                f"in node {nid} of lineage {lineage.graph['lineage_id']}."
             )
 
         time = lineage.nodes[nid][self.ref_time_prop]
@@ -263,7 +269,7 @@ class Timepoint(NodeLocalPropCalculator):
         if not math.isclose(timepoint, rounded_timepoint, rel_tol=1e-9, abs_tol=1e-9):
             raise ValueError(
                 f"Computed timepoint {timepoint} for node {nid} "
-                f"of lineage {lineage.graph['lineage_ID']} is not close to an integer. "
+                f"of lineage {lineage.graph['lineage_id']} is not close to an integer. "
                 f"Check time step and reference time values."
             )
 
@@ -272,9 +278,9 @@ class Timepoint(NodeLocalPropCalculator):
 
 def create_cell_id_property(provenance: str = "pycellin") -> Property:
     """
-    Create the declaration of the `cell_ID` core property.
+    Create the declaration of the `cell_id` core property.
 
-    `cell_ID` is the unique identifier of the cell within its lineage. It is a
+    `cell_id` is the unique identifier of the cell within its lineage. It is a
     node property of cell lineages, and is used as the node ID of `CellLineage`
     graphs.
 
@@ -287,10 +293,10 @@ def create_cell_id_property(provenance: str = "pycellin") -> Property:
     Returns
     -------
     Property
-        Declaration of the `cell_ID` property.
+        Declaration of the `cell_id` property.
     """
     return Property(
-        identifier="cell_ID",
+        identifier="cell_id",
         name="Cell ID",
         description="Unique identifier of the cell",
         provenance=provenance,
@@ -302,9 +308,9 @@ def create_cell_id_property(provenance: str = "pycellin") -> Property:
 
 def create_lineage_id_property(provenance: str = "pycellin") -> Property:
     """
-    Create the declaration of the `lineage_ID` core property.
+    Create the declaration of the `lineage_id` core property.
 
-    `lineage_ID` is the unique identifier of the lineage. It is both a node and
+    `lineage_id` is the unique identifier of the lineage. It is both a node and
     a lineage property, and is defined on cell and cycle lineages alike.
 
     Parameters
@@ -316,10 +322,10 @@ def create_lineage_id_property(provenance: str = "pycellin") -> Property:
     Returns
     -------
     Property
-        Declaration of the `lineage_ID` property.
+        Declaration of the `lineage_id` property.
     """
     return Property(
-        identifier="lineage_ID",
+        identifier="lineage_id",
         name="Lineage ID",
         description="Unique identifier of the lineage",
         provenance=provenance,
@@ -489,9 +495,9 @@ def _create_generic_lineage_coord_property() -> Property:
 
 def create_cycle_id_property(provenance: str = "pycellin") -> Property:
     """
-    Create the declaration of the `cycle_ID` core property.
+    Create the declaration of the `cycle_id` core property.
 
-    `cycle_ID` is the unique identifier of the cell cycle, i.e. the cell_ID of
+    `cycle_id` is the unique identifier of the cell cycle, i.e. the cell_id of
     its last cell. It is a node property of cycle lineages, and is used as the
     node ID of `CycleLineage` graphs.
 
@@ -504,13 +510,13 @@ def create_cycle_id_property(provenance: str = "pycellin") -> Property:
     Returns
     -------
     Property
-        Declaration of the `cycle_ID` property.
+        Declaration of the `cycle_id` property.
     """
     return Property(
-        identifier="cycle_ID",
+        identifier="cycle_id",
         name="Cycle ID",
         description=(
-            "Unique identifier of the cell cycle, i.e. cell_ID of the last cell in the cell cycle"
+            "Unique identifier of the cell cycle, i.e. cell_id of the last cell in the cell cycle"
         ),
         provenance=provenance,
         prop_type="node",
@@ -523,7 +529,7 @@ def create_cells_property(provenance: str = "pycellin") -> Property:
     """
     Create the declaration of the `cells` core property.
 
-    `cells` holds the cell_IDs of the cells of the cell cycle, in chronological
+    `cells` holds the cell_ids of the cells of the cell cycle, in chronological
     order. It is a node property of cycle lineages.
 
     Parameters
@@ -540,11 +546,70 @@ def create_cells_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cells",
         name="Cells",
-        description="cell_IDs of the cells in the cell cycle, in chronological order",
+        description="cell_ids of the cells in the cell cycle, in chronological order",
         provenance=provenance,
         prop_type="node",
         lin_type="CycleLineage",
         dtype="list[int]",
+    )
+
+
+def create_first_cell_property(provenance: str = "pycellin") -> Property:
+    """
+    Create the declaration of the `first_cell` core property.
+
+    `first_cell` is the cell_id of the first cell of the cell cycle. It is a node
+    property of cycle lineages.
+
+    Parameters
+    ----------
+    provenance : str, optional
+        Origin of the property, e.g. the name of the format it was loaded from.
+        "pycellin" by default.
+
+    Returns
+    -------
+    Property
+        Declaration of the `first_cell` property.
+    """
+    return Property(
+        identifier="first_cell",
+        name="First cell",
+        description="cell_id of the first cell in the cell cycle",
+        provenance=provenance,
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="int",
+    )
+
+
+def create_last_cell_property(provenance: str = "pycellin") -> Property:
+    """
+    Create the declaration of the `last_cell` core property.
+
+    `last_cell` is the cell_id of the last cell of the cell cycle. It has the same
+    value as `cycle_id`, but says what this value is. It is a node property of
+    cycle lineages.
+
+    Parameters
+    ----------
+    provenance : str, optional
+        Origin of the property, e.g. the name of the format it was loaded from.
+        "pycellin" by default.
+
+    Returns
+    -------
+    Property
+        Declaration of the `last_cell` property.
+    """
+    return Property(
+        identifier="last_cell",
+        name="Last cell",
+        description="cell_id of the last cell in the cell cycle, i.e. its cycle_id",
+        provenance=provenance,
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="int",
     )
 
 
@@ -603,6 +668,74 @@ def create_cycle_duration_property(
         identifier="cycle_duration",
         name="Cycle duration",
         description="Duration of the cell cycle, regardless of gaps",
+        provenance=provenance,
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=time_unit,
+    )
+
+
+def create_cycle_start_time_property(
+    time_unit: str | None, provenance: str = "pycellin"
+) -> Property:
+    """
+    Create the declaration of the `cycle_start_time` core property.
+
+    `cycle_start_time` is the time of the first cell of the cell cycle, expressed
+    in `time_unit`. It is a node property of cycle lineages.
+
+    Parameters
+    ----------
+    time_unit : str or None
+        Unit of the time, e.g. "min".
+    provenance : str, optional
+        Origin of the property, e.g. the name of the format it was loaded from.
+        "pycellin" by default.
+
+    Returns
+    -------
+    Property
+        Declaration of the `cycle_start_time` property.
+    """
+    return Property(
+        identifier="cycle_start_time",
+        name="Cycle start time",
+        description="Time of the first cell in the cell cycle",
+        provenance=provenance,
+        prop_type="node",
+        lin_type="CycleLineage",
+        dtype="float",
+        unit=time_unit,
+    )
+
+
+def create_cycle_end_time_property(
+    time_unit: str | None, provenance: str = "pycellin"
+) -> Property:
+    """
+    Create the declaration of the `cycle_end_time` core property.
+
+    `cycle_end_time` is the time of the last cell of the cell cycle, expressed in
+    `time_unit`. It is a node property of cycle lineages.
+
+    Parameters
+    ----------
+    time_unit : str or None
+        Unit of the time, e.g. "min".
+    provenance : str, optional
+        Origin of the property, e.g. the name of the format it was loaded from.
+        "pycellin" by default.
+
+    Returns
+    -------
+    Property
+        Declaration of the `cycle_end_time` property.
+    """
+    return Property(
+        identifier="cycle_end_time",
+        name="Cycle end time",
+        description="Time of the last cell in the cell cycle",
         provenance=provenance,
         prop_type="node",
         lin_type="CycleLineage",

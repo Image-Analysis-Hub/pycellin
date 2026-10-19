@@ -27,9 +27,9 @@ class FusionError(LineageStructureError):
 
     Parameters
     ----------
-    node_ID : int
+    node_id : int
         The ID of the node where the fusion event was detected.
-    lineage_ID : int, optional
+    lineage_id : int, optional
         The ID of the lineage where the fusion event was detected.
         None by default.
     message : str, optional
@@ -38,17 +38,17 @@ class FusionError(LineageStructureError):
 
     def __init__(
         self,
-        node_ID: int,
-        lineage_ID: int | None = None,
+        node_id: int,
+        lineage_id: int | None = None,
         message: str | None = None,
     ):
-        self.node_ID = node_ID
-        self.lineage_ID = lineage_ID
+        self.node_id = node_id
+        self.lineage_id = lineage_id
         if message is None:
-            if lineage_ID is None:
-                message = f"Node {node_ID} has more than one parent node."
+            if lineage_id is None:
+                message = f"Node {node_id} has more than one parent node."
             else:
-                message = f"Node {node_ID} in lineage {lineage_ID} has more than one parent node."
+                message = f"Node {node_id} in lineage {lineage_id} has more than one parent node."
         super().__init__(message)
 
 
@@ -65,10 +65,10 @@ class TimeFlowError(LineageStructureError):
         The ID of the source node.
     target_nid : int
         The ID of the target node.
-    source_lineage_ID : int, optional
+    source_lineage_id : int, optional
         The ID of the lineage of the source node.
         None by default.
-    target_lineage_ID : int, optional
+    target_lineage_id : int, optional
         The ID of the lineage of the target node.
         None by default.
     message : str, optional
@@ -79,20 +79,20 @@ class TimeFlowError(LineageStructureError):
         self,
         source_nid: int,
         target_nid: int,
-        source_lineage_ID: int | None = None,
-        target_lineage_ID: int | None = None,
+        source_lineage_id: int | None = None,
+        target_lineage_id: int | None = None,
         message: str | None = None,
     ):
         self.source_nid = source_nid
-        self.source_lineage_ID = source_lineage_ID
+        self.source_lineage_id = source_lineage_id
         self.target_nid = target_nid
-        self.target_lineage_ID = target_lineage_ID
+        self.target_lineage_id = target_lineage_id
         if message is None:
             txt_source_lin = (
-                "" if source_lineage_ID is None else f" in lineage {source_lineage_ID}"
+                "" if source_lineage_id is None else f" in lineage {source_lineage_id}"
             )
             txt_target_lin = (
-                "" if target_lineage_ID is None else f" in lineage {target_lineage_ID}"
+                "" if target_lineage_id is None else f" in lineage {target_lineage_id}"
             )
             message = (
                 f"Node {target_nid}{txt_target_lin} "
@@ -151,7 +151,7 @@ class MissingPropertyError(KeyError):
     nid : int, optional
         The ID of the node where the property is missing. None when the property
         is missing from the model rather than from a specific node.
-    lineage_ID : int, optional
+    lineage_id : int, optional
         The ID of the lineage where the property is missing.
     message : str, optional
         Custom error message. If not provided, a default message is displayed.
@@ -161,15 +161,19 @@ class MissingPropertyError(KeyError):
         self,
         prop_name: str,
         nid: int | None = None,
-        lineage_ID: int | None = None,
+        lineage_id: int | None = None,
         message: str | None = None,
     ):
         self.prop_name = prop_name
         self.nid = nid
-        self.lineage_ID = lineage_ID
+        self.lineage_id = lineage_id
         if message is None:
             node_txt = f" for node {nid}" if nid is not None else ""
-            lin_txt = f" in lineage {lineage_ID}" if lineage_ID is not None else ""
+            lin_txt = f" in lineage {lineage_id}" if lineage_id is not None else ""
             message = f"Required property '{prop_name}' is missing{node_txt}{lin_txt}."
         self.message = message
         super().__init__(message)
+
+    def __str__(self) -> str:
+        # KeyError.__str__() returns the repr of the message, i.e. in quotes.
+        return self.message
