@@ -340,6 +340,9 @@ class Model:
         (which is a special property that should always be protected)
         - updates the time step and time unit of the model based on the new
         reference time property
+        - sets the unit of the "cycle_duration", "cycle_start_time" and "cycle_end_time"
+        properties, if declared, to the unit of the new reference time property, since
+        their values are computed from it at the next `update()`
         - updates the timepoint calculator property to use the new reference time property
 
         Parameters
@@ -368,6 +371,7 @@ class Model:
 
         self.set_time_step()
         self.model_metadata.time_unit = node_props[prop_id].unit
+        self._set_cycle_time_units(node_props[prop_id].unit)
 
         calc = Timepoint(
             property=create_timepoint_property(),
@@ -602,15 +606,10 @@ class Model:
         self._multiply_prop_values(time_prop, PropertyType.NODE, factor)
         if time_unit is not None:
             self.model_metadata.time_unit = time_unit
-            for prop_id in (
-                time_prop,
-                "cycle_duration",
-                "cycle_start_time",
-                "cycle_end_time",
-            ):
-                prop = self.props_metadata.props.get(prop_id)
-                if prop is not None:
-                    prop.unit = time_unit
+            prop = self.props_metadata.props.get(time_prop)
+            if prop is not None:
+                prop.unit = time_unit
+            self._set_cycle_time_units(time_unit)
 
         time_step = self.model_metadata.time_step
         if time_step is not None:
@@ -716,6 +715,24 @@ class Model:
 
         if self.data.cell_data:
             self.prepare_full_data_update()
+
+    def _set_cycle_time_units(self, time_unit: str | None) -> None:
+        """
+        Set the unit of the cycle properties computed from the reference time property.
+
+        The values of "cycle_duration", "cycle_start_time" and "cycle_end_time" are
+        computed from the reference time property, so they share its unit. The
+        properties that are not declared, e.g. before `add_cycle_data()`, are skipped.
+
+        Parameters
+        ----------
+        time_unit : str | None
+            The unit of the reference time property.
+        """
+        for prop_id in ("cycle_duration", "cycle_start_time", "cycle_end_time"):
+            prop = self.props_metadata.props.get(prop_id)
+            if prop is not None:
+                prop.unit = time_unit
 
     def _multiply_prop_values(
         self,

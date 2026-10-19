@@ -18,6 +18,7 @@ from pycellin.custom_types import PropertyType
 from pycellin.properties.core import (
     Time,
     create_cell_coord_property,
+    create_frame_property,
     create_lineage_coord_property,
     create_link_coord_property,
     create_time_property,
@@ -785,6 +786,66 @@ class TestRescaleTime:
         frame_time_model._updater.register_calculator(calc)
         with pytest.warns(UserWarning, match="has a calculator"):
             frame_time_model.rescale_time(5)
+
+
+@pytest.fixture()
+def two_times_model():
+    """
+    Create a model with a dividing lineage and two time properties: "time" in
+    minutes, the reference time property, and "frame".
+
+    Cell cycles (ID = last cell): 2 (cells 1-2) divides into 4 (cell 4) and 5
+    (cells 3 and 5).
+    """
+    lin = CellLineage(lid=1)
+    for cell_id, frame in [(1, 0), (2, 1), (3, 2), (4, 2), (5, 3)]:
+        lin.add_node(cell_id, cell_id=cell_id, frame=frame, time=5 * frame)
+    for source, target in [(1, 2), (2, 3), (2, 4), (3, 5)]:
+        lin.add_edge(source, target)
+
+    props = {
+        "time": create_time_property(unit="min"),
+        "frame": create_frame_property(),
+    }
+    return Model(
+        model_metadata={"time_step": 5, "time_unit": "min"},
+        props_metadata=PropsMetadata(props=props),
+        data=Data({1: lin}),
+        reference_time_property="time",
+    )
+
+
+class TestSetReferenceTimeProperty:
+    """Test cases for Model.set_reference_time_property() method."""
+
+    def test_cycle_duration_in_new_reference(self, two_times_model):
+        two_times_model.add_cycle_data()
+        two_times_model.set_reference_time_property("frame")
+        two_times_model.update()
+        cycle_lin = two_times_model.data.cycle_data[1]
+        assert dict(cycle_lin.nodes(data="cycle_duration")) == {2: 1, 4: 0, 5: 1}
+        assert two_times_model.get_property("cycle_duration").unit == "frame"
+
+    def test_cycle_start_time_in_new_reference(self, two_times_model):
+        two_times_model.add_cycle_data()
+        two_times_model.set_reference_time_property("frame")
+        two_times_model.update()
+        cycle_lin = two_times_model.data.cycle_data[1]
+        assert dict(cycle_lin.nodes(data="cycle_start_time")) == {2: 0, 4: 2, 5: 2}
+        assert two_times_model.get_property("cycle_start_time").unit == "frame"
+
+    def test_cycle_end_time_in_new_reference(self, two_times_model):
+        two_times_model.add_cycle_data()
+        two_times_model.set_reference_time_property("frame")
+        two_times_model.update()
+        cycle_lin = two_times_model.data.cycle_data[1]
+        assert dict(cycle_lin.nodes(data="cycle_end_time")) == {2: 1, 4: 2, 5: 3}
+        assert two_times_model.get_property("cycle_end_time").unit == "frame"
+
+    def test_without_cycle_data(self, two_times_model):
+        two_times_model.set_reference_time_property("frame")
+        assert two_times_model.get_time_unit() == "frame"
+        assert two_times_model.get_property("cycle_duration") is None
 
 
 @pytest.fixture()

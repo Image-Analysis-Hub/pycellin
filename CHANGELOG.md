@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 5d2b4e2, plus the uncommitted changes that add the first_cell and last_cell properties. Update from there with: git log 5d2b4e2..dev -->
+<!-- Planned v0.6.0. Covers commits up to 5bbf36b, plus the uncommitted change that fixes the unit of the cycle time properties after set_reference_time_property(). Update from there with: git log 5bbf36b..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -110,6 +110,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 ### Fixed
 
 - **Model:** changing the time step with `set_time_step()` corrupted the `timepoint` values
+- **Model:** after `set_reference_time_property()`, `cycle_duration` kept the unit of the previous reference time property, although its values are computed from the new one
 - **Model:** `add_lineage()` failed with `with_CycleLineage=True` or with a lineage that had no lineage ID, and ignored its `lid` argument when given a lineage
 - **Model:** `add_lineage()` silently replaced a lineage that already had the same ID. It now raises `ValueError`
 - **Model:** `to_cell_dataframe()`, `to_link_dataframe()`, `to_cycle_dataframe()` and `to_lineage_dataframe()` raised a pandas `FutureWarning` when a numeric property was None everywhere in a lineage. With no lineage to export, they now raise a `ValueError` that says so
