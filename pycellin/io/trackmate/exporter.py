@@ -359,6 +359,10 @@ def _write_FeatureDeclarations(
     edge features, and track features. But they are all processed
     in the same way.
 
+    Only the properties of cell lineages are declared, since TrackMate has no
+    cycle lineages. Cycle properties are declared once propagated to the cell
+    lineages, which makes them `Lineage` properties.
+
     Parameters
     ----------
     xf : ET.xmlfile
@@ -389,6 +393,8 @@ def _write_FeatureDeclarations(
                         raise ValueError(f"Unknown feature type: {f_type}")
                 first_feat_written = False
                 for prop in props.values():
+                    if prop.lin_type == "CycleLineage":
+                        continue  # no values on spots, edges or tracks
                     trackmate_feat = _convert_prop_to_feat(prop)
                     if trackmate_feat:
                         if first_feat_written:
@@ -1350,7 +1356,8 @@ def export_TrackMate_XML(
     propagate_cycle_props : bool, optional
         If True, cycle properties will be propagated to cell lineages before export.
         Useful if you want to export the cycle properties to TrackMate
-        and have them accessible in the tracks. Default is False.
+        and have them accessible in the tracks. Default is False: cycle properties
+        are not exported, since TrackMate has no cycle lineages.
 
     Returns
     -------

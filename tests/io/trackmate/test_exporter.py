@@ -2,22 +2,27 @@
 
 """Unit test for TrackMate XML file exporter."""
 
+import io
 import logging
 
 import pytest
+from lxml import etree as ET
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
-from pycellin.properties.core import (
-    create_cell_coord_property,
-    create_cell_id_property,
-    create_lineage_id_property,
-    create_timepoint_property,
-)
 from pycellin.io.trackmate.exporter import (
     _relabel_nodes,
     _remove_non_numeric_props,
     _transform_name,
     _value_to_str,
+    _write_FeatureDeclarations,
+    export_TrackMate_XML,
+)
+from pycellin.io.trackmate.loader import load_TrackMate_XML
+from pycellin.properties.core import (
+    create_cell_coord_property,
+    create_cell_id_property,
+    create_lineage_id_property,
+    create_timepoint_property,
 )
 
 # Fixtures ####################################################################
@@ -104,6 +109,15 @@ def model_non_unique_ids(simple_model):
     simple_model.props_metadata._add_prop(cell_name_prop)
 
     return simple_model
+
+
+@pytest.fixture
+def model_with_cycle_data(model_unique_ids):
+    """Create a model with cycle lineages and their mother_cycle property."""
+    model_unique_ids.add_cycle_data()
+    model_unique_ids.add_mother_cycle()
+    model_unique_ids.update()
+    return model_unique_ids
 
 
 @pytest.fixture
@@ -442,3 +456,87 @@ class TestRelabelNodes:
                     assert lin.nodes[node]["cell_name"] == f"ID{node}"
                 else:
                     assert lin.nodes[node]["cell_name"] == f"Cell{inv_mapping[node]}"
+
+
+class TestWriteFeatureDeclarations:
+    """Test cases for _write_FeatureDeclarations function."""
+
+    @staticmethod
+    def _get_declared_features(model):
+        """Write the declarations of `model` and return the features of each part."""
+        buffer = io.BytesIO()
+        with ET.xmlfile(buffer, encoding="utf-8") as xf:
+            with xf.element("Model"):
+                _write_FeatureDeclarations(xf, model)
+        declarations = ET.fromstring(buffer.getvalue()).find("FeatureDeclarations")
+        return {
+            part.tag: [feat.get("feature") for feat in part] for part in declarations
+        }
+
+    def test_cell_lineage_properties_are_declared(self, model_with_cycle_data):
+        """Test that the properties of cell lineages are declared."""
+        features = self._get_declared_features(model_with_cycle_data)
+
+        assert {"cell_x", "cell_y", "lineage_id"} <= set(features["SpotFeatures"])
+        assert "lineage_id" in features["TrackFeatures"]
+
+    def test_cycle_lineage_properties_are_not_declared(self, model_with_cycle_data):
+        """Test that cycle properties are not declared, as cells have no values."""
+        for prop_type in ["edge", "lineage"]:
+            model_with_cycle_data.props_metadata._add_prop(
+                Property(
+                    identifier=f"cycle_{prop_type}_prop",
+                    name=f"Cycle {prop_type} property",
+                    description=f"Cycle {prop_type} property",
+                    provenance="test",
+                    prop_type=prop_type,
+                    lin_type="CycleLineage",
+                    dtype="float",
+                )
+            )
+
+        features = self._get_declared_features(model_with_cycle_data)
+
+        declared = {feat for part in features.values() for feat in part}
+        cycle_props = {
+            "cycle_id",
+            "level",
+            "cycle_duration",
+            "mother_cycle",
+            "cycle_edge_prop",
+            "cycle_lineage_prop",
+        }
+        assert not declared & cycle_props
+
+    def test_propagated_cycle_properties_are_declared(self, model_with_cycle_data):
+        """Test that cycle properties propagated to cell lineages are declared."""
+        model_with_cycle_data.propagate_cycle_properties(["level"])
+
+        features = self._get_declared_features(model_with_cycle_data)
+
+        assert "level" in features["SpotFeatures"]
+        assert "cycle_duration" not in features["SpotFeatures"]
+
+
+class TestExportTrackMateXML:
+    """Test cases for export_TrackMate_XML function."""
+
+    def test_cycle_data_can_be_computed_after_reload(
+        self, tmp_path, model_with_cycle_data
+    ):
+        """Test that cycle properties can be computed again on the reloaded model."""
+        xml_path = tmp_path / "model.xml"
+        export_TrackMate_XML(
+            model_with_cycle_data, xml_path, units={"space": "pixel", "time": "frame"}
+        )
+        # The model has no POSITION_T, the default reference time property.
+        model = load_TrackMate_XML(xml_path, ref_time_prop="FRAME")
+
+        model.add_cycle_data()
+        model.add_mother_cycle()
+        model.update()
+
+        assert model.get_property("level").lin_type == "CycleLineage"
+        assert model.get_property("mother_cycle").lin_type == "CycleLineage"
+        pairs = model.to_cycle_pair_dataframe("mother_cycle")
+        assert sorted(zip(pairs["cycle_id_1"], pairs["cycle_id_2"])) == [(5, 4), (8, 4)]
