@@ -15,8 +15,6 @@ from pycellin.classes import (
     PropsMetadata,
 )
 from pycellin.custom_types import PropertyType
-from pycellin.properties.core import create_cell_id_property
-from pycellin.properties.morphology import create_cell_contour_property
 from pycellin.io.utils import (
     _split_graph_into_lineages,
     _update_lineage_prop_key,
@@ -24,6 +22,8 @@ from pycellin.io.utils import (
     _update_node_prop_key,
     check_fusions,
 )
+from pycellin.properties.core import create_cell_id_property, create_time_property
+from pycellin.properties.morphology import create_cell_contour_property
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +105,9 @@ def _dimension_to_unit(trackmate_prop, units) -> str | None:
     """
     Convert the dimension of a property to its unit.
 
+    FRAME has no dimension in TrackMate, but its unit is "frame", so that it can
+    be the reference time property of a model.
+
     Parameters
     ----------
     trackmate_prop : dict[str, str]
@@ -117,6 +120,8 @@ def _dimension_to_unit(trackmate_prop, units) -> str | None:
     str | None
         The unit of the property.
     """
+    if trackmate_prop["feature"] == "FRAME":
+        return "frame"
     dimension = trackmate_prop["dimension"]
     match dimension:
         case "NONE" | "QUALITY" | "VISIBILITY" | "RATIO" | "INTENSITY" | "COST":
@@ -1016,6 +1021,56 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
     raise KeyError("The 'ImageData' element is not found in the settings.")
 
 
+def _add_missing_position_t(
+    data: Data,
+    props_md: PropsMetadata,
+    frame_interval: float,
+    time_unit: str,
+) -> None:
+    """
+    Compute POSITION_T from FRAME when no spot of the file has it.
+
+    TrackMate requires FRAME but not POSITION_T, which it defines as FRAME times
+    the frame interval of the image. Files not written by TrackMate can lack it.
+
+    Parameters
+    ----------
+    data : Data
+        The data of the model, whose cells get POSITION_T.
+    props_md : PropsMetadata
+        The properties metadata, where POSITION_T is declared if it is not already.
+    frame_interval : float
+        The time interval between two frames of the image, in `time_unit`.
+    time_unit : str
+        The temporal unit of the TrackMate model.
+
+    Warns
+    -----
+    If POSITION_T is computed, since its values don't come from the file.
+    """
+    cells = [
+        cell for lin in data.cell_data.values() for _, cell in lin.nodes(data=True)
+    ]
+    if not cells or any("POSITION_T" in cell for cell in cells):
+        return
+
+    for cell in cells:
+        cell["POSITION_T"] = cell["FRAME"] * frame_interval
+    if not props_md._has_prop("POSITION_T"):
+        props_md._add_prop(
+            create_time_property(
+                unit=time_unit,
+                custom_identifier="POSITION_T",
+                custom_name="T",
+                custom_description="Time of the detection, computed from FRAME",
+            )
+        )
+    logger.warning(
+        "No spot of the file has 'POSITION_T': it is computed from 'FRAME' and the "
+        f"frame interval of the image ({frame_interval} {time_unit})."
+    )
+
+
 def load_TrackMate_XML(
     xml_path: str | Path,
     ref_time_prop: str = "POSITION_T",
@@ -1038,10 +1093,13 @@ def load_TrackMate_XML(
     xml_path : str | Path
         Path of the XML file to process.
     ref_time_prop : str, optional
-        Name of the property that contains the time information of the model. Must
-        match the time unit and timestep of the TrackMate model (i.e. the properties
-        of the image on which TrackMate was applied). "POSITION_T" by default as it is
-        what TrackMate uses.
+        Name of the property that contains the time information of the model.
+        "POSITION_T" by default as it is what TrackMate uses. TrackMate doesn't
+        require it, so if no spot has it, it is computed from "FRAME" and the frame
+        interval of the image, with a warning. "FRAME" counts the time in frames,
+        with a time step of 1. Any other property must match the time unit and
+        timestep of the TrackMate model (i.e. the properties of the image on which
+        TrackMate was applied).
     keep_all_spots : bool, optional
         True to keep the spots filtered out in TrackMate, False otherwise.
         False by default.
@@ -1062,12 +1120,22 @@ def load_TrackMate_XML(
         xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
     )
     pixel_size = _get_pixel_size(dict_tags["Settings"])
+    time_step: int | float
+    if ref_time_prop == "FRAME":
+        # Frames are counted one by one, whatever the frame interval of the image.
+        time_unit = "frame"
+        time_step = 1
+    else:
+        time_unit = units["timeunits"]
+        time_step = _get_time_step(dict_tags["Settings"])  # the frame interval
+        if ref_time_prop == "POSITION_T":
+            _add_missing_position_t(data, props_md, time_step, time_unit)
     metadata: dict[str, Any] = {}
     metadata["reference_time_property"] = ref_time_prop
     # Dimensions info.
     metadata["space_unit"] = units["spatialunits"]
-    metadata["time_unit"] = units["timeunits"]
-    metadata["time_step"] = _get_time_step(dict_tags["Settings"])
+    metadata["time_unit"] = time_unit
+    metadata["time_step"] = time_step
     metadata["pixel_width"] = pixel_size.get("pixel_width")
     metadata["pixel_height"] = pixel_size.get("pixel_height")
     metadata["pixel_depth"] = pixel_size.get("pixel_depth")

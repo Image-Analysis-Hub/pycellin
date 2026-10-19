@@ -529,8 +529,7 @@ class TestExportTrackMateXML:
         export_TrackMate_XML(
             model_with_cycle_data, xml_path, units={"space": "pixel", "time": "frame"}
         )
-        # The model has no POSITION_T, the default reference time property.
-        model = load_TrackMate_XML(xml_path, ref_time_prop="FRAME")
+        model = load_TrackMate_XML(xml_path)
 
         model.add_cycle_data()
         model.add_mother_cycle()

@@ -13,7 +13,7 @@ import pytest
 from lxml import etree as ET
 
 import pycellin.io.trackmate.loader as tml
-from pycellin.classes import CellLineage, Property, PropsMetadata
+from pycellin.classes import CellLineage, Data, Property, PropsMetadata
 from pycellin.custom_types import PropertyType
 from pycellin.utils import is_equal
 
@@ -49,6 +49,7 @@ def prop_FRAME():
         prop_type="node",
         lin_type="CellLineage",
         dtype="int",
+        unit="frame",
     )
 
 
@@ -158,6 +159,30 @@ def track_props(
     }
 
 
+@pytest.fixture(scope="module")
+def celegans_xml_path():
+    """Path of the C. elegans sample, whose frame interval is 2 min."""
+    return (
+        Path(__file__).resolve().parents[3]
+        / "sample_data"
+        / "Celegans-5pc-17timepoints.xml"
+    )
+
+
+@pytest.fixture
+def celegans_without_position_t(tmp_path, celegans_xml_path):
+    """Copy the C. elegans sample without POSITION_T, as TrackMate allows."""
+    tree = ET.parse(str(celegans_xml_path))
+    for spot in tree.iter("Spot"):
+        del spot.attrib["POSITION_T"]
+    features = [f for f in tree.iter("Feature") if f.get("feature") == "POSITION_T"]
+    for feature in features:
+        feature.getparent().remove(feature)
+    xml_path = tmp_path / "Celegans_without_POSITION_T.xml"
+    tree.write(str(xml_path), xml_declaration=True, encoding="UTF-8")
+    return xml_path
+
+
 # _get_units ##################################################################
 
 
@@ -245,6 +270,23 @@ def test_get_props_dict_other_tag():
     props = tml._get_props_dict(it, element)
     spot_features = [{"feature": "QUALITY", "isint": "false"}]
     assert props == spot_features
+
+
+# _dimension_to_unit ##########################################################
+
+
+class TestDimensionToUnit:
+    """Test cases for _dimension_to_unit function."""
+
+    def test_frame_is_in_frames(self, units: dict[str, str]):
+        """Test that FRAME, which has no dimension in TrackMate, is in frames."""
+        trackmate_feature = {"feature": "FRAME", "dimension": "NONE"}
+        assert tml._dimension_to_unit(trackmate_feature, units) == "frame"
+
+    def test_other_dimensionless_feature_has_no_unit(self, units: dict[str, str]):
+        """Test that other features without dimension have no unit."""
+        trackmate_feature = {"feature": "VISIBILITY", "dimension": "NONE"}
+        assert tml._dimension_to_unit(trackmate_feature, units) is None
 
 
 # _convert_and_add_prop ####################################################
@@ -1275,3 +1317,109 @@ def test_get_pixel_size_missing_image_data():
         KeyError, match="The 'ImageData' element is not found in the settings."
     ):
         tml._get_pixel_size(settings)
+
+
+# _add_missing_position_t #####################################################
+
+
+class TestAddMissingPositionT:
+    """Test cases for _add_missing_position_t function."""
+
+    def test_computed_from_frame(self):
+        """Test that POSITION_T is FRAME times the frame interval, in the time unit."""
+        lin = CellLineage()
+        lin.add_node(1, FRAME=0)
+        lin.add_node(2, FRAME=3)
+        props_md = PropsMetadata()
+
+        tml._add_missing_position_t(Data({0: lin}), props_md, 2.5, "min")
+
+        assert lin.nodes[1]["POSITION_T"] == 0.0
+        assert lin.nodes[2]["POSITION_T"] == 7.5
+        prop = props_md.props["POSITION_T"]
+        assert (prop.dtype, prop.unit, prop.provenance) == ("float", "min", "pycellin")
+
+    def test_warns_when_computed(self, caplog):
+        """Test that a warning says POSITION_T is not from the file."""
+        lin = CellLineage()
+        lin.add_node(1, FRAME=0)
+
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.loader"):
+            tml._add_missing_position_t(Data({0: lin}), PropsMetadata(), 2.5, "min")
+
+        assert len(caplog.records) == 1
+        assert "computed from 'FRAME'" in caplog.records[0].message
+        assert "(2.5 min)" in caplog.records[0].message
+
+    def test_values_from_the_file_are_kept(self, caplog):
+        """Test that nothing changes when the spots have POSITION_T."""
+        lin = CellLineage()
+        lin.add_node(1, FRAME=0, POSITION_T=0.0)
+        lin.add_node(2, FRAME=3, POSITION_T=9.0)
+        props_md = PropsMetadata()
+
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.loader"):
+            tml._add_missing_position_t(Data({0: lin}), props_md, 2.5, "min")
+
+        assert lin.nodes[2]["POSITION_T"] == 9.0
+        assert not props_md._has_prop("POSITION_T")
+        assert not caplog.records
+
+
+# load_TrackMate_XML ##########################################################
+
+
+class TestLoadTrackMateXML:
+    """Test cases for load_TrackMate_XML function."""
+
+    @staticmethod
+    def _get_cells(model):
+        """Return the attributes of the cells of `model`, by lineage and cell IDs."""
+        return {
+            (lin_id, cell_id): cell
+            for lin_id, lin in model.data.cell_data.items()
+            for cell_id, cell in lin.nodes(data=True)
+        }
+
+    def test_missing_position_t_is_computed(
+        self, celegans_xml_path, celegans_without_position_t
+    ):
+        """Test that a file without POSITION_T gives the same times as with it."""
+        expected = self._get_cells(tml.load_TrackMate_XML(celegans_xml_path))
+
+        model = tml.load_TrackMate_XML(celegans_without_position_t)
+
+        obtained = self._get_cells(model)
+        assert obtained.keys() == expected.keys()
+        for key, cell in obtained.items():
+            assert cell["POSITION_T"] == expected[key]["POSITION_T"]
+            assert cell["timepoint"] == expected[key]["timepoint"]
+        assert model.model_metadata.time_step == 2.0
+        assert model.get_property("POSITION_T").unit == "min"
+
+    def test_frame_as_reference_time_property(self, celegans_xml_path):
+        """Test that FRAME counts the time in frames, whatever the frame interval."""
+        expected = self._get_cells(tml.load_TrackMate_XML(celegans_xml_path))
+
+        model = tml.load_TrackMate_XML(celegans_xml_path, ref_time_prop="FRAME")
+
+        assert model.model_metadata.time_step == 1
+        assert model.model_metadata.time_unit == "frame"
+        assert model.get_property("FRAME").unit == "frame"
+        obtained = self._get_cells(model)
+        for key, cell in obtained.items():
+            assert cell["timepoint"] == expected[key]["timepoint"]
+
+    def test_frame_as_reference_needs_no_frame_interval(
+        self, tmp_path, celegans_xml_path
+    ):
+        """Test that FRAME as reference doesn't read the frame interval of the image."""
+        tree = ET.parse(str(celegans_xml_path))
+        for image_data in tree.iter("ImageData"):
+            del image_data.attrib["timeinterval"]
+        xml_path = tmp_path / "Celegans_without_timeinterval.xml"
+        tree.write(str(xml_path), xml_declaration=True, encoding="UTF-8")
+
+        model = tml.load_TrackMate_XML(xml_path, ref_time_prop="FRAME")
+
+        assert model.model_metadata.time_step == 1
