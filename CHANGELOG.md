@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 5bbf36b, plus the uncommitted change that fixes the unit of the cycle time properties after set_reference_time_property(). Update from there with: git log 5bbf36b..dev -->
+<!-- Planned v0.6.0. Covers commits up to 5bbf36b, plus the uncommitted changes that fix the unit of the cycle time properties after set_reference_time_property() and give lineage_duration the unit and dtype of its time property (no entry: lineage_duration is new in 0.6.0). Update from there with: git log 5bbf36b..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 

@@ -4213,11 +4213,15 @@ class Model:
             If `time_prop` is not a node property of cell lineages.
         """
         time_prop = time_prop or self.reference_time_property
+        # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
+        time = self._get_input_prop(time_prop)
 
         prop = topo.create_lineage_duration_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
+            dtype=time.dtype if time else "float",
+            unit=time.unit if time else None,
         )
 
         self.add_custom_property(topo.LineageDuration(prop, time_prop=time_prop))

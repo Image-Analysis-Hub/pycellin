@@ -403,6 +403,8 @@ def create_lineage_duration_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
+    dtype: str = "float",
+    unit: str | None = None,
 ) -> Property:
     return Property(
         identifier=custom_identifier or "lineage_duration",
@@ -413,7 +415,8 @@ def create_lineage_duration_property(
         provenance="pycellin",
         prop_type="lineage",
         lin_type="CellLineage",
-        dtype="float",
+        dtype=dtype,
+        unit=unit,
     )
 
 

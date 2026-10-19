@@ -1699,3 +1699,37 @@ class TestAddCousinCycles:
         with pytest.raises(ValueError, match="at least 1 or None, got 0"):
             input_props_model.add_cousin_cycles(degree=0)
         assert input_props_model.get_property("cousin_cycles") is None
+
+
+class TestAddLineageDuration:
+    """Test cases for Model.add_lineage_duration() method."""
+
+    def test_default_time_prop_is_reference(self, two_times_model):
+        two_times_model.add_lineage_duration()
+        two_times_model.update()
+        assert two_times_model.data.cell_data[1].graph["lineage_duration"] == 15
+
+    def test_custom_time_prop(self, two_times_model):
+        two_times_model.add_lineage_duration(time_prop="frame")
+        two_times_model.update()
+        assert two_times_model.data.cell_data[1].graph["lineage_duration"] == 3
+
+    def test_dtype_and_unit_from_time_prop(self, two_times_model):
+        two_times_model.add_lineage_duration()
+        prop = two_times_model.get_property("lineage_duration")
+        assert (prop.dtype, prop.unit) == ("float", "min")
+
+    def test_dtype_and_unit_from_custom_time_prop(self, two_times_model):
+        two_times_model.add_lineage_duration(time_prop="frame")
+        prop = two_times_model.get_property("lineage_duration")
+        assert (prop.dtype, prop.unit) == ("int", "frame")
+
+    def test_missing_time_prop_raises(self, two_times_model):
+        with pytest.raises(MissingPropertyError, match="set 'time_prop'"):
+            two_times_model.add_lineage_duration(time_prop="unknown")
+
+    def test_property_object_time_prop_raises(self, two_times_model):
+        time_prop = two_times_model.get_property("time")
+        with pytest.raises(TypeError, match="Pass its identifier instead: 'time'"):
+            two_times_model.add_lineage_duration(time_prop=time_prop)
+        assert two_times_model.get_property("lineage_duration") is None
