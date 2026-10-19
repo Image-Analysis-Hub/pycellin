@@ -362,6 +362,40 @@ class TestAddCycleData:
         assert df["last_cell"].tolist() == df["cells"].str[-1].tolist()
         assert df["last_cell"].tolist() == df["cycle_id"].tolist()
 
+    def test_prop_declared_otherwise_with_values_raises(self, lineage_props_model):
+        model = lineage_props_model
+        # E.g. a cycle property propagated to cell lineages, loaded from a file.
+        model.props_metadata._add_prop(_create_test_property("level", "node"))
+        for _, cell in model.data.cell_data[1].nodes(data=True):
+            cell["level"] = 0
+        with pytest.raises(ValueError, match="calculator: 'level'") as exc_info:
+            model.add_cycle_data()
+        assert "model.remove_property()" in str(exc_info.value)
+        assert model.get_property("level").lin_type == "CellLineage"
+        assert not model.has_cycle_data()
+
+    def test_prop_declared_otherwise_with_calculator_raises(self, lineage_props_model):
+        # Not computed yet, so without values.
+        prop = _create_test_property("level", "node", dtype="list[int]")
+        lineage_props_model.add_custom_property(RootRelation(prop, []))
+        with pytest.raises(ValueError, match="calculator: 'level'"):
+            lineage_props_model.add_cycle_data()
+
+    def test_unused_prop_declared_otherwise_replaced(self, lineage_props_model):
+        model = lineage_props_model
+        # E.g. declared in a file without values.
+        model.props_metadata._add_prop(_create_test_property("level", "node"))
+        model.add_cycle_data()
+        assert model.get_property("level").lin_type == "CycleLineage"
+        assert "level" in model.props_metadata._get_protected_props()
+
+    def test_propagated_prop_kept(self, lineage_props_model):
+        model = lineage_props_model
+        model.add_cycle_data()
+        model.propagate_cycle_properties(["level"])
+        model.add_cycle_data()
+        assert model.get_property("level").lin_type == "Lineage"
+
 
 class TestToCycleDataframe:
     """Test cases for Model.to_cycle_dataframe() method."""
@@ -1126,6 +1160,40 @@ class TestAddCustomProperty:
         with pytest.raises(MissingPropertyError):
             input_props_model.add_custom_property(calc)
         assert input_props_model.get_property("cycle_mean_area") is None
+
+    def test_readding_replaces_declaration(self, two_times_model):
+        two_times_model.add_absolute_age()
+        with pytest.warns(UserWarning, match="Overwriting the old Property"):
+            two_times_model.add_absolute_age(time_prop="frame")
+        prop = two_times_model.get_property("absolute_age")
+        assert (prop.dtype, prop.unit) == ("int", "frame")
+
+    def test_prop_declared_otherwise_with_values_raises(self, input_props_model):
+        # E.g. a cycle property propagated to cell lineages, loaded from a file.
+        prop = _create_test_property("mother_cycle", "node", dtype="int")
+        input_props_model.props_metadata._add_prop(prop)
+        for _, cell in input_props_model.data.cell_data[1].nodes(data=True):
+            cell["mother_cycle"] = 2
+        with pytest.raises(ValueError, match="declared as a node property of cell"):
+            input_props_model.add_mother_cycle()
+        assert input_props_model.get_property("mother_cycle") is prop
+        assert "mother_cycle" not in input_props_model._updater._calculators
+
+    def test_unused_prop_declared_otherwise_replaced(self, input_props_model):
+        # E.g. declared in a file without values.
+        prop = _create_test_property("mother_cycle", "node", dtype="int")
+        input_props_model.props_metadata._add_prop(prop)
+        input_props_model.add_mother_cycle()
+        input_props_model.update()
+        assert input_props_model.get_property("mother_cycle").lin_type == "CycleLineage"
+        assert input_props_model.data.cycle_data[1].nodes[3]["mother_cycle"] == 2
+
+    def test_readding_propagated_prop_keeps_lineage_type(self, input_props_model):
+        input_props_model.add_mother_cycle()
+        input_props_model.propagate_cycle_properties(["mother_cycle"])
+        with pytest.warns(UserWarning, match="Overwriting the old Property"):
+            input_props_model.add_mother_cycle()
+        assert input_props_model.get_property("mother_cycle").lin_type == "Lineage"
 
 
 class TestAddCellArea:

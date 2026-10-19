@@ -539,3 +539,31 @@ class TestExportTrackMateXML:
         assert model.get_property("mother_cycle").lin_type == "CycleLineage"
         pairs = model.to_cycle_pair_dataframe("mother_cycle")
         assert sorted(zip(pairs["cycle_id_1"], pairs["cycle_id_2"])) == [(5, 4), (8, 4)]
+
+    def test_propagated_cycle_properties_must_be_removed_after_reload(
+        self, tmp_path, model_with_cycle_data
+    ):
+        """Test that cycle properties propagated in the file must be removed first."""
+        xml_path = tmp_path / "model.xml"
+        export_TrackMate_XML(
+            model_with_cycle_data,
+            xml_path,
+            units={"space": "pixel", "time": "frame"},
+            propagate_cycle_props=True,
+        )
+        model = load_TrackMate_XML(xml_path)
+        with pytest.raises(ValueError, match="remove them first"):
+            model.add_cycle_data()
+
+        cycle_props = model_with_cycle_data.get_cycle_lineage_properties(
+            include_Lineage_props=False
+        )
+        for prop_id in cycle_props:
+            if model.has_property(prop_id):
+                model.remove_property(prop_id)
+        model.add_cycle_data()
+        model.add_mother_cycle()
+        model.update()
+
+        pairs = model.to_cycle_pair_dataframe("mother_cycle")
+        assert sorted(zip(pairs["cycle_id_1"], pairs["cycle_id_2"])) == [(5, 4), (8, 4)]

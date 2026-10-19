@@ -2077,6 +2077,14 @@ class Model:
         and notify the updater that all data needs to be updated.
         To actually update the data, the user needs to call the update() method.
 
+        If the property is already declared with the same property type and lineage
+        type, e.g. added before with other arguments, its declaration and calculator
+        are replaced, with a warning. A cycle property propagated to cell lineages
+        stays declared as a `Lineage` property. If the property is declared with
+        another property type or lineage type, e.g. loaded from a file, the
+        declaration is replaced only if it is unused: not protected, without
+        calculator and without values in cell lineages.
+
         Parameters
         ----------
         calculator : PropertyCalculator
@@ -2094,16 +2102,126 @@ class Model:
         ValueError
             If a property read by the calculator does not have the property type
             or lineage type expected by the calculator.
+        ValueError
+            If the property is already declared with another property type or
+            lineage type, and this declaration is used.
+
+        Warns
+        -----
+        UserWarning
+            If the property is already declared with the same property type and
+            lineage type, since its declaration is replaced.
         """
-        if calculator.prop.lin_type == "CycleLineage" and not self.data.cycle_data:
+        prop = calculator.prop
+        if prop.lin_type == "CycleLineage" and not self.data.cycle_data:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with model.add_cycle_data()."
             )
         self._check_input_props(calculator)
-        self.props_metadata._add_prop(calculator.prop)
+        declared = self.get_property(prop.identifier)
+        if declared is not None:
+            if self._is_same_kind(declared, prop):
+                # A cycle property propagated to cell lineages stays declared on both.
+                prop.lin_type = declared.lin_type
+            elif self._is_unused_prop(prop.identifier):
+                self.props_metadata._remove_prop(prop.identifier)
+            else:
+                raise ValueError(
+                    f"Cannot add '{prop.identifier}' as a {self._describe_kind(prop)}: "
+                    f"it is already declared as a {self._describe_kind(declared)}, "
+                    "with values or a calculator. If it is a cycle property propagated "
+                    "to cell lineages, e.g. loaded from an exported file, remove it "
+                    "first with model.remove_property(). Otherwise, give the new "
+                    "property another identifier with the custom_identifier "
+                    "argument of the add_*() methods."
+                )
+        self.props_metadata._add_prop(prop, overwrite=True)
         self._updater.register_calculator(calculator)
         self.prepare_full_data_update()
+
+    @staticmethod
+    def _is_same_kind(declared: Property, prop: Property) -> bool:
+        """
+        Check whether a property is of the same kind as a declared one.
+
+        Both must have the same property type and lineage type. A declared `Lineage`
+        property, e.g. a cycle property propagated to cell lineages, is also of the
+        same kind as a cycle lineage property, since the updater computes `Lineage`
+        properties on cycle lineages.
+
+        Parameters
+        ----------
+        declared : Property
+            Property already declared in the model.
+        prop : Property
+            Property to compare with `declared`.
+
+        Returns
+        -------
+        bool
+            True if both properties are of the same kind, False otherwise.
+        """
+        if declared.prop_type != prop.prop_type:
+            return False
+        if declared.lin_type == "Lineage":
+            return prop.lin_type in ("CycleLineage", "Lineage")
+        return declared.lin_type == prop.lin_type
+
+    def _is_unused_prop(self, prop_id: str) -> bool:
+        """
+        Check whether a declared property is unused.
+
+        A property is unused when it is not protected, has no calculator and no cell
+        lineage holds a value for it, e.g. a property declared in a file but given
+        no values. Values in cycle lineages are not checked: cycle lineages are
+        rebuilt from the cell lineages, and only protected properties and properties
+        with a calculator get values again.
+
+        Parameters
+        ----------
+        prop_id : str
+            Identifier of the declared property.
+
+        Returns
+        -------
+        bool
+            True if the property is unused, False otherwise.
+        """
+        if prop_id in self.props_metadata._get_protected_props():
+            return False
+        if prop_id in self._updater._calculators:
+            return False
+        for lin in self.data.cell_data.values():
+            if prop_id in lin.graph:
+                return False
+            if any(prop_id in cell for _, cell in lin.nodes(data=True)):
+                return False
+            if any(prop_id in link for _, _, link in lin.edges(data=True)):
+                return False
+        return True
+
+    @staticmethod
+    def _describe_kind(prop: Property) -> str:
+        """
+        Describe the property type and lineage type of a property, for messages.
+
+        Parameters
+        ----------
+        prop : Property
+            Property to describe.
+
+        Returns
+        -------
+        str
+            Description of the property, e.g. "node property of cell lineages".
+        """
+        lineages = {
+            "CellLineage": "cell lineages",
+            "CycleLineage": "cycle lineages",
+            "Lineage": "cell and cycle lineages",
+        }
+        return f"{prop.prop_type} property of {lineages[prop.lin_type]}"
 
     def _check_input_props(self, calculator: PropertyCalculator) -> None:
         """
@@ -4968,10 +5086,18 @@ class Model:
         and add them to the model. It also adds the default properties
         associated with cycle lineages to the PropsMetadata.
 
+        These default properties may be declared already as other kinds of
+        properties, e.g. as cell lineage properties in a loaded file where cycle
+        properties were propagated to cell lineages. Such declarations are replaced
+        if they are unused: not protected, without calculator and without values in
+        cell lineages. Otherwise, remove them first with `remove_property()`.
+
         Raises
         ------
         ValueError
             If the time step of the model is not defined.
+            If a default property of cycle lineages is already declared as another
+            kind of property, and this declaration is used.
         """
         # if self._updater._update_required:
         #     txt = (
@@ -4992,6 +5118,28 @@ class Model:
                 "but is required for cycle lineage computation."
             )
         time_unit = self.model_metadata.time_unit
+        unused, used = [], []
+        for prop in self.props_metadata._create_cycle_lineage_props(time_unit):
+            declared = self.get_property(prop.identifier)
+            if declared is None or self._is_same_kind(declared, prop):
+                continue
+            if self._is_unused_prop(prop.identifier):
+                unused.append(prop.identifier)
+            else:
+                used.append(prop.identifier)
+        if used:
+            names = ", ".join(repr(prop_id) for prop_id in used)
+            raise ValueError(
+                "Cannot add the cycle lineages: these properties are already declared, "
+                "but not as node properties of cycle lineages, and have values or a "
+                f"calculator: {names}. If they are cycle properties propagated to cell "
+                "lineages, e.g. loaded from an exported file, remove them first with "
+                "model.remove_property(), as well as the other cycle properties "
+                "propagated there: add_cycle_data() and the add_*() methods compute "
+                "them again."
+            )
+        for prop_id in unused:
+            self.props_metadata._remove_prop(prop_id)
         self.data._add_cycle_lineages(time_prop, time_step)
         self.props_metadata._add_cycle_lineage_props(time_unit)
 

@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to c82e5e0, plus the uncommitted changes that make the TrackMate loader compute POSITION_T when the file has none, fix ref_time_prop="FRAME" and give FRAME the unit "frame". Update from there with: git log c82e5e0..dev -->
+<!-- Planned v0.6.0. Covers commits up to e2ac3a6, plus the uncommitted changes that make add_cycle_data() and add_custom_property() check properties already declared under the same identifier. Update from there with: git log e2ac3a6..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -116,6 +116,8 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** `add_lineage()` silently replaced a lineage that already had the same ID. It now raises `ValueError`
 - **Model:** `to_cell_dataframe()`, `to_link_dataframe()`, `to_cycle_dataframe()` and `to_lineage_dataframe()` raised a pandas `FutureWarning` when a numeric property was None everywhere in a lineage. With no lineage to export, they now raise a `ValueError` that says so
 - **Model:** the columns of `to_link_dataframe()` came in a different order in each Python session. They now keep the order in which the link properties were added
+- **Model:** `add_cycle_data()` silently kept the properties already declared under the identifiers of its cycle properties, e.g. cycle properties propagated to cell lineages in an exported file and loaded back, so pycellin treated them as cell lineage properties. Such a declaration is now replaced when unused (no values in cell lineages, no calculator), and `add_cycle_data()` raises `ValueError` otherwise, asking to remove it first with `remove_property()`
+- **Model:** adding a property already declared, e.g. calling an `add_*()` method again with other arguments, registered the new calculator but kept the first declaration. The declaration is now replaced too, with a warning. A property declared with another property type or lineage type is replaced only when unused, and raises `ValueError` otherwise
 - **Properties:** `turning_angle` (`angle` in 0.5.1), `absolute_age` and `relative_age` were recomputed for every lineage at each update, as their calculators were global instead of local
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells
 - **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning

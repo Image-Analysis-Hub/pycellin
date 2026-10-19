@@ -288,16 +288,22 @@ class PropsMetadata:
         for property in properties:
             self._add_prop(property, overwrite=overwrite)
 
-    def _add_cycle_lineage_props(self, time_unit: str | None) -> None:
+    @staticmethod
+    def _create_cycle_lineage_props(time_unit: str | None) -> list[Property]:
         """
-        Add the basic properties of cell cycle lineages.
+        Create the declarations of the basic properties of cell cycle lineages.
 
         Parameters
         ----------
         time_unit : str | None
             The unit of the time property (e.g. 'frame', 'minute', 'hour', etc.).
+
+        Returns
+        -------
+        list[Property]
+            The declarations of the basic properties of cell cycle lineages.
         """
-        props = [
+        return [
             create_cycle_id_property(),
             create_cells_property(),
             create_first_cell_property(),
@@ -308,7 +314,19 @@ class PropsMetadata:
             create_cycle_end_time_property(time_unit),
             create_level_property(),
         ]
-        for prop in props:
+
+    def _add_cycle_lineage_props(self, time_unit: str | None) -> None:
+        """
+        Add the basic properties of cell cycle lineages.
+
+        Properties already declared are left as they are.
+
+        Parameters
+        ----------
+        time_unit : str | None
+            The unit of the time property (e.g. 'frame', 'minute', 'hour', etc.).
+        """
+        for prop in self._create_cycle_lineage_props(time_unit):
             if prop.identifier not in self.props:
                 self._add_prop(prop)
                 self._protect_prop(prop.identifier)
