@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to e2ac3a6, plus the uncommitted changes that make add_cycle_data() and add_custom_property() check properties already declared under the same identifier. Update from there with: git log e2ac3a6..dev -->
+<!-- Planned v0.6.0. Covers commits up to f504e73, plus the uncommitted fix of to_cycle_pair_dataframe(unique_pairs=True) dropping a cell cycle listed by itself (no entry: the function is new in 0.6.0). Update from there with: git log f504e73..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 

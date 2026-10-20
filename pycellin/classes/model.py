@@ -6360,12 +6360,14 @@ class Model:
                 "compute it with model.update()."
             )
         if unique_pairs:
-            # Pairs listed from both sides keep the row with the lower ID first.
+            # Pairs listed from both sides keep the row with the lower ID first, and
+            # a cell cycle listed by itself keeps its row, which is its own reverse.
             listed = set(pairs)
             pairs = [
                 (lin_id, cycle_id, related_id)
                 for lin_id, cycle_id, related_id in pairs
-                if cycle_id < related_id or (lin_id, related_id, cycle_id) not in listed
+                if cycle_id <= related_id
+                or (lin_id, related_id, cycle_id) not in listed
             ]
 
         # The properties of both cell cycles, side by side.

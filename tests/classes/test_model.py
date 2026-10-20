@@ -542,6 +542,16 @@ class TestToCyclePairDataframe:
         pairs = list(zip(df["cycle_id_1"], df["cycle_id_2"]))
         assert pairs == [(5, 2), (6, 5), (7, 5), (8, 2), (9, 8), (10, 8)]
 
+    def test_unique_pairs_keep_cycle_listed_by_itself(self, relatives_model):
+        prop = root_relation_property()
+        relatives_model.add_custom_property(RootRelation(prop, [2, 5]))
+        relatives_model.update()
+        df = relatives_model.to_cycle_pair_dataframe(
+            "root_relation", props=[], unique_pairs=True
+        )
+        pairs = list(zip(df["cycle_id_1"], df["cycle_id_2"]))
+        assert pairs == [(2, 2), (2, 5)]
+
     def test_props_of_both_cycles(self, relatives_model):
         df = relatives_model.to_cycle_pair_dataframe(
             "mother_cycle", props=["cycle_length", "level"]
