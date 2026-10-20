@@ -10,10 +10,13 @@ import pytest
 
 from pycellin.classes import CellLineage, Data, Property
 from pycellin.properties.motion import (
+    CellDisplacement,
     CellSpeed,
     CycleMeanDisplacement,
     CycleMeanSpeed,
     CycleTotalDisplacement,
+    Straightness,
+    TurningAngle,
 )
 
 # Fixtures ####################################################################
@@ -62,6 +65,42 @@ def prop_cell_lin_edge():
     )
 
 
+@pytest.fixture
+def prop_cell_lin_node():
+    return Property(
+        identifier="test_property",
+        name="test property",
+        description="test property",
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="float",
+    )
+
+
+# CellDisplacement ############################################################
+
+
+class TestCellDisplacement:
+    def test_compute_3d(self, prop_cell_lin_edge):
+        lineage = CellLineage()
+        lineage.add_node(1, cell_x=0.0, cell_y=0.0, cell_z=0.0)
+        lineage.add_node(2, cell_x=1.0, cell_y=2.0, cell_z=2.0)
+        lineage.add_edge(1, 2)
+        calculator = CellDisplacement(prop_cell_lin_edge)
+        assert calculator.compute(lineage, (1, 2)) == 3.0
+
+    def test_compute_2d(self, prop_cell_lin_edge):
+        lineage = CellLineage()
+        lineage.add_node(1, cell_x=0.0, cell_y=0.0)
+        lineage.add_node(2, cell_x=3.0, cell_y=4.0)
+        lineage.add_edge(1, 2)
+        calculator = CellDisplacement(
+            prop_cell_lin_edge, coord_props=("cell_x", "cell_y")
+        )
+        assert calculator.compute(lineage, (1, 2)) == 5.0
+
+
 # CellSpeed ###################################################################
 
 
@@ -72,6 +111,16 @@ class TestCellSpeed:
         lineage.add_node(2, frame=2, cell_x=3.0, cell_y=4.0, cell_z=0.0)
         lineage.add_edge(1, 2)
         calculator = CellSpeed(prop_cell_lin_edge, time_prop="frame")
+        assert calculator.compute(lineage, (1, 2)) == 2.5
+
+    def test_compute_2d(self, prop_cell_lin_edge):
+        lineage = CellLineage()
+        lineage.add_node(1, frame=0, cell_x=0.0, cell_y=0.0)
+        lineage.add_node(2, frame=2, cell_x=3.0, cell_y=4.0)
+        lineage.add_edge(1, 2)
+        calculator = CellSpeed(
+            prop_cell_lin_edge, time_prop="frame", coord_props=("cell_x", "cell_y")
+        )
         assert calculator.compute(lineage, (1, 2)) == 2.5
 
     def test_compute_ignores_cell_displacement(self, prop_cell_lin_edge):
@@ -146,3 +195,57 @@ class TestCycleMeanSpeed:
             warnings.simplefilter("error")
             result = calculator.compute(data, data.cycle_data[1], nid=4)
         assert math.isnan(result)
+
+
+# Straightness ################################################################
+
+
+class TestStraightness:
+    def test_compute_3d(self, data, prop_cycle_lin):
+        # Cycle 3 goes from (0, 0, 0) to (2, 1, 2), then to (4, 0, 0): 6 traveled,
+        # 4 from start to end.
+        lineage = data.cell_data[1]
+        for cell, position in {1: (0, 0, 0), 2: (2, 1, 2), 3: (4, 0, 0)}.items():
+            lineage.nodes[cell].update(zip(("cell_x", "cell_y", "cell_z"), position))
+        calculator = Straightness(prop_cycle_lin)
+        result = calculator.compute(data, data.cycle_data[1], nid=3)
+        assert result == pytest.approx(4 / 6)
+
+    def test_compute_2d(self, data, prop_cycle_lin):
+        # Cycle 3 goes from (0, 0) to (3, 4), then to (6, 0): 10 traveled, 6 from
+        # start to end.
+        lineage = data.cell_data[1]
+        for cell, position in {1: (0, 0), 2: (3, 4), 3: (6, 0)}.items():
+            lineage.nodes[cell].update(zip(("cell_x", "cell_y"), position))
+        calculator = Straightness(prop_cycle_lin, coord_props=("cell_x", "cell_y"))
+        result = calculator.compute(data, data.cycle_data[1], nid=3)
+        assert result == pytest.approx(0.6)
+
+
+# TurningAngle ################################################################
+
+
+class TestTurningAngle:
+    def test_compute_3d(self, prop_cell_lin_node):
+        lineage = CellLineage()
+        lineage.add_node(1, cell_x=0.0, cell_y=0.0, cell_z=0.0)
+        lineage.add_node(2, cell_x=1.0, cell_y=0.0, cell_z=0.0)
+        lineage.add_node(3, cell_x=1.0, cell_y=0.0, cell_z=1.0)
+        lineage.add_edges_from([(1, 2), (2, 3)])
+        calculator = TurningAngle(prop_cell_lin_node)
+        assert calculator.compute(lineage, 2) == pytest.approx(math.pi / 2)
+
+    def test_compute_2d(self, prop_cell_lin_node):
+        lineage = CellLineage()
+        lineage.add_node(1, cell_x=0.0, cell_y=0.0)
+        lineage.add_node(2, cell_x=1.0, cell_y=0.0)
+        lineage.add_node(3, cell_x=0.0, cell_y=1.0)
+        lineage.add_edges_from([(1, 2), (2, 3)])
+        calculator = TurningAngle(
+            prop_cell_lin_node, unit="degree", coord_props=("cell_x", "cell_y")
+        )
+        # No NumPy warning about 2D vectors in np.cross().
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = calculator.compute(lineage, 2)
+        assert result == pytest.approx(135.0)

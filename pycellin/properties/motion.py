@@ -25,6 +25,33 @@ from pycellin.properties.utils import (
     _nansum,
 )
 
+# Cell coordinates of 3D data. 2D data has no "cell_z".
+_CELL_COORD_PROPS = ("cell_x", "cell_y", "cell_z")
+
+
+def _get_position(
+    lineage: CellLineage, cell_id: int, coord_props: tuple[str, ...]
+) -> list[float]:
+    """
+    Return the position of a cell.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        Lineage graph containing the cell.
+    cell_id : int
+        ID of the cell.
+    coord_props : tuple[str, ...]
+        Identifiers of the node properties holding the coordinates of the cells,
+        one per axis.
+
+    Returns
+    -------
+    list[float]
+        The coordinates of the cell, in the order of `coord_props`.
+    """
+    return [lineage.nodes[cell_id][prop] for prop in coord_props]
+
 
 def create_cell_displacement_property(
     custom_identifier: str | None = None,
@@ -53,6 +80,22 @@ class CellDisplacement(EdgeLocalPropCalculator):
     of the cell at the two consecutive detections.
     """
 
+    def __init__(
+        self, property: Property, coord_props: tuple[str, ...] = _CELL_COORD_PROPS
+    ):
+        """
+        Parameters
+        ----------
+        property : Property
+            Property object to which the calculator is associated.
+        coord_props : tuple[str, ...], optional
+            Identifiers of the cell lineage node properties holding the coordinates
+            of the cells, one per axis. Default is ("cell_x", "cell_y", "cell_z"),
+            for 3D data.
+        """
+        super().__init__(property)
+        self.coord_props = coord_props
+
     def compute(  # type: ignore[override]
         self, lineage: CellLineage, edge: tuple[int, int]
     ) -> float:
@@ -71,19 +114,8 @@ class CellDisplacement(EdgeLocalPropCalculator):
         float
             The cell displacement.
         """
-        pos1 = []
-        pos2 = []
-        for axis in ["x", "y", "z"]:
-            pos1.append(lineage.nodes[edge[0]][f"cell_{axis}"])
-            pos2.append(lineage.nodes[edge[1]][f"cell_{axis}"])
-            # pos1 = lineage.nodes[edge[0]][f"link_{axis}"]
-            # pos2 = lineage.nodes[edge[1]][f"link_{axis}"]
-        #     if i == 0:
-        #         displacement = (pos1 - pos2) ** 2
-        #     else:
-        #         displacement += (pos1 - pos2) ** 2
-        # pos1 = lineage.nodes[edge[0]]["cell_location"]
-        # pos2 = lineage.nodes[edge[1]]["cell_location"]
+        pos1 = _get_position(lineage, edge[0], self.coord_props)
+        pos2 = _get_position(lineage, edge[1], self.coord_props)
         return math.dist(pos1, pos2)
 
 
@@ -283,7 +315,12 @@ class CellSpeed(EdgeLocalPropCalculator):
         "time_prop": ("node", "CellLineage")
     }
 
-    def __init__(self, property: Property, time_prop: str):
+    def __init__(
+        self,
+        property: Property,
+        time_prop: str,
+        coord_props: tuple[str, ...] = _CELL_COORD_PROPS,
+    ):
         """
         Parameters
         ----------
@@ -292,9 +329,14 @@ class CellSpeed(EdgeLocalPropCalculator):
         time_prop : str
             Identifier of the cell lineage node property holding the time
             of the cells (e.g. "frame", "POSITION_T").
+        coord_props : tuple[str, ...], optional
+            Identifiers of the cell lineage node properties holding the coordinates
+            of the cells, one per axis. Default is ("cell_x", "cell_y", "cell_z"),
+            for 3D data.
         """
         super().__init__(property)
         self.time_prop = time_prop
+        self.coord_props = coord_props
 
     def compute(  # type: ignore[override]
         self, lineage: CellLineage, edge: tuple[int, int]
@@ -316,11 +358,8 @@ class CellSpeed(EdgeLocalPropCalculator):
         """
         time1 = lineage.nodes[edge[0]][self.time_prop]
         time2 = lineage.nodes[edge[1]][self.time_prop]
-        pos1 = []
-        pos2 = []
-        for axis in ["x", "y", "z"]:
-            pos1.append(lineage.nodes[edge[0]][f"cell_{axis}"])
-            pos2.append(lineage.nodes[edge[1]][f"cell_{axis}"])
+        pos1 = _get_position(lineage, edge[0], self.coord_props)
+        pos2 = _get_position(lineage, edge[1], self.coord_props)
         return math.dist(pos1, pos2) / (time2 - time1)
 
 
@@ -432,7 +471,12 @@ class Straightness(NodeGlobalPropCalculator):
     while a trajectory with many turns has a straightness close to 0.
     """
 
-    def __init__(self, property: Property, include_incoming_edge: bool = False):
+    def __init__(
+        self,
+        property: Property,
+        include_incoming_edge: bool = False,
+        coord_props: tuple[str, ...] = _CELL_COORD_PROPS,
+    ):
         """
         Parameters
         ----------
@@ -441,9 +485,14 @@ class Straightness(NodeGlobalPropCalculator):
         include_incoming_edge : bool, optional
             Whether to include the distance between the first cell and its predecessor.
             Default is False.
+        coord_props : tuple[str, ...], optional
+            Identifiers of the cell lineage node properties holding the coordinates
+            of the cells, one per axis. Default is ("cell_x", "cell_y", "cell_z"),
+            for 3D data.
         """
         super().__init__(property)
         self.include_incoming_edge = include_incoming_edge
+        self.coord_props = coord_props
 
     def compute(  # type: ignore[override]
         self, data: Data, cycle_lin: CycleLineage, nid: int
@@ -471,16 +520,8 @@ class Straightness(NodeGlobalPropCalculator):
         cells = cycle_lin.nodes[nid]["cells"]
         distances = [
             math.dist(
-                (
-                    cell_lin.nodes[n1]["cell_x"],
-                    cell_lin.nodes[n1]["cell_y"],
-                    cell_lin.nodes[n1]["cell_z"],
-                ),
-                (
-                    cell_lin.nodes[n2]["cell_x"],
-                    cell_lin.nodes[n2]["cell_y"],
-                    cell_lin.nodes[n2]["cell_z"],
-                ),
+                _get_position(cell_lin, n1, self.coord_props),
+                _get_position(cell_lin, n2, self.coord_props),
             )
             for (n1, n2) in pairwise(cells)
         ]
@@ -490,16 +531,8 @@ class Straightness(NodeGlobalPropCalculator):
             preds = list(cell_lin.predecessors(first_cell))
             if len(preds) == 1:
                 dist = math.dist(
-                    (
-                        cell_lin.nodes[preds[0]]["cell_x"],
-                        cell_lin.nodes[preds[0]]["cell_y"],
-                        cell_lin.nodes[preds[0]]["cell_z"],
-                    ),
-                    (
-                        cell_lin.nodes[first_cell]["cell_x"],
-                        cell_lin.nodes[first_cell]["cell_y"],
-                        cell_lin.nodes[first_cell]["cell_z"],
-                    ),
+                    _get_position(cell_lin, preds[0], self.coord_props),
+                    _get_position(cell_lin, first_cell, self.coord_props),
                 )
                 distances.append(dist)
             elif len(preds) > 1:
@@ -508,16 +541,8 @@ class Straightness(NodeGlobalPropCalculator):
         if sum(distances) == 0:
             return math.nan
 
-        first_cell_loc = (
-            cell_lin.nodes[cells[0]]["cell_x"],
-            cell_lin.nodes[cells[0]]["cell_y"],
-            cell_lin.nodes[cells[0]]["cell_z"],
-        )
-        last_cell_loc = (
-            cell_lin.nodes[cells[-1]]["cell_x"],
-            cell_lin.nodes[cells[-1]]["cell_y"],
-            cell_lin.nodes[cells[-1]]["cell_z"],
-        )
+        first_cell_loc = _get_position(cell_lin, cells[0], self.coord_props)
+        last_cell_loc = _get_position(cell_lin, cells[-1], self.coord_props)
         return math.dist(first_cell_loc, last_cell_loc) / sum(distances)
 
 
@@ -550,7 +575,12 @@ class TurningAngle(NodeLocalPropCalculator):
         - the displacement vector from itself to its successor
     """
 
-    def __init__(self, property: Property, unit: Literal["radian", "degree"] = "radian"):
+    def __init__(
+        self,
+        property: Property,
+        unit: Literal["radian", "degree"] = "radian",
+        coord_props: tuple[str, ...] = _CELL_COORD_PROPS,
+    ):
         """
         Parameters
         ----------
@@ -558,9 +588,14 @@ class TurningAngle(NodeLocalPropCalculator):
             Property object to which the calculator is associated.
         unit : {'radian', 'degree'}, optional
             Unit in which the angle is computed. Default is 'radian'.
+        coord_props : tuple[str, ...], optional
+            Identifiers of the cell lineage node properties holding the coordinates
+            of the cells, one per axis. Default is ("cell_x", "cell_y", "cell_z"),
+            for 3D data.
         """
         super().__init__(property)
         self.unit = unit
+        self.coord_props = coord_props
 
     def compute(  # type: ignore[override]
         self, lineage: CellLineage, nid: int
@@ -595,23 +630,14 @@ class TurningAngle(NodeLocalPropCalculator):
             raise FusionError(nid, lineage.graph["lineage_id"])
 
         # Compute the angle between the incoming and outgoing edges.
-        in_coords = (
-            lineage.nodes[predecessors[0]]["cell_x"],
-            lineage.nodes[predecessors[0]]["cell_y"],
-            lineage.nodes[predecessors[0]]["cell_z"],
-        )
-        nid_coords = (
-            lineage.nodes[nid]["cell_x"],
-            lineage.nodes[nid]["cell_y"],
-            lineage.nodes[nid]["cell_z"],
-        )
-        out_coords = (
-            lineage.nodes[successors[0]]["cell_x"],
-            lineage.nodes[successors[0]]["cell_y"],
-            lineage.nodes[successors[0]]["cell_z"],
-        )
-        vector_in = np.array(nid_coords) - np.array(in_coords)
-        vector_out = np.array(out_coords) - np.array(nid_coords)
+        in_coords = np.array(_get_position(lineage, predecessors[0], self.coord_props))
+        nid_coords = np.array(_get_position(lineage, nid, self.coord_props))
+        out_coords = np.array(_get_position(lineage, successors[0], self.coord_props))
+        vector_in = nid_coords - in_coords
+        vector_out = out_coords - nid_coords
+        # np.cross() needs 3D vectors: 2D ones get a null z.
+        vector_in = np.pad(vector_in, (0, 3 - vector_in.size))
+        vector_out = np.pad(vector_out, (0, 3 - vector_out.size))
         cross_prod = np.cross(vector_in, vector_out)
         dot_prod = np.dot(vector_in, vector_out)
         angle = math.atan2(np.linalg.norm(cross_prod), dot_prod)

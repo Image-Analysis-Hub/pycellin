@@ -2445,7 +2445,9 @@ class Model:
         Add the turning angle property to the model.
 
         The turning angle is defined as the angle between the vectors representing
-        the displacement of the cell at two consecutive detections.
+        the displacement of the cell at two consecutive detections. The positions
+        are given by `cell_x` and `cell_y`, and by `cell_z` when it is declared at
+        the time of this call, as for 3D data.
 
         Parameters
         ----------
@@ -2466,7 +2468,9 @@ class Model:
             custom_description=custom_description,
             unit=unit,
         )
-        self.add_custom_property(motion.TurningAngle(prop, unit))
+        self.add_custom_property(
+            motion.TurningAngle(prop, unit, self._get_coord_props())
+        )
 
     def add_cycle_mean_displacement(
         self,
@@ -3039,7 +3043,9 @@ class Model:
         Add the cell displacement property to the model.
 
         The cell displacement is defined as the Euclidean distance between the positions
-        of the cell at two consecutive detections.
+        of the cell at two consecutive detections. The positions are given by `cell_x`
+        and `cell_y`, and by `cell_z` when it is declared at the time of this call, as
+        for 3D data.
 
         Parameters
         ----------
@@ -3058,7 +3064,9 @@ class Model:
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-        self.add_custom_property(motion.CellDisplacement(prop))
+        self.add_custom_property(
+            motion.CellDisplacement(prop, self._get_coord_props())
+        )
 
     def add_cell_polygon(
         self,
@@ -3879,6 +3887,20 @@ class Model:
                 )
         return tifffile.imread(label_img_path).astype(np.uint32)
 
+    def _get_coord_props(self) -> tuple[str, ...]:
+        """
+        Return the identifiers of the cell coordinates of the model.
+
+        Returns
+        -------
+        tuple[str, ...]
+            ("cell_x", "cell_y", "cell_z") when `cell_z` is declared, as for 3D data,
+            else ("cell_x", "cell_y").
+        """
+        if self.props_metadata._has_prop("cell_z"):
+            return ("cell_x", "cell_y", "cell_z")
+        return ("cell_x", "cell_y")
+
     def _get_xy_pixel_size(self) -> float:
         """
         Return the pixel size in x and y, which must be the same.
@@ -3942,7 +3964,9 @@ class Model:
         The cell speed is defined as the displacement of the cell between two
         consecutive detections divided by the time elapsed between these two detections.
         By default, it is computed using the reference time property
-        of the model, but a custom time property can be specified.
+        of the model, but a custom time property can be specified. The positions
+        are given by `cell_x` and `cell_y`, and by `cell_z` when it is declared at
+        the time of this call, as for 3D data.
 
         Parameters
         ----------
@@ -3975,7 +3999,11 @@ class Model:
             custom_description=custom_description,
             unit=f"{space_unit}/{time_unit}" if time_unit else None,
         )
-        self.add_custom_property(motion.CellSpeed(prop, time_prop=time_prop))
+        self.add_custom_property(
+            motion.CellSpeed(
+                prop, time_prop=time_prop, coord_props=self._get_coord_props()
+            )
+        )
 
     def add_rod_width(
         self,
@@ -4854,6 +4882,8 @@ class Model:
         the start and end cells of the cell cycle to the total distance traveled.
         Straightness is a value between 0 and 1. A straight line has a straightness
         of 1, while a trajectory with many turns has a straightness close to 0.
+        The positions are given by `cell_x` and `cell_y`, and by `cell_z` when it is
+        declared at the time of this call, as for 3D data.
 
         Parameters
         ----------
@@ -4874,7 +4904,9 @@ class Model:
             custom_name=custom_name,
             custom_description=custom_description,
         )
-        self.add_custom_property(motion.Straightness(prop, include_incoming_edge))
+        self.add_custom_property(
+            motion.Straightness(prop, include_incoming_edge, self._get_coord_props())
+        )
 
     def _get_prop_method(self, prop_identifier: str) -> Callable:
         """

@@ -2048,6 +2048,64 @@ class TestAddCellSpeed:
             input_props_model.add_cell_speed(time_prop=time_prop)
         assert input_props_model.get_property("cell_speed") is None
 
+    def test_2d_model(self, contour_model):
+        contour_model.add_cell_speed()
+        contour_model.update()
+        lin = contour_model.data.cell_data[1]
+        assert lin.edges[1, 2]["cell_speed"] == 1.0
+        assert lin.edges[2, 4]["cell_speed"] == 2.0
+
+
+class TestGetCoordProps:
+    """Test cases for Model._get_coord_props() method."""
+
+    def test_2d_model(self, contour_model):
+        assert contour_model._get_coord_props() == ("cell_x", "cell_y")
+
+    def test_3d_model(self, pixel_space_model):
+        assert pixel_space_model._get_coord_props() == ("cell_x", "cell_y", "cell_z")
+
+
+class TestAddCellDisplacement:
+    """Test cases for Model.add_cell_displacement() method."""
+
+    def test_2d_model(self, contour_model):
+        contour_model.add_cell_displacement()
+        contour_model.update()
+        lin = contour_model.data.cell_data[1]
+        assert lin.edges[1, 2]["cell_displacement"] == 1.0
+        assert lin.edges[2, 4]["cell_displacement"] == 2.0
+
+    def test_3d_model(self, pixel_space_model):
+        pixel_space_model.add_cell_displacement()
+        pixel_space_model.update()
+        lin = pixel_space_model.data.cell_data[1]
+        # From (10, 20, 2) to (30, 40, 4).
+        assert lin.edges[1, 2]["cell_displacement"] == pytest.approx(804**0.5)
+
+
+class TestAddTurningAngle:
+    """Test cases for Model.add_turning_angle() method."""
+
+    def test_2d_model(self, contour_model):
+        contour_model.add_turning_angle()
+        contour_model.update()
+        calculator = contour_model._updater._calculators["turning_angle"]
+        assert calculator.coord_props == ("cell_x", "cell_y")
+        # Cell 2 divides, and the other cells lack an incoming or outgoing link.
+        lin = contour_model.data.cell_data[1]
+        assert all(np.isnan(angle) for _, angle in lin.nodes(data="turning_angle"))
+
+
+class TestAddStraightness:
+    """Test cases for Model.add_straightness() method."""
+
+    def test_2d_model(self, contour_model):
+        contour_model.add_straightness()
+        contour_model.update()
+        # Cycle 2 goes straight from cell 1, at x = 1, to cell 2, at x = 2.
+        assert contour_model.data.cycle_data[1].nodes[2]["straightness"] == 1.0
+
 
 class TestAddMotherCycle:
     """Test cases for Model.add_mother_cycle() method."""

@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to a402b50, plus the uncommitted fixes of the CTC loader with label images (labels_path). Update from there with: git log a402b50..dev -->
+<!-- Planned v0.6.0. Covers commits up to fcc95d9, plus the uncommitted fix of the motion properties on 2D models. Update from there with: git log fcc95d9..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -127,6 +127,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** `turning_angle` (`angle` in 0.5.1), `absolute_age` and `relative_age` were recomputed for every lineage at each update, as their calculators were global instead of local
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells
 - **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning
+- **Properties:** `cell_displacement`, `cell_speed`, `turning_angle` (`angle` in 0.5.1) and `straightness`, and the cycle properties computed from them, failed with `KeyError` on 2D models without `cell_z`, e.g. loaded from a trackpy DataFrame, CTC label images or a GEFF file. They now use `cell_x` and `cell_y`, plus `cell_z` when it is declared
 - **TrackMate:** `turning_angle` (`angle` in 0.5.1) in degrees was exported as a TrackMate angle, which TrackMate reads as radians
 - **TrackMate:** with `keep_all_spots=True`, spots without a track got lineage IDs already used by tracks, so some lineages were silently lost. Their lineage ID is now -cell ID
 - **TrackMate:** the exporter wrote missing values (None) as the string 'None', which TrackMate can't read. They are now written as NaN, which the loader reads back as None for integer properties instead of failing
