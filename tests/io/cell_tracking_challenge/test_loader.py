@@ -4,6 +4,7 @@
 
 import logging
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -308,7 +309,7 @@ class TestLoadCTCFile:
             model = load_CTC_file(ctc_path, labels_path=labels_path)
 
         # The warning points to the call of load_CTC_file().
-        assert record[0].filename == __file__
+        assert Path(record[0].filename).samefile(__file__)
         assert model.get_space_unit() == "pixel"
         cells = _get_cells(model)
         assert (cells[0]["cell_x"], cells[0]["cell_y"]) == pytest.approx((6.0, 2.5))
