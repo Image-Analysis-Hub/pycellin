@@ -611,3 +611,16 @@ class TestExportTrackMateXML:
         model = load_TrackMate_XML(xml_path, keep_all_tracks=True)
         assert model.data.cell_data[0].graph["FilteredTrack"] is False
         assert model.data.cell_data[lid].graph["FilteredTrack"] is True
+
+    def test_reloaded_cells_without_contour_exported_again(
+        self, tmp_path, simple_model
+    ):
+        """Test that cells without contour, loaded back with a None contour, can be
+        exported again."""
+        units = {"space": "pixel", "time": "frame"}
+        export_TrackMate_XML(simple_model, tmp_path / "first.xml", units=units)
+        model = load_TrackMate_XML(tmp_path / "first.xml")
+        export_TrackMate_XML(model, tmp_path / "second.xml", units=units)
+        reloaded = load_TrackMate_XML(tmp_path / "second.xml")
+        contours = dict(reloaded.data.cell_data[0].nodes(data="cell_contour"))
+        assert contours == {1: None, 2: None}

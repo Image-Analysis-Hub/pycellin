@@ -473,16 +473,18 @@ def _create_Spot(
         for k, v in lineage.nodes[node].items()
         if k not in exluded_keys
     }
-    if "cell_contour" in lineage.nodes[node]:
-        n_attr["ROI_N_POINTS"] = str(len(lineage.nodes[node]["cell_contour"]))
+    # A cell without contour may have None, e.g. when loaded from a TrackMate file.
+    contour = lineage.nodes[node].get("cell_contour")
+    if contour is not None:
+        n_attr["ROI_N_POINTS"] = str(len(contour))
         # The text of a Spot is the coordinates of its ROI points, in a flattened list.
-        coords = [item for pt in lineage.nodes[node]["cell_contour"] for item in pt]
+        coords = [item for pt in contour for item in pt]
     else:
         # No segmentation mask, so we set the ROI_N_POINTS to 0.
         n_attr["ROI_N_POINTS"] = "0"
 
     el_node = ET.Element("Spot", n_attr)
-    if "cell_contour" in lineage.nodes[node]:
+    if contour is not None:
         el_node.text = " ".join(map(str, coords))
     return el_node
 
