@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
+from pycellin.classes.exceptions import UpdateRequiredError
 from pycellin.properties.core import (
     create_cell_coord_property,
     create_lineage_id_property,
@@ -15,6 +16,7 @@ from pycellin.properties.core import (
 )
 from pycellin.io.utils import (
     _add_lineage_props,
+    _check_up_to_date,
     _get_int_ids,
     _get_props_from_data,
     _graph_has_node_prop,
@@ -317,6 +319,20 @@ def model_with_lineage_id_config():
 
 
 # Test classes ###############################################################
+
+
+class TestCheckUpToDate:
+    """Test cases for _check_up_to_date function."""
+
+    def test_model_requiring_update_raises(self, model):
+        """Test that a model requiring an update raises UpdateRequiredError."""
+        model.prepare_full_data_update()
+        with pytest.raises(UpdateRequiredError, match="before exporting"):
+            _check_up_to_date(model)
+
+    def test_up_to_date_model_passes(self, model):
+        """Test that a model not requiring an update passes."""
+        _check_up_to_date(model)
 
 
 class TestAddLineagesProps:

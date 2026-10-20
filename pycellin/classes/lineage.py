@@ -1458,7 +1458,8 @@ class CellLineage(Lineage):
         Returns
         -------
         CellLineage
-            The new lineage created from the split.
+            The new lineage created from the split. It has no lineage properties,
+            not even a lineage ID.
 
         Raises
         ------
@@ -1477,6 +1478,9 @@ class CellLineage(Lineage):
         else:
             raise ValueError("The split parameter must be 'upstream' or 'downstream'.")
         new_lineage = self.subgraph(nodes).copy()  # new_lineage has same type as self
+        # The lineage properties of this lineage describe it whole, e.g. its number
+        # of cells, or identify it, e.g. its name.
+        new_lineage.graph.clear()
         self.remove_nodes_from(nodes)
         return new_lineage  # type: ignore
 

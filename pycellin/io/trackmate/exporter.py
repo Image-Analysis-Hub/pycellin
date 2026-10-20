@@ -25,6 +25,7 @@ from pycellin.classes.property import Property
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.custom_types import PropertyType
 from pycellin.io.utils import (
+    _check_up_to_date,
     _identify_frame_prop,
     _update_node_prop_key,
 )
@@ -613,7 +614,9 @@ def _write_FilteredTracks(
     with xf.element("FilteredTracks"):
         if has_FilteredTracks:
             for lineage in data.values():
-                if lineage.graph["FilteredTrack"]:
+                # A lineage without the flag, e.g. added or split off in pycellin,
+                # is visible.
+                if lineage.graph.get("FilteredTrack", True):
                     _write_track_id(xf, lineage)
         else:
             # If there are no filtered tracks, we need to add all the tracks
@@ -1366,6 +1369,11 @@ def export_TrackMate_XML(
         exporter (removal of incompatible properties, propagation of cycle properties...).
         This is a copy of the original model, so the original model is not modified.
 
+    Raises
+    ------
+    UpdateRequiredError
+        If the model requires an update.
+
     Warnings
     --------
     Quantitative analysis of cell cycle properties should not be done on cell
@@ -1384,6 +1392,7 @@ def export_TrackMate_XML(
     For example, a location tag added with `tag_names` holds strings and is not
     exported: add it without `tag_names` to keep the integer tags.
     """
+    _check_up_to_date(model)
     # We don't want to modify the original model.
     model_copy = copy.deepcopy(model)
 

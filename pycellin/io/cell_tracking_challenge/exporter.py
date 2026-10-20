@@ -20,6 +20,7 @@ from pathlib import Path
 from pycellin.classes.exceptions import FusionError
 from pycellin.classes.lineage import CellLineage
 from pycellin.classes.model import Model
+from pycellin.io.utils import _check_up_to_date
 
 # TODO: need to extensively test this.
 # TODO: check beforehand for fusions and gap just after division. No need to start
@@ -246,8 +247,13 @@ def export_CTC_file(
         The model from which we want to export the CTC file.
     ctc_file_out : str | Path
         The path to the CTC file to write.
-    -----
+
+    Raises
+    ------
+    UpdateRequiredError
+        If the model requires an update.
     """
+    _check_up_to_date(model)
     lineages = [lineage for lineage in model.data.cell_data.values()]
     current_track_label = 1  # 0 is kept for no parent track
     tracks_to_write = []

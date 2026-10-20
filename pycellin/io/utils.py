@@ -6,6 +6,7 @@ from typing import Any
 import networkx as nx
 
 from pycellin.classes import CellLineage, Model
+from pycellin.classes.exceptions import UpdateRequiredError
 from pycellin.custom_types import PropertyType, property_type_from_string
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,31 @@ def check_fusions(model: Model) -> None:
             "results can occur. See documentation for more details."
         )
         logger.warning(fusion_warning)
+
+
+def _check_up_to_date(model: Model) -> None:
+    """
+    Check that a model to export doesn't require an update.
+
+    Otherwise, the exported data would miss the changes not yet processed by
+    `update()`, e.g. the split of a lineage after `remove_link()`, or the values of
+    a property just added.
+
+    Parameters
+    ----------
+    model : Model
+        The model to export.
+
+    Raises
+    ------
+    UpdateRequiredError
+        If the model requires an update.
+    """
+    if model.is_update_required():
+        raise UpdateRequiredError(
+            "The model has changes that update() has not processed yet. "
+            "Update it with model.update() before exporting it."
+        )
 
 
 def _add_lineage_props(

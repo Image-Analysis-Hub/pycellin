@@ -5,6 +5,7 @@ import geff_spec
 import pytest
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
+from pycellin.classes.exceptions import UpdateRequiredError
 from pycellin.properties.core import (
     create_cell_coord_property,
     create_frame_property,
@@ -767,3 +768,10 @@ class TestExportGEFF:
 
         graph, metadata = geff.read(geff_out)
         assert var_length_prop.identifier in metadata.node_props_metadata
+
+    def test_model_requiring_update_raises(self, simple_model, tmp_path):
+        """Test that a model requiring an update is not exported."""
+        simple_model.prepare_full_data_update()
+        with pytest.raises(UpdateRequiredError, match="before exporting"):
+            export_GEFF(simple_model, str(tmp_path / "test.geff"))
+        assert not (tmp_path / "test.geff").exists()

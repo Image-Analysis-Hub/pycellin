@@ -9,6 +9,7 @@ import pytest
 from lxml import etree as ET
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
+from pycellin.classes.exceptions import UpdateRequiredError
 from pycellin.io.trackmate.exporter import (
     _relabel_nodes,
     _remove_non_numeric_props,
@@ -567,3 +568,46 @@ class TestExportTrackMateXML:
 
         pairs = model.to_cycle_pair_dataframe("mother_cycle")
         assert sorted(zip(pairs["cycle_id_1"], pairs["cycle_id_2"])) == [(5, 4), (8, 4)]
+
+    def test_model_requiring_update_raises(self, tmp_path, simple_model):
+        """Test that a model requiring an update is not exported."""
+        simple_model.prepare_full_data_update()
+        with pytest.raises(UpdateRequiredError, match="before exporting"):
+            export_TrackMate_XML(
+                simple_model,
+                tmp_path / "model.xml",
+                units={"space": "pixel", "time": "frame"},
+            )
+        assert not (tmp_path / "model.xml").exists()
+
+    def test_lineage_without_FilteredTrack_exported_as_visible(
+        self, tmp_path, simple_model
+    ):
+        """Test that a lineage without the FilteredTrack flag, e.g. added in pycellin,
+        is exported as a visible track."""
+        # As loaded from TrackMate, with a hidden track.
+        simple_model.props_metadata._add_prop(
+            Property(
+                identifier="FilteredTrack",
+                name="FilteredTrack",
+                description="True if the track was not filtered out in TrackMate",
+                provenance="TrackMate",
+                prop_type="lineage",
+                lin_type="CellLineage",
+                dtype="int",
+            )
+        )
+        simple_model.data.cell_data[0].graph["FilteredTrack"] = False
+        lid = simple_model.add_lineage()
+        coords = {"cell_x": 0.0, "cell_y": 0.0}
+        simple_model.add_cell(lid=lid, cid=10, time_value=0, prop_values=coords)
+        simple_model.add_cell(lid=lid, cid=11, time_value=1, prop_values=coords)
+        simple_model.add_link(source_cid=10, source_lid=lid, target_cid=11)
+        simple_model.update()
+        xml_path = tmp_path / "model.xml"
+        export_TrackMate_XML(
+            simple_model, xml_path, units={"space": "pixel", "time": "frame"}
+        )
+        model = load_TrackMate_XML(xml_path, keep_all_tracks=True)
+        assert model.data.cell_data[0].graph["FilteredTrack"] is False
+        assert model.data.cell_data[lid].graph["FilteredTrack"] is True

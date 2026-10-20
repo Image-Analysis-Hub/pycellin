@@ -277,8 +277,11 @@ class ModelUpdater:
             self._modified_lineages.add(largest_lin.graph["lineage_id"])
             splitted_lins.remove(largest_lin)
 
-            # The other lineages are considered as new lineages.
+            # The other lineages are considered as new lineages. They don't keep the
+            # lineage properties of the original lineage, whose values describe it
+            # whole, e.g. its number of cells, or identify it, e.g. its name.
             for split_lin in splitted_lins:
+                split_lin.graph.clear()
                 if len(split_lin) == 1:
                     # ID of a one-node lineage is minus the ID of the node.
                     original_cell_id = next(iter(split_lin.nodes()))
@@ -379,6 +382,14 @@ class ModelUpdater:
         lins_to_process = (
             self._added_lineages | self._modified_lineages
         ) - self._removed_lineages
+
+        # Cells may come from another lineage, e.g. after a split or a link between
+        # two lineages, so the lineage ID of their lineage is set again where present.
+        for lin_id in lins_to_process:
+            if lin_id in data.cell_data:
+                for _, cell_attrs in data.cell_data[lin_id].nodes(data=True):
+                    if "lineage_id" in cell_attrs:
+                        cell_attrs["lineage_id"] = lin_id
 
         # Prepare the list of nodes to process.
         nodes_to_process = [

@@ -1404,6 +1404,14 @@ class Model:
         on them, listed or not. The other cell lineage properties are not computed:
         the model then still requires an update, and the next `update()` computes all
         the properties again.
+
+        The update also deletes empty lineages, and splits a lineage made of several
+        parts, e.g. after `remove_link()`. The largest part keeps the lineage ID and
+        the lineage properties. Each other part becomes a new lineage, with a new ID
+        and no other lineage property, since the values of the original lineage
+        describe it whole, e.g. its number of cells, or identify it, e.g. its name.
+        The `lineage_id` of the cells of the lineages that changed is set to the ID of
+        their lineage.
         """
         if not self._updater._update_required:
             warnings.warn("Model is already up to date.")
@@ -1644,7 +1652,10 @@ class Model:
         """
         From a given cell, split a part of the given lineage into a new lineage.
 
-        By default, the given cell will be the root of the new lineage.
+        By default, the given cell will be the root of the new lineage. The new
+        lineage has no lineage property other than its ID, since the values of the
+        original lineage describe it whole, e.g. its number of cells, or identify it,
+        e.g. its name. Its cells get its ID as `lineage_id` at the next `update()`.
 
         Parameters
         ----------

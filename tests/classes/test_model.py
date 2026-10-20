@@ -1263,12 +1263,12 @@ def two_lineages_model():
     """
     lin1 = CellLineage(lid=1)
     for nid, time in [(1, 0), (2, 1), (3, 2), (4, 1), (5, 2)]:
-        lin1.add_node(nid, cell_id=nid, time=time)
+        lin1.add_node(nid, cell_id=nid, lineage_id=1, time=time)
     for source, target in [(1, 2), (2, 3), (1, 4), (4, 5)]:
         lin1.add_edge(source, target)
     lin2 = CellLineage(lid=2)
     for nid, time in [(10, 0), (11, 1)]:
-        lin2.add_node(nid, cell_id=nid, time=time)
+        lin2.add_node(nid, cell_id=nid, lineage_id=2, time=time)
     lin2.add_edge(10, 11)
 
     time_prop = create_time_property(unit="frame")
@@ -1392,6 +1392,36 @@ class TestUpdate:
         assert two_lineages_model.data.cell_data[2].nodes[6]["cell_value"] == 1.0
         assert 2 in two_lineages_model.data.cycle_data
 
+    def test_split_off_lineage_cells_get_its_id(self, two_lineages_model):
+        # Removing link 1 -> 4 splits off cells 4 and 5 into a new lineage.
+        two_lineages_model.remove_link(source_cid=1, target_cid=4, lid=1)
+        two_lineages_model.update()
+        new_lid, new_lin = next(
+            (lid, lin)
+            for lid, lin in two_lineages_model.data.cell_data.items()
+            if 4 in lin
+        )
+        assert new_lid not in (1, 2)
+        assert dict(new_lin.nodes(data="lineage_id")) == {4: new_lid, 5: new_lid}
+
+    def test_single_cell_split_off_lineage_cell_gets_its_id(self, two_lineages_model):
+        # Removing link 4 -> 5 splits off cell 5 into lineage -5.
+        two_lineages_model.remove_link(source_cid=4, target_cid=5, lid=1)
+        two_lineages_model.update()
+        assert two_lineages_model.data.cell_data[-5].nodes[5]["lineage_id"] == -5
+
+    def test_split_off_lineage_without_original_lineage_props(
+        self, two_lineages_model
+    ):
+        two_lineages_model.data.cell_data[1].graph["lineage_name"] = "Track_1"
+        two_lineages_model.remove_link(source_cid=1, target_cid=4, lid=1)
+        two_lineages_model.update()
+        new_lin = next(
+            lin for lin in two_lineages_model.data.cell_data.values() if 4 in lin
+        )
+        assert "lineage_name" not in new_lin.graph
+        assert two_lineages_model.data.cell_data[1].graph["lineage_name"] == "Track_1"
+
 
 class TestAddLineage:
     """Test cases for Model.add_lineage() method."""
@@ -1436,6 +1466,18 @@ class TestSplitLineageFromCell:
         assert set(two_lineages_model.data.cell_data[2].nodes) == {4, 5}
         assert 2 in two_lineages_model.data.cycle_data
 
+    def test_new_lineage_without_original_lineage_props(self, two_lineages_model):
+        two_lineages_model.data.cell_data[1].graph["lineage_name"] = "Track_1"
+        new_lineage = two_lineages_model.split_lineage_from_cell(cid=4, lid=1)
+        assert new_lineage.graph == {"lineage_id": 3}
+        assert two_lineages_model.data.cell_data[1].graph["lineage_name"] == "Track_1"
+
+    def test_cells_get_new_lineage_id_at_update(self, two_lineages_model):
+        two_lineages_model.split_lineage_from_cell(cid=4, lid=1)
+        two_lineages_model.update()
+        new_lineage = two_lineages_model.data.cell_data[3]
+        assert dict(new_lineage.nodes(data="lineage_id")) == {4: 3, 5: 3}
+
 
 class TestAddCell:
     """Test cases for Model.add_cell() method."""
@@ -1458,6 +1500,16 @@ class TestAddLink:
         two_lineages_model.add_link(source_cid=4, source_lid=1, target_cid=5)
         two_lineages_model.update()
         assert two_lineages_model.data.cell_data[1].edges[4, 5]["link_value"] == 1.0
+
+    def test_cells_moved_from_other_lineage_get_its_id(self, two_lineages_model):
+        # Cell 12 is split off into lineage -12, then moves to lineage 1 with the link.
+        two_lineages_model.add_cell(lid=2, cid=12, time_value=3)
+        two_lineages_model.update()
+        two_lineages_model.add_link(
+            source_cid=3, source_lid=1, target_cid=12, target_lid=-12
+        )
+        two_lineages_model.update()
+        assert two_lineages_model.data.cell_data[1].nodes[12]["lineage_id"] == 1
 
 
 class TestAddCellArea:

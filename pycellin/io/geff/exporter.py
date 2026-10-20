@@ -21,7 +21,7 @@ import networkx as nx
 
 from pycellin.classes import CellLineage, Model, Property
 from pycellin.custom_types import PropertyType
-from pycellin.io.utils import _remove_orphaned_metadata
+from pycellin.io.utils import _check_up_to_date, _remove_orphaned_metadata
 from pycellin.utils import _normalize_dtype
 
 # TODO: geffception for cycle and lineage props
@@ -411,11 +411,14 @@ def export_GEFF(
 
     Raises
     ------
+    UpdateRequiredError
+        If the model requires an update.
     ValueError
         If the model contains no lineage data.
     RuntimeError
         If the GEFF export process fails.
     """
+    _check_up_to_date(model)
     if not model.data.cell_data:
         raise ValueError("Model contains no lineage data to export.")
 

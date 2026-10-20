@@ -20,7 +20,7 @@ import copy
 import pandas as pd
 
 from pycellin.classes.model import Model
-from pycellin.io.utils import _identify_frame_prop
+from pycellin.io.utils import _check_up_to_date, _identify_frame_prop
 
 
 def safekeep_original_lineage_ids(model: Model) -> None:
@@ -182,7 +182,13 @@ def export_trackpy_dataframe(model: Model) -> pd.DataFrame:
     -------
     pd.DataFrame
         A DataFrame containing trackpy formatted data.
+
+    Raises
+    ------
+    UpdateRequiredError
+        If the model requires an update.
     """
+    _check_up_to_date(model)
     # Prepare the model for export.
     model_copy = copy.deepcopy(model)  # Don't want to modify the original model.
     safekeep_original_lineage_ids(model_copy)

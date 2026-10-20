@@ -1653,6 +1653,13 @@ class TestCellLineageSplitFromCell:
         assert sorted(new_lin.nodes()) == [5, 6, 7, 8, 9, 10]
         assert sorted(cell_lin.nodes()) == [1, 2, 3, 4, 11, 12, 13, 14, 15, 16]
 
+    def test_new_lineage_without_lineage_props(self, cell_lin):
+        """Test that the new lineage doesn't keep the lineage properties."""
+        cell_lin.graph["lineage_name"] = "Track_1"
+        new_lin = cell_lin._split_from_cell(4)
+        assert new_lin.graph == {}
+        assert cell_lin.graph["lineage_name"] == "Track_1"
+
     def test_root_upstream(self, cell_lin):
         """Test split upstream from a root node."""
         new_lin = cell_lin._split_from_cell(1, split="upstream")
