@@ -391,11 +391,14 @@ class ModelUpdater:
                     if "lineage_id" in cell_attrs:
                         cell_attrs["lineage_id"] = lin_id
 
-        # Prepare the list of nodes to process.
+        # Prepare the list of nodes to process. A recorded cell may not be in its
+        # lineage anymore, e.g. when add_link() moved it to another lineage, which is
+        # processed whole below.
         nodes_to_process = [
             cell
             for cell in self._added_cells - self._removed_cells
             if cell.lineage_id in lins_to_process
+            and cell.cell_id in data.cell_data.get(cell.lineage_id, ())
         ]
         # Also include the nodes of added and modified lineages that weren't explicitly
         # added/removed.
@@ -408,8 +411,17 @@ class ModelUpdater:
         # Remove duplicates.
         nodes_to_process = list(set(nodes_to_process))
 
-        # Prepare the list of edges to process.
-        edges_to_process = list(self._added_links - self._removed_links)
+        # Prepare the list of edges to process. Likewise, a recorded link may not be in
+        # its lineage anymore, or its lineage may have been removed.
+        edges_to_process = [
+            link
+            for link in self._added_links - self._removed_links
+            if link.lineage_id in lins_to_process
+            and link.lineage_id in data.cell_data
+            and data.cell_data[link.lineage_id].has_edge(
+                link.source_cell_id, link.target_cell_id
+            )
+        ]
         # Also include the edges of added and modified lineages.
         for lin_id in lins_to_process:
             if lin_id in data.cell_data:

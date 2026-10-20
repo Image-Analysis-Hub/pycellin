@@ -1455,6 +1455,18 @@ class TestAddLineage:
         assert two_lineages_model.data.cell_data[2].edges[10, 11]["link_value"] == 1.0
 
 
+class TestRemoveLineage:
+    """Test cases for Model.remove_lineage() method."""
+
+    def test_lineage_with_new_link_removed_before_update(self, two_lineages_model):
+        two_lineages_model.add_cell(lid=2, cid=12, time_value=2)
+        two_lineages_model.add_link(source_cid=11, source_lid=2, target_cid=12)
+        two_lineages_model.remove_lineage(2)
+        two_lineages_model.update()
+        assert sorted(two_lineages_model.data.cell_data) == [1]
+        assert not two_lineages_model.is_update_required()
+
+
 class TestSplitLineageFromCell:
     """Test cases for Model.split_lineage_from_cell() method."""
 
@@ -1510,6 +1522,20 @@ class TestAddLink:
         )
         two_lineages_model.update()
         assert two_lineages_model.data.cell_data[1].nodes[12]["lineage_id"] == 1
+
+    def test_cells_and_link_added_then_moved_computed(self, two_lineages_model):
+        # Cells 12 and 13 and their link, added to lineage 2, move to lineage 1 with
+        # the link from cell 3 before the update.
+        two_lineages_model.add_cell(lid=2, cid=12, time_value=3)
+        two_lineages_model.add_cell(lid=2, cid=13, time_value=4)
+        two_lineages_model.add_link(source_cid=12, source_lid=2, target_cid=13)
+        two_lineages_model.add_link(
+            source_cid=3, source_lid=1, target_cid=12, target_lid=2
+        )
+        two_lineages_model.update()
+        lineage = two_lineages_model.data.cell_data[1]
+        assert lineage.nodes[13]["cell_value"] == 1.0
+        assert lineage.edges[12, 13]["link_value"] == 1.0
 
 
 class TestAddCellArea:
