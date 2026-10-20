@@ -1286,8 +1286,9 @@ class Model:
         Next available lineage IDs are determined by finding the maximum
         (for positive IDs) or minimum (for negative IDs) existing lineage ID
         in the model and incrementing or decrementing it by one, respectively.
-        This way, lineage IDs of previously deleted lineages are not reused.
-        This avoids potential confusion or errors in lineage handling.
+        This way, lineage IDs of previously deleted lineages are not reused,
+        unless they were above the maximum (or below the minimum) of the remaining
+        lineage IDs. This avoids potential confusion or errors in lineage handling.
 
         The returned lineage ID cannot be 0 in case the user wants to reserve
         it for special purposes.
@@ -1576,6 +1577,7 @@ class Model:
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
         self._updater._added_lineages.add(lid)
+        self._updater._discard_removals(lineage)
 
         return lid
 
@@ -1691,6 +1693,7 @@ class Model:
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
         self._updater._added_lineages.add(new_lid)
+        self._updater._discard_removals(new_lineage)
         self._updater._modified_lineages.add(lid)
 
         return new_lineage
@@ -1789,6 +1792,8 @@ class Model:
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
         self._updater._added_cells.add(Cell(cid, lid))
+        # A cell removed then added back is not removed anymore.
+        self._updater._removed_cells.discard(Cell(cid, lid))
         self._updater._modified_lineages.add(lid)
 
         return cid
@@ -1949,6 +1954,8 @@ class Model:
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
         self._updater._added_links.add(Link(source_cid, target_cid, source_lid))
+        # A link removed then added back is not removed anymore.
+        self._updater._removed_links.discard(Link(source_cid, target_cid, source_lid))
         self._updater._modified_lineages.add(source_lid)
         if target_lid != source_lid:
             self._updater._modified_lineages.add(target_lid)

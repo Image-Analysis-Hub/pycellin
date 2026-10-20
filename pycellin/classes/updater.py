@@ -93,6 +93,27 @@ class ModelUpdater:
         self._removed_lineages.clear()
         self._modified_lineages.clear()
 
+    def _discard_removals(self, lineage: CellLineage) -> None:
+        """
+        Discard the removals recorded for an added lineage, and for its cells and links.
+
+        The lineage ID, or the IDs of its cells and links, may have been removed since
+        the last update, e.g. when a removed lineage is added back, or when a new
+        lineage gets the ID of a removed one. The update would otherwise treat them as
+        removed: it would delete the lineage and skip its cells and links.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            The added lineage, with its lineage ID set.
+        """
+        lin_id = lineage.graph["lineage_id"]
+        self._removed_lineages.discard(lin_id)
+        self._removed_cells -= {Cell(cell_id, lin_id) for cell_id in lineage.nodes}
+        self._removed_links -= {
+            Link(source, target, lin_id) for source, target in lineage.edges
+        }
+
     def _print_state(self) -> None:
         """
         Print the state of the updater.
@@ -286,6 +307,7 @@ class ModelUpdater:
                         split_lin.graph["lineage_id"] = -new_cell_id
                         data.cell_data[-new_cell_id] = split_lin
                         self._added_lineages.add(-new_cell_id)
+                        self._discard_removals(split_lin)
                     else:
                         # Track that the cell moved to a new lineage.
                         self._removed_cells.add(
@@ -297,6 +319,7 @@ class ModelUpdater:
                         split_lin.graph["lineage_id"] = new_lin_id
                         data.cell_data[new_lin_id] = split_lin
                         self._added_lineages.add(new_lin_id)
+                        self._discard_removals(split_lin)
                 else:
                     new_lin_id = data._get_next_available_lineage_id(positive=True)
                     # Track all cells moving to the new lineage.
@@ -326,6 +349,7 @@ class ModelUpdater:
                     split_lin.graph["lineage_id"] = new_lin_id
                     data.cell_data[new_lin_id] = split_lin
                     self._added_lineages.add(new_lin_id)
+                    self._discard_removals(split_lin)
 
         # The timepoint property is always kept present and up to date.
         timepoint_built = self._ensure_timepoint_calculator(data, time_prop, time_step)

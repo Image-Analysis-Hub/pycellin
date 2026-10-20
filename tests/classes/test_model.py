@@ -14,7 +14,10 @@ from shapely.geometry import MultiPolygon, Polygon
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.classes.exceptions import MissingPropertyError
-from pycellin.classes.property_calculator import NodeLocalPropCalculator
+from pycellin.classes.property_calculator import (
+    EdgeLocalPropCalculator,
+    NodeLocalPropCalculator,
+)
 from pycellin.custom_types import PropertyType
 from pycellin.properties.core import (
     Time,
@@ -1241,6 +1244,52 @@ class DoubledAreaCopy(NodeLocalPropCalculator):
         return 2 * lineage.nodes[nid]["area_copy"]
 
 
+class ConstantLinkValue(EdgeLocalPropCalculator):
+    """User-defined property with the same value on every link."""
+
+    def __init__(self, property, value):
+        super().__init__(property)
+        self.value = value
+
+    def compute(self, lineage, edge):
+        return self.value
+
+
+@pytest.fixture()
+def two_lineages_model():
+    """
+    Create an updated model with cycle lineages, a cell property and a link property.
+    Lineage 1: 1 -> 2 -> 3 and 1 -> 4 -> 5. Lineage 2: 10 -> 11.
+    """
+    lin1 = CellLineage(lid=1)
+    for nid, time in [(1, 0), (2, 1), (3, 2), (4, 1), (5, 2)]:
+        lin1.add_node(nid, cell_id=nid, time=time)
+    for source, target in [(1, 2), (2, 3), (1, 4), (4, 5)]:
+        lin1.add_edge(source, target)
+    lin2 = CellLineage(lid=2)
+    for nid, time in [(10, 0), (11, 1)]:
+        lin2.add_node(nid, cell_id=nid, time=time)
+    lin2.add_edge(10, 11)
+
+    time_prop = create_time_property(unit="frame")
+    time_prop.dtype = "int"
+    model = Model(
+        model_metadata={"time_step": 1, "time_unit": "frame"},
+        props_metadata=PropsMetadata(props={"time": time_prop}),
+        data=Data({1: lin1, 2: lin2}),
+        reference_time_property="time",
+    )
+    model.add_custom_property(
+        ConstantValue(_create_test_property("cell_value", "node"), 1.0)
+    )
+    model.add_custom_property(
+        ConstantLinkValue(_create_test_property("link_value", "edge"), 1.0)
+    )
+    model.add_cycle_data()
+    model.update()
+    return model
+
+
 class TestUpdate:
     """Test cases for Model.update() method."""
 
@@ -1330,6 +1379,85 @@ class TestUpdate:
         input_props_model.update()
         lin = input_props_model.data.cell_data[1]
         assert set(dict(lin.nodes(data="doubled_area")).values()) == {20.0}
+
+    def test_split_off_lineage_with_removed_id_computed(self, two_lineages_model):
+        # Removing link 2 -> 3 splits lineage 1 at the update, and the split-off
+        # lineage, with the new cell 6, gets ID 2, the ID of the removed lineage.
+        two_lineages_model.remove_lineage(2)
+        two_lineages_model.remove_link(source_cid=2, target_cid=3, lid=1)
+        two_lineages_model.add_cell(lid=1, cid=6, time_value=3)
+        two_lineages_model.add_link(source_cid=3, source_lid=1, target_cid=6)
+        two_lineages_model.update()
+        assert set(two_lineages_model.data.cell_data[2].nodes) == {3, 6}
+        assert two_lineages_model.data.cell_data[2].nodes[6]["cell_value"] == 1.0
+        assert 2 in two_lineages_model.data.cycle_data
+
+
+class TestAddLineage:
+    """Test cases for Model.add_lineage() method."""
+
+    def test_lineage_removed_then_added_back_kept(self, two_lineages_model):
+        lineage = two_lineages_model.remove_lineage(2)
+        two_lineages_model.add_lineage(lineage)
+        two_lineages_model.update()
+        assert set(two_lineages_model.data.cell_data[2].nodes) == {10, 11}
+        assert 2 in two_lineages_model.data.cycle_data
+
+    def test_cell_removed_before_lineage_added_back_computed(
+        self, two_lineages_model
+    ):
+        two_lineages_model.remove_cell(cid=11, lid=2)
+        lineage = two_lineages_model.remove_lineage(2)
+        lineage.add_node(11, cell_id=11, time=1)
+        lineage.add_edge(10, 11)
+        two_lineages_model.add_lineage(lineage)
+        two_lineages_model.update()
+        assert two_lineages_model.data.cell_data[2].nodes[11]["cell_value"] == 1.0
+
+    def test_link_removed_before_lineage_added_back_computed(
+        self, two_lineages_model
+    ):
+        two_lineages_model.remove_link(source_cid=10, target_cid=11, lid=2)
+        lineage = two_lineages_model.remove_lineage(2)
+        lineage.add_edge(10, 11)
+        two_lineages_model.add_lineage(lineage)
+        two_lineages_model.update()
+        assert two_lineages_model.data.cell_data[2].edges[10, 11]["link_value"] == 1.0
+
+
+class TestSplitLineageFromCell:
+    """Test cases for Model.split_lineage_from_cell() method."""
+
+    def test_split_off_lineage_with_removed_id_kept(self, two_lineages_model):
+        # The split-off lineage gets ID 2, the ID of the removed lineage.
+        two_lineages_model.remove_lineage(2)
+        two_lineages_model.split_lineage_from_cell(cid=4, lid=1)
+        two_lineages_model.update()
+        assert set(two_lineages_model.data.cell_data[2].nodes) == {4, 5}
+        assert 2 in two_lineages_model.data.cycle_data
+
+
+class TestAddCell:
+    """Test cases for Model.add_cell() method."""
+
+    def test_cell_removed_then_added_back_computed(self, two_lineages_model):
+        two_lineages_model.remove_cell(cid=5, lid=1)
+        two_lineages_model.add_cell(lid=1, cid=5, time_value=2)
+        two_lineages_model.add_link(source_cid=4, source_lid=1, target_cid=5)
+        two_lineages_model.update()
+        cell = two_lineages_model.data.cell_data[1].nodes[5]
+        assert cell["timepoint"] == 2
+        assert cell["cell_value"] == 1.0
+
+
+class TestAddLink:
+    """Test cases for Model.add_link() method."""
+
+    def test_link_removed_then_added_back_computed(self, two_lineages_model):
+        two_lineages_model.remove_link(source_cid=4, target_cid=5, lid=1)
+        two_lineages_model.add_link(source_cid=4, source_lid=1, target_cid=5)
+        two_lineages_model.update()
+        assert two_lineages_model.data.cell_data[1].edges[4, 5]["link_value"] == 1.0
 
 
 class TestAddCellArea:

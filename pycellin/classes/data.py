@@ -208,8 +208,9 @@ class Data:
         Next available lineage IDs are determined by finding the maximum
         (for positive IDs) or minimum (for negative IDs) existing lineage ID
         in the model and incrementing or decrementing it by one, respectively.
-        This way, lineage IDs of previously deleted lineages are not reused.
-        This avoids potential confusion or errors in lineage handling.
+        This way, lineage IDs of previously deleted lineages are not reused,
+        unless they were above the maximum (or below the minimum) of the remaining
+        lineage IDs. This avoids potential confusion or errors in lineage handling.
 
         The returned lineage ID cannot be 0 in case the user wants to reserve
         it for special purposes.
