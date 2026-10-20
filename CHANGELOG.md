@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 55111ce, plus the uncommitted fixes of the TrackMate export of cells whose contour is None, and of the GEFF export of properties GEFF can't store and of None values. Update from there with: git log 55111ce..dev -->
+<!-- Planned v0.6.0. Covers commits up to a402b50, plus the uncommitted fixes of the CTC loader with label images (labels_path). Update from there with: git log a402b50..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -33,6 +33,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Lineages:** rename `CellLineage.get_sister_cells()` to `get_sisters()`, which also works on cycle lineages, where it returns the sister cell cycles
 - **Plotting:** rename `node_color_scale` to `node_colormap` in `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()`
 - **CTC:** the loader now uses a new `time` property as the reference time property, instead of `timepoint`
+- **CTC:** with label images (`labels_path`), cell positions and contours are now in the space unit: their pixel coordinates are multiplied by the pixel size. They were in pixels while the model had the space unit given to the loader, so properties computed from them, such as `cell_displacement`, got that unit for values in pixels
 - **trackpy:** the loader now uses a new `time` property (frame × time step) as the reference time property, instead of `frame`, and renames the trackpy coordinates `x`, `y`, `z` to `cell_x`, `cell_y`, `cell_z`
 - **Export:** `export_CTC_file()`, `export_GEFF()`, `export_TrackMate_XML()` and `export_trackpy_dataframe()` raise `UpdateRequiredError` when the model requires an update: call `model.update()` first. Most of them exported the changes not yet processed as they were, e.g. a lineage left in two parts by `remove_link()`, so a GEFF file written that way couldn't be read back correctly
 - **Exceptions:** pycellin exceptions now subclass the matching built-in exception: `LineageStructureError` (so `FusionError` and `TimeFlowError`) is a `ValueError`, `UpdateRequiredError` a `RuntimeError`, `ProtectedPropertyError` an `AttributeError`
@@ -137,8 +138,14 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **GEFF:** the loader overwrote the `cell_id` and `lineage_id` properties of the file (`cell_ID` and `lineage_ID` in 0.5.1) when it didn't use them as identifiers. They are now kept as `geff_cell_id` and `geff_lineage_id`, with a warning
 - **GEFF:** the exporter didn't write the metadata of properties with several types (`LINEAGE | NODE`, `LINEAGE | EDGE`)
 - **GEFF:** the exporter failed with a `RuntimeError` that named no property on cell or link properties whose data type GEFF can't store, such as `cells` after `propagate_cycle_properties()` or TrackMate features loaded with the `unknown` data type, and on None values. Such properties are now skipped with a warning naming them, and None values are written as missing values
-- **CTC:** the loader gave cells no `timepoint`, although it was the reference time property, and no `lineage_id`. Reading the pixel size from label images (`labels_path`) failed
+- **CTC:** the loader gave cells no `timepoint`, although it was the reference time property, and no `lineage_id`
 - **CTC:** the loader failed on labels with holes or made of several pieces. Their contour is now the outline of the largest piece, holes filled, and a warning lists them
+- **CTC:** loading label images (`labels_path`):
+  - reading the pixel size from them failed with `KeyError`. It is now read from their resolution, in the unit of the ResolutionUnit tag or of the ImageJ metadata. A resolution without unit is ignored, and so is one in inches, most likely a print default such as 72 dpi, with a warning
+  - each label was matched to its cell by scanning all the cells, so the loading time grew with the square of their number (over a minute for 8,000 cells). It now grows linearly
+  - 3D label images failed with "too many values to unpack", and a stack holding all the frames with that error or, when its name had no frame number, with "Can't parse frame value". The loader now says that only 2D label images, one per frame, are supported
+  - a `labels_path` that wasn't a folder was silently ignored when the space unit and pixel sizes were given, leaving cell positions and contours declared without values. It now raises `ValueError`
+  - the `label_imgs_location` metadata field was missing when the space unit and pixel sizes were given
 - **trackpy:** the loader failed when given a `time_step`, which it applied to frames, and gave cells no `lineage_id`
 - **trackpy:** the loader silently overwrote the DataFrame columns named like the properties it creates (`cell_id`, `lineage_id` and `timepoint`; `cell_ID` and `lineage_ID` in 0.5.1). It now raises `ValueError`
 
