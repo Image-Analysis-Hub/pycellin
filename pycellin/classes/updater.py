@@ -29,17 +29,11 @@ class ModelUpdater:
 
         self._calculators = {}  # {prop_name: PropertyCalculator}
 
-        # TODO: add something to store the order in which properties are computed?
-        # Or maybe add an argument to update() to specify the order? We need to be able
-        # to specify the order only for properties that have dependencies. So it might be
-        # easier to put this as an argument to the update() method, and have a default
-        # order for the other properties that is the order of registration (order of keys
-        # in the _calculators dictionary). Even better would be to have a solver.
-        # => keep this for later
-        # On a related note, currently cell properties are computed before cycle properties.
-        # So if a cell property depends on a cycle property, it will not be computed
-        # correctly. In that case, the solution is to add the cycle properties first,
-        # then update, then add the cell properties and update again.
+        # Cell properties are computed before cycle properties, whatever the order of
+        # the calculators (see _order_calculators()). So if a cell property depends on
+        # a cycle property, it will not be computed correctly. In that case, the
+        # solution is to add the cycle properties first, then update, then add the cell
+        # properties and update again.
 
     def _ensure_timepoint_calculator(
         self, data: Data, time_prop: str, time_step: int | float
@@ -120,12 +114,52 @@ class ModelUpdater:
         """
         Register a calculator for a property.
 
+        Calculators run in registration order, except that a calculator runs after
+        the calculators of the properties it reads (see `_order_calculators()`).
+
         Parameters
         ----------
         calculator : PropertyCalculator
             The calculator to use to compute the property.
         """
         self._calculators[calculator.prop.identifier] = calculator
+        self._order_calculators()
+
+    def _order_calculators(self) -> None:
+        """
+        Order the calculators so that each one runs after the calculators of the
+        properties it reads.
+
+        The properties a calculator reads are the ones of its `INPUT_PROPS`. This
+        matters when a property gets its calculator after a property computed from it,
+        e.g. a property loaded from a file, then added again with its add method: the
+        property computed from it would otherwise be computed first, from the old
+        values. Such a calculator is moved just before the first calculator reading its
+        property, together with the calculators of its own inputs. The reader is not
+        moved after it instead, since the calculators registered in between may read
+        the reader without declaring it. Otherwise, the registration order is kept, and
+        the timepoint calculator stays first. With circular dependencies, a calculator
+        necessarily runs before one it reads.
+        """
+        ordered: dict[str, PropertyCalculator] = {}
+        visited: set[str] = set()
+
+        def place(prop_id: str) -> None:
+            # The calculators of the properties read are placed first.
+            if prop_id in visited:  # Already placed, or circular dependency.
+                return
+            visited.add(prop_id)
+            calc = self._calculators[prop_id]
+            for input_id, _, _ in calc.get_input_props().values():
+                if input_id in self._calculators:
+                    place(input_id)
+            ordered[prop_id] = calc
+
+        if "timepoint" in self._calculators:
+            place("timepoint")
+        for prop_id in self._calculators:
+            place(prop_id)
+        self._calculators = ordered
 
     def delete_calculator(self, prop_name: str) -> None:
         """
@@ -152,7 +186,7 @@ class ModelUpdater:
         time_prop: str,
         time_step: int | float,
         props_to_update: list[str] | None = None,
-    ) -> None:
+    ) -> bool:
         """
         Update the property values of the data.
 
@@ -166,15 +200,23 @@ class ModelUpdater:
             The time step to use for the update.
         props_to_update : list of str, optional
             List of properties to update. If None, all properties are updated.
+            Properties without calculator are skipped. All the cycle lineage
+            properties are computed on rebuilt cycle lineages, listed or not.
+
+        Returns
+        -------
+        bool
+            False if the update left out cell lineage properties that have to be
+            computed on the cells, links and lineages that changed, i.e. a partial
+            update that did not list them. True otherwise.
 
         Warnings
         --------
-        This method does not resolve properties dependencies. It is the responsibility
-        of the user to ensure that properties are updated in the correct order, if needed.
-        For example, cell lineage properties are computed before cycle lineage properties,
-        so if a cell lineage property depends on a cycle lineage property, it will not be
-        computed correctly. In that case, the solution is to add the cycle properties
-        first, then update, then add the cell properties and update again.
+        A property is computed after the properties it reads (`INPUT_PROPS`), but cell
+        lineage properties are computed before cycle lineage properties. So if a cell
+        lineage property depends on a cycle lineage property, it will not be computed
+        correctly. In that case, the solution is to add the cycle properties first,
+        then update, then add the cell properties and update again.
         """
         # TODO: refactor, this method is too long and does too many things.
 
@@ -288,8 +330,8 @@ class ModelUpdater:
         # The timepoint property is always kept present and up to date.
         timepoint_built = self._ensure_timepoint_calculator(data, time_prop, time_step)
 
-        # Update cell lineage properties.
-        # TODO: Deal with property dependencies. See comments in __init__.
+        # Update cell lineage properties, in the order of the calculators, which puts
+        # a property after the properties it reads.
         if props_to_update is None:
             cell_calculators = [
                 calc
@@ -298,9 +340,9 @@ class ModelUpdater:
             ]
         else:
             cell_calculators = [
-                self._calculators[prop]
-                for prop in props_to_update
-                if self._calculators[prop].prop.lin_type == "CellLineage"
+                calc
+                for prop_id, calc in self._calculators.items()
+                if prop_id in props_to_update and calc.prop.lin_type == "CellLineage"
             ]
 
         # The timepoint property is computed first, since other properties rely on it.
@@ -371,8 +413,10 @@ class ModelUpdater:
         # In case of modifications in the structure of some cell lineages,
         # we need to recompute the cycle lineages and their properties.
         # TODO: optimize so we don't have to recompute EVERYTHING for cycle lineages?
+        cycle_lineages_rebuilt = False
         for lin_id in lins_to_process:
             if data.cycle_data is not None:
+                cycle_lineages_rebuilt = True
                 # To preserve references, but cannot work on frozen lineages...:
                 # new_cycle_data = data._compute_cycle_lineage(lin_id)
                 # if lin_id in data.cycle_data:
@@ -388,7 +432,9 @@ class ModelUpdater:
                 del data.cycle_data[lin_id]
         # Update cycle lineages with cycle properties.
         if data.cycle_data is not None:
-            if props_to_update is None:
+            # Rebuilt cycle lineages only hold their core properties, so all the cycle
+            # lineage properties are computed again, even in a partial update.
+            if props_to_update is None or cycle_lineages_rebuilt:
                 cycle_calculators = [
                     calc
                     for calc in self._calculators.values()
@@ -396,10 +442,10 @@ class ModelUpdater:
                 ]
             else:
                 cycle_calculators = [
-                    self._calculators[prop]
-                    for prop in props_to_update
-                    if self._calculators[prop].prop.lin_type
-                    in ("CycleLineage", "Lineage")
+                    calc
+                    for prop_id, calc in self._calculators.items()
+                    if prop_id in props_to_update
+                    and calc.prop.lin_type in ("CycleLineage", "Lineage")
                 ]
             # Since cycle lineages are recreated at each update, every element
             # of the lineages need to be updated with its properties.
@@ -423,5 +469,18 @@ class ModelUpdater:
                     lineages_to_enrich=data.cycle_data.keys(),
                 )
 
+        # A partial update leaves out the cell lineage properties it doesn't list, on
+        # the cells, links and lineages that changed.
+        complete = (
+            props_to_update is None
+            or not lins_to_process
+            or all(
+                calc in cell_calculators
+                for calc in self._calculators.values()
+                if calc.prop.lin_type == "CellLineage"
+            )
+        )
+
         # Update is done, we can clean up.
         self._reinit()
+        return complete

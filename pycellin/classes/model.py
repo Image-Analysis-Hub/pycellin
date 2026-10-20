@@ -1361,7 +1361,8 @@ class Model:
         ----------
         props_to_update : list[str], optional
             List of properties to update. If None, all properties are updated.
-            The "timepoint" property is updated even if it is not in the list
+            The "timepoint" property is updated even if it is not in the list,
+            and so are the cycle lineage properties of rebuilt cycle lineages
             (see Notes).
 
         Warns
@@ -1369,8 +1370,9 @@ class Model:
         If the model is already up to date, a warning is raised and no update
         is performed. If the user wants to force an update, they can call
         `prepare_full_data_update()` before calling this method.
-        If a property in the `props_to_update` list has not been declared,
-        a warning is raised and that property is ignored during the update.
+        If a property in the `props_to_update` list has not been declared, or has
+        no calculator (e.g. a property loaded from a file), a warning is raised and
+        that property is ignored during the update.
         If no properties are left to update after filtering, a warning is raised
         and the model is not updated.
 
@@ -1390,6 +1392,17 @@ class Model:
         Consequently, the reference time property must not be computed from
         "timepoint", which would be a circular dependency. To convert the reference
         time into another unit, e.g. from frames to minutes, use `rescale_time()`.
+
+        A property is computed after the properties it reads, but cell lineage
+        properties are computed before cycle lineage properties.
+
+        A partial update, with `props_to_update`, computes the listed properties on
+        the cells, links and lineages that changed since the last update, i.e. on all
+        of them after a property was added. Their cycle lineages are rebuilt with only
+        the core properties, so all the cycle lineage properties are computed again
+        on them, listed or not. The other cell lineage properties are not computed:
+        the model then still requires an update, and the next `update()` computes all
+        the properties again.
         """
         if not self._updater._update_required:
             warnings.warn("Model is already up to date.")
@@ -1403,17 +1416,30 @@ class Model:
             ]
             if missing_props:
                 warnings.warn(
-                    f"The following properties have not been declared "
-                    f"and will be ignored: {', '.join(missing_props)}."
+                    "The following properties have not been declared and will be "
+                    f"ignored: {', '.join(repr(prop) for prop in missing_props)}."
                 )
-                props_to_update = [
-                    prop for prop in props_to_update if prop not in missing_props
-                ]
-                if not props_to_update:
-                    warnings.warn(
-                        "No properties to update. The model will not be updated."
-                    )
-                    return
+            # E.g. a property loaded from a file, or a core property of cycle lineages.
+            props_without_calc = [
+                prop
+                for prop in props_to_update
+                if prop not in missing_props and prop not in self._updater._calculators
+            ]
+            if props_without_calc:
+                warnings.warn(
+                    "The following properties have no calculator and will be ignored: "
+                    f"{', '.join(repr(prop) for prop in props_without_calc)}. Their "
+                    "values come from the data, or are computed with the cycle "
+                    "lineages."
+                )
+            props_to_update = [
+                prop
+                for prop in props_to_update
+                if prop not in missing_props and prop not in props_without_calc
+            ]
+            if not props_to_update:
+                warnings.warn("No properties to update. The model will not be updated.")
+                return
 
         # self.data._freeze_lineage_data()
 
@@ -1438,12 +1464,16 @@ class Model:
         ):
             self.props_metadata._add_prop(create_timepoint_property())
             self.props_metadata._protect_prop("timepoint")
-        self._updater._update(
+        complete = self._updater._update(
             self.data,
             time_prop=self.model_metadata.reference_time_property,
             time_step=time_step,
             props_to_update=props_to_update,
         )
+        if not complete:
+            # The properties left out by a partial update are computed by the next
+            # update, which recomputes all of them.
+            self.prepare_full_data_update()
 
         # self.data._unfreeze_lineage_data()
 

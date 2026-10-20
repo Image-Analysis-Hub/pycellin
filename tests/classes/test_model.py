@@ -4,6 +4,7 @@
 
 import warnings
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -1204,6 +1205,131 @@ class TestAddCustomProperty:
         with pytest.warns(UserWarning, match="Overwriting the old Property"):
             input_props_model.add_mother_cycle()
         assert input_props_model.get_property("mother_cycle").lin_type == "Lineage"
+
+
+class InputCopy(NodeLocalPropCalculator):
+    """User-defined property copying another node property of cell lineages."""
+
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "input_prop": ("node", "CellLineage")
+    }
+
+    def __init__(self, property, input_prop):
+        super().__init__(property)
+        self.input_prop = input_prop
+
+    def compute(self, lineage, nid):
+        return lineage.nodes[nid][self.input_prop]
+
+
+class ConstantValue(NodeLocalPropCalculator):
+    """User-defined property with the same value on every cell."""
+
+    def __init__(self, property, value):
+        super().__init__(property)
+        self.value = value
+
+    def compute(self, lineage, nid):
+        return self.value
+
+
+class DoubledAreaCopy(NodeLocalPropCalculator):
+    """User-defined property doubling 'area_copy', which it reads without declaring
+    it."""
+
+    def compute(self, lineage, nid):
+        return 2 * lineage.nodes[nid]["area_copy"]
+
+
+class TestUpdate:
+    """Test cases for Model.update() method."""
+
+    def test_partial_update_keeps_other_cycle_props(self, input_props_model):
+        input_props_model.add_division_time()
+        input_props_model.update()
+        division_times = dict(
+            input_props_model.data.cycle_data[1].nodes(data="division_time")
+        )
+        # The cycle lineages are rebuilt at the first update after adding a property.
+        input_props_model.add_mother_cycle()
+        input_props_model.update(["mother_cycle"])
+        cycle_lin = input_props_model.data.cycle_data[1]
+        assert dict(cycle_lin.nodes(data="division_time")) == pytest.approx(
+            division_times, nan_ok=True
+        )
+        assert cycle_lin.nodes[3]["mother_cycle"] == 2
+
+    def test_props_left_out_computed_by_next_update(self, input_props_model):
+        input_props_model.add_absolute_age()
+        input_props_model.add_relative_age()
+        input_props_model.update(["absolute_age"])
+        assert input_props_model.is_update_required()
+        input_props_model.update()
+        lin = input_props_model.data.cell_data[1]
+        assert dict(lin.nodes(data="relative_age")) == {1: 0, 2: 1, 3: 0, 4: 0}
+
+    def test_partial_update_of_all_props_completes(self, input_props_model):
+        input_props_model.add_absolute_age()
+        input_props_model.update(["absolute_age"])
+        assert not input_props_model.is_update_required()
+
+    def test_partial_update_after_edit(self, input_props_model):
+        input_props_model.add_absolute_age()
+        input_props_model.add_division_time()
+        input_props_model.update()
+        input_props_model.add_cell(lid=1, cid=5, time_value=3)
+        input_props_model.add_link(source_cid=3, source_lid=1, target_cid=5)
+        input_props_model.update(["absolute_age"])
+        assert input_props_model.data.cell_data[1].nodes[5]["absolute_age"] == 3
+        cycle_lin = input_props_model.data.cycle_data[1]
+        assert all("division_time" in cycle for _, cycle in cycle_lin.nodes(data=True))
+
+    def test_undeclared_prop_ignored(self, input_props_model):
+        input_props_model.add_absolute_age()
+        with pytest.warns(UserWarning, match="not been declared and will be ignored"):
+            input_props_model.update(["unknown", "absolute_age"])
+        assert input_props_model.data.cell_data[1].nodes[3]["absolute_age"] == 2
+
+    def test_prop_without_calculator_ignored(self, input_props_model):
+        input_props_model.add_absolute_age()
+        with pytest.warns(UserWarning, match="no calculator and will be ignored"):
+            input_props_model.update(["my_area", "absolute_age"])
+        assert input_props_model.data.cell_data[1].nodes[3]["absolute_age"] == 2
+
+    def test_only_props_without_calculator_no_update(self, input_props_model):
+        input_props_model.add_absolute_age()
+        with pytest.warns(UserWarning) as record:
+            input_props_model.update(["my_area"])
+        messages = [str(warning.message) for warning in record]
+        assert any("no calculator" in message for message in messages)
+        assert any("No properties to update" in message for message in messages)
+        assert input_props_model.is_update_required()
+        assert "absolute_age" not in input_props_model.data.cell_data[1].nodes[3]
+
+    def test_input_computed_before_its_reader(self, input_props_model):
+        # 'my_area' has values but no calculator, as if loaded from a file.
+        copy_prop = _create_test_property("area_copy", "node")
+        input_props_model.add_custom_property(InputCopy(copy_prop, "my_area"))
+        input_props_model.update()
+        area_prop = _create_test_property("my_area", "node", unit="um^2")
+        with pytest.warns(UserWarning, match="Overwriting the old Property"):
+            input_props_model.add_custom_property(ConstantValue(area_prop, 10.0))
+        input_props_model.update()
+        lin = input_props_model.data.cell_data[1]
+        assert set(dict(lin.nodes(data="area_copy")).values()) == {10.0}
+
+    def test_undeclared_reader_kept_after_what_it_reads(self, input_props_model):
+        copy_prop = _create_test_property("area_copy", "node")
+        input_props_model.add_custom_property(InputCopy(copy_prop, "my_area"))
+        doubled_prop = _create_test_property("doubled_area", "node")
+        input_props_model.add_custom_property(DoubledAreaCopy(doubled_prop))
+        input_props_model.update()
+        area_prop = _create_test_property("my_area", "node", unit="um^2")
+        with pytest.warns(UserWarning, match="Overwriting the old Property"):
+            input_props_model.add_custom_property(ConstantValue(area_prop, 10.0))
+        input_props_model.update()
+        lin = input_props_model.data.cell_data[1]
+        assert set(dict(lin.nodes(data="doubled_area")).values()) == {20.0}
 
 
 class TestAddCellArea:

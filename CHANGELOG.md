@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to f504e73, plus the uncommitted fix of to_cycle_pair_dataframe(unique_pairs=True) dropping a cell cycle listed by itself (no entry: the function is new in 0.6.0). Update from there with: git log f504e73..dev -->
+<!-- Planned v0.6.0. Covers commits up to 9f61b2c, plus the uncommitted fix of partial updates (update() with a list of properties) and the ordering of calculators after the properties they read (no entry: INPUT_PROPS is new in 0.6.0). Update from there with: git log 9f61b2c..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -118,6 +118,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** the columns of `to_link_dataframe()` came in a different order in each Python session. They now keep the order in which the link properties were added
 - **Model:** `add_cycle_data()` silently kept the properties already declared under the identifiers of its cycle properties, e.g. cycle properties propagated to cell lineages in an exported file and loaded back, so pycellin treated them as cell lineage properties. Such a declaration is now replaced when unused (no values in cell lineages, no calculator), and `add_cycle_data()` raises `ValueError` otherwise, asking to remove it first with `remove_property()`
 - **Model:** adding a property already declared, e.g. calling an `add_*()` method again with other arguments, registered the new calculator but kept the first declaration. The declaration is now replaced too, with a warning. A property declared with another property type or lineage type is replaced only when unused, and raises `ValueError` otherwise
+- **Model:** `update()` with a list of properties erased the values of the other cycle properties wherever it rebuilt cycle lineages (all of them after adding a property), left the other properties uncomputed on new or changed cells, and then reported the model as up to date. All the cycle properties are now computed again on rebuilt cycle lineages, and the model still requires an update, which computes the rest. A listed property without calculator, e.g. loaded from a file, made the update fail midway with `KeyError`: it is now ignored with a warning
 - **Properties:** `turning_angle` (`angle` in 0.5.1), `absolute_age` and `relative_age` were recomputed for every lineage at each update, as their calculators were global instead of local
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells
 - **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning
