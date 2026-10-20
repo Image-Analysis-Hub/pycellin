@@ -1,5 +1,7 @@
 """Unit test for GEFF file exporter."""
 
+import logging
+
 import geff
 import geff_spec
 import pytest
@@ -25,7 +27,10 @@ from pycellin.io.geff.exporter import (
     _find_node_overlaps,
     _get_next_available_id,
     _relabel_nodes,
+    _remove_none_values,
+    _remove_unsupported_props,
     _solve_node_overlaps,
+    _to_geff_dtype,
     export_GEFF,
 )
 
@@ -138,6 +143,20 @@ def var_length_prop():
         lin_type="CellLineage",
         dtype="float",
         unit="micrometer",
+    )
+
+
+@pytest.fixture
+def list_prop():
+    """Create a node property whose data type GEFF cannot store."""
+    return Property(
+        identifier="daughter_ids",
+        name="Daughter IDs",
+        description="IDs of the daughter cells",
+        provenance="Test",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="list[int]",
     )
 
 
@@ -319,6 +338,114 @@ class TestSolveNodeOverlaps:
         assert set(lineage1.nodes()) == {1, 2, 3, 4, 5}
         assert set(lineage2.nodes()) == {10, 11, 12, 13, 23, 25}
         assert set(lineage3.nodes()) == {20, 21, 22, 24, 26}
+
+
+class TestToGeffDtype:
+    """Test cases for _to_geff_dtype function."""
+
+    def test_string_dtype(self):
+        """Test that the string data type is spelled 'str'."""
+        assert _to_geff_dtype("string") == "str"
+        assert _to_geff_dtype("str") == "str"
+
+    def test_other_dtypes_unchanged(self):
+        """Test that other data types are returned unchanged."""
+        assert _to_geff_dtype("int") == "int"
+        assert _to_geff_dtype("float64") == "float64"
+        assert _to_geff_dtype("list[int]") == "list[int]"
+
+
+class TestRemoveUnsupportedProps:
+    """Test cases for _remove_unsupported_props function."""
+
+    def test_supported_props_kept(self, caplog, simple_model):
+        """Test that properties GEFF can store are kept, without warning."""
+        props = simple_model.get_properties()
+
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+            _remove_unsupported_props(simple_model)
+
+        assert simple_model.get_properties() == props
+        assert not caplog.records
+
+    def test_unsupported_props_removed(self, caplog, simple_model, list_prop):
+        """Test that cell and link properties GEFF cannot store are removed."""
+        simple_model.props_metadata._add_prop(list_prop)
+        simple_model.props_metadata._add_prop(
+            Property(
+                identifier="LINK_FEATURE",
+                name="LINK_FEATURE",
+                description="Link feature not declared in a TrackMate file",
+                provenance="TrackMate",
+                prop_type="edge",
+                lin_type="CellLineage",
+                dtype="unknown",
+            )
+        )
+        lin = simple_model.data.cell_data[0]
+        lin.nodes[1]["daughter_ids"] = [2]
+        lin.edges[1, 2]["LINK_FEATURE"] = 1.5
+
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+            _remove_unsupported_props(simple_model)
+
+        assert "daughter_ids" not in simple_model.get_properties()
+        assert "LINK_FEATURE" not in simple_model.get_properties()
+        assert "daughter_ids" not in lin.nodes[1]
+        assert "LINK_FEATURE" not in lin.edges[1, 2]
+        assert len(caplog.records) == 1
+        message = caplog.records[0].message
+        assert message.startswith("Ignoring properties with a data type that GEFF")
+        assert "'daughter_ids' (dtype 'list[int]')" in message
+        assert "'LINK_FEATURE' (dtype 'unknown')" in message
+
+    def test_lineage_props_kept(self, caplog, simple_model):
+        """Test that lineage properties are kept, since they are not exported."""
+        simple_model.props_metadata._add_prop(
+            Property(
+                identifier="lineage_tags",
+                name="Lineage tags",
+                description="Tags of the lineage",
+                provenance="Test",
+                prop_type="lineage",
+                lin_type="CellLineage",
+                dtype="list[str]",
+            )
+        )
+        simple_model.data.cell_data[0].graph["lineage_tags"] = ["a", "b"]
+
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+            _remove_unsupported_props(simple_model)
+
+        assert "lineage_tags" in simple_model.get_properties()
+        assert simple_model.data.cell_data[0].graph["lineage_tags"] == ["a", "b"]
+        assert not caplog.records
+
+    def test_protected_prop_removed(self, simple_model, list_prop):
+        """Test that protected properties GEFF cannot store are removed too."""
+        simple_model.props_metadata._add_prop(list_prop)
+        simple_model.props_metadata._protect_prop("daughter_ids")
+
+        _remove_unsupported_props(simple_model)
+
+        assert "daughter_ids" not in simple_model.get_properties()
+
+
+class TestRemoveNoneValues:
+    """Test cases for _remove_none_values function."""
+
+    def test_none_values_removed(self, simple_model):
+        """Test that None values of cells and links are removed, not other values."""
+        lin = simple_model.data.cell_data[0]
+        lin.nodes[1]["cell_x"] = None
+        lin.edges[1, 2]["link_x"] = None
+
+        _remove_none_values(simple_model)
+
+        assert "cell_x" not in lin.nodes[1]
+        assert lin.nodes[2]["cell_x"] == 12.0
+        assert "link_x" not in lin.edges[1, 2]
+        assert simple_model.data.cell_data[1].edges[3, 4]["link_x"] == 2.0
 
 
 class TestBuildAxes:
@@ -768,6 +895,43 @@ class TestExportGEFF:
 
         graph, metadata = geff.read(geff_out)
         assert var_length_prop.identifier in metadata.node_props_metadata
+
+    def test_export_skips_unsupported_props(
+        self, caplog, simple_model, list_prop, tmp_path
+    ):
+        """Test that properties GEFF cannot store are skipped, with a warning."""
+        geff_out = str(tmp_path / "test.geff")
+        simple_model.props_metadata._add_prop(list_prop)
+        for lin in simple_model.data.cell_data.values():
+            for node in lin.nodes:
+                lin.nodes[node]["daughter_ids"] = list(lin.successors(node))
+
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+            exported_model = export_GEFF(simple_model, geff_out)
+
+        graph, metadata = geff.read(geff_out)
+        assert "daughter_ids" not in metadata.node_props_metadata
+        assert all("daughter_ids" not in attrs for _, attrs in graph.nodes(data=True))
+        assert "'daughter_ids'" in caplog.text
+        assert "daughter_ids" not in exported_model.get_properties()
+        # The original model is not modified.
+        assert "daughter_ids" in simple_model.get_properties()
+
+    def test_export_writes_none_as_missing(self, simple_model, tmp_path):
+        """Test that None values are written as missing values."""
+        geff_out = str(tmp_path / "test.geff")
+        simple_model.data.cell_data[0].nodes[1]["cell_x"] = None
+        simple_model.data.cell_data[0].edges[1, 2]["link_x"] = None
+
+        export_GEFF(simple_model, geff_out)
+
+        graph, metadata = geff.read(geff_out)
+        assert "cell_x" not in graph.nodes[1]
+        assert graph.nodes[2]["cell_x"] == 12.0
+        assert "link_x" not in graph.edges[1, 2]
+        assert graph.edges[3, 4]["link_x"] == 2.0
+        # The original model is not modified.
+        assert simple_model.data.cell_data[0].nodes[1]["cell_x"] is None
 
     def test_model_requiring_update_raises(self, simple_model, tmp_path):
         """Test that a model requiring an update is not exported."""

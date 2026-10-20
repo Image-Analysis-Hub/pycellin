@@ -12,6 +12,7 @@ References:
 """
 
 import copy
+import logging
 from pathlib import Path
 from typing import Literal
 
@@ -20,9 +21,12 @@ import geff_spec
 import networkx as nx
 
 from pycellin.classes import CellLineage, Model, Property
+from pycellin.classes.exceptions import ProtectedPropertyError
 from pycellin.custom_types import PropertyType
 from pycellin.io.utils import _check_up_to_date, _remove_orphaned_metadata
 from pycellin.utils import _normalize_dtype
+
+logger = logging.getLogger(__name__)
 
 # TODO: geffception for cycle and lineage props
 
@@ -117,6 +121,91 @@ def _solve_node_overlaps(lineages: list[CellLineage]) -> None:
     overlaps = _find_node_overlaps(lineages)
     if overlaps:
         _relabel_nodes(lineages, overlaps)
+
+
+def _to_geff_dtype(dtype: str) -> str:
+    """
+    Return the GEFF spelling of a property data type.
+
+    Parameters
+    ----------
+    dtype : str
+        Data type of a pycellin property.
+
+    Returns
+    -------
+    str
+        "str" for strings, since GEFF spells the string data type "str", else
+        `dtype` unchanged.
+    """
+    if _normalize_dtype(dtype) == "string":
+        return "str"
+    return dtype
+
+
+def _remove_unsupported_props(model: Model) -> None:
+    """
+    Remove the cell and link properties whose data type GEFF cannot store.
+
+    GEFF stores booleans, numbers and strings, as single values or as
+    variable-length arrays (e.g. cell contours), but not data types such as
+    `list[int]` or shapely geometries. Lineage properties are not checked, since
+    they are not exported.
+
+    Parameters
+    ----------
+    model : Model
+        Model to modify.
+
+    Warns
+    -----
+    If some properties have a data type that GEFF cannot store. They are removed
+    from the model and won't be exported.
+    """
+    unsupported = {}
+    for prop_id, prop in model.get_cell_lineage_properties().items():
+        if not prop.prop_type & (PropertyType.NODE | PropertyType.EDGE):
+            continue
+        try:
+            geff_spec.PropMetadata(identifier=prop_id, dtype=_to_geff_dtype(prop.dtype))
+        except ValueError:  # pydantic's ValidationError is a ValueError.
+            unsupported[prop_id] = prop.dtype
+    if not unsupported:
+        return
+
+    for prop_id in unsupported:
+        try:
+            model.remove_property(prop_id)
+        except ProtectedPropertyError:
+            model.props_metadata._unprotect_prop(prop_id)
+            model.remove_property(prop_id)
+    props_str = ", ".join(
+        f"'{prop_id}' (dtype '{dtype}')" for prop_id, dtype in unsupported.items()
+    )
+    logger.warning(
+        f"Ignoring propert{'ies' if len(unsupported) > 1 else 'y'} with a data type "
+        f"that GEFF cannot store: {props_str}."
+    )
+
+
+def _remove_none_values(model: Model) -> None:
+    """
+    Remove the None values of cell and link properties.
+
+    GEFF has no None value: geff writes a key absent from a cell or a link as a
+    missing value, but fails on a None value.
+
+    Parameters
+    ----------
+    model : Model
+        Model to modify.
+    """
+    for lineage in model.data.cell_data.values():
+        attrs_dicts = [attrs for _, attrs in lineage.nodes(data=True)]
+        attrs_dicts += [attrs for _, _, attrs in lineage.edges(data=True)]
+        for attrs in attrs_dicts:
+            for key in [key for key, value in attrs.items() if value is None]:
+                del attrs[key]
 
 
 def _build_axes(
@@ -252,15 +341,9 @@ def _build_props_metadata(
     edge_props_md: dict[str, geff_spec.PropMetadata] = {}
 
     for prop_id, prop in properties.items():
-        # GEFF spells the string data type "str".
-        if _normalize_dtype(prop.dtype) == "string":
-            dtype = "str"
-        else:
-            dtype = prop.dtype
-
         prop_md = geff_spec.PropMetadata(
             identifier=prop_id,
-            dtype=dtype,
+            dtype=_to_geff_dtype(prop.dtype),
             varlength=prop_id in var_length_props if var_length_props else False,
             unit=prop.unit,
             name=prop.name,
@@ -417,6 +500,14 @@ def export_GEFF(
         If the model contains no lineage data.
     RuntimeError
         If the GEFF export process fails.
+
+    Notes
+    -----
+    Only cell and link properties are exported: lineage properties are not, and
+    cycle properties only once propagated to the cells with
+    `Model.propagate_cycle_properties()`. Properties whose data type GEFF cannot
+    store, such as `list[int]` or shapely geometries, are not exported either, and
+    a warning names them. None values are written as missing values.
     """
     _check_up_to_date(model)
     if not model.data.cell_data:
@@ -426,6 +517,9 @@ def export_GEFF(
         # We don't want to modify the original model.
         model_copy = copy.deepcopy(model)
 
+        # GEFF can store neither some data types nor None values.
+        _remove_unsupported_props(model_copy)
+        _remove_none_values(model_copy)
         # For GEFF compatibility, we need to ensure that there are no property metadata
         # entries that don't correspond to any actual property in the data.
         _remove_orphaned_metadata(model_copy)
