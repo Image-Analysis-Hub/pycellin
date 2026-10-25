@@ -545,7 +545,9 @@ def test_convert_attributes_ValueError():
         tml._convert_attributes(attributes, props, "node")
 
 
-def test_convert_attributes_missing_prop(caplog):
+def test_convert_attributes_undeclared_attribute(caplog):
+    """An undeclared attribute is recorded and left as a string, without warning:
+    its data type is inferred once the whole file is read."""
     props = {
         "prop_float": Property(
             identifier="prop_float",
@@ -558,21 +560,105 @@ def test_convert_attributes_missing_prop(caplog):
         ),
     }
     attributes = {"prop_float": "30", "prop_int": "20"}
+    undeclared = {}
 
     with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.loader"):
-        tml._convert_attributes(attributes, props, "node")
-    assert len(caplog.records) == 1
-    assert caplog.records[0].levelname == "WARNING"
-    assert "not found in the properties metadata" in caplog.records[0].message
+        tml._convert_attributes(attributes, props, "node", undeclared)
 
-    assert props["prop_int"].identifier == "prop_int"
-    assert props["prop_int"].name == "prop_int"
-    assert props["prop_int"].description == "unknown"
-    assert props["prop_int"].provenance == "unknown"
-    assert props["prop_int"].prop_type == PropertyType.NODE
-    assert props["prop_int"].lin_type == "CellLineage"
-    assert props["prop_int"].dtype == "unknown"
-    assert props["prop_int"].unit == "unknown"
+    assert attributes == {"prop_float": 30.0, "prop_int": "20"}
+    assert undeclared == {"node": {"prop_int"}}
+    assert list(props) == ["prop_float"]
+    assert not caplog.records
+
+
+# _infer_attribute_dtype ######################################################
+
+
+@pytest.mark.parametrize(
+    "values, expected",
+    [
+        (["1", "-2"], "int"),
+        (["1", "NaN"], "int"),
+        (["1", "2.5"], "float"),
+        (["1e3"], "float"),
+        (["NaN", "Infinity"], "float"),
+        (["NaN"], "float"),
+        (["1", "a"], "str"),
+    ],
+)
+def test_infer_attribute_dtype(values, expected):
+    assert tml._infer_attribute_dtype(values) == expected
+
+
+# _declare_undeclared_attributes ##############################################
+
+
+def test_declare_undeclared_attributes(caplog):
+    """Values are converted to the inferred data type, and the attributes declared
+    without unit, with a single warning."""
+    graph = nx.DiGraph()
+    graph.add_node(1, TRACK_ID=0, count="3", label="a")
+    graph.add_node(2, TRACK_ID=0, count="NaN", label="b")
+    graph.add_edge(1, 2, weight="0.5")
+    tracks_attributes = [{"TRACK_ID": 0, "score": "2"}]
+    undeclared = {"node": {"count", "label"}, "edge": {"weight"}, "lineage": {"score"}}
+    props_md = PropsMetadata()
+
+    with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.loader"):
+        tml._declare_undeclared_attributes(
+            undeclared, graph, tracks_attributes, props_md
+        )
+
+    assert graph.nodes[1]["count"] == 3
+    assert graph.nodes[2]["count"] is None
+    assert graph.nodes[1]["label"] == "a"
+    assert graph.edges[1, 2]["weight"] == 0.5
+    assert tracks_attributes[0]["score"] == 2
+    dtypes = {key: props_md.props[key].dtype for key in props_md.props}
+    assert dtypes == {"count": "int", "label": "str", "weight": "float", "score": "int"}
+    assert props_md.props["weight"].prop_type == PropertyType.EDGE
+    assert props_md.props["score"].prop_type == PropertyType.LINEAGE
+    assert all(prop.unit is None for prop in props_md.props.values())
+    assert len(caplog.records) == 1
+    assert "'count' (spots, int)" in caplog.records[0].message
+    assert "'score' (tracks, int)" in caplog.records[0].message
+
+
+def test_declare_undeclared_attributes_of_spots_and_tracks():
+    """An attribute of spots and tracks gets a single declaration."""
+    graph = nx.DiGraph()
+    graph.add_node(1, TRACK_ID=0, extra="1")
+    graph.add_node(2, TRACK_ID=0, extra="2")
+    graph.add_edge(1, 2)
+    tracks_attributes = [{"TRACK_ID": 0, "extra": "1.5"}]
+    props_md = PropsMetadata()
+
+    tml._declare_undeclared_attributes(
+        {"node": {"extra"}, "lineage": {"extra"}}, graph, tracks_attributes, props_md
+    )
+
+    prop = props_md.props["extra"]
+    assert prop.prop_type == PropertyType.NODE | PropertyType.LINEAGE
+    assert prop.dtype == "float"
+    assert graph.nodes[1]["extra"] == 1.0
+
+
+def test_declare_undeclared_attributes_of_filtered_track_ignored(caplog):
+    """An attribute found only on a track that was filtered out is not declared."""
+    graph = nx.DiGraph()
+    graph.add_node(1, TRACK_ID=0)
+    graph.add_node(2, TRACK_ID=0)
+    graph.add_edge(1, 2)
+    tracks_attributes = [{"TRACK_ID": 0}, {"TRACK_ID": 1, "extra": "1"}]
+    props_md = PropsMetadata()
+
+    with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.loader"):
+        tml._declare_undeclared_attributes(
+            {"lineage": {"extra"}}, graph, tracks_attributes, props_md
+        )
+
+    assert "extra" not in props_md.props
+    assert not caplog.records
 
 
 # _convert_ROI_coordinates ####################################################
@@ -1201,6 +1287,43 @@ def test_parse_model_tag_keep_all_spots_and_tracks():
         assert lin.graph["lineage_id"] == lin_id
         cell_lin_ids = {cell_lin_id for _, cell_lin_id in lin.nodes(data="lineage_id")}
         assert cell_lin_ids == {lin_id}
+
+
+def test_parse_model_tag_undeclared_attributes(tmp_path):
+    """Attributes that the file doesn't declare, here on every spot, edge and track
+    of FakeTracks, are loaded with the data type of their values."""
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    tree = ET.parse(str(xml_path))
+    for i, spot in enumerate(tree.iter("Spot")):
+        spot.set("spot_int", str(i))
+        spot.set("spot_text", f"spot{i}")
+    for edge in tree.iter("Edge"):
+        edge.set("edge_float", "1.5")
+    for track in tree.iter("Track"):
+        track.set("track_int", "7")
+    modified_path = tmp_path / "FakeTracks_undeclared.xml"
+    tree.write(str(modified_path), xml_declaration=True, encoding="UTF-8")
+
+    _, props_md, data = tml._parse_model_tag(
+        modified_path, keep_all_spots=False, keep_all_tracks=False
+    )
+
+    dtypes = {
+        key: props_md.props[key].dtype
+        for key in ("spot_int", "spot_text", "edge_float", "track_int")
+    }
+    assert dtypes == {
+        "spot_int": "int",
+        "spot_text": "str",
+        "edge_float": "float",
+        "track_int": "int",
+    }
+    for lin in data.cell_data.values():
+        for _, attrs in lin.nodes(data=True):
+            assert attrs["spot_text"] == f"spot{attrs['spot_int']}"
+        assert all(value == 1.5 for *_, value in lin.edges(data="edge_float"))
+        if len(lin) > 1:
+            assert lin.graph["track_int"] == 7
 
 
 # _get_specific_tags ##########################################################

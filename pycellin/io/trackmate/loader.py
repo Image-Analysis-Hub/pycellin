@@ -262,12 +262,15 @@ def _convert_attributes(
     attributes: dict[str, str],
     props: dict[str, Property],
     prop_type: str,
+    undeclared: dict[str, set[str]] | None = None,
 ) -> None:
     """
     Convert the values of `attributes` from string to the correct data type.
 
     The type to convert to is given by the properties metadata that stores all
-    the properties info.
+    the properties info. The values of attributes that the file doesn't declare
+    are left as strings: their data type is inferred once the whole file is read,
+    by `_declare_undeclared_attributes()`.
 
     Parameters
     ----------
@@ -278,16 +281,15 @@ def _convert_attributes(
         the values of `attributes`.
     prop_type : str
         The type of the property to convert (node, edge, or lineage).
+    undeclared : dict[str, set[str]] | None, optional
+        The keys of the attributes that the file doesn't declare, by property type,
+        to which the undeclared keys of `attributes` are added. If None, they are
+        not recorded.
 
     Raises
     ------
     ValueError
         If a property has an invalid dtype (not "int", "float" nor "string").
-
-    Warns
-    -----
-    UserWarning
-        If a property is not found in the properties metadata.
     """
     # TODO: Rewrite this.
     for key, value in attributes.items():
@@ -313,26 +315,139 @@ def _convert_attributes(
             # This attribute is a special case (stored as a tag text instead of tag
             # attribute) and will be converted later, in _add_ROI_coordinates().
             pass
-        else:
-            msg = (
-                f"{prop_type.capitalize()} property {key} not found in the properties "
-                "metadata. A stub version of the property metadata has been added "
-                "instead. You can manually update the metadata later on."
-            )
-            logger.warning(msg)
-            # In that case we add a stub version of the property to the properties
-            # declaration. The user will need to manually update the property later on.
-            missing_prop = Property(
-                identifier=key,
-                name=key,
-                description="unknown",
-                provenance="unknown",
-                prop_type=prop_type,
-                lin_type="CellLineage",
-                dtype="unknown",
-                unit="unknown",
-            )
-            props[key] = missing_prop
+        elif undeclared is not None:
+            undeclared.setdefault(prop_type, set()).add(key)
+
+
+def _infer_attribute_dtype(values: list[str]) -> str:
+    """
+    Infer the data type of attribute values read as strings.
+
+    The values are integers if they all are, NaN being a missing value as for
+    declared integer features, else real numbers if they all are, else strings.
+
+    Parameters
+    ----------
+    values : list[str]
+        The values whose data type to infer.
+
+    Returns
+    -------
+    str
+        "int", "float" or "str".
+    """
+    numbers = [value for value in values if value != "NaN"]
+    try:
+        for value in numbers:
+            int(value)
+    except ValueError:
+        pass
+    else:
+        if numbers:
+            return "int"
+    try:
+        for value in values:
+            float(value)
+    except ValueError:
+        return "str"
+    return "float"
+
+
+def _convert_attribute_value(value: str, dtype: str) -> int | float | str | None:
+    """
+    Convert an attribute value read as a string to a data type.
+
+    Parameters
+    ----------
+    value : str
+        The value to convert.
+    dtype : str
+        The data type to convert to: "int", "float" or "str". NaN integers become
+        None.
+
+    Returns
+    -------
+    int | float | str | None
+        The converted value.
+    """
+    match dtype:
+        case "int":
+            return None if value == "NaN" else int(value)
+        case "float":
+            return float(value)
+        case _:
+            return value
+
+
+def _declare_undeclared_attributes(
+    undeclared: dict[str, set[str]],
+    graph: nx.DiGraph,
+    tracks_attributes: list[dict[str, Any]],
+    props_md: PropsMetadata,
+) -> None:
+    """
+    Convert and declare the attributes that the file doesn't declare.
+
+    The data type of such an attribute is inferred from its values, see
+    `_infer_attribute_dtype()`, and it is declared without unit. An attribute of
+    several kinds of elements, e.g. of spots and tracks, gets a single declaration
+    with several property types. Only the spots, edges and tracks that are kept
+    are considered.
+
+    Parameters
+    ----------
+    undeclared : dict[str, set[str]]
+        The keys of the attributes that the file doesn't declare, by property type.
+    graph : nx.DiGraph
+        The graph holding the spots and edges that are kept.
+    tracks_attributes : list[dict[str, Any]]
+        The attributes of the tracks.
+    props_md : PropsMetadata
+        The properties metadata to add the declarations to.
+
+    Warns
+    -----
+    If some attributes are not declared in the file.
+    """
+    kept_tracks = {track_id for _, track_id in graph.nodes(data="TRACK_ID")}
+    attrs_dicts = {
+        "node": [attrs for _, attrs in graph.nodes(data=True)],
+        "edge": [attrs for _, _, attrs in graph.edges(data=True)],
+        "lineage": [
+            attrs for attrs in tracks_attributes if attrs.get("TRACK_ID") in kept_tracks
+        ],
+    }
+    prop_types: dict[str, list[str]] = {}
+    for prop_type in ("node", "edge", "lineage"):
+        for key in undeclared.get(prop_type, set()):
+            prop_types.setdefault(key, []).append(prop_type)
+
+    element_names = {"node": "spots", "edge": "edges", "lineage": "tracks"}
+    loaded = []
+    for key, types in sorted(prop_types.items()):
+        dicts = [attrs for t in types for attrs in attrs_dicts[t] if key in attrs]
+        if not dicts:
+            continue  # Only on spots or tracks that were filtered out.
+        dtype = _infer_attribute_dtype([attrs[key] for attrs in dicts])
+        for attrs in dicts:
+            attrs[key] = _convert_attribute_value(attrs[key], dtype)
+        prop = Property(
+            identifier=key,
+            name=key,
+            description="Attribute not declared in the TrackMate file",
+            provenance="unknown",
+            prop_type=types,
+            lin_type="CellLineage",
+            dtype=dtype,
+        )
+        props_md._add_prop(prop)
+        elements = ", ".join(element_names[t] for t in types)
+        loaded.append(f"'{key}' ({elements}, {dtype})")
+    if loaded:
+        logger.warning(
+            f"Attributes not declared in the TrackMate file: {', '.join(loaded)}. "
+            "They were loaded with the data type of their values, and no unit."
+        )
 
 
 def _convert_ROI_coordinates(
@@ -378,6 +493,7 @@ def _add_all_nodes(
     ancestor: ET._Element,
     props_md: PropsMetadata,
     graph: nx.DiGraph,
+    undeclared: dict[str, set[str]] | None = None,
 ) -> bool:
     """
     Add nodes and their attributes to a graph and return the presence of segmentation.
@@ -395,6 +511,10 @@ def _add_all_nodes(
         node attributes.
     graph : nx.DiGraph
         Graph to add the nodes to.
+    undeclared : dict[str, set[str]] | None, optional
+        The keys of the attributes that the file doesn't declare, by property type,
+        to which the undeclared node attributes are added. If None, they are not
+        recorded.
 
     Returns
     -------
@@ -419,7 +539,7 @@ def _add_all_nodes(
             # as defined in the properties metadata.
             attribs = deepcopy(element.attrib)
             try:
-                _convert_attributes(attribs, props_md.props, "node")
+                _convert_attributes(attribs, props_md.props, "node", undeclared)
             except ValueError as err:
                 print(f"ERROR: {err} Please check the XML file.")
                 raise
@@ -459,6 +579,7 @@ def _add_edge(
     props_md: PropsMetadata,
     graph: nx.DiGraph,
     current_track_id: int,
+    undeclared: dict[str, set[str]] | None = None,
 ) -> None:
     """
     Add an edge between two nodes in the graph based on the XML element.
@@ -480,6 +601,10 @@ def _add_edge(
         The graph to which the edge and its attributes will be added.
     current_track_id : int
         Track ID of the track holding the edge.
+    undeclared : dict[str, set[str]] | None, optional
+        The keys of the attributes that the file doesn't declare, by property type,
+        to which the undeclared edge attributes are added. If None, they are not
+        recorded.
 
     Raises
     ------
@@ -490,7 +615,7 @@ def _add_edge(
     """
     attribs = deepcopy(element.attrib)
     try:
-        _convert_attributes(attribs, props_md.props, "edge")
+        _convert_attributes(attribs, props_md.props, "edge", undeclared)
     except ValueError as err:
         print(f"ERROR: {err} Please check the XML file.")
         raise
@@ -529,6 +654,7 @@ def _build_tracks(
     ancestor: ET._Element,
     props_md: PropsMetadata,
     graph: nx.DiGraph,
+    undeclared: dict[str, set[str]] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Add edges and their attributes to a graph based on the XML elements.
@@ -550,6 +676,10 @@ def _build_tracks(
         to convert the edge and tracks attributes.
     graph: nx.DiGraph
         The graph to which the edges and their attributes will be added.
+    undeclared : dict[str, set[str]] | None, optional
+        The keys of the attributes that the file doesn't declare, by property type,
+        to which the undeclared edge and track attributes are added. If None, they
+        are not recorded.
 
     Returns
     -------
@@ -565,7 +695,7 @@ def _build_tracks(
         if element.tag == "Track" and event == "start":
             attribs = deepcopy(element.attrib)
             try:
-                _convert_attributes(attribs, props_md.props, "lineage")
+                _convert_attributes(attribs, props_md.props, "lineage", undeclared)
             except ValueError as err:
                 print(f"ERROR: {err} Please check the XML file.")
                 raise
@@ -582,7 +712,7 @@ def _build_tracks(
         # Edge creation.
         if element.tag == "Edge" and event == "start":
             assert current_track_id is not None, "No current track ID."
-            _add_edge(element, props_md, graph, current_track_id)
+            _add_edge(element, props_md, graph, current_track_id, undeclared)
 
         event, element = next(iterator)
 
@@ -796,6 +926,8 @@ def _parse_model_tag(
         and the data of the model.
     """
     props_md = PropsMetadata()
+    # Keys of the attributes that the file doesn't declare, by property type.
+    undeclared: dict[str, set[str]] = {}
 
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
@@ -825,12 +957,12 @@ def _parse_model_tag(
 
         # Adding the spots as nodes.
         if element.tag == "AllSpots" and event == "start":
-            segmentation = _add_all_nodes(it, element, props_md, graph)
+            segmentation = _add_all_nodes(it, element, props_md, graph, undeclared)
             root.clear()
 
         # Adding the tracks as edges.
         if element.tag == "AllTracks" and event == "start":
-            tracks_attributes = _build_tracks(it, element, props_md, graph)
+            tracks_attributes = _build_tracks(it, element, props_md, graph, undeclared)
             root.clear()
 
             # Removal of filtered spots / nodes.
@@ -851,6 +983,10 @@ def _parse_model_tag(
 
         if element.tag == "Model" and event == "end":
             break  # We are not interested in the following data.
+
+    # Now that all the values are read, we can infer the data type of the attributes
+    # that the file doesn't declare.
+    _declare_undeclared_attributes(undeclared, graph, tracks_attributes, props_md)
 
     # We want one lineage per track, so we need to split the graph
     # into its connected components.

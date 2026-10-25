@@ -624,3 +624,52 @@ class TestExportTrackMateXML:
         reloaded = load_TrackMate_XML(tmp_path / "second.xml")
         contours = dict(reloaded.data.cell_data[0].nodes(data="cell_contour"))
         assert contours == {1: None, 2: None}
+
+    def test_undeclared_attributes_not_exported(self, tmp_path, simple_model, caplog):
+        """Test that attributes without a property declaration are not exported,
+        with a warning naming them, so that TrackMate can read the file."""
+        lin = simple_model.data.cell_data[0]
+        for _, attrs in lin.nodes(data=True):
+            attrs["note"] = "text"
+        lin.edges[1, 2]["link_note"] = 1.0
+        lin.graph["lineage_note"] = 2
+        xml_path = tmp_path / "model.xml"
+
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.exporter"):
+            export_TrackMate_XML(
+                simple_model, xml_path, units={"space": "pixel", "time": "frame"}
+            )
+
+        tree = ET.parse(str(xml_path))
+        for tag, key in (
+            ("Spot", "note"),
+            ("Edge", "link_note"),
+            ("Track", "lineage_note"),
+        ):
+            assert all(key not in element.attrib for element in tree.iter(tag))
+        messages = [
+            r.message for r in caplog.records if "no property declaration" in r.message
+        ]
+        assert len(messages) == 1
+        assert "'note' (cells)" in messages[0]
+        assert "'link_note' (links)" in messages[0]
+        assert "'lineage_note' (lineages)" in messages[0]
+        model = load_TrackMate_XML(xml_path)
+        assert model.get_property("note") is None
+
+    def test_declared_attributes_exported_without_warning(
+        self, tmp_path, simple_model, caplog
+    ):
+        """Test that a model whose attributes are all declared exports them all,
+        without warning about undeclared attributes."""
+        xml_path = tmp_path / "model.xml"
+
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.exporter"):
+            export_TrackMate_XML(
+                simple_model, xml_path, units={"space": "pixel", "time": "frame"}
+            )
+
+        assert not any("no property declaration" in r.message for r in caplog.records)
+        spot = next(ET.parse(str(xml_path)).iter("Spot"))
+        for key in ("ID", "FRAME", "POSITION_X", "POSITION_Y", "RADIUS"):
+            assert key in spot.attrib

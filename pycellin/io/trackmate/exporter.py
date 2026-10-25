@@ -448,9 +448,82 @@ def _value_to_str(
         return str(value)
 
 
+def _get_exported_keys(model: Model) -> dict[str, set[str]]:
+    """
+    Return the keys of the attributes to write for spots, edges and tracks.
+
+    These are the properties declared in the FeatureDeclarations tag, plus the
+    attributes that TrackMate reads without declaration: the ID and name of spots,
+    and the name of tracks. The other attributes of cells, links and lineages are
+    not exported.
+
+    Parameters
+    ----------
+    model : Model
+        Model prepared for the export.
+
+    Returns
+    -------
+    dict[str, set[str]]
+        The keys of the attributes to write, by property type ("node", "edge" and
+        "lineage").
+
+    Warns
+    -----
+    If some attributes have no property declaration, and so are not exported.
+    """
+    exported_keys = {
+        "node": {"ID", "name"},
+        "edge": set(),
+        "lineage": {"name"},
+    }
+    for prop_type, props in (
+        ("node", model.get_node_properties()),
+        ("edge", model.get_edge_properties()),
+        ("lineage", model.get_lineage_properties()),
+    ):
+        # Cycle lineage properties are not declared, see _write_FeatureDeclarations().
+        exported_keys[prop_type].update(
+            prop_id
+            for prop_id, prop in props.items()
+            if prop.lin_type != "CycleLineage"
+        )
+
+    # Attributes written in another way, or not at all on purpose.
+    handled_keys = {
+        "node": {"TRACK_ID", "cell_contour"},
+        "edge": set(),
+        "lineage": {"Model", "FilteredTrack"},
+    }
+    ignored: dict[str, set[str]] = {"node": set(), "edge": set(), "lineage": set()}
+    for lin in model.data.cell_data.values():
+        attrs_dicts = {
+            "node": [attrs for _, attrs in lin.nodes(data=True)],
+            "edge": [attrs for _, _, attrs in lin.edges(data=True)],
+            "lineage": [lin.graph],
+        }
+        for prop_type, dicts in attrs_dicts.items():
+            known = exported_keys[prop_type] | handled_keys[prop_type]
+            for attrs in dicts:
+                ignored[prop_type].update(key for key in attrs if key not in known)
+    element_names = {"node": "cells", "edge": "links", "lineage": "lineages"}
+    ignored_str = ", ".join(
+        f"'{key}' ({element_names[prop_type]})"
+        for prop_type, keys in ignored.items()
+        for key in sorted(keys)
+    )
+    if ignored_str:
+        logger.warning(
+            f"Not exporting attributes that have no property declaration: "
+            f"{ignored_str}."
+        )
+    return exported_keys
+
+
 def _create_Spot(
     lineage: CellLineage,
     node: int,
+    keys: set[str],
 ) -> ET._Element:
     """
     Create an XML Spot Element representing a node of a Lineage.
@@ -461,17 +534,17 @@ def _create_Spot(
         Lineage containing the node to create.
     node : int
         ID of the node in the lineage.
+    keys : set[str]
+        Keys of the node attributes to write, see `_get_exported_keys()`. The cell
+        contour is written in any case, as the ROI of the spot.
 
     Returns
     -------
     ET._Element
         The newly created Spot Element.
     """
-    exluded_keys = ["TRACK_ID", "cell_contour"]
     n_attr = {
-        k: _value_to_str(v)
-        for k, v in lineage.nodes[node].items()
-        if k not in exluded_keys
+        k: _value_to_str(v) for k, v in lineage.nodes[node].items() if k in keys
     }
     # A cell without contour may have None, e.g. when loaded from a TrackMate file.
     contour = lineage.nodes[node].get("cell_contour")
@@ -492,6 +565,7 @@ def _create_Spot(
 def _write_AllSpots(
     xf: ET.xmlfile,
     data: dict[int, CellLineage],
+    keys: set[str],
 ) -> None:
     """
     Write the nodes/spots data into an XML file.
@@ -502,6 +576,8 @@ def _write_AllSpots(
         Context manager for the XML file to write.
     data : dict[int, CellLineage]
         Cell lineages containing the data to write.
+    keys : set[str]
+        Keys of the node attributes to write, see `_get_exported_keys()`.
     """
     xf.write(f"\n{' ' * 4}")
     lineages = data.values()
@@ -521,7 +597,7 @@ def _write_AllSpots(
                     nodes = [n for n in lin.nodes() if lin.nodes[n]["FRAME"] == frame]
                     for node in nodes:
                         xf.write(f"\n{' ' * 8}")
-                        xf.write(_create_Spot(lin, node))
+                        xf.write(_create_Spot(lin, node, keys))
                 xf.write(f"\n{' ' * 6}")
         xf.write(f"\n{' ' * 4}")
 
@@ -529,6 +605,8 @@ def _write_AllSpots(
 def _write_AllTracks(
     xf: ET.xmlfile,
     data: dict[int, CellLineage],
+    track_keys: set[str],
+    edge_keys: set[str],
 ) -> None:
     """
     Write the tracks data into an XML file.
@@ -539,6 +617,10 @@ def _write_AllTracks(
         Context manager for the XML file to write.
     data : dict[int, CellLineage]
         Cell lineages containing the data to write.
+    track_keys : set[str]
+        Keys of the lineage attributes to write, see `_get_exported_keys()`.
+    edge_keys : set[str]
+        Keys of the edge attributes to write, see `_get_exported_keys()`.
     """
     xf.write(f"\n{' ' * 4}")
     with xf.element("AllTracks"):
@@ -551,17 +633,20 @@ def _write_AllTracks(
 
             # Track tags.
             xf.write(f"\n{' ' * 6}")
-            exluded_keys = ["Model", "FilteredTrack"]
             t_attr = {
                 k: _value_to_str(v)
                 for k, v in lineage.graph.items()
-                if k not in exluded_keys
+                if k in track_keys
             }
             with xf.element("Track", t_attr):
                 # Edge tags.
                 for edge in lineage.edges.data():
                     xf.write(f"\n{' ' * 8}")
-                    e_attr = {k: _value_to_str(v) for k, v in edge[2].items()}
+                    e_attr = {
+                        k: _value_to_str(v)
+                        for k, v in edge[2].items()
+                        if k in edge_keys
+                    }
                     xf.write(ET.Element("Edge", e_attr))
                 xf.write(f"\n{' ' * 6}")
         xf.write(f"\n{' ' * 4}")
@@ -1391,6 +1476,8 @@ def export_TrackMate_XML(
     TrackMate only supports numeric features. Non-numeric properties (strings,
     lists, polygons...) are not exported, except TrackMate's own properties and
     'name'. Boolean properties are exported as integers (1 for True, 0 for False).
+    Attributes of cells, links and lineages without a property declaration are not
+    exported either, and a warning names them.
     For example, a location tag added with `tag_names` holds strings and is not
     exported: add it without `tag_names` to keep the integer tags.
     """
@@ -1407,6 +1494,7 @@ def export_TrackMate_XML(
         tm_version = "unknown"
     has_FilteredTrack = model_copy.has_property("FilteredTrack")
     _prepare_model_for_export(model_copy, propagate_cycle_props)
+    exported_keys = _get_exported_keys(model_copy)
 
     with ET.xmlfile(xml_path, encoding="utf-8", close=True) as xf:
         xf.write_declaration()
@@ -1416,8 +1504,13 @@ def export_TrackMate_XML(
             xf.write("\n  ")
             with xf.element("Model", tm_units):
                 _write_FeatureDeclarations(xf, model_copy)
-                _write_AllSpots(xf, model_copy.data.cell_data)
-                _write_AllTracks(xf, model_copy.data.cell_data)
+                _write_AllSpots(xf, model_copy.data.cell_data, exported_keys["node"])
+                _write_AllTracks(
+                    xf,
+                    model_copy.data.cell_data,
+                    exported_keys["lineage"],
+                    exported_keys["edge"],
+                )
                 _write_FilteredTracks(xf, model_copy.data.cell_data, has_FilteredTrack)
             xf.write("\n  ")
             _write_Settings(

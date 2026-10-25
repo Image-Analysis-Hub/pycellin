@@ -24,8 +24,10 @@ import pandas as pd
 from pycellin.classes import (
     Data,
     Model,
+    Property,
     PropsMetadata,
 )
+from pycellin.io.utils import _split_graph_into_lineages
 from pycellin.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
@@ -33,7 +35,59 @@ from pycellin.properties.core import (
     create_lineage_id_property,
     create_time_property,
 )
-from pycellin.io.utils import _split_graph_into_lineages
+from pycellin.utils import _infer_dtype
+
+# Columns written by trackpy: name, description, and whether the values are in the
+# unit of the coordinates. With a diameter that differs between axes, trackpy writes
+# a size and a static error per axis instead of 'size' and 'ep'.
+_TRACKPY_COLUMNS: dict[str, tuple[str, str, bool]] = {
+    "particle": (
+        "Particle",
+        "Identifier of the particle, given by trackpy linking",
+        False,
+    ),
+    "mass": ("Mass", "Total integrated brightness of the particle", False),
+    "size": (
+        "Size",
+        "Radius of gyration of the brightness profile of the particle",
+        True,
+    ),
+    "ecc": ("Eccentricity", "Eccentricity of the particle, 0 when circular", False),
+    "signal": (
+        "Signal",
+        "Maximum brightness of the particle in the preprocessed image",
+        False,
+    ),
+    "raw_mass": (
+        "Raw mass",
+        "Total integrated brightness of the particle in the raw image",
+        False,
+    ),
+    "ep": (
+        "Static error",
+        "Estimated uncertainty of the position of the particle",
+        True,
+    ),
+    **{
+        f"size_{axis}": (
+            f"Size {axis}",
+            (
+                "Radius of gyration of the brightness profile of the particle "
+                f"along {axis}"
+            ),
+            True,
+        )
+        for axis in ("x", "y", "z")
+    },
+    **{
+        f"ep_{axis}": (
+            f"Static error {axis}",
+            f"Estimated uncertainty of the {axis} position of the particle",
+            True,
+        )
+        for axis in ("x", "y", "z")
+    },
+}
 
 
 def _add_nodes(graph: nx.DiGraph, df: pd.DataFrame) -> None:
@@ -41,9 +95,10 @@ def _add_nodes(graph: nx.DiGraph, df: pd.DataFrame) -> None:
     Add nodes to the graph from the DataFrame.
 
     One node is created per row of the DataFrame. Its attributes are the row values,
-    with 'frame' and 'particle' cast to int and the trackpy coordinates 'x', 'y'
-    and 'z' renamed to 'cell_x', 'cell_y' and 'cell_z'. A 'cell_id' equal to the
-    position of the row in the DataFrame is added, and also used as node ID.
+    with their data type, 'frame' and 'particle' cast to int and the trackpy
+    coordinates 'x', 'y' and 'z' renamed to 'cell_x', 'cell_y' and 'cell_z'. A
+    'cell_id' equal to the position of the row in the DataFrame is added, and also
+    used as node ID.
 
     Parameters
     ----------
@@ -52,44 +107,68 @@ def _add_nodes(graph: nx.DiGraph, df: pd.DataFrame) -> None:
     df : pd.DataFrame
         The DataFrame containing trackpy data.
     """
-    for i, (_, row) in enumerate(df.iterrows()):
-        row_dict = row.to_dict()
+    # Unlike iterrows(), to_dict() keeps the integers of a row whose values are all
+    # numbers, instead of turning them into floats.
+    for i, row_dict in enumerate(df.to_dict("records")):
         row_dict["frame"] = int(row_dict["frame"])
         row_dict["particle"] = int(row_dict["particle"])
         for axis in ("x", "y", "z"):
             if axis in row_dict:
                 row_dict[f"cell_{axis}"] = row_dict.pop(axis)
+        row_dict["cell_id"] = i
         graph.add_node(i, **row_dict)
-        graph.nodes[i]["cell_id"] = i
 
 
-def _add_edges(graph: nx.DiGraph, particles: list) -> None:
+def _add_edges(graph: nx.DiGraph) -> None:
     """
     Add edges to the graph based on particle trajectories.
 
-    For each particle, its nodes are sorted by frame and each node is linked
-    to the next one. Frames do not need to be consecutive, so trajectories
-    with gaps are supported.
+    The nodes of each particle are sorted by frame and each node is linked to the
+    next one. Frames do not need to be consecutive, so trajectories with gaps are
+    supported.
 
     Parameters
     ----------
     graph : nx.DiGraph
         The graph to which edges will be added.
-    particles : list
-        List of unique particle identifiers.
     """
-    for particle in particles:
-        # We need to link cells that have the same 'particle' value and are in frames
-        # that follows each other. Since there can be gaps in trackpy trajectories,
-        # we can't rely on the fact that frames will be truly consecutive.
-        candidates = [
-            (node, frame)
-            for node, frame in graph.nodes(data="frame")
-            if graph.nodes[node]["particle"] == particle
-        ]
-        candidates.sort(key=lambda x: x[1])
-        for (n1, _), (n2, _) in pairwise(candidates):
+    # Grouping the nodes by particle first keeps the linking time linear in the
+    # number of nodes.
+    trajectories: dict[int, list[tuple[int, int]]] = {}
+    for node, attrs in graph.nodes(data=True):
+        trajectories.setdefault(attrs["particle"], []).append((attrs["frame"], node))
+    for trajectory in trajectories.values():
+        trajectory.sort()
+        for (_, n1), (_, n2) in pairwise(trajectory):
             graph.add_edge(n1, n2)
+
+
+def _get_column_dtype(column: pd.Series) -> str:
+    """
+    Return the data type of a DataFrame column, in Python type hint syntax.
+
+    Boolean, integer and float columns give "bool", "int" and "float". For other
+    columns, the data type is inferred from the values, missing values ignored,
+    e.g. "str". A column without any value gives its pandas data type, e.g.
+    "object".
+
+    Parameters
+    ----------
+    column : pd.Series
+        The column whose data type to return.
+
+    Returns
+    -------
+    str
+        The data type of the column.
+    """
+    if pd.api.types.is_bool_dtype(column):
+        return "bool"
+    if pd.api.types.is_integer_dtype(column):
+        return "int"
+    if pd.api.types.is_float_dtype(column):
+        return "float"
+    return _infer_dtype(column.dropna().tolist()) or str(column.dtype)
 
 
 def _create_metadata(
@@ -144,16 +223,21 @@ def _create_metadata(
 
 
 def _create_PropsMetadata(
-    props: list[str], metadata: dict[str, Any], time_prop: str
+    dtypes: dict[str, str], metadata: dict[str, Any], time_prop: str
 ) -> PropsMetadata:
     """
     Return a PropsMetadata object populated with the needed properties.
 
+    Every column of the trackpy DataFrame is declared. The coordinate columns
+    ('x', 'y', 'z') are declared as 'cell_x', 'cell_y' and 'cell_z', and the
+    other columns under their own name, with their data type. The columns written
+    by trackpy get a name and a description, and the sizes and static errors the
+    unit of the coordinates.
+
     Parameters
     ----------
-    props : list[str]
-        Column names of the trackpy DataFrame, used to detect the coordinate
-        columns ('x', 'y', 'z').
+    dtypes : dict[str, str]
+        Data types of the columns of the trackpy DataFrame, by column name.
     metadata : dict[str, Any]
         Metadata dictionary containing information about the data, as created
         by `_create_metadata()`. Its 'space_unit' and 'time_unit' are used as
@@ -178,14 +262,33 @@ def _create_PropsMetadata(
     for prop in [cell_id_prop, frame_prop, time_prop_md, lin_id_prop]:
         props_md._add_prop(prop)
 
-    # Trackpy properties.
+    # Trackpy coordinates.
     for axis in ["x", "y", "z"]:
-        if axis in props:
+        if axis in dtypes:
             prop = create_cell_coord_property(
                 unit=metadata["space_unit"], axis=axis, provenance="trackpy"
             )
             props_md._add_prop(prop)
-    # TODO: add props for other trackpy properties
+
+    # Other columns, from trackpy or not.
+    for column, dtype in dtypes.items():
+        if column in ("frame", "x", "y", "z"):
+            continue  # Already declared.
+        name, description, is_length = _TRACKPY_COLUMNS.get(
+            column, (column, "Column of the trackpy DataFrame", False)
+        )
+        prop = Property(
+            identifier=column,
+            name=name,
+            description=description,
+            provenance="trackpy",
+            prop_type="node",
+            lin_type="CellLineage",
+            # The loader casts the particle IDs to int.
+            dtype="int" if column == "particle" else dtype,
+            unit=metadata["space_unit"] if is_length else None,
+        )
+        props_md._add_prop(prop)
 
     return props_md
 
@@ -212,6 +315,11 @@ def load_trackpy_dataframe(
     and a time property computed by the loader (named by `computed_time_prop`),
     equal to frame * time_step and expressed in time_unit. The computed time
     property is the reference time property of the model.
+
+    The other columns of the DataFrame become cell properties too, declared with
+    the data type of the column. The columns written by trackpy ('mass', 'size',
+    'ecc', 'signal', 'raw_mass', 'ep'...) get a description, and the sizes and
+    static errors the unit of the coordinates.
 
     Parameters
     ----------
@@ -279,10 +387,9 @@ def load_trackpy_dataframe(
     # Build the lineages.
     graph = nx.DiGraph()
     _add_nodes(graph, df)
-    props = df.columns.to_list()
-    particles = df["particle"].unique()
+    dtypes = {column: _get_column_dtype(df[column]) for column in df.columns}
     del df  # Free memory.
-    _add_edges(graph, particles)
+    _add_edges(graph)
 
     md = _create_metadata(
         space_unit, pixel_width, pixel_height, pixel_depth, time_unit, time_step
@@ -298,7 +405,7 @@ def load_trackpy_dataframe(
     data = {lin.graph["lineage_id"]: lin for lin in lineages if len(lin) > 0}
 
     # Create a pycellin model.
-    props_md = _create_PropsMetadata(props, md, computed_time_prop)
+    props_md = _create_PropsMetadata(dtypes, md, computed_time_prop)
     model = Model(md, props_md, Data(data), computed_time_prop)
 
     return model
