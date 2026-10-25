@@ -233,17 +233,18 @@ def _identify_time_prop(
     Warns
     -----
     UserWarning
-        If the provided time_key is not present in the graph, triggering fallback
-        inference from GEFF metadata.
+        If the provided time_key is not on every node of the graph, triggering
+        fallback inference from GEFF metadata.
     UserWarning
         If a valid time property is inferred from display hints.
     UserWarning
         If a valid time property is inferred from axes.
     """
     if time_key is not None and not _graph_has_node_prop(geff_graph, time_key):
-        logger.info(
-            f"The provided property '{time_key}' is not present in the graph. "
-            "It will be inferred from GEFF metadata, if possible.",
+        logger.warning(
+            f"The property '{time_key}' given as time_prop is not on every node of the "
+            "GEFF graph, so the time property will be inferred from the GEFF metadata "
+            "instead, if possible.",
             stacklevel=3,
         )
         time_key = None
@@ -283,6 +284,33 @@ def _identify_time_prop(
     return time_key
 
 
+_COORDINATES = ("x", "y", "z")
+
+
+def _coordinate_from_name(name: str) -> str | None:
+    """
+    Return the coordinate ('x', 'y' or 'z') that a property name stands for, if any.
+
+    A name stands for a coordinate when it is that letter, in any case, or ends with
+    an underscore followed by that letter, e.g. 'x', 'Y', 'cell_x' or 'POSITION_Z'.
+
+    Parameters
+    ----------
+    name : str
+        The property name to check.
+
+    Returns
+    -------
+    str | None
+        'x', 'y' or 'z', or None if the name doesn't stand for a coordinate.
+    """
+    lowered = name.lower()
+    for coordinate in _COORDINATES:
+        if lowered == coordinate or lowered.endswith(f"_{coordinate}"):
+            return coordinate
+    return None
+
+
 def _identify_space_props(
     cell_x_key: str | None,
     cell_y_key: str | None,
@@ -297,10 +325,21 @@ def _identify_space_props(
     system (`x` and `y`) or a complete 3D coordinate system (`x`, `y`, and `z`).
     Partial specifications and duplicate property names raise `ValueError`.
 
-    When no space properties are provided, the function infers them first from
-    GEFF display hints and then from space axes. Inferred properties are assigned
-    at most once. Missing or unavailable properties remain `None`, so a 2D result
-    is returned as `(x, y, None)`.
+    The coordinates that are not provided are inferred, in this order:
+
+    1. from the GEFF display hints (horizontal for x, vertical for y, depth for z);
+    2. from the names of the space axes: an axis named 'x', 'y' or 'z' (any case),
+       or ending with '_x', '_y' or '_z' (e.g. 'cell_x', 'POSITION_X');
+    3. from the position of the remaining space axes whose names don't stand for
+       a coordinate, with a warning: the last one for x, the one before for y,
+       then z.
+
+    The GEFF specification orders the axes as OME-Zarr does, i.e. as the
+    dimensions of the image, where x comes last (e.g. t, z, y, x). Hence the
+    names come before the positions, and positions are read from the end.
+    Inferred properties are assigned at most once.
+    Missing or unavailable properties remain `None`, so a 2D result is returned
+    as `(x, y, None)`.
 
     Parameters
     ----------
@@ -323,26 +362,36 @@ def _identify_space_props(
     Raises
     ------
     ValueError
-        If only one space property is provided or if duplicate property names are
-        provided.
+        If the provided space properties don't include both x and y, if duplicate
+        property names are provided, or if the names of several space axes stand
+        for the same coordinate.
+
+    Warns
+    -----
+    UserWarning
+        If a provided property is not on every node of the graph, in which case
+        the coordinate is inferred instead, and if coordinates are inferred from
+        the position of the space axes.
 
     Notes
     -----
     A property provided by the caller is replaced by metadata inference if it is
-    not present on the graph.
+    not on every node of the graph.
     """
     space_keys = [cell_x_key, cell_y_key, cell_z_key]
     provided_keys = [key for key in space_keys if key is not None]
-    if provided_keys and len(provided_keys) not in (2, 3):
+    if provided_keys and (cell_x_key is None or cell_y_key is None):
         raise ValueError("Space properties must include both x and y, and optionally z.")
     if len(set(provided_keys)) != len(provided_keys):
         raise ValueError("Space properties must be distinct.")
 
     for i, key in enumerate(space_keys):
         if key is not None and not _graph_has_node_prop(geff_graph, key):
-            logger.info(
-                f"The provided property '{key}' is not present in the graph. "
-                "It will be inferred from GEFF metadata, if possible.",
+            coordinate = _COORDINATES[i]
+            logger.warning(
+                f"The property '{key}' given as cell_{coordinate}_prop is not on every "
+                f"node of the GEFF graph, so cell_{coordinate} will be inferred from "
+                "the GEFF metadata instead, if possible.",
                 stacklevel=3,
             )
             space_keys[i] = None
@@ -367,25 +416,59 @@ def _identify_space_props(
                 space_key = None
             space_keys[i] = space_key
 
-    # Fallback to GEFF axes: space axes are consumed in order.
+    # Fallback to the GEFF space axes, matched by name first.
     axes = geff_md.axes if geff_md is not None else None
     if axes is not None:
-        space_axes = [axis for axis in axes if axis.type == "space"]
-        for i, key in enumerate(space_keys):
-            if key is None:
-                for axis in space_axes:
-                    if (
-                        axis.name is not None
-                        and axis.name not in assigned_keys
-                        and _graph_has_node_prop(geff_graph, axis.name)
-                    ):
-                        space_keys[i] = axis.name
-                        assigned_keys.add(axis.name)
-                        logger.info(
-                            f"Valid space property inferred from axes: '{space_keys[i]}'.",
-                            stacklevel=3,
-                        )
-                        break
+        space_axes = [
+            axis.name
+            for axis in axes
+            if axis.type == "space"
+            and axis.name is not None
+            and axis.name not in assigned_keys
+            and _graph_has_node_prop(geff_graph, axis.name)
+        ]
+        for i, coordinate in enumerate(_COORDINATES):
+            if space_keys[i] is not None:
+                continue
+            matches = [
+                name for name in space_axes if _coordinate_from_name(name) == coordinate
+            ]
+            if len(matches) > 1:
+                matches_str = ", ".join(f"'{name}'" for name in matches)
+                raise ValueError(
+                    f"The names of several space axes of the GEFF file stand for the "
+                    f"{coordinate} coordinate: {matches_str}. Choose the coordinate "
+                    "properties with cell_x_prop, cell_y_prop and cell_z_prop."
+                )
+            if matches:
+                space_keys[i] = matches[0]
+                assigned_keys.add(matches[0])
+                logger.info(
+                    f"Valid space property inferred from axis name: '{matches[0]}'.",
+                    stacklevel=3,
+                )
+
+        # Last resort: the position of the axes whose names say nothing, as in
+        # OME-Zarr, where the spatial axes are ordered z, y, x: from the end.
+        by_position = []
+        for i, coordinate in enumerate(_COORDINATES):
+            if space_keys[i] is not None:
+                continue
+            for name in reversed(space_axes):
+                if name not in assigned_keys and _coordinate_from_name(name) is None:
+                    space_keys[i] = name
+                    assigned_keys.add(name)
+                    by_position.append(f"'{name}' as cell_{coordinate}")
+                    break
+        if by_position:
+            logger.warning(
+                "Neither display hints nor axis names say which coordinate some space "
+                "axes of the GEFF file are, so they were assigned by their position, "
+                f"as in OME-Zarr where x comes last: {', '.join(by_position)}. If this "
+                "is wrong, choose the coordinate properties with cell_x_prop, "
+                "cell_y_prop and cell_z_prop.",
+                stacklevel=3,
+            )
 
     return space_keys[0], space_keys[1], space_keys[2]
 
@@ -1097,6 +1180,48 @@ def _ensure_valid_cell_id(
     return cell_id_key
 
 
+def _get_coordinate_renames(
+    cell_x_key: str | None,
+    cell_y_key: str | None,
+    cell_z_key: str | None,
+    rename_map: dict[PropertyType, dict[str, str]],
+) -> dict[str, str]:
+    """
+    Map the current name of each coordinate property to its pycellin name.
+
+    The current name of a coordinate is its name after the collision renames
+    recorded in *rename_map*. Coordinates already named like in pycellin are left
+    out.
+
+    Parameters
+    ----------
+    cell_x_key : str | None
+        The x-coordinate key name in the GEFF file, if any.
+    cell_y_key : str | None
+        The y-coordinate key name in the GEFF file, if any.
+    cell_z_key : str | None
+        The z-coordinate key name in the GEFF file, if any.
+    rename_map : dict[PropertyType, dict[str, str]]
+        The ``{old_key: new_key}`` collision renames per property type, collected
+        during metadata extraction.
+
+    Returns
+    -------
+    dict[str, str]
+        ``{current_key: pycellin_key}`` for each coordinate to rename, in x, y, z
+        order.
+    """
+    renames = {}
+    for coordinate, key in zip(_COORDINATES, (cell_x_key, cell_y_key, cell_z_key)):
+        if key is None:
+            continue
+        current_key = rename_map[PropertyType.NODE].get(key, key)
+        pycellin_key = f"cell_{coordinate}"
+        if current_key != pycellin_key:
+            renames[current_key] = pycellin_key
+    return renames
+
+
 def _standardize_properties_data(
     lineages: list[CellLineage],
     lin_id_key: str,
@@ -1136,6 +1261,9 @@ def _standardize_properties_data(
         Applied to each lineage's node attributes, edge attributes, and
         graph-level attributes respectively.
     """
+    coordinate_renames = _get_coordinate_renames(
+        cell_x_key, cell_y_key, cell_z_key, rename_map
+    )
     for lin in lineages:
         # Collision renames as recorded during metadata extraction.
         for old_key, new_key in rename_map[PropertyType.NODE].items():
@@ -1150,12 +1278,17 @@ def _standardize_properties_data(
             _update_node_prop_key(lin, old_key=lin_id_key, new_key="lineage_id")
         if cell_id_key != "cell_id":
             _update_node_prop_key(lin, old_key=cell_id_key, new_key="cell_id")
-        if cell_x_key is not None and cell_x_key != "cell_x":
-            _update_node_prop_key(lin, old_key=cell_x_key, new_key="cell_x")
-        if cell_y_key is not None and cell_y_key != "cell_y":
-            _update_node_prop_key(lin, old_key=cell_y_key, new_key="cell_y")
-        if cell_z_key is not None and cell_z_key != "cell_z":
-            _update_node_prop_key(lin, old_key=cell_z_key, new_key="cell_z")
+        # The coordinates are renamed all at once: the current name of one can be
+        # the pycellin name of another (e.g. 'cell_y' used as x), so renaming them
+        # one after the other would overwrite values.
+        for node in lin.nodes:
+            attrs = lin.nodes[node]
+            values = {
+                new_key: attrs.pop(old_key)
+                for old_key, new_key in coordinate_renames.items()
+                if old_key in attrs
+            }
+            attrs.update(values)
 
     if lin_id_key != "lineage_id":
         _update_lineages_ids_key(lineages, lin_id_key)
@@ -1216,26 +1349,32 @@ def _standardize_props_metadata(
         props_md["cell_id"] = create_cell_id_property(provenance="geff")
 
     # Create or standardize coordinate property keys.
-    for axis, geff_key in [
-        ("x", cell_x_key),
-        ("y", cell_y_key),
-        ("z", cell_z_key),
-    ]:
-        pycellin_key = f"cell_{axis}"
+    coordinate_keys = list(zip(_COORDINATES, (cell_x_key, cell_y_key, cell_z_key)))
+    for _, geff_key in coordinate_keys:
         if geff_key is not None:
-            original_key = geff_key
-            geff_key = rename_map[PropertyType.NODE].get(geff_key, geff_key)
             # Remove the original key if it was renamed to a different key.
-            if original_key in props_md and original_key != geff_key:
-                props_md.pop(original_key)
-            if geff_key in props_md:
-                if geff_key != pycellin_key:
-                    props_md[pycellin_key] = props_md.pop(geff_key)
-                props_md[pycellin_key].identifier = pycellin_key
-            elif pycellin_key not in props_md:
-                props_md[pycellin_key] = create_cell_coord_property(
-                    unit=space_unit, axis=axis, provenance="geff"
-                )
+            current_key = rename_map[PropertyType.NODE].get(geff_key, geff_key)
+            if geff_key in props_md and geff_key != current_key:
+                props_md.pop(geff_key)
+    # All at once, as in _standardize_properties_data(): the current name of a
+    # coordinate can be the pycellin name of another.
+    renames = _get_coordinate_renames(cell_x_key, cell_y_key, cell_z_key, rename_map)
+    moved = {
+        new_key: props_md.pop(old_key)
+        for old_key, new_key in renames.items()
+        if old_key in props_md
+    }
+    props_md.update(moved)
+    for axis, geff_key in coordinate_keys:
+        if geff_key is None:
+            continue
+        pycellin_key = f"cell_{axis}"
+        if pycellin_key in props_md:
+            props_md[pycellin_key].identifier = pycellin_key
+        else:
+            props_md[pycellin_key] = create_cell_coord_property(
+                unit=space_unit, axis=axis, provenance="geff"
+            )
 
 
 def load_GEFF(
@@ -1282,21 +1421,27 @@ def load_GEFF(
         be inferred from GEFF metadata when available.
     time_prop : str | None, optional
         Name of the property to use as the reference time property.
-        If None, it will be infered from the GEFF metadata.
+        If None, it will be inferred from the GEFF metadata. If the property is not
+        on every node of the graph, a warning is logged and it is inferred too.
     structure_validation : bool, optional
         Whether to validate the GEFF file's structure, i.e. to check that it is
         compliant with the GEFF specification. Default is True.
 
     Notes
     -----
-    When coordinate properties are not provided, ``load_GEFF`` first tries to
-    infer them from GEFF display hints and then from space axes. Inferred
-    properties are assigned at most once, and a 2D dataset is represented by
-    ``(x, y, None)`` internally. Coordinate properties in the resulting model
-    are normalized to ``cell_x``, ``cell_y``, and ``cell_z`` when available.
+    When coordinate properties are not provided, ``load_GEFF`` infers them from
+    the GEFF metadata: first from the display hints, then from the names of the
+    space axes ('x', 'y' and 'z' in any case, or names ending with '_x', '_y'
+    and '_z', such as 'cell_x' or 'POSITION_X'), and last from the position of
+    the remaining space axes, as in OME-Zarr where x comes last, with a warning.
+    Inferred properties are assigned at most once, and a 2D dataset is
+    represented by ``(x, y, None)`` internally. Coordinate properties in the
+    resulting model are normalized to ``cell_x``, ``cell_y``, and ``cell_z`` when
+    available.
 
-    If a supplied coordinate property is not present in the graph, inference is
-    attempted for that coordinate from GEFF metadata. Explicit coordinate
+    If a supplied coordinate property is not on every node of the graph, a
+    warning is logged and inference is attempted for that coordinate from GEFF
+    metadata. Explicit coordinate
     arguments must otherwise describe either a complete 2D set (x and y) or a
     complete 3D set (x, y, and z); partial specifications and duplicate
     property names are invalid.
@@ -1314,10 +1459,11 @@ def load_GEFF(
     ------
     ValueError
         If the GEFF graph is undirected, as pycellin does not support undirected
-        graphs, if the coordinate arguments contain only one property or
-        duplicate property names, or if a 'cell_id' or 'lineage_id' property of
-        the GEFF file must be renamed but the file already has a 'geff_cell_id'
-        or 'geff_lineage_id' property.
+        graphs, if the coordinate arguments don't include both x and y or contain
+        duplicate property names, if the names of several space axes stand for
+        the same coordinate, or if a 'cell_id' or 'lineage_id' property of the
+        GEFF file must be renamed but the file already has a 'geff_cell_id' or
+        'geff_lineage_id' property.
     """
     # Read the GEFF file.
     geff_graph, geff_md = geff.read(geff_file, structure_validation=structure_validation)

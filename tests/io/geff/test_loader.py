@@ -601,14 +601,14 @@ class TestIdentifyTimeProp:
         self, caplog, graph_lin_id, geff_md_display_hints
     ):
         """When time_key is not in the graph but display hints have a valid time prop,
-        log and return the hint key."""
+        warn and return the hint key."""
         with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_time_prop(
                 "missing_key", geff_md_display_hints, graph_lin_id
             )
         assert len(caplog.records) == 2
-        assert caplog.records[0].levelname == "INFO"
-        assert "not present in the graph" in caplog.records[0].message
+        assert caplog.records[0].levelname == "WARNING"
+        assert "'missing_key' given as time_prop" in caplog.records[0].message
         assert caplog.records[1].levelname == "INFO"
         assert "inferred from display hints" in caplog.records[1].message
 
@@ -618,12 +618,12 @@ class TestIdentifyTimeProp:
         self, caplog, graph_lin_id, geff_md_axes
     ):
         """When time_key is not in the graph, no display hints are available,
-        and the axes have a matching time prop, log and return the axis key."""
+        and the axes have a matching time prop, warn and return the axis key."""
         with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_time_prop("missing_key", geff_md_axes, graph_lin_id)
         assert len(caplog.records) == 2
-        assert caplog.records[0].levelname == "INFO"
-        assert "not present in the graph" in caplog.records[0].message
+        assert caplog.records[0].levelname == "WARNING"
+        assert "is not on every node" in caplog.records[0].message
         assert caplog.records[1].levelname == "INFO"
         assert "inferred from axes" in caplog.records[1].message
 
@@ -631,13 +631,13 @@ class TestIdentifyTimeProp:
 
     def test_provided_key_not_in_graph_no_geff_md_raises(self, caplog, graph_lin_id):
         """When time_key is not in the graph and geff_md is None,
-        log and raise ValueError."""
+        warn and raise ValueError."""
         with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             with pytest.raises(ValueError):
                 _identify_time_prop("missing_key", None, graph_lin_id)
         assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "INFO"
-        assert "not present in the graph" in caplog.records[0].message
+        assert caplog.records[0].levelname == "WARNING"
+        assert "'missing_key' given as time_prop" in caplog.records[0].message
 
     def test_none_key_inferred_from_display_hints(
         self, caplog, graph_lin_id, geff_md_display_hints
@@ -730,44 +730,54 @@ class TestIdentifySpaceProps:
 
         assert result == ("position_x", "position_y", None)
 
-    def test_none_keys_inferred_from_axes(self, caplog, graph_with_coords, geff_md_axes):
-        """When keys are None and axes have space props, infer x and y from axes and log."""
+    def test_none_keys_inferred_from_axis_names(
+        self, caplog, graph_with_coords, geff_md_axes
+    ):
+        """When keys are None and the space axes are named after coordinates, infer x
+        and y from the axis names and log."""
         with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_space_props(
                 None, None, None, geff_md_axes, graph_with_coords
             )
         assert len(caplog.records) == 2
         assert all(record.levelname == "INFO" for record in caplog.records)
-        assert all("inferred from axes" in record.message for record in caplog.records)
+        assert all(
+            "inferred from axis name" in record.message for record in caplog.records
+        )
 
         assert result == ("position_x", "position_y", None)
 
-    def test_none_keys_all_three_inferred_from_axes(
+    def test_none_keys_all_three_inferred_from_axis_names(
         self, caplog, graph_with_3d_coords, geff_md_3d_axes
     ):
-        """When all keys are None and 3D axes are present, infer x, y, and z from axes."""
+        """When all keys are None and 3D axes are present, infer x, y, and z from the
+        axis names."""
         with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_space_props(
                 None, None, None, geff_md_3d_axes, graph_with_3d_coords
             )
         assert len(caplog.records) == 3
         assert all(record.levelname == "INFO" for record in caplog.records)
-        assert all("inferred from axes" in record.message for record in caplog.records)
+        assert all(
+            "inferred from axis name" in record.message for record in caplog.records
+        )
 
         assert result == ("position_x", "position_y", "position_z")
 
     def test_provided_key_not_in_graph_falls_back_to_display_hints(
         self, caplog, graph_with_coords, geff_md_display_hints
     ):
-        """When x and y keys are absent from the graph, log and infer them from display hints."""
+        """When x and y keys are absent from the graph, warn and infer them from
+        display hints."""
         with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_space_props(
                 "missing_x", "missing_y", None, geff_md_display_hints, graph_with_coords
             )
         assert len(caplog.records) == 4
-        assert caplog.records[0].levelname == "INFO"
-        assert "not present in the graph" in caplog.records[0].message
-        assert "not present in the graph" in caplog.records[1].message
+        assert caplog.records[0].levelname == "WARNING"
+        assert caplog.records[1].levelname == "WARNING"
+        assert "'missing_x' given as cell_x_prop" in caplog.records[0].message
+        assert "'missing_y' given as cell_y_prop" in caplog.records[1].message
         assert "inferred from display hints" in caplog.records[2].message
         assert "inferred from display hints" in caplog.records[3].message
 
@@ -776,17 +786,19 @@ class TestIdentifySpaceProps:
     def test_provided_key_not_in_graph_falls_back_to_axes(
         self, caplog, graph_with_coords, geff_md_axes
     ):
-        """When x and y keys are absent from the graph, log and infer them from axes."""
+        """When x and y keys are absent from the graph, warn and infer them from the
+        axis names."""
         with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
             result = _identify_space_props(
                 "missing_x", "missing_y", None, geff_md_axes, graph_with_coords
             )
         assert len(caplog.records) == 4
-        assert caplog.records[0].levelname == "INFO"
-        assert "not present in the graph" in caplog.records[0].message
-        assert "not present in the graph" in caplog.records[1].message
-        assert "inferred from axes" in caplog.records[2].message
-        assert "inferred from axes" in caplog.records[3].message
+        assert caplog.records[0].levelname == "WARNING"
+        assert caplog.records[1].levelname == "WARNING"
+        assert "is not on every node" in caplog.records[0].message
+        assert "is not on every node" in caplog.records[1].message
+        assert "inferred from axis name" in caplog.records[2].message
+        assert "inferred from axis name" in caplog.records[3].message
 
         assert result == ("position_x", "position_y", None)
 
@@ -799,6 +811,106 @@ class TestIdentifySpaceProps:
             None, None, None, geff_md_display_hints, graph_no_lin_id
         )
         assert result == (None, None, None)
+
+    @staticmethod
+    def _md_and_graph(space_names, hints=None):
+        """GEFF metadata with a time axis 't' then the given space axes, in that
+        order, and a graph whose nodes have all these properties."""
+        graph = nx.DiGraph()
+        for node in range(2):
+            graph.add_node(node, t=node, **{name: float(node) for name in space_names})
+        geff_md = geff.GeffMetadata(
+            directed=True,
+            axes=[geff_spec.Axis(name="t", type="time")]
+            + [geff_spec.Axis(name=name, type="space") for name in space_names],
+            display_hints=hints,
+            node_props_metadata={},
+            edge_props_metadata={},
+        )
+        return geff_md, graph
+
+    @pytest.mark.parametrize(
+        "space_names, expected",
+        [
+            (["y", "x"], ("x", "y", None)),  # geff's CTC converter, 2D
+            (["z", "y", "x"], ("x", "y", "z")),  # geff's CTC converter 3D, ultrack
+            (
+                ["POSITION_Z", "POSITION_Y", "POSITION_X"],
+                ("POSITION_X", "POSITION_Y", "POSITION_Z"),
+            ),
+            (["X", "Y"], ("X", "Y", None)),
+            (["cell_y", "cell_x"], ("cell_x", "cell_y", None)),
+        ],
+    )
+    def test_axes_matched_by_name_whatever_their_position(self, space_names, expected):
+        """Axes named after a coordinate are used for it, whatever their position:
+        GEFF orders the axes like OME-Zarr, where x comes last."""
+        geff_md, graph = self._md_and_graph(space_names)
+        assert _identify_space_props(None, None, None, geff_md, graph) == expected
+
+    def test_display_hints_take_precedence_over_axis_names(self):
+        """Display hints decide before axis names, e.g. for a transposed display."""
+        hints = geff_spec.DisplayHint(display_horizontal="y", display_vertical="x")
+        geff_md, graph = self._md_and_graph(["y", "x"], hints=hints)
+        result = _identify_space_props(None, None, None, geff_md, graph)
+        assert result == ("y", "x", None)
+
+    def test_unnamed_axes_assigned_by_position_with_warning(self, caplog):
+        """Axes whose names don't stand for a coordinate are assigned by position as
+        in OME-Zarr, x last, with a warning naming the assignments."""
+        geff_md, graph = self._md_and_graph(["u", "v"])
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
+            result = _identify_space_props(None, None, None, geff_md, graph)
+        assert result == ("v", "u", None)
+        assert len(caplog.records) == 1
+        assert "'v' as cell_x, 'u' as cell_y" in caplog.records[0].message
+
+    def test_three_unnamed_axes_assigned_z_y_x(self):
+        """Three unnamed space axes are read as z, y, x, as in OME-Zarr."""
+        geff_md, graph = self._md_and_graph(["u", "v", "w"])
+        result = _identify_space_props(None, None, None, geff_md, graph)
+        assert result == ("w", "v", "u")
+
+    def test_unnamed_axes_after_names_taken_from_the_end(self):
+        """When names give some coordinates, the others take the remaining unnamed
+        axes from the end."""
+        geff_md, graph = self._md_and_graph(["u", "v", "x"])
+        result = _identify_space_props(None, None, None, geff_md, graph)
+        assert result == ("x", "v", "u")
+
+    def test_names_first_then_position_for_the_rest(self, caplog):
+        """Named axes are matched first, then the remaining coordinates take the
+        unnamed axes by position."""
+        geff_md, graph = self._md_and_graph(["depth", "y", "x"])
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
+            result = _identify_space_props(None, None, None, geff_md, graph)
+        assert result == ("x", "y", "depth")
+        assert len(caplog.records) == 1
+        assert "'depth' as cell_z" in caplog.records[0].message
+
+    def test_axis_named_for_another_coordinate_not_assigned_by_position(self, caplog):
+        """An axis named after a coordinate that is already assigned is not used for
+        another coordinate."""
+        geff_md, graph = self._md_and_graph(["x", "y"])
+        for node in graph.nodes:
+            graph.nodes[node].update(col=1.0, row=2.0)
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
+            result = _identify_space_props("col", "row", None, geff_md, graph)
+        assert result == ("col", "row", None)
+        assert not caplog.records
+
+    def test_several_axes_named_for_the_same_coordinate_raises(self):
+        """Axis names that stand for the same coordinate are ambiguous."""
+        geff_md, graph = self._md_and_graph(["cell_x", "nucleus_x", "cell_y"])
+        with pytest.raises(ValueError, match="'cell_x', 'nucleus_x'"):
+            _identify_space_props(None, None, None, geff_md, graph)
+
+    def test_x_and_z_without_y_raises(self, graph_with_3d_coords):
+        """Explicit coordinates must include x and y."""
+        with pytest.raises(ValueError, match="both x and y"):
+            _identify_space_props(
+                "position_x", None, "position_z", None, graph_with_3d_coords
+            )
 
 
 class TestResolvePropKey:
@@ -2069,6 +2181,57 @@ class TestStandardizePropertiesData:
         assert lin.nodes[1]["cell_y"] == 2.0
         assert lin.nodes[1]["cell_z"] == 3.0
 
+    def test_coordinates_renamed_all_at_once(self):
+        """A coordinate whose current name is the pycellin name of another one keeps
+        its values, e.g. when the axes are permuted."""
+        lin = CellLineage()
+        lin.add_node(1, lineage_id=0, cell_id=11, cell_x=1.0, cell_y=2.0, cell_z=3.0)
+        lin.graph["lineage_id"] = 0
+
+        _standardize_properties_data(
+            [lin],
+            lin_id_key="lineage_id",
+            cell_id_key="cell_id",
+            cell_x_key="cell_z",
+            cell_y_key="cell_x",
+            cell_z_key="cell_y",
+            rename_map={
+                PropertyType.NODE: {},
+                PropertyType.EDGE: {},
+                PropertyType.LINEAGE: {},
+            },
+        )
+
+        assert lin.nodes[1]["cell_x"] == 3.0
+        assert lin.nodes[1]["cell_y"] == 1.0
+        assert lin.nodes[1]["cell_z"] == 2.0
+
+    def test_coordinate_renamed_from_its_collision_name(self):
+        """A coordinate already renamed because of a node/edge name collision is
+        renamed from that new name."""
+        lin = CellLineage()
+        lin.add_node(1, lineage_id=0, cell_id=11, x=1.0, y=2.0, z=3.0)
+        lin.graph["lineage_id"] = 0
+
+        _standardize_properties_data(
+            [lin],
+            lin_id_key="lineage_id",
+            cell_id_key="cell_id",
+            cell_x_key="z",
+            cell_y_key="y",
+            cell_z_key="x",
+            rename_map={
+                PropertyType.NODE: {"z": "cell_z"},
+                PropertyType.EDGE: {},
+                PropertyType.LINEAGE: {},
+            },
+        )
+
+        assert lin.nodes[1]["cell_x"] == 3.0
+        assert lin.nodes[1]["cell_y"] == 2.0
+        assert lin.nodes[1]["cell_z"] == 1.0
+        assert not {"x", "y", "z"} & set(lin.nodes[1])
+
     def test_assigns_fallback_lineage_id_for_single_node_lineage_without_key(self):
         """When lin_id_key is absent from a single-node lineage graph, -node_id is used."""
         lin = CellLineage()
@@ -2121,6 +2284,27 @@ class TestStandardizePropertiesData:
 
 class TestStandardizePropsMetadata:
     """Test cases for _standardize_props_metadata function."""
+
+    def test_coordinate_declarations_renamed_all_at_once(self, rename_map):
+        """Permuted coordinates keep their own declarations."""
+        props_md = {
+            "cell_x": create_cell_coord_property(unit="um", axis="x", provenance="a"),
+            "cell_y": create_cell_coord_property(unit="um", axis="y", provenance="b"),
+        }
+        _standardize_props_metadata(
+            props_md,
+            lin_id_key=None,
+            cell_id_key=None,
+            cell_x_key="cell_y",
+            cell_y_key="cell_x",
+            cell_z_key=None,
+            space_unit="um",
+            rename_map=rename_map,
+        )
+        assert props_md["cell_x"].provenance == "b"
+        assert props_md["cell_y"].provenance == "a"
+        assert props_md["cell_x"].identifier == "cell_x"
+        assert props_md["cell_y"].identifier == "cell_y"
 
     def test_lin_id_standard_key_preserved(self, pycellin_standard_md, rename_map):
         """When lineage_id_key is already 'lineage_id', key and metadata are preserved."""
