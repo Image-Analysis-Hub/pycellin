@@ -28,6 +28,9 @@ from pycellin.utils import _normalize_dtype
 
 logger = logging.getLogger(__name__)
 
+# Cell property that holds the tracklet IDs written by export_GEFF(tracklets=True).
+_TRACKLET_PROP = "tracklet_id"
+
 # TODO: geffception for cycle and lineage props
 
 
@@ -206,6 +209,98 @@ def _remove_none_values(model: Model) -> None:
         for attrs in attrs_dicts:
             for key in [key for key, value in attrs.items() if value is None]:
                 del attrs[key]
+
+
+def _create_tracklet_property() -> Property:
+    """
+    Create the declaration of the cell property that holds the tracklet IDs.
+
+    Returns
+    -------
+    Property
+        Declaration of the 'tracklet_id' property.
+    """
+    return Property(
+        identifier=_TRACKLET_PROP,
+        name="Tracklet ID",
+        description=(
+            "Identifier of the tracklet of the cell, i.e. of its cell cycle: "
+            "ID of the last cell of the tracklet"
+        ),
+        provenance="pycellin",
+        prop_type="node",
+        lin_type="CellLineage",
+        dtype="int",
+    )
+
+
+def _get_tracklet_ids(lineage: CellLineage) -> dict[int, int]:
+    """
+    Return the tracklet ID of each cell of a lineage.
+
+    GEFF defines a tracklet as a maximal path whose links each join a cell with
+    a single child to a cell with a single parent. Without fusions, the tracklets
+    are the cell cycles; with a fusion, a new tracklet starts at the merged cell.
+    A tracklet is identified by the ID of its last cell, as a cell cycle is by
+    its 'cycle_id'.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The lineage whose tracklets to identify.
+
+    Returns
+    -------
+    dict[int, int]
+        The tracklet ID of each cell, by cell ID.
+    """
+    tracklet_ids = {}
+    for cid in lineage.nodes:
+        parents = list(lineage.predecessors(cid))
+        if len(parents) == 1 and lineage.out_degree(parents[0]) == 1:
+            continue  # The cell extends the tracklet of its parent.
+        tracklet = [cid]
+        while lineage.out_degree(tracklet[-1]) == 1:
+            child = next(iter(lineage.successors(tracklet[-1])))
+            if lineage.in_degree(child) != 1:
+                break
+            tracklet.append(child)
+        for cell in tracklet:
+            tracklet_ids[cell] = tracklet[-1]
+    return tracklet_ids
+
+
+def _add_tracklet_ids(model: Model) -> None:
+    """
+    Write the tracklet ID of each cell in the 'tracklet_id' cell property.
+
+    Tracklet IDs are cell IDs, so they are unique across lineages only once the
+    node overlaps are solved. An existing 'tracklet_id' property is replaced.
+
+    Parameters
+    ----------
+    model : Model
+        Model to modify, with cell IDs unique across lineages.
+
+    Warns
+    -----
+    If some cells already had a 'tracklet_id' value that differs from their
+    tracklet ID.
+    """
+    num_changed = 0
+    for lineage in model.data.cell_data.values():
+        for cid, tracklet_id in _get_tracklet_ids(lineage).items():
+            attrs = lineage.nodes[cid]
+            if _TRACKLET_PROP in attrs and attrs[_TRACKLET_PROP] != tracklet_id:
+                num_changed += 1
+            attrs[_TRACKLET_PROP] = tracklet_id
+    model.props_metadata.props[_TRACKLET_PROP] = _create_tracklet_property()
+    if num_changed:
+        logger.warning(
+            "With tracklets=True, the GEFF file has the tracklet IDs computed at "
+            f"export, which differ from the '{_TRACKLET_PROP}' values of "
+            f"{num_changed} cell{'s' if num_changed > 1 else ''} of the model."
+        )
 
 
 def _get_default_space_axes(model: Model) -> list[str]:
@@ -423,6 +518,7 @@ def _build_geff_metadata(
     space_axes: list[str] | None = None,
     channel_axes: list[str] | None = None,
     var_length_props: list[str] | None = None,
+    tracklets: bool = False,
 ) -> geff.GeffMetadata:
     """
     Build GEFF metadata from a pycellin model.
@@ -453,6 +549,10 @@ def _build_geff_metadata(
     var_length_props : list[str] | None, optional
         List of property identifiers that are variable in length (i.e., their values
         are lists or arrays). If None, no properties are considered variable length.
+    tracklets : bool, optional
+        Whether to declare the 'tracklet_id' cell property as the GEFF tracklet
+        property. The cells must already have it, see `_add_tracklet_ids()`.
+        Default is False.
 
     Returns
     -------
@@ -482,10 +582,10 @@ def _build_geff_metadata(
     props = model.get_cell_lineage_properties()
     node_props_md, edge_props_md = _build_props_metadata(props, var_length_props)
 
-    # Define identifiers of lineage and cell cycle.
+    # Identifiers of lineages and tracklets.
     track_node_props = {"lineage": "lineage_id"}
-    if model.has_cycle_data():
-        track_node_props["tracklet"] = "cycle_id"
+    if tracklets:
+        track_node_props["tracklet"] = _TRACKLET_PROP
 
     return geff.GeffMetadata(
         directed=True,
@@ -504,6 +604,7 @@ def export_GEFF(
     space_axes: list[str] | None = None,
     channel_axes: list[str] | None = None,
     variable_length_props: list[str] | None = None,
+    tracklets: bool = False,
     zarr_format: Literal[2, 3] = 2,
 ) -> Model:
     """
@@ -538,6 +639,14 @@ def export_GEFF(
     variable_length_props : list[str] | None, optional
         List of property identifiers that are variable in length (i.e., their values
         are lists or arrays). If None, no properties are considered variable length.
+    tracklets : bool, optional
+        Whether to write the tracklets in a 'tracklet_id' cell property, declared
+        as the GEFF tracklet property. A tracklet is a cell cycle, identified like
+        'cycle_id' by the ID of its last cell; with a fusion, a new tracklet starts
+        at the merged cell. The tracklets are computed at export from the cell
+        lineages, so they don't need cycle lineages and are always up to date. An
+        existing 'tracklet_id' cell property is replaced in the GEFF file, with a
+        warning if some of its values differ. Default is False.
     zarr_format : Literal[2, 3], optional
         The Zarr format version to use for the GEFF file. Default is 2.
 
@@ -554,6 +663,8 @@ def export_GEFF(
         If the model requires an update.
     ValueError
         If the model contains no lineage data.
+        If `tracklets` is True and the model has a 'tracklet_id' property that
+        isn't only a cell property.
     RuntimeError
         If the GEFF export process fails.
 
@@ -561,13 +672,23 @@ def export_GEFF(
     -----
     Only cell and link properties are exported: lineage properties are not, and
     cycle properties only once propagated to the cells with
-    `Model.propagate_cycle_properties()`. Properties whose data type GEFF cannot
-    store, such as `list[int]` or shapely geometries, are not exported either, and
-    a warning names them. None values are written as missing values.
+    `Model.propagate_cycle_properties()`. A propagated 'cycle_id' is written like
+    any other property: use `tracklets=True` to declare the tracklets in the GEFF
+    file. Properties whose data type GEFF cannot store, such as `list[int]` or
+    shapely geometries, are not exported either, and a warning names them. None
+    values are written as missing values.
     """
     _check_up_to_date(model)
     if not model.data.cell_data:
         raise ValueError("Model contains no lineage data to export.")
+    if tracklets:
+        prop = model.get_property(_TRACKLET_PROP)
+        if prop is not None and prop.prop_type != PropertyType.NODE:
+            raise ValueError(
+                f"Can't write the tracklets in a '{_TRACKLET_PROP}' cell property: "
+                f"the model has a '{_TRACKLET_PROP}' property that isn't only a cell "
+                "property. Rename it, or export with tracklets=False."
+            )
 
     try:
         # We don't want to modify the original model.
@@ -583,6 +704,9 @@ def export_GEFF(
         # have the same identifier across different lineages.
         lineages = list(model_copy.data.cell_data.values())
         _solve_node_overlaps(lineages)
+        if tracklets:
+            # Tracklet IDs are cell IDs, now unique across lineages.
+            _add_tracklet_ids(model_copy)
         geff_graph = nx.compose_all(lineages)
 
         metadata = _build_geff_metadata(
@@ -591,6 +715,7 @@ def export_GEFF(
             space_axes=space_axes,
             channel_axes=channel_axes,
             var_length_props=variable_length_props,
+            tracklets=tracklets,
         )
 
         geff.write(

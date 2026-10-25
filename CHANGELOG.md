@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 3145157, plus the uncommitted change of the GEFF exporter's default space axes and OME-Zarr axis order. Update from there with: git log 3145157..dev -->
+<!-- Planned v0.6.0. Covers commits up to 58c3034, plus the uncommitted `tracklets` argument of the GEFF exporter. Update from there with: git log 58c3034..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -92,6 +92,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **TrackMate:** `ref_time_prop` argument to `load_TrackMate_XML()`, e.g. `"FRAME"` to count the time in frames
 - **TrackMate:** default tracker in the exported XML, so the TrackMate wizard can be navigated back
 - **TrackMate:** dimension mappings for the new properties
+- **GEFF:** `tracklets` argument to `export_GEFF()`, to write the tracklets (the cell cycles) in a `tracklet_id` cell property declared as the GEFF tracklet property. Like `cycle_id`, a tracklet is identified by the ID of its last cell. The tracklets are computed at export from the cell lineages, so they don't need cycle lineages and are always up to date
 - **trackpy:** `computed_time_prop` argument to `load_trackpy_dataframe()`
 - **Dependencies:** `notebooks` extra with what the example notebooks need: JupyterLab, ipykernel, and nbformat, without which Plotly can't show figures in notebooks. Install it with `pip install "pycellin[notebooks]"`
 
@@ -143,6 +144,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **GEFF:** the loader lost coordinate values when a coordinate was read from a property named like another pycellin coordinate, e.g. with `cell_x_prop="cell_y", cell_y_prop="cell_x"`, which left the model without `cell_x`
 - **GEFF:** the exporter didn't write the metadata of properties with several types (`LINEAGE | NODE`, `LINEAGE | EDGE`)
 - **GEFF:** the exporter failed with a `RuntimeError` that named no property on cell or link properties whose data type GEFF can't store, such as `cells` after `propagate_cycle_properties()` or TrackMate features loaded with the `unknown` data type, and on None values. Such properties are now skipped with a warning naming them, and None values are written as missing values
+- **GEFF:** the exporter declared `cycle_id` (`cycle_ID` in 0.5.1) as the tracklet property of every model with cycle lineages, but cells only have it once propagated, so most files declared tracklets they didn't contain. Even propagated, the values could be out of date or repeated across lineages (e.g. after `merge()`), which fails geff's tracklet validation. A tracklet property is now only declared with `tracklets=True`, which writes its own `tracklet_id` property
 - **CTC:** the loader gave cells no `timepoint`, although it was the reference time property, and no `lineage_id`
 - **CTC:** the loader failed on labels with holes or made of several pieces. Their contour is now the outline of the largest piece, holes filled, and a warning lists them
 - **CTC:** loading label images (`labels_path`):

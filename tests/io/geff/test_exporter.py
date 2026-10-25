@@ -5,9 +5,11 @@ import logging
 import geff
 import geff_spec
 import pytest
+from geff.validate.data import ValidationConfig
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.classes.exceptions import UpdateRequiredError
+from pycellin.custom_types import PropertyType
 from pycellin.properties.core import (
     create_cell_coord_property,
     create_frame_property,
@@ -20,6 +22,7 @@ from pycellin.properties.tracking import (
     create_absolute_age_property,
 )
 from pycellin.io.geff.exporter import (
+    _add_tracklet_ids,
     _build_axes,
     _build_display_hints,
     _build_geff_metadata,
@@ -27,6 +30,7 @@ from pycellin.io.geff.exporter import (
     _find_node_overlaps,
     _get_default_space_axes,
     _get_next_available_id,
+    _get_tracklet_ids,
     _relabel_nodes,
     _remove_none_values,
     _remove_unsupported_props,
@@ -450,6 +454,94 @@ class TestRemoveNoneValues:
         assert simple_model.data.cell_data[1].edges[3, 4]["link_x"] == 2.0
 
 
+class TestGetTrackletIds:
+    """Test cases for _get_tracklet_ids function."""
+
+    def test_division(self, lineage1):
+        """The tracklet of the mother ends at the division, and each daughter
+        starts its own."""
+        assert _get_tracklet_ids(lineage1) == {1: 3, 2: 3, 3: 3, 4: 4, 5: 5}
+
+    def test_lineage_without_division(self, lineage2):
+        """A lineage without division is a single tracklet."""
+        assert _get_tracklet_ids(lineage2) == {10: 13, 11: 13, 12: 13, 13: 13}
+
+    def test_single_cell(self):
+        """A single cell is its own tracklet."""
+        lin = CellLineage()
+        lin.add_node(7)
+        assert _get_tracklet_ids(lin) == {7: 7}
+
+    def test_division_right_after_birth(self):
+        """A daughter that divides right away is a one-cell tracklet."""
+        lin = CellLineage()
+        lin.add_edges_from([(1, 2), (2, 3), (2, 4), (3, 5), (3, 6)])
+        assert _get_tracklet_ids(lin) == {1: 2, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6}
+
+    def test_fusion(self):
+        """A new tracklet starts at a cell with several parents."""
+        lin = CellLineage()
+        lin.add_edges_from([(1, 2), (3, 4), (2, 5), (4, 5), (5, 6)])
+        assert _get_tracklet_ids(lin) == {1: 2, 2: 2, 3: 4, 4: 4, 5: 6, 6: 6}
+
+    def test_same_as_cell_cycles(self):
+        """Without fusion, the tracklets are the cell cycles."""
+        lin = CellLineage()
+        lin.add_edges_from([(1, 2), (2, 3), (2, 4), (3, 5), (3, 6), (4, 7), (7, 8)])
+        tracklet_ids = _get_tracklet_ids(lin)
+        for cycle in lin.get_cell_cycles():
+            assert {tracklet_ids[cid] for cid in cycle} == {cycle[-1]}
+
+
+class TestAddTrackletIds:
+    """Test cases for _add_tracklet_ids function."""
+
+    def test_tracklet_ids_added_and_declared(self, simple_model):
+        """Each cell gets the ID of the last cell of its tracklet, declared as an
+        integer cell property."""
+        _add_tracklet_ids(simple_model)
+
+        for lin, expected in zip(simple_model.data.cell_data.values(), (2, 4)):
+            values = [attrs["tracklet_id"] for _, attrs in lin.nodes(data=True)]
+            assert values == [expected, expected]
+        prop = simple_model.get_property("tracklet_id")
+        assert prop.prop_type == PropertyType.NODE
+        assert prop.lin_type == "CellLineage"
+        assert prop.dtype == "int"
+
+    def test_different_values_replaced_with_warning(self, simple_model, caplog):
+        """Existing tracklet_id values that differ are replaced, with a warning."""
+        simple_model.props_metadata._add_prop(
+            Property(
+                identifier="tracklet_id",
+                name="Tracklet ID",
+                description="Tracklet ID from another tool",
+                provenance="geff",
+                prop_type="node",
+                lin_type="CellLineage",
+                dtype="int",
+            )
+        )
+        lin = simple_model.data.cell_data[0]
+        lin.nodes[1]["tracklet_id"] = 99
+        lin.nodes[2]["tracklet_id"] = 2
+
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+            _add_tracklet_ids(simple_model)
+
+        assert lin.nodes[1]["tracklet_id"] == 2
+        assert simple_model.get_property("tracklet_id").provenance == "pycellin"
+        assert len(caplog.records) == 1
+        assert "values of 1 cell of the model" in caplog.records[0].message
+
+    def test_same_values_replaced_without_warning(self, simple_model, caplog):
+        """Existing tracklet_id values equal to the tracklet IDs give no warning."""
+        _add_tracklet_ids(simple_model)
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+            _add_tracklet_ids(simple_model)
+        assert not caplog.records
+
+
 class TestGetDefaultSpaceAxes:
     """Test cases for _get_default_space_axes function."""
 
@@ -797,13 +889,29 @@ class TestBuildGeffMetadata:
         assert [ax.type for ax in metadata.axes] == ["time"]
         assert metadata.display_hints is None
 
-    def test_track_node_props_without_cycle(self, simple_model):
-        """Test track_node_props when model has no cycle data."""
+    def test_track_node_props_without_tracklets(self, simple_model):
+        """By default, track_node_props only declares the lineages."""
         metadata = _build_geff_metadata(simple_model)
 
-        assert "lineage" in metadata.track_node_props
-        assert metadata.track_node_props["lineage"] == "lineage_id"
+        assert metadata.track_node_props == {"lineage": "lineage_id"}
+
+    def test_no_tracklet_from_cycle_data(self, simple_model):
+        """Cycle data alone doesn't declare a tracklet property."""
+        simple_model.add_cycle_data()
+        metadata = _build_geff_metadata(simple_model)
+
         assert "tracklet" not in metadata.track_node_props
+
+    def test_track_node_props_with_tracklets(self, simple_model):
+        """With tracklets, tracklet_id is declared and described."""
+        _add_tracklet_ids(simple_model)
+        metadata = _build_geff_metadata(simple_model, tracklets=True)
+
+        assert metadata.track_node_props == {
+            "lineage": "lineage_id",
+            "tracklet": "tracklet_id",
+        }
+        assert "tracklet_id" in metadata.node_props_metadata
 
     def test_node_and_edge_props_metadata(self, simple_model):
         """Test that node and edge properties metadata are correctly built."""
@@ -1026,4 +1134,88 @@ class TestExportGEFF:
         simple_model.prepare_full_data_update()
         with pytest.raises(UpdateRequiredError, match="before exporting"):
             export_GEFF(simple_model, str(tmp_path / "test.geff"))
+        assert not (tmp_path / "test.geff").exists()
+
+    def test_export_with_tracklets(self, simple_model, tmp_path):
+        """The tracklets pass geff's validation, and the model is not modified."""
+        geff_out = str(tmp_path / "test.geff")
+        export_GEFF(simple_model, geff_out, tracklets=True)
+
+        graph, metadata = geff.read(
+            geff_out, data_validation=ValidationConfig(tracklet=True, lineage=True)
+        )
+        assert metadata.track_node_props["tracklet"] == "tracklet_id"
+        assert dict(graph.nodes(data="tracklet_id")) == {1: 2, 2: 2, 3: 4, 4: 4}
+        assert simple_model.get_property("tracklet_id") is None
+        assert all(
+            "tracklet_id" not in attrs
+            for lin in simple_model.data.cell_data.values()
+            for _, attrs in lin.nodes(data=True)
+        )
+
+    def test_export_with_tracklets_and_repeated_cell_ids(self, simple_model, tmp_path):
+        """With cell IDs repeated across lineages, as after merge() or
+        relabel_cells(), the tracklet IDs are still unique."""
+        lin = CellLineage()
+        lin.add_node(1, timepoint=0, cell_x=20.0, lineage_id=1)
+        lin.add_node(2, timepoint=1, cell_x=22.0, lineage_id=1)
+        lin.add_edge(1, 2, link_x=2.0)
+        lin.graph["lineage_id"] = 1
+        simple_model.data.cell_data[1] = lin
+        geff_out = str(tmp_path / "test.geff")
+        export_GEFF(simple_model, geff_out, tracklets=True)
+
+        graph, _ = geff.read(
+            geff_out, data_validation=ValidationConfig(tracklet=True, lineage=True)
+        )
+        assert len(set(dict(graph.nodes(data="tracklet_id")).values())) == 2
+
+    def test_no_tracklet_by_default_with_propagated_cycle_id(
+        self, simple_model, tmp_path
+    ):
+        """Without tracklets, a propagated cycle_id is written as an ordinary
+        property, and no tracklet property is declared."""
+        simple_model.add_cycle_data()
+        simple_model.propagate_cycle_properties(["cycle_id"])
+        geff_out = str(tmp_path / "test.geff")
+        export_GEFF(simple_model, geff_out)
+
+        _, metadata = geff.read(geff_out)
+        assert "tracklet" not in metadata.track_node_props
+        assert "cycle_id" in metadata.node_props_metadata
+
+    def test_tracklets_round_trip(self, simple_model, tmp_path):
+        """A reloaded file has the tracklet_id cell property, and cycle lineages
+        can still be added."""
+        geff_out = str(tmp_path / "test.geff")
+        export_GEFF(simple_model, geff_out, tracklets=True)
+
+        reloaded = load_GEFF(geff_out)
+        reloaded.add_cycle_data()
+
+        cells = [
+            attrs
+            for lin in reloaded.data.cell_data.values()
+            for _, attrs in lin.nodes(data=True)
+        ]
+        assert sorted(attrs["tracklet_id"] for attrs in cells) == [2, 2, 4, 4]
+        assert reloaded.has_cycle_data()
+
+    def test_tracklets_with_link_property_named_tracklet_id_raises(
+        self, simple_model, tmp_path
+    ):
+        """A tracklet_id property that isn't only a cell property raises."""
+        simple_model.props_metadata._add_prop(
+            Property(
+                identifier="tracklet_id",
+                name="Tracklet ID",
+                description="Tracklet ID of the link",
+                provenance="Test",
+                prop_type="edge",
+                lin_type="CellLineage",
+                dtype="int",
+            )
+        )
+        with pytest.raises(ValueError, match="isn't only a cell property"):
+            export_GEFF(simple_model, str(tmp_path / "test.geff"), tracklets=True)
         assert not (tmp_path / "test.geff").exists()
