@@ -208,6 +208,61 @@ def _remove_none_values(model: Model) -> None:
                 del attrs[key]
 
 
+def _get_default_space_axes(model: Model) -> list[str]:
+    """
+    Return the coordinate properties to export as space axes by default.
+
+    These are 'cell_x' and 'cell_y', plus 'cell_z' when it is declared. GEFF doesn't
+    allow missing values on axes, so a coordinate is only exported as an axis when
+    every cell has a value for it: without complete 'cell_x' and 'cell_y', no space
+    axis is exported.
+
+    Parameters
+    ----------
+    model : Model
+        The model to export, without None values.
+
+    Returns
+    -------
+    list[str]
+        The coordinate properties, in x, y, z order.
+
+    Warns
+    -----
+    If 'cell_x', 'cell_y' or 'cell_z' is declared but some cells have no value
+    for it, so that it can't be exported as an axis.
+    """
+    node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
+    if "cell_x" not in node_props or "cell_y" not in node_props:
+        return []
+    declared = [key for key in ("cell_x", "cell_y", "cell_z") if key in node_props]
+    cells = [
+        attrs
+        for lin in model.data.cell_data.values()
+        for _, attrs in lin.nodes(data=True)
+    ]
+    incomplete = {
+        key: count
+        for key in declared
+        if (count := sum(key not in attrs for attrs in cells)) > 0
+    }
+    if not incomplete:
+        return declared
+    counts_str = ", ".join(f"'{key}' ({count})" for key, count in incomplete.items())
+    if "cell_x" in incomplete or "cell_y" in incomplete:
+        space_axes = []
+        consequence = "the GEFF file has no space axes"
+    else:
+        space_axes = ["cell_x", "cell_y"]
+        consequence = "the GEFF file has no z axis"
+    logger.warning(
+        f"Some cells have no value for {counts_str}, so {consequence}: GEFF axes "
+        "can't have missing values. Give these cells coordinates, or choose other "
+        "properties with space_axes."
+    )
+    return space_axes
+
+
 def _build_axes(
     node_props: dict[str, Property],
     time_axes: list[str],
@@ -217,6 +272,9 @@ def _build_axes(
     """
     Build a list of Axis objects for GEFF metadata.
 
+    The axes are ordered as in OME-Zarr: time, then channel, then space axes in reverse 
+    order (z, y, x).
+
     Parameters
     ----------
     node_props : dict[str, Property]
@@ -225,10 +283,9 @@ def _build_axes(
         List of property names that Geff will consider as time axes.
         These should be properties in the model that represent time (e.g., "timepoint").
     space_axes : list[str] | None, optional
-        List of property names that Geff will consider as space axes.
-        These should be properties in the model that represent spatial coordinates
-        (e.g., "cell_x", "cell_y", "cell_z"). If None, no spatial axes will be included
-        in the GEFF metadata, and no display hints for spatial dimensions will be set.
+        The properties of the x, y and optionally z coordinates, in that order
+        (e.g., "cell_x", "cell_y", "cell_z"). If None or empty, no spatial axes
+        will be included in the GEFF metadata.
     channel_axes : list[str] | None, optional
         List of property names that Geff will consider as channel axes.
         These should be properties in the model that represent different channels
@@ -253,19 +310,6 @@ def _build_axes(
                 unit=node_props[prop_name].unit,
             )
         )
-    if space_axes is not None:
-        for prop_name in space_axes:
-            if prop_name not in node_props:
-                raise ValueError(
-                    f"Unknown node property '{prop_name}', cannot be mapped to space axis."
-                )
-            axes.append(
-                geff_spec.Axis(
-                    name=prop_name,
-                    type="space",
-                    unit=node_props[prop_name].unit,
-                )
-            )
     if channel_axes is not None:
         for prop_name in channel_axes:
             if prop_name not in node_props:
@@ -276,6 +320,19 @@ def _build_axes(
                 geff_spec.Axis(
                     name=prop_name,
                     type="channel",
+                )
+            )
+    if space_axes is not None:
+        for prop_name in reversed(space_axes):
+            if prop_name not in node_props:
+                raise ValueError(
+                    f"Unknown node property '{prop_name}', cannot be mapped to space axis."
+                )
+            axes.append(
+                geff_spec.Axis(
+                    name=prop_name,
+                    type="space",
+                    unit=node_props[prop_name].unit,
                 )
             )
     return axes
@@ -293,9 +350,9 @@ def _build_display_hints(
     time_axis : str
         Name of the time axis.
     space_axes : list[str] | None
-        List of space axis names in order of horizontal, vertical, and depth dimensions.
-        If None or if fewer than 2 space axes are provided, no display hints will
-        be set for spatial dimensions (cf Geff specification).
+        List of space axis names in order of horizontal, vertical, and depth dimensions,
+        i.e. x, y, z. If None or if fewer than 2 space axes are provided, no display
+        hints will be set (cf Geff specification).
 
     Returns
     -------
@@ -382,14 +439,12 @@ def _build_geff_metadata(
         determine the order of both the axes and display hint in the GEFF metadata.
         The time display hint will be set to the first time axis in the list.
     space_axes : list[str] | None, optional
-        List of property names that Geff will consider as space axes.
-        These should be properties in the model that represent spatial coordinates
-        (e.g., "cell_x", "cell_y", "cell_z"). If None, no spatial axes will be included
-        in the GEFF metadata, and no display hints for spatial dimensions will be set.
-        If provided, the order of the property names in the list will determine
-        the order of both the axes and the display hints in the GEFF metadata.
-        Display hints will be set for the first three space axes as horizontal,
-        vertical, and depth dimensions, respectively.
+        The properties of the x, y and optionally z coordinates, in that order,
+        that Geff will consider as space axes. If None, 'cell_x' and 'cell_y' are
+        used, plus 'cell_z' when it is declared, as long as every cell has a value
+        for them. An empty list exports no space axes. The space axes are written in
+        OME-Zarr order (z, y, x), and the display hints are set to x (horizontal),
+        y (vertical) and z (depth).
     channel_axes : list[str] | None, optional
         List of property names that Geff will consider as channel axes.
         These should be properties in the model that represent different channels
@@ -410,6 +465,8 @@ def _build_geff_metadata(
         time_axes = [model.reference_time_property]
     elif isinstance(time_axes, str):
         time_axes = [time_axes]
+    if space_axes is None:
+        space_axes = _get_default_space_axes(model)
     axes = _build_axes(
         node_props=node_props,
         time_axes=time_axes,
@@ -466,19 +523,18 @@ def export_GEFF(
         determine the order of both the axes and display hint in the GEFF metadata.
         The time display hint will be set to the first time axis in the list.
     space_axes : list[str] | None, optional
-        List of property names that Geff will consider as space axes.
-        These should be properties in the model that represent spatial coordinates
-        (e.g., "cell_x", "cell_y", "cell_z"). If None, no spatial axes will be included
-        in the GEFF metadata, and no display hints for spatial dimensions will be set.
-        If provided, the order of the property names in the list will determine
-        the order of both the axes and the display hints in the GEFF metadata.
-        Display hints will be set for the first three space axes as horizontal,
-        vertical, and depth dimensions, respectively.
+        The properties of the x, y and optionally z coordinates, in that order,
+        that Geff will consider as space axes. If None, 'cell_x' and 'cell_y' are
+        used, plus 'cell_z' when it is declared, as long as every cell has a value
+        for them (GEFF axes can't have missing values). An empty list exports no
+        space axes. The space axes are written in OME-Zarr order (z, y, x), and the
+        display hints are set to x (horizontal), y (vertical) and z (depth).
     channel_axes : list[str] | None, optional
         List of property names that Geff will consider as channel axes.
         These should be properties in the model that represent different channels
         or modalities (e.g., "chan_1", "chan_2"). If None, no channel axes will be
-        included in the GEFF metadata.
+        included in the GEFF metadata. They are written between the time and the
+        space axes, as in OME-Zarr.
     variable_length_props : list[str] | None, optional
         List of property identifiers that are variable in length (i.e., their values
         are lists or arrays). If None, no properties are considered variable length.

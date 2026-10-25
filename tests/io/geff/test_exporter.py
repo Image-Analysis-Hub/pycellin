@@ -25,6 +25,7 @@ from pycellin.io.geff.exporter import (
     _build_geff_metadata,
     _build_props_metadata,
     _find_node_overlaps,
+    _get_default_space_axes,
     _get_next_available_id,
     _relabel_nodes,
     _remove_none_values,
@@ -33,6 +34,7 @@ from pycellin.io.geff.exporter import (
     _to_geff_dtype,
     export_GEFF,
 )
+from pycellin.io.geff.loader import load_GEFF
 
 # Fixtures ####################################################################
 
@@ -448,6 +450,38 @@ class TestRemoveNoneValues:
         assert simple_model.data.cell_data[1].edges[3, 4]["link_x"] == 2.0
 
 
+class TestGetDefaultSpaceAxes:
+    """Test cases for _get_default_space_axes function."""
+
+    def test_xyz_declared(self, model_with_xyz):
+        """cell_x, cell_y and cell_z are used when every cell has them."""
+        assert _get_default_space_axes(model_with_xyz) == ["cell_x", "cell_y", "cell_z"]
+
+    def test_no_y_declared(self, simple_model):
+        """Without cell_y, no space axis is exported."""
+        assert _get_default_space_axes(simple_model) == []
+
+    def test_missing_z_value(self, model_with_xyz, caplog):
+        """A cell without cell_z drops the z axis, with a warning."""
+        del model_with_xyz.data.cell_data[0].nodes[1]["cell_z"]
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+            space_axes = _get_default_space_axes(model_with_xyz)
+        assert space_axes == ["cell_x", "cell_y"]
+        assert len(caplog.records) == 1
+        assert "'cell_z' (1)" in caplog.records[0].message
+        assert "no z axis" in caplog.records[0].message
+
+    def test_missing_y_value(self, model_with_xyz, caplog):
+        """A cell without cell_y drops all the space axes, with a warning."""
+        del model_with_xyz.data.cell_data[0].nodes[1]["cell_y"]
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+            space_axes = _get_default_space_axes(model_with_xyz)
+        assert space_axes == []
+        assert len(caplog.records) == 1
+        assert "'cell_y' (1)" in caplog.records[0].message
+        assert "no space axes" in caplog.records[0].message
+
+
 class TestBuildAxes:
     """Test cases for _build_axes function."""
 
@@ -475,7 +509,8 @@ class TestBuildAxes:
         assert axes[1] == geff_spec.Axis(name="POSITION_T", type="time", unit="second")
 
     def test_time_and_space_axes(self, node_props):
-        """Test building axes with time and X, Y, Z spatial axes."""
+        """Test building axes with time and X, Y, Z spatial axes: the space axes are
+        written in OME-Zarr order, z, y, x."""
         axes = _build_axes(
             node_props=node_props,
             time_axes=["POSITION_T"],
@@ -484,12 +519,13 @@ class TestBuildAxes:
         )
         assert len(axes) == 4
         assert axes[0] == geff_spec.Axis(name="POSITION_T", type="time", unit="second")
-        assert axes[1] == geff_spec.Axis(name="cell_x", type="space", unit="micrometer")
+        assert axes[1] == geff_spec.Axis(name="cell_z", type="space", unit="micrometer")
         assert axes[2] == geff_spec.Axis(name="cell_y", type="space", unit="micrometer")
-        assert axes[3] == geff_spec.Axis(name="cell_z", type="space", unit="micrometer")
+        assert axes[3] == geff_spec.Axis(name="cell_x", type="space", unit="micrometer")
 
     def test_time_space_and_channel_axes(self, node_props):
-        """Test building axes with time, space, and channel axes."""
+        """Test building axes with time, space, and channel axes: OME-Zarr order is
+        time, channel, then space (y, x)."""
         axes = _build_axes(
             node_props=node_props,
             time_axes=["timepoint"],
@@ -498,10 +534,20 @@ class TestBuildAxes:
         )
         assert len(axes) == 5
         assert axes[0] == geff_spec.Axis(name="timepoint", type="time", unit=None)
-        assert axes[1] == geff_spec.Axis(name="cell_x", type="space", unit="micrometer")
-        assert axes[2] == geff_spec.Axis(name="cell_y", type="space", unit="micrometer")
-        assert axes[3] == geff_spec.Axis(name="channel_1", type="channel")
-        assert axes[4] == geff_spec.Axis(name="channel_2", type="channel")
+        assert axes[1] == geff_spec.Axis(name="channel_1", type="channel")
+        assert axes[2] == geff_spec.Axis(name="channel_2", type="channel")
+        assert axes[3] == geff_spec.Axis(name="cell_y", type="space", unit="micrometer")
+        assert axes[4] == geff_spec.Axis(name="cell_x", type="space", unit="micrometer")
+
+    def test_empty_space_axes(self, node_props):
+        """An empty list of space axes writes none."""
+        axes = _build_axes(
+            node_props=node_props,
+            time_axes=["timepoint"],
+            space_axes=[],
+            channel_axes=None,
+        )
+        assert [axis.type for axis in axes] == ["time"]
 
     def test_unknown_time_property_raises_error(self, node_props):
         """Test that unknown time property raises ValueError."""
@@ -726,6 +772,31 @@ class TestBuildGeffMetadata:
         )
         assert metadata.display_hints == hints_expected
 
+    def test_default_space_axes(self, model_with_xyz):
+        """Without space_axes, the cell coordinates are written as space axes in
+        OME-Zarr order, and the display hints map them to x, y and z."""
+        metadata = _build_geff_metadata(model_with_xyz)
+
+        assert [ax.name for ax in metadata.axes] == [
+            "timepoint",
+            "cell_z",
+            "cell_y",
+            "cell_x",
+        ]
+        assert metadata.display_hints == geff_spec.DisplayHint(
+            display_horizontal="cell_x",
+            display_vertical="cell_y",
+            display_depth="cell_z",
+            display_time="timepoint",
+        )
+
+    def test_empty_space_axes(self, model_with_xyz):
+        """An empty space_axes list writes neither space axes nor display hints."""
+        metadata = _build_geff_metadata(model_with_xyz, space_axes=[])
+
+        assert [ax.type for ax in metadata.axes] == ["time"]
+        assert metadata.display_hints is None
+
     def test_track_node_props_without_cycle(self, simple_model):
         """Test track_node_props when model has no cycle data."""
         metadata = _build_geff_metadata(simple_model)
@@ -862,6 +933,23 @@ class TestExportGEFF:
         graph, metadata = geff.read(geff_out)
         space_axes = [ax for ax in metadata.axes if ax.type == "space"]
         assert len(space_axes) == 3
+
+    def test_default_export_round_trip(self, model_with_xyz, tmp_path):
+        """With the default space axes, coordinates and space unit come back."""
+        geff_out = str(tmp_path / "test.geff")
+        export_GEFF(model_with_xyz, geff_out)
+
+        reloaded = load_GEFF(geff_out)
+
+        assert reloaded.get_space_unit() == "micrometer"
+        cells = [
+            attrs
+            for lin in reloaded.data.cell_data.values()
+            for _, attrs in lin.nodes(data=True)
+        ]
+        assert sorted(attrs["cell_x"] for attrs in cells) == [10.0, 12.0, 20.0, 22.0]
+        assert all(attrs["cell_y"] == 5.0 for attrs in cells)
+        assert all(attrs["cell_z"] == 1.0 for attrs in cells)
 
     def test_export_with_custom_time_axes(self, simple_model, tmp_path):
         """Test export with custom time axes."""

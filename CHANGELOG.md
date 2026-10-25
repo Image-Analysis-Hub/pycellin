@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 4c3a2fa, plus the uncommitted fix of the GEFF loader matching coordinates by axis name. Update from there with: git log 4c3a2fa..dev -->
+<!-- Planned v0.6.0. Covers commits up to 3145157, plus the uncommitted change of the GEFF exporter's default space axes and OME-Zarr axis order. Update from there with: git log 3145157..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -106,6 +106,8 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **TrackMate:** the loader declares `FRAME` with the unit "frame" instead of no unit
 - **GEFF:** stricter coordinate arguments in `load_GEFF()`: they must describe a complete 2D or 3D system (x and y, plus z in 3D), and inferred coordinates are each assigned at most once. A coordinate argument or `time_prop` naming a property that isn't on every node is now reported with a warning instead of an INFO message, before the property is inferred from the GEFF metadata
 - **GEFF:** without `cell_id_prop`, `load_GEFF()` uses the `cell_id` property of the file as cell identifier when its values are unique non-negative integers, instead of always creating cell IDs from the GEFF node IDs. Without `lineage_id_prop`, it also looks for a `lineage_id` property when the GEFF metadata only declares a tracklet property
+- **GEFF:** `export_GEFF()` writes the cell coordinates as space axes by default: `cell_x`, `cell_y`, and `cell_z` when it is declared, as long as every cell has a value for them, since GEFF axes can't have missing values (otherwise they are left out, with a warning). Pass `space_axes=[]` to write none. Without space axes, other GEFF tools couldn't place the cells, and `load_GEFF()` lost the space unit of the model
+- **GEFF:** `export_GEFF()` writes the axes in the order of the GEFF specification, which follows OME-Zarr: time, channel, then space axes from z to x (e.g. t, z, y, x), as the dimensions of an image. `space_axes` still lists the x, y and z properties in that order, and the display hints are unchanged
 - **Dependencies:** declare numpy, pillow, tifffile and geff-spec, which pycellin imports directly but only got through other packages
 - **Dependencies:** raise the minimum versions of pandas (2.2.2), scikit-image (0.24), shapely (2.0.4) and plotly (5.12) to the first ones that work with NumPy 2. The previous minimums allowed installs that failed at `import pycellin`
 - **Dependencies:** the test dependencies moved from the `test` extra to a `test` dependency group, installed from a clone of the repository with `pip install -e . --group test` (pip >= 25.1)
