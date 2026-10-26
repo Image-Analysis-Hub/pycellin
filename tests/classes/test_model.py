@@ -2,6 +2,8 @@
 
 """Unit tests for Model class from model.py module."""
 
+import copy
+import pickle
 import warnings
 from pathlib import Path
 from typing import ClassVar
@@ -1432,6 +1434,117 @@ class TestUpdate:
         )
         assert "lineage_name" not in new_lin.graph
         assert two_lineages_model.data.cell_data[1].graph["lineage_name"] == "Track_1"
+
+    @pytest.mark.parametrize("props_to_update", [None, ["cell_value"]])
+    def test_propagated_props_copied_again(self, two_lineages_model, props_to_update):
+        """Test that the cycle properties propagated to the cells follow the changes
+        of their cycles, here when a division is removed."""
+        model = two_lineages_model
+        model.propagate_cycle_properties(["cycle_id", "level"])
+        # Cell 1 divides into cells 2 and 4: without 1 -> 4, 1 -> 2 -> 3 is one cycle.
+        model.remove_link(source_cid=1, target_cid=4, lid=1)
+        model.update(props_to_update)
+        lin = model.data.cell_data[1]
+        assert dict(lin.nodes(data="cycle_id")) == {1: 3, 2: 3, 3: 3}
+        assert dict(lin.nodes(data="level")) == {1: 0, 2: 0, 3: 0}
+        new_lin = next(lin for lin in model.data.cell_data.values() if 4 in lin)
+        assert dict(new_lin.nodes(data="cycle_id")) == {4: 5, 5: 5}
+        assert dict(new_lin.nodes(data="level")) == {4: 0, 5: 0}
+
+    def test_propagated_props_given_to_new_cells(self, two_lineages_model):
+        model = two_lineages_model
+        model.propagate_cycle_properties(["cycle_id"])
+        model.add_cell(lid=1, cid=6, time_value=3)
+        model.add_link(source_cid=5, source_lid=1, target_cid=6)
+        model.update()
+        lin = model.data.cell_data[1]
+        assert dict(lin.nodes(data="cycle_id")) == {1: 1, 2: 3, 3: 3, 4: 6, 5: 6, 6: 6}
+
+    def test_propagated_prop_with_calculator_copied_again(self, two_lineages_model):
+        model = two_lineages_model
+        model.add_mother_cycle()
+        model.propagate_cycle_properties(["mother_cycle"])
+        assert model.data.cell_data[1].nodes[4]["mother_cycle"] == 1
+        model.remove_link(source_cid=1, target_cid=4, lid=1)
+        model.update()
+        new_lin = next(lin for lin in model.data.cell_data.values() if 4 in lin)
+        assert dict(new_lin.nodes(data="mother_cycle")) == {4: None, 5: None}
+
+    def test_cycle_props_not_propagated_stay_off_cells(self, two_lineages_model):
+        model = two_lineages_model
+        model.propagate_cycle_properties(["cycle_id"])
+        model.remove_link(source_cid=1, target_cid=4, lid=1)
+        model.update()
+        for lin in model.data.cell_data.values():
+            assert all("level" not in cell for _, cell in lin.nodes(data=True))
+
+
+class TestPropagateCycleProperties:
+    """Test cases for the record of the properties propagated to cell lineages."""
+
+    def test_propagated_props_recorded(self, two_lineages_model):
+        two_lineages_model.propagate_cycle_properties(["cycle_id"])
+        assert two_lineages_model.props_metadata._get_propagated_props() == ["cycle_id"]
+
+    def test_lineage_type_prop_left_alone(self, two_lineages_model):
+        """Test that a property declared with the Lineage type, and not propagated,
+        keeps the values of its cells when all the cycle properties are propagated,
+        and at updates."""
+        model = two_lineages_model
+        prop = _create_test_property("both_prop", "node", lin_type="Lineage")
+        model.add_custom_property(ConstantValue(prop, 2.0))
+        model.update()
+        for lin in model.data.cell_data.values():
+            for _, cell in lin.nodes(data=True):
+                cell["both_prop"] = 5.0
+        model.propagate_cycle_properties()
+        model.remove_link(source_cid=1, target_cid=4, lid=1)
+        model.update()
+        assert "both_prop" not in model.props_metadata._get_propagated_props()
+        for lin in model.data.cell_data.values():
+            assert set(dict(lin.nodes(data="both_prop")).values()) == {5.0}
+
+    def test_removed_prop_dropped_from_record(self, two_lineages_model):
+        model = two_lineages_model
+        model.add_mother_cycle()
+        model.propagate_cycle_properties(["mother_cycle"])
+        model.remove_property("mother_cycle")
+        assert model.props_metadata._get_propagated_props() == []
+
+    def test_record_kept_by_copies(self, two_lineages_model):
+        two_lineages_model.propagate_cycle_properties(["cycle_id"])
+        for model in (
+            pickle.loads(pickle.dumps(two_lineages_model)),
+            copy.deepcopy(two_lineages_model),
+        ):
+            model.remove_link(source_cid=1, target_cid=4, lid=1)
+            model.update()
+            lin = model.data.cell_data[1]
+            assert dict(lin.nodes(data="cycle_id")) == {1: 3, 2: 3, 3: 3}
+
+    def test_model_pickled_without_record(self, two_lineages_model):
+        """Test that a model pickled before propagated properties were recorded loads,
+        with its propagated properties copied once, as then."""
+        two_lineages_model.propagate_cycle_properties(["cycle_id"])
+        del two_lineages_model.props_metadata._propagated_props
+        model = pickle.loads(pickle.dumps(two_lineages_model))
+        assert model.props_metadata._get_propagated_props() == []
+        model.remove_link(source_cid=1, target_cid=4, lid=1)
+        model.update()
+        assert model.data.cell_data[1].nodes[1]["cycle_id"] == 1
+
+    def test_record_merged(self, two_lineages_model):
+        """Test that a property propagated in the merged model only is copied to the
+        cells of both models at the next update."""
+        model1 = copy.deepcopy(two_lineages_model)
+        model2 = two_lineages_model
+        model2.add_mother_cycle()
+        model2.propagate_cycle_properties(["mother_cycle"])
+        merged = model1.merge(model2)
+        assert merged.props_metadata._get_propagated_props() == ["mother_cycle"]
+        merged.update()
+        for lin in merged.data.cell_data.values():
+            assert all("mother_cycle" in cell for _, cell in lin.nodes(data=True))
 
 
 class TestAddLineage:

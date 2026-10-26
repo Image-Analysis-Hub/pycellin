@@ -32,6 +32,9 @@ class PropsMetadata:
         the values are the Property objects.
     protected_props : list[str]
         A list of property identifiers that are protected from being modified or removed.
+    propagated_props : list[str]
+        The identifiers of the cycle properties propagated to the cell lineages with
+        `Model.propagate_cycle_properties()`, which `Model.update()` copies again.
 
     Notes
     -----
@@ -44,9 +47,13 @@ class PropsMetadata:
         self,
         props: dict[str, Property] | None = None,
         protected_props: list[str] | None = None,
+        propagated_props: list[str] | None = None,
     ) -> None:
         self.props = props if props is not None else {}
         self._protected_props = protected_props if protected_props is not None else []
+        self._propagated_props = (
+            propagated_props if propagated_props is not None else []
+        )
         for prop in self._protected_props:
             if prop not in self.props:
                 msg = (
@@ -76,7 +83,25 @@ class PropsMetadata:
             prop_id: copy.deepcopy(prop, memo) for prop_id, prop in self.props.items()
         }
         protected_props_copy = copy.deepcopy(self._protected_props, memo)
-        return PropsMetadata(props=props_copy, protected_props=protected_props_copy)
+        propagated_props_copy = copy.deepcopy(self._propagated_props, memo)
+        return PropsMetadata(
+            props=props_copy,
+            protected_props=protected_props_copy,
+            propagated_props=propagated_props_copy,
+        )
+
+    def __setstate__(self, state: dict) -> None:
+        """
+        Restore a pickled PropsMetadata object.
+
+        Parameters
+        ----------
+        state : dict
+            State dictionary from pickling.
+        """
+        # Objects pickled before propagated properties were recorded have no record.
+        state.setdefault("_propagated_props", [])
+        self.__dict__.update(state)
 
     def __eq__(self, other):
         if not isinstance(other, PropsMetadata):
@@ -229,6 +254,29 @@ class PropsMetadata:
         """
         return self._protected_props
 
+    def _get_propagated_props(self) -> list[str]:
+        """
+        Return the cycle properties propagated to the cell lineages.
+
+        Returns
+        -------
+        list[str]
+            The identifiers of the propagated properties.
+        """
+        return self._propagated_props
+
+    def _add_propagated_prop(self, prop_id: str) -> None:
+        """
+        Record that a cycle property is propagated to the cell lineages.
+
+        Parameters
+        ----------
+        prop_id : str
+            The identifier of the propagated property.
+        """
+        if prop_id not in self._propagated_props:
+            self._propagated_props.append(prop_id)
+
     def _add_prop(self, property: Property, overwrite: bool = False) -> None:
         """
         Add the specified property to the PropsMetadata.
@@ -378,6 +426,7 @@ class PropsMetadata:
         # If no prop_type specified, remove entirely.
         if prop_type is None:
             del self.props[prop_id]
+            self._forget_propagated_prop(prop_id)
             return
 
         # Determine new type for the property.
@@ -392,8 +441,21 @@ class PropsMetadata:
         # Update or remove the property.
         if new_prop_type == PropertyType(0):
             del self.props[prop_id]
+            self._forget_propagated_prop(prop_id)
         else:
             self.props[prop_id].prop_type = new_prop_type
+
+    def _forget_propagated_prop(self, prop_id: str) -> None:
+        """
+        Drop a property from the record of the propagated properties, if it is in it.
+
+        Parameters
+        ----------
+        prop_id : str
+            The identifier of the property.
+        """
+        if prop_id in self._propagated_props:
+            self._propagated_props.remove(prop_id)
 
     def _remove_props(
         self,
@@ -449,6 +511,9 @@ class PropsMetadata:
         else:
             self.props[new_id] = self.props.pop(prop_id)
             self.props[new_id]._change_identifier(new_id)
+            if prop_id in self._propagated_props:
+                self._forget_propagated_prop(prop_id)
+                self._add_propagated_prop(new_id)
 
     def _change_prop_name(self, prop_id: str, new_name: str) -> None:
         """

@@ -1405,6 +1405,10 @@ class Model:
         the model then still requires an update, and the next `update()` computes all
         the properties again.
 
+        The cycle properties propagated to the cell lineages with
+        `propagate_cycle_properties()` are copied to them again once computed on the
+        cycle lineages, so that they stay up to date.
+
         The update also deletes empty lineages, and splits a lineage made of several
         parts, e.g. after `remove_link()`. The largest part keeps the lineage ID and
         the lineage properties. Each other part becomes a new lineage, with a new ID
@@ -1479,6 +1483,17 @@ class Model:
             time_step=time_step,
             props_to_update=props_to_update,
         )
+        # The cycle properties propagated to the cells were computed again on the
+        # cycle lineages: they are copied to the cells again.
+        if self.data.cycle_data:
+            cycle_props = self.get_cycle_lineage_properties()
+            propagated_props = [
+                prop_id
+                for prop_id in self.props_metadata._get_propagated_props()
+                if prop_id in cycle_props
+            ]
+            if propagated_props:
+                self._copy_cycle_props_to_cells(propagated_props)
         if not complete:
             # The properties left out by a partial update are computed by the next
             # update, which recomputes all of them.
@@ -5440,15 +5455,19 @@ class Model:
         properties that were propagated becomes `Lineage`, since the properties are
         then present on both cycle and cell lineages.
 
-        This is a one-shot copy: cell lineage values are not kept in sync if the
-        cycle lineages change later, e.g. when they are rebuilt during `update()`.
-        Call this method again to refresh them.
+        `update()` keeps the propagated values up to date: once it has computed the
+        cycle properties again, it copies the properties propagated with this method
+        again to the cell lineages, including to the cells added since. A propagated
+        property that the update doesn't compute, e.g. without calculator, keeps its
+        previous values on the cells. A property declared with the `Lineage` type,
+        and not propagated, is left as it is.
 
         Parameters
         ----------
         props : list[str], optional
-            List of the properties to propagate. If None, all cycle properties are
-            propagated. Default is None.
+            List of the properties to propagate. If None, the cycle lineage
+            properties are propagated, i.e. those of the `CycleLineage` type and
+            those already propagated. Default is None.
         update : bool, optional
             Whether to update the model before propagating the properties.
             Default is True. For a correct propagation, the model must be updated
@@ -5483,34 +5502,64 @@ class Model:
             )
         if self._updater._update_required and update:
             self.update()
-        node_props, edge_props, lin_props = self._categorize_props(props)
-
-        propagated_props = (
-            set()
-        )  # to keep track of which properties were actually propagated
-
-        # Propagation.
-        for lin_id in self.data.cell_data:
-            lin = self.data.cell_data[lin_id]
-            clin = self.data.cycle_data[lin_id]
-            if node_props:
-                propagated_props.update(
-                    Model._propagate_cycle_node_props(node_props, clin, lin)
-                )
-            if edge_props:
-                propagated_props.update(
-                    Model._propagate_cycle_edge_props(edge_props, clin, lin)
-                )
-            if lin_props:
-                propagated_props.update(
-                    Model._propagate_cycle_lineage_props(lin_props, clin, lin)
-                )
+        if props is None:
+            # Not the properties declared with the Lineage type, such as lineage_id.
+            already_propagated = self.props_metadata._get_propagated_props()
+            props = [
+                prop_id
+                for prop_id, prop in self.get_cycle_lineage_properties().items()
+                if prop.lin_type == "CycleLineage" or prop_id in already_propagated
+            ]
+        propagated_props = self._copy_cycle_props_to_cells(props)
 
         # Update the properties declaration: now the property type is `Lineage`
         # instead of just `CycleLineage` since the properties are now present on cycle
-        # AND cell lineages.
+        # AND cell lineages. They are recorded for update() to copy them again.
         for prop in propagated_props:
             self.props_metadata.props[prop].lin_type = "Lineage"
+            self.props_metadata._add_propagated_prop(prop)
+
+    def _copy_cycle_props_to_cells(self, props: list[str] | None) -> set[str]:
+        """
+        Copy the values of cycle properties from the cycle lineages to the cells.
+
+        Parameters
+        ----------
+        props : list[str] | None
+            The cycle properties to copy, or None for all of them.
+
+        Returns
+        -------
+        set[str]
+            The properties that had values to copy.
+
+        Raises
+        ------
+        ValueError
+            If a property is not a cycle lineage property or not declared.
+        FusionError
+            If the first cell of a cycle has more than one incoming link.
+        """
+        node_props, edge_props, lin_props = self._categorize_props(props)
+        cycle_data = self.data.cycle_data or {}
+        copied_props: set[str] = set()
+        for lin_id, lin in self.data.cell_data.items():
+            clin = cycle_data.get(lin_id)
+            if clin is None:
+                continue
+            if node_props:
+                copied_props.update(
+                    Model._propagate_cycle_node_props(node_props, clin, lin)
+                )
+            if edge_props:
+                copied_props.update(
+                    Model._propagate_cycle_edge_props(edge_props, clin, lin)
+                )
+            if lin_props:
+                copied_props.update(
+                    Model._propagate_cycle_lineage_props(lin_props, clin, lin)
+                )
+        return copied_props
 
     def merge(
         self,
@@ -5910,10 +5959,14 @@ class Model:
             else:  # register both metadata and calculator
                 model1.add_custom_property(calc)
 
-        # A property is protected if it is protected in either model.
+        # A property is protected if it is protected in either model, and likewise
+        # propagated to cell lineages.
         for prop_id in model2.props_metadata._protected_props:
             if model1.has_property(prop_id):
                 model1.props_metadata._protect_prop(prop_id)
+        for prop_id in model2.props_metadata._get_propagated_props():
+            if model1.has_property(prop_id):
+                model1.props_metadata._add_propagated_prop(prop_id)
 
         # Model metadata stored on lineages. Each lineage gets the value of the model it
         # comes from, unless that model already stores the field from a previous merge.

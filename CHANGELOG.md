@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 28048c8, plus the uncommitted text fixes (lineage_id_pycellin, the merge-tests claim, propagation in "Managing properties", sisters in "Getting started") and the removal of the "Creating a model from scratch" notebook. Update from there with: git log 28048c8..dev -->
+<!-- Planned v0.6.0. Covers commits up to 28048c8, plus the uncommitted text fixes (lineage_id_pycellin, the merge-tests claim, sisters in "Getting started"), `update()` copying propagated cycle properties again, the removal of the "Creating a model from scratch" and "Working with TrackMate data" notebooks, and of the State column of the README notebook table. Update from there with: git log 28048c8..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -129,6 +129,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** a cell, link or lineage removed and then added back with the same ID before `update()` was still treated as removed: `update()` left the cell or link without property values, and deleted the lineage. This also happened without reusing an ID on purpose: once the lineage with the highest ID is removed, the next new lineage gets that ID back (the docstring of `get_next_available_lineage_id()` wrongly said it never does). So `update()` deleted a lineage split off with `split_lineage_from_cell()`, and left a lineage it split itself without cycle lineage and its new cells without property values
 - **Model:** cells moved to another lineage, by a split in `update()` (e.g. after `remove_link()`), by `split_lineage_from_cell()` or by `add_link()` between two lineages, kept the `lineage_id` of their old lineage, so a GEFF file exported afterwards couldn't be read back correctly. `update()` now sets it. A split-off lineage also copied the lineage properties of the original lineage, e.g. TrackMate's track name, index and number of spots, so TrackMate exports had several tracks with the same name and index: it now starts with its new ID only
 - **Model:** `update()` failed with `KeyError` when cells or links added since the last update had been moved to another lineage by `add_link()`, or when a link had been added to a lineage removed since
+- **Model:** `update()` didn't update the cycle properties propagated to the cells with `propagate_cycle_properties()`, although the "Managing properties" notebook said it did: after a change, e.g. `remove_link()`, the cells kept the values of their former cell cycle, and cells added later got none. `update()` now copies them again once computed on the cycle lineages. Only the properties propagated that way are copied, and `propagate_cycle_properties()` without `props` now leaves out the properties declared with the `Lineage` type, whose cell values it overwrote with those of the cycles
 - **Properties:** `turning_angle` (`angle` in 0.5.1), `absolute_age` and `relative_age` were recomputed for every lineage at each update, as their calculators were global instead of local
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells
 - **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning
@@ -172,7 +173,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 ### Maintenance
 
 - **Tests:** new tests for the new properties, plotting, exceptions, utils, the CTC and trackpy loaders, and `load_GEFF()` end to end
-- **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks, remove the unfinished "Creating a model from scratch" notebook, and explain when a calculator should be local or global
+- **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks, remove the unfinished "Creating a model from scratch" and "Working with TrackMate data" notebooks (the latter covered by "Getting started") and the State column of the README notebook table, and explain when a calculator should be local or global
 - **Properties:** make the `cycle_completeness` calculator local, since it only reads its own lineage. Its values and update cost are unchanged
 - **Packaging:** find packages automatically in `pyproject.toml`
 - **Packaging:** declare the license as an SPDX expression (`BSD-3-Clause`) instead of the deprecated classifier. Building pycellin now needs setuptools >= 77
