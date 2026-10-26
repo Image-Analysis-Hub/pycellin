@@ -126,15 +126,13 @@ pc.export_GEFF(
 
 ## Usage
 
-Please note that the following notebooks are still a work in progress. There may be some mistakes in the code and some sections might move from one notebook to another.
+Please note that the following notebooks serve as temporary documentation. A full user's documentation and API documentation will be added soon.
 
-| Notebook                                                                                                                                        | Description                                                         | Level    | State |
-|-------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|----------|-------|
-| [Getting started](https://github.com/Image-Analysis-Hub/pycellin/blob/main/notebooks/Getting%20started.ipynb)                                   | The basics of pycellin, through examples                            | Beginner | WIP   |
-| [Managing properties](https://github.com/Image-Analysis-Hub/pycellin/blob/main/notebooks/Managing%20properties.ipynb)                           | How to add, compute and remove properties from a model              | Beginner | WIP   |
-| [Working with TrackMate data](https://github.com/Image-Analysis-Hub/pycellin/blob/main/notebooks/Working%20with%20TrackMate%20data.ipynb)       | How pycellin can work with TrackMate, through an example            | Beginner | WIP   |
-| [Creating a model from scratch](https://github.com/Image-Analysis-Hub/pycellin/blob/main/notebooks/Creating%20a%20model%20from%20scratch.ipynb) | How to manually create a pycellin model, including its lineages     | Advanced | Stub  |
-| [Custom properties](https://github.com/Image-Analysis-Hub/pycellin/blob/main/notebooks/Custom%20properties.ipynb)                               | How to create user-defined properties and augment a model with them | Advanced | WIP   |
+| Notebook                                                                                                              | Description                                                         | Level    |
+|-----------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|----------|
+| [Getting started](https://github.com/Image-Analysis-Hub/pycellin/blob/main/notebooks/Getting%20started.ipynb)         | The basics of pycellin, through examples                            | Beginner |
+| [Managing properties](https://github.com/Image-Analysis-Hub/pycellin/blob/main/notebooks/Managing%20properties.ipynb) | How to add, compute and remove properties from a model              | Beginner |
+| [Custom properties](https://github.com/Image-Analysis-Hub/pycellin/blob/main/notebooks/Custom%20properties.ipynb)     | How to create user-defined properties and augment a model with them | Advanced |
 
 
 ## Credits and references

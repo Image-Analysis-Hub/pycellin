@@ -5,14 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 4323e23, plus the uncommitted `frame_offset` argument of the CTC exporter and the uncommitted `lone_spots` and `tracks` arguments of the TrackMate loader (with the exporter keeping `VISIBILITY`), and the uncommitted fixes of the PyPI page links (project URLs, README) and of the README conda step. Update from there with: git log 4323e23..dev -->
+<!-- Planned v0.6.0. Covers commits up to 28048c8, plus the uncommitted text fixes (lineage_id_pycellin, the merge-tests claim, propagation in "Managing properties", sisters in "Getting started") and the removal of the "Creating a model from scratch" notebook. Update from there with: git log 28048c8..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
 ### ⚠️ Breaking changes
 
 - **Naming:** `ID` is now written in lowercase in all pycellin names, following PEP 8:
-  - the core properties `cell_ID`, `lineage_ID` and `cycle_ID` are renamed `cell_id`, `lineage_id` and `cycle_id`, in DataFrames and exported files too. So are the `source_cell_ID` and `target_cell_ID` columns of `to_link_dataframe()`, the `pycellin_cell_ID` property of TrackMate exports and the `lineage_ID_Pycellin` column of trackpy exports
+  - the core properties `cell_ID`, `lineage_ID` and `cycle_ID` are renamed `cell_id`, `lineage_id` and `cycle_id`, in DataFrames and exported files too. So are the `source_cell_ID` and `target_cell_ID` columns of `to_link_dataframe()`, the `pycellin_cell_ID` property of TrackMate exports and the `lineage_ID_Pycellin` column of trackpy exports, now `lineage_id_pycellin`
   - `Model` methods: `get_cell_lineage_from_ID()` → `get_cell_lineage_from_id()`, and likewise `get_cycle_lineage_from_ID()`, `get_cell_lineage_IDs()`, `get_lineage_IDs()`, `get_cycle_lineage_IDs()` and `get_next_available_lineage_ID()`
   - the `ID_prop` argument of `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()` → `id_prop`
   - the fields of the `Cell` and `Link` named tuples (e.g. returned by `get_divisions()`), and the `node_ID`, `lineage_ID`, `source_lineage_ID` and `target_lineage_ID` arguments and attributes of exceptions
@@ -171,8 +171,8 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 
 ### Maintenance
 
-- **Tests:** new tests for model merging and splitting, the new properties, plotting, exceptions, utils, the CTC and trackpy loaders, and `load_GEFF()` end to end
-- **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks, and explain when a calculator should be local or global
+- **Tests:** new tests for the new properties, plotting, exceptions, utils, the CTC and trackpy loaders, and `load_GEFF()` end to end
+- **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks, remove the unfinished "Creating a model from scratch" notebook, and explain when a calculator should be local or global
 - **Properties:** make the `cycle_completeness` calculator local, since it only reads its own lineage. Its values and update cost are unchanged
 - **Packaging:** find packages automatically in `pyproject.toml`
 - **Packaging:** declare the license as an SPDX expression (`BSD-3-Clause`) instead of the deprecated classifier. Building pycellin now needs setuptools >= 77

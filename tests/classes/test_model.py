@@ -136,6 +136,17 @@ class TestCategorizePropsMockModel:
         ):
             Model._categorize_props(model, invalid_props)
 
+    def test_categorize_props_invalid_property(self, props_dict):
+        """Test that a single invalid property is reported in the error."""
+        model = MagicMock(spec=Model)
+        model.get_cycle_lineage_properties.return_value = props_dict
+
+        with pytest.raises(
+            ValueError,
+            match="'invalid1' is either not a cycle lineage property or not declared",
+        ):
+            Model._categorize_props(model, ["invalid1", "division_time"])
+
     def test_categorize_props_empty_list(self, props_dict):
         """Test categorization with an empty list of properties."""
         model = MagicMock(spec=Model)

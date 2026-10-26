@@ -5283,7 +5283,7 @@ class Model:
                 plural = len(missing_props) > 1
                 raise ValueError(
                     f"Propert{'ies' if plural else 'y'} {missing_str} "
-                    f"{'are' if plural else 'is'} either not{' ' if plural else 'a'}"
+                    f"{'are' if plural else 'is'} either not {'' if plural else 'a '}"
                     f"cycle lineage propert{'ies' if plural else 'y'} or not declared "
                     f"in the model."
                 )
