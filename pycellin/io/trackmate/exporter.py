@@ -735,7 +735,10 @@ def _update_nodes(lin: CellLineage, frame_prop: str) -> set[int]:
     for node, data in lin.nodes(data=True):
         data["ID"] = data.pop("cell_id")
         data["FRAME"] = data.pop(frame_prop)
-        data["VISIBILITY"] = 1
+        # Cells keep the visibility they were loaded with, e.g. hidden by the spot
+        # filters of TrackMate. The others are visible.
+        if data.get("VISIBILITY") is None:
+            data["VISIBILITY"] = 1
         try:
             data.pop("lineage_id")  # TM needs it only on the tracks, not on the spots
         except KeyError:
