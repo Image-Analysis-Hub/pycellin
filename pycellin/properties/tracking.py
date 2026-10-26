@@ -9,11 +9,11 @@ Vocabulary:
 - Property/Attribute: TrackMate (resp. networkX) uses the word property (resp. attribute) 
   to refer to spot (resp. node), link (resp. edge) or track (resp. graph) information. 
   Both naming are used here, depending on the context.
-- Generation: A generation is a list of nodes between 2 successive divisions. 
+- Cell cycle: A cell cycle is a list of nodes between 2 successive divisions.
   It includes the second division but not the first one.
   For example, in the following graph where node IDs belong to [0, 9]:
 
-        0           we have the following generation:
+        0           we have the following cell cycles:
         |             [0, 1]
         1             [2, 4, 6]
        / \\            [3, 5, 7]
@@ -25,8 +25,8 @@ Vocabulary:
      / \\
     8   9
 
-- Complete generation: It is a generation that do not include a root nor a leaf.
-  If we take the previous example, the only complete generation is [2, 4, 6].
+- Complete cell cycle: It is a cell cycle that includes neither a root nor a leaf.
+  If we take the previous example, the only complete cell cycle is [2, 4, 6].
 """
 
 from typing import ClassVar
@@ -43,7 +43,7 @@ from pycellin.classes.property_calculator import (
 )
 
 # TODO: should I add the word Calc or Calculator to the class names?
-# TODO: add calculator for mandatory cycle lineage properties (e.g. cycle length)
+# TODO: add calculator for mandatory cycle lineage properties (e.g. cycle_num_cells)
 
 
 def create_absolute_age_property(
@@ -302,14 +302,14 @@ class NormalizedAge(NodeLocalPropCalculator):
         return (lineage.nodes[nid][self.time_prop] - start_time) / duration
 
 
-def create_cycle_completeness_property(
+def create_is_complete_cycle_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
     return Property(
-        identifier=custom_identifier or "cycle_completeness",
-        name=custom_name or "Cycle completeness",
+        identifier=custom_identifier or "is_complete_cycle",
+        name=custom_name or "Is complete cycle",
         description=custom_description
         or "Whether the full cell cycle is captured, i.e. starts from a division "
         "and ends with a division",
@@ -320,14 +320,14 @@ def create_cycle_completeness_property(
     )
 
 
-class CycleCompleteness(NodeLocalPropCalculator):
+class IsCompleteCycle(NodeLocalPropCalculator):
     """
-    Calculator to compute the cell cycle completeness.
+    Calculator to compute whether cell cycles are complete.
 
     A cell cycle is defined as complete when it starts by a division
     AND ends by a division. Cell cycles that start at the root
     or end with a leaf are thus incomplete.
-    This can be useful when analyzing properties like division time. It avoids
+    This can be useful when analyzing properties like interdivision time. It avoids
     the introduction of a bias since we have no information on what happened
     before the root or after the leaves.
     """
@@ -336,7 +336,7 @@ class CycleCompleteness(NodeLocalPropCalculator):
         self, lineage: CellLineage | CycleLineage, nid: int
     ) -> bool:
         """
-        Compute the cell cycle completeness of a given cell or cell cycle.
+        Compute whether the cell cycle of a given cell, or a given cell cycle, is complete.
 
         Parameters
         ----------
@@ -378,7 +378,7 @@ def _get_cell_lin_timepoints(
     """
     Get the timepoints of the divisions defining the cell cycle.
 
-    This function is used by the DivisionTime and DivisionRate calculators.
+    This function is used by the InterdivisionTime and DivisionRate calculators.
 
     Parameters
     ----------
@@ -422,7 +422,7 @@ def _get_cycle_lin_timepoints(
     """
     Get the timepoints of the divisions defining the cell cycle.
 
-    This function is used by the DivisionTime and DivisionRate calculators.
+    This function is used by the InterdivisionTime and DivisionRate calculators.
 
     Parameters
     ----------
@@ -461,7 +461,7 @@ def _get_cycle_lin_timepoints(
     return frame_current_div, frame_prev_div
 
 
-def create_division_time_property(
+def create_interdivision_time_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
@@ -469,8 +469,8 @@ def create_division_time_property(
     unit: str | None = None,
 ) -> Property:
     return Property(
-        identifier=custom_identifier or "division_time",
-        name=custom_name or "Division time",
+        identifier=custom_identifier or "interdivision_time",
+        name=custom_name or "Interdivision time",
         description=custom_description or "Time elapsed between two successive divisions",
         provenance="pycellin",
         prop_type="node",
@@ -480,11 +480,11 @@ def create_division_time_property(
     )
 
 
-class DivisionTime(NodeGlobalPropCalculator):
+class InterdivisionTime(NodeGlobalPropCalculator):
     """
-    Calculator to compute the division time of cells.
+    Calculator to compute the interdivision time of cells.
 
-    Division time is defined as the time elapsed between the 2 divisions
+    Interdivision time is defined as the time elapsed between the 2 divisions
     that define the cell cycle.
     It is computed in the same unit as the time property given as input
     (e.g. "frame", "time", etc.).
@@ -511,7 +511,7 @@ class DivisionTime(NodeGlobalPropCalculator):
         self, data: Data, lineage: CellLineage | CycleLineage, nid: int
     ) -> int | float:
         """
-        Compute the division time of a given cell or cell cycle.
+        Compute the interdivision time of a given cell or cell cycle.
 
         Parameters
         ----------
@@ -525,7 +525,7 @@ class DivisionTime(NodeGlobalPropCalculator):
         Returns
         -------
         int | float
-            Division time.
+            Interdivision time.
 
         Raises
         ------
@@ -571,7 +571,7 @@ class DivisionRate(NodeGlobalPropCalculator):
     Calculator to compute the division rate of cells.
 
     Division rate is defined as the number of divisions per time unit.
-    It is the inverse of the division time.
+    It is the inverse of the interdivision time.
     It is computed in the same unit as the time property given as input
     (e.g. "frame", "time", etc.).
     """

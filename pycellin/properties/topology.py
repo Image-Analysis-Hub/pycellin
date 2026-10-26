@@ -212,13 +212,13 @@ class NumCycles(LineageLocalPropCalculator):
         return len(lineage)
 
 
-def create_num_divs_property(
+def create_num_divisions_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
     return Property(
-        identifier=custom_identifier or "num_divs",
+        identifier=custom_identifier or "num_divisions",
         name=custom_name or "Number of divisions",
         description=custom_description or "Number of cell divisions in the lineage",
         provenance="pycellin",
@@ -228,8 +228,8 @@ def create_num_divs_property(
     )
 
 
-class NumDivs(LineageLocalPropCalculator):
-    """Calculator for the num_divs property."""
+class NumDivisions(LineageLocalPropCalculator):
+    """Calculator for the num_divisions property."""
 
     def compute(self, lineage) -> int:
         """
@@ -332,8 +332,8 @@ def create_lineage_cell_depth_property(
         identifier=custom_identifier or "lineage_cell_depth",
         name=custom_name or "Lineage cell depth",
         description=custom_description
-        or "Number of cells from the founding cell (root) to the most recent "
-        "descendant (leaf)",
+        or "Maximum number of cells along any path from the founding cell (root) to "
+        "a terminal cell (leaf)",
         provenance="pycellin",
         prop_type="lineage",
         lin_type="CellLineage",
@@ -371,7 +371,8 @@ def create_lineage_cycle_depth_property(
         identifier=custom_identifier or "lineage_cycle_depth",
         name=custom_name or "Lineage cycle depth",
         description=custom_description
-        or "Maximum number of cell cycles along any path from founding cell (root) to terminal cell (leaf)",
+        or "Maximum number of cell cycles along any path from the founding cell (root) "
+        "to a terminal cell (leaf), i.e. the highest generation + 1",
         provenance="pycellin",
         prop_type="lineage",
         lin_type="CycleLineage",
@@ -380,7 +381,7 @@ def create_lineage_cycle_depth_property(
 
 
 class LineageCycleDepth(LineageLocalPropCalculator):
-    """Calculator for the lineage_cell_depth property."""
+    """Calculator for the lineage_cycle_depth property."""
 
     def compute(self, lineage) -> int:
         """

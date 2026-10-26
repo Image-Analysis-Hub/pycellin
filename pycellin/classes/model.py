@@ -3013,19 +3013,19 @@ class Model:
             )
         )
 
-    def add_cycle_completeness(
+    def add_is_complete_cycle(
         self,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the cell cycle completeness property to the model.
+        Add the is_complete_cycle property to the model.
 
         A cell cycle is defined as complete when it starts by a division
         AND ends by a division. Cell cycles that start at the root
         or end with a leaf are thus incomplete.
-        This can be useful when analyzing properties like division time. It avoids
+        This can be useful when analyzing properties like interdivision time. It avoids
         the introduction of a bias since we have no information on what happened
         before the root or after the leaves.
 
@@ -3033,20 +3033,20 @@ class Model:
         ----------
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
-            "cycle_completeness".
+            "is_complete_cycle".
         custom_name : str, optional
             New name for the property. If None, the name will be
-            "Cycle completeness".
+            "Is complete cycle".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.tracking.create_cycle_completeness_property`).
+            default value (see :func:`pycellin.properties.tracking.create_is_complete_cycle_property`).
         """
-        prop = tracking.create_cycle_completeness_property(
+        prop = tracking.create_is_complete_cycle_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
         )
-        self.add_custom_property(tracking.CycleCompleteness(prop))
+        self.add_custom_property(tracking.IsCompleteCycle(prop))
 
     def add_cell_displacement(
         self,
@@ -4142,7 +4142,7 @@ class Model:
         Add the division rate property to the model.
 
         Division rate is defined as the number of divisions per time unit.
-        It is the inverse of the division time. By default, division rate
+        It is the inverse of the interdivision time. By default, division rate
         is given in the time unit of the model, but a custom time property can be
         specified.
 
@@ -4178,7 +4178,7 @@ class Model:
         )
         self.add_custom_property(tracking.DivisionRate(prop, time_prop=time_prop))
 
-    def add_division_time(
+    def add_interdivision_time(
         self,
         time_prop: str | None = None,
         custom_identifier: str | None = None,
@@ -4186,11 +4186,11 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the division time property to the model.
+        Add the interdivision time property to the model.
 
-        Division time is defined as the time elapsed between two successive divisions.
-        By default, division time is given in the time unit of the model,
-        but a custom time property can be specified.
+        Interdivision time is defined as the time elapsed between two successive
+        divisions. By default, interdivision time is given in the time unit of the
+        model, but a custom time property can be specified.
 
         Parameters
         ----------
@@ -4199,9 +4199,9 @@ class Model:
             cells. If None, the reference time property of the model is used.
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
-            "division_time".
+            "interdivision_time".
         custom_name : str, optional
-            New name for the property. If None, the name will be "Division time".
+            New name for the property. If None, the name will be "Interdivision time".
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Time elapsed between two successive divisions".
@@ -4217,7 +4217,7 @@ class Model:
         # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
         time = self._get_input_prop(time_prop)
 
-        prop = tracking.create_division_time_property(
+        prop = tracking.create_interdivision_time_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
@@ -4225,7 +4225,7 @@ class Model:
             unit=time.unit if time else None,
         )
 
-        self.add_custom_property(tracking.DivisionTime(prop, time_prop=time_prop))
+        self.add_custom_property(tracking.InterdivisionTime(prop, time_prop=time_prop))
 
     def add_is_division(
         self,
@@ -4330,9 +4330,8 @@ class Model:
         Add the lineage_cell_depth property to the model.
 
         The lineage_cell_depth property is a cell lineage property that indicates the
-        number of cells from the founding cell (root) to the most recent descendant
-        (leaf).
-        The founding cell has a depth of 0, its children have a depth of 1, etc.
+        maximum number of cells along any path from the founding cell (root) to a
+        terminal cell (leaf): 1 for a lineage of a single cell.
 
         Parameters
         ----------
@@ -4363,8 +4362,8 @@ class Model:
         Add the lineage_cycle_depth property to the model.
 
         The lineage_cycle_depth property is a cycle lineage property that indicates the
-        maximum number of cell cycles along any path from founding cell (root) to
-        terminal cell (leaf).
+        maximum number of cell cycles along any path from the founding cell (root) to
+        a terminal cell (leaf), i.e. the highest generation + 1.
 
         Parameters
         ----------
@@ -4705,36 +4704,36 @@ class Model:
 
         self.add_custom_property(topo.NumCycles(prop))
 
-    def add_num_divs(
+    def add_num_divisions(
         self,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the num_divs property to the model.
+        Add the num_divisions property to the model.
 
-        The num_divs property is a cell lineage property that indicates the number of
+        The num_divisions property is a cell lineage property that indicates the number of
         cell divisions in the lineage.
 
         Parameters
         ----------
         custom_identifier : str, optional
             New identifier for the property. If None, the identifier will be
-            "num_divs".
+            "num_divisions".
         custom_name : str, optional
             New name for the property. If None, the name will be "Number of cell divisions".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_num_divs_property`).
+            default value (see :func:`pycellin.properties.topology.create_num_divisions_property`).
         """
-        prop = topo.create_num_divs_property(
+        prop = topo.create_num_divisions_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
         )
 
-        self.add_custom_property(topo.NumDivs(prop))
+        self.add_custom_property(topo.NumDivisions(prop))
 
     def add_num_gaps(
         self,
@@ -5016,7 +5015,7 @@ class Model:
         >>> model.add_pycellin_properties(
         ...     [
         ...         {"absolute_age": {"in_time_unit": True}},
-        ...         "cell_cycle_completeness",
+        ...         "is_complete_cycle",
         ...         {"relative_age": {"in_time_unit": True}},
         ...     ]
         )
@@ -5488,9 +5487,10 @@ class Model:
         Warnings
         --------
         Quantitative analysis of cell cycle properties should not be done on cell
-        lineages after propagation of cycle properties, UNLESS you account for cell
-        cycle length. Otherwise you will introduce a bias in your quantification.
-        Indeed, after propagation, cycle properties (like division time) become
+        lineages after propagation of cycle properties, UNLESS you account for the
+        number of cells in each cell cycle (`cycle_num_cells`). Otherwise you will
+        introduce a bias in your quantification.
+        Indeed, after propagation, cycle properties (like interdivision time) become
         over-represented in long cell cycles since these properties are propagated on each
         node of the cell cycle in cell lineages, whereas they are stored only once
         per cell cycle on the cycle node in cycle lineages.
@@ -6302,7 +6302,7 @@ class Model:
         ValueError
             If the cycle lineages have not been computed yet.
             If the model has no lineages, or none with an ID in `lids`.
-            If the `lineage_id`, `level` or `cycle_id` property is not found
+            If the `lineage_id`, `generation` or `cycle_id` property is not found
             in the model.
             If a property of `lineage_props` is not a lineage property of cell
             lineages, is not declared in the model, or clashes with an existing
@@ -6332,12 +6332,12 @@ class Model:
         # Reoder the columns to have pycellin mandatory properties first.
         columns = df.columns.tolist()
         columns.remove("lineage_id")
-        columns.remove("level")
+        columns.remove("generation")
         columns.remove("cycle_id")
-        columns = ["lineage_id", "level", "cycle_id"] + columns
+        columns = ["lineage_id", "generation", "cycle_id"] + columns
         df = df[columns]
         df.sort_values(
-            ["lineage_id", "level", "cycle_id"], ignore_index=True, inplace=True
+            ["lineage_id", "generation", "cycle_id"], ignore_index=True, inplace=True
         )
 
         return self._add_lineage_props_to_df(df, lineage_props)
@@ -6417,8 +6417,8 @@ class Model:
         -----
         No cell cycle is left out. The first cell cycle of a lineage starts with the
         tracking, not at a division, and the last ones can end with it: add
-        "cycle_completeness" to `props` to keep the pairs of complete cell cycles,
-        e.g. to compare areas at birth or division times.
+        "is_complete_cycle" to `props` to keep the pairs of complete cell cycles,
+        e.g. to compare areas at birth or interdivision times.
 
         Examples
         --------

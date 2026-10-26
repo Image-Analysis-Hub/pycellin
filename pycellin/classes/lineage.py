@@ -2902,7 +2902,7 @@ class CycleLineage(Lineage):
                 self.nodes[n]["first_cell"] = first
                 self.nodes[n]["last_cell"] = last
                 # How many cells in the cycle?
-                self.nodes[n]["cycle_length"] = len(cells_in_cycle)
+                self.nodes[n]["cycle_num_cells"] = len(cells_in_cycle)
                 # How long does the cycle last?
                 self.nodes[n]["cycle_duration"] = (
                     cell_lineage.nodes[last][time_prop]
@@ -2915,7 +2915,7 @@ class CycleLineage(Lineage):
                     raise LineageStructureError(
                         "A cycle lineage cannot have multiple roots."
                     )
-                self.nodes[n]["level"] = nx.shortest_path_length(self, root, n)
+                self.nodes[n]["generation"] = nx.shortest_path_length(self, root, n)
 
     def __str__(self) -> str:
         name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
@@ -2956,7 +2956,7 @@ class CycleLineage(Lineage):
         Warns
         -----
         UserWarning
-            If there is no 'level' property to order the cell cycles.
+            If there is no 'generation' property to order the cell cycles.
         """
         try:
             ancestors = super().get_ancestors(ccid)
@@ -2964,9 +2964,9 @@ class CycleLineage(Lineage):
             raise KeyError(f"Cell cycle {ccid} is not in the lineage.") from err
         if sorted:
             try:
-                ancestors.sort(key=lambda n: self.nodes[n]["level"])
+                ancestors.sort(key=lambda n: self.nodes[n]["generation"])
             except KeyError:
-                warnings.warn("No 'level' property to order the cell cycles.")
+                warnings.warn("No 'generation' property to order the cell cycles.")
         return ancestors
 
     def get_links_within_cycle(self, ccid: int) -> list[tuple[int, int]]:
@@ -3038,7 +3038,7 @@ class CycleLineage(Lineage):
         id_prop : str, optional
             The property of the nodes to use as the node ID. "cycle_id" by default.
         y_prop : str or Property, optional
-            Node property to plot on the y-axis, "level" by default. A
+            Node property to plot on the y-axis, "generation" by default. A
             Property also supplies the axis label (its name and unit); a plain
             string is used as-is.
         title : str, optional
@@ -3096,9 +3096,9 @@ class CycleLineage(Lineage):
         This cannot easily be corrected.
         """
         if y_prop is None:
-            from pycellin.properties.core import create_level_property
+            from pycellin.properties.core import create_generation_property
 
-            y_prop = create_level_property()
+            y_prop = create_generation_property()
 
         return super().get_tree_figure(
             id_prop=id_prop,
@@ -3148,7 +3148,7 @@ class CycleLineage(Lineage):
         id_prop : str, optional
             The property of the nodes to use as the node ID. "cycle_id" by default.
         y_prop : str or Property, optional
-            Node property to plot on the y-axis, "level" by default. A
+            Node property to plot on the y-axis, "generation" by default. A
             Property also supplies the axis label (its name and unit); a plain
             string is used as-is.
         title : str, optional

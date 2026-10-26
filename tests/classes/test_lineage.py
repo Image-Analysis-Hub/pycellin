@@ -177,7 +177,7 @@ def empty_cycle_lin():
 @pytest.fixture
 def one_node_cycle_lin():
     lineage = CycleLineage(time_prop="timepoint", time_step=1)
-    lineage.add_node(1, level=0)
+    lineage.add_node(1, generation=0)
     return lineage
 
 
@@ -194,14 +194,14 @@ def cycle_lin():
         ]
     )
     for n in lineage.nodes:
-        lineage.nodes[n]["level"] = nx.shortest_path_length(lineage, 1, n)
+        lineage.nodes[n]["generation"] = nx.shortest_path_length(lineage, 1, n)
     return lineage
 
 
 @pytest.fixture
 def cycle_lin_triple_div(cycle_lin):
     # Triple division.
-    cycle_lin.add_node(6, level=2)
+    cycle_lin.add_node(6, generation=2)
     cycle_lin.add_edge(2, 6)
     return cycle_lin
 
@@ -2415,26 +2415,26 @@ class TestCycleLineageInit:
         assert cycle_lin.nodes[2]["cells"] == [1, 2]
         assert cycle_lin.nodes[2]["first_cell"] == 1
         assert cycle_lin.nodes[2]["last_cell"] == 2
-        assert cycle_lin.nodes[2]["cycle_length"] == 2
+        assert cycle_lin.nodes[2]["cycle_num_cells"] == 2
         assert cycle_lin.nodes[2]["cycle_start_time"] == 0
         assert cycle_lin.nodes[2]["cycle_end_time"] == 1
-        assert cycle_lin.nodes[2]["level"] == 0
+        assert cycle_lin.nodes[2]["generation"] == 0
         assert cycle_lin.nodes[9]["cycle_id"] == 9
         assert cycle_lin.nodes[9]["cells"] == [9]
         assert cycle_lin.nodes[9]["first_cell"] == 9
         assert cycle_lin.nodes[9]["last_cell"] == 9
-        assert cycle_lin.nodes[9]["cycle_length"] == 1
+        assert cycle_lin.nodes[9]["cycle_num_cells"] == 1
         assert cycle_lin.nodes[9]["cycle_start_time"] == 6
         assert cycle_lin.nodes[9]["cycle_end_time"] == 6
-        assert cycle_lin.nodes[9]["level"] == 3
+        assert cycle_lin.nodes[9]["generation"] == 3
         assert cycle_lin.nodes[14]["cycle_id"] == 14
         assert cycle_lin.nodes[14]["cells"] == [11, 12, 13, 14]
         assert cycle_lin.nodes[14]["first_cell"] == 11
         assert cycle_lin.nodes[14]["last_cell"] == 14
-        assert cycle_lin.nodes[14]["cycle_length"] == 4
+        assert cycle_lin.nodes[14]["cycle_num_cells"] == 4
         assert cycle_lin.nodes[14]["cycle_start_time"] == 2
         assert cycle_lin.nodes[14]["cycle_end_time"] == 5
-        assert cycle_lin.nodes[14]["level"] == 1
+        assert cycle_lin.nodes[14]["generation"] == 1
 
     def test_empty_lin(self, empty_cell_lin):
         """Test CycleLineage creation on empty lineage."""
@@ -2455,10 +2455,10 @@ class TestCycleLineageInit:
         assert cycle_lin.nodes[1]["cells"] == [1]
         assert cycle_lin.nodes[1]["first_cell"] == 1
         assert cycle_lin.nodes[1]["last_cell"] == 1
-        assert cycle_lin.nodes[1]["cycle_length"] == 1
+        assert cycle_lin.nodes[1]["cycle_num_cells"] == 1
         assert cycle_lin.nodes[1]["cycle_start_time"] == 0
         assert cycle_lin.nodes[1]["cycle_end_time"] == 0
-        assert cycle_lin.nodes[1]["level"] == 0
+        assert cycle_lin.nodes[1]["generation"] == 0
 
     def test_gap(self, cell_lin_gap):
         """Test CycleLineage creation on lineage with gaps."""
@@ -2471,26 +2471,26 @@ class TestCycleLineageInit:
         assert cycle_lin.nodes[2]["cells"] == [1, 2]
         assert cycle_lin.nodes[2]["first_cell"] == 1
         assert cycle_lin.nodes[2]["last_cell"] == 2
-        assert cycle_lin.nodes[2]["cycle_length"] == 2
+        assert cycle_lin.nodes[2]["cycle_num_cells"] == 2
         assert cycle_lin.nodes[2]["cycle_start_time"] == 0
         assert cycle_lin.nodes[2]["cycle_end_time"] == 1
-        assert cycle_lin.nodes[2]["level"] == 0
+        assert cycle_lin.nodes[2]["generation"] == 0
         assert cycle_lin.nodes[9]["cycle_id"] == 9
         assert cycle_lin.nodes[9]["cells"] == [9]
         assert cycle_lin.nodes[9]["first_cell"] == 9
         assert cycle_lin.nodes[9]["last_cell"] == 9
-        assert cycle_lin.nodes[9]["cycle_length"] == 1
+        assert cycle_lin.nodes[9]["cycle_num_cells"] == 1
         assert cycle_lin.nodes[9]["cycle_start_time"] == 6
         assert cycle_lin.nodes[9]["cycle_end_time"] == 6
-        assert cycle_lin.nodes[9]["level"] == 3
+        assert cycle_lin.nodes[9]["generation"] == 3
         assert cycle_lin.nodes[14]["cycle_id"] == 14
         assert cycle_lin.nodes[14]["cells"] == [11, 14]
         assert cycle_lin.nodes[14]["first_cell"] == 11
         assert cycle_lin.nodes[14]["last_cell"] == 14
-        assert cycle_lin.nodes[14]["cycle_length"] == 2
+        assert cycle_lin.nodes[14]["cycle_num_cells"] == 2
         assert cycle_lin.nodes[14]["cycle_start_time"] == 2
         assert cycle_lin.nodes[14]["cycle_end_time"] == 5
-        assert cycle_lin.nodes[14]["level"] == 1
+        assert cycle_lin.nodes[14]["generation"] == 1
 
     def test_div_root(self, cell_lin_div_root):
         """Test CycleLineage creation on lineage with division root."""
@@ -2503,18 +2503,18 @@ class TestCycleLineageInit:
         assert cycle_lin.nodes[1]["cells"] == [1]
         assert cycle_lin.nodes[1]["first_cell"] == 1
         assert cycle_lin.nodes[1]["last_cell"] == 1
-        assert cycle_lin.nodes[1]["cycle_length"] == 1
+        assert cycle_lin.nodes[1]["cycle_num_cells"] == 1
         assert cycle_lin.nodes[1]["cycle_start_time"] == 0
         assert cycle_lin.nodes[1]["cycle_end_time"] == 0
-        assert cycle_lin.nodes[1]["level"] == 0
+        assert cycle_lin.nodes[1]["generation"] == 0
         assert cycle_lin.nodes[17]["cycle_id"] == 17
         assert cycle_lin.nodes[17]["cells"] == [17]
         assert cycle_lin.nodes[17]["first_cell"] == 17
         assert cycle_lin.nodes[17]["last_cell"] == 17
-        assert cycle_lin.nodes[17]["cycle_length"] == 1
+        assert cycle_lin.nodes[17]["cycle_num_cells"] == 1
         assert cycle_lin.nodes[17]["cycle_start_time"] == 1
         assert cycle_lin.nodes[17]["cycle_end_time"] == 1
-        assert cycle_lin.nodes[17]["level"] == 1
+        assert cycle_lin.nodes[17]["generation"] == 1
 
     def test_successive_divs_and_root(self, cell_lin_successive_divs_and_root):
         """Test CycleLineage creation on lineage with successive divisions and division root."""
@@ -2529,18 +2529,18 @@ class TestCycleLineageInit:
         assert cycle_lin.nodes[3]["cells"] == [3]
         assert cycle_lin.nodes[3]["first_cell"] == 3
         assert cycle_lin.nodes[3]["last_cell"] == 3
-        assert cycle_lin.nodes[3]["cycle_length"] == 1
+        assert cycle_lin.nodes[3]["cycle_num_cells"] == 1
         assert cycle_lin.nodes[3]["cycle_start_time"] == 2
         assert cycle_lin.nodes[3]["cycle_end_time"] == 2
-        assert cycle_lin.nodes[3]["level"] == 1
+        assert cycle_lin.nodes[3]["generation"] == 1
         assert cycle_lin.nodes[5]["cycle_id"] == 5
         assert cycle_lin.nodes[5]["cells"] == [4, 5]
         assert cycle_lin.nodes[5]["first_cell"] == 4
         assert cycle_lin.nodes[5]["last_cell"] == 5
-        assert cycle_lin.nodes[5]["cycle_length"] == 2
+        assert cycle_lin.nodes[5]["cycle_num_cells"] == 2
         assert cycle_lin.nodes[5]["cycle_start_time"] == 3
         assert cycle_lin.nodes[5]["cycle_end_time"] == 4
-        assert cycle_lin.nodes[5]["level"] == 2
+        assert cycle_lin.nodes[5]["generation"] == 2
 
     def test_triple_div(self, cell_lin_triple_div):
         """Test CycleLineage creation on lineage with triple division."""
@@ -2553,18 +2553,18 @@ class TestCycleLineageInit:
         assert cycle_lin.nodes[4]["cells"] == [3, 4]
         assert cycle_lin.nodes[4]["first_cell"] == 3
         assert cycle_lin.nodes[4]["last_cell"] == 4
-        assert cycle_lin.nodes[4]["cycle_length"] == 2
+        assert cycle_lin.nodes[4]["cycle_num_cells"] == 2
         assert cycle_lin.nodes[4]["cycle_start_time"] == 2
         assert cycle_lin.nodes[4]["cycle_end_time"] == 3
-        assert cycle_lin.nodes[4]["level"] == 1
+        assert cycle_lin.nodes[4]["generation"] == 1
         assert cycle_lin.nodes[18]["cycle_id"] == 18
         assert cycle_lin.nodes[18]["cells"] == [17, 18]
         assert cycle_lin.nodes[18]["first_cell"] == 17
         assert cycle_lin.nodes[18]["last_cell"] == 18
-        assert cycle_lin.nodes[18]["cycle_length"] == 2
+        assert cycle_lin.nodes[18]["cycle_num_cells"] == 2
         assert cycle_lin.nodes[18]["cycle_start_time"] == 4
         assert cycle_lin.nodes[18]["cycle_end_time"] == 5
-        assert cycle_lin.nodes[18]["level"] == 2
+        assert cycle_lin.nodes[18]["generation"] == 2
 
     def test_unconnected_node(self, cell_lin_unconnected_node):
         """Test CycleLineage creation on lineage with unconnected node."""
@@ -2594,10 +2594,10 @@ class TestCycleLineageGetAncestors:
             cycle_lin.get_ancestors(0)
 
     def test_cannot_order_cycle(self, cycle_lin):
-        """Test get_ancestors raises UserWarning if 'level' property is missing."""
+        """Test get_ancestors raises UserWarning if 'generation' property is missing."""
         for n in cycle_lin.nodes:
-            del cycle_lin.nodes[n]["level"]
-        msg = "No 'level' property to order the cell cycles."
+            del cycle_lin.nodes[n]["generation"]
+        msg = "No 'generation' property to order the cell cycles."
         with pytest.warns(UserWarning, match=msg):
             cycle_lin.get_ancestors(5)
 

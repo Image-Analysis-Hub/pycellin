@@ -13,8 +13,8 @@ from pycellin.properties.tracking import (
     AbsoluteAge,
     RelativeAge,
     NormalizedAge,
-    CycleCompleteness,
-    DivisionTime,
+    IsCompleteCycle,
+    InterdivisionTime,
     DivisionRate,
 )
 from pycellin.classes import Property, Data, CellLineage, CycleLineage
@@ -203,12 +203,12 @@ class TestNormalizedAge:
         }
 
 
-# CellCycleCompleteness #######################################################
+# IsCompleteCycle #############################################################
 
 
-def test_cell_cycle_completeness_cell_lin(cell_lin, prop_cell_lin):
-    """Test CycleCompleteness Calculator with CellLineage."""
-    calculator = CycleCompleteness(prop_cell_lin)
+def test_is_complete_cycle_cell_lin(cell_lin, prop_cell_lin):
+    """Test IsCompleteCycle Calculator with CellLineage."""
+    calculator = IsCompleteCycle(prop_cell_lin)
     # Complete cell cycles.
     assert calculator.compute(cell_lin, nid=4) is True  # division
     assert calculator.compute(cell_lin, nid=14) is True  # division
@@ -225,9 +225,9 @@ def test_cell_cycle_completeness_cell_lin(cell_lin, prop_cell_lin):
         calculator.compute(cell_lin, nid=99)
 
 
-def test_cell_cycle_completeness_cycle_lin(cycle_lin, prop_cycle_lin):
-    """Test CycleCompleteness Calculator with CycleLineage."""
-    calculator = CycleCompleteness(prop_cycle_lin)
+def test_is_complete_cycle_cycle_lin(cycle_lin, prop_cycle_lin):
+    """Test IsCompleteCycle Calculator with CycleLineage."""
+    calculator = IsCompleteCycle(prop_cycle_lin)
     # Complete cell cycles.
     assert calculator.compute(cycle_lin, nid=4) is True  # division
     assert calculator.compute(cycle_lin, nid=8) is True  # division
@@ -242,12 +242,12 @@ def test_cell_cycle_completeness_cycle_lin(cycle_lin, prop_cycle_lin):
         calculator.compute(cycle_lin, nid=99)
 
 
-# DivisionTime ################################################################
+# InterdivisionTime ###########################################################
 
 
-def test_division_time(cell_lin, prop_cell_lin):
-    """Test DivisionTime Calculator."""
-    calculator = DivisionTime(prop_cell_lin, time_prop="frame")
+def test_interdivision_time(cell_lin, prop_cell_lin):
+    """Test InterdivisionTime Calculator."""
+    calculator = InterdivisionTime(prop_cell_lin, time_prop="frame")
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 1
     # Divisions.
@@ -264,12 +264,12 @@ def test_division_time(cell_lin, prop_cell_lin):
         calculator.compute(Data({}), cell_lin, nid=99)
 
 
-def test_division_time_gap(cell_lin, prop_cell_lin):
-    """Test DivisionTime Calculator and a gap in the lineage."""
+def test_interdivision_time_gap(cell_lin, prop_cell_lin):
+    """Test InterdivisionTime Calculator and a gap in the lineage."""
     # Create a lineage with a gap.
     cell_lin.remove_nodes_from([3, 12, 13])
     cell_lin.add_edges_from([(2, 4), (11, 14)])
-    calculator = DivisionTime(prop_cell_lin, time_prop="frame")
+    calculator = InterdivisionTime(prop_cell_lin, time_prop="frame")
     # Root.
     assert calculator.compute(Data({}), cell_lin, nid=1) == 1
     # Divisions.
@@ -286,9 +286,9 @@ def test_division_time_gap(cell_lin, prop_cell_lin):
         calculator.compute(Data({}), cell_lin, nid=99)
 
 
-def test_division_time_cycle_lin(cell_lin, prop_cycle_lin):
-    """Test DivisionTime Calculator with CycleLineage."""
-    calculator = DivisionTime(prop_cycle_lin, time_prop="frame")
+def test_interdivision_time_cycle_lin(cell_lin, prop_cycle_lin):
+    """Test InterdivisionTime Calculator with CycleLineage."""
+    calculator = InterdivisionTime(prop_cycle_lin, time_prop="frame")
     data = Data({1: cell_lin})
     data._add_cycle_lineages(time_prop="frame", time_step=1)
     cycle_lin = data.cycle_data[1]

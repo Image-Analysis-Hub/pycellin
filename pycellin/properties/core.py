@@ -613,11 +613,11 @@ def create_last_cell_property(provenance: str = "pycellin") -> Property:
     )
 
 
-def create_cycle_length_property(provenance: str = "pycellin") -> Property:
+def create_cycle_num_cells_property(provenance: str = "pycellin") -> Property:
     """
-    Create the declaration of the `cycle_length` core property.
+    Create the declaration of the `cycle_num_cells` core property.
 
-    `cycle_length` is the number of cells in the cell cycle, minding gaps. It is
+    `cycle_num_cells` is the number of cells in the cell cycle, minding gaps. It is
     a node property of cycle lineages.
 
     Parameters
@@ -629,11 +629,11 @@ def create_cycle_length_property(provenance: str = "pycellin") -> Property:
     Returns
     -------
     Property
-        Declaration of the `cycle_length` property.
+        Declaration of the `cycle_num_cells` property.
     """
     return Property(
-        identifier="cycle_length",
-        name="Cycle length",
+        identifier="cycle_num_cells",
+        name="Number of cells in the cycle",
         description="Number of cells in the cell cycle, minding gaps",
         provenance=provenance,
         prop_type="node",
@@ -744,13 +744,13 @@ def create_cycle_end_time_property(
     )
 
 
-def create_level_property(provenance: str = "pycellin") -> Property:
+def create_generation_property(provenance: str = "pycellin") -> Property:
     """
-    Create the declaration of the `level` core property.
+    Create the declaration of the `generation` core property.
 
-    `level` is the level of the cell cycle in the lineage, i.e. the number of
-    cell cycles upstream of the current one. It is a node property of cycle
-    lineages.
+    `generation` is the generation of the cell cycle in the lineage, i.e. the number
+    of cell cycles upstream of the current one: 0 for the root cell cycle. It is a
+    node property of cycle lineages.
 
     Parameters
     ----------
@@ -761,13 +761,13 @@ def create_level_property(provenance: str = "pycellin") -> Property:
     Returns
     -------
     Property
-        Declaration of the `level` property.
+        Declaration of the `generation` property.
     """
     return Property(
-        identifier="level",
-        name="Level",
+        identifier="generation",
+        name="Generation",
         description=(
-            "Level of the cell cycle in the lineage, "
+            "Generation of the cell cycle in the lineage, "
             "i.e. number of cell cycles upstream of the current one"
         ),
         provenance=provenance,

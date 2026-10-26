@@ -90,8 +90,8 @@ model.add_pycellin_properties(
         "cell_speed",
         "cycle_mean_speed",
         "relative_age",
-        "division_time",
-        "cycle_completeness",
+        "interdivision_time",
+        "is_complete_cycle",
     ]
 )
 model.update()

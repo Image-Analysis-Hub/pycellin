@@ -35,7 +35,7 @@ from pycellin.properties.morphology import (
 )
 from pycellin.properties.tracking import (
     create_absolute_age_property,
-    create_division_time_property,
+    create_interdivision_time_property,
 )
 
 
@@ -44,7 +44,7 @@ def props_dict():
     """
     Create a dictionary of properties for testing using predefined property creators.
     """
-    division_time_prop = create_division_time_property()
+    interdivision_time_prop = create_interdivision_time_property()
     absolute_age_prop = create_absolute_age_property()
 
     edge_prop = Property(
@@ -78,7 +78,7 @@ def props_dict():
     )
 
     return {
-        "division_time": division_time_prop,
+        "interdivision_time": interdivision_time_prop,
         "absolute_age": absolute_age_prop,
         "edge_prop": edge_prop,
         "lineage_prop": lin_prop,
@@ -103,12 +103,12 @@ class TestCategorizePropsMockModel:
             k: v for k, v in props_dict.items() if PropertyType.LINEAGE in v.prop_type
         }
 
-        props_to_categorize = ["division_time", "edge_prop"]  # only a subset
+        props_to_categorize = ["interdivision_time", "edge_prop"]  # only a subset
         node_props, edge_props, lin_props = Model._categorize_props(
             model, props_to_categorize
         )
 
-        assert node_props == ["division_time"]
+        assert node_props == ["interdivision_time"]
         assert edge_props == ["edge_prop"]
         assert lin_props == []
 
@@ -118,7 +118,7 @@ class TestCategorizePropsMockModel:
         model.get_cycle_lineage_properties.return_value = props_dict
         node_props, edge_props, lin_props = Model._categorize_props(model, None)
 
-        expected_node_props = {"division_time", "absolute_age", "mixed_prop"}
+        expected_node_props = {"interdivision_time", "absolute_age", "mixed_prop"}
         expected_edge_props = {"edge_prop", "mixed_prop"}
 
         assert set(node_props) == expected_node_props
@@ -130,7 +130,7 @@ class TestCategorizePropsMockModel:
         model = MagicMock(spec=Model)
         model.get_cycle_lineage_properties.return_value = props_dict
 
-        invalid_props = ["invalid1", "invalid2", "division_time"]
+        invalid_props = ["invalid1", "invalid2", "interdivision_time"]
 
         with pytest.raises(
             ValueError,
@@ -147,7 +147,7 @@ class TestCategorizePropsMockModel:
             ValueError,
             match="'invalid1' is either not a cycle lineage property or not declared",
         ):
-            Model._categorize_props(model, ["invalid1", "division_time"])
+            Model._categorize_props(model, ["invalid1", "interdivision_time"])
 
     def test_categorize_props_empty_list(self, props_dict):
         """Test categorization with an empty list of properties."""
@@ -382,36 +382,36 @@ class TestAddCycleData:
     def test_prop_declared_otherwise_with_values_raises(self, lineage_props_model):
         model = lineage_props_model
         # E.g. a cycle property propagated to cell lineages, loaded from a file.
-        model.props_metadata._add_prop(_create_test_property("level", "node"))
+        model.props_metadata._add_prop(_create_test_property("generation", "node"))
         for _, cell in model.data.cell_data[1].nodes(data=True):
-            cell["level"] = 0
-        with pytest.raises(ValueError, match="calculator: 'level'") as exc_info:
+            cell["generation"] = 0
+        with pytest.raises(ValueError, match="calculator: 'generation'") as exc_info:
             model.add_cycle_data()
         assert "model.remove_property()" in str(exc_info.value)
-        assert model.get_property("level").lin_type == "CellLineage"
+        assert model.get_property("generation").lin_type == "CellLineage"
         assert not model.has_cycle_data()
 
     def test_prop_declared_otherwise_with_calculator_raises(self, lineage_props_model):
         # Not computed yet, so without values.
-        prop = _create_test_property("level", "node", dtype="list[int]")
+        prop = _create_test_property("generation", "node", dtype="list[int]")
         lineage_props_model.add_custom_property(RootRelation(prop, []))
-        with pytest.raises(ValueError, match="calculator: 'level'"):
+        with pytest.raises(ValueError, match="calculator: 'generation'"):
             lineage_props_model.add_cycle_data()
 
     def test_unused_prop_declared_otherwise_replaced(self, lineage_props_model):
         model = lineage_props_model
         # E.g. declared in a file without values.
-        model.props_metadata._add_prop(_create_test_property("level", "node"))
+        model.props_metadata._add_prop(_create_test_property("generation", "node"))
         model.add_cycle_data()
-        assert model.get_property("level").lin_type == "CycleLineage"
-        assert "level" in model.props_metadata._get_protected_props()
+        assert model.get_property("generation").lin_type == "CycleLineage"
+        assert "generation" in model.props_metadata._get_protected_props()
 
     def test_propagated_prop_kept(self, lineage_props_model):
         model = lineage_props_model
         model.add_cycle_data()
-        model.propagate_cycle_properties(["level"])
+        model.propagate_cycle_properties(["generation"])
         model.add_cycle_data()
-        assert model.get_property("level").lin_type == "Lineage"
+        assert model.get_property("generation").lin_type == "Lineage"
 
 
 class TestToCycleDataframe:
@@ -571,20 +571,20 @@ class TestToCyclePairDataframe:
 
     def test_props_of_both_cycles(self, relatives_model):
         df = relatives_model.to_cycle_pair_dataframe(
-            "mother_cycle", props=["cycle_length", "level"]
+            "mother_cycle", props=["cycle_num_cells", "generation"]
         )
         assert df.columns.tolist() == [
             "lineage_id",
             "cycle_id_1",
             "cycle_id_2",
-            "cycle_length_1",
-            "cycle_length_2",
-            "level_1",
-            "level_2",
+            "cycle_num_cells_1",
+            "cycle_num_cells_2",
+            "generation_1",
+            "generation_2",
         ]
         row = df[df["cycle_id_1"] == 6].iloc[0]
-        assert (row["cycle_length_1"], row["cycle_length_2"]) == (1, 2)
-        assert (row["level_1"], row["level_2"]) == (2, 1)
+        assert (row["cycle_num_cells_1"], row["cycle_num_cells_2"]) == (1, 2)
+        assert (row["generation_1"], row["generation_2"]) == (2, 1)
 
     def test_all_props_by_default(self, relatives_model):
         df = relatives_model.to_cycle_pair_dataframe("mother_cycle")
@@ -601,39 +601,39 @@ class TestToCyclePairDataframe:
 
     def test_custom_suffixes(self, relatives_model):
         df = relatives_model.to_cycle_pair_dataframe(
-            "mother_cycle", props=["cycle_length"], suffixes=("", "_mother")
+            "mother_cycle", props=["cycle_num_cells"], suffixes=("", "_mother")
         )
         assert df.columns.tolist() == [
             "lineage_id",
             "cycle_id",
             "cycle_id_mother",
-            "cycle_length",
-            "cycle_length_mother",
+            "cycle_num_cells",
+            "cycle_num_cells_mother",
         ]
 
     def test_id_props_not_repeated(self, relatives_model):
         df = relatives_model.to_cycle_pair_dataframe(
-            "mother_cycle", props=["lineage_id", "cycle_id", "level"]
+            "mother_cycle", props=["lineage_id", "cycle_id", "generation"]
         )
         assert df.columns.tolist() == [
             "lineage_id",
             "cycle_id_1",
             "cycle_id_2",
-            "level_1",
-            "level_2",
+            "generation_1",
+            "generation_2",
         ]
 
     def test_lineage_without_pairs_gives_empty_dataframe(self, relatives_model):
         df = relatives_model.to_cycle_pair_dataframe(
-            "mother_cycle", props=["level"], lids=[-11]
+            "mother_cycle", props=["generation"], lids=[-11]
         )
         assert df.empty
         assert df.columns.tolist() == [
             "lineage_id",
             "cycle_id_1",
             "cycle_id_2",
-            "level_1",
-            "level_2",
+            "generation_1",
+            "generation_2",
         ]
 
     def test_lids(self, relatives_model):
@@ -681,7 +681,7 @@ class TestToCyclePairDataframe:
     def test_undeclared_prop_raises(self, relatives_model):
         with pytest.raises(ValueError, match="'cell_area'"):
             relatives_model.to_cycle_pair_dataframe(
-                "mother_cycle", props=["level", "cell_area"]
+                "mother_cycle", props=["generation", "cell_area"]
             )
 
     def test_same_suffixes_raise(self, relatives_model):
@@ -691,9 +691,9 @@ class TestToCyclePairDataframe:
             )
 
     def test_suffixes_giving_same_column_name_raise(self, relatives_model):
-        # "cycle_length" with the suffix "_mother" is named like this property.
+        # "cycle_num_cells" with the suffix "_mother" is named like this property.
         clashing = Property(
-            identifier="cycle_length_mother",
+            identifier="cycle_num_cells_mother",
             name="clashing",
             description="Named like a suffixed column",
             provenance="test",
@@ -705,7 +705,7 @@ class TestToCyclePairDataframe:
         with pytest.raises(ValueError, match="give the same name to two columns"):
             relatives_model.to_cycle_pair_dataframe(
                 "mother_cycle",
-                props=["cycle_length", "cycle_length_mother"],
+                props=["cycle_num_cells", "cycle_num_cells_mother"],
                 suffixes=("", "_mother"),
             )
 
@@ -1130,7 +1130,7 @@ class TestCheckInputProps:
 
     def test_wrong_lin_type_raises(self, input_props_model):
         calc = CycleMeanArea(
-            create_cycle_mean_area_property(), area_prop="cycle_length"
+            create_cycle_mean_area_property(), area_prop="cycle_num_cells"
         )
         with pytest.raises(ValueError, match="lin_type 'CellLineage'"):
             input_props_model._check_input_props(calc)
@@ -1307,17 +1307,17 @@ class TestUpdate:
     """Test cases for Model.update() method."""
 
     def test_partial_update_keeps_other_cycle_props(self, input_props_model):
-        input_props_model.add_division_time()
+        input_props_model.add_interdivision_time()
         input_props_model.update()
-        division_times = dict(
-            input_props_model.data.cycle_data[1].nodes(data="division_time")
+        interdivision_times = dict(
+            input_props_model.data.cycle_data[1].nodes(data="interdivision_time")
         )
         # The cycle lineages are rebuilt at the first update after adding a property.
         input_props_model.add_mother_cycle()
         input_props_model.update(["mother_cycle"])
         cycle_lin = input_props_model.data.cycle_data[1]
-        assert dict(cycle_lin.nodes(data="division_time")) == pytest.approx(
-            division_times, nan_ok=True
+        assert dict(cycle_lin.nodes(data="interdivision_time")) == pytest.approx(
+            interdivision_times, nan_ok=True
         )
         assert cycle_lin.nodes[3]["mother_cycle"] == 2
 
@@ -1337,14 +1337,16 @@ class TestUpdate:
 
     def test_partial_update_after_edit(self, input_props_model):
         input_props_model.add_absolute_age()
-        input_props_model.add_division_time()
+        input_props_model.add_interdivision_time()
         input_props_model.update()
         input_props_model.add_cell(lid=1, cid=5, time_value=3)
         input_props_model.add_link(source_cid=3, source_lid=1, target_cid=5)
         input_props_model.update(["absolute_age"])
         assert input_props_model.data.cell_data[1].nodes[5]["absolute_age"] == 3
         cycle_lin = input_props_model.data.cycle_data[1]
-        assert all("division_time" in cycle for _, cycle in cycle_lin.nodes(data=True))
+        assert all(
+            "interdivision_time" in cycle for _, cycle in cycle_lin.nodes(data=True)
+        )
 
     def test_undeclared_prop_ignored(self, input_props_model):
         input_props_model.add_absolute_age()
@@ -1440,16 +1442,16 @@ class TestUpdate:
         """Test that the cycle properties propagated to the cells follow the changes
         of their cycles, here when a division is removed."""
         model = two_lineages_model
-        model.propagate_cycle_properties(["cycle_id", "level"])
+        model.propagate_cycle_properties(["cycle_id", "generation"])
         # Cell 1 divides into cells 2 and 4: without 1 -> 4, 1 -> 2 -> 3 is one cycle.
         model.remove_link(source_cid=1, target_cid=4, lid=1)
         model.update(props_to_update)
         lin = model.data.cell_data[1]
         assert dict(lin.nodes(data="cycle_id")) == {1: 3, 2: 3, 3: 3}
-        assert dict(lin.nodes(data="level")) == {1: 0, 2: 0, 3: 0}
+        assert dict(lin.nodes(data="generation")) == {1: 0, 2: 0, 3: 0}
         new_lin = next(lin for lin in model.data.cell_data.values() if 4 in lin)
         assert dict(new_lin.nodes(data="cycle_id")) == {4: 5, 5: 5}
-        assert dict(new_lin.nodes(data="level")) == {4: 0, 5: 0}
+        assert dict(new_lin.nodes(data="generation")) == {4: 0, 5: 0}
 
     def test_propagated_props_given_to_new_cells(self, two_lineages_model):
         model = two_lineages_model
@@ -1476,7 +1478,7 @@ class TestUpdate:
         model.remove_link(source_cid=1, target_cid=4, lid=1)
         model.update()
         for lin in model.data.cell_data.values():
-            assert all("level" not in cell for _, cell in lin.nodes(data=True))
+            assert all("generation" not in cell for _, cell in lin.nodes(data=True))
 
 
 class TestPropagateCycleProperties:

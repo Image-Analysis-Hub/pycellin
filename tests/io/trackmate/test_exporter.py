@@ -502,7 +502,7 @@ class TestWriteFeatureDeclarations:
         declared = {feat for part in features.values() for feat in part}
         cycle_props = {
             "cycle_id",
-            "level",
+            "generation",
             "cycle_duration",
             "mother_cycle",
             "cycle_edge_prop",
@@ -512,11 +512,11 @@ class TestWriteFeatureDeclarations:
 
     def test_propagated_cycle_properties_are_declared(self, model_with_cycle_data):
         """Test that cycle properties propagated to cell lineages are declared."""
-        model_with_cycle_data.propagate_cycle_properties(["level"])
+        model_with_cycle_data.propagate_cycle_properties(["generation"])
 
         features = self._get_declared_features(model_with_cycle_data)
 
-        assert "level" in features["SpotFeatures"]
+        assert "generation" in features["SpotFeatures"]
         assert "cycle_duration" not in features["SpotFeatures"]
 
 
@@ -537,7 +537,7 @@ class TestExportTrackMateXML:
         model.add_mother_cycle()
         model.update()
 
-        assert model.get_property("level").lin_type == "CycleLineage"
+        assert model.get_property("generation").lin_type == "CycleLineage"
         assert model.get_property("mother_cycle").lin_type == "CycleLineage"
         pairs = model.to_cycle_pair_dataframe("mother_cycle")
         assert sorted(zip(pairs["cycle_id_1"], pairs["cycle_id_2"])) == [(5, 4), (8, 4)]

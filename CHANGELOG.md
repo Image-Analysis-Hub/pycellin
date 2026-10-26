@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 28048c8, plus the uncommitted text fixes (lineage_id_pycellin, the merge-tests claim, sisters in "Getting started"), `update()` copying propagated cycle properties again, the removal of the "Creating a model from scratch" and "Working with TrackMate data" notebooks, and of the State column of the README notebook table. Update from there with: git log 28048c8..dev -->
+<!-- Planned v0.6.0. Covers commits up to 1d701b2, plus the uncommitted renaming of predefined properties (num_divisions, cycle_num_cells, generation, interdivision_time, is_complete_cycle). Update from there with: git log 1d701b2..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -24,9 +24,15 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
   - `branch_mean_speed` → `cycle_mean_speed`
 - **Properties:** rename the `angle` property to `turning_angle` (`add_angle()` → `add_turning_angle()`)
 - **Properties:** rename the `ROI_coords` node property to `cell_contour` (TrackMate and CTC loaders, all exporters, sample GEFF data)
+- **Properties:** rename four properties whose names could be misread, in DataFrames and exported files too:
+  - `cycle_length` → `cycle_num_cells` (`create_cycle_num_cells_property()`): it counts the cells of a cell cycle, while the length of a cell cycle usually means its duration, which is `cycle_duration`
+  - `level` → `generation` (`create_generation_property()`): the root cell cycle is still generation 0. Cycle lineage plots use it on the y-axis by default, and `to_cycle_dataframe()` sorts by it
+  - `division_time` → `interdivision_time` (`add_interdivision_time()`, `InterdivisionTime`, `create_interdivision_time_property()`): it's the time between two successive divisions, not the time of a division
+  - `cycle_completeness` → `is_complete_cycle` (`add_is_complete_cycle()`, `IsCompleteCycle`, `create_is_complete_cycle_property()`): it's a boolean, named like `is_division`
+  - models pickled with an earlier version keep the old names
 - **Properties:** `cycle_duration` values change: it is now the time elapsed between the first and last cells of the cycle, in the reference time unit. It was previously off by one frame and scaled by the time step a second time
 - **Properties:** `cycle_total_displacement` is NaN instead of 0 for cell cycles without links, such as a cycle of a single cell
-- **Properties:** rename the `custom_time_property` argument of `add_absolute_age()`, `add_cell_speed()`, `add_division_rate()`, `add_division_time()` and `add_relative_age()` to `time_prop`. Their calculators' `time_prop_name` argument is renamed to `time_prop` too, and the `use_div_time` argument of the `DivisionRate` calculator is removed
+- **Properties:** rename the `custom_time_property` argument of `add_absolute_age()`, `add_cell_speed()`, `add_division_rate()`, `add_division_time()` (now `add_interdivision_time()`) and `add_relative_age()` to `time_prop`. Their calculators' `time_prop_name` argument is renamed to `time_prop` too, and the `use_div_time` argument of the `DivisionRate` calculator is removed
 - **Properties:** `add_cycle_mean_displacement()`, `add_cycle_total_displacement()` and `add_cycle_mean_speed()` raise `MissingPropertyError` when the property they're computed from (`cell_displacement` or `cell_speed`) isn't declared yet: add it first. `add_cycle_mean_speed()` now takes `speed_prop` as first argument, so pass `include_incoming_edge` by keyword
 - **Properties:** `Property` setters raise `TypeError` instead of `ValueError` when given a non-string value
 - **Model:** remove the `Model.recompute_property()` and `Model.export()` stubs, which did nothing. Use the `pycellin.export_*()` functions
@@ -72,7 +78,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** intensity properties `cycle_mean_intensity`, `birth_intensity` and `division_intensity`
 - **Properties:** the `add_*()` methods of properties computed from another property take its identifier as an argument (`polygon_prop`, `area_prop`, `displacement_prop`, `speed_prop`, `intensity_prop`), e.g. to compute `cell_area` from your own polygons. The unit of the new property is taken from that property
 - **Properties:** `INPUT_PROPS` class attribute on calculators, to list the properties they read. `add_custom_property()` checks that these properties are declared with the expected property and lineage types, for custom calculators too
-- **Properties:** topology lineage properties `num_cells`, `num_cycles`, `num_divs`, `num_gaps` and `num_leaves`
+- **Properties:** topology lineage properties `num_cells`, `num_cycles`, `num_divisions`, `num_gaps` and `num_leaves`
 - **Properties:** topology lineage properties `lineage_cell_depth`, `lineage_cycle_depth` and `lineage_duration`
 - **Properties:** topology cycle properties `mother_cycle`, `daughter_cycles`, `sister_cycles` and `cousin_cycles`, the IDs of the mother, daughter, sister and cousin cell cycles of each cell cycle. `mother_cycle` is None for root cycles, and `add_cousin_cycles()` takes a `degree`, like `get_cousins()`
 - **Properties:** `location_tag`, a cell property read from a mask image. `mask_path_metadata_field` reads the mask path from the model metadata, and a `tag_names` dict maps pixel values to region names
@@ -173,8 +179,8 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 ### Maintenance
 
 - **Tests:** new tests for the new properties, plotting, exceptions, utils, the CTC and trackpy loaders, and `load_GEFF()` end to end
-- **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks, remove the unfinished "Creating a model from scratch" and "Working with TrackMate data" notebooks (the latter covered by "Getting started") and the State column of the README notebook table, and explain when a calculator should be local or global
-- **Properties:** make the `cycle_completeness` calculator local, since it only reads its own lineage. Its values and update cost are unchanged
+- **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks, remove the unfinished "Creating a model from scratch" and "Working with TrackMate data" notebooks (the latter covered by "Getting started") and the State column of the README notebook table, explain when a calculator should be local or global, and fix the property names in the `add_pycellin_properties()` examples of its docstring and of "Managing properties" (`angle`, `cell_cycle_completeness`)
+- **Properties:** make the `is_complete_cycle` calculator local, since it only reads its own lineage. Its values and update cost are unchanged
 - **Packaging:** find packages automatically in `pyproject.toml`
 - **Packaging:** declare the license as an SPDX expression (`BSD-3-Clause`) instead of the deprecated classifier. Building pycellin now needs setuptools >= 77
 - **Packaging:** between releases, the version on `dev` ends with `.dev0` (e.g. `0.6.0.dev0`), so models made with development code say so in their `pycellin_version` metadata

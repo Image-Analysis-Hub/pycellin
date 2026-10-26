@@ -166,23 +166,23 @@ def _unit_to_dimension(
         "cycle_mean_displacement": "LENGTH",
         "cycle_mean_speed": "VELOCITY",
         "cells": "NONE",  # not float nor int so won't be exported anyway
-        "cycle_completeness": "NONE",
+        "is_complete_cycle": "NONE",
         "cycle_duration": "TIME",
         "cycle_end_time": "TIME",
         "cycle_id": "NONE",
-        "cycle_length": "NONE",
+        "cycle_num_cells": "NONE",
         "cycle_start_time": "TIME",
-        "division_time": "TIME",
+        "interdivision_time": "TIME",
         "division_rate": "TIME",  # TODO: check if this is correct
         "first_cell": "NONE",
         "last_cell": "NONE",
-        "level": "NONE",
+        "generation": "NONE",
         "mother_cycle": "NONE",
         "straightness": "NONE",
         # Lineage features.
         "num_cells": "NONE",
         "num_cycles": "NONE",
-        "num_divs": "NONE",
+        "num_divisions": "NONE",
         "num_gaps": "NONE",
         "num_leaves": "NONE",
         "lineage_cell_depth": "NONE",
@@ -1467,9 +1467,10 @@ def export_TrackMate_XML(
     Warnings
     --------
     Quantitative analysis of cell cycle properties should not be done on cell
-    lineages after propagation of cycle properties, UNLESS you account for cell
-    cycle length. Otherwise you will introduce a bias in your quantification.
-    Indeed, after propagation, cycle properties (like division time) become
+    lineages after propagation of cycle properties, UNLESS you account for the
+    number of cells in each cell cycle (`cycle_num_cells`). Otherwise you will
+    introduce a bias in your quantification.
+    Indeed, after propagation, cycle properties (like interdivision time) become
     over-represented in long cell cycles since these properties are propagated on each
     node of the cell cycle in cell lineages, whereas they are stored only once
     per cell cycle on the cycle node in cycle lineages.
