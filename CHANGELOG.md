@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 58c3034, plus the uncommitted `tracklets` argument of the GEFF exporter and the uncommitted fixes for undeclared attributes (trackpy loader, TrackMate loader and exporter). Update from there with: git log 58c3034..dev -->
+<!-- Planned v0.6.0. Covers commits up to 4323e23, plus the uncommitted `frame_offset` argument of the CTC exporter. Update from there with: git log 4323e23..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -93,6 +93,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **TrackMate:** default tracker in the exported XML, so the TrackMate wizard can be navigated back
 - **TrackMate:** dimension mappings for the new properties
 - **GEFF:** `tracklets` argument to `export_GEFF()`, to write the tracklets (the cell cycles) in a `tracklet_id` cell property declared as the GEFF tracklet property. Like `cycle_id`, a tracklet is identified by the ID of its last cell. The tracklets are computed at export from the cell lineages, so they don't need cycle lineages and are always up to date
+- **CTC:** `frame_offset` argument to `export_CTC_file()`, the frame of timepoint 0, added to the timepoints of the cells to give their CTC frames. Timepoints start at 0 at the earliest cell, so data that starts at a later frame, e.g. a CTC file whose first frame is 5, was exported from frame 0, out of line with its images. Pass that first frame, or in general the frame of any cell minus its timepoint
 - **trackpy:** `computed_time_prop` argument to `load_trackpy_dataframe()`
 - **Dependencies:** `notebooks` extra with what the example notebooks need: JupyterLab, ipykernel, and nbformat, without which Plotly can't show figures in notebooks. Install it with `pip install "pycellin[notebooks]"`
 
@@ -155,6 +156,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
   - 3D label images failed with "too many values to unpack", and a stack holding all the frames with that error or, when its name had no frame number, with "Can't parse frame value". The loader now says that only 2D label images, one per frame, are supported
   - a `labels_path` that wasn't a folder was silently ignored when the space unit and pixel sizes were given, leaving cell positions and contours declared without values. It now raises `ValueError`
   - the `label_imgs_location` metadata field was missing when the space unit and pixel sizes were given
+- **CTC:** the exporter wrote negative frames for cells with negative timepoints, e.g. in a lineage added with earlier times than the rest of the model. It now raises `ValueError`, giving the smallest `frame_offset` that avoids them
 - **trackpy:** the loader failed when given a `time_step`, which it applied to frames, and gave cells no `lineage_id`
 - **trackpy:** the loader silently overwrote the DataFrame columns named like the properties it creates (`cell_id`, `lineage_id` and `timepoint`; `cell_ID` and `lineage_ID` in 0.5.1). It now raises `ValueError`
 - **trackpy:** the loader didn't declare the DataFrame columns other than `frame` and the coordinates, e.g. `particle`, `mass` or `size`: they were on the cells but missing from the properties of the model, and a model exported to TrackMate couldn't be loaded back. Every column is now declared with its data type: trackpy's own columns get a description, and the sizes and static errors (`size`, `ep`...) the unit of the coordinates. When all the columns were numbers, integer columns were also loaded as floats

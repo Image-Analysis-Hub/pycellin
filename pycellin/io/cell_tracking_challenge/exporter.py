@@ -15,6 +15,7 @@ References:
 https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content%20conventions.pdf
 """
 
+import numbers
 from pathlib import Path
 
 from pycellin.classes.exceptions import FusionError
@@ -234,6 +235,7 @@ def _add_parent_track(
 def export_CTC_file(
     model: Model,
     ctc_file_out: str | Path,
+    frame_offset: int = 0,
 ) -> None:
     """
     Export lineage data from a Model to CTC tracking file format.
@@ -241,20 +243,48 @@ def export_CTC_file(
     The CTC tracking format does not support fusion events and does not allow
     gaps right after division events.
 
+    The CTC frames of the cells are their timepoints plus `frame_offset`.
+    Timepoints count time steps from the earliest cell of the model, so they start
+    at 0 even when the data doesn't, e.g. for a model loaded from a CTC file whose
+    first frame is 5. To keep the frames in line with the images, set
+    `frame_offset` to the frame of timepoint 0: the first frame of that file, or in
+    general the frame of any cell minus its timepoint.
+
     Parameters
     ----------
     model : Model
         The model from which we want to export the CTC file.
     ctc_file_out : str | Path
         The path to the CTC file to write.
+    frame_offset : int, optional
+        The frame of timepoint 0, added to the timepoints of the cells to give
+        their CTC frames. 0 by default, which writes the timepoints as frames.
 
     Raises
     ------
+    TypeError
+        If `frame_offset` is not an integer.
     UpdateRequiredError
         If the model requires an update.
+    ValueError
+        If `frame_offset` gives cells a negative frame.
     """
+    if isinstance(frame_offset, bool) or not isinstance(frame_offset, numbers.Integral):
+        raise TypeError(
+            f"'frame_offset' must be an integer, not {type(frame_offset).__name__}."
+        )
     _check_up_to_date(model)
     lineages = [lineage for lineage in model.data.cell_data.values()]
+    timepoints = [lin.nodes[cid]["timepoint"] for lin in lineages for cid in lin.nodes]
+    if timepoints and min(timepoints) + frame_offset < 0:
+        min_timepoint = min(timepoints)
+        raise ValueError(
+            f"CTC frames can't be negative, but the earliest cells, at timepoint "
+            f"{min_timepoint}, would be at frame {min_timepoint + frame_offset} with "
+            f"frame_offset={frame_offset}. Use a frame_offset of at least "
+            f"{-min_timepoint}."
+        )
+
     current_track_label = 1  # 0 is kept for no parent track
     tracks_to_write = []
     for lin in lineages:
@@ -265,8 +295,10 @@ def export_CTC_file(
         )
         for track_label, track_info in ctc_tracks.items():
             _add_parent_track(lin, track_info, node_to_parent_track)
-            txt = f"{track_label} {track_info['B']} {track_info['E']} {track_info['P']}\n"
-            tracks_to_write.append(txt)
+            # The tracks hold timepoints, turned into frames here.
+            begin = track_info["B"] + frame_offset
+            end = track_info["E"] + frame_offset
+            tracks_to_write.append(f"{track_label} {begin} {end} {track_info['P']}\n")
 
     with open(ctc_file_out, "w") as file:
         file.writelines(tracks_to_write)
