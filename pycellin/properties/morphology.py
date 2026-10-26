@@ -1654,7 +1654,7 @@ if __name__ == "__main__":
 
     xml = "sample_data/FakeTracks.xml"
 
-    model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
+    model = load_TrackMate_XML(xml, lone_spots="all", tracks="all")
     lineage = model.data.cell_data[0]
     # print(lineage.nodes[2004]["cell_contour"])
     node = 2035

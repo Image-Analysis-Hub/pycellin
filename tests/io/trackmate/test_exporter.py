@@ -4,6 +4,7 @@
 
 import io
 import logging
+from pathlib import Path
 
 import pytest
 from lxml import etree as ET
@@ -608,7 +609,7 @@ class TestExportTrackMateXML:
         export_TrackMate_XML(
             simple_model, xml_path, units={"space": "pixel", "time": "frame"}
         )
-        model = load_TrackMate_XML(xml_path, keep_all_tracks=True)
+        model = load_TrackMate_XML(xml_path, tracks="all")
         assert model.data.cell_data[0].graph["FilteredTrack"] is False
         assert model.data.cell_data[lid].graph["FilteredTrack"] is True
 
@@ -673,3 +674,29 @@ class TestExportTrackMateXML:
         spot = next(ET.parse(str(xml_path)).iter("Spot"))
         for key in ("ID", "FRAME", "POSITION_X", "POSITION_Y", "RADIUS"):
             assert key in spot.attrib
+
+    def test_cells_without_visibility_exported_as_visible(
+        self, tmp_path, simple_model
+    ):
+        """Test that cells without VISIBILITY, e.g. not from TrackMate, are visible."""
+        xml_path = tmp_path / "model.xml"
+        export_TrackMate_XML(
+            simple_model, xml_path, units={"space": "pixel", "time": "frame"}
+        )
+        spots = ET.parse(str(xml_path)).iter("Spot")
+        assert [float(spot.get("VISIBILITY")) for spot in spots] == [1.0, 1.0]
+
+    def test_hidden_spot_stays_hidden(self, tmp_path):
+        """Test that a spot hidden by the spot filters of TrackMate is exported with
+        its VISIBILITY of 0, so that it stays hidden."""
+        xml_in = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+        model = load_TrackMate_XML(xml_in, lone_spots="all", tracks="all")
+        xml_path = tmp_path / "model.xml"
+        export_TrackMate_XML(
+            model, xml_path, units={"space": "micrometer", "time": "second"}
+        )
+        visibilities = [
+            float(spot.get("VISIBILITY")) for spot in ET.parse(str(xml_path)).iter("Spot")
+        ]
+        assert visibilities.count(0.0) == 1
+        assert visibilities.count(1.0) == 106

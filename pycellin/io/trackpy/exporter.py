@@ -218,8 +218,8 @@ if __name__ == "__main__":
     )
     model = load_TrackMate_XML(
         xml,
-        keep_all_spots=True,
-        keep_all_tracks=True,
+        lone_spots="all",
+        tracks="all",
     )
 
     df = export_trackpy_dataframe(model)

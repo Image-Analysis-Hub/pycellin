@@ -1266,11 +1266,9 @@ def test_update_location_related_props_one_node():
 # _parse_model_tag ############################################################
 
 
-def test_parse_model_tag_keep_all_spots_and_tracks():
+def test_parse_model_tag_all_lone_spots_and_tracks():
     xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
-    _, _, data = tml._parse_model_tag(
-        xml_path, keep_all_spots=True, keep_all_tracks=True
-    )
+    _, _, data = tml._parse_model_tag(xml_path, lone_spots="all", tracks="all")
 
     # 107 spots: 96 in 7 tracks that keep their TrackMate ID, and 11 lone spots
     # whose lineage ID is -cell_id.
@@ -1287,6 +1285,92 @@ def test_parse_model_tag_keep_all_spots_and_tracks():
         assert lin.graph["lineage_id"] == lin_id
         cell_lin_ids = {cell_lin_id for _, cell_lin_id in lin.nodes(data="lineage_id")}
         assert cell_lin_ids == {lin_id}
+    # Only tracks 0 and 4 are listed in FilteredTracks.
+    visible = {lid for lid, lin in data.cell_data.items() if lin.graph["FilteredTrack"]}
+    assert visible == {0, 4}
+
+
+@pytest.mark.parametrize(
+    "lone_spots, tracks, num_cells",
+    [
+        ("none", "visible", 84),
+        ("none", "all", 96),
+        ("visible", "visible", 94),
+        ("visible", "all", 106),
+        ("all", "visible", 95),
+        ("all", "all", 107),
+    ],
+)
+def test_parse_model_tag_lone_spots_and_tracks(lone_spots, tracks, num_cells):
+    """FakeTracks has 84 spots in its 2 visible tracks, 12 in its 5 hidden tracks,
+    and 11 outside tracks, 1 of them hidden by the spot filters (VISIBILITY of 0)."""
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    _, _, data = tml._parse_model_tag(xml_path, lone_spots=lone_spots, tracks=tracks)
+
+    assert sum(len(lin) for lin in data.cell_data.values()) == num_cells
+    lone_spot_visibilities = {
+        visibility
+        for lin in data.cell_data.values()
+        if len(lin) == 1
+        for _, visibility in lin.nodes(data="VISIBILITY")
+    }
+    expected = {"none": set(), "visible": {1}, "all": {0, 1}}
+    assert lone_spot_visibilities == expected[lone_spots]
+
+
+def test_parse_model_tag_lone_spots_without_visibility(tmp_path):
+    """Spots without VISIBILITY, as in files written by other tools, are visible."""
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    tree = ET.parse(str(xml_path))
+    for spot in tree.iter("Spot"):
+        del spot.attrib["VISIBILITY"]
+    declaration = tree.find(".//SpotFeatures/Feature[@feature='VISIBILITY']")
+    declaration.getparent().remove(declaration)
+    modified_path = tmp_path / "FakeTracks_without_visibility.xml"
+    tree.write(str(modified_path), xml_declaration=True, encoding="UTF-8")
+
+    _, _, data = tml._parse_model_tag(
+        modified_path, lone_spots="visible", tracks="visible"
+    )
+
+    # The 84 spots of the visible tracks, and the 11 spots outside tracks.
+    assert sum(len(lin) for lin in data.cell_data.values()) == 95
+
+
+def test_parse_model_tag_without_FilteredTracks(tmp_path):
+    """Without a FilteredTracks tag, as in files written by other tools, all the
+    tracks are visible."""
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    tree = ET.parse(str(xml_path))
+    filtered_tracks = tree.find(".//FilteredTracks")
+    filtered_tracks.getparent().remove(filtered_tracks)
+    modified_path = tmp_path / "FakeTracks_without_FilteredTracks.xml"
+    tree.write(str(modified_path), xml_declaration=True, encoding="UTF-8")
+
+    _, _, data = tml._parse_model_tag(modified_path, lone_spots="none", tracks="visible")
+
+    # The 96 spots of the 7 tracks.
+    assert sum(len(lin) for lin in data.cell_data.values()) == 96
+    assert all(lin.graph["FilteredTrack"] for lin in data.cell_data.values())
+
+
+def test_parse_model_tag_spots_after_tracks(tmp_path):
+    """Spots and tracks are filtered once the whole file is read, so a file with its
+    spots after its tracks, as other tools may write it, loads as with the tag order
+    of TrackMate."""
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    tree = ET.parse(str(xml_path))
+    model = tree.find(".//Model")
+    all_spots = model.find("AllSpots")
+    model.remove(all_spots)
+    model.append(all_spots)
+    modified_path = tmp_path / "FakeTracks_spots_after_tracks.xml"
+    tree.write(str(modified_path), xml_declaration=True, encoding="UTF-8")
+
+    _, _, data = tml._parse_model_tag(modified_path, lone_spots="none", tracks="visible")
+
+    track_sizes = {lin_id: len(lin) for lin_id, lin in data.cell_data.items()}
+    assert track_sizes == {0: 74, 4: 10}
 
 
 def test_parse_model_tag_undeclared_attributes(tmp_path):
@@ -1305,7 +1389,7 @@ def test_parse_model_tag_undeclared_attributes(tmp_path):
     tree.write(str(modified_path), xml_declaration=True, encoding="UTF-8")
 
     _, props_md, data = tml._parse_model_tag(
-        modified_path, keep_all_spots=False, keep_all_tracks=False
+        modified_path, lone_spots="none", tracks="visible"
     )
 
     dtypes = {
@@ -1546,3 +1630,19 @@ class TestLoadTrackMateXML:
         model = tml.load_TrackMate_XML(xml_path, ref_time_prop="FRAME")
 
         assert model.model_metadata.time_step == 1
+
+    @pytest.mark.parametrize(
+        "option, value",
+        [
+            ("lone_spots", True),
+            ("lone_spots", "hidden"),
+            ("tracks", True),
+            ("tracks", "none"),
+        ],
+    )
+    def test_invalid_spot_and_track_options_raise(
+        self, celegans_xml_path, option, value
+    ):
+        """Test that a value that isn't an option of lone_spots or tracks raises."""
+        with pytest.raises(ValueError, match=f"'{option}' must be"):
+            tml.load_TrackMate_XML(celegans_xml_path, **{option: value})

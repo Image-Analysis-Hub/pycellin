@@ -2,7 +2,7 @@
 import logging
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import networkx as nx
 from lxml import etree as ET
@@ -24,8 +24,14 @@ from pycellin.io.utils import (
 )
 from pycellin.properties.core import create_cell_id_property, create_time_property
 from pycellin.properties.morphology import create_cell_contour_property
+from pycellin.utils import check_literal_type
 
 logger = logging.getLogger(__name__)
+
+# What the loader keeps of the spots outside tracks, and of the tracks. As in TrackMate,
+# visible spots have a VISIBILITY of 1, and visible tracks are listed in FilteredTracks.
+LoneSpotsOption = Literal["none", "visible", "all"]
+TracksOption = Literal["visible", "all"]
 
 
 def _get_units(
@@ -897,10 +903,51 @@ def _update_location_related_props(
         #         lineage.graph[f"lineage_{axis}"] = sum(coords) / len(coords)
 
 
+def _filter_spots_and_tracks(
+    graph: nx.DiGraph,
+    lone_spots: LoneSpotsOption,
+    tracks: TracksOption,
+    visible_tracks: set[int] | None,
+) -> None:
+    """
+    Remove from the graph the spots outside tracks and the tracks not to load.
+
+    The spots of a track are kept or removed with it, whatever their VISIBILITY.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph holding all the spots and links of the file. The spots in a track
+        have a 'TRACK_ID' attribute.
+    lone_spots : {"none", "visible", "all"}
+        Spots outside tracks to keep: none, only the visible ones (VISIBILITY of 1,
+        or no VISIBILITY), or all.
+    tracks : {"visible", "all"}
+        Tracks to keep: only the visible ones (listed in FilteredTracks), or all.
+    visible_tracks : set[int] | None
+        IDs of the tracks listed in FilteredTracks, or None when the file has no
+        FilteredTracks tag: all tracks are then visible.
+    """
+    to_remove = []
+    for node, data in graph.nodes(data=True):
+        track_id = data.get("TRACK_ID")
+        if track_id is None:
+            hidden = data.get("VISIBILITY") == 0
+            if lone_spots == "none" or (lone_spots == "visible" and hidden):
+                to_remove.append(node)
+        elif (
+            tracks == "visible"
+            and visible_tracks is not None
+            and track_id not in visible_tracks
+        ):
+            to_remove.append(node)
+    graph.remove_nodes_from(to_remove)
+
+
 def _parse_model_tag(
     xml_path: str | Path,
-    keep_all_spots: bool,
-    keep_all_tracks: bool,
+    lone_spots: LoneSpotsOption,
+    tracks: TracksOption,
 ) -> tuple[dict[str, str], PropsMetadata, Data]:
     """
     Read an XML file and convert the model data into several graphs.
@@ -914,10 +961,10 @@ def _parse_model_tag(
     ----------
     xml_path : str | Path
         Path of the XML file to process.
-    keep_all_spots : bool
-        True to keep the spots filtered out in TrackMate, False otherwise.
-    keep_all_tracks : bool
-        True to keep the tracks filtered out in TrackMate, False otherwise.
+    lone_spots : {"none", "visible", "all"}
+        Spots outside tracks to keep: none, only the visible ones, or all.
+    tracks : {"visible", "all"}
+        Tracks to keep: only the visible ones, or all.
 
     Returns
     -------
@@ -928,6 +975,8 @@ def _parse_model_tag(
     props_md = PropsMetadata()
     # Keys of the attributes that the file doesn't declare, by property type.
     undeclared: dict[str, set[str]] = {}
+    # IDs of the tracks listed in FilteredTracks. None if the file has no such tag.
+    visible_tracks: set[int] | None = None
 
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
@@ -965,24 +1014,16 @@ def _parse_model_tag(
             tracks_attributes = _build_tracks(it, element, props_md, graph, undeclared)
             root.clear()
 
-            # Removal of filtered spots / nodes.
-            if not keep_all_spots:
-                # Those nodes belong to no tracks: they have a degree of 0.
-                lone_nodes = [n for n, d in graph.degree if d == 0]
-                graph.remove_nodes_from(lone_nodes)
-
-        # Filtering out tracks and adding tracks attribute.
+        # Getting the tracks visible in TrackMate.
         if element.tag == "FilteredTracks" and event == "start":
-            # Removal of filtered tracks.
-            id_to_keep = _get_filtered_tracks_id(it, element)
-            if not keep_all_tracks:
-                to_remove = [
-                    n for n, t in graph.nodes(data="TRACK_ID") if t not in id_to_keep
-                ]
-                graph.remove_nodes_from(to_remove)
+            visible_tracks = set(_get_filtered_tracks_id(it, element))
 
         if element.tag == "Model" and event == "end":
             break  # We are not interested in the following data.
+
+    # The spots and tracks are filtered once all of them are read, since files written
+    # by other tools can have the spots after the tracks.
+    _filter_spots_and_tracks(graph, lone_spots, tracks, visible_tracks)
 
     # Now that all the values are read, we can infer the data type of the attributes
     # that the file doesn't declare.
@@ -1013,11 +1054,10 @@ def _parse_model_tag(
 
         # Adding if each track was present in the 'FilteredTracks' tag
         # because this info is needed when reconstructing TrackMate XMLs
-        # from graphs.
-        if lin.graph["lineage_id"] in id_to_keep:
-            lin.graph["FilteredTrack"] = True
-        else:
-            lin.graph["FilteredTrack"] = False
+        # from graphs. Without the tag, all tracks are visible.
+        lin.graph["FilteredTrack"] = (
+            visible_tracks is None or lin.graph["lineage_id"] in visible_tracks
+        )
 
     return units, props_md, Data({lin.graph["lineage_id"]: lin for lin in lineages})
 
@@ -1210,8 +1250,8 @@ def _add_missing_position_t(
 def load_TrackMate_XML(
     xml_path: str | Path,
     ref_time_prop: str = "POSITION_T",
-    keep_all_spots: bool = False,
-    keep_all_tracks: bool = False,
+    lone_spots: LoneSpotsOption = "none",
+    tracks: TracksOption = "visible",
 ) -> Model:
     """
     Read a TrackMate XML file and convert the tracks data to directed acyclic graphs.
@@ -1236,19 +1276,32 @@ def load_TrackMate_XML(
         with a time step of 1. Any other property must match the time unit and
         timestep of the TrackMate model (i.e. the properties of the image on which
         TrackMate was applied).
-    keep_all_spots : bool, optional
-        True to keep the spots filtered out in TrackMate, False otherwise.
-        False by default.
-    keep_all_tracks : bool, optional
-        True to keep the tracks filtered out in TrackMate, False otherwise.
-        False by default.
+    lone_spots : {"none", "visible", "all"}, optional
+        Spots outside tracks to load, each as a single-cell lineage: "none" (default),
+        "visible" for only the spots that TrackMate shows, i.e. that passed its spot
+        filters (VISIBILITY of 1, or no VISIBILITY), or "all".
+    tracks : {"visible", "all"}, optional
+        Tracks to load, with all their spots: "visible" (default) for only the tracks
+        that TrackMate shows, i.e. that passed its track filters (listed in
+        FilteredTracks, or all of them without this tag), or "all".
 
     Returns
     -------
     Model
         A pycellin Model that contains all the data from the TrackMate XML file.
+
+    Raises
+    ------
+    ValueError
+        If `lone_spots` or `tracks` is not one of its options.
     """
-    units, props_md, data = _parse_model_tag(xml_path, keep_all_spots, keep_all_tracks)
+    if not check_literal_type(lone_spots, LoneSpotsOption):
+        raise ValueError(
+            f"'lone_spots' must be 'none', 'visible' or 'all', not {lone_spots!r}."
+        )
+    if not check_literal_type(tracks, TracksOption):
+        raise ValueError(f"'tracks' must be 'visible' or 'all', not {tracks!r}.")
+    units, props_md, data = _parse_model_tag(xml_path, lone_spots, tracks)
 
     # Add in the metadata all the TrackMate info that was not in the
     # TrackMate XML `Model` tag.
@@ -1302,8 +1355,8 @@ if __name__ == "__main__":
     )
     model = load_TrackMate_XML(
         xml,
-        keep_all_spots=True,
-        keep_all_tracks=True,
+        lone_spots="all",
+        tracks="all",
     )
 
     print(model)
