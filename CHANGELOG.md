@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 4323e23, plus the uncommitted `frame_offset` argument of the CTC exporter and the uncommitted `lone_spots` and `tracks` arguments of the TrackMate loader (with the exporter keeping `VISIBILITY`). Update from there with: git log 4323e23..dev -->
+<!-- Planned v0.6.0. Covers commits up to 4323e23, plus the uncommitted `frame_offset` argument of the CTC exporter and the uncommitted `lone_spots` and `tracks` arguments of the TrackMate loader (with the exporter keeping `VISIBILITY`), and the uncommitted fixes of the PyPI page links (project URLs, README) and of the README conda step. Update from there with: git log 4323e23..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -166,6 +166,8 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **trackpy:** the loader silently overwrote the DataFrame columns named like the properties it creates (`cell_id`, `lineage_id` and `timepoint`; `cell_ID` and `lineage_ID` in 0.5.1). It now raises `ValueError`
 - **trackpy:** the loader didn't declare the DataFrame columns other than `frame` and the coordinates, e.g. `particle`, `mass` or `size`: they were on the cells but missing from the properties of the model, and a model exported to TrackMate couldn't be loaded back. Every column is now declared with its data type: trackpy's own columns get a description, and the sizes and static errors (`size`, `ep`...) the unit of the coordinates. When all the columns were numbers, integer columns were also loaded as floats
 - **trackpy:** the loader linked the cells by scanning all of them for each particle, so the linking time grew with the square of the number of rows: loading 40,000 rows took 14 s, now 3 s
+- **Packaging:** the PyPI page had broken links: Documentation and Examples led to a site that doesn't exist, the README links to the notebooks didn't open them, and the README logo didn't show. Examples now opens the notebooks on GitHub, Documentation is removed until there is a documentation site, and a Changelog link is added
+- **Docs:** the installation steps of the README, also shown on the PyPI page, created a conda environment without Python, so `pip install pycellin` used the pip of another environment, if any. The environment is now created with Python 3.14
 
 ### Maintenance
 

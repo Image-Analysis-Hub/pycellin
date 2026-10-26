@@ -44,8 +44,8 @@ notebooks = [
 ]
 
 [project.urls]
-Documentation = "https://Image-Analysis-Hub.github.io/pycellin/"
-Examples = "https://Image-Analysis-Hub.github.io/pycellin/notebooks/"
+Examples = "https://github.com/Image-Analysis-Hub/pycellin/tree/main/notebooks"
+Changelog = "https://github.com/Image-Analysis-Hub/pycellin/blob/main/CHANGELOG.md"
 Issues = "https://github.com/Image-Analysis-Hub/pycellin/issues"
 Source = "https://github.com/Image-Analysis-Hub/pycellin/"
 

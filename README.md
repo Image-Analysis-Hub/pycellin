@@ -7,7 +7,7 @@
 
 </br>
 <p align="center">
-    <img src="https://github.com/Image-Analysis-Hub/pycellin/blob/main/pycellin_logo.png" height="150"/>
+    <img src="https://raw.githubusercontent.com/Image-Analysis-Hub/pycellin/main/pycellin_logo.png" height="150"/>
 </p>
 
 
@@ -38,7 +38,7 @@ It is recommended to install pycellin in a conda or mamba environment.
 
 2. Create a Python environment dedicated to pycellin:
     ```
-    conda create -n my_env_pycellin
+    conda create -n my_env_pycellin python=3.14
     ```
 
 3. Activate the environment:
@@ -128,13 +128,13 @@ pc.export_GEFF(
 
 Please note that the following notebooks are still a work in progress. There may be some mistakes in the code and some sections might move from one notebook to another.
 
-| Notebook                                                                                 | Description                                                       | Level    | State |
-|------------------------------------------------------------------------------------------|-------------------------------------------------------------------|----------|-------|
-| [Getting started](./notebooks/Getting%20started.ipynb)                                   | The basics of pycellin, through examples                          | Beginner | WIP   |
-| [Managing properties](./notebooks/Managing%20properties.ipynb)                               | How to add, compute and remove properties from a model              | Beginner | WIP   |
-| [Working with TrackMate data](./notebooks/Working%20with%20TrackMate%20data.ipynb)       | How pycellin can work with TrackMate, through an example          | Beginner | WIP   |
-| [Creating a model from scratch](./notebooks/Creating%20a%20model%20from%20scratch.ipynb) | How to manually create a pycellin model, including its lineages   | Advanced | Stub  |
-| [Custom properties](./notebooks/Custom%20properties.ipynb)                                   | How to create user-defined properties and augment a model with them | Advanced | WIP   |
+| Notebook                                                                                                                                        | Description                                                         | Level    | State |
+|-------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|----------|-------|
+| [Getting started](https://github.com/Image-Analysis-Hub/pycellin/blob/main/notebooks/Getting%20started.ipynb)                                   | The basics of pycellin, through examples                            | Beginner | WIP   |
+| [Managing properties](https://github.com/Image-Analysis-Hub/pycellin/blob/main/notebooks/Managing%20properties.ipynb)                           | How to add, compute and remove properties from a model              | Beginner | WIP   |
+| [Working with TrackMate data](https://github.com/Image-Analysis-Hub/pycellin/blob/main/notebooks/Working%20with%20TrackMate%20data.ipynb)       | How pycellin can work with TrackMate, through an example            | Beginner | WIP   |
+| [Creating a model from scratch](https://github.com/Image-Analysis-Hub/pycellin/blob/main/notebooks/Creating%20a%20model%20from%20scratch.ipynb) | How to manually create a pycellin model, including its lineages     | Advanced | Stub  |
+| [Custom properties](https://github.com/Image-Analysis-Hub/pycellin/blob/main/notebooks/Custom%20properties.ipynb)                               | How to create user-defined properties and augment a model with them | Advanced | WIP   |
 
 
 ## Credits and references
