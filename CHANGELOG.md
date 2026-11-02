@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 1d701b2, plus the uncommitted renaming of predefined properties (num_divisions, cycle_num_cells, generation, interdivision_time, is_complete_cycle). Update from there with: git log 1d701b2..dev -->
+<!-- Planned v0.6.0. Covers commits up to aff043b, plus the uncommitted fix of the add_pycellin_property() and add_pycellin_properties() examples, the TypeError of add_pycellin_properties() and the warning of rescale_time() and rescale_space() about units left as they were. Update from there with: git log aff043b..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -55,7 +55,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
   - property declarations are checked for compatibility (property type, lineage type, unit, dtype)
   - calculators that rely on external data (e.g. a label image) are not kept
   - cycle data is handled when only one of the models has some
-- **Model:** `rescale_time()` and `rescale_space()` to convert time or space values into another unit (e.g. frames to minutes, pixels to µm)
+- **Model:** `rescale_time()` and `rescale_space()` to convert time or space values into another unit (e.g. frames to minutes, pixels to µm). Rescale right after loading: the properties added before keep their unit, and a warning names those to add again to update it
 - **Model:** `remove_lineages()`
 - **Model:** `relabel_cells()` to give cells consecutive IDs, optionally unique across the whole model
 - **Model:** `remove_intercycle_links()` to remove the outgoing links of division cells
@@ -136,6 +136,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** cells moved to another lineage, by a split in `update()` (e.g. after `remove_link()`), by `split_lineage_from_cell()` or by `add_link()` between two lineages, kept the `lineage_id` of their old lineage, so a GEFF file exported afterwards couldn't be read back correctly. `update()` now sets it. A split-off lineage also copied the lineage properties of the original lineage, e.g. TrackMate's track name, index and number of spots, so TrackMate exports had several tracks with the same name and index: it now starts with its new ID only
 - **Model:** `update()` failed with `KeyError` when cells or links added since the last update had been moved to another lineage by `add_link()`, or when a link had been added to a lineage removed since
 - **Model:** `update()` didn't update the cycle properties propagated to the cells with `propagate_cycle_properties()`, although the "Managing properties" notebook said it did: after a change, e.g. `remove_link()`, the cells kept the values of their former cell cycle, and cells added later got none. `update()` now copies them again once computed on the cycle lineages. Only the properties propagated that way are copied, and `propagate_cycle_properties()` without `props` now leaves out the properties declared with the `Lineage` type, whose cell values it overwrote with those of the cycles
+- **Model:** `add_pycellin_properties()` given a dictionary instead of a list, as the "Managing properties" notebook showed, silently ignored the arguments of the properties, e.g. angles came in radians instead of degrees. It now raises `TypeError`, as it does for a string, which it split into letters, and for list items other than strings and dictionaries, which it skipped. No property is added then
 - **Properties:** `turning_angle` (`angle` in 0.5.1), `absolute_age` and `relative_age` were recomputed for every lineage at each update, as their calculators were global instead of local
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells
 - **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning
@@ -175,11 +176,14 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **trackpy:** the loader linked the cells by scanning all of them for each particle, so the linking time grew with the square of the number of rows: loading 40,000 rows took 14 s, now 3 s
 - **Packaging:** the PyPI page had broken links: Documentation and Examples led to a site that doesn't exist, the README links to the notebooks didn't open them, and the README logo didn't show. Examples now opens the notebooks on GitHub, Documentation is removed until there is a documentation site, and a Changelog link is added
 - **Docs:** the installation steps of the README, also shown on the PyPI page, created a conda environment without Python, so `pip install pycellin` used the pip of another environment, if any. The environment is now created with Python 3.14
+- **Docs:** some examples of `add_pycellin_property()` and `add_pycellin_properties()` didn't work:
+  - their docstrings used an `in_time_unit` argument, which `add_absolute_age()` and `add_relative_age()` don't have, so the examples raised `TypeError`
+  - the docstring of `add_pycellin_properties()` and "Managing properties" added a `cell_cycle_completeness` property, which doesn't exist (`cycle_completeness` in 0.5.1, now `is_complete_cycle`)
 
 ### Maintenance
 
 - **Tests:** new tests for the new properties, plotting, exceptions, utils, the CTC and trackpy loaders, and `load_GEFF()` end to end
-- **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks, remove the unfinished "Creating a model from scratch" and "Working with TrackMate data" notebooks (the latter covered by "Getting started") and the State column of the README notebook table, explain when a calculator should be local or global, and fix the property names in the `add_pycellin_properties()` examples of its docstring and of "Managing properties" (`angle`, `cell_cycle_completeness`)
+- **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks, remove the unfinished "Creating a model from scratch" and "Working with TrackMate data" notebooks (the latter covered by "Getting started") and the State column of the README notebook table, explain when a calculator should be local or global, and replace `angle` with `turning_angle` in the examples of "Managing properties"
 - **Properties:** make the `is_complete_cycle` calculator local, since it only reads its own lineage. Its values and update cost are unchanged
 - **Packaging:** find packages automatically in `pyproject.toml`
 - **Packaging:** declare the license as an SPDX expression (`BSD-3-Clause`) instead of the deprecated classifier. Building pycellin now needs setuptools >= 77

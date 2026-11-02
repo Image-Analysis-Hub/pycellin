@@ -2,7 +2,41 @@
 
 """Unit tests for utils.py module."""
 
-from pycellin.utils import _is_numeric_dtype
+import pytest
+
+from pycellin.utils import _is_numeric_dtype, _unit_uses
+
+
+class TestUnitUses:
+    """Test cases for _unit_uses function."""
+
+    @pytest.mark.parametrize(
+        ("unit", "base_unit"),
+        [
+            ("minute", "minute"),
+            ("micrometer/minute", "minute"),
+            ("1/min", "min"),
+            ("micrometer^2", "micrometer"),
+            ("µm^2", "µm"),
+            ("m^2", "m"),
+            ("arbitrary unit/s", "arbitrary unit"),
+        ],
+    )
+    def test_unit_used(self, unit, base_unit):
+        assert _unit_uses(unit, base_unit) is True
+
+    @pytest.mark.parametrize(
+        ("unit", "base_unit"),
+        [
+            ("minute", "min"),
+            ("micrometer", "m"),
+            ("mm", "m"),
+            ("pixel", "px"),
+            ("1/s", "1"),
+        ],
+    )
+    def test_unit_not_used(self, unit, base_unit):
+        assert _unit_uses(unit, base_unit) is False
 
 
 class TestIsNumericDtype:

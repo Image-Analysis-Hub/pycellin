@@ -37,7 +37,7 @@ from pycellin.properties.core import (
     create_timepoint_property,
 )
 from pycellin.styling import PYCELLIN_PURPLE
-from pycellin.utils import _color_to_rgba, _infer_dtype
+from pycellin.utils import _color_to_rgba, _infer_dtype, _unit_uses
 
 L = TypeVar("L", bound="Lineage")
 
@@ -568,6 +568,9 @@ class Model:
         UserWarning
             If the reference time property has a calculator, since it will overwrite
             the rescaled values at the next update.
+            If `time_unit` is given and properties with a calculator have a unit that
+            uses the previous time unit, e.g. "1/frame", since their unit is left as
+            it is.
 
         Notes
         -----
@@ -577,7 +580,9 @@ class Model:
         values of other properties without a calculator (e.g. loaded from a file),
         as well as the units of other property declarations, are left as they are.
         As such, the rescaling should be done shortly after loading the data and
-        before adding any other properties or calculators.
+        before adding any other properties or calculators. The properties added
+        before, whose unit uses the previous time unit, are named in a warning: add
+        them again to update their unit.
 
         Examples
         --------
@@ -602,6 +607,8 @@ class Model:
                 "will overwrite the rescaled values at the next update.",
                 stacklevel=2,
             )
+        # The units of the properties computed from time are built from this unit.
+        old_time_unit = self._get_prop_unit(time_prop)
 
         self._multiply_prop_values(time_prop, PropertyType.NODE, factor)
         if time_unit is not None:
@@ -619,6 +626,12 @@ class Model:
             self.set_time_step(time_step * factor)
         elif self.data.cell_data:
             self.prepare_full_data_update()
+
+        self._warn_outdated_units(
+            old_time_unit,
+            time_unit,
+            {time_prop, "cycle_duration", "cycle_start_time", "cycle_end_time"},
+        )
 
     def rescale_space(
         self,
@@ -657,6 +670,9 @@ class Model:
         UserWarning
             If a coordinate property has a calculator, since it will overwrite the
             rescaled values at the next update.
+            If `space_unit` is given and properties with a calculator have a unit that
+            uses the previous space unit, e.g. "pixel/frame", since their unit is left
+            as it is.
 
         Notes
         -----
@@ -669,7 +685,10 @@ class Model:
         from a file), the units of other property declarations, and the parameters of
         existing calculators (e.g. the pixel size used by `add_cell_polygon()`) are
         left as they are. As such, the rescaling should be done shortly after loading
-        the data and before adding any other properties or calculators.
+        the data and before adding any other properties or calculators. The
+        properties added before, whose unit uses the previous space unit ("pixel" if
+        the model had none), are named in a warning: add them again to update their
+        unit.
 
         Examples
         --------
@@ -686,7 +705,11 @@ class Model:
             z_factor = factor
         elif not z_factor > 0:
             raise ValueError(f"'z_factor' must be strictly positive, got {z_factor}.")
+        # The units of the properties computed from space are built from this unit,
+        # or from "pixel" when the model has none.
+        old_space_unit = self.model_metadata.space_unit or "pixel"
 
+        rescaled_props: set[str] = set()
         for axis in ("x", "y", "z"):
             axis_factor = z_factor if axis == "z" else factor
             for element in ("cell", "link", "lineage"):
@@ -702,6 +725,7 @@ class Model:
                 self._multiply_prop_values(prop.identifier, prop.prop_type, axis_factor)
                 if space_unit is not None:
                     prop.unit = space_unit
+                rescaled_props.add(prop.identifier)
 
         metadata = self.model_metadata
         if metadata.pixel_width is not None:
@@ -715,6 +739,8 @@ class Model:
 
         if self.data.cell_data:
             self.prepare_full_data_update()
+
+        self._warn_outdated_units(old_space_unit, space_unit, rescaled_props)
 
     def _set_cycle_time_units(self, time_unit: str | None) -> None:
         """
@@ -733,6 +759,59 @@ class Model:
             prop = self.props_metadata.props.get(prop_id)
             if prop is not None:
                 prop.unit = time_unit
+
+    def _warn_outdated_units(
+        self, old_unit: str | None, new_unit: str | None, updated_props: set[str]
+    ) -> None:
+        """
+        Warn about the properties whose unit still uses the unit before a rescaling.
+
+        The properties with a calculator are recomputed at the next update, but their
+        unit was built from the units of the model when they were added (e.g.
+        "micrometer/minute" for "cell_speed") and is left as it is. The properties
+        without a calculator are skipped: their values are not recomputed, so they
+        still match their unit. The properties are named in the order they were
+        added, which puts the input properties before the properties computed from
+        them.
+
+        Parameters
+        ----------
+        old_unit : str | None
+            The unit before the rescaling. If None, nothing is checked.
+        new_unit : str | None
+            The unit after the rescaling. If None or equal to `old_unit`, units are
+            unchanged and nothing is checked.
+        updated_props : set[str]
+            Identifiers of the properties whose unit the rescaling sets.
+        """
+        if old_unit is None or new_unit is None or new_unit == old_unit:
+            return
+        outdated = [
+            prop
+            for prop_id, prop in self.props_metadata.props.items()
+            if prop_id not in updated_props
+            and prop_id in self._updater._calculators
+            and prop.unit is not None
+            and _unit_uses(prop.unit, old_unit)
+        ]
+        if not outdated:
+            return
+        names = [f"'{prop.identifier}' ({prop.unit})" for prop in outdated]
+        if len(names) == 1:
+            message = (
+                f"Property {names[0]} was added before the rescaling, so its unit "
+                f"still uses '{old_unit}' instead of '{new_unit}'. Add it again, with "
+                "the same method and arguments, to update its unit."
+            )
+        else:
+            message = (
+                f"Properties {', '.join(names[:-1])} and {names[-1]} were added before "
+                f"the rescaling, so their units still use '{old_unit}' instead of "
+                f"'{new_unit}'. Add them again in this order, with the same methods "
+                "and arguments, to update their units."
+            )
+        # stacklevel=3 points to the call of rescale_time() or rescale_space().
+        warnings.warn(message, stacklevel=3)
 
     def _multiply_prop_values(
         self,
@@ -4953,7 +5032,7 @@ class Model:
         else:
             raise AttributeError(f"Method {method_name} not found in Model class.")
 
-    def add_pycellin_property(self, prop_identifier: str, **kwargs: bool) -> None:
+    def add_pycellin_property(self, prop_identifier: str, **kwargs: Any) -> None:
         """
         Add a single predefined pycellin property to the model.
 
@@ -4961,11 +5040,10 @@ class Model:
         ----------
         prop_identifier : str
             Identifier of the property to add. Needs to be an available property.
-        kwargs : bool
-            Additional keyword arguments to pass to the function
-            computing the property. For example, for absolute_age,
-            in_time_unit=True can be used to yield the age
-            in the time unit of the model instead of in frames.
+        **kwargs
+            Keyword arguments passed to the method that adds the property,
+            `add_<prop_identifier>()`, whose docstring lists them. For example,
+            `unit="degree"` for "turning_angle".
 
         Raises
         ------
@@ -4989,41 +5067,82 @@ class Model:
             )
         self._get_prop_method(prop_identifier)(**kwargs)
 
-    def add_pycellin_properties(self, props_info: list[str | dict[str, Any]]) -> None:
+    def add_pycellin_properties(
+        self, props_info: list[str | dict[str, dict[str, Any]]]
+    ) -> None:
         """
         Add the specified predefined pycellin properties to the model.
 
         Parameters
         ----------
-        props_info : list[str | dict[str, Any]]
+        props_info : list[str | dict[str, dict[str, Any]]]
             List of the properties to add. Each property can be a string
             (the identifier of the property) or a dictionary with the identifier
-            of the property as the key and additional keyword arguments as values.
+            of the property as the key and a dictionary of keyword arguments as
+            the value (see `add_pycellin_property()`).
+
+        Raises
+        ------
+        TypeError
+            If `props_info` is not a list, if one of its items is neither a string
+            nor a dictionary, or if the keyword arguments of a property are not given
+            as a dictionary. No property is added then.
+        KeyError
+            If a property is not a predefined property of pycellin.
+        ValueError
+            If a property is a property of cycle lineages and the cycle lineages
+            have not been computed yet.
 
         Examples
         --------
         With no additional arguments:
+
         >>> model.add_pycellin_properties(["absolute_age", "relative_age"])
+
         With additional arguments:
+
         >>> model.add_pycellin_properties(
         ...     [
-        ...         {"absolute_age": {"in_time_unit": True}},
-        ...         {"relative_age": {"in_time_unit": True}},
+        ...         {"rod_length": {"skel_algo": "lee", "tolerance": 0.6}},
+        ...         {"turning_angle": {"unit": "degree"}},
         ...     ]
-        )
+        ... )
+
         It is possible to mix properties with and without additional arguments:
+
         >>> model.add_pycellin_properties(
-        ...     [
-        ...         {"absolute_age": {"in_time_unit": True}},
-        ...         "is_complete_cycle",
-        ...         {"relative_age": {"in_time_unit": True}},
-        ...     ]
-        )
+        ...     [{"turning_angle": {"unit": "degree"}}, "is_complete_cycle"]
+        ... )
         """
+        example = '["absolute_age", {"turning_angle": {"unit": "degree"}}]'
+        if not isinstance(props_info, list):
+            raise TypeError(
+                "'props_info' must be a list of property identifiers and "
+                f"dictionaries, e.g. {example}, got '{type(props_info).__name__}'."
+            )
+        # Everything is checked before adding any property, so that a TypeError
+        # leaves the model unchanged.
+        for prop_info in props_info:
+            if isinstance(prop_info, str):
+                continue
+            if not isinstance(prop_info, dict):
+                raise TypeError(
+                    "The items of 'props_info' must be property identifiers or "
+                    f"dictionaries, e.g. {example}, got "
+                    f"'{type(prop_info).__name__}': {prop_info!r}."
+                )
+            for prop_id, kwargs in prop_info.items():
+                if not isinstance(kwargs, dict):
+                    raise TypeError(
+                        f"The keyword arguments of '{prop_id}' must be given as a "
+                        f"dictionary, e.g. {example}, got "
+                        f"'{type(kwargs).__name__}': {kwargs!r}."
+                    )
+
         for prop_info in props_info:
             if isinstance(prop_info, str):
                 self.add_pycellin_property(prop_info)
-            elif isinstance(prop_info, dict):
+            else:
                 for prop_id, kwargs in prop_info.items():
                     self.add_pycellin_property(prop_id, **kwargs)
 

@@ -848,6 +848,54 @@ class TestRescaleTime:
         with pytest.warns(UserWarning, match="has a calculator"):
             frame_time_model.rescale_time(5)
 
+    def test_outdated_units_warn(self, frame_time_model):
+        frame_time_model.add_absolute_age()
+        frame_time_model.add_relative_age()
+        # The units of the cycle durations and times are set by rescale_time().
+        frame_time_model.add_cycle_data()
+        with pytest.warns(UserWarning) as record:
+            frame_time_model.rescale_time(5, time_unit="min")
+        assert [str(warning.message) for warning in record] == [
+            "Properties 'absolute_age' (frame) and 'relative_age' (frame) were added "
+            "before the rescaling, so their units still use 'frame' instead of 'min'. "
+            "Add them again in this order, with the same methods and arguments, to "
+            "update their units."
+        ]
+
+    def test_outdated_unit_warns_for_one_property(self, frame_time_model):
+        frame_time_model.add_cycle_data()
+        frame_time_model.add_division_rate()
+        with pytest.warns(UserWarning) as record:
+            frame_time_model.rescale_time(5, time_unit="min")
+        assert [str(warning.message) for warning in record] == [
+            "Property 'division_rate' (1/frame) was added before the rescaling, so "
+            "its unit still uses 'frame' instead of 'min'. Add it again, with the "
+            "same method and arguments, to update its unit."
+        ]
+
+    @pytest.mark.parametrize("time_unit", [None, "frame"])
+    def test_unchanged_time_unit_does_not_warn(self, frame_time_model, time_unit):
+        frame_time_model.add_absolute_age()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            frame_time_model.rescale_time(5, time_unit=time_unit)
+
+    def test_property_without_calculator_not_named(self, frame_time_model):
+        # Like a property loaded from a file: its values are not recomputed.
+        loaded = create_time_property(unit="frame", custom_identifier="loaded_age")
+        frame_time_model.props_metadata._add_prop(loaded)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            frame_time_model.rescale_time(5, time_unit="min")
+
+    def test_adding_again_updates_unit(self, frame_time_model):
+        frame_time_model.add_absolute_age()
+        with pytest.warns(UserWarning, match="added before the rescaling"):
+            frame_time_model.rescale_time(5, time_unit="min")
+        with pytest.warns(UserWarning, match="Overwriting the old Property"):
+            frame_time_model.add_absolute_age()
+        assert frame_time_model.get_property("absolute_age").unit == "min"
+
 
 @pytest.fixture()
 def two_times_model():
@@ -907,6 +955,68 @@ class TestSetReferenceTimeProperty:
         two_times_model.set_reference_time_property("frame")
         assert two_times_model.get_time_unit() == "frame"
         assert two_times_model.get_property("cycle_duration") is None
+
+
+class TestAddPycellinProperties:
+    """Test cases for Model.add_pycellin_properties() method."""
+
+    def test_identifiers(self, two_times_model):
+        two_times_model.add_pycellin_properties(["absolute_age", "relative_age"])
+        assert two_times_model.get_property("absolute_age").unit == "min"
+        assert two_times_model.get_property("relative_age").unit == "min"
+
+    def test_arguments_passed(self, two_times_model):
+        two_times_model.add_pycellin_properties(
+            [{"absolute_age": {"time_prop": "frame"}}, "relative_age"]
+        )
+        assert two_times_model.get_property("absolute_age").unit == "frame"
+        assert two_times_model.get_property("relative_age").unit == "min"
+
+    def test_several_properties_in_one_dict(self, two_times_model):
+        two_times_model.add_pycellin_properties(
+            [
+                {
+                    "absolute_age": {"time_prop": "frame"},
+                    "relative_age": {"time_prop": "frame"},
+                }
+            ]
+        )
+        assert two_times_model.get_property("absolute_age").unit == "frame"
+        assert two_times_model.get_property("relative_age").unit == "frame"
+
+    def test_dict_raises(self, two_times_model):
+        # The arguments were silently ignored, since only the keys were read.
+        with pytest.raises(TypeError) as excinfo:
+            two_times_model.add_pycellin_properties(
+                {"absolute_age": {"time_prop": "frame"}}
+            )
+        assert str(excinfo.value) == (
+            "'props_info' must be a list of property identifiers and dictionaries, "
+            'e.g. ["absolute_age", {"turning_angle": {"unit": "degree"}}], '
+            "got 'dict'."
+        )
+        assert two_times_model.get_property("absolute_age") is None
+
+    # A string was split into letters, each one raising KeyError.
+    @pytest.mark.parametrize("props_info", ["absolute_age", ("absolute_age",)])
+    def test_other_containers_raise(self, two_times_model, props_info):
+        with pytest.raises(TypeError, match="'props_info' must be a list"):
+            two_times_model.add_pycellin_properties(props_info)
+        assert two_times_model.get_property("absolute_age") is None
+
+    def test_item_of_another_type_raises(self, two_times_model):
+        # Such an item was skipped, so its property was silently not added.
+        with pytest.raises(TypeError, match="got 'tuple'"):
+            two_times_model.add_pycellin_properties(
+                ["relative_age", ("absolute_age", {"time_prop": "frame"})]
+            )
+        # The properties listed before the invalid item are not added either.
+        assert two_times_model.get_property("relative_age") is None
+
+    def test_arguments_not_in_a_dict_raise(self, two_times_model):
+        with pytest.raises(TypeError, match="keyword arguments of 'absolute_age'"):
+            two_times_model.add_pycellin_properties([{"absolute_age": "frame"}])
+        assert two_times_model.get_property("absolute_age") is None
 
 
 @pytest.fixture()
@@ -1019,6 +1129,30 @@ class TestRescaleSpace:
         pixel_space_model._updater.register_calculator(calc)
         with pytest.warns(UserWarning, match="'cell_x' has a calculator"):
             pixel_space_model.rescale_space(2)
+
+    def test_outdated_unit_warns(self, pixel_space_model):
+        pixel_space_model.add_cell_displacement()
+        with pytest.warns(UserWarning) as record:
+            pixel_space_model.rescale_space(0.5, space_unit="um")
+        assert [str(warning.message) for warning in record] == [
+            "Property 'cell_displacement' (pixel) was added before the rescaling, so "
+            "its unit still uses 'pixel' instead of 'um'. Add it again, with the "
+            "same method and arguments, to update its unit."
+        ]
+
+    def test_outdated_unit_warns_without_space_unit(self, pixel_space_model):
+        # Without a space unit, the units of the properties are built from "pixel".
+        pixel_space_model.model_metadata.space_unit = None
+        pixel_space_model.add_cell_displacement()
+        with pytest.warns(UserWarning, match="still uses 'pixel' instead of 'um'"):
+            pixel_space_model.rescale_space(0.5, space_unit="um")
+
+    @pytest.mark.parametrize("space_unit", [None, "pixel"])
+    def test_unchanged_space_unit_does_not_warn(self, pixel_space_model, space_unit):
+        pixel_space_model.add_cell_displacement()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            pixel_space_model.rescale_space(0.5, space_unit=space_unit)
 
 
 class TestAddLocationTag:

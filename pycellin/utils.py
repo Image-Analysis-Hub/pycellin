@@ -257,3 +257,34 @@ def _infer_dtype(values: Iterable[Any]) -> str | None:
     if {"int", "float"} <= names:
         names.discard("int")
     return " | ".join(sorted(names))
+
+
+def _unit_uses(unit: str, base_unit: str) -> bool:
+    """
+    Check if a unit is written with another unit, e.g. "micrometer/minute" with
+    "minute".
+
+    Units are compared word by word, a word being a run of letters: "min" is found in
+    "1/min" but not in "minute", and "m" in "m^2" but not in "mm".
+
+    Parameters
+    ----------
+    unit : str
+        The unit to search, e.g. "micrometer/minute".
+    base_unit : str
+        The unit to look for, e.g. "minute".
+
+    Returns
+    -------
+    bool
+        True if the words of `base_unit` appear in `unit`, in a row.
+    """
+
+    def words(text: str) -> list[str]:
+        return "".join(char if char.isalpha() else " " for char in text).split()
+
+    unit_words, base_words = words(unit), words(base_unit)
+    n = len(base_words)
+    return n > 0 and any(
+        unit_words[i : i + n] == base_words for i in range(len(unit_words) - n + 1)
+    )
