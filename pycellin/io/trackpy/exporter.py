@@ -85,36 +85,48 @@ def renumber_negative_lineage_ids(model: Model) -> None:
         model.data.cell_data[new_lin_id] = lin
 
 
-def rename_columns_if_exist(df, columns_map):
+def rename_columns_if_exist(df: pd.DataFrame, columns_map: dict) -> pd.DataFrame:
     """
     Helper function to rename columns if they exist in the DataFrame.
 
     Parameters
     ----------
     df : pd.DataFrame
-        The DataFrame to modify.
+        The DataFrame whose columns to rename. It is not modified.
     columns_map : dict
         A dictionary mapping old column names to new column names.
+
+    Returns
+    -------
+    pd.DataFrame
+        A copy of the DataFrame, with its existing columns renamed.
     """
     for old_name, new_name in columns_map.items():
         if old_name in df.columns:
-            df.rename(columns={old_name: new_name}, inplace=True)
+            df = df.rename(columns={old_name: new_name})
+    return df
 
 
-def drop_columns_if_exist(df, columns):
+def drop_columns_if_exist(df: pd.DataFrame, columns: list) -> pd.DataFrame:
     """
     Helper function to drop columns if they exist in the DataFrame.
 
     Parameters
     ----------
     df : pd.DataFrame
-        The DataFrame to modify.
+        The DataFrame whose columns to drop. It is not modified.
     columns : list
         The names of the columns to drop.
+
+    Returns
+    -------
+    pd.DataFrame
+        A copy of the DataFrame, without the columns that existed among `columns`.
     """
     for column in columns:
         if column in df.columns:
-            df.drop(columns=[column], inplace=True)
+            df = df.drop(columns=[column])
+    return df
 
 
 def format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
@@ -134,13 +146,13 @@ def format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
         The formatted DataFrame.
     """
     # Drop unnecessary columns.
-    drop_columns_if_exist(df, ["cell_contour", "particle"])
+    df = drop_columns_if_exist(df, ["cell_contour", "particle"])
     # If we already have the "particle" column, it means the data is coming from
     # trackpy, but it might not be up to date. Safer to remove it then recreate
     # it from "lineage_id".
 
     # Rename columns to match trackpy format.
-    rename_columns_if_exist(
+    df = rename_columns_if_exist(
         df,
         {
             "cell_x": "x",
@@ -160,7 +172,7 @@ def format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
     ]
 
     # Sort the rows.
-    df.sort_values(by=["particle", "frame"], inplace=True)
+    df = df.sort_values(by=["particle", "frame"])
 
     return df
 

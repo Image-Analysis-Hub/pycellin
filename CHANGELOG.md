@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 9a86ade (the uncommitted step-2 hash added to .git-blame-ignore-revs needs no entry). Update from there with: git log 9a86ade..dev -->
+<!-- Planned v0.6.0. Covers commits up to 0b27581, plus the uncommitted pandas fix (`inplace` arguments removed, trackpy exporter tests). Update from there with: git log 0b27581..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -134,6 +134,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** `add_lineage()` failed with `with_CycleLineage=True` or with a lineage that had no lineage ID, and ignored its `lineage_id` argument (`lid` in 0.5.1) when given a lineage
 - **Model:** `add_lineage()` silently replaced a lineage that already had the same ID. It now raises `ValueError`
 - **Model:** `to_cell_dataframe()`, `to_link_dataframe()`, `to_cycle_dataframe()` and `to_lineage_dataframe()` raised a pandas `FutureWarning` when a numeric property was None everywhere in a lineage. With no lineage to export, they now raise a `ValueError` that says so
+- **Model:** with pandas 3.1 or later, `to_cell_dataframe()`, `to_link_dataframe()`, `to_cycle_dataframe()` and `to_lineage_dataframe()` raised a `Pandas4Warning`, since they used pandas' `inplace` argument, deprecated in pandas 3.1 and removed in pandas 4
 - **Model:** the columns of `to_link_dataframe()` came in a different order in each Python session. They now keep the order in which the link properties were added
 - **Model:** `add_cycle_data()` silently kept the properties already declared under the identifiers of its cycle properties, e.g. cycle properties propagated to cell lineages in an exported file and loaded back, so pycellin treated them as cell lineage properties. Such a declaration is now replaced when unused (no values in cell lineages, no calculator), and `add_cycle_data()` raises `ValueError` otherwise, asking to remove it first with `remove_property()`
 - **Model:** adding a property already declared, e.g. calling an `add_*()` method again with other arguments, registered the new calculator but kept the first declaration. The declaration is now replaced too, with a warning. A property declared with another property type or lineage type is replaced only when unused, and raises `ValueError` otherwise
@@ -180,6 +181,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **trackpy:** the loader silently overwrote the DataFrame columns named like the properties it creates (`cell_id`, `lineage_id` and `timepoint`; `cell_ID` and `lineage_ID` in 0.5.1). It now raises `ValueError`
 - **trackpy:** the loader didn't declare the DataFrame columns other than `frame` and the coordinates, e.g. `particle`, `mass` or `size`: they were on the cells but missing from the properties of the model, and a model exported to TrackMate couldn't be loaded back. Every column is now declared with its data type: trackpy's own columns get a description, and the sizes and static errors (`size`, `ep`...) the unit of the coordinates. When all the columns were numbers, integer columns were also loaded as floats
 - **trackpy:** the loader linked the cells by scanning all of them for each particle, so the linking time grew with the square of the number of rows: loading 40,000 rows took 14 s, now 3 s
+- **trackpy:** with pandas 3.1 or later, the exporter raised `Pandas4Warning`s, since it used pandas' `inplace` argument, deprecated in pandas 3.1 and removed in pandas 4
 - **Packaging:** the PyPI page had broken links: Documentation and Examples led to a site that doesn't exist, the README links to the notebooks didn't open them, and the README logo didn't show. Examples now opens the notebooks on GitHub, Documentation is removed until there is a documentation site, and a Changelog link is added
 - **Docs:** the installation steps of the README, also shown on the PyPI page, created a conda environment without Python, so `pip install pycellin` used the pip of another environment, if any. The environment is now created with Python 3.14
 - **Docs:** some examples of `add_pycellin_property()` and `add_pycellin_properties()` didn't work:
@@ -188,7 +190,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 
 ### Maintenance
 
-- **Tests:** new tests for the new properties, plotting, exceptions, utils, the CTC and trackpy loaders, and `load_GEFF()` end to end
+- **Tests:** new tests for the new properties, plotting, exceptions, utils, the CTC and trackpy loaders, the trackpy exporter, and `load_GEFF()` end to end
 - **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks, remove the unfinished "Creating a model from scratch" and "Working with TrackMate data" notebooks (the latter covered by "Getting started") and the State column of the README notebook table, explain when a calculator should be local or global, and replace `angle` with `turning_angle` in the examples of "Managing properties"
 - **Properties:** make the `is_complete_cycle` calculator local, since it only reads its own lineage. Its values and update cost are unchanged
 - **Packaging:** find packages automatically in `pyproject.toml`

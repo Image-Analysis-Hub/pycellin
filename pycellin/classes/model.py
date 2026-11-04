@@ -6346,9 +6346,7 @@ class Model:
             col for col in df.columns if col not in mandatory_columns
         ]
         df = df[columns]
-        df.sort_values(
-            ["lineage_id", time_prop, "cell_id"], ignore_index=True, inplace=True
-        )
+        df = df.sort_values(["lineage_id", time_prop, "cell_id"], ignore_index=True)
 
         return self._add_lineage_props_to_df(df, lineage_props)
 
@@ -6418,7 +6416,7 @@ class Model:
             col for col in df.columns if col not in mandatory_columns
         ]
         df = df[columns]
-        df.sort_values("lineage_id", ignore_index=True, inplace=True)
+        df = df.sort_values("lineage_id", ignore_index=True)
 
         return self._add_lineage_props_to_df(df, lineage_props)
 
@@ -6468,7 +6466,7 @@ class Model:
         columns.remove("lineage_id")
         columns = ["lineage_id"] + columns
         df = df[columns]
-        df.sort_values("lineage_id", ignore_index=True, inplace=True)
+        df = df.sort_values("lineage_id", ignore_index=True)
 
         return df
 
@@ -6534,9 +6532,7 @@ class Model:
         columns.remove("cycle_id")
         columns = ["lineage_id", "generation", "cycle_id"] + columns
         df = df[columns]
-        df.sort_values(
-            ["lineage_id", "generation", "cycle_id"], ignore_index=True, inplace=True
-        )
+        df = df.sort_values(["lineage_id", "generation", "cycle_id"], ignore_index=True)
 
         return self._add_lineage_props_to_df(df, lineage_props)
 
@@ -6721,7 +6717,7 @@ class Model:
                 how="left",
             )
         pairs_df = pairs_df[columns]
-        pairs_df.sort_values(id_columns, ignore_index=True, inplace=True)
+        pairs_df = pairs_df.sort_values(id_columns, ignore_index=True)
 
         return self._add_lineage_props_to_df(pairs_df, lineage_props)
 
