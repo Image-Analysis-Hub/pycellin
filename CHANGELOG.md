@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 9a5b902, plus the uncommitted line-length step 2 (docstrings, comments and long strings wrapped at 88, E501 enabled, Style workflow, .git-blame-ignore-revs). Update from there with: git log 9a5b902..dev -->
+<!-- Planned v0.6.0. Covers commits up to 9a86ade (the uncommitted step-2 hash added to .git-blame-ignore-revs needs no entry). Update from there with: git log 9a86ade..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 

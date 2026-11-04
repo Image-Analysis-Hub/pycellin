@@ -3,3 +3,6 @@
 
 # Set line length to 88 and reformat with Ruff
 bfb28b4e91ad6bdf627b3ba24292ad13e99f5a33
+
+# Enforce 88 line length (docstrings, comments and long strings wrapped by hand)
+9a86ade2f81351b7cf5712c22d92f69750ee1ad3
