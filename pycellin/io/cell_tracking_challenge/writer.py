@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-exporter.py
+writer.py
 
 This module is part of the pycellin package.
 
@@ -232,9 +232,10 @@ def _add_parent_track(
         track_info["P"] = 0
 
 
-def export_CTC_file(
+def write_ctc(
     model: Model,
-    ctc_file_out: str | Path,
+    path: str | Path,
+    *,
     frame_offset: int = 0,
 ) -> None:
     """
@@ -254,7 +255,7 @@ def export_CTC_file(
     ----------
     model : Model
         The model from which we want to export the CTC file.
-    ctc_file_out : str | Path
+    path : str | Path
         The path to the CTC file to write.
     frame_offset : int, optional
         The frame of timepoint 0, added to the timepoints of the cells to give
@@ -300,7 +301,7 @@ def export_CTC_file(
             end = track_info["E"] + frame_offset
             tracks_to_write.append(f"{track_label} {begin} {end} {track_info['P']}\n")
 
-    with open(ctc_file_out, "w") as file:
+    with open(path, "w") as file:
         file.writelines(tracks_to_write)
 
 
@@ -310,11 +311,11 @@ if __name__ == "__main__":
     """
     import tempfile
 
-    from pycellin.io.trackmate.loader import load_TrackMate_XML
+    from pycellin.io.trackmate.reader import read_trackmate_xml
 
     xml_in = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
-    model = load_TrackMate_XML(xml_in)
+    model = read_trackmate_xml(xml_in)
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         ctc_out = Path(tmp_dir) / "output.xml"
-        export_CTC_file(model, ctc_out)
+        write_ctc(model, ctc_out)

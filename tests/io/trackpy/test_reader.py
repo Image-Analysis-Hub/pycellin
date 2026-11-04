@@ -5,9 +5,9 @@
 import pandas as pd
 import pytest
 
-from pycellin.io.trackmate.exporter import export_TrackMate_XML
-from pycellin.io.trackmate.loader import load_TrackMate_XML
-from pycellin.io.trackpy.loader import load_trackpy_dataframe
+from pycellin.io.trackmate.writer import write_trackmate_xml
+from pycellin.io.trackmate.reader import read_trackmate_xml
+from pycellin.io.trackpy.reader import from_trackpy
 
 # Fixtures ####################################################################
 
@@ -36,30 +36,30 @@ def trackpy_full_df(trackpy_df):
 # Test Classes ################################################################
 
 
-class TestLoadTrackpyDataframe:
-    """Test cases for load_trackpy_dataframe function."""
+class TestFromTrackpy:
+    """Test cases for from_trackpy function."""
 
     def test_cell_id_column_raises(self, trackpy_df):
         """A 'cell_id' column would be overwritten by pycellin: raise."""
         trackpy_df["cell_id"] = [5, 6]
         with pytest.raises(ValueError, match=r"column\(s\) \['cell_id'\]"):
-            load_trackpy_dataframe(trackpy_df)
+            from_trackpy(trackpy_df)
 
     def test_lineage_id_column_raises(self, trackpy_df):
         """A 'lineage_id' column would be overwritten by pycellin: raise."""
         trackpy_df["lineage_id"] = [7, 7]
         with pytest.raises(ValueError, match=r"column\(s\) \['lineage_id'\]"):
-            load_trackpy_dataframe(trackpy_df)
+            from_trackpy(trackpy_df)
 
     def test_timepoint_column_raises(self, trackpy_df):
         """A 'timepoint' column would be overwritten by pycellin: raise."""
         trackpy_df["timepoint"] = [10, 11]
         with pytest.raises(ValueError, match=r"column\(s\) \['timepoint'\]"):
-            load_trackpy_dataframe(trackpy_df)
+            from_trackpy(trackpy_df)
 
     def test_no_reserved_column(self, trackpy_df):
         """Without reserved columns, pycellin creates its own properties."""
-        model = load_trackpy_dataframe(trackpy_df)
+        model = from_trackpy(trackpy_df)
         (lin,) = model.data.cell_data.values()
         assert [lin.nodes[n]["cell_id"] for n in sorted(lin.nodes)] == [0, 1]
         assert all(lin.nodes[n]["lineage_id"] == lin.graph["lineage_id"] for n in lin)
@@ -67,7 +67,7 @@ class TestLoadTrackpyDataframe:
     def test_trackpy_columns_declared(self, trackpy_full_df):
         """The columns written by trackpy are declared, with a description, and the
         sizes and static errors in the unit of the coordinates."""
-        model = load_trackpy_dataframe(trackpy_full_df, space_unit="micrometer")
+        model = from_trackpy(trackpy_full_df, space_unit="micrometer")
 
         for column in ("particle", "mass", "size", "ecc", "signal", "raw_mass", "ep"):
             prop = model.get_property(column)
@@ -83,7 +83,7 @@ class TestLoadTrackpyDataframe:
     def test_integer_column_stays_integer(self, trackpy_df):
         """In a DataFrame of numbers only, an integer column stays integer."""
         trackpy_df["label"] = [5, 6]
-        model = load_trackpy_dataframe(trackpy_df)
+        model = from_trackpy(trackpy_df)
 
         assert model.get_property("label").dtype == "int"
         (lin,) = model.data.cell_data.values()
@@ -95,7 +95,7 @@ class TestLoadTrackpyDataframe:
         """Text and boolean columns are declared with their data type."""
         trackpy_df["condition"] = ["control", None]
         trackpy_df["selected"] = [True, False]
-        model = load_trackpy_dataframe(trackpy_df)
+        model = from_trackpy(trackpy_df)
 
         assert model.get_property("condition").dtype == "str"
         assert model.get_property("selected").dtype == "bool"
@@ -111,7 +111,7 @@ class TestLoadTrackpyDataframe:
                 "y": [0.0, 1.0, 2.0, 3.0, 4.0],
             }
         )
-        model = load_trackpy_dataframe(df)
+        model = from_trackpy(df)
 
         edges = {edge for lin in model.data.cell_data.values() for edge in lin.edges}
         # Rows 2 -> 3 -> 0 for particle 0, rows 1 -> 4 for particle 1.
@@ -120,13 +120,26 @@ class TestLoadTrackpyDataframe:
     def test_TrackMate_round_trip(self, trackpy_full_df, tmp_path):
         """A trackpy model exported to TrackMate can be loaded back, with its
         trackpy columns."""
-        model = load_trackpy_dataframe(trackpy_full_df)
+        model = from_trackpy(trackpy_full_df)
         xml_path = tmp_path / "trackpy.xml"
-        export_TrackMate_XML(model, xml_path, units={"space": "pixel", "time": "frame"})
+        write_trackmate_xml(model, xml_path, space_unit="pixel", time_unit="frame")
 
-        reloaded = load_TrackMate_XML(xml_path)
+        reloaded = read_trackmate_xml(xml_path)
 
         assert reloaded.get_property("particle").dtype == "int"
         (lin,) = reloaded.data.cell_data.values()
         masses = sorted(attrs["mass"] for _, attrs in lin.nodes(data=True))
         assert masses == [100.0, 110.0]
+
+    def test_reference_time_prop_names_the_time_property(self, trackpy_df):
+        """Test that reference_time_prop names the time property built from the
+        frames, which is the reference time property of the model."""
+        model = from_trackpy(trackpy_df, time_step=2.0, reference_time_prop="t")
+        assert model.reference_time_prop == "t"
+        (lin,) = model.data.cell_data.values()
+        assert sorted(t for _, t in lin.nodes(data="t")) == [0.0, 2.0]
+
+    def test_reference_time_prop_naming_a_column_raises(self, trackpy_full_df):
+        """Test that a reference_time_prop already used by a column raises."""
+        with pytest.raises(ValueError, match="'reference_time_prop' argument"):
+            from_trackpy(trackpy_full_df, reference_time_prop="mass")

@@ -21,7 +21,7 @@ from pycellin.properties.motion import create_cell_displacement_property
 from pycellin.properties.tracking import (
     create_absolute_age_property,
 )
-from pycellin.io.geff.exporter import (
+from pycellin.io.geff.writer import (
     _add_tracklet_ids,
     _build_axes,
     _build_display_hints,
@@ -36,9 +36,9 @@ from pycellin.io.geff.exporter import (
     _remove_unsupported_props,
     _solve_node_overlaps,
     _to_geff_dtype,
-    export_GEFF,
+    write_geff,
 )
-from pycellin.io.geff.loader import load_GEFF
+from pycellin.io.geff.reader import read_geff
 
 # Fixtures ####################################################################
 
@@ -192,7 +192,7 @@ def simple_model():
     model = Model(
         data=data,
         props_metadata=props_metadata,
-        reference_time_property="timepoint",
+        reference_time_prop="timepoint",
     )
     return model
 
@@ -368,7 +368,7 @@ class TestRemoveUnsupportedProps:
         """Test that properties GEFF can store are kept, without warning."""
         props = simple_model.get_properties()
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
             _remove_unsupported_props(simple_model)
 
         assert simple_model.get_properties() == props
@@ -392,7 +392,7 @@ class TestRemoveUnsupportedProps:
         lin.nodes[1]["daughter_ids"] = [2]
         lin.edges[1, 2]["LINK_FEATURE"] = 1.5
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
             _remove_unsupported_props(simple_model)
 
         assert "daughter_ids" not in simple_model.get_properties()
@@ -420,7 +420,7 @@ class TestRemoveUnsupportedProps:
         )
         simple_model.data.cell_data[0].graph["lineage_tags"] = ["a", "b"]
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
             _remove_unsupported_props(simple_model)
 
         assert "lineage_tags" in simple_model.get_properties()
@@ -526,7 +526,7 @@ class TestAddTrackletIds:
         lin.nodes[1]["tracklet_id"] = 99
         lin.nodes[2]["tracklet_id"] = 2
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
             _add_tracklet_ids(simple_model)
 
         assert lin.nodes[1]["tracklet_id"] == 2
@@ -537,7 +537,7 @@ class TestAddTrackletIds:
     def test_same_values_replaced_without_warning(self, simple_model, caplog):
         """Existing tracklet_id values equal to the tracklet IDs give no warning."""
         _add_tracklet_ids(simple_model)
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
             _add_tracklet_ids(simple_model)
         assert not caplog.records
 
@@ -556,7 +556,7 @@ class TestGetDefaultSpaceAxes:
     def test_missing_z_value(self, model_with_xyz, caplog):
         """A cell without cell_z drops the z axis, with a warning."""
         del model_with_xyz.data.cell_data[0].nodes[1]["cell_z"]
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
             space_axes = _get_default_space_axes(model_with_xyz)
         assert space_axes == ["cell_x", "cell_y"]
         assert len(caplog.records) == 1
@@ -566,7 +566,7 @@ class TestGetDefaultSpaceAxes:
     def test_missing_y_value(self, model_with_xyz, caplog):
         """A cell without cell_y drops all the space axes, with a warning."""
         del model_with_xyz.data.cell_data[0].nodes[1]["cell_y"]
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
             space_axes = _get_default_space_axes(model_with_xyz)
         assert space_axes == []
         assert len(caplog.records) == 1
@@ -827,7 +827,7 @@ class TestBuildGeffMetadata:
     """Test cases for _build_geff_metadata function."""
 
     def test_default_time_axis(self, simple_model):
-        """Test that default time axis uses model's reference_time_property."""
+        """Test that default time axis uses model's reference_time_prop."""
         metadata = _build_geff_metadata(simple_model)
 
         assert len(metadata.axes) == 1
@@ -953,13 +953,13 @@ class TestBuildGeffMetadata:
         assert metadata.display_hints.display_time == "timepoint"
 
 
-class TestExportGEFF:
-    """Test cases for export_GEFF function."""
+class TestWriteGeff:
+    """Test cases for write_geff function."""
 
     def test_basic_export(self, simple_model, tmp_path):
         """Test basic GEFF export functionality."""
         geff_out = str(tmp_path / "test.geff")
-        exported_model = export_GEFF(simple_model, geff_out)
+        exported_model = write_geff(simple_model, geff_out)
 
         # Check that the GEFF file was created.
         assert (tmp_path / "test.geff").exists()
@@ -973,12 +973,12 @@ class TestExportGEFF:
         assert metadata is not None
 
     def test_export_returns_copy(self, simple_model, tmp_path):
-        """Test that export_GEFF returns a copy and doesn't modify the original data.
+        """Test that write_geff returns a copy and doesn't modify the original data.
         It's not an exhaustive check since we are only checking the number of nodes
         and edges.
         """
         geff_out = str(tmp_path / "test.geff")
-        exported_model = export_GEFF(simple_model, geff_out)
+        exported_model = write_geff(simple_model, geff_out)
 
         # Check that the original model's data is unchanged. It's not an exhaustive
         # check since we are only checking the number of nodes and edges.
@@ -1000,7 +1000,7 @@ class TestExportGEFF:
         assert exported_model is not simple_model
 
     def test_export_cleans_metadata(self, simple_model, tmp_path):
-        """Test that export_GEFF cleans metadata by removing orphaned properties.
+        """Test that write_geff cleans metadata by removing orphaned properties.
 
         Also validates that multi-type properties (like lineage_id with NODE | LINEAGE)
         are preserved when they have actual data in the lineages.
@@ -1009,7 +1009,7 @@ class TestExportGEFF:
         simple_model.props_metadata._add_prop(
             create_absolute_age_property(unit="timepoint")
         )
-        exported_model = export_GEFF(simple_model, geff_out)
+        exported_model = write_geff(simple_model, geff_out)
 
         # The absolute_age property is orphaned (no data in lineages), so it's removed.
         # All other properties are preserved, including multi-type ones (lineage_id).
@@ -1029,16 +1029,16 @@ class TestExportGEFF:
         empty_model = Model(
             data=empty_data,
             props_metadata=props_metadata,
-            reference_time_property="timepoint",
+            reference_time_prop="timepoint",
         )
 
         with pytest.raises(ValueError, match="Model contains no lineage data"):
-            export_GEFF(empty_model, geff_out)
+            write_geff(empty_model, geff_out)
 
     def test_export_with_space_axes(self, model_with_xyz, tmp_path):
         """Test export with space axes specified."""
         geff_out = str(tmp_path / "test.geff")
-        export_GEFF(model_with_xyz, geff_out, space_axes=["cell_x", "cell_y", "cell_z"])
+        write_geff(model_with_xyz, geff_out, space_axes=["cell_x", "cell_y", "cell_z"])
 
         graph, metadata = geff.read(geff_out)
         space_axes = [ax for ax in metadata.axes if ax.type == "space"]
@@ -1047,9 +1047,9 @@ class TestExportGEFF:
     def test_default_export_round_trip(self, model_with_xyz, tmp_path):
         """With the default space axes, coordinates and space unit come back."""
         geff_out = str(tmp_path / "test.geff")
-        export_GEFF(model_with_xyz, geff_out)
+        write_geff(model_with_xyz, geff_out)
 
-        reloaded = load_GEFF(geff_out)
+        reloaded = read_geff(geff_out)
 
         assert reloaded.get_space_unit() == "micrometer"
         cells = [
@@ -1064,7 +1064,7 @@ class TestExportGEFF:
     def test_export_with_custom_time_axes(self, simple_model, tmp_path):
         """Test export with custom time axes."""
         geff_out = str(tmp_path / "test.geff")
-        export_GEFF(simple_model, geff_out, time_axes="timepoint")
+        write_geff(simple_model, geff_out, time_axes="timepoint")
 
         graph, metadata = geff.read(geff_out)
         time_axes = [ax for ax in metadata.axes if ax.type == "time"]
@@ -1085,7 +1085,7 @@ class TestExportGEFF:
                     [1, 1],
                     [0, 1],
                 ]
-        export_GEFF(
+        write_geff(
             simple_model,
             geff_out,
             variable_length_props=[var_length_prop.identifier],
@@ -1104,8 +1104,8 @@ class TestExportGEFF:
             for node in lin.nodes:
                 lin.nodes[node]["daughter_ids"] = list(lin.successors(node))
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.exporter"):
-            exported_model = export_GEFF(simple_model, geff_out)
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
+            exported_model = write_geff(simple_model, geff_out)
 
         graph, metadata = geff.read(geff_out)
         assert "daughter_ids" not in metadata.node_props_metadata
@@ -1121,7 +1121,7 @@ class TestExportGEFF:
         simple_model.data.cell_data[0].nodes[1]["cell_x"] = None
         simple_model.data.cell_data[0].edges[1, 2]["link_x"] = None
 
-        export_GEFF(simple_model, geff_out)
+        write_geff(simple_model, geff_out)
 
         graph, metadata = geff.read(geff_out)
         assert "cell_x" not in graph.nodes[1]
@@ -1135,13 +1135,13 @@ class TestExportGEFF:
         """Test that a model requiring an update is not exported."""
         simple_model.prepare_full_data_update()
         with pytest.raises(UpdateRequiredError, match="before exporting"):
-            export_GEFF(simple_model, str(tmp_path / "test.geff"))
+            write_geff(simple_model, str(tmp_path / "test.geff"))
         assert not (tmp_path / "test.geff").exists()
 
     def test_export_with_tracklets(self, simple_model, tmp_path):
         """The tracklets pass geff's validation, and the model is not modified."""
         geff_out = str(tmp_path / "test.geff")
-        export_GEFF(simple_model, geff_out, tracklets=True)
+        write_geff(simple_model, geff_out, tracklets=True)
 
         graph, metadata = geff.read(
             geff_out, data_validation=ValidationConfig(tracklet=True, lineage=True)
@@ -1165,7 +1165,7 @@ class TestExportGEFF:
         lin.graph["lineage_id"] = 1
         simple_model.data.cell_data[1] = lin
         geff_out = str(tmp_path / "test.geff")
-        export_GEFF(simple_model, geff_out, tracklets=True)
+        write_geff(simple_model, geff_out, tracklets=True)
 
         graph, _ = geff.read(
             geff_out, data_validation=ValidationConfig(tracklet=True, lineage=True)
@@ -1180,7 +1180,7 @@ class TestExportGEFF:
         simple_model.add_cycle_data()
         simple_model.propagate_cycle_properties(["cycle_id"])
         geff_out = str(tmp_path / "test.geff")
-        export_GEFF(simple_model, geff_out)
+        write_geff(simple_model, geff_out)
 
         _, metadata = geff.read(geff_out)
         assert "tracklet" not in metadata.track_node_props
@@ -1190,9 +1190,9 @@ class TestExportGEFF:
         """A reloaded file has the tracklet_id cell property, and cycle lineages
         can still be added."""
         geff_out = str(tmp_path / "test.geff")
-        export_GEFF(simple_model, geff_out, tracklets=True)
+        write_geff(simple_model, geff_out, tracklets=True)
 
-        reloaded = load_GEFF(geff_out)
+        reloaded = read_geff(geff_out)
         reloaded.add_cycle_data()
 
         cells = [
@@ -1219,5 +1219,5 @@ class TestExportGEFF:
             )
         )
         with pytest.raises(ValueError, match="isn't only a cell property"):
-            export_GEFF(simple_model, str(tmp_path / "test.geff"), tracklets=True)
+            write_geff(simple_model, str(tmp_path / "test.geff"), tracklets=True)
         assert not (tmp_path / "test.geff").exists()

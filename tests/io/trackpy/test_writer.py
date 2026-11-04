@@ -8,7 +8,7 @@ import pytest
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.classes.exceptions import UpdateRequiredError
-from pycellin.io.trackpy.exporter import export_trackpy_dataframe
+from pycellin.io.trackpy.writer import to_trackpy
 from pycellin.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
@@ -36,7 +36,7 @@ def simple_model():
     return Model(
         data=Data({1: lin}),
         props_metadata=props_metadata,
-        reference_time_property="timepoint",
+        reference_time_prop="timepoint",
     )
 
 
@@ -87,7 +87,7 @@ def model_with_positions():
     return Model(
         data=Data(lineages),
         props_metadata=props_metadata,
-        reference_time_property="timepoint",
+        reference_time_prop="timepoint",
     )
 
 
@@ -119,7 +119,7 @@ def model_with_division():
     return Model(
         data=Data({1: lin}),
         props_metadata=props_metadata,
-        reference_time_property="timepoint",
+        reference_time_prop="timepoint",
     )
 
 
@@ -128,18 +128,18 @@ def model_with_division():
 
 # pandas 3.1 deprecates the `inplace` argument, removed in pandas 4.
 @pytest.mark.filterwarnings("error:The inplace keyword")
-class TestExportTrackpyDataframe:
-    """Test cases for export_trackpy_dataframe function."""
+class TestToTrackpy:
+    """Test cases for to_trackpy function."""
 
     def test_model_requiring_update_raises(self, simple_model):
         """Test that a model requiring an update is not exported."""
         simple_model.prepare_full_data_update()
         with pytest.raises(UpdateRequiredError, match="before exporting"):
-            export_trackpy_dataframe(simple_model)
+            to_trackpy(simple_model)
 
     def test_columns_follow_trackpy_format(self, model_with_positions):
         """Test that positions come first and frame and particle last, renamed."""
-        df = export_trackpy_dataframe(model_with_positions)
+        df = to_trackpy(model_with_positions)
         assert list(df.columns[:2]) == ["y", "x"]
         assert list(df.columns[-2:]) == ["frame", "particle"]
         for column in ["cell_x", "cell_y", "timepoint", "lineage_id", "cell_contour"]:
@@ -148,7 +148,7 @@ class TestExportTrackpyDataframe:
 
     def test_values_kept_under_trackpy_names(self, model_with_positions):
         """Test that the renamed columns keep their values."""
-        df = export_trackpy_dataframe(model_with_positions)
+        df = to_trackpy(model_with_positions)
         assert df["x"].tolist() == [1.0, 2.0, 3.0, 4.0]
         assert df["y"].tolist() == [10.0, 20.0, 30.0, 40.0]
         assert df["frame"].tolist() == [0, 1, 0, 1]
@@ -157,7 +157,7 @@ class TestExportTrackpyDataframe:
 
     def test_rows_sorted_by_particle_then_frame(self, model_with_positions):
         """Test that the rows are sorted by particle, then by frame."""
-        df = export_trackpy_dataframe(model_with_positions)
+        df = to_trackpy(model_with_positions)
         keys = list(zip(df["particle"], df["frame"]))
         assert keys == sorted(keys)
 
@@ -169,7 +169,7 @@ class TestExportTrackpyDataframe:
         model_with_positions.props_metadata._add_prop(
             create_cell_coord_property(unit=None, axis="z")
         )
-        df = export_trackpy_dataframe(model_with_positions)
+        df = to_trackpy(model_with_positions)
         assert list(df.columns[:3]) == ["z", "y", "x"]
         assert df["z"].tolist() == [0.5] * 4
 
@@ -179,11 +179,11 @@ class TestExportTrackpyDataframe:
         """Test that a model without divisions is exported without any warning."""
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            export_trackpy_dataframe(model_with_positions)
+            to_trackpy(model_with_positions)
 
     def test_divisions_split_into_particles(self, model_with_division):
         """Test that each cell cycle becomes a particle, from the same lineage."""
-        df = export_trackpy_dataframe(model_with_division)
+        df = to_trackpy(model_with_division)
         cells = sorted(df.groupby("particle")["cell_id"].apply(sorted).tolist())
         assert cells == [[1], [2, 4], [3]]
         assert df["lineage_id_pycellin"].tolist() == [1, 1, 1, 1]

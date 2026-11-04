@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import inspect
-import pickle
 import warnings
 from copy import deepcopy
 from decimal import Decimal
@@ -53,7 +52,7 @@ class Model:
         model_metadata: ModelMetadata | dict[str, Any] | None = None,
         props_metadata: PropsMetadata | None = None,
         data: Data | None = None,
-        reference_time_property: str | None = None,
+        reference_time_prop: str | None = None,
         variable_time_step: bool = False,
     ) -> None:
         """
@@ -67,7 +66,7 @@ class Model:
             The declaration of the properties present in the model (default is None).
         data : Data, optional
             The lineages data of the model (default is None).
-        reference_time_property : str, optional
+        reference_time_prop : str, optional
             The name of the property to use as the reference for time measurements.
             Needs to be provided if model_metadata is None or does not contain it.
         variable_time_step : bool, optional
@@ -81,7 +80,7 @@ class Model:
         Raises
         ------
         ValueError
-            If `reference_time_property` is not provided and cannot be inferred from
+            If `reference_time_prop` is not provided and cannot be inferred from
             `model_metadata`.
         TypeError
             If `model_metadata` is not None, ModelMetadata, or dict.
@@ -97,25 +96,25 @@ class Model:
         The core properties "cell_id", "lineage_id", "timepoint" and the reference
         time property are protected whenever they are declared.
         """
-        # Check that we have a reference_time_property.
-        if reference_time_property is None:
+        # Check that we have a reference_time_prop.
+        if reference_time_prop is None:
             if model_metadata is None:
-                raise ValueError("'reference_time_property' must be provided.")
+                raise ValueError("'reference_time_prop' must be provided.")
 
             # Extract from metadata regardless of type.
             if isinstance(model_metadata, dict):
-                reference_time_property = model_metadata.get("reference_time_property")
+                reference_time_prop = model_metadata.get("reference_time_prop")
             else:
-                reference_time_property = getattr(
-                    model_metadata, "reference_time_property", None
+                reference_time_prop = getattr(
+                    model_metadata, "reference_time_prop", None
                 )
 
-            if not reference_time_property:
+            if not reference_time_prop:
                 raise ValueError(
-                    "'reference_time_property' must be provided in model_metadata "
+                    "'reference_time_prop' must be provided in model_metadata "
                     "or as an explicit argument."
                 )
-        self._reference_time_property = reference_time_property
+        self._reference_time_prop = reference_time_prop
 
         # Initialize data early since _compute_time_step() needs it.
         self.data = data.copy() if data is not None else Data({})
@@ -133,9 +132,7 @@ class Model:
         if time_step is None:
             if self.data.cell_data:
                 # Create temporary metadata for _compute_time_step().
-                temp_metadata = ModelMetadata(
-                    reference_time_property=reference_time_property
-                )
+                temp_metadata = ModelMetadata(reference_time_prop=reference_time_prop)
                 self.model_metadata = temp_metadata
                 time_step = self._compute_time_step(variable_time_step)
             else:
@@ -152,16 +149,16 @@ class Model:
         # TODO: add unit extracted from props_metadata, if any
         if model_metadata is None:
             self.model_metadata = ModelMetadata(
-                reference_time_property=reference_time_property, time_step=time_step
+                reference_time_prop=reference_time_prop, time_step=time_step
             )
         elif isinstance(model_metadata, ModelMetadata):
             metadata_dict = model_metadata.to_dict()  # to avoid mutating the original
-            metadata_dict["reference_time_property"] = reference_time_property
+            metadata_dict["reference_time_prop"] = reference_time_prop
             metadata_dict["time_step"] = time_step
             self.model_metadata = ModelMetadata.from_dict(metadata_dict)
         elif isinstance(model_metadata, dict):
             metadata_dict = model_metadata.copy()  # to avoid mutating the original
-            metadata_dict["reference_time_property"] = reference_time_property
+            metadata_dict["reference_time_prop"] = reference_time_prop
             metadata_dict["time_step"] = time_step
             self.model_metadata = ModelMetadata.from_dict(metadata_dict)
         else:
@@ -184,7 +181,7 @@ class Model:
                     property=create_timepoint_property(),
                     data=self.data,
                     time_step=self.get_time_step(),
-                    reference_time_property=self.reference_time_property,
+                    reference_time_prop=self.reference_time_prop,
                 )
             )
             self.update(["timepoint"])
@@ -194,7 +191,7 @@ class Model:
             "cell_id",
             "lineage_id",
             "timepoint",
-            self.reference_time_property,
+            self.reference_time_prop,
         )
         for prop_id in core_props:
             if self.props_metadata._has_prop(prop_id):
@@ -302,7 +299,7 @@ class Model:
         self.__dict__.update(state)
 
     @property
-    def reference_time_property(self) -> str:
+    def reference_time_prop(self) -> str:
         """
         Get the reference time property of the model.
 
@@ -311,14 +308,14 @@ class Model:
         str
             The identifier of the reference time property.
         """
-        return self._reference_time_property
+        return self._reference_time_prop
 
-    @reference_time_property.setter
-    def reference_time_property(self, value: str) -> None:
+    @reference_time_prop.setter
+    def reference_time_prop(self, value: str) -> None:
         """
-        Prevent direct assignment to reference_time_property.
+        Prevent direct assignment to reference_time_prop.
 
-        Users must use the set_reference_time_property() method instead.
+        Users must use the set_reference_time_prop() method instead.
 
         Raises
         ------
@@ -326,11 +323,11 @@ class Model:
             Always raised to prevent direct assignment.
         """
         raise AttributeError(
-            "Cannot assign directly to 'reference_time_property'. "
-            "Use the 'set_reference_time_property()' method instead."
+            "Cannot assign directly to 'reference_time_prop'. "
+            "Use the 'set_reference_time_prop()' method instead."
         )
 
-    def set_reference_time_property(self, prop_id: str) -> None:
+    def set_reference_time_prop(self, prop_id: str) -> None:
         """
         Set the reference time property of the model.
 
@@ -363,13 +360,13 @@ class Model:
                 "model's node properties."
             )
 
-        old_ref_time_prop = self._reference_time_property
-        self._reference_time_property = prop_id
-        self.model_metadata.reference_time_property = prop_id
+        old_reference_time_prop = self._reference_time_prop
+        self._reference_time_prop = prop_id
+        self.model_metadata.reference_time_prop = prop_id
 
         self.props_metadata._protect_prop(prop_id)
-        if old_ref_time_prop != "timepoint":
-            self.props_metadata._unprotect_prop(old_ref_time_prop)
+        if old_reference_time_prop != "timepoint":
+            self.props_metadata._unprotect_prop(old_reference_time_prop)
 
         self.set_time_step()
         self.model_metadata.time_unit = node_props[prop_id].unit
@@ -379,7 +376,7 @@ class Model:
             property=create_timepoint_property(),
             data=self.data,
             time_step=self.model_metadata.time_step,
-            reference_time_property=self.model_metadata.reference_time_property,
+            reference_time_prop=self.model_metadata.reference_time_prop,
         )
         self._updater.register_calculator(calc)
 
@@ -411,7 +408,7 @@ class Model:
             If no lineages are found in the model data.
             If no valid time intervals are found (e.g., all nodes have the same
             timepoint).
-            If reference_time_property is not found in lineage nodes.
+            If reference_time_prop is not found in lineage nodes.
 
         Examples
         --------
@@ -471,7 +468,7 @@ class Model:
             raise ValueError("Cannot compute time step: no lineages found.")
 
         time_diffs = set()
-        time_prop = self.model_metadata.reference_time_property
+        time_prop = self.model_metadata.reference_time_prop
         for lin in lineages:
             for source_node, target_node in lin.edges():
                 if time_prop not in lin.nodes[source_node]:
@@ -596,7 +593,7 @@ class Model:
 
         Examples
         --------
-        >>> model.reference_time_property, model.get_time_step()
+        >>> model.reference_time_prop, model.get_time_step()
         ('time', 1)
         >>> model.rescale_time(5, time_unit="min")  # frames acquired every 5 min
         >>> model.update()
@@ -605,11 +602,11 @@ class Model:
         """
         if not factor > 0:
             raise ValueError(f"'factor' must be strictly positive, got {factor}.")
-        time_prop = self.reference_time_property
+        time_prop = self.reference_time_prop
         if time_prop == "timepoint":
             raise ValueError(
                 "Cannot rescale the 'timepoint' reference time property. Set another "
-                "reference time property first with set_reference_time_property()."
+                "reference time property first with set_reference_time_prop()."
             )
         if time_prop in self._updater._calculators:
             warnings.warn(
@@ -1562,7 +1559,7 @@ class Model:
         # The timepoint property is always declared and protected, unless it is the
         # reference time property (see ModelUpdater._update()).
         if (
-            self.model_metadata.reference_time_property != "timepoint"
+            self.model_metadata.reference_time_prop != "timepoint"
             and self.data.cell_data
             and not self.props_metadata._has_prop("timepoint")
         ):
@@ -1570,7 +1567,7 @@ class Model:
             self.props_metadata._protect_prop("timepoint")
         complete = self._updater._update(
             self.data,
-            time_prop=self.model_metadata.reference_time_property,
+            time_prop=self.model_metadata.reference_time_prop,
             time_step=time_step,
             props_to_update=props_to_update,
         )
@@ -1688,7 +1685,7 @@ class Model:
                     )
                 else:
                     cycle_lineage = self.data._compute_cycle_lineage(
-                        self.reference_time_property, timestep, lineage_id
+                        self.reference_time_prop, timestep, lineage_id
                     )
                     self.data.cycle_data[lineage_id] = cycle_lineage
 
@@ -1909,7 +1906,7 @@ class Model:
 
         cell_id = lineage._add_cell(
             cell_id,
-            time_prop=self.model_metadata.reference_time_property,
+            time_prop=self.model_metadata.reference_time_prop,
             time_prop_value=time_value,
             **prop_values,
         )
@@ -1981,7 +1978,7 @@ class Model:
         Within each lineage, cells are relabeled in a deterministic order:
         a topological order (each cell is numbered after all of its ancestors,
         so a parent always receives a smaller ID than its descendants), with
-        ties broken by the ``reference_time_property`` value and then by the
+        ties broken by the ``reference_time_prop`` value and then by the
         original cell ID. This guarantees reproducible IDs across runs and
         across differently-built but structurally-identical lineages.
         When ``unique_ids`` is True, lineages are processed in order of their
@@ -1998,7 +1995,7 @@ class Model:
 
             ordered = list(
                 nx.lexicographical_topological_sort(
-                    lin, key=lambda n: (lin.nodes[n][self.reference_time_property], n)
+                    lin, key=lambda n: (lin.nodes[n][self.reference_time_prop], n)
                 )
             )
             # Temporary relabeling to guard against cycles (e.g. {0: 55, 55: 0}).
@@ -2079,7 +2076,7 @@ class Model:
             source_cell_id,
             target_cell_id,
             target_lineage,
-            time_prop=self.model_metadata.reference_time_property,
+            time_prop=self.model_metadata.reference_time_prop,
             **prop_values,
         )
 
@@ -2556,7 +2553,7 @@ class Model:
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
-        time_prop = time_prop or self.reference_time_property
+        time_prop = time_prop or self.reference_time_prop
         # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
         time = self._get_input_prop(time_prop)
 
@@ -4135,7 +4132,7 @@ class Model:
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
-        time_prop = time_prop or self.reference_time_property
+        time_prop = time_prop or self.reference_time_prop
         space_unit = self.get_space_unit() or "pixel"
         time_unit = self._get_prop_unit(time_prop)
 
@@ -4300,7 +4297,7 @@ class Model:
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
-        time_prop = time_prop or self.reference_time_property
+        time_prop = time_prop or self.reference_time_prop
         time_unit = self._get_prop_unit(time_prop)
 
         prop = tracking.create_division_rate_property(
@@ -4346,7 +4343,7 @@ class Model:
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
-        time_prop = time_prop or self.reference_time_property
+        time_prop = time_prop or self.reference_time_prop
         # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
         time = self._get_input_prop(time_prop)
 
@@ -4557,7 +4554,7 @@ class Model:
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
-        time_prop = time_prop or self.reference_time_property
+        time_prop = time_prop or self.reference_time_prop
         # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
         time = self._get_input_prop(time_prop)
 
@@ -4768,7 +4765,7 @@ class Model:
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
-        time_prop = time_prop or self.reference_time_property
+        time_prop = time_prop or self.reference_time_prop
         prop = tracking.create_normalized_age_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
@@ -4981,7 +4978,7 @@ class Model:
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
-        time_prop = time_prop or self.reference_time_property
+        time_prop = time_prop or self.reference_time_prop
         # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
         time = self._get_input_prop(time_prop)
 
@@ -5391,7 +5388,7 @@ class Model:
         #     raise UpdateRequiredError(txt)
         # TODO: I have nothing to check if the structure was modified since
         # _update_required becomes true when properties are added...
-        time_prop = self.model_metadata.reference_time_property
+        time_prop = self.model_metadata.reference_time_prop
         time_step = self.model_metadata.time_step
         if time_step is None:
             # TODO: add "see documentation" to the error message or explain
@@ -5864,7 +5861,7 @@ class Model:
         md1 = model1.model_metadata.get_standard_metadata()
         md2 = model2.model_metadata.get_standard_metadata()
         critical = [
-            "reference_time_property",
+            "reference_time_prop",
             "time_step",
             "time_unit",
             "pixel_width",
@@ -5910,16 +5907,16 @@ class Model:
         # released timepoint values).
         timepoint_calc = model1._updater._calculators.get("timepoint")
         if isinstance(timepoint_calc, Timepoint):
-            ref_time_prop = timepoint_calc.ref_time_prop
+            reference_time_prop = timepoint_calc.reference_time_prop
             times2 = [
-                lin.nodes[nid][ref_time_prop]
+                lin.nodes[nid][reference_time_prop]
                 for lin in model2.get_cell_lineages()
                 for nid in lin.nodes
-                if ref_time_prop in lin.nodes[nid]
+                if reference_time_prop in lin.nodes[nid]
             ]
             if times2 and min(times2) < timepoint_calc.min_time:
                 raise ValueError(
-                    f"Cannot merge a model starting earlier ({ref_time_prop}="
+                    f"Cannot merge a model starting earlier ({reference_time_prop}="
                     f"{min(times2)}) than the time origin of this model "
                     f"({timepoint_calc.min_time}), since it would give negative "
                     "timepoints. Merge this model into the other one instead."
@@ -6003,7 +6000,7 @@ class Model:
         )
         cycle_lineages_to_add = {}
         if with_cycles:
-            time_prop = model1.reference_time_property
+            time_prop = model1.reference_time_prop
             time_step = model1.model_metadata.time_step
             if time_step is None:
                 raise ValueError(
@@ -6334,7 +6331,7 @@ class Model:
         df = pd.DataFrame(records)
 
         # Reoder the columns to have pycellin mandatory properties first.
-        time_prop = self.model_metadata.reference_time_property
+        time_prop = self.model_metadata.reference_time_prop
         mandatory_columns = ["lineage_id", time_prop, "cell_id"]
         missing_columns = [col for col in mandatory_columns if col not in df.columns]
         if missing_columns:
@@ -6745,46 +6742,6 @@ class Model:
             return []
         return [int(value)]
 
-    def save_to_pickle(
-        self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL
-    ) -> None:
-        """
-        Save the model to a file by pickling it.
-
-        Uses custom __getstate__ and __setstate__ methods to ensure ModelMetadata
-        with dynamic fields is properly serialized and deserialized.
-
-        Parameters
-        ----------
-        path : str
-            Path to save the model.
-        protocol : int, optional
-            Pickle protocol to use (default is pickle.HIGHEST_PROTOCOL).
-        """
-        with open(path, "wb") as file:
-            pickle.dump(self, file, protocol=protocol)
-
-    @staticmethod
-    def load_from_pickle(path: str) -> "Model":
-        """
-        Load a model from a pickled pycellin file.
-
-        Uses custom __getstate__ and __setstate__ methods to ensure ModelMetadata
-        with dynamic fields is properly serialized and deserialized.
-
-        Parameters
-        ----------
-        path : str
-            Path to read the model.
-
-        Returns
-        -------
-        Model
-            The loaded model.
-        """
-        with open(path, "rb") as file:
-            return pickle.load(file)
-
     # def export(self, path: str, format: str) -> None:
     #     """
     #     Export the model to a file in a specific format (e.g. TrackMate).
@@ -6877,7 +6834,7 @@ class Model:
         fig : plotly.graph_objects.Figure
         """
         if time_prop is None:
-            time_prop = self.reference_time_property
+            time_prop = self.reference_time_prop
 
         # Validation.
         df_cells = self.to_cell_dataframe()

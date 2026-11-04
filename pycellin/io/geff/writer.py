@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-exporter.py
+writer.py
 
 This module is part of the pycellin package.
 It provides functionality to export a pycellin model to the GEFF format.
@@ -28,7 +28,7 @@ from pycellin.utils import _normalize_dtype
 
 logger = logging.getLogger(__name__)
 
-# Cell property that holds the tracklet IDs written by export_GEFF(tracklets=True).
+# Cell property that holds the tracklet IDs written by write_geff(tracklets=True).
 _TRACKLET_PROP = "tracklet_id"
 
 # TODO: geffception for cycle and lineage props
@@ -565,7 +565,7 @@ def _build_geff_metadata(
     # Generic metadata.
     node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
     if time_axes is None:
-        time_axes = [model.reference_time_property]
+        time_axes = [model.reference_time_prop]
     elif isinstance(time_axes, str):
         time_axes = [time_axes]
     if space_axes is None:
@@ -600,9 +600,10 @@ def _build_geff_metadata(
     )
 
 
-def export_GEFF(
+def write_geff(
     model: Model,
-    geff_out: str | Path,
+    path: str | Path,
+    *,
     time_axes: str | list[str] | None = None,
     space_axes: list[str] | None = None,
     channel_axes: list[str] | None = None,
@@ -617,7 +618,7 @@ def export_GEFF(
     ----------
     model : Model
         The pycellin model to export.
-    geff_out : str | Path
+    path : str | Path
         Path to the output GEFF file.
     time_axes : str | list[str] | None, optional
         List of property names that Geff will consider as time axes.
@@ -723,7 +724,7 @@ def export_GEFF(
 
         geff.write(
             geff_graph,
-            geff_out,
+            path,
             metadata=metadata,
             zarr_format=zarr_format,
             structure_validation=True,
@@ -731,7 +732,7 @@ def export_GEFF(
         )
 
     except Exception as e:
-        raise RuntimeError(f"Failed to export GEFF file to '{geff_out}': {e}.") from e
+        raise RuntimeError(f"Failed to export GEFF file to '{path}': {e}.") from e
 
     return model_copy
 
@@ -742,14 +743,14 @@ if __name__ == "__main__":
     """
     import tempfile
 
-    from pycellin.io.trackmate.loader import load_TrackMate_XML
+    from pycellin.io.trackmate.reader import read_trackmate_xml
 
     xml_in = (
         Path(__file__).resolve().parents[3]
         / "sample_data"
         / "Ecoli_growth_on_agar_pad.xml"
     )
-    model = load_TrackMate_XML(xml_in)
+    model = read_trackmate_xml(xml_in)
 
     print(model)
     print("Model metadata:")
@@ -757,7 +758,7 @@ if __name__ == "__main__":
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         geff_out = Path(tmp_dir) / "output.geff"
-        export_GEFF(
+        write_geff(
             model,
             geff_out,
             space_axes=["cell_x", "cell_y", "cell_z"],

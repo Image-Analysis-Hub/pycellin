@@ -228,7 +228,7 @@ def lineage_props_model():
         model_metadata={"time_step": 1},
         props_metadata=props_md,
         data=Data({1: lin, -4: single_lin}),
-        reference_time_property="frame",
+        reference_time_prop="frame",
     )
 
 
@@ -481,7 +481,7 @@ def relatives_model():
         model_metadata={"time_step": 1},
         props_metadata=PropsMetadata(props={"lin_prop": lin_prop}),
         data=Data({1: lin, -11: single_lin}),
-        reference_time_property="frame",
+        reference_time_prop="frame",
     )
     model.add_cycle_data()
     model.add_mother_cycle()
@@ -736,7 +736,7 @@ def frame_time_model():
         model_metadata={"time_step": 1, "time_unit": "frame"},
         props_metadata=PropsMetadata(props={"time": time_prop}),
         data=Data({1: lin}),
-        reference_time_property="time",
+        reference_time_prop="time",
     )
 
 
@@ -841,7 +841,7 @@ class TestRescaleTime:
 
     def test_timepoint_reference_time_raises(self):
         model = MagicMock()
-        model.reference_time_property = "timepoint"
+        model.reference_time_prop = "timepoint"
         with pytest.raises(ValueError, match="Cannot rescale the 'timepoint'"):
             Model.rescale_time(model, 5)
 
@@ -923,16 +923,16 @@ def two_times_model():
         model_metadata={"time_step": 5, "time_unit": "min"},
         props_metadata=PropsMetadata(props=props),
         data=Data({1: lin}),
-        reference_time_property="time",
+        reference_time_prop="time",
     )
 
 
-class TestSetReferenceTimeProperty:
-    """Test cases for Model.set_reference_time_property() method."""
+class TestSetReferenceTimeProp:
+    """Test cases for Model.set_reference_time_prop() method."""
 
     def test_cycle_duration_in_new_reference(self, two_times_model):
         two_times_model.add_cycle_data()
-        two_times_model.set_reference_time_property("frame")
+        two_times_model.set_reference_time_prop("frame")
         two_times_model.update()
         cycle_lin = two_times_model.data.cycle_data[1]
         assert dict(cycle_lin.nodes(data="cycle_duration")) == {2: 1, 4: 0, 5: 1}
@@ -940,7 +940,7 @@ class TestSetReferenceTimeProperty:
 
     def test_cycle_start_time_in_new_reference(self, two_times_model):
         two_times_model.add_cycle_data()
-        two_times_model.set_reference_time_property("frame")
+        two_times_model.set_reference_time_prop("frame")
         two_times_model.update()
         cycle_lin = two_times_model.data.cycle_data[1]
         assert dict(cycle_lin.nodes(data="cycle_start_time")) == {2: 0, 4: 2, 5: 2}
@@ -948,14 +948,14 @@ class TestSetReferenceTimeProperty:
 
     def test_cycle_end_time_in_new_reference(self, two_times_model):
         two_times_model.add_cycle_data()
-        two_times_model.set_reference_time_property("frame")
+        two_times_model.set_reference_time_prop("frame")
         two_times_model.update()
         cycle_lin = two_times_model.data.cycle_data[1]
         assert dict(cycle_lin.nodes(data="cycle_end_time")) == {2: 1, 4: 2, 5: 3}
         assert two_times_model.get_property("cycle_end_time").unit == "frame"
 
     def test_without_cycle_data(self, two_times_model):
-        two_times_model.set_reference_time_property("frame")
+        two_times_model.set_reference_time_prop("frame")
         assert two_times_model.get_time_unit() == "frame"
         assert two_times_model.get_property("cycle_duration") is None
 
@@ -1054,7 +1054,7 @@ def pixel_space_model():
         },
         props_metadata=PropsMetadata(props=props),
         data=Data({1: lin}),
-        reference_time_property="frame",
+        reference_time_prop="frame",
     )
 
 
@@ -1234,7 +1234,7 @@ def input_props_model():
         model_metadata={"time_step": 1, "time_unit": "frame"},
         props_metadata=PropsMetadata(props={prop.identifier: prop for prop in props}),
         data=Data({1: lin}),
-        reference_time_property="time",
+        reference_time_prop="time",
     )
     model.add_cycle_data()
     return model
@@ -1425,7 +1425,7 @@ def two_lineages_model():
         model_metadata={"time_step": 1, "time_unit": "frame"},
         props_metadata=PropsMetadata(props={"time": time_prop}),
         data=Data({1: lin1, 2: lin2}),
-        reference_time_property="time",
+        reference_time_prop="time",
     )
     model.add_custom_property(
         ConstantValue(_create_test_property("cell_value", "node"), 1.0)

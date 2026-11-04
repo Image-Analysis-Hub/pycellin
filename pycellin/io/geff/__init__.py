@@ -1,4 +1,4 @@
-from .loader import load_GEFF
-from .exporter import export_GEFF
+from .reader import read_geff
+from .writer import write_geff
 
-__all__ = ["load_GEFF", "export_GEFF"]
+__all__ = ["read_geff", "write_geff"]

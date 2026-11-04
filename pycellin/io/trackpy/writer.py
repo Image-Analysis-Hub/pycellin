@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-exporter.py
+writer.py
 
 This module is part of the pycellin package.
 
@@ -183,7 +183,7 @@ def format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
     return df
 
 
-def export_trackpy_dataframe(model: Model) -> pd.DataFrame:
+def to_trackpy(model: Model) -> pd.DataFrame:
     """
     Export a pycellin model to a trackpy DataFrame.
 
@@ -227,19 +227,19 @@ if __name__ == "__main__":
     """
     from pathlib import Path
 
-    from pycellin.io.trackmate.loader import load_TrackMate_XML
+    from pycellin.io.trackmate.reader import read_trackmate_xml
 
     xml = (
         Path(__file__).resolve().parents[3]
         / "sample_data"
         / "Ecoli_growth_on_agar_pad.xml"
     )
-    model = load_TrackMate_XML(
+    model = read_trackmate_xml(
         xml,
         lone_spots="all",
         tracks="all",
     )
 
-    df = export_trackpy_dataframe(model)
+    df = to_trackpy(model)
     print(df.head())
     print(df.shape)

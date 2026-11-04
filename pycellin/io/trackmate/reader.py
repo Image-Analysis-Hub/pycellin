@@ -1263,9 +1263,10 @@ def _add_missing_position_t(
     )
 
 
-def load_TrackMate_XML(
-    xml_path: str | Path,
-    ref_time_prop: str = "POSITION_T",
+def read_trackmate_xml(
+    path: str | Path,
+    *,
+    reference_time_prop: str = "POSITION_T",
     lone_spots: LoneSpotsOption = "none",
     tracks: TracksOption = "visible",
 ) -> Model:
@@ -1282,9 +1283,9 @@ def load_TrackMate_XML(
 
     Parameters
     ----------
-    xml_path : str | Path
+    path : str | Path
         Path of the XML file to process.
-    ref_time_prop : str, optional
+    reference_time_prop : str, optional
         Name of the property that contains the time information of the model.
         "POSITION_T" by default as it is what TrackMate uses. TrackMate doesn't
         require it, so if no spot has it, it is computed from "FRAME" and the frame
@@ -1317,26 +1318,26 @@ def load_TrackMate_XML(
         )
     if not check_literal_type(tracks, TracksOption):
         raise ValueError(f"'tracks' must be 'visible' or 'all', not {tracks!r}.")
-    units, props_md, data = _parse_model_tag(xml_path, lone_spots, tracks)
+    units, props_md, data = _parse_model_tag(path, lone_spots, tracks)
 
     # Add in the metadata all the TrackMate info that was not in the
     # TrackMate XML `Model` tag.
     dict_tags = _get_specific_tags(
-        xml_path, ["Log", "Settings", "GUIState", "DisplaySettings"]
+        path, ["Log", "Settings", "GUIState", "DisplaySettings"]
     )
     pixel_size = _get_pixel_size(dict_tags["Settings"])
     time_step: int | float
-    if ref_time_prop == "FRAME":
+    if reference_time_prop == "FRAME":
         # Frames are counted one by one, whatever the frame interval of the image.
         time_unit = "frame"
         time_step = 1
     else:
         time_unit = units["timeunits"]
         time_step = _get_time_step(dict_tags["Settings"])  # the frame interval
-        if ref_time_prop == "POSITION_T":
+        if reference_time_prop == "POSITION_T":
             _add_missing_position_t(data, props_md, time_step, time_unit)
     metadata: dict[str, Any] = {}
-    metadata["reference_time_property"] = ref_time_prop
+    metadata["reference_time_prop"] = reference_time_prop
     # Dimensions info.
     metadata["space_unit"] = units["spatialunits"]
     metadata["time_unit"] = time_unit
@@ -1345,10 +1346,10 @@ def load_TrackMate_XML(
     metadata["pixel_height"] = pixel_size.get("pixel_height")
     metadata["pixel_depth"] = pixel_size.get("pixel_depth")
     # Traceability info.
-    metadata["name"] = Path(xml_path).stem
-    metadata["file_location"] = xml_path
+    metadata["name"] = Path(path).stem
+    metadata["file_location"] = path
     metadata["provenance"] = "TrackMate"
-    metadata["TrackMate_version"] = _get_trackmate_version(xml_path)
+    metadata["TrackMate_version"] = _get_trackmate_version(path)
     # The rest of the tags.
     for tag_name, tag in dict_tags.items():
         element_string = ET.tostring(tag, encoding="utf-8").decode()
@@ -1369,7 +1370,7 @@ if __name__ == "__main__":
         / "sample_data"
         / "Ecoli_growth_on_agar_pad.xml"
     )
-    model = load_TrackMate_XML(
+    model = read_trackmate_xml(
         xml,
         lone_spots="all",
         tracks="all",

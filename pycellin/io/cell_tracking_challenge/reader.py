@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-loader.py
+reader.py
 
 This module is part of the pycellin package.
 
@@ -132,7 +132,7 @@ def _integrate_label_imgs_metadata(
                 f"Ignoring the resolution of label image '{label_img_path}', given in "
                 "inches: it is most likely a print default such as 72 dpi, not a "
                 "pixel size. Give 'space_unit', 'pixel_width' and 'pixel_height' to "
-                "load_CTC_file() to calibrate the cell positions.",
+                "read_ctc() to calibrate the cell positions.",
                 stacklevel=4,
             )
 
@@ -552,8 +552,9 @@ def _integrate_seg_data(
         graph.nodes[node]["cell_contour"] = contour
 
 
-def load_CTC_file(
-    ctc_path: str | Path,
+def read_ctc(
+    path: str | Path,
+    *,
     labels_path: str | Path | None = None,
     space_unit: str | None = None,
     pixel_width: float | None = None,
@@ -567,7 +568,7 @@ def load_CTC_file(
 
     The CTC tracking format does not support fusion events and does not allow
     gaps right after division events.
-    If only 'ctc_path' is given, only track topology is read. To load
+    If only 'path' is given, only track topology is read. To load
     cell positions and contours into the model, 'labels_path' must also be given.
     The label images must be in the same format as the CTC format,
     i.e. a single 2D image per frame with a single label per cell. 3D label
@@ -587,7 +588,7 @@ def load_CTC_file(
 
     Parameters
     ----------
-    ctc_path : str | Path
+    path : str | Path
         The path to the CTC text file that contains the tracking data.
     labels_path : str | Path, optional
         The path to the folder of label images, if any. If not provided, only the
@@ -638,7 +639,7 @@ def load_CTC_file(
 
     graph = nx.DiGraph()
     current_node_id = 0
-    with open(ctc_path) as file:
+    with open(path) as file:
         nodes_from_tracks = []
         # The lines in the file are read sequentially to create the nodes.
         # However, nothing ensures that parent nodes are created before
@@ -655,7 +656,7 @@ def load_CTC_file(
         _merge_tracks(graph, nodes)
 
     md = _create_metadata(
-        ctc_path,
+        path,
         labels_path=labels_path,
         space_unit=space_unit,
         pixel_width=pixel_width,
@@ -703,7 +704,7 @@ def load_CTC_file(
         model_metadata=md,
         props_metadata=props_md,
         data=Data(data),
-        reference_time_property="time",
+        reference_time_prop="time",
     )
     return model
 
@@ -720,7 +721,7 @@ if __name__ == "__main__":
     #     / "sample_data"
     #     / "Ecoli_growth_on_agar_pad_TMtoCTC.txt"
     # )
-    model = load_CTC_file(ctc_file)  # , labels_path)
+    model = read_ctc(ctc_file)  # , labels_path)
 
     print(model)
     print("\nModel metadata:")

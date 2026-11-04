@@ -211,7 +211,7 @@ def model():
     model = Model(
         data=data,
         props_metadata=props_metadata,
-        reference_time_property="timepoint",
+        reference_time_prop="timepoint",
     )
     return model
 
@@ -316,7 +316,7 @@ def model_with_lineage_id_config():
         return Model(
             data=data,
             props_metadata=props_metadata,
-            reference_time_property="timepoint",
+            reference_time_prop="timepoint",
         )
 
     return _create_model
@@ -515,7 +515,7 @@ class TestGetPropsFromData:
     def test_get_props_from_empty_data(self):
         """Test with empty data."""
         data = Data({})
-        model = Model(data=data, reference_time_property="timepoint")
+        model = Model(data=data, reference_time_prop="timepoint")
 
         node_props, edge_props, lineage_props = _get_props_from_data(model)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-loader.py
+reader.py
 
 This module is part of the pycellin package.
 It provides functionality to load a GEFF file into a pycellin model.
@@ -242,9 +242,9 @@ def _identify_time_prop(
     """
     if time_key is not None and not _graph_has_node_prop(geff_graph, time_key):
         logger.warning(
-            f"The property '{time_key}' given as time_prop is not on every node of the "
-            "GEFF graph, so the time property will be inferred from the GEFF metadata "
-            "instead, if possible.",
+            f"The property '{time_key}' given as reference_time_prop is not on every "
+            "node of the GEFF graph, so the time property will be inferred from the "
+            "GEFF metadata instead, if possible.",
             stacklevel=3,
         )
         time_key = None
@@ -991,7 +991,7 @@ def _build_generic_metadata(
         geff_md, time_key, cell_x_key, cell_y_key, cell_z_key
     )
     metadata.update(units_metadata)
-    metadata["reference_time_property"] = time_key
+    metadata["reference_time_prop"] = time_key
 
     return metadata
 
@@ -1381,14 +1381,15 @@ def _standardize_props_metadata(
             )
 
 
-def load_GEFF(
-    geff_file: Path | str,
+def read_geff(
+    path: Path | str,
+    *,
     lineage_id_prop: str | None = None,
     cell_id_prop: str | None = None,
     cell_x_prop: str | None = None,
     cell_y_prop: str | None = None,
     cell_z_prop: str | None = None,
-    time_prop: str | None = None,
+    reference_time_prop: str | None = None,
     structure_validation: bool = True,
 ) -> Model:
     """
@@ -1396,7 +1397,7 @@ def load_GEFF(
 
     Parameters
     ----------
-    geff_file : Path | str
+    path : Path | str
         Path to the GEFF file to load.
     lineage_id_prop: str | None, optional
         Name of the property that identifies lineages in the GEFF file.
@@ -1423,7 +1424,7 @@ def load_GEFF(
         Name of the node property that contains the z-coordinate for 3D data.
         Omit it for 2D data. If all coordinate properties are ``None``, it will
         be inferred from GEFF metadata when available.
-    time_prop : str | None, optional
+    reference_time_prop : str | None, optional
         Name of the property to use as the reference time property.
         If None, it will be inferred from the GEFF metadata. If the property is not
         on every node of the graph, a warning is logged and it is inferred too.
@@ -1433,7 +1434,7 @@ def load_GEFF(
 
     Notes
     -----
-    When coordinate properties are not provided, ``load_GEFF`` infers them from
+    When coordinate properties are not provided, ``read_geff`` infers them from
     the GEFF metadata: first from the display hints, then from the names of the
     space axes ('x', 'y' and 'z' in any case, or names ending with '_x', '_y'
     and '_z', such as 'cell_x' or 'POSITION_X'), and last from the position of
@@ -1470,9 +1471,7 @@ def load_GEFF(
         'geff_lineage_id' property.
     """
     # Read the GEFF file.
-    geff_graph, geff_md = geff.read(
-        geff_file, structure_validation=structure_validation
-    )
+    geff_graph, geff_md = geff.read(path, structure_validation=structure_validation)
     if not geff_md.directed:
         raise ValueError(
             "The GEFF graph is undirected: pycellin does not support undirected graphs."
@@ -1482,14 +1481,14 @@ def load_GEFF(
     lineage_id_prop = _identify_lin_id_prop(
         lineage_id_prop, geff_md.track_node_props, geff_graph
     )
-    time_prop = _identify_time_prop(time_prop, geff_md, geff_graph)
+    reference_time_prop = _identify_time_prop(reference_time_prop, geff_md, geff_graph)
     cell_x_prop, cell_y_prop, cell_z_prop = _identify_space_props(
         cell_x_prop, cell_y_prop, cell_z_prop, geff_md, geff_graph
     )
 
     # Extract and dispatch metadata.
     generic_md = _build_generic_metadata(
-        geff_file, geff_md, time_prop, cell_x_prop, cell_y_prop, cell_z_prop
+        path, geff_md, reference_time_prop, cell_x_prop, cell_y_prop, cell_z_prop
     )
     rename_map: dict[PropertyType, dict[str, str]] = {
         PropertyType.NODE: {},
@@ -1553,11 +1552,11 @@ if __name__ == "__main__":
         / "sample_data"
         / "Ecoli_growth_on_agar_pad.geff"
     )
-    model = load_GEFF(
+    model = read_geff(
         geff_in,
         lineage_id_prop="lineage_id",
         cell_id_prop="cell_id",
-        time_prop="POSITION_T",
+        reference_time_prop="POSITION_T",
     )
 
     print(model)

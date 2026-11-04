@@ -10,11 +10,11 @@ import numpy as np
 import pytest
 import tifffile
 
-from pycellin.io.cell_tracking_challenge.loader import (
+from pycellin.io.cell_tracking_challenge.reader import (
     _extract_seg_data,
     _get_label_img_paths,
     _integrate_label_imgs_metadata,
-    load_CTC_file,
+    read_ctc,
 )
 
 # Fixtures ####################################################################
@@ -251,13 +251,13 @@ class TestExtractSegData:
             _extract_seg_data(str(path))
 
 
-# load_CTC_file ###############################################################
+# read_ctc ###############################################################
 
 
-class TestLoadCTCFile:
+class TestReadCtc:
     def test_labels_give_positions_and_contours(self, ctc_data):
         ctc_path, labels_path = ctc_data
-        model = load_CTC_file(ctc_path, labels_path=labels_path)
+        model = read_ctc(ctc_path, labels_path=labels_path)
 
         cells = _get_cells(model)
         assert (cells[0]["cell_x"], cells[0]["cell_y"]) == pytest.approx((6.0, 2.5))
@@ -270,7 +270,7 @@ class TestLoadCTCFile:
 
     def test_positions_and_contours_in_space_unit(self, ctc_data):
         ctc_path, labels_path = ctc_data
-        model = load_CTC_file(
+        model = read_ctc(
             ctc_path,
             labels_path=labels_path,
             space_unit="um",
@@ -294,7 +294,7 @@ class TestLoadCTCFile:
         _write_label_imgs(
             labels_path, resolution=(2.0, 0.5), resolutionunit="CENTIMETER"
         )
-        model = load_CTC_file(ctc_path, labels_path=labels_path)
+        model = read_ctc(ctc_path, labels_path=labels_path)
 
         assert model.get_space_unit() == "cm"
         assert (model.get_pixel_width(), model.get_pixel_height()) == (0.5, 2.0)
@@ -306,9 +306,9 @@ class TestLoadCTCFile:
         ctc_path, labels_path = ctc_data
         _write_label_imgs(labels_path, resolution=(72.0, 72.0), resolutionunit="INCH")
         with pytest.warns(UserWarning, match="given in inches") as record:
-            model = load_CTC_file(ctc_path, labels_path=labels_path)
+            model = read_ctc(ctc_path, labels_path=labels_path)
 
-        # The warning points to the call of load_CTC_file().
+        # The warning points to the call of read_ctc().
         assert Path(record[0].filename).samefile(__file__)
         assert model.get_space_unit() == "pixel"
         cells = _get_cells(model)
@@ -325,14 +325,14 @@ class TestLoadCTCFile:
             photometric="minisblack",
         )
         with pytest.raises(ValueError, match="only 2D label images, one per frame"):
-            load_CTC_file(ctc_path, labels_path=labels_path)
+            read_ctc(ctc_path, labels_path=labels_path)
 
     def test_labels_path_not_a_folder_raises(self, ctc_data):
         # The folder is checked even when the label images are not read for the
         # space unit and pixel sizes, since they are given.
         ctc_path, labels_path = ctc_data
         with pytest.raises(ValueError, match="is not a folder"):
-            load_CTC_file(
+            read_ctc(
                 ctc_path,
                 labels_path=labels_path / "mask000.tif",
                 space_unit="um",
@@ -347,4 +347,4 @@ class TestLoadCTCFile:
         img[0, 0] = 9
         tifffile.imwrite(labels_path / "mask001.tif", img)
         with pytest.raises(ValueError, match="Label 9 not found"):
-            load_CTC_file(ctc_path, labels_path=labels_path)
+            read_ctc(ctc_path, labels_path=labels_path)

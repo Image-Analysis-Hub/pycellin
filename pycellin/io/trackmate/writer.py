@@ -1375,42 +1375,45 @@ def _write_metadata_tag(
         xf.write(ET.Element(tag))
 
 
-def _ask_units(
-    props_md: PropsMetadata,
-) -> dict[str, str]:
+def _get_trackmate_unit(
+    unit: str | None, model_unit: str | None, dimension: str, default: str
+) -> str:
     """
-    Ask the user to check units consistency and to give unique spatio-temporal units.
+    Return the unit to write in the TrackMate file for one dimension.
 
     Parameters
     ----------
-    props_md : PropsMetadata
-        Metadata of the properties. It contains the unit of each property.
+    unit : str | None
+        Unit given by the user, used if not None.
+    model_unit : str | None
+        Unit of the model, used if `unit` is None.
+    dimension : str
+        "space" or "time", for the warning.
+    default : str
+        Unit used, with a warning, if neither `unit` nor `model_unit` is given.
 
     Returns
     -------
-    dict[str, str]
-        Dictionary containing the spatial and temporal units of the properties.
+    str
+        The unit to write.
     """
-    print(
-        "TrackMate requires a unique spatial unit, and a unique temporal unit. "
-        "Please check below that your spatial and temporal units are the same "
-        "across all properties. If not, convert your properties to the same unit "
-        "before reattempting to export to TrackMate format."
+    if unit is not None:
+        return unit
+    if model_unit:
+        return model_unit
+    logger.warning(
+        f"The model has no {dimension} unit: writing '{default}' as the TrackMate "
+        f"{dimension} unit. Give `{dimension}_unit` to choose it."
     )
-    model_units = props_md._get_units_per_props()
-    for unit, props in model_units.items():
-        print(f"{unit}: {props}")
-    trackmate_units = {}
-    trackmate_units["space"] = input("Please type the spatial unit: ")
-    trackmate_units["time"] = input("Please type the temporal unit: ")
-    logger.info(f"Using the following units for TrackMate export: {trackmate_units}")
-    return trackmate_units
+    return default
 
 
-def export_TrackMate_XML(
+def write_trackmate_xml(
     model: Model,
-    xml_path: str | Path,
-    units: dict[str, str] | None = None,
+    path: str | Path,
+    *,
+    space_unit: str | None = None,
+    time_unit: str | None = None,
     img_path: str | Path | None = None,
     img_path_field: str | None = None,
     img_shape: tuple[int, int, int, int, int] | None = None,
@@ -1424,13 +1427,14 @@ def export_TrackMate_XML(
     ----------
     model : Model
         pycellin model containing the data to write.
-    xml_path : str | Path
+    path : str | Path
         Path of the XML file to write.
-    units : dict[str, str], optional
-        Dictionary containing the spatial and temporal units of the model.
-        If not specified, the user will be asked to provide them. Format is:
-        {"space": "your_unit", "time": "your_unit"}, e.g.
-        {"space": "pixel", "time": "sec"}.
+    space_unit : str, optional
+        Spatial unit of the TrackMate model, e.g. "µm". Defaults to the space unit
+        of the model, or "pixel", with a warning, if the model has none.
+    time_unit : str, optional
+        Temporal unit of the TrackMate model, e.g. "min". Defaults to the time unit
+        of the model, or "frame", with a warning, if the model has none.
     img_path : str | Path | None, optional
         Path to the image file associated with the model. Default is None.
         If provided, will be used instead of `img_path_field`.
@@ -1478,6 +1482,11 @@ def export_TrackMate_XML(
 
     Notes
     -----
+    TrackMate has a single spatial unit and a single temporal unit for all its
+    features, while each pycellin property has its own unit. The values are written
+    as they are, without conversion: check that the units of the properties match
+    `space_unit` and `time_unit`, e.g. with `model.get_units_per_properties()`.
+
     TrackMate only supports numeric features. Non-numeric properties (strings,
     lists, polygons...) are not exported, except TrackMate's own properties and
     'name'. Boolean properties are exported as integers (1 for True, 0 for False).
@@ -1490,9 +1499,14 @@ def export_TrackMate_XML(
     # We don't want to modify the original model.
     model_copy = copy.deepcopy(model)
 
-    if not units:
-        units = _ask_units(model_copy.props_metadata)
-    tm_units = {"spatialunits": units["space"], "timeunits": units["time"]}
+    tm_units = {
+        "spatialunits": _get_trackmate_unit(
+            space_unit, model_copy.get_space_unit(), "space", "pixel"
+        ),
+        "timeunits": _get_trackmate_unit(
+            time_unit, model_copy.get_time_unit(), "time", "frame"
+        ),
+    }
     if hasattr(model_copy.model_metadata, "TrackMate_version"):
         tm_version = model_copy.model_metadata.TrackMate_version
     else:
@@ -1501,7 +1515,7 @@ def export_TrackMate_XML(
     _prepare_model_for_export(model_copy, propagate_cycle_props)
     exported_keys = _get_exported_keys(model_copy)
 
-    with ET.xmlfile(xml_path, encoding="utf-8", close=True) as xf:
+    with ET.xmlfile(path, encoding="utf-8", close=True) as xf:
         xf.write_declaration()
         with xf.element("TrackMate", {"version": tm_version}):
             xf.write("\n  ")
@@ -1538,18 +1552,18 @@ if __name__ == "__main__":
     """
     import tempfile
 
-    from pycellin.io.geff.loader import load_GEFF
+    from pycellin.io.geff.reader import read_geff
 
     geff_in = (
         Path(__file__).resolve().parents[3]
         / "sample_data"
         / "Ecoli_growth_on_agar_pad.geff"
     )
-    model = load_GEFF(
+    model = read_geff(
         geff_in,
         lineage_id_prop="lineage_id",
         cell_id_prop="cell_id",
-        time_prop="POSITION_T",
+        reference_time_prop="POSITION_T",
     )
 
     print(model)
@@ -1558,11 +1572,4 @@ if __name__ == "__main__":
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         xml_out = Path(tmp_dir) / "output.xml"
-        export_TrackMate_XML(
-            model,
-            xml_out,
-            units={
-                "space": model.get_space_unit() or "pixel",
-                "time": model.get_time_unit() or "frame",
-            },
-        )
+        write_trackmate_xml(model, xml_out)

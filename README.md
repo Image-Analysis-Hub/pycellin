@@ -70,7 +70,7 @@ import pycellin as pc
 
 # Import data from an external tool, here TrackMate.
 xml_path = "sample_data/Ecoli_growth_on_agar_pad.xml"
-model = pc.load_TrackMate_XML(xml_path)
+model = pc.read_trackmate_xml(xml_path)
 
 # Plot the cell lineages.
 for lin in model.get_cell_lineages():
@@ -103,18 +103,14 @@ cycle_df = model.to_cycle_dataframe()
 lineage_df = model.to_lineage_dataframe()
 
 # ... or export back to TrackMate...
-pc.export_TrackMate_XML(
+pc.write_trackmate_xml(
     model,
     "sample_data/Ecoli_growth_on_agar_pad_enriched.xml",
-    units={
-        "space": model.get_space_unit(),
-        "time": model.get_time_unit(),
-    },
     propagate_cycle_props=True,
 )
 
 # ... or to another file format.
-pc.export_GEFF(
+pc.write_geff(
     model,
     "sample_data/Ecoli_growth_on_agar_pad_enriched.geff",
     time_axes=["POSITION_T"],

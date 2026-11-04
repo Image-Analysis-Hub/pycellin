@@ -1661,11 +1661,11 @@ if __name__ == "__main__":
 
     from shapely.geometry import Polygon
 
-    from pycellin.io.trackmate import load_TrackMate_XML
+    from pycellin.io.trackmate import read_trackmate_xml
 
     xml = "sample_data/FakeTracks.xml"
 
-    model = load_TrackMate_XML(xml, lone_spots="all", tracks="all")
+    model = read_trackmate_xml(xml, lone_spots="all", tracks="all")
     lineage = model.data.cell_data[0]
     # print(lineage.nodes[2004]["cell_contour"])
     node = 2035

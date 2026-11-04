@@ -12,7 +12,7 @@ import networkx as nx
 import pytest
 from lxml import etree as ET
 
-import pycellin.io.trackmate.loader as tml
+import pycellin.io.trackmate.reader as tml
 from pycellin.classes import CellLineage, Data, Property, PropsMetadata
 from pycellin.custom_types import PropertyType
 from pycellin.utils import is_equal
@@ -566,7 +566,7 @@ def test_convert_attributes_undeclared_attribute(caplog):
     attributes = {"prop_float": "30", "prop_int": "20"}
     undeclared = {}
 
-    with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.loader"):
+    with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.reader"):
         tml._convert_attributes(attributes, props, "node", undeclared)
 
     assert attributes == {"prop_float": 30.0, "prop_int": "20"}
@@ -608,7 +608,7 @@ def test_declare_undeclared_attributes(caplog):
     undeclared = {"node": {"count", "label"}, "edge": {"weight"}, "lineage": {"score"}}
     props_md = PropsMetadata()
 
-    with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.loader"):
+    with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.reader"):
         tml._declare_undeclared_attributes(
             undeclared, graph, tracks_attributes, props_md
         )
@@ -656,7 +656,7 @@ def test_declare_undeclared_attributes_of_filtered_track_ignored(caplog):
     tracks_attributes = [{"TRACK_ID": 0}, {"TRACK_ID": 1, "extra": "1"}]
     props_md = PropsMetadata()
 
-    with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.loader"):
+    with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.reader"):
         tml._declare_undeclared_attributes(
             {"lineage": {"extra"}}, graph, tracks_attributes, props_md
         )
@@ -1571,7 +1571,7 @@ class TestAddMissingPositionT:
         lin = CellLineage()
         lin.add_node(1, FRAME=0)
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.loader"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.reader"):
             tml._add_missing_position_t(Data({0: lin}), PropsMetadata(), 2.5, "min")
 
         assert len(caplog.records) == 1
@@ -1585,7 +1585,7 @@ class TestAddMissingPositionT:
         lin.add_node(2, FRAME=3, POSITION_T=9.0)
         props_md = PropsMetadata()
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.loader"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.reader"):
             tml._add_missing_position_t(Data({0: lin}), props_md, 2.5, "min")
 
         assert lin.nodes[2]["POSITION_T"] == 9.0
@@ -1593,11 +1593,11 @@ class TestAddMissingPositionT:
         assert not caplog.records
 
 
-# load_TrackMate_XML ##########################################################
+# read_trackmate_xml ##########################################################
 
 
-class TestLoadTrackMateXML:
-    """Test cases for load_TrackMate_XML function."""
+class TestReadTrackmateXml:
+    """Test cases for read_trackmate_xml function."""
 
     @staticmethod
     def _get_cells(model):
@@ -1612,9 +1612,9 @@ class TestLoadTrackMateXML:
         self, celegans_xml_path, celegans_without_position_t
     ):
         """Test that a file without POSITION_T gives the same times as with it."""
-        expected = self._get_cells(tml.load_TrackMate_XML(celegans_xml_path))
+        expected = self._get_cells(tml.read_trackmate_xml(celegans_xml_path))
 
-        model = tml.load_TrackMate_XML(celegans_without_position_t)
+        model = tml.read_trackmate_xml(celegans_without_position_t)
 
         obtained = self._get_cells(model)
         assert obtained.keys() == expected.keys()
@@ -1624,11 +1624,11 @@ class TestLoadTrackMateXML:
         assert model.model_metadata.time_step == 2.0
         assert model.get_property("POSITION_T").unit == "min"
 
-    def test_frame_as_reference_time_property(self, celegans_xml_path):
+    def test_frame_as_reference_time_prop(self, celegans_xml_path):
         """Test that FRAME counts the time in frames, whatever the frame interval."""
-        expected = self._get_cells(tml.load_TrackMate_XML(celegans_xml_path))
+        expected = self._get_cells(tml.read_trackmate_xml(celegans_xml_path))
 
-        model = tml.load_TrackMate_XML(celegans_xml_path, ref_time_prop="FRAME")
+        model = tml.read_trackmate_xml(celegans_xml_path, reference_time_prop="FRAME")
 
         assert model.model_metadata.time_step == 1
         assert model.model_metadata.time_unit == "frame"
@@ -1647,7 +1647,7 @@ class TestLoadTrackMateXML:
         xml_path = tmp_path / "Celegans_without_timeinterval.xml"
         tree.write(str(xml_path), xml_declaration=True, encoding="UTF-8")
 
-        model = tml.load_TrackMate_XML(xml_path, ref_time_prop="FRAME")
+        model = tml.read_trackmate_xml(xml_path, reference_time_prop="FRAME")
 
         assert model.model_metadata.time_step == 1
 
@@ -1665,4 +1665,4 @@ class TestLoadTrackMateXML:
     ):
         """Test that a value that isn't an option of lone_spots or tracks raises."""
         with pytest.raises(ValueError, match=f"'{option}' must be"):
-            tml.load_TrackMate_XML(celegans_xml_path, **{option: value})
+            tml.read_trackmate_xml(celegans_xml_path, **{option: value})

@@ -11,15 +11,15 @@ from lxml import etree as ET
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.classes.exceptions import UpdateRequiredError
-from pycellin.io.trackmate.exporter import (
+from pycellin.io.trackmate.writer import (
     _relabel_nodes,
     _remove_non_numeric_props,
     _transform_name,
     _value_to_str,
     _write_FeatureDeclarations,
-    export_TrackMate_XML,
+    write_trackmate_xml,
 )
-from pycellin.io.trackmate.loader import load_TrackMate_XML
+from pycellin.io.trackmate.reader import read_trackmate_xml
 from pycellin.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
@@ -51,7 +51,7 @@ def simple_model():
     model = Model(
         data=data,
         props_metadata=props_metadata,
-        reference_time_property="timepoint",
+        reference_time_prop="timepoint",
     )
     return model
 
@@ -329,7 +329,7 @@ class TestRemoveNonNumericProps:
         simple_model.props_metadata._add_prop(string_prop)
         simple_model.props_metadata._add_prop(list_prop)
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.exporter"):
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"):
             _remove_non_numeric_props(simple_model)
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
@@ -521,18 +521,18 @@ class TestWriteFeatureDeclarations:
         assert "cycle_duration" not in features["SpotFeatures"]
 
 
-class TestExportTrackMateXML:
-    """Test cases for export_TrackMate_XML function."""
+class TestWriteTrackmateXml:
+    """Test cases for write_trackmate_xml function."""
 
     def test_cycle_data_can_be_computed_after_reload(
         self, tmp_path, model_with_cycle_data
     ):
         """Test that cycle properties can be computed again on the reloaded model."""
         xml_path = tmp_path / "model.xml"
-        export_TrackMate_XML(
-            model_with_cycle_data, xml_path, units={"space": "pixel", "time": "frame"}
+        write_trackmate_xml(
+            model_with_cycle_data, xml_path, space_unit="pixel", time_unit="frame"
         )
-        model = load_TrackMate_XML(xml_path)
+        model = read_trackmate_xml(xml_path)
 
         model.add_cycle_data()
         model.add_mother_cycle()
@@ -548,13 +548,14 @@ class TestExportTrackMateXML:
     ):
         """Test that cycle properties propagated in the file must be removed first."""
         xml_path = tmp_path / "model.xml"
-        export_TrackMate_XML(
+        write_trackmate_xml(
             model_with_cycle_data,
             xml_path,
-            units={"space": "pixel", "time": "frame"},
+            space_unit="pixel",
+            time_unit="frame",
             propagate_cycle_props=True,
         )
-        model = load_TrackMate_XML(xml_path)
+        model = read_trackmate_xml(xml_path)
         with pytest.raises(ValueError, match="remove them first"):
             model.add_cycle_data()
 
@@ -575,10 +576,11 @@ class TestExportTrackMateXML:
         """Test that a model requiring an update is not exported."""
         simple_model.prepare_full_data_update()
         with pytest.raises(UpdateRequiredError, match="before exporting"):
-            export_TrackMate_XML(
+            write_trackmate_xml(
                 simple_model,
                 tmp_path / "model.xml",
-                units={"space": "pixel", "time": "frame"},
+                space_unit="pixel",
+                time_unit="frame",
             )
         assert not (tmp_path / "model.xml").exists()
 
@@ -613,10 +615,10 @@ class TestExportTrackMateXML:
         )
         simple_model.update()
         xml_path = tmp_path / "model.xml"
-        export_TrackMate_XML(
-            simple_model, xml_path, units={"space": "pixel", "time": "frame"}
+        write_trackmate_xml(
+            simple_model, xml_path, space_unit="pixel", time_unit="frame"
         )
-        model = load_TrackMate_XML(xml_path, tracks="all")
+        model = read_trackmate_xml(xml_path, tracks="all")
         assert model.data.cell_data[0].graph["FilteredTrack"] is False
         assert model.data.cell_data[lid].graph["FilteredTrack"] is True
 
@@ -625,11 +627,11 @@ class TestExportTrackMateXML:
     ):
         """Test that cells without contour, loaded back with a None contour, can be
         exported again."""
-        units = {"space": "pixel", "time": "frame"}
-        export_TrackMate_XML(simple_model, tmp_path / "first.xml", units=units)
-        model = load_TrackMate_XML(tmp_path / "first.xml")
-        export_TrackMate_XML(model, tmp_path / "second.xml", units=units)
-        reloaded = load_TrackMate_XML(tmp_path / "second.xml")
+        units = {"space_unit": "pixel", "time_unit": "frame"}
+        write_trackmate_xml(simple_model, tmp_path / "first.xml", **units)
+        model = read_trackmate_xml(tmp_path / "first.xml")
+        write_trackmate_xml(model, tmp_path / "second.xml", **units)
+        reloaded = read_trackmate_xml(tmp_path / "second.xml")
         contours = dict(reloaded.data.cell_data[0].nodes(data="cell_contour"))
         assert contours == {1: None, 2: None}
 
@@ -643,9 +645,9 @@ class TestExportTrackMateXML:
         lin.graph["lineage_note"] = 2
         xml_path = tmp_path / "model.xml"
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.exporter"):
-            export_TrackMate_XML(
-                simple_model, xml_path, units={"space": "pixel", "time": "frame"}
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"):
+            write_trackmate_xml(
+                simple_model, xml_path, space_unit="pixel", time_unit="frame"
             )
 
         tree = ET.parse(str(xml_path))
@@ -662,7 +664,7 @@ class TestExportTrackMateXML:
         assert "'note' (cells)" in messages[0]
         assert "'link_note' (links)" in messages[0]
         assert "'lineage_note' (lineages)" in messages[0]
-        model = load_TrackMate_XML(xml_path)
+        model = read_trackmate_xml(xml_path)
         assert model.get_property("note") is None
 
     def test_declared_attributes_exported_without_warning(
@@ -672,9 +674,9 @@ class TestExportTrackMateXML:
         without warning about undeclared attributes."""
         xml_path = tmp_path / "model.xml"
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.exporter"):
-            export_TrackMate_XML(
-                simple_model, xml_path, units={"space": "pixel", "time": "frame"}
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"):
+            write_trackmate_xml(
+                simple_model, xml_path, space_unit="pixel", time_unit="frame"
             )
 
         assert not any("no property declaration" in r.message for r in caplog.records)
@@ -685,8 +687,8 @@ class TestExportTrackMateXML:
     def test_cells_without_visibility_exported_as_visible(self, tmp_path, simple_model):
         """Test that cells without VISIBILITY, e.g. not from TrackMate, are visible."""
         xml_path = tmp_path / "model.xml"
-        export_TrackMate_XML(
-            simple_model, xml_path, units={"space": "pixel", "time": "frame"}
+        write_trackmate_xml(
+            simple_model, xml_path, space_unit="pixel", time_unit="frame"
         )
         spots = ET.parse(str(xml_path)).iter("Spot")
         assert [float(spot.get("VISIBILITY")) for spot in spots] == [1.0, 1.0]
@@ -695,10 +697,10 @@ class TestExportTrackMateXML:
         """Test that a spot hidden by the spot filters of TrackMate is exported with
         its VISIBILITY of 0, so that it stays hidden."""
         xml_in = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
-        model = load_TrackMate_XML(xml_in, lone_spots="all", tracks="all")
+        model = read_trackmate_xml(xml_in, lone_spots="all", tracks="all")
         xml_path = tmp_path / "model.xml"
-        export_TrackMate_XML(
-            model, xml_path, units={"space": "micrometer", "time": "second"}
+        write_trackmate_xml(
+            model, xml_path, space_unit="micrometer", time_unit="second"
         )
         visibilities = [
             float(spot.get("VISIBILITY"))
@@ -706,3 +708,50 @@ class TestExportTrackMateXML:
         ]
         assert visibilities.count(0.0) == 1
         assert visibilities.count(1.0) == 106
+
+
+class TestWriteTrackmateXmlUnits:
+    """Test cases for the units written by write_trackmate_xml function."""
+
+    @staticmethod
+    def _read_units(xml_path: Path) -> tuple[str, str]:
+        model_tag = next(ET.parse(str(xml_path)).iter("Model"))
+        return model_tag.get("spatialunits"), model_tag.get("timeunits")
+
+    def test_model_units_by_default(self, tmp_path, simple_model):
+        """Test that the units of the model are written when none are given."""
+        simple_model.model_metadata.space_unit = "micrometer"
+        simple_model.model_metadata.time_unit = "minute"
+        xml_path = tmp_path / "model.xml"
+        write_trackmate_xml(simple_model, xml_path)
+        assert self._read_units(xml_path) == ("micrometer", "minute")
+
+    def test_given_units_written(self, tmp_path, simple_model):
+        """Test that the given units are written instead of those of the model."""
+        simple_model.model_metadata.space_unit = "micrometer"
+        simple_model.model_metadata.time_unit = "minute"
+        xml_path = tmp_path / "model.xml"
+        write_trackmate_xml(simple_model, xml_path, space_unit="pixel", time_unit="sec")
+        assert self._read_units(xml_path) == ("pixel", "sec")
+
+    def test_model_without_units_written_in_pixels_and_frames(
+        self, tmp_path, simple_model, caplog, monkeypatch
+    ):
+        """Test that a model without units is written in pixels and frames, with a
+        warning for each unit, without asking for them."""
+        monkeypatch.setattr("builtins.input", lambda *args: pytest.fail("input()"))
+        xml_path = tmp_path / "model.xml"
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"):
+            write_trackmate_xml(simple_model, xml_path)
+        assert self._read_units(xml_path) == ("pixel", "frame")
+        messages = [record.message for record in caplog.records]
+        assert any("no space unit" in m and "`space_unit`" in m for m in messages)
+        assert any("no time unit" in m and "`time_unit`" in m for m in messages)
+
+    def test_units_by_position_raise(self, tmp_path, simple_model):
+        """Test that options passed by position, like the units dict of pycellin
+        0.5.1, raise instead of landing in another argument."""
+        xml_path = tmp_path / "model.xml"
+        with pytest.raises(TypeError):
+            write_trackmate_xml(simple_model, xml_path, {"space": "pixel", "time": "s"})
+        assert not xml_path.exists()

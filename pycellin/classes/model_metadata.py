@@ -43,17 +43,17 @@ class ModelMetadata:
 
     Parameters
     ----------
-    reference_time_property : str
+    reference_time_prop : str
         Name of the property used as the reference for time measurements.
         Common choices are "frame" for frame number or "time" for actual time.
         By default, all time-related operations will use this property so it must
         be present across all cells.
     time_step : int | float | None
         Time interval between consecutive time points in time_unit.
-        If None, will be set depending on reference_time_property and props_metadata.
+        If None, will be set depending on reference_time_prop and props_metadata.
     time_unit : str | None
         Unit of time measurements (e.g., 's', 'min', 'h', 'frames').
-        If None, will be set depending on reference_time_property and props_metadata.
+        If None, will be set depending on reference_time_prop and props_metadata.
     pixel_width : float | None
         Physical size of a pixel in the x-dimension, in space_unit.
     pixel_height : float | None
@@ -78,7 +78,7 @@ class ModelMetadata:
     Create basic metadata:
 
     >>> metadata = ModelMetadata(
-    ...     reference_time_property="time",
+    ...     reference_time_prop="time",
     ...     time_unit="seconds",
     ...     time_step=30.0,
     ...     space_unit="μm",
@@ -100,7 +100,7 @@ class ModelMetadata:
     """
 
     # Mandatory field.
-    reference_time_property: str
+    reference_time_prop: str
 
     # Semi-required fields, used to define the model's spatial and temporal context.
     time_step: int | float | None = None
@@ -125,14 +125,14 @@ class ModelMetadata:
 
         Handles any additional metadata validation.
         """
-        # reference_time_property validation.
-        if not isinstance(self.reference_time_property, str):
+        # reference_time_prop validation.
+        if not isinstance(self.reference_time_prop, str):
             raise TypeError(
-                f"reference_time_property must be a string, got "
-                f"{type(self.reference_time_property).__name__}"
+                f"reference_time_prop must be a string, got "
+                f"{type(self.reference_time_prop).__name__}"
             )
-        if not self.reference_time_property:
-            raise ValueError("reference_time_property cannot be an empty string.")
+        if not self.reference_time_prop:
+            raise ValueError("reference_time_prop cannot be an empty string.")
 
         # Validate that pixel dimensions are positive, if provided.
         if self.pixel_width is not None and self.pixel_width <= 0:

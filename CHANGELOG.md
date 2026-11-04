@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 0b27581, plus the uncommitted pandas fix (`inplace` arguments removed, trackpy exporter tests) and trackpy export warning fix (no update() without divisions). Update from there with: git log 0b27581..dev -->
+<!-- Planned v0.6.0. Covers commits up to 4828eb6, plus the uncommitted rename pass 3 (IO: read_*/write_*/from_*/to_* functions and their modules, `path`, keyword-only options, `reference_time_prop`, TrackMate writer units, pickles). Update from there with: git log 4828eb6..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -16,12 +16,20 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
   - `Model` methods: `get_cell_lineage_from_ID()` → `get_cell_lineage_from_id()`, and likewise `get_cycle_lineage_from_ID()`, `get_cell_lineage_IDs()`, `get_lineage_IDs()`, `get_cycle_lineage_IDs()` and `get_next_available_lineage_ID()`
   - the `ID_prop` argument of `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()` → `id_prop`
   - the fields of the `Cell` and `Link` named tuples (e.g. returned by `get_divisions()`), and the `node_ID`, `lineage_ID`, `source_lineage_ID` and `target_lineage_ID` arguments and attributes of exceptions
-  - models pickled with an earlier version keep the old names
 - **Naming:** arguments that abbreviated an ID are spelled out. Only calls that pass them by name break:
   - `lid` → `lineage_id` (e.g. in `remove_lineage()` and `CellLineage()`), `lids` → `lineage_ids` (`get_divisions()`, `get_fusions()` and the `to_*_dataframe()` methods), `new_lid` → `new_lineage_id`, and `source_lid` and `target_lid` → `source_lineage_id` and `target_lineage_id`
   - `cid` → `cell_id`, `cids` → `cell_ids`, and `source_cid` and `target_cid` → `source_cell_id` and `target_cell_id`. In `CycleLineage.get_links_within_cycle()` and `yield_links_within_cycle()`, `ccid` → `cycle_id`
   - `nid` → `node_id`, e.g. in `is_root()`, `is_leaf()`, `get_descendants()` and the `compute()` method of calculators, and → `cell_id` in `Data.get_closest_cell()` and `get_closest_cells()`. `get_ancestors()` takes `node_id` in cell and cycle lineages too (`cid` and `ccid` before), so it is called the same way on both. Custom calculators can keep `nid` in their `compute()` method, since pycellin passes the node ID by position
   - the `source_nid` and `target_nid` arguments and attributes of `TimeFlowError` → `source_node_id` and `target_node_id`
+- **Naming:** the reading and writing functions follow PEP 8, with one verb pair: `read_*()` and `write_*()` for files, `from_*()` and `to_*()` for DataFrames:
+  - `load_TrackMate_XML()` → `read_trackmate_xml()` and `export_TrackMate_XML()` → `write_trackmate_xml()`
+  - `load_GEFF()` → `read_geff()` and `export_GEFF()` → `write_geff()`
+  - `load_CTC_file()` → `read_ctc()` and `export_CTC_file()` → `write_ctc()`
+  - `load_trackpy_dataframe()` → `from_trackpy()` and `export_trackpy_dataframe()` → `to_trackpy()`
+  - `Model.load_from_pickle(path)` → `read_pickle(path)` and `model.save_to_pickle(path)` → `write_pickle(model, path)`
+  - their modules are renamed alike, `loader` → `reader` and `exporter` → `writer` (e.g. `pycellin.io.geff.reader`), and the pickle functions are in `pycellin.io.pickle`
+  - their file argument is `path` (`xml_path`, `geff_file`, `geff_out`, `ctc_path` and `ctc_file_out` before). Only the file or the DataFrame, and the model for the writers, can be given by position: the other arguments are keyword-only, e.g. `read_ctc(path, labels_path=...)`
+- **Naming:** `reference_time_property` → `reference_time_prop`, since it holds the identifier of the property, like the other `*_prop` arguments: the `Model` attribute and argument, `set_reference_time_property()` → `set_reference_time_prop()`, the `ModelMetadata` field, and the argument and attribute (`ref_time_prop`) of the `Timepoint` calculator. The readers take it too: `read_geff(reference_time_prop=...)` (`time_prop` in 0.5.1)
 - **Properties:** `pycellin.graph.properties` moved to `pycellin.properties`. The `pycellin.graph` package no longer exists
 - **Properties:** rename the `branch_*` properties to `cycle_*`, along with their `add_*()` methods, factories and calculators:
   - `branch_total_displacement` → `cycle_total_displacement`
@@ -34,21 +42,22 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
   - `level` → `generation` (`create_generation_property()`): the root cell cycle is still generation 0. Cycle lineage plots use it on the y-axis by default, and `to_cycle_dataframe()` sorts by it
   - `division_time` → `interdivision_time` (`add_interdivision_time()`, `InterdivisionTime`, `create_interdivision_time_property()`): it's the time between two successive divisions, not the time of a division
   - `cycle_completeness` → `is_complete_cycle` (`add_is_complete_cycle()`, `IsCompleteCycle`, `create_is_complete_cycle_property()`): it's a boolean, named like `is_division`
-  - models pickled with an earlier version keep the old names
 - **Properties:** `cycle_duration` values change: it is now the time elapsed between the first and last cells of the cycle, in the reference time unit. It was previously off by one frame and scaled by the time step a second time
 - **Properties:** `cycle_total_displacement` is NaN instead of 0 for cell cycles without links, such as a cycle of a single cell
 - **Properties:** rename the `custom_time_property` argument of `add_absolute_age()`, `add_cell_speed()`, `add_division_rate()`, `add_division_time()` (now `add_interdivision_time()`) and `add_relative_age()` to `time_prop`. Their calculators' `time_prop_name` argument is renamed to `time_prop` too, and the `use_div_time` argument of the `DivisionRate` calculator is removed
 - **Properties:** `add_cycle_mean_displacement()`, `add_cycle_total_displacement()` and `add_cycle_mean_speed()` raise `MissingPropertyError` when the property they're computed from (`cell_displacement` or `cell_speed`) isn't declared yet: add it first. `add_cycle_mean_speed()` now takes `speed_prop` as first argument, so pass `include_incoming_edge` by keyword
 - **Properties:** `Property` setters raise `TypeError` instead of `ValueError` when given a non-string value
-- **Model:** remove the `Model.recompute_property()` and `Model.export()` stubs, which did nothing. Use the `pycellin.export_*()` functions
+- **Model:** remove the `Model.recompute_property()` and `Model.export()` stubs, which did nothing. Use the `pycellin.write_*()` functions
 - **Model:** `add_cell()`, `remove_cell()`, `add_link()`, `remove_link()` and `split_lineage_from_cell()` take the lineage IDs, and the arguments after them, by keyword only, e.g. `model.remove_cell(5, lineage_id=0)`. Cell and lineage IDs are both integers, and these methods took them in different orders (`add_cell(lid, cid)` but `remove_cell(cid, lid)`), so a call written by analogy silently acted on another cell. `add_link()` now takes the two cell IDs first: `add_link(source_cell_id, target_cell_id, source_lineage_id=...)`. Calls written the old way fail with `TypeError`
 - **Lineages:** rename `CellLineage.get_sister_cells()` to `get_sisters()`, which also works on cycle lineages, where it returns the sister cell cycles
 - **Plotting:** rename `node_color_scale` to `node_colormap` in `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()`
-- **TrackMate:** `load_TrackMate_XML()` takes `lone_spots` and `tracks` instead of `keep_all_spots` and `keep_all_tracks`, which name what it loads in TrackMate's terms: `lone_spots` is `"none"` (default), `"visible"` or `"all"` for the spots outside tracks, and `tracks` is `"visible"` (default) or `"all"`. Visible spots and tracks passed the spot and track filters of TrackMate (`VISIBILITY` of 1, listed in `FilteredTracks`). Replace `keep_all_spots=True` with `lone_spots="all"`, and `keep_all_tracks=True` with `tracks="all"`. `lone_spots="visible"` is new: it adds the spots outside tracks that TrackMate shows, without those its spot filters hid
+- **TrackMate:** `read_trackmate_xml()` takes `lone_spots` and `tracks` instead of `keep_all_spots` and `keep_all_tracks`, which name what it loads in TrackMate's terms: `lone_spots` is `"none"` (default), `"visible"` or `"all"` for the spots outside tracks, and `tracks` is `"visible"` (default) or `"all"`. Visible spots and tracks passed the spot and track filters of TrackMate (`VISIBILITY` of 1, listed in `FilteredTracks`). Replace `keep_all_spots=True` with `lone_spots="all"`, and `keep_all_tracks=True` with `tracks="all"`. `lone_spots="visible"` is new: it adds the spots outside tracks that TrackMate shows, without those its spot filters hid
+- **TrackMate:** `write_trackmate_xml()` takes `space_unit` and `time_unit` instead of the `units` dict. They default to the units of the model, or to "pixel" and "frame", with a warning, when the model has none. The writer no longer asks for them with `input()`, which blocked scripts
 - **CTC:** the loader now uses a new `time` property as the reference time property, instead of `timepoint`
 - **CTC:** with label images (`labels_path`), cell positions and contours are now in the space unit: their pixel coordinates are multiplied by the pixel size. They were in pixels while the model had the space unit given to the loader, so properties computed from them, such as `cell_displacement`, got that unit for values in pixels
 - **trackpy:** the loader now uses a new `time` property (frame × time step) as the reference time property, instead of `frame`, and renames the trackpy coordinates `x`, `y`, `z` to `cell_x`, `cell_y`, `cell_z`
-- **Export:** `export_CTC_file()`, `export_GEFF()`, `export_TrackMate_XML()` and `export_trackpy_dataframe()` raise `UpdateRequiredError` when the model requires an update: call `model.update()` first. Most of them exported the changes not yet processed as they were, e.g. a lineage left in two parts by `remove_link()`, so a GEFF file written that way couldn't be read back correctly
+- **Export:** `write_ctc()`, `write_geff()`, `write_trackmate_xml()` and `to_trackpy()` raise `UpdateRequiredError` when the model requires an update: call `model.update()` first. Most of them exported the changes not yet processed as they were, e.g. a lineage left in two parts by `remove_link()`, so a GEFF file written that way couldn't be read back correctly
+- **Pickles:** models pickled with pycellin 0.5.1 can't be read, since modules moved (`pycellin.graph` no longer exists) and names changed (e.g. `cell_ID`, `cycle_length`): read their original files again
 - **Exceptions:** pycellin exceptions now subclass the matching built-in exception: `LineageStructureError` (so `FusionError` and `TimeFlowError`) is a `ValueError`, `UpdateRequiredError` a `RuntimeError`, `ProtectedPropertyError` an `AttributeError`
 - **Logging:** pycellin no longer adds a `NullHandler` to its logger, so warnings logged by pycellin are shown on stderr by default
 - **Dependencies:** matplotlib is no longer installed with pycellin: install it yourself if your code uses it. pycellin only needs it for the debug plots of the `RodWidth` and `RodLength` calculators (`debug=True`)
@@ -102,12 +111,12 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Plotting:** `y_prop` of `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()` also accepts a property identifier, used as axis label. With a `Property`, the hover text now shows its unit too
 - **Plotting:** `node_colormap` also accepts a dict for discrete color maps
 - **Plotting:** nodes can be styled individually through `node_marker_style`
-- **TrackMate:** `ref_time_prop` argument to `load_TrackMate_XML()`, e.g. `"FRAME"` to count the time in frames
+- **TrackMate:** `reference_time_prop` argument to `read_trackmate_xml()`, e.g. `"FRAME"` to count the time in frames
 - **TrackMate:** default tracker in the exported XML, so the TrackMate wizard can be navigated back
 - **TrackMate:** dimension mappings for the new properties
-- **GEFF:** `tracklets` argument to `export_GEFF()`, to write the tracklets (the cell cycles) in a `tracklet_id` cell property declared as the GEFF tracklet property. Like `cycle_id`, a tracklet is identified by the ID of its last cell. The tracklets are computed at export from the cell lineages, so they don't need cycle lineages and are always up to date
-- **CTC:** `frame_offset` argument to `export_CTC_file()`, the frame of timepoint 0, added to the timepoints of the cells to give their CTC frames. Timepoints start at 0 at the earliest cell, so data that starts at a later frame, e.g. a CTC file whose first frame is 5, was exported from frame 0, out of line with its images. Pass that first frame, or in general the frame of any cell minus its timepoint
-- **trackpy:** `computed_time_prop` argument to `load_trackpy_dataframe()`
+- **GEFF:** `tracklets` argument to `write_geff()`, to write the tracklets (the cell cycles) in a `tracklet_id` cell property declared as the GEFF tracklet property. Like `cycle_id`, a tracklet is identified by the ID of its last cell. The tracklets are computed at export from the cell lineages, so they don't need cycle lineages and are always up to date
+- **CTC:** `frame_offset` argument to `write_ctc()`, the frame of timepoint 0, added to the timepoints of the cells to give their CTC frames. Timepoints start at 0 at the earliest cell, so data that starts at a later frame, e.g. a CTC file whose first frame is 5, was exported from frame 0, out of line with its images. Pass that first frame, or in general the frame of any cell minus its timepoint
+- **trackpy:** `reference_time_prop` argument to `from_trackpy()`, to name the time property it builds from the frames
 - **Dependencies:** `notebooks` extra with what the example notebooks need: JupyterLab, ipykernel, and nbformat, without which Plotly can't show figures in notebooks. Install it with `pip install "pycellin[notebooks]"`
 
 ### Changed
@@ -119,10 +128,10 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **TrackMate:** one-node lineages are identified by their size instead of by their lineage ID sign
 - **TrackMate:** document that only numeric properties are exported
 - **TrackMate:** the loader declares `FRAME` with the unit "frame" instead of no unit
-- **GEFF:** stricter coordinate arguments in `load_GEFF()`: they must describe a complete 2D or 3D system (x and y, plus z in 3D), and inferred coordinates are each assigned at most once. A coordinate argument or `time_prop` naming a property that isn't on every node is now reported with a warning instead of an INFO message, before the property is inferred from the GEFF metadata
-- **GEFF:** without `cell_id_prop`, `load_GEFF()` uses the `cell_id` property of the file as cell identifier when its values are unique non-negative integers, instead of always creating cell IDs from the GEFF node IDs. Without `lineage_id_prop`, it also looks for a `lineage_id` property when the GEFF metadata only declares a tracklet property
-- **GEFF:** `export_GEFF()` writes the cell coordinates as space axes by default: `cell_x`, `cell_y`, and `cell_z` when it is declared, as long as every cell has a value for them, since GEFF axes can't have missing values (otherwise they are left out, with a warning). Pass `space_axes=[]` to write none. Without space axes, other GEFF tools couldn't place the cells, and `load_GEFF()` lost the space unit of the model
-- **GEFF:** `export_GEFF()` writes the axes in the order of the GEFF specification, which follows OME-Zarr: time, channel, then space axes from z to x (e.g. t, z, y, x), as the dimensions of an image. `space_axes` still lists the x, y and z properties in that order, and the display hints are unchanged
+- **GEFF:** stricter coordinate arguments in `read_geff()`: they must describe a complete 2D or 3D system (x and y, plus z in 3D), and inferred coordinates are each assigned at most once. A coordinate argument or `reference_time_prop` (`time_prop` in 0.5.1) naming a property that isn't on every node is now reported with a warning instead of an INFO message, before the property is inferred from the GEFF metadata
+- **GEFF:** without `cell_id_prop`, `read_geff()` uses the `cell_id` property of the file as cell identifier when its values are unique non-negative integers, instead of always creating cell IDs from the GEFF node IDs. Without `lineage_id_prop`, it also looks for a `lineage_id` property when the GEFF metadata only declares a tracklet property
+- **GEFF:** `write_geff()` writes the cell coordinates as space axes by default: `cell_x`, `cell_y`, and `cell_z` when it is declared, as long as every cell has a value for them, since GEFF axes can't have missing values (otherwise they are left out, with a warning). Pass `space_axes=[]` to write none. Without space axes, other GEFF tools couldn't place the cells, and `read_geff()` lost the space unit of the model
+- **GEFF:** `write_geff()` writes the axes in the order of the GEFF specification, which follows OME-Zarr: time, channel, then space axes from z to x (e.g. t, z, y, x), as the dimensions of an image. `space_axes` still lists the x, y and z properties in that order, and the display hints are unchanged
 - **Dependencies:** declare numpy, pillow, tifffile and geff-spec, which pycellin imports directly but only got through other packages
 - **Dependencies:** raise the minimum versions of pandas (2.2.2), scikit-image (0.24), shapely (2.0.4) and plotly (5.12) to the first ones that work with NumPy 2. The previous minimums allowed installs that failed at `import pycellin`
 - **Dependencies:** the test dependencies moved from the `test` extra to a `test` dependency group, installed from a clone of the repository with `pip install -e . --group test` (pip >= 25.1)
@@ -130,7 +139,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 ### Fixed
 
 - **Model:** changing the time step with `set_time_step()` corrupted the `timepoint` values
-- **Model:** after `set_reference_time_property()`, `cycle_duration` kept the unit of the previous reference time property, although its values are computed from the new one
+- **Model:** after `set_reference_time_prop()` (`set_reference_time_property()` in 0.5.1), `cycle_duration` kept the unit of the previous reference time property, although its values are computed from the new one
 - **Model:** `add_lineage()` failed with `with_CycleLineage=True` or with a lineage that had no lineage ID, and ignored its `lineage_id` argument (`lid` in 0.5.1) when given a lineage
 - **Model:** `add_lineage()` silently replaced a lineage that already had the same ID. It now raises `ValueError`
 - **Model:** `to_cell_dataframe()`, `to_link_dataframe()`, `to_cycle_dataframe()` and `to_lineage_dataframe()` raised a pandas `FutureWarning` when a numeric property was None everywhere in a lineage. With no lineage to export, they now raise a `ValueError` that says so
@@ -191,7 +200,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 
 ### Maintenance
 
-- **Tests:** new tests for the new properties, plotting, exceptions, utils, the CTC and trackpy loaders, the trackpy exporter, and `load_GEFF()` end to end
+- **Tests:** new tests for the new properties, plotting, exceptions, utils, the CTC and trackpy readers, the trackpy writer, `read_geff()` end to end, the pickle functions, and the signatures of the reading and writing functions
 - **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks, remove the unfinished "Creating a model from scratch" and "Working with TrackMate data" notebooks (the latter covered by "Getting started") and the State column of the README notebook table, explain when a calculator should be local or global, and replace `angle` with `turning_angle` in the examples of "Managing properties"
 - **Properties:** make the `is_complete_cycle` calculator local, since it only reads its own lineage. Its values and update cost are unchanged
 - **Packaging:** find packages automatically in `pyproject.toml`

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-loader.py
+reader.py
 
 This module is part of the pycellin package.
 
@@ -293,15 +293,16 @@ def _create_PropsMetadata(
     return props_md
 
 
-def load_trackpy_dataframe(
+def from_trackpy(
     df: pd.DataFrame,
+    *,
     space_unit: str | None = None,
     pixel_width: float | None = None,
     pixel_height: float | None = None,
     pixel_depth: float | None = None,
     time_unit: str | None = None,
     time_step: float | None = None,
-    computed_time_prop: str = "time",
+    reference_time_prop: str = "time",
 ) -> Model:
     """
     Load a trackpy DataFrame into a pycellin model.
@@ -312,7 +313,7 @@ def load_trackpy_dataframe(
     The DataFrame is not modified.
 
     Cell times are stored in two node properties: 'frame', read from the DataFrame,
-    and a time property computed by the loader (named by `computed_time_prop`),
+    and a time property computed by the loader (named by `reference_time_prop`),
     equal to frame * time_step and expressed in time_unit. The computed time
     property is the reference time property of the model.
 
@@ -343,9 +344,10 @@ def load_trackpy_dataframe(
     time_step : float, optional
         The time between two consecutive frames, in the temporal unit. If not
         provided, it will be set to 1.0 by default.
-    computed_time_prop : str, optional
-        Identifier of the time property built by the loader from the 'frame'
-        column. Defaults to "time". It must not be the name of a column of `df`.
+    reference_time_prop : str, optional
+        Identifier of the time property built from the 'frame' column
+        (frame * time_step), which becomes the reference time property of the model.
+        Defaults to "time". It must not be the name of a column of `df`.
 
     Returns
     -------
@@ -357,7 +359,7 @@ def load_trackpy_dataframe(
     ValueError
         If `df` has both a trackpy coordinate column and its pycellin counterpart
         (e.g. 'x' and 'cell_x'), if it has a 'cell_id', 'lineage_id' or
-        'timepoint' column, which pycellin creates, or if `computed_time_prop` is
+        'timepoint' column, which pycellin creates, or if `reference_time_prop` is
         already a column of `df` or is a property written by pycellin ('cell_id',
         'lineage_id', 'timepoint' or a renamed coordinate).
     """
@@ -377,11 +379,11 @@ def load_trackpy_dataframe(
             "before loading."
         )
     reserved_props = pycellin_props | coord_props
-    if computed_time_prop in df.columns or computed_time_prop in reserved_props:
+    if reference_time_prop in df.columns or reference_time_prop in reserved_props:
         raise ValueError(
-            f"Cannot build the time property '{computed_time_prop}': a column or "
+            f"Cannot build the time property '{reference_time_prop}': a column or "
             f"a pycellin property with this name already exists. Use the "
-            f"'computed_time_prop' argument to choose another name."
+            f"'reference_time_prop' argument to choose another name."
         )
 
     # Build the lineages.
@@ -397,7 +399,7 @@ def load_trackpy_dataframe(
     # The reference time property is the physical time, so that the time step and
     # time unit apply to it. Timepoints are then derived from it by the model.
     for _, node_data in graph.nodes(data=True):
-        node_data[computed_time_prop] = float(node_data["frame"] * md["time_step"])
+        node_data[reference_time_prop] = float(node_data["frame"] * md["time_step"])
 
     # Split the graph into lineages.
     lineages = _split_graph_into_lineages(graph)
@@ -405,8 +407,8 @@ def load_trackpy_dataframe(
     data = {lin.graph["lineage_id"]: lin for lin in lineages if len(lin) > 0}
 
     # Create a pycellin model.
-    props_md = _create_PropsMetadata(dtypes, md, computed_time_prop)
-    model = Model(md, props_md, Data(data), computed_time_prop)
+    props_md = _create_PropsMetadata(dtypes, md, reference_time_prop)
+    model = Model(md, props_md, Data(data), reference_time_prop)
 
     return model
 
@@ -424,7 +426,7 @@ if __name__ == "__main__":
     print(df.shape)
     print(df.head(), "\n")
 
-    model = load_trackpy_dataframe(df)
+    model = from_trackpy(df)
     print(model)
     print("\nModel metadata:")
     print(model.model_metadata)

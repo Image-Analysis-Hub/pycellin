@@ -64,7 +64,7 @@ class ModelUpdater:
         calc = self._calculators.get("timepoint")
         if (
             isinstance(calc, Timepoint)
-            and calc.ref_time_prop == time_prop
+            and calc.reference_time_prop == time_prop
             and calc.time_step == time_step
         ):
             return False
@@ -72,7 +72,7 @@ class ModelUpdater:
             property=create_timepoint_property(),
             data=data,
             time_step=time_step,
-            reference_time_property=time_prop,
+            reference_time_prop=time_prop,
         )
         # Registered first, so that timepoint is computed before the other properties.
         others = {k: v for k, v in self._calculators.items() if k != "timepoint"}

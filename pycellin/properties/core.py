@@ -201,7 +201,7 @@ class Timepoint(NodeLocalPropCalculator):
         property: Property,
         data: Data,
         time_step: int | float | None,
-        reference_time_property: str,
+        reference_time_prop: str,
     ):
         super().__init__(property)
 
@@ -212,7 +212,7 @@ class Timepoint(NodeLocalPropCalculator):
             )
 
         self.time_step = time_step
-        self.ref_time_prop = reference_time_property
+        self.reference_time_prop = reference_time_prop
 
         min_time = None
         for lin in data.cell_data.values():
@@ -222,13 +222,13 @@ class Timepoint(NodeLocalPropCalculator):
                     f"Lineage {lin.graph['lineage_id']} has several root nodes. "
                     f"Timepoint calculation requires a single root node."
                 )
-            if self.ref_time_prop not in lin.nodes[root]:
+            if self.reference_time_prop not in lin.nodes[root]:
                 raise ValueError(
-                    f"Reference time property '{self.ref_time_prop}' not found in "
-                    f"root node {root} of lineage "
+                    f"Reference time property '{self.reference_time_prop}' not found "
+                    f"in root node {root} of lineage "
                     f"{lin.graph.get('lineage_id', 'of unknown ID')}."
                 )
-            time = lin.nodes[root][self.ref_time_prop]
+            time = lin.nodes[root][self.reference_time_prop]
             if min_time is None or time < min_time:
                 min_time = time
 
@@ -258,13 +258,13 @@ class Timepoint(NodeLocalPropCalculator):
         KeyError
             If the reference time property is not found in the node.
         """
-        if self.ref_time_prop not in lineage.nodes[node_id]:
+        if self.reference_time_prop not in lineage.nodes[node_id]:
             raise KeyError(
-                f"Reference time property '{self.ref_time_prop}' not found "
+                f"Reference time property '{self.reference_time_prop}' not found "
                 f"in node {node_id} of lineage {lineage.graph['lineage_id']}."
             )
 
-        time = lineage.nodes[node_id][self.ref_time_prop]
+        time = lineage.nodes[node_id][self.reference_time_prop]
         timepoint = (time - self.min_time) / self.time_step
 
         rounded_timepoint = round(timepoint)
