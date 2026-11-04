@@ -44,17 +44,23 @@ def remove_division_events(model: Model) -> None:
     """
     Remove division events by deleting edges involved in divisions.
 
+    The model is then updated, so that each cell cycle becomes a separate lineage.
+    A model without divisions is left unchanged.
+
     Parameters
     ----------
     model : Model
         The pycellin model to modify.
     """
+    removed_link = False
     for lin in model.get_cell_lineages():
         divs = lin.get_divisions()
         div_edges = [edge for div in divs for edge in lin.out_edges(div)]
         for edge in div_edges:
             model.remove_link(*edge, lineage_id=lin.graph["lineage_id"])
-    model.update()
+            removed_link = True
+    if removed_link:
+        model.update()
 
 
 def renumber_negative_lineage_ids(model: Model) -> None:

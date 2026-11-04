@@ -2,6 +2,8 @@
 
 """Unit test for trackpy DataFrame exporter."""
 
+import warnings
+
 import pytest
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
@@ -89,12 +91,41 @@ def model_with_positions():
     )
 
 
+@pytest.fixture
+def model_with_division():
+    """Create a model with a lineage where cell 1 divides into cells 2 and 3."""
+    lin = CellLineage()
+    for cell_id, timepoint in [(1, 0), (2, 1), (3, 1), (4, 2)]:
+        lin.add_node(
+            cell_id,
+            timepoint=timepoint,
+            cell_id=cell_id,
+            lineage_id=1,
+            cell_x=float(cell_id),
+            cell_y=float(cell_id),
+        )
+    lin.add_edges_from([(1, 2), (1, 3), (2, 4)])
+    lin.graph["lineage_id"] = 1
+
+    props_metadata = PropsMetadata()
+    for prop in [
+        create_timepoint_property(),
+        create_cell_id_property(),
+        create_lineage_id_property(),
+        create_cell_coord_property(unit=None, axis="x"),
+        create_cell_coord_property(unit=None, axis="y"),
+    ]:
+        props_metadata._add_prop(prop)
+    return Model(
+        data=Data({1: lin}),
+        props_metadata=props_metadata,
+        reference_time_property="timepoint",
+    )
+
+
 # Test classes ###############################################################
 
 
-# The export calls update() on its copy of the model, which warns that the model is
-# already up to date when there is no division to remove.
-@pytest.mark.filterwarnings("ignore:Model is already up to date")
 # pandas 3.1 deprecates the `inplace` argument, removed in pandas 4.
 @pytest.mark.filterwarnings("error:The inplace keyword")
 class TestExportTrackpyDataframe:
@@ -141,3 +172,24 @@ class TestExportTrackpyDataframe:
         df = export_trackpy_dataframe(model_with_positions)
         assert list(df.columns[:3]) == ["z", "y", "x"]
         assert df["z"].tolist() == [0.5] * 4
+
+    def test_model_without_divisions_exported_without_warning(
+        self, model_with_positions
+    ):
+        """Test that a model without divisions is exported without any warning."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            export_trackpy_dataframe(model_with_positions)
+
+    def test_divisions_split_into_particles(self, model_with_division):
+        """Test that each cell cycle becomes a particle, from the same lineage."""
+        df = export_trackpy_dataframe(model_with_division)
+        cells = sorted(df.groupby("particle")["cell_id"].apply(sorted).tolist())
+        assert cells == [[1], [2, 4], [3]]
+        assert df["lineage_id_pycellin"].tolist() == [1, 1, 1, 1]
+        # The model given to the export keeps its division.
+        assert sorted(model_with_division.data.cell_data[1].edges()) == [
+            (1, 2),
+            (1, 3),
+            (2, 4),
+        ]

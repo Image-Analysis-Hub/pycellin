@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 0b27581, plus the uncommitted pandas fix (`inplace` arguments removed, trackpy exporter tests). Update from there with: git log 0b27581..dev -->
+<!-- Planned v0.6.0. Covers commits up to 0b27581, plus the uncommitted pandas fix (`inplace` arguments removed, trackpy exporter tests) and trackpy export warning fix (no update() without divisions). Update from there with: git log 0b27581..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -182,6 +182,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **trackpy:** the loader didn't declare the DataFrame columns other than `frame` and the coordinates, e.g. `particle`, `mass` or `size`: they were on the cells but missing from the properties of the model, and a model exported to TrackMate couldn't be loaded back. Every column is now declared with its data type: trackpy's own columns get a description, and the sizes and static errors (`size`, `ep`...) the unit of the coordinates. When all the columns were numbers, integer columns were also loaded as floats
 - **trackpy:** the loader linked the cells by scanning all of them for each particle, so the linking time grew with the square of the number of rows: loading 40,000 rows took 14 s, now 3 s
 - **trackpy:** with pandas 3.1 or later, the exporter raised `Pandas4Warning`s, since it used pandas' `inplace` argument, deprecated in pandas 3.1 and removed in pandas 4
+- **trackpy:** exporting a model without divisions, e.g. one loaded from trackpy, warned that the model was already up to date
 - **Packaging:** the PyPI page had broken links: Documentation and Examples led to a site that doesn't exist, the README links to the notebooks didn't open them, and the README logo didn't show. Examples now opens the notebooks on GitHub, Documentation is removed until there is a documentation site, and a Changelog link is added
 - **Docs:** the installation steps of the README, also shown on the PyPI page, created a conda environment without Python, so `pip install pycellin` used the pip of another environment, if any. The environment is now created with Python 3.14
 - **Docs:** some examples of `add_pycellin_property()` and `add_pycellin_properties()` didn't work:
