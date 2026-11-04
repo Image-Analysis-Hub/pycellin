@@ -1000,7 +1000,7 @@ class TestCellLineageAddLink:
 
     def test_different_lineages(self, cell_lin):
         """Test _add_link between different lineages."""
-        new_lin = CellLineage(lid=2)
+        new_lin = CellLineage(lineage_id=2)
         new_lin.add_node(19, timepoint=1, cell_id=19)
         new_lin.add_node(20, timepoint=2, cell_id=20)
         new_lin.add_node(21, timepoint=3, cell_id=21)
@@ -1043,7 +1043,7 @@ class TestCellLineageAddLink:
 
     def test_conflicting_id(self, cell_lin):
         """Test _add_link between different lineages with a conflicting ID."""
-        new_lin = CellLineage(lid=2)
+        new_lin = CellLineage(lineage_id=2)
         new_lin.add_node(5, timepoint=1, cell_id=5)
         ids_mapping = cell_lin._add_link(1, 5, target_lineage=new_lin)
         assert ids_mapping == {5: 17}
@@ -1091,7 +1091,7 @@ class TestCellLineageAddLink:
 
     def test_same_ids(self, cell_lin):
         """Test _add_link between different lineages with the same single ID."""
-        new_lin = CellLineage(lid=2)
+        new_lin = CellLineage(lineage_id=2)
         new_lin.add_node(1, timepoint=1, cell_id=1)
         ids_mapping = cell_lin._add_link(1, 1, new_lin)
         assert ids_mapping == {1: 17}

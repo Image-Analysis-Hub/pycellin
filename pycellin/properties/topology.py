@@ -37,7 +37,7 @@ def create_is_division_property(
 class IsDivision(NodeLocalPropCalculator):
     """Calculator for the is_division property."""
 
-    def compute(self, lineage, nid: int) -> bool:
+    def compute(self, lineage, node_id: int) -> bool:
         """
         Compute whether a given node is a division event.
 
@@ -45,7 +45,7 @@ class IsDivision(NodeLocalPropCalculator):
         ----------
         lineage : Lineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cell_id) of the cell of interest.
 
         Returns
@@ -54,7 +54,7 @@ class IsDivision(NodeLocalPropCalculator):
             True if the cell is a division event, i.e. has more than one daughter cell,
             False otherwise.
         """
-        return lineage.is_division(nid)  # type: ignore
+        return lineage.is_division(node_id)  # type: ignore
 
 
 def create_is_leaf_property(
@@ -77,7 +77,7 @@ def create_is_leaf_property(
 class IsLeaf(NodeLocalPropCalculator):
     """Calculator for the is_leaf property."""
 
-    def compute(self, lineage, nid: int) -> bool:
+    def compute(self, lineage, node_id: int) -> bool:
         """
         Compute whether a given node is a leaf cell.
 
@@ -85,7 +85,7 @@ class IsLeaf(NodeLocalPropCalculator):
         ----------
         lineage : Lineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cell_id) of the cell of interest.
 
         Returns
@@ -94,7 +94,7 @@ class IsLeaf(NodeLocalPropCalculator):
             True if the cell is a leaf cell, i.e. has no daughter cells,
             False otherwise.
         """
-        return lineage.is_leaf(nid)  # type: ignore
+        return lineage.is_leaf(node_id)  # type: ignore
 
 
 def create_is_root_property(
@@ -117,7 +117,7 @@ def create_is_root_property(
 class IsRoot(NodeLocalPropCalculator):
     """Calculator for the is_root property."""
 
-    def compute(self, lineage, nid: int) -> bool:
+    def compute(self, lineage, node_id: int) -> bool:
         """
         Compute whether a given node is a root cell.
 
@@ -125,7 +125,7 @@ class IsRoot(NodeLocalPropCalculator):
         ----------
         lineage : Lineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cell_id) of the cell of interest.
 
         Returns
@@ -134,7 +134,7 @@ class IsRoot(NodeLocalPropCalculator):
             True if the cell is a root cell, i.e. has no parent cell,
             False otherwise.
         """
-        return lineage.is_root(nid)  # type: ignore
+        return lineage.is_root(node_id)  # type: ignore
 
 
 # TODO: should be named num_cells or lineage_length?
@@ -597,7 +597,7 @@ class LocationTag(NodeLocalPropCalculator):
                 "so cells on these values will get None."
             )
 
-    def compute(self, lineage, nid: int) -> int | str | None:
+    def compute(self, lineage, node_id: int) -> int | str | None:
         """
         Compute the location tag of a cell.
 
@@ -608,7 +608,7 @@ class LocationTag(NodeLocalPropCalculator):
         ----------
         lineage : CellLineage
             Lineage graph containing the cell of interest.
-        nid : int
+        node_id : int
             Node ID (cell_id) of the cell of interest.
 
         Returns
@@ -622,14 +622,14 @@ class LocationTag(NodeLocalPropCalculator):
         ValueError
             If the cell's position is outside the mask image.
         """
-        x = int(np.floor(lineage.nodes[nid]["cell_x"] / self.pixel_size + 0.5))
-        y = int(np.floor(lineage.nodes[nid]["cell_y"] / self.pixel_size + 0.5))
-        t = lineage.nodes[nid]["timepoint"]
+        x = int(np.floor(lineage.nodes[node_id]["cell_x"] / self.pixel_size + 0.5))
+        y = int(np.floor(lineage.nodes[node_id]["cell_y"] / self.pixel_size + 0.5))
+        t = lineage.nodes[node_id]["timepoint"]
         # Explicit check: negative indices would silently wrap around.
         for axis, index, size in zip("tyx", (t, y, x), self.mask.shape):
             if not 0 <= index < size:
                 raise ValueError(
-                    f"Cell {nid} is outside the mask image: {axis} index {index} "
+                    f"Cell {node_id} is outside the mask image: {axis} index {index} "
                     f"is out of range [0, {size - 1}]."
                 )
         value = int(self.mask[t, y, x])
@@ -659,7 +659,7 @@ def create_mother_cycle_property(
 class MotherCycle(NodeLocalPropCalculator):
     """Calculator for the mother_cycle property."""
 
-    def compute(self, lineage, nid: int) -> int | None:
+    def compute(self, lineage, node_id: int) -> int | None:
         """
         Compute the mother cycle of a given cell cycle.
 
@@ -667,7 +667,7 @@ class MotherCycle(NodeLocalPropCalculator):
         ----------
         lineage : CycleLineage
             Lineage graph containing the cell cycle of interest.
-        nid : int
+        node_id : int
             Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
@@ -675,7 +675,7 @@ class MotherCycle(NodeLocalPropCalculator):
         int | None
             ID of the mother cycle, or None if the cell cycle is the root.
         """
-        return next(lineage.predecessors(nid), None)
+        return next(lineage.predecessors(node_id), None)
 
 
 def create_daughter_cycles_property(
@@ -698,7 +698,7 @@ def create_daughter_cycles_property(
 class DaughterCycles(NodeLocalPropCalculator):
     """Calculator for the daughter_cycles property."""
 
-    def compute(self, lineage, nid: int) -> list[int]:
+    def compute(self, lineage, node_id: int) -> list[int]:
         """
         Compute the daughter cycles of a given cell cycle.
 
@@ -706,7 +706,7 @@ class DaughterCycles(NodeLocalPropCalculator):
         ----------
         lineage : CycleLineage
             Lineage graph containing the cell cycle of interest.
-        nid : int
+        node_id : int
             Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
@@ -714,7 +714,7 @@ class DaughterCycles(NodeLocalPropCalculator):
         list[int]
             IDs of the daughter cycles, empty if the cell cycle is a leaf.
         """
-        return list(lineage.successors(nid))
+        return list(lineage.successors(node_id))
 
 
 def create_sister_cycles_property(
@@ -737,7 +737,7 @@ def create_sister_cycles_property(
 class SisterCycles(NodeLocalPropCalculator):
     """Calculator for the sister_cycles property."""
 
-    def compute(self, lineage, nid: int) -> list[int]:
+    def compute(self, lineage, node_id: int) -> list[int]:
         """
         Compute the sister cycles of a given cell cycle.
 
@@ -745,7 +745,7 @@ class SisterCycles(NodeLocalPropCalculator):
         ----------
         lineage : CycleLineage
             Lineage graph containing the cell cycle of interest.
-        nid : int
+        node_id : int
             Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
@@ -753,7 +753,7 @@ class SisterCycles(NodeLocalPropCalculator):
         list[int]
             IDs of the sister cycles, empty if the cell cycle is the root.
         """
-        return lineage.get_sisters(nid)
+        return lineage.get_sisters(node_id)
 
 
 def create_cousin_cycles_property(
@@ -804,7 +804,7 @@ class CousinCycles(NodeLocalPropCalculator):
             raise ValueError(f"'degree' must be at least 1 or None, got {degree}.")
         self.degree = degree
 
-    def compute(self, lineage, nid: int) -> list[int]:
+    def compute(self, lineage, node_id: int) -> list[int]:
         """
         Compute the cousin cycles of a given cell cycle.
 
@@ -812,7 +812,7 @@ class CousinCycles(NodeLocalPropCalculator):
         ----------
         lineage : CycleLineage
             Lineage graph containing the cell cycle of interest.
-        nid : int
+        node_id : int
             Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
@@ -820,4 +820,4 @@ class CousinCycles(NodeLocalPropCalculator):
         list[int]
             IDs of the cousin cycles of the requested degree.
         """
-        return lineage.get_cousins(nid, degree=self.degree)
+        return lineage.get_cousins(node_id, degree=self.degree)

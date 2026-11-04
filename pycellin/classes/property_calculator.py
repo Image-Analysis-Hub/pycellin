@@ -185,7 +185,7 @@ class NodeLocalPropCalculator(LocalPropCalculator):
     _PROPERTY_TYPE = "node"
 
     @abstractmethod
-    def compute(self, lineage: Lineage, nid: int) -> Any:
+    def compute(self, lineage: Lineage, node_id: int) -> Any:
         """
         Compute the value of a local property for a single node.
         Need to be implemented in subclasses.
@@ -194,7 +194,7 @@ class NodeLocalPropCalculator(LocalPropCalculator):
         ----------
         lineage : Lineage
             Lineage object containing the node of interest.
-        nid : int
+        node_id : int
             Node ID of the node of interest.
 
         Returns
@@ -353,7 +353,7 @@ class NodeGlobalPropCalculator(GlobalPropCalculator):
     _PROPERTY_TYPE = "node"
 
     @abstractmethod
-    def compute(self, data: Data, lineage: Lineage, nid: int) -> Any:
+    def compute(self, data: Data, lineage: Lineage, node_id: int) -> Any:
         """
         Compute the value of a global property for a single node.
         Need to be implemented in subclasses.
@@ -364,7 +364,7 @@ class NodeGlobalPropCalculator(GlobalPropCalculator):
             Data object containing the lineages.
         lineage : Lineage
             Lineage containing the node of interest.
-        nid : int
+        node_id : int
             Node ID of the node of interest.
 
         Returns

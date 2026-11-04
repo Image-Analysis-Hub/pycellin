@@ -43,13 +43,25 @@ class TestDataGetNextAvailableLineageID:
 
     def test_positive_id_with_positive_lineages(self):
         """Test positive ID generation with existing positive lineage IDs."""
-        data = Data({1: CellLineage(lid=1), 5: CellLineage(lid=5), 3: CellLineage(lid=3)})
+        data = Data(
+            {
+                1: CellLineage(lineage_id=1),
+                5: CellLineage(lineage_id=5),
+                3: CellLineage(lineage_id=3),
+            }
+        )
         result = data._get_next_available_lineage_id(positive=True)
         assert result == 6  # max(1, 5, 3) + 1
 
     def test_negative_id_with_negative_lineages(self):
         """Test negative ID generation with existing negative lineage IDs."""
-        data = Data({-1: CellLineage(lid=-1), -5: CellLineage(lid=-5), -3: CellLineage(lid=-3)})
+        data = Data(
+            {
+                -1: CellLineage(lineage_id=-1),
+                -5: CellLineage(lineage_id=-5),
+                -3: CellLineage(lineage_id=-3),
+            }
+        )
         result = data._get_next_available_lineage_id(positive=False)
         assert result == -6  # min(-1, -5, -3) - 1
 
@@ -57,10 +69,10 @@ class TestDataGetNextAvailableLineageID:
         """Test positive ID generation with mixed positive and negative lineage IDs."""
         data = Data(
             {
-                2: CellLineage(lid=2),
-                -3: CellLineage(lid=-3),
-                7: CellLineage(lid=7),
-                -1: CellLineage(lid=-1),
+                2: CellLineage(lineage_id=2),
+                -3: CellLineage(lineage_id=-3),
+                7: CellLineage(lineage_id=7),
+                -1: CellLineage(lineage_id=-1),
             }
         )
         result = data._get_next_available_lineage_id(positive=True)
@@ -70,10 +82,10 @@ class TestDataGetNextAvailableLineageID:
         """Test negative ID generation with mixed positive and negative lineage IDs."""
         data = Data(
             {
-                2: CellLineage(lid=2),
-                -3: CellLineage(lid=-3),
-                7: CellLineage(lid=7),
-                -1: CellLineage(lid=-1),
+                2: CellLineage(lineage_id=2),
+                -3: CellLineage(lineage_id=-3),
+                7: CellLineage(lineage_id=7),
+                -1: CellLineage(lineage_id=-1),
             }
         )
         result = data._get_next_available_lineage_id(positive=False)
@@ -81,19 +93,19 @@ class TestDataGetNextAvailableLineageID:
 
     def test_positive_id_ensures_minimum_value(self):
         """Test that positive ID is at least 1, even with negative max."""
-        data = Data({-5: CellLineage(lid=-5), -2: CellLineage(lid=-2)})
+        data = Data({-5: CellLineage(lineage_id=-5), -2: CellLineage(lineage_id=-2)})
         result = data._get_next_available_lineage_id(positive=True)
         assert result == 1  # max(-5, -2) + 1 = -1, but should be at least 1
 
     def test_negative_id_ensures_maximum_value(self):
         """Test that negative ID is at most -1, even with positive min."""
-        data = Data({5: CellLineage(lid=5), 2: CellLineage(lid=2)})
+        data = Data({5: CellLineage(lineage_id=5), 2: CellLineage(lineage_id=2)})
         result = data._get_next_available_lineage_id(positive=False)
         assert result == -1  # min(5, 2) - 1 = 1, but should be at most -1
 
     def test_single_positive_lineage(self):
         """Test with a single positive lineage."""
-        data = Data({10: CellLineage(lid=10)})
+        data = Data({10: CellLineage(lineage_id=10)})
 
         positive_result = data._get_next_available_lineage_id(positive=True)
         assert positive_result == 11
@@ -103,7 +115,7 @@ class TestDataGetNextAvailableLineageID:
 
     def test_single_negative_lineage(self):
         """Test with a single negative lineage."""
-        data = Data({-10: CellLineage(lid=-10)})
+        data = Data({-10: CellLineage(lineage_id=-10)})
 
         positive_result = data._get_next_available_lineage_id(positive=True)
         assert positive_result == 1  # max(-10) + 1 = -9, but should be at least 1

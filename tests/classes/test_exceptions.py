@@ -11,15 +11,15 @@ from pycellin.classes.exceptions import MissingPropertyError
 
 class TestMissingPropertyError:
     def test_default_message_with_node_and_lineage(self):
-        err = MissingPropertyError("cell_area", nid=3, lineage_id=1)
-        assert err.nid == 3
+        err = MissingPropertyError("cell_area", node_id=3, lineage_id=1)
+        assert err.node_id == 3
         assert err.message == (
             "Required property 'cell_area' is missing for node 3 in lineage 1."
         )
 
     def test_default_message_without_node(self):
         err = MissingPropertyError("cell_area")
-        assert err.nid is None
+        assert err.node_id is None
         assert err.message == "Required property 'cell_area' is missing."
 
     def test_custom_message(self):

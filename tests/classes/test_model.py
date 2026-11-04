@@ -187,7 +187,7 @@ def lineage_props_model():
     Create a model with a dividing lineage and a single-cell lineage, and properties
     of lineage, node and node-and-lineage types.
     """
-    lin = CellLineage(lid=1)
+    lin = CellLineage(lineage_id=1)
     lin.add_node(1, cell_id=1, frame=0, node_prop=10, mixed_prop="node1")
     lin.add_node(2, cell_id=2, frame=1, node_prop=20, mixed_prop="node2")
     lin.add_node(3, cell_id=3, frame=1, node_prop=30, mixed_prop="node3")
@@ -196,7 +196,7 @@ def lineage_props_model():
     lin.graph["lin_prop"] = 1.5
     lin.graph["shared_prop"] = "a"
     lin.graph["mixed_prop"] = "lineage1"
-    single_lin = CellLineage(lid=-4)
+    single_lin = CellLineage(lineage_id=-4)
     single_lin.add_node(4, cell_id=4, frame=0, node_prop=40, mixed_prop="node4")
     single_lin.graph["lin_prop"] = 2.5
     single_lin.graph["mixed_prop"] = "lineage-4"
@@ -260,7 +260,7 @@ class TestToCellDataframe:
 
     def test_lineage_props_restricted_to_lids(self, lineage_props_model):
         df = lineage_props_model.to_cell_dataframe(
-            lids=[-4], lineage_props=["lin_prop"]
+            lineage_ids=[-4], lineage_props=["lin_prop"]
         )
 
         assert df["lin_prop"].tolist() == [2.5]
@@ -287,7 +287,7 @@ class TestToCellDataframe:
 
     def test_no_matching_lineage_raises(self, lineage_props_model):
         with pytest.raises(ValueError, match="No cells to export"):
-            lineage_props_model.to_cell_dataframe(lids=[99])
+            lineage_props_model.to_cell_dataframe(lineage_ids=[99])
 
     def test_column_all_none_in_a_lineage_does_not_warn(self, lineage_props_model):
         # Like a propagated mother_cycle: None on root cells, so on all the cells
@@ -328,14 +328,14 @@ class TestToLinkDataframe:
         assert df.columns.tolist() == expected
 
     def test_lineages_without_links_give_empty_dataframe(self, lineage_props_model):
-        df = lineage_props_model.to_link_dataframe(lids=[-4])
+        df = lineage_props_model.to_link_dataframe(lineage_ids=[-4])
 
         assert df.empty
         assert df.columns.tolist() == ["lineage_id", "source_cell_id", "target_cell_id"]
 
     def test_no_matching_lineage_raises(self, lineage_props_model):
         with pytest.raises(ValueError, match="No links to export"):
-            lineage_props_model.to_link_dataframe(lids=[99])
+            lineage_props_model.to_link_dataframe(lineage_ids=[99])
 
 
 class TestToLineageDataframe:
@@ -349,7 +349,7 @@ class TestToLineageDataframe:
 
     def test_no_matching_lineage_raises(self, lineage_props_model):
         with pytest.raises(ValueError, match="No lineages to export"):
-            lineage_props_model.to_lineage_dataframe(lids=[99])
+            lineage_props_model.to_lineage_dataframe(lineage_ids=[99])
 
     def test_prop_none_in_a_lineage_does_not_warn(self, lineage_props_model):
         lineage_props_model.data.cell_data[-4].graph["lin_prop"] = None
@@ -430,7 +430,7 @@ class TestToCycleDataframe:
     def test_no_matching_lineage_raises(self, lineage_props_model):
         lineage_props_model.add_cycle_data()
         with pytest.raises(ValueError, match="No cell cycles to export"):
-            lineage_props_model.to_cycle_dataframe(lids=[99])
+            lineage_props_model.to_cycle_dataframe(lineage_ids=[99])
 
     def test_column_all_none_in_a_lineage_does_not_warn(self, lineage_props_model):
         # Lineage -4 has a single cell cycle, which has no mother cycle.
@@ -453,7 +453,7 @@ def relatives_model():
     Cell cycles of lineage 1 (ID = last cell): 2 (cells 1-2) divides into 5 (cells 3
     and 5) and 8 (cells 4 and 8); 5 divides into 6 and 7, 8 into 9 and 10.
     """
-    lin = CellLineage(lid=1)
+    lin = CellLineage(lineage_id=1)
     for cell_id, frame in [(1, 0), (2, 1), (3, 2), (4, 2), (5, 3), (8, 3)]:
         lin.add_node(cell_id, cell_id=cell_id, frame=frame)
     for cell_id in [6, 7, 9, 10]:
@@ -463,7 +463,7 @@ def relatives_model():
     for source, target in [(5, 6), (5, 7), (8, 9), (8, 10)]:
         lin.add_edge(source, target)
     lin.graph["lin_prop"] = 1.5
-    single_lin = CellLineage(lid=-11)
+    single_lin = CellLineage(lineage_id=-11)
     single_lin.add_node(11, cell_id=11, frame=0)
     single_lin.graph["lin_prop"] = 2.5
 
@@ -625,7 +625,7 @@ class TestToCyclePairDataframe:
 
     def test_lineage_without_pairs_gives_empty_dataframe(self, relatives_model):
         df = relatives_model.to_cycle_pair_dataframe(
-            "mother_cycle", props=["generation"], lids=[-11]
+            "mother_cycle", props=["generation"], lineage_ids=[-11]
         )
         assert df.empty
         assert df.columns.tolist() == [
@@ -637,7 +637,7 @@ class TestToCyclePairDataframe:
         ]
 
     def test_lids(self, relatives_model):
-        df = relatives_model.to_cycle_pair_dataframe("sister_cycles", lids=[1])
+        df = relatives_model.to_cycle_pair_dataframe("sister_cycles", lineage_ids=[1])
         assert (df["lineage_id"] == 1).all()
         assert len(df) == 6
 
@@ -720,7 +720,7 @@ def frame_time_model():
     Create a model with a dividing lineage whose reference time property "time" is
     given in frames, with a time origin different from 0.
     """
-    lin = CellLineage(lid=1)
+    lin = CellLineage(lineage_id=1)
     lin.add_node(1, cell_id=1, time=3)
     lin.add_node(2, cell_id=2, time=4)
     lin.add_node(3, cell_id=3, time=5)
@@ -906,7 +906,7 @@ def two_times_model():
     Cell cycles (ID = last cell): 2 (cells 1-2) divides into 4 (cell 4) and 5
     (cells 3 and 5).
     """
-    lin = CellLineage(lid=1)
+    lin = CellLineage(lineage_id=1)
     for cell_id, frame in [(1, 0), (2, 1), (3, 2), (4, 2), (5, 3)]:
         lin.add_node(cell_id, cell_id=cell_id, frame=frame, time=5 * frame)
     for source, target in [(1, 2), (2, 3), (2, 4), (3, 5)]:
@@ -1025,7 +1025,7 @@ def pixel_space_model():
     Create a 3D model with a two-cell lineage whose cell, link and lineage coordinates
     are given in pixels.
     """
-    lin = CellLineage(lid=1)
+    lin = CellLineage(lineage_id=1)
     lin.add_node(1, cell_id=1, frame=0, cell_x=10, cell_y=20, cell_z=2)
     lin.add_node(2, cell_id=2, frame=1, cell_x=30, cell_y=40, cell_z=4)
     lin.add_edge(1, 2, link_x=20, link_y=30, link_z=3)
@@ -1209,7 +1209,7 @@ def input_props_model():
     as inputs of predefined properties: a cell area, a cell polygon and a cell speed.
     Cycles: 2 = [1, 2], 3 = [3] and 4 = [4].
     """
-    lin = CellLineage(lid=1)
+    lin = CellLineage(lineage_id=1)
     for nid, time in [(1, 0), (2, 1), (3, 2), (4, 2)]:
         lin.add_node(
             nid,
@@ -1408,12 +1408,12 @@ def two_lineages_model():
     Create an updated model with cycle lineages, a cell property and a link property.
     Lineage 1: 1 -> 2 -> 3 and 1 -> 4 -> 5. Lineage 2: 10 -> 11.
     """
-    lin1 = CellLineage(lid=1)
+    lin1 = CellLineage(lineage_id=1)
     for nid, time in [(1, 0), (2, 1), (3, 2), (4, 1), (5, 2)]:
         lin1.add_node(nid, cell_id=nid, lineage_id=1, time=time)
     for source, target in [(1, 2), (2, 3), (1, 4), (4, 5)]:
         lin1.add_edge(source, target)
-    lin2 = CellLineage(lid=2)
+    lin2 = CellLineage(lineage_id=2)
     for nid, time in [(10, 0), (11, 1)]:
         lin2.add_node(nid, cell_id=nid, lineage_id=2, time=time)
     lin2.add_edge(10, 11)
@@ -1473,8 +1473,10 @@ class TestUpdate:
         input_props_model.add_absolute_age()
         input_props_model.add_interdivision_time()
         input_props_model.update()
-        input_props_model.add_cell(lid=1, cid=5, time_value=3)
-        input_props_model.add_link(source_cid=3, source_lid=1, target_cid=5)
+        input_props_model.add_cell(lineage_id=1, cell_id=5, time_value=3)
+        input_props_model.add_link(
+            source_cell_id=3, source_lineage_id=1, target_cell_id=5
+        )
         input_props_model.update(["absolute_age"])
         assert input_props_model.data.cell_data[1].nodes[5]["absolute_age"] == 3
         cycle_lin = input_props_model.data.cycle_data[1]
@@ -1533,9 +1535,11 @@ class TestUpdate:
         # Removing link 2 -> 3 splits lineage 1 at the update, and the split-off
         # lineage, with the new cell 6, gets ID 2, the ID of the removed lineage.
         two_lineages_model.remove_lineage(2)
-        two_lineages_model.remove_link(source_cid=2, target_cid=3, lid=1)
-        two_lineages_model.add_cell(lid=1, cid=6, time_value=3)
-        two_lineages_model.add_link(source_cid=3, source_lid=1, target_cid=6)
+        two_lineages_model.remove_link(source_cell_id=2, target_cell_id=3, lineage_id=1)
+        two_lineages_model.add_cell(lineage_id=1, cell_id=6, time_value=3)
+        two_lineages_model.add_link(
+            source_cell_id=3, source_lineage_id=1, target_cell_id=6
+        )
         two_lineages_model.update()
         assert set(two_lineages_model.data.cell_data[2].nodes) == {3, 6}
         assert two_lineages_model.data.cell_data[2].nodes[6]["cell_value"] == 1.0
@@ -1543,7 +1547,7 @@ class TestUpdate:
 
     def test_split_off_lineage_cells_get_its_id(self, two_lineages_model):
         # Removing link 1 -> 4 splits off cells 4 and 5 into a new lineage.
-        two_lineages_model.remove_link(source_cid=1, target_cid=4, lid=1)
+        two_lineages_model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         two_lineages_model.update()
         new_lid, new_lin = next(
             (lid, lin)
@@ -1555,7 +1559,7 @@ class TestUpdate:
 
     def test_single_cell_split_off_lineage_cell_gets_its_id(self, two_lineages_model):
         # Removing link 4 -> 5 splits off cell 5 into lineage -5.
-        two_lineages_model.remove_link(source_cid=4, target_cid=5, lid=1)
+        two_lineages_model.remove_link(source_cell_id=4, target_cell_id=5, lineage_id=1)
         two_lineages_model.update()
         assert two_lineages_model.data.cell_data[-5].nodes[5]["lineage_id"] == -5
 
@@ -1563,7 +1567,7 @@ class TestUpdate:
         self, two_lineages_model
     ):
         two_lineages_model.data.cell_data[1].graph["lineage_name"] = "Track_1"
-        two_lineages_model.remove_link(source_cid=1, target_cid=4, lid=1)
+        two_lineages_model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         two_lineages_model.update()
         new_lin = next(
             lin for lin in two_lineages_model.data.cell_data.values() if 4 in lin
@@ -1578,7 +1582,7 @@ class TestUpdate:
         model = two_lineages_model
         model.propagate_cycle_properties(["cycle_id", "generation"])
         # Cell 1 divides into cells 2 and 4: without 1 -> 4, 1 -> 2 -> 3 is one cycle.
-        model.remove_link(source_cid=1, target_cid=4, lid=1)
+        model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         model.update(props_to_update)
         lin = model.data.cell_data[1]
         assert dict(lin.nodes(data="cycle_id")) == {1: 3, 2: 3, 3: 3}
@@ -1590,8 +1594,8 @@ class TestUpdate:
     def test_propagated_props_given_to_new_cells(self, two_lineages_model):
         model = two_lineages_model
         model.propagate_cycle_properties(["cycle_id"])
-        model.add_cell(lid=1, cid=6, time_value=3)
-        model.add_link(source_cid=5, source_lid=1, target_cid=6)
+        model.add_cell(lineage_id=1, cell_id=6, time_value=3)
+        model.add_link(source_cell_id=5, source_lineage_id=1, target_cell_id=6)
         model.update()
         lin = model.data.cell_data[1]
         assert dict(lin.nodes(data="cycle_id")) == {1: 1, 2: 3, 3: 3, 4: 6, 5: 6, 6: 6}
@@ -1601,7 +1605,7 @@ class TestUpdate:
         model.add_mother_cycle()
         model.propagate_cycle_properties(["mother_cycle"])
         assert model.data.cell_data[1].nodes[4]["mother_cycle"] == 1
-        model.remove_link(source_cid=1, target_cid=4, lid=1)
+        model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         model.update()
         new_lin = next(lin for lin in model.data.cell_data.values() if 4 in lin)
         assert dict(new_lin.nodes(data="mother_cycle")) == {4: None, 5: None}
@@ -1609,7 +1613,7 @@ class TestUpdate:
     def test_cycle_props_not_propagated_stay_off_cells(self, two_lineages_model):
         model = two_lineages_model
         model.propagate_cycle_properties(["cycle_id"])
-        model.remove_link(source_cid=1, target_cid=4, lid=1)
+        model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         model.update()
         for lin in model.data.cell_data.values():
             assert all("generation" not in cell for _, cell in lin.nodes(data=True))
@@ -1634,7 +1638,7 @@ class TestPropagateCycleProperties:
             for _, cell in lin.nodes(data=True):
                 cell["both_prop"] = 5.0
         model.propagate_cycle_properties()
-        model.remove_link(source_cid=1, target_cid=4, lid=1)
+        model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         model.update()
         assert "both_prop" not in model.props_metadata._get_propagated_props()
         for lin in model.data.cell_data.values():
@@ -1653,7 +1657,7 @@ class TestPropagateCycleProperties:
             pickle.loads(pickle.dumps(two_lineages_model)),
             copy.deepcopy(two_lineages_model),
         ):
-            model.remove_link(source_cid=1, target_cid=4, lid=1)
+            model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
             model.update()
             lin = model.data.cell_data[1]
             assert dict(lin.nodes(data="cycle_id")) == {1: 3, 2: 3, 3: 3}
@@ -1665,7 +1669,7 @@ class TestPropagateCycleProperties:
         del two_lineages_model.props_metadata._propagated_props
         model = pickle.loads(pickle.dumps(two_lineages_model))
         assert model.props_metadata._get_propagated_props() == []
-        model.remove_link(source_cid=1, target_cid=4, lid=1)
+        model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         model.update()
         assert model.data.cell_data[1].nodes[1]["cycle_id"] == 1
 
@@ -1696,7 +1700,7 @@ class TestAddLineage:
     def test_cell_removed_before_lineage_added_back_computed(
         self, two_lineages_model
     ):
-        two_lineages_model.remove_cell(cid=11, lid=2)
+        two_lineages_model.remove_cell(cell_id=11, lineage_id=2)
         lineage = two_lineages_model.remove_lineage(2)
         lineage.add_node(11, cell_id=11, time=1)
         lineage.add_edge(10, 11)
@@ -1707,7 +1711,9 @@ class TestAddLineage:
     def test_link_removed_before_lineage_added_back_computed(
         self, two_lineages_model
     ):
-        two_lineages_model.remove_link(source_cid=10, target_cid=11, lid=2)
+        two_lineages_model.remove_link(
+            source_cell_id=10, target_cell_id=11, lineage_id=2
+        )
         lineage = two_lineages_model.remove_lineage(2)
         lineage.add_edge(10, 11)
         two_lineages_model.add_lineage(lineage)
@@ -1719,8 +1725,10 @@ class TestRemoveLineage:
     """Test cases for Model.remove_lineage() method."""
 
     def test_lineage_with_new_link_removed_before_update(self, two_lineages_model):
-        two_lineages_model.add_cell(lid=2, cid=12, time_value=2)
-        two_lineages_model.add_link(source_cid=11, source_lid=2, target_cid=12)
+        two_lineages_model.add_cell(lineage_id=2, cell_id=12, time_value=2)
+        two_lineages_model.add_link(
+            source_cell_id=11, source_lineage_id=2, target_cell_id=12
+        )
         two_lineages_model.remove_lineage(2)
         two_lineages_model.update()
         assert sorted(two_lineages_model.data.cell_data) == [1]
@@ -1733,19 +1741,21 @@ class TestSplitLineageFromCell:
     def test_split_off_lineage_with_removed_id_kept(self, two_lineages_model):
         # The split-off lineage gets ID 2, the ID of the removed lineage.
         two_lineages_model.remove_lineage(2)
-        two_lineages_model.split_lineage_from_cell(cid=4, lid=1)
+        two_lineages_model.split_lineage_from_cell(cell_id=4, lineage_id=1)
         two_lineages_model.update()
         assert set(two_lineages_model.data.cell_data[2].nodes) == {4, 5}
         assert 2 in two_lineages_model.data.cycle_data
 
     def test_new_lineage_without_original_lineage_props(self, two_lineages_model):
         two_lineages_model.data.cell_data[1].graph["lineage_name"] = "Track_1"
-        new_lineage = two_lineages_model.split_lineage_from_cell(cid=4, lid=1)
+        new_lineage = two_lineages_model.split_lineage_from_cell(
+            cell_id=4, lineage_id=1
+        )
         assert new_lineage.graph == {"lineage_id": 3}
         assert two_lineages_model.data.cell_data[1].graph["lineage_name"] == "Track_1"
 
     def test_cells_get_new_lineage_id_at_update(self, two_lineages_model):
-        two_lineages_model.split_lineage_from_cell(cid=4, lid=1)
+        two_lineages_model.split_lineage_from_cell(cell_id=4, lineage_id=1)
         two_lineages_model.update()
         new_lineage = two_lineages_model.data.cell_data[3]
         assert dict(new_lineage.nodes(data="lineage_id")) == {4: 3, 5: 3}
@@ -1755,9 +1765,11 @@ class TestAddCell:
     """Test cases for Model.add_cell() method."""
 
     def test_cell_removed_then_added_back_computed(self, two_lineages_model):
-        two_lineages_model.remove_cell(cid=5, lid=1)
-        two_lineages_model.add_cell(lid=1, cid=5, time_value=2)
-        two_lineages_model.add_link(source_cid=4, source_lid=1, target_cid=5)
+        two_lineages_model.remove_cell(cell_id=5, lineage_id=1)
+        two_lineages_model.add_cell(lineage_id=1, cell_id=5, time_value=2)
+        two_lineages_model.add_link(
+            source_cell_id=4, source_lineage_id=1, target_cell_id=5
+        )
         two_lineages_model.update()
         cell = two_lineages_model.data.cell_data[1].nodes[5]
         assert cell["timepoint"] == 2
@@ -1768,17 +1780,22 @@ class TestAddLink:
     """Test cases for Model.add_link() method."""
 
     def test_link_removed_then_added_back_computed(self, two_lineages_model):
-        two_lineages_model.remove_link(source_cid=4, target_cid=5, lid=1)
-        two_lineages_model.add_link(source_cid=4, source_lid=1, target_cid=5)
+        two_lineages_model.remove_link(source_cell_id=4, target_cell_id=5, lineage_id=1)
+        two_lineages_model.add_link(
+            source_cell_id=4, source_lineage_id=1, target_cell_id=5
+        )
         two_lineages_model.update()
         assert two_lineages_model.data.cell_data[1].edges[4, 5]["link_value"] == 1.0
 
     def test_cells_moved_from_other_lineage_get_its_id(self, two_lineages_model):
         # Cell 12 is split off into lineage -12, then moves to lineage 1 with the link.
-        two_lineages_model.add_cell(lid=2, cid=12, time_value=3)
+        two_lineages_model.add_cell(lineage_id=2, cell_id=12, time_value=3)
         two_lineages_model.update()
         two_lineages_model.add_link(
-            source_cid=3, source_lid=1, target_cid=12, target_lid=-12
+            source_cell_id=3,
+            source_lineage_id=1,
+            target_cell_id=12,
+            target_lineage_id=-12,
         )
         two_lineages_model.update()
         assert two_lineages_model.data.cell_data[1].nodes[12]["lineage_id"] == 1
@@ -1786,11 +1803,16 @@ class TestAddLink:
     def test_cells_and_link_added_then_moved_computed(self, two_lineages_model):
         # Cells 12 and 13 and their link, added to lineage 2, move to lineage 1 with
         # the link from cell 3 before the update.
-        two_lineages_model.add_cell(lid=2, cid=12, time_value=3)
-        two_lineages_model.add_cell(lid=2, cid=13, time_value=4)
-        two_lineages_model.add_link(source_cid=12, source_lid=2, target_cid=13)
+        two_lineages_model.add_cell(lineage_id=2, cell_id=12, time_value=3)
+        two_lineages_model.add_cell(lineage_id=2, cell_id=13, time_value=4)
         two_lineages_model.add_link(
-            source_cid=3, source_lid=1, target_cid=12, target_lid=2
+            source_cell_id=12, source_lineage_id=2, target_cell_id=13
+        )
+        two_lineages_model.add_link(
+            source_cell_id=3,
+            source_lineage_id=1,
+            target_cell_id=12,
+            target_lineage_id=2,
         )
         two_lineages_model.update()
         lineage = two_lineages_model.data.cell_data[1]
@@ -2226,8 +2248,10 @@ class TestAddAbsoluteAge:
     def test_new_root_updates_all_cells(self, input_props_model):
         input_props_model.add_absolute_age()
         input_props_model.update()
-        input_props_model.add_cell(lid=1, cid=5, time_value=-1)
-        input_props_model.add_link(source_cid=5, source_lid=1, target_cid=1)
+        input_props_model.add_cell(lineage_id=1, cell_id=5, time_value=-1)
+        input_props_model.add_link(
+            source_cell_id=5, source_lineage_id=1, target_cell_id=1
+        )
         input_props_model.update()
         lin = input_props_model.data.cell_data[1]
         assert dict(lin.nodes(data="absolute_age")) == {1: 1, 2: 2, 3: 3, 4: 3, 5: 0}
@@ -2285,8 +2309,10 @@ class TestAddRelativeAge:
         input_props_model.update()
         assert input_props_model.data.cell_data[1].nodes[2]["relative_age"] == 1
         # Cell 1 divides into cells 2 and 5: cycle [1, 2] becomes [1] and [2].
-        input_props_model.add_cell(lid=1, cid=5, time_value=1)
-        input_props_model.add_link(source_cid=1, source_lid=1, target_cid=5)
+        input_props_model.add_cell(lineage_id=1, cell_id=5, time_value=1)
+        input_props_model.add_link(
+            source_cell_id=1, source_lineage_id=1, target_cell_id=5
+        )
         input_props_model.update()
         assert input_props_model.data.cell_data[1].nodes[2]["relative_age"] == 0
 
@@ -2410,9 +2436,9 @@ class TestAddCousinCycles:
         # Cells 3 and 4 divide into cells 5, 6 and 7, 8: cycles 5 and 7 are first
         # cousins, and there are no second cousins.
         for mother, daughter in [(3, 5), (3, 6), (4, 7), (4, 8)]:
-            input_props_model.add_cell(lid=1, cid=daughter, time_value=3)
+            input_props_model.add_cell(lineage_id=1, cell_id=daughter, time_value=3)
             input_props_model.add_link(
-                source_cid=mother, source_lid=1, target_cid=daughter
+                source_cell_id=mother, source_lineage_id=1, target_cell_id=daughter
             )
         input_props_model.add_cousin_cycles()
         input_props_model.add_cousin_cycles(

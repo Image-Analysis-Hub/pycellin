@@ -194,13 +194,13 @@ class TestCellIntensityFromLabelImg:
             prop_cell_lin, "total", intensity_img, "label", label_img
         )
         # Rows 1-2, columns 1-3: 9 + 10 + 11 + 17 + 18 + 19.
-        assert calculator.compute(cell_lineage, nid=1) == 84.0
+        assert calculator.compute(cell_lineage, node_id=1) == 84.0
 
     def test_compute_mean(self, cell_lineage, label_img, intensity_img, prop_cell_lin):
         calculator = CellIntensityFromLabelImg(
             prop_cell_lin, "mean", intensity_img, "label", label_img
         )
-        assert calculator.compute(cell_lineage, nid=1) == 14.0
+        assert calculator.compute(cell_lineage, node_id=1) == 14.0
 
     def test_compute_all_pieces(
         self, cell_lineage, label_img, intensity_img, prop_cell_lin
@@ -209,7 +209,7 @@ class TestCellIntensityFromLabelImg:
             prop_cell_lin, "total", intensity_img, "label", label_img
         )
         # The 2x2 square (29 + 30 + 37 + 38) and the pixel (0, 7) of value 7.
-        assert calculator.compute(cell_lineage, nid=2) == 141.0
+        assert calculator.compute(cell_lineage, node_id=2) == 141.0
 
     def test_compute_hole_left_out(self, prop_cell_lin):
         label_img = np.ones((1, 3, 3), dtype=np.uint32)
@@ -219,7 +219,7 @@ class TestCellIntensityFromLabelImg:
         calculator = CellIntensityFromLabelImg(
             prop_cell_lin, "total", np.ones((1, 3, 3)), "label", label_img
         )
-        assert calculator.compute(lineage, nid=1) == 8.0
+        assert calculator.compute(lineage, node_id=1) == 8.0
 
     def test_compute_background(
         self, cell_lineage, label_img, intensity_img, prop_cell_lin
@@ -230,8 +230,8 @@ class TestCellIntensityFromLabelImg:
         mean = CellIntensityFromLabelImg(
             prop_cell_lin, "mean", intensity_img, "label", label_img, background=4.0
         )
-        assert total.compute(cell_lineage, nid=1) == 84.0 - 6 * 4.0
-        assert mean.compute(cell_lineage, nid=1) == 10.0
+        assert total.compute(cell_lineage, node_id=1) == 84.0 - 6 * 4.0
+        assert mean.compute(cell_lineage, node_id=1) == 10.0
 
     def test_compute_background_above_pixel_values(
         self, cell_lineage, label_img, prop_cell_lin
@@ -241,7 +241,7 @@ class TestCellIntensityFromLabelImg:
         calculator = CellIntensityFromLabelImg(
             prop_cell_lin, "mean", intensity_img, "label", label_img, background=100
         )
-        assert calculator.compute(cell_lineage, nid=1) == -50.0
+        assert calculator.compute(cell_lineage, node_id=1) == -50.0
 
     def test_compute_3d(self, prop_cell_lin):
         label_img = np.zeros((1, 2, 3, 3), dtype=np.uint32)
@@ -254,7 +254,7 @@ class TestCellIntensityFromLabelImg:
             prop_cell_lin, "total", intensity_img, "label", label_img
         )
         # 4 pixels in each of the 2 planes, of values 0 and 2.
-        assert calculator.compute(lineage, nid=1) == 8.0
+        assert calculator.compute(lineage, node_id=1) == 8.0
 
     def test_compute_missing_label_raises(
         self, cell_lineage, label_img, intensity_img, prop_cell_lin
@@ -264,7 +264,7 @@ class TestCellIntensityFromLabelImg:
             prop_cell_lin, "total", intensity_img, "label", label_img
         )
         with pytest.raises(ValueError, match="Label 7 of cell 1"):
-            calculator.compute(cell_lineage, nid=1)
+            calculator.compute(cell_lineage, node_id=1)
 
     def test_invalid_statistic_raises(self, label_img, intensity_img, prop_cell_lin):
         with pytest.raises(ValueError, match="'statistic' must be one of"):
@@ -316,14 +316,14 @@ class TestCellIntensityFromPolygon:
         calculator = CellIntensityFromPolygon(
             prop_cell_lin, "mean", intensity_img, "cell_polygon", 1.0
         )
-        assert calculator.compute(cell_lineage, nid=1) == 9.5
+        assert calculator.compute(cell_lineage, node_id=1) == 9.5
 
     def test_compute_none_shape(self, cell_lineage, intensity_img, prop_cell_lin):
         cell_lineage.nodes[1]["cell_polygon"] = None
         calculator = CellIntensityFromPolygon(
             prop_cell_lin, "total", intensity_img, "cell_polygon", 1.0
         )
-        assert math.isnan(calculator.compute(cell_lineage, nid=1))
+        assert math.isnan(calculator.compute(cell_lineage, node_id=1))
 
     def test_compute_no_pixel_center(self, cell_lineage, intensity_img, prop_cell_lin):
         cell_lineage.nodes[1]["cell_polygon"] = MultiPolygon(
@@ -332,7 +332,7 @@ class TestCellIntensityFromPolygon:
         calculator = CellIntensityFromPolygon(
             prop_cell_lin, "total", intensity_img, "cell_polygon", 1.0
         )
-        assert math.isnan(calculator.compute(cell_lineage, nid=1))
+        assert math.isnan(calculator.compute(cell_lineage, node_id=1))
 
     def test_compute_missing_shape_raises(
         self, cell_lineage, intensity_img, prop_cell_lin
@@ -341,7 +341,7 @@ class TestCellIntensityFromPolygon:
             prop_cell_lin, "total", intensity_img, "cell_polygon", 1.0
         )
         with pytest.raises(KeyError, match="missing 'cell_polygon' property"):
-            calculator.compute(cell_lineage, nid=1)
+            calculator.compute(cell_lineage, node_id=1)
 
     def test_get_input_props(self, intensity_img, prop_cell_lin):
         calculator = CellIntensityFromPolygon(
@@ -358,18 +358,18 @@ class TestCellIntensityFromPolygon:
 class TestCycleMeanIntensity:
     def test_compute(self, data, prop_cycle_lin):
         calculator = CycleMeanIntensity(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], nid=4) == 2.5
+        assert calculator.compute(data, data.cycle_data[1], node_id=4) == 2.5
 
     def test_compute_ignores_nan(self, data, prop_cycle_lin):
         data.cell_data[1].nodes[1]["cell_mean_intensity"] = np.nan
         calculator = CycleMeanIntensity(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], nid=4) == 3.0
+        assert calculator.compute(data, data.cycle_data[1], node_id=4) == 3.0
 
     def test_compute_custom_intensity_prop(self, data, prop_cycle_lin):
         calculator = CycleMeanIntensity(
             prop_cycle_lin, intensity_prop="cell_total_intensity"
         )
-        assert calculator.compute(data, data.cycle_data[1], nid=6) == 55.0
+        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 55.0
 
     def test_get_input_props(self, prop_cycle_lin):
         calculator = CycleMeanIntensity(prop_cycle_lin)
@@ -384,21 +384,21 @@ class TestCycleMeanIntensity:
 class TestBirthIntensity:
     def test_compute_complete_cycle(self, data, prop_cycle_lin):
         calculator = BirthIntensity(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], nid=6) == 50.0
+        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 50.0
 
     def test_compute_leaf_cycle(self, data, prop_cycle_lin):
         calculator = BirthIntensity(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], nid=7) == 70.0
+        assert calculator.compute(data, data.cycle_data[1], node_id=7) == 70.0
 
     def test_compute_root_cycle(self, data, prop_cycle_lin):
         calculator = BirthIntensity(prop_cycle_lin)
-        assert math.isnan(calculator.compute(data, data.cycle_data[1], nid=4))
+        assert math.isnan(calculator.compute(data, data.cycle_data[1], node_id=4))
 
     def test_compute_custom_intensity_prop(self, data, prop_cycle_lin):
         calculator = BirthIntensity(
             prop_cycle_lin, intensity_prop="cell_mean_intensity"
         )
-        assert calculator.compute(data, data.cycle_data[1], nid=6) == 5.0
+        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 5.0
 
 
 # DivisionIntensity ###########################################################
@@ -407,18 +407,18 @@ class TestBirthIntensity:
 class TestDivisionIntensity:
     def test_compute_complete_cycle(self, data, prop_cycle_lin):
         calculator = DivisionIntensity(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], nid=6) == 60.0
+        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 60.0
 
     def test_compute_root_cycle(self, data, prop_cycle_lin):
         calculator = DivisionIntensity(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], nid=4) == 40.0
+        assert calculator.compute(data, data.cycle_data[1], node_id=4) == 40.0
 
     def test_compute_leaf_cycle(self, data, prop_cycle_lin):
         calculator = DivisionIntensity(prop_cycle_lin)
-        assert math.isnan(calculator.compute(data, data.cycle_data[1], nid=7))
+        assert math.isnan(calculator.compute(data, data.cycle_data[1], node_id=7))
 
     def test_compute_custom_intensity_prop(self, data, prop_cycle_lin):
         calculator = DivisionIntensity(
             prop_cycle_lin, intensity_prop="cell_mean_intensity"
         )
-        assert calculator.compute(data, data.cycle_data[1], nid=6) == 6.0
+        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 6.0

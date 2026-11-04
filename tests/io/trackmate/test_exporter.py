@@ -601,9 +601,15 @@ class TestExportTrackMateXML:
         simple_model.data.cell_data[0].graph["FilteredTrack"] = False
         lid = simple_model.add_lineage()
         coords = {"cell_x": 0.0, "cell_y": 0.0}
-        simple_model.add_cell(lid=lid, cid=10, time_value=0, prop_values=coords)
-        simple_model.add_cell(lid=lid, cid=11, time_value=1, prop_values=coords)
-        simple_model.add_link(source_cid=10, source_lid=lid, target_cid=11)
+        simple_model.add_cell(
+            lineage_id=lid, cell_id=10, time_value=0, prop_values=coords
+        )
+        simple_model.add_cell(
+            lineage_id=lid, cell_id=11, time_value=1, prop_values=coords
+        )
+        simple_model.add_link(
+            source_cell_id=10, source_lineage_id=lid, target_cell_id=11
+        )
         simple_model.update()
         xml_path = tmp_path / "model.xml"
         export_TrackMate_XML(

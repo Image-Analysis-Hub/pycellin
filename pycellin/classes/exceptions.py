@@ -61,9 +61,9 @@ class TimeFlowError(LineageStructureError):
 
     Parameters
     ----------
-    source_nid : int
+    source_node_id : int
         The ID of the source node.
-    target_nid : int
+    target_node_id : int
         The ID of the target node.
     source_lineage_id : int, optional
         The ID of the lineage of the source node.
@@ -77,15 +77,15 @@ class TimeFlowError(LineageStructureError):
 
     def __init__(
         self,
-        source_nid: int,
-        target_nid: int,
+        source_node_id: int,
+        target_node_id: int,
         source_lineage_id: int | None = None,
         target_lineage_id: int | None = None,
         message: str | None = None,
     ):
-        self.source_nid = source_nid
+        self.source_node_id = source_node_id
         self.source_lineage_id = source_lineage_id
-        self.target_nid = target_nid
+        self.target_node_id = target_node_id
         self.target_lineage_id = target_lineage_id
         if message is None:
             txt_source_lin = (
@@ -95,9 +95,9 @@ class TimeFlowError(LineageStructureError):
                 "" if target_lineage_id is None else f" in lineage {target_lineage_id}"
             )
             message = (
-                f"Node {target_nid}{txt_target_lin} "
+                f"Node {target_node_id}{txt_target_lin} "
                 f"has a time value lower than its parent node, "
-                f"node {source_nid}{txt_source_lin}."
+                f"node {source_node_id}{txt_source_lin}."
             )
         super().__init__(message)
 
@@ -148,7 +148,7 @@ class MissingPropertyError(KeyError):
     ----------
     prop_name : str
         The name of the missing property.
-    nid : int, optional
+    node_id : int, optional
         The ID of the node where the property is missing. None when the property
         is missing from the model rather than from a specific node.
     lineage_id : int, optional
@@ -160,15 +160,15 @@ class MissingPropertyError(KeyError):
     def __init__(
         self,
         prop_name: str,
-        nid: int | None = None,
+        node_id: int | None = None,
         lineage_id: int | None = None,
         message: str | None = None,
     ):
         self.prop_name = prop_name
-        self.nid = nid
+        self.node_id = node_id
         self.lineage_id = lineage_id
         if message is None:
-            node_txt = f" for node {nid}" if nid is not None else ""
+            node_txt = f" for node {node_id}" if node_id is not None else ""
             lin_txt = f" in lineage {lineage_id}" if lineage_id is not None else ""
             message = f"Required property '{prop_name}' is missing{node_txt}{lin_txt}."
         self.message = message

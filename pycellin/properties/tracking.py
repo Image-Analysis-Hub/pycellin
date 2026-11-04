@@ -94,7 +94,7 @@ class AbsoluteAge(NodeLocalPropCalculator):
         self.time_prop = time_prop
 
     def compute(  # type: ignore[override]
-        self, lineage: CellLineage, nid: int
+        self, lineage: CellLineage, node_id: int
     ) -> int | float:
         """
         Compute the absolute age of a given cell.
@@ -103,7 +103,7 @@ class AbsoluteAge(NodeLocalPropCalculator):
         ----------
         lineage : CellLineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cell_id) of the cell of interest.
 
         Returns
@@ -116,11 +116,11 @@ class AbsoluteAge(NodeLocalPropCalculator):
         KeyError
             If the cell is not in the lineage.
         """
-        if nid not in lineage.nodes:
-            raise KeyError(f"Cell {nid} not in the lineage.")
+        if node_id not in lineage.nodes:
+            raise KeyError(f"Cell {node_id} not in the lineage.")
         root = lineage.get_root()
         age = (
-            lineage.nodes[nid][self.time_prop]
+            lineage.nodes[node_id][self.time_prop]
             - lineage.nodes[root][self.time_prop]
         )
         return age
@@ -175,7 +175,7 @@ class RelativeAge(NodeLocalPropCalculator):
         self.time_prop = time_prop
 
     def compute(  # type: ignore[override]
-        self, lineage: CellLineage, nid: int
+        self, lineage: CellLineage, node_id: int
     ) -> int | float:
         """
         Compute the relative age of a given cell.
@@ -184,7 +184,7 @@ class RelativeAge(NodeLocalPropCalculator):
         ----------
         lineage : CellLineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cell_id) of the cell of interest.
 
         Returns
@@ -197,11 +197,11 @@ class RelativeAge(NodeLocalPropCalculator):
         KeyError
             If the cell is not in the lineage.
         """
-        if nid not in lineage.nodes:
-            raise KeyError(f"Cell {nid} not in the lineage.")
-        first_cell = lineage.get_cell_cycle(nid)[0]
+        if node_id not in lineage.nodes:
+            raise KeyError(f"Cell {node_id} not in the lineage.")
+        first_cell = lineage.get_cell_cycle(node_id)[0]
         age = (
-            lineage.nodes[nid][self.time_prop]
+            lineage.nodes[node_id][self.time_prop]
             - lineage.nodes[first_cell][self.time_prop]
         )
         return age
@@ -265,7 +265,7 @@ class NormalizedAge(NodeLocalPropCalculator):
         self.ignore_incomplete_cycles = ignore_incomplete_cycles
 
     def compute(  # type: ignore[override]
-        self, lineage: CellLineage, nid: int
+        self, lineage: CellLineage, node_id: int
     ) -> float:
         """
         Compute the normalized age of a given cell.
@@ -274,7 +274,7 @@ class NormalizedAge(NodeLocalPropCalculator):
         ----------
         lineage : CellLineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cell_id) of the cell of interest.
 
         Returns
@@ -288,9 +288,9 @@ class NormalizedAge(NodeLocalPropCalculator):
         KeyError
             If the cell is not in the lineage.
         """
-        if nid not in lineage.nodes:
-            raise KeyError(f"Cell {nid} not in the lineage.")
-        cells = lineage.get_cell_cycle(nid)
+        if node_id not in lineage.nodes:
+            raise KeyError(f"Cell {node_id} not in the lineage.")
+        cells = lineage.get_cell_cycle(node_id)
         if self.ignore_incomplete_cycles and (
             lineage.is_root(cells[0]) or lineage.is_leaf(cells[-1])
         ):
@@ -299,7 +299,7 @@ class NormalizedAge(NodeLocalPropCalculator):
         duration = lineage.nodes[cells[-1]][self.time_prop] - start_time
         if duration == 0:
             return np.nan
-        return (lineage.nodes[nid][self.time_prop] - start_time) / duration
+        return (lineage.nodes[node_id][self.time_prop] - start_time) / duration
 
 
 def create_is_complete_cycle_property(
@@ -333,7 +333,7 @@ class IsCompleteCycle(NodeLocalPropCalculator):
     """
 
     def compute(  # type: ignore[override]
-        self, lineage: CellLineage | CycleLineage, nid: int
+        self, lineage: CellLineage | CycleLineage, node_id: int
     ) -> bool:
         """
         Compute whether the cell cycle of a given cell, or a given cell cycle, is complete.
@@ -342,7 +342,7 @@ class IsCompleteCycle(NodeLocalPropCalculator):
         ----------
         lineage : CellLineage | CycleLineage
             Lineage graph containing the node (cell or cell cycle) of interest.
-        nid : int
+        node_id : int
             Node ID of the node (cell or cell cycle) of interest.
 
         Returns
@@ -356,17 +356,17 @@ class IsCompleteCycle(NodeLocalPropCalculator):
             If the cell or cycle is not in the lineage.
         """
         if isinstance(lineage, CellLineage):
-            if nid not in lineage.nodes:
-                raise KeyError(f"Cell {nid} not in the lineage.")
-            cell_cycle = lineage.get_cell_cycle(nid)
+            if node_id not in lineage.nodes:
+                raise KeyError(f"Cell {node_id} not in the lineage.")
+            cell_cycle = lineage.get_cell_cycle(node_id)
             if lineage.is_root(cell_cycle[0]) or lineage.is_leaf(cell_cycle[-1]):
                 return False
             else:
                 return True
         elif isinstance(lineage, CycleLineage):
-            if nid not in lineage.nodes:
-                raise KeyError(f"Cycle {nid} not in the lineage.")
-            if lineage.is_root(nid) or lineage.is_leaf(nid):
+            if node_id not in lineage.nodes:
+                raise KeyError(f"Cycle {node_id} not in the lineage.")
+            if lineage.is_root(node_id) or lineage.is_leaf(node_id):
                 return False
             else:
                 return True
@@ -508,7 +508,7 @@ class InterdivisionTime(NodeGlobalPropCalculator):
         self.time_prop = time_prop
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage | CycleLineage, nid: int
+        self, data: Data, lineage: CellLineage | CycleLineage, node_id: int
     ) -> int | float:
         """
         Compute the interdivision time of a given cell or cell cycle.
@@ -519,7 +519,7 @@ class InterdivisionTime(NodeGlobalPropCalculator):
             Data object containing the lineage.
         lineage : CellLineage | CycleLineage
             Lineage graph containing the node (cell or cell cycle) of interest.
-        nid : int
+        node_id : int
             Node ID of the node (cell or cell cycle) of interest.
 
         Returns
@@ -534,11 +534,11 @@ class InterdivisionTime(NodeGlobalPropCalculator):
         """
         if isinstance(lineage, CellLineage):
             timepoint_curr_div, timepoint_prev_div = _get_cell_lin_timepoints(
-                lineage, nid, self.time_prop
+                lineage, node_id, self.time_prop
             )
         elif isinstance(lineage, CycleLineage):
             timepoint_curr_div, timepoint_prev_div = _get_cycle_lin_timepoints(
-                data, lineage, nid, self.time_prop
+                data, lineage, node_id, self.time_prop
             )
         else:
             raise TypeError(
@@ -594,7 +594,7 @@ class DivisionRate(NodeGlobalPropCalculator):
         self.time_prop = time_prop
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CellLineage | CycleLineage, nid: int
+        self, data: Data, lineage: CellLineage | CycleLineage, node_id: int
     ) -> int | float:
         """
         Compute the division rate of a given cell or cell cycle.
@@ -605,7 +605,7 @@ class DivisionRate(NodeGlobalPropCalculator):
             Data object containing the lineage.
         lineage : CellLineage | CycleLineage
             Lineage graph containing the node (cell or cell cycle) of interest.
-        nid : int
+        node_id : int
             Node ID of the node (cell or cell cycle) of interest.
 
         Returns
@@ -620,11 +620,11 @@ class DivisionRate(NodeGlobalPropCalculator):
         """
         if isinstance(lineage, CellLineage):
             timepoint_curr_div, timepoint_prev_div = _get_cell_lin_timepoints(
-                lineage, nid, self.time_prop
+                lineage, node_id, self.time_prop
             )
         elif isinstance(lineage, CycleLineage):
             timepoint_curr_div, timepoint_prev_div = _get_cycle_lin_timepoints(
-                data, lineage, nid, self.time_prop
+                data, lineage, node_id, self.time_prop
             )
         else:
             raise TypeError(

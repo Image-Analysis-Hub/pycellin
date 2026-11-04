@@ -357,7 +357,7 @@ def standardize_rename_map():
 @pytest.fixture
 def lineages_with_nonstandard_keys() -> list[CellLineage]:
     """Two lineages carrying non-standard node and lineage property keys."""
-    lin_a = CellLineage(nx.DiGraph(), lid=None)
+    lin_a = CellLineage(nx.DiGraph(), lineage_id=None)
     lin_a.add_node(
         0,
         custom_lin_id=11,
@@ -380,7 +380,7 @@ def lineages_with_nonstandard_keys() -> list[CellLineage]:
     lin_a.graph["custom_lin_id"] = 11
     lin_a.graph["old_lin_key"] = "lin-a"
 
-    lin_b = CellLineage(nx.DiGraph(), lid=None)
+    lin_b = CellLineage(nx.DiGraph(), lineage_id=None)
     lin_b.add_node(
         2,
         custom_lin_id=12,

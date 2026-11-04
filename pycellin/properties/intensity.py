@@ -234,7 +234,7 @@ class _CellIntensityCalculator(NodeLocalPropCalculator):
         """
 
     def compute(  # type: ignore[override]
-        self, lineage: CellLineage, nid: int
+        self, lineage: CellLineage, node_id: int
     ) -> float:
         """
         Compute the intensity of a cell.
@@ -243,7 +243,7 @@ class _CellIntensityCalculator(NodeLocalPropCalculator):
         ----------
         lineage : CellLineage
             Lineage graph containing the cell.
-        nid : int
+        node_id : int
             Node ID of the cell.
 
         Returns
@@ -252,7 +252,7 @@ class _CellIntensityCalculator(NodeLocalPropCalculator):
             Sum or mean of the background-subtracted pixel values of the cell,
             or NaN if the cell has no pixel.
         """
-        values = self._cell_pixels(lineage, nid)
+        values = self._cell_pixels(lineage, node_id)
         if values is None or values.size == 0:
             return np.nan
         values = values.astype(np.float64) - self.background
@@ -430,7 +430,7 @@ class CycleMeanIntensity(NodeGlobalPropCalculator):
         self.intensity_prop = intensity_prop
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, nid: int
+        self, data: Data, lineage: CycleLineage, node_id: int
     ) -> float:
         """
         Compute the mean intensity of a cell during the cell cycle.
@@ -441,7 +441,7 @@ class CycleMeanIntensity(NodeGlobalPropCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
@@ -451,7 +451,7 @@ class CycleMeanIntensity(NodeGlobalPropCalculator):
             of the cell cycle has an intensity value.
         """
         intensities = _get_cycle_node_property_values(
-            self.intensity_prop, data, lineage, nid
+            self.intensity_prop, data, lineage, node_id
         )
         return _nanmean(intensities)
 
@@ -503,7 +503,7 @@ class BirthIntensity(NodeGlobalPropCalculator):
         self.intensity_prop = intensity_prop
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, nid: int
+        self, data: Data, lineage: CycleLineage, node_id: int
     ) -> float:
         """
         Compute the intensity of a cell at birth.
@@ -514,7 +514,7 @@ class BirthIntensity(NodeGlobalPropCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
@@ -523,10 +523,10 @@ class BirthIntensity(NodeGlobalPropCalculator):
             Intensity of the first cell of the cell cycle, or NaN if the cell cycle
             starts at a root.
         """
-        if lineage.is_root(nid):
+        if lineage.is_root(node_id):
             return np.nan
         return _get_cycle_node_property_values(
-            self.intensity_prop, data, lineage, nid
+            self.intensity_prop, data, lineage, node_id
         )[0]
 
 
@@ -577,7 +577,7 @@ class DivisionIntensity(NodeGlobalPropCalculator):
         self.intensity_prop = intensity_prop
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, nid: int
+        self, data: Data, lineage: CycleLineage, node_id: int
     ) -> float:
         """
         Compute the intensity of a cell at division.
@@ -588,7 +588,7 @@ class DivisionIntensity(NodeGlobalPropCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
@@ -597,8 +597,8 @@ class DivisionIntensity(NodeGlobalPropCalculator):
             Intensity of the last cell of the cell cycle, or NaN if the cell cycle
             ends at a leaf.
         """
-        if lineage.is_leaf(nid):
+        if lineage.is_leaf(node_id):
             return np.nan
         return _get_cycle_node_property_values(
-            self.intensity_prop, data, lineage, nid
+            self.intensity_prop, data, lineage, node_id
         )[-1]

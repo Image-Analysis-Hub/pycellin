@@ -135,7 +135,7 @@ class Time(NodeLocalPropCalculator):
         self.factor = factor
         self.force_recompute = force_recompute
 
-    def compute(self, lineage, nid: int) -> float:
+    def compute(self, lineage, node_id: int) -> float:
         """
         Compute the time of a given node.
 
@@ -143,7 +143,7 @@ class Time(NodeLocalPropCalculator):
         ----------
         lineage : CellLineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cell_id) of the cell of interest.
 
         Returns
@@ -151,15 +151,15 @@ class Time(NodeLocalPropCalculator):
         float
             The computed time value for the given node.
         """
-        if not self.force_recompute and self.prop.identifier in lineage.nodes[nid]:
-            return lineage.nodes[nid][self.prop.identifier]
+        if not self.force_recompute and self.prop.identifier in lineage.nodes[node_id]:
+            return lineage.nodes[node_id][self.prop.identifier]
 
-        if self.time_prop not in lineage.nodes[nid]:
+        if self.time_prop not in lineage.nodes[node_id]:
             raise KeyError(
                 f"Time property '{self.time_prop}' not found "
-                f"in node {nid} of lineage {lineage.graph['lineage_id']}."
+                f"in node {node_id} of lineage {lineage.graph['lineage_id']}."
             )
-        return lineage.nodes[nid][self.time_prop] * self.factor
+        return lineage.nodes[node_id][self.time_prop] * self.factor
 
 
 def create_timepoint_property(provenance: str = "pycellin") -> Property:
@@ -235,7 +235,7 @@ class Timepoint(NodeLocalPropCalculator):
 
         self.min_time = min_time
 
-    def compute(self, lineage, nid: int) -> int:
+    def compute(self, lineage, node_id: int) -> int:
         """
         Compute the timepoint of a given node.
 
@@ -243,7 +243,7 @@ class Timepoint(NodeLocalPropCalculator):
         ----------
         lineage : CellLineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cell_id) of the cell of interest.
 
         Returns
@@ -256,19 +256,19 @@ class Timepoint(NodeLocalPropCalculator):
         KeyError
             If the reference time property is not found in the node.
         """
-        if self.ref_time_prop not in lineage.nodes[nid]:
+        if self.ref_time_prop not in lineage.nodes[node_id]:
             raise KeyError(
                 f"Reference time property '{self.ref_time_prop}' not found "
-                f"in node {nid} of lineage {lineage.graph['lineage_id']}."
+                f"in node {node_id} of lineage {lineage.graph['lineage_id']}."
             )
 
-        time = lineage.nodes[nid][self.ref_time_prop]
+        time = lineage.nodes[node_id][self.ref_time_prop]
         timepoint = (time - self.min_time) / self.time_step
 
         rounded_timepoint = round(timepoint)
         if not math.isclose(timepoint, rounded_timepoint, rel_tol=1e-9, abs_tol=1e-9):
             raise ValueError(
-                f"Computed timepoint {timepoint} for node {nid} "
+                f"Computed timepoint {timepoint} for node {node_id} "
                 f"of lineage {lineage.graph['lineage_id']} is not close to an integer. "
                 f"Check time step and reference time values."
             )

@@ -53,7 +53,7 @@ def remove_division_events(model: Model) -> None:
         divs = lin.get_divisions()
         div_edges = [edge for div in divs for edge in lin.out_edges(div)]
         for edge in div_edges:
-            model.remove_link(*edge, lin.graph["lineage_id"])
+            model.remove_link(*edge, lineage_id=lin.graph["lineage_id"])
     model.update()
 
 

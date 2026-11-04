@@ -57,7 +57,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     """
 
     def __init__(
-        self, nx_digraph: nx.DiGraph | None = None, lid: int | None = None
+        self, nx_digraph: nx.DiGraph | None = None, lineage_id: int | None = None
     ) -> None:
         """
         Initialize a lineage graph.
@@ -67,13 +67,13 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         nx_digraph : nx.DiGraph, optional
             A NetworkX directed graph to initialize the lineage with,
             by default None.
-        lid : int, optional
+        lineage_id : int, optional
             The ID of the lineage, by default None.
         """
         super().__init__(incoming_graph_data=nx_digraph)
-        if lid is not None:
-            assert isinstance(lid, int), "The lineage ID must be an integer."
-            self.graph["lineage_id"] = lid
+        if lineage_id is not None:
+            assert isinstance(lineage_id, int), "The lineage ID must be an integer."
+            self.graph["lineage_id"] = lineage_id
 
     def _remove_prop(self, prop_name: str, prop_type: PropertyType | None = None) -> None:
         """
@@ -187,7 +187,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             leaves = [n for n in self.nodes() if self.out_degree(n) == 0]
         return leaves
 
-    def get_ancestors(self, nid: int) -> list[int]:
+    def get_ancestors(self, node_id: int) -> list[int]:
         """
         Return all the ancestors of a given node.
 
@@ -197,7 +197,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        nid : int
+        node_id : int
             ID of the node for which to find ancestors.
 
         Returns
@@ -205,16 +205,16 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         list[int]
             A list of all the ancestor nodes.
         """
-        ancestors = list(nx.ancestors(self, nid))
+        ancestors = list(nx.ancestors(self, node_id))
         return ancestors
 
-    def get_descendants(self, nid: int) -> list[int]:
+    def get_descendants(self, node_id: int) -> list[int]:
         """
         Return all the descendants of a given node.
 
         Parameters
         ----------
-        nid : int
+        node_id : int
             ID of the node for which to find descendants.
 
         Returns
@@ -222,7 +222,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         list[int]
             A list of all the descendant nodes, from target node to leaf nodes.
         """
-        descendants = nx.descendants(self, nid)
+        descendants = nx.descendants(self, node_id)
         return list(descendants)
 
     def get_sisters(self, node_id: int) -> list[int]:
@@ -479,7 +479,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         return [n for n in self.nodes() if self.in_degree(n) > 1]  # type: ignore
 
-    def is_root(self, nid: int) -> bool:
+    def is_root(self, node_id: int) -> bool:
         """
         Check if a given node is a root node.
 
@@ -488,7 +488,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        nid : int
+        node_id : int
             ID of the node to check.
 
         Returns
@@ -496,9 +496,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         bool
             True if the node is a root node, False otherwise.
         """
-        return self.in_degree(nid) == 0
+        return self.in_degree(node_id) == 0
 
-    def is_leaf(self, nid: int) -> bool:
+    def is_leaf(self, node_id: int) -> bool:
         """
         Check if a given node is a leaf node.
 
@@ -506,7 +506,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        nid : int
+        node_id : int
             ID of the node to check.
 
         Returns
@@ -514,7 +514,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         bool
             True if the node is a leaf node, False otherwise.
         """
-        return self.out_degree(nid) == 0
+        return self.out_degree(node_id) == 0
 
     def _get_nodes_position(self, positions: dict) -> tuple[list, list]:
         """Extract x and y coordinates from positions dict."""
@@ -1484,7 +1484,7 @@ class CellLineage(Lineage):
         self.remove_nodes_from(nodes)
         return new_lineage  # type: ignore
 
-    def get_ancestors(self, cid: int, sorted=True) -> list[int]:
+    def get_ancestors(self, node_id: int, sorted=True) -> list[int]:
         """
         Return all the ancestors of a given cell.
 
@@ -1494,7 +1494,7 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        cid : int
+        node_id : int
             ID of the cell for which to retrieve ancestor cells.
         sorted : bool, optional
             True to return the ancestors in chronological order, False otherwise.
@@ -1516,9 +1516,9 @@ class CellLineage(Lineage):
             If the timepoint property is missing when ordering the cells.
         """
         try:
-            ancestors = super().get_ancestors(cid)
+            ancestors = super().get_ancestors(node_id)
         except nx.NetworkXError as err:
-            raise KeyError(f"Cell {cid} is not in the lineage.") from err
+            raise KeyError(f"Cell {node_id} is not in the lineage.") from err
         if sorted:
             try:
                 ancestors.sort(key=lambda n: self.nodes[n]["timepoint"])
@@ -1760,12 +1760,12 @@ class CellLineage(Lineage):
                 group = self.nodes[cid][highlight_prop]
             except KeyError:
                 raise MissingPropertyError(
-                    highlight_prop, nid=cid, lineage_id=self.graph.get("lineage_id")
+                    highlight_prop, node_id=cid, lineage_id=self.graph.get("lineage_id")
                 ) from None
             colors.append(get_highlight_color(group))
         return colors
 
-    def get_divisions(self, cids: list[int] | None = None) -> list[int]:
+    def get_divisions(self, cell_ids: list[int] | None = None) -> list[int]:
         """
         Return the cells that are dividing in the lineage.
 
@@ -1773,7 +1773,7 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        cids : list[int], optional
+        cell_ids : list[int], optional
             A list of cell IDs to check for divisions. If None, all cells
             in the lineage will be checked.
 
@@ -1782,9 +1782,9 @@ class CellLineage(Lineage):
         list[int]
             The list of dividing cells of the lineage.
         """
-        if cids is None:
-            cids = list(self.nodes())
-        return [n for n in cids if self.out_degree(n) > 1]  # type: ignore
+        if cell_ids is None:
+            cell_ids = list(self.nodes())
+        return [n for n in cell_ids if self.out_degree(n) > 1]  # type: ignore
 
     def get_gaps(self) -> list[tuple[int, int]]:
         """
@@ -1833,7 +1833,7 @@ class CellLineage(Lineage):
             raise ValueError(f"No '{time_prop}' property found in the lineage nodes.")
         return max(times.values()) - min(times.values())
 
-    def get_cell_cycle(self, cid: int) -> list[int]:
+    def get_cell_cycle(self, cell_id: int) -> list[int]:
         """
         Return all the cells in the cell cycle of the given cell, in chronological order.
 
@@ -1843,7 +1843,7 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        cid : int
+        cell_id : int
             ID of the cell for which to identify the cells in the cell cycle.
 
         Returns
@@ -1859,34 +1859,34 @@ class CellLineage(Lineage):
         """
         # TODO: factorize
         lid, _ = CellLineage._get_lineage_id_and_err_msg(self)
-        cell_cycle = [cid]
+        cell_cycle = [cell_id]
         start = False
         end = False
 
-        if self.is_root(cid):
+        if self.is_root(cell_id):
             start = True
-        if self.is_division(cid) or self.is_leaf(cid):
+        if self.is_division(cell_id) or self.is_leaf(cell_id):
             end = True
 
         if not start:
-            predecessors = list(self.predecessors(cid))
+            predecessors = list(self.predecessors(cell_id))
             if len(predecessors) != 1:
-                raise FusionError(cid, lid)
+                raise FusionError(cell_id, lid)
             while not self.is_division(*predecessors) and not self.is_root(*predecessors):
                 # While not the generation birth.
                 cell_cycle.append(*predecessors)
                 predecessors = list(self.predecessors(*predecessors))
                 if len(predecessors) != 1:
-                    raise FusionError(cid, lid)
+                    raise FusionError(cell_id, lid)
             if self.is_root(*predecessors) and not self.is_division(*predecessors):
                 cell_cycle.append(*predecessors)
             cell_cycle.reverse()  # We built it from the end.
 
         if not end:
-            successors = list(self.successors(cid))
+            successors = list(self.successors(cell_id))
             err = (
                 f"Something went wrong: division detected in the cell cycle "
-                f"of cell {cid}. This cell has {len(successors)} successors."
+                f"of cell {cell_id}. This cell has {len(successors)} successors."
             )
             assert len(successors) == 1, err
             while not self.is_division(*successors) and not self.is_leaf(*successors):
@@ -1894,7 +1894,7 @@ class CellLineage(Lineage):
                 successors = list(self.successors(*successors))
                 err = (
                     f"Something went wrong: division detected in the cell cycle "
-                    f"of cell {cid}. This cell has {len(successors)} successors."
+                    f"of cell {cell_id}. This cell has {len(successors)} successors."
                 )
                 assert len(successors) == 1, err
             cell_cycle.append(*successors)
@@ -2021,7 +2021,7 @@ class CellLineage(Lineage):
             if self.nodes[cell_id]["timepoint"] == timepoint
         ]
 
-    def is_division(self, cid: int) -> bool:
+    def is_division(self, cell_id: int) -> bool:
         """
         Check if a given cell is dividing.
 
@@ -2030,7 +2030,7 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        cid : int
+        cell_id : int
             ID of the cell to check.
 
         Returns
@@ -2038,7 +2038,7 @@ class CellLineage(Lineage):
         bool
             True if the cell is a division cell, False otherwise.
         """
-        return self.in_degree(cid) <= 1 and self.out_degree(cid) > 1
+        return self.in_degree(cell_id) <= 1 and self.out_degree(cell_id) > 1
 
     def _remove_intercycle_links(self) -> list[tuple[int, int, dict]]:
         """
@@ -2613,7 +2613,7 @@ class CellLineage(Lineage):
                         if prop not in lineage.nodes[node]:
                             raise MissingPropertyError(
                                 prop_name=prop,
-                                nid=node,
+                                node_id=node,
                                 lineage_id=lineage.graph["lineage_id"],
                             )
                         text += f"<br>{prop}: {lineage.nodes[node][prop]}"
@@ -2927,7 +2927,7 @@ class CycleLineage(Lineage):
 
     # Methods to freeze / unfreeze?
 
-    def get_ancestors(self, ccid: int, sorted=True) -> list[int]:
+    def get_ancestors(self, node_id: int, sorted=True) -> list[int]:
         """
         Return all the ancestor cell cycles of a given cell cycle.
 
@@ -2937,7 +2937,7 @@ class CycleLineage(Lineage):
 
         Parameters
         ----------
-        ccid : int
+        node_id : int
             ID of the cell cycle for which to retrieve ancestor cell cycle.
         sorted : bool, optional
             True to return the ancestors in chronological order, False otherwise.
@@ -2959,9 +2959,9 @@ class CycleLineage(Lineage):
             If there is no 'generation' property to order the cell cycles.
         """
         try:
-            ancestors = super().get_ancestors(ccid)
+            ancestors = super().get_ancestors(node_id)
         except nx.NetworkXError as err:
-            raise KeyError(f"Cell cycle {ccid} is not in the lineage.") from err
+            raise KeyError(f"Cell cycle {node_id} is not in the lineage.") from err
         if sorted:
             try:
                 ancestors.sort(key=lambda n: self.nodes[n]["generation"])
@@ -2969,7 +2969,7 @@ class CycleLineage(Lineage):
                 warnings.warn("No 'generation' property to order the cell cycles.")
         return ancestors
 
-    def get_links_within_cycle(self, ccid: int) -> list[tuple[int, int]]:
+    def get_links_within_cycle(self, cycle_id: int) -> list[tuple[int, int]]:
         """
         Return all the links between the cells of a cell cycle.
 
@@ -2977,7 +2977,7 @@ class CycleLineage(Lineage):
 
         Parameters
         ----------
-        ccid : int
+        cycle_id : int
             The ID of the cell cycle for which to retrieve links.
 
         Returns
@@ -2985,9 +2985,9 @@ class CycleLineage(Lineage):
         list[tuple(int, int)]
             A list of links between the cells of a cell cycle.
         """
-        return list(pairwise(self.nodes[ccid]["cells"]))
+        return list(pairwise(self.nodes[cycle_id]["cells"]))
 
-    def yield_links_within_cycle(self, ccid: int) -> Iterator[tuple[int, int]]:
+    def yield_links_within_cycle(self, cycle_id: int) -> Iterator[tuple[int, int]]:
         """
         Yield all the links between the cells of a cell cycle.
 
@@ -2995,7 +2995,7 @@ class CycleLineage(Lineage):
 
         Parameters
         ----------
-        ccid : int
+        cycle_id : int
             The ID of the cell cycle for which to retrieve links.
 
         Yields
@@ -3003,7 +3003,7 @@ class CycleLineage(Lineage):
         tuple(int, int)
             The links between the cells of a cell cycle.
         """
-        yield from pairwise(self.nodes[ccid]["cells"])
+        yield from pairwise(self.nodes[cycle_id]["cells"])
 
     def get_tree_figure(
         self,

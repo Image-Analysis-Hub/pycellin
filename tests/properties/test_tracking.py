@@ -99,19 +99,19 @@ def test_absolute_age(cell_lin, prop_cell_lin):
     """Test AbsoluteAge Calculator."""
     calculator = AbsoluteAge(prop_cell_lin, time_prop="frame")
     # Root.
-    assert calculator.compute(cell_lin, nid=1) == 0
+    assert calculator.compute(cell_lin, node_id=1) == 0
     # Divisions.
-    assert calculator.compute(cell_lin, nid=2) == 1
-    assert calculator.compute(cell_lin, nid=4) == 3
+    assert calculator.compute(cell_lin, node_id=2) == 1
+    assert calculator.compute(cell_lin, node_id=4) == 3
     # Leaves.
-    assert calculator.compute(cell_lin, nid=6) == 5
-    assert calculator.compute(cell_lin, nid=10) == 6
+    assert calculator.compute(cell_lin, node_id=6) == 5
+    assert calculator.compute(cell_lin, node_id=10) == 6
     # Intermediate nodes.
-    assert calculator.compute(cell_lin, nid=3) == 2
-    assert calculator.compute(cell_lin, nid=13) == 4
+    assert calculator.compute(cell_lin, node_id=3) == 2
+    assert calculator.compute(cell_lin, node_id=13) == 4
     # Non-existent node.
     with pytest.raises(KeyError):
-        calculator.compute(cell_lin, nid=99)
+        calculator.compute(cell_lin, node_id=99)
 
 
 # RelativeAge #################################################################
@@ -121,19 +121,19 @@ def test_relative_age(cell_lin, prop_cell_lin):
     """Test RelativeAge Calculator."""
     calculator = RelativeAge(prop_cell_lin, time_prop="frame")
     # Root.
-    assert calculator.compute(cell_lin, nid=1) == 0
+    assert calculator.compute(cell_lin, node_id=1) == 0
     # Divisions.
-    assert calculator.compute(cell_lin, nid=2) == 1
-    assert calculator.compute(cell_lin, nid=4) == 1
+    assert calculator.compute(cell_lin, node_id=2) == 1
+    assert calculator.compute(cell_lin, node_id=4) == 1
     # Leaves.
-    assert calculator.compute(cell_lin, nid=6) == 1
-    assert calculator.compute(cell_lin, nid=10) == 0
+    assert calculator.compute(cell_lin, node_id=6) == 1
+    assert calculator.compute(cell_lin, node_id=10) == 0
     # Intermediate nodes.
-    assert calculator.compute(cell_lin, nid=3) == 0
-    assert calculator.compute(cell_lin, nid=13) == 2
+    assert calculator.compute(cell_lin, node_id=3) == 0
+    assert calculator.compute(cell_lin, node_id=13) == 2
     # Non-existent node.
     with pytest.raises(KeyError):
-        calculator.compute(cell_lin, nid=99)
+        calculator.compute(cell_lin, node_id=99)
 
 
 # NormalizedAge ###############################################################
@@ -143,20 +143,20 @@ class TestNormalizedAge:
     def test_compute_first_cell_of_cycle(self, cell_lin, prop_cell_lin):
         calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
         # Root, then a cell born from a division.
-        assert calculator.compute(cell_lin, nid=1) == 0
-        assert calculator.compute(cell_lin, nid=11) == 0
+        assert calculator.compute(cell_lin, node_id=1) == 0
+        assert calculator.compute(cell_lin, node_id=11) == 0
 
     def test_compute_last_cell_of_cycle(self, cell_lin, prop_cell_lin):
         calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
         # Division, then leaf.
-        assert calculator.compute(cell_lin, nid=14) == 1
-        assert calculator.compute(cell_lin, nid=6) == 1
+        assert calculator.compute(cell_lin, node_id=14) == 1
+        assert calculator.compute(cell_lin, node_id=6) == 1
 
     def test_compute_intermediate_cells(self, cell_lin, prop_cell_lin):
         calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
         # Cycle [11, 12, 13, 14], from frame 2 to frame 5.
-        assert calculator.compute(cell_lin, nid=12) == pytest.approx(1 / 3)
-        assert calculator.compute(cell_lin, nid=13) == pytest.approx(2 / 3)
+        assert calculator.compute(cell_lin, node_id=12) == pytest.approx(1 / 3)
+        assert calculator.compute(cell_lin, node_id=13) == pytest.approx(2 / 3)
 
     def test_compute_gap(self, cell_lin, prop_cell_lin):
         cell_lin.remove_node(12)
@@ -164,37 +164,37 @@ class TestNormalizedAge:
         calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
         # Cycle [11, 13, 14], from frame 2 to frame 5: normalized by time, not by
         # position in the cycle.
-        assert calculator.compute(cell_lin, nid=13) == pytest.approx(2 / 3)
+        assert calculator.compute(cell_lin, node_id=13) == pytest.approx(2 / 3)
 
     def test_compute_single_cell_cycle(self, cell_lin, prop_cell_lin):
         calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
-        assert math.isnan(calculator.compute(cell_lin, nid=9))
+        assert math.isnan(calculator.compute(cell_lin, node_id=9))
 
     def test_compute_ignored_cycle_starting_at_root(self, cell_lin, prop_cell_lin):
         calculator = NormalizedAge(
             prop_cell_lin, time_prop="frame", ignore_incomplete_cycles=True
         )
         # Cycle [1, 2].
-        assert math.isnan(calculator.compute(cell_lin, nid=1))
+        assert math.isnan(calculator.compute(cell_lin, node_id=1))
 
     def test_compute_ignored_cycle_ending_with_leaf(self, cell_lin, prop_cell_lin):
         calculator = NormalizedAge(
             prop_cell_lin, time_prop="frame", ignore_incomplete_cycles=True
         )
         # Cycle [5, 6].
-        assert math.isnan(calculator.compute(cell_lin, nid=5))
+        assert math.isnan(calculator.compute(cell_lin, node_id=5))
 
     def test_compute_complete_cycle_not_ignored(self, cell_lin, prop_cell_lin):
         calculator = NormalizedAge(
             prop_cell_lin, time_prop="frame", ignore_incomplete_cycles=True
         )
         # Cycle [11, 12, 13, 14], from a division to a division.
-        assert calculator.compute(cell_lin, nid=12) == pytest.approx(1 / 3)
+        assert calculator.compute(cell_lin, node_id=12) == pytest.approx(1 / 3)
 
     def test_compute_missing_cell(self, cell_lin, prop_cell_lin):
         calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
         with pytest.raises(KeyError):
-            calculator.compute(cell_lin, nid=99)
+            calculator.compute(cell_lin, node_id=99)
 
     def test_get_input_props(self, prop_cell_lin):
         calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
@@ -210,36 +210,36 @@ def test_is_complete_cycle_cell_lin(cell_lin, prop_cell_lin):
     """Test IsCompleteCycle Calculator with CellLineage."""
     calculator = IsCompleteCycle(prop_cell_lin)
     # Complete cell cycles.
-    assert calculator.compute(cell_lin, nid=4) is True  # division
-    assert calculator.compute(cell_lin, nid=14) is True  # division
-    assert calculator.compute(cell_lin, nid=7) is True  # intermediate
-    assert calculator.compute(cell_lin, nid=13) is True  # intermediate
+    assert calculator.compute(cell_lin, node_id=4) is True  # division
+    assert calculator.compute(cell_lin, node_id=14) is True  # division
+    assert calculator.compute(cell_lin, node_id=7) is True  # intermediate
+    assert calculator.compute(cell_lin, node_id=13) is True  # intermediate
     # Incomplete cell cycles.
-    assert calculator.compute(cell_lin, nid=1) is False  # root
-    assert calculator.compute(cell_lin, nid=6) is False  # leaf
-    assert calculator.compute(cell_lin, nid=10) is False  # leaf
-    assert calculator.compute(cell_lin, nid=2) is False  # division
-    assert calculator.compute(cell_lin, nid=5) is False  # intermediate
+    assert calculator.compute(cell_lin, node_id=1) is False  # root
+    assert calculator.compute(cell_lin, node_id=6) is False  # leaf
+    assert calculator.compute(cell_lin, node_id=10) is False  # leaf
+    assert calculator.compute(cell_lin, node_id=2) is False  # division
+    assert calculator.compute(cell_lin, node_id=5) is False  # intermediate
     # Non-existent node.
     with pytest.raises(KeyError, match="Cell 99 not in the lineage."):
-        calculator.compute(cell_lin, nid=99)
+        calculator.compute(cell_lin, node_id=99)
 
 
 def test_is_complete_cycle_cycle_lin(cycle_lin, prop_cycle_lin):
     """Test IsCompleteCycle Calculator with CycleLineage."""
     calculator = IsCompleteCycle(prop_cycle_lin)
     # Complete cell cycles.
-    assert calculator.compute(cycle_lin, nid=4) is True  # division
-    assert calculator.compute(cycle_lin, nid=8) is True  # division
-    assert calculator.compute(cycle_lin, nid=14) is True  # division
+    assert calculator.compute(cycle_lin, node_id=4) is True  # division
+    assert calculator.compute(cycle_lin, node_id=8) is True  # division
+    assert calculator.compute(cycle_lin, node_id=14) is True  # division
     # Incomplete cell cycles.
-    assert calculator.compute(cycle_lin, nid=2) is False  # division
-    assert calculator.compute(cycle_lin, nid=6) is False  # leaf
-    assert calculator.compute(cycle_lin, nid=10) is False  # leaf
-    assert calculator.compute(cycle_lin, nid=15) is False  # leaf
+    assert calculator.compute(cycle_lin, node_id=2) is False  # division
+    assert calculator.compute(cycle_lin, node_id=6) is False  # leaf
+    assert calculator.compute(cycle_lin, node_id=10) is False  # leaf
+    assert calculator.compute(cycle_lin, node_id=15) is False  # leaf
     # Non-existent node.
     with pytest.raises(KeyError, match="Cycle 99 not in the lineage."):
-        calculator.compute(cycle_lin, nid=99)
+        calculator.compute(cycle_lin, node_id=99)
 
 
 # InterdivisionTime ###########################################################
@@ -249,19 +249,19 @@ def test_interdivision_time(cell_lin, prop_cell_lin):
     """Test InterdivisionTime Calculator."""
     calculator = InterdivisionTime(prop_cell_lin, time_prop="frame")
     # Root.
-    assert calculator.compute(Data({}), cell_lin, nid=1) == 1
+    assert calculator.compute(Data({}), cell_lin, node_id=1) == 1
     # Divisions.
-    assert calculator.compute(Data({}), cell_lin, nid=2) == 1
-    assert calculator.compute(Data({}), cell_lin, nid=4) == 2
+    assert calculator.compute(Data({}), cell_lin, node_id=2) == 1
+    assert calculator.compute(Data({}), cell_lin, node_id=4) == 2
     # Leaves.
-    assert calculator.compute(Data({}), cell_lin, nid=6) == 2
-    assert calculator.compute(Data({}), cell_lin, nid=10) == 1
+    assert calculator.compute(Data({}), cell_lin, node_id=6) == 2
+    assert calculator.compute(Data({}), cell_lin, node_id=10) == 1
     # Intermediate nodes.
-    assert calculator.compute(Data({}), cell_lin, nid=3) == 2
-    assert calculator.compute(Data({}), cell_lin, nid=13) == 4
+    assert calculator.compute(Data({}), cell_lin, node_id=3) == 2
+    assert calculator.compute(Data({}), cell_lin, node_id=13) == 4
     # Non-existent node.
     with pytest.raises(KeyError, match="Cell 99 not in the lineage."):
-        calculator.compute(Data({}), cell_lin, nid=99)
+        calculator.compute(Data({}), cell_lin, node_id=99)
 
 
 def test_interdivision_time_gap(cell_lin, prop_cell_lin):
@@ -271,19 +271,19 @@ def test_interdivision_time_gap(cell_lin, prop_cell_lin):
     cell_lin.add_edges_from([(2, 4), (11, 14)])
     calculator = InterdivisionTime(prop_cell_lin, time_prop="frame")
     # Root.
-    assert calculator.compute(Data({}), cell_lin, nid=1) == 1
+    assert calculator.compute(Data({}), cell_lin, node_id=1) == 1
     # Divisions.
-    assert calculator.compute(Data({}), cell_lin, nid=2) == 1
-    assert calculator.compute(Data({}), cell_lin, nid=4) == 2
-    assert calculator.compute(Data({}), cell_lin, nid=14) == 4
+    assert calculator.compute(Data({}), cell_lin, node_id=2) == 1
+    assert calculator.compute(Data({}), cell_lin, node_id=4) == 2
+    assert calculator.compute(Data({}), cell_lin, node_id=14) == 4
     # Leaves.
-    assert calculator.compute(Data({}), cell_lin, nid=6) == 2
-    assert calculator.compute(Data({}), cell_lin, nid=10) == 1
+    assert calculator.compute(Data({}), cell_lin, node_id=6) == 2
+    assert calculator.compute(Data({}), cell_lin, node_id=10) == 1
     # Intermediate nodes.
-    assert calculator.compute(Data({}), cell_lin, nid=11) == 4
+    assert calculator.compute(Data({}), cell_lin, node_id=11) == 4
     # Non-existent node.
     with pytest.raises(KeyError, match="Cell 99 not in the lineage."):
-        calculator.compute(Data({}), cell_lin, nid=99)
+        calculator.compute(Data({}), cell_lin, node_id=99)
 
 
 def test_interdivision_time_cycle_lin(cell_lin, prop_cycle_lin):
@@ -293,17 +293,17 @@ def test_interdivision_time_cycle_lin(cell_lin, prop_cycle_lin):
     data._add_cycle_lineages(time_prop="frame", time_step=1)
     cycle_lin = data.cycle_data[1]
     # Complete cell cycles.
-    assert calculator.compute(data, cycle_lin, nid=4) == 2  # division
-    assert calculator.compute(data, cycle_lin, nid=8) == 2  # division
-    assert calculator.compute(data, cycle_lin, nid=14) == 4  # division
+    assert calculator.compute(data, cycle_lin, node_id=4) == 2  # division
+    assert calculator.compute(data, cycle_lin, node_id=8) == 2  # division
+    assert calculator.compute(data, cycle_lin, node_id=14) == 4  # division
     # Incomplete cell cycles.
-    assert calculator.compute(data, cycle_lin, nid=2) == 1  # division
-    assert calculator.compute(data, cycle_lin, nid=6) == 2  # leaf
-    assert calculator.compute(data, cycle_lin, nid=10) == 1  # leaf
-    assert calculator.compute(data, cycle_lin, nid=15) == 1  # leaf
+    assert calculator.compute(data, cycle_lin, node_id=2) == 1  # division
+    assert calculator.compute(data, cycle_lin, node_id=6) == 2  # leaf
+    assert calculator.compute(data, cycle_lin, node_id=10) == 1  # leaf
+    assert calculator.compute(data, cycle_lin, node_id=15) == 1  # leaf
     # Non-existent node.
     with pytest.raises(KeyError, match="Cycle 99 not in the lineage."):
-        calculator.compute(data, cycle_lin, nid=99)
+        calculator.compute(data, cycle_lin, node_id=99)
 
 
 # DivisionRate ################################################################
@@ -313,19 +313,19 @@ def test_division_rate(cell_lin, prop_cell_lin):
     """Test DivisionRate Calculator."""
     calculator = DivisionRate(prop_cell_lin, time_prop="frame")
     # Root.
-    assert calculator.compute(Data({}), cell_lin, nid=1) == 1 / 1
+    assert calculator.compute(Data({}), cell_lin, node_id=1) == 1 / 1
     # Divisions.
-    assert calculator.compute(Data({}), cell_lin, nid=2) == 1 / 1
-    assert calculator.compute(Data({}), cell_lin, nid=4) == 1 / 2
+    assert calculator.compute(Data({}), cell_lin, node_id=2) == 1 / 1
+    assert calculator.compute(Data({}), cell_lin, node_id=4) == 1 / 2
     # Leaves.
-    assert calculator.compute(Data({}), cell_lin, nid=6) == 1 / 2
-    assert calculator.compute(Data({}), cell_lin, nid=10) == 1 / 1
+    assert calculator.compute(Data({}), cell_lin, node_id=6) == 1 / 2
+    assert calculator.compute(Data({}), cell_lin, node_id=10) == 1 / 1
     # Intermediate nodes.
-    assert calculator.compute(Data({}), cell_lin, nid=3) == 1 / 2
-    assert calculator.compute(Data({}), cell_lin, nid=13) == 1 / 4
+    assert calculator.compute(Data({}), cell_lin, node_id=3) == 1 / 2
+    assert calculator.compute(Data({}), cell_lin, node_id=13) == 1 / 4
     # Non-existent node.
     with pytest.raises(KeyError, match="Cell 99 not in the lineage."):
-        calculator.compute(Data({}), cell_lin, nid=99)
+        calculator.compute(Data({}), cell_lin, node_id=99)
 
 
 def test_division_rate_gap(cell_lin, prop_cell_lin):
@@ -335,19 +335,19 @@ def test_division_rate_gap(cell_lin, prop_cell_lin):
     cell_lin.add_edges_from([(2, 4), (11, 14)])
     calculator = DivisionRate(prop_cell_lin, time_prop="frame")
     # Root.
-    assert calculator.compute(Data({}), cell_lin, nid=1) == 1 / 1
+    assert calculator.compute(Data({}), cell_lin, node_id=1) == 1 / 1
     # Divisions.
-    assert calculator.compute(Data({}), cell_lin, nid=2) == 1 / 1
-    assert calculator.compute(Data({}), cell_lin, nid=4) == 1 / 2
-    assert calculator.compute(Data({}), cell_lin, nid=14) == 1 / 4
+    assert calculator.compute(Data({}), cell_lin, node_id=2) == 1 / 1
+    assert calculator.compute(Data({}), cell_lin, node_id=4) == 1 / 2
+    assert calculator.compute(Data({}), cell_lin, node_id=14) == 1 / 4
     # Leaves.
-    assert calculator.compute(Data({}), cell_lin, nid=6) == 1 / 2
-    assert calculator.compute(Data({}), cell_lin, nid=10) == 1 / 1
+    assert calculator.compute(Data({}), cell_lin, node_id=6) == 1 / 2
+    assert calculator.compute(Data({}), cell_lin, node_id=10) == 1 / 1
     # Intermediate nodes.
-    assert calculator.compute(Data({}), cell_lin, nid=11) == 1 / 4
+    assert calculator.compute(Data({}), cell_lin, node_id=11) == 1 / 4
     # Non-existent node.
     with pytest.raises(KeyError, match="Cell 99 not in the lineage."):
-        calculator.compute(Data({}), cell_lin, nid=99)
+        calculator.compute(Data({}), cell_lin, node_id=99)
 
 
 def test_division_rate_cycle_lin(cell_lin, prop_cycle_lin):
@@ -357,14 +357,14 @@ def test_division_rate_cycle_lin(cell_lin, prop_cycle_lin):
     data._add_cycle_lineages(time_prop="frame", time_step=1)
     cycle_lin = data.cycle_data[1]
     # Complete cell cycles.
-    assert calculator.compute(data, cycle_lin, nid=4) == 1 / 2  # division
-    assert calculator.compute(data, cycle_lin, nid=8) == 1 / 2  # division
-    assert calculator.compute(data, cycle_lin, nid=14) == 1 / 4  # division
+    assert calculator.compute(data, cycle_lin, node_id=4) == 1 / 2  # division
+    assert calculator.compute(data, cycle_lin, node_id=8) == 1 / 2  # division
+    assert calculator.compute(data, cycle_lin, node_id=14) == 1 / 4  # division
     # Incomplete cell cycles.
-    assert calculator.compute(data, cycle_lin, nid=2) == 1 / 1  # division
-    assert calculator.compute(data, cycle_lin, nid=6) == 1 / 2  # leaf
-    assert calculator.compute(data, cycle_lin, nid=10) == 1 / 1  # leaf
-    assert calculator.compute(data, cycle_lin, nid=15) == 1 / 1  # leaf
+    assert calculator.compute(data, cycle_lin, node_id=2) == 1 / 1  # division
+    assert calculator.compute(data, cycle_lin, node_id=6) == 1 / 2  # leaf
+    assert calculator.compute(data, cycle_lin, node_id=10) == 1 / 1  # leaf
+    assert calculator.compute(data, cycle_lin, node_id=15) == 1 / 1  # leaf
     # Non-existent node.
     with pytest.raises(KeyError, match="Cycle 99 not in the lineage."):
-        calculator.compute(data, cycle_lin, nid=99)
+        calculator.compute(data, cycle_lin, node_id=99)

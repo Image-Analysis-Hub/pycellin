@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to aff043b, plus the uncommitted fix of the add_pycellin_property() and add_pycellin_properties() examples, the TypeError of add_pycellin_properties() and the warning of rescale_time() and rescale_space() about units left as they were. Update from there with: git log aff043b..dev -->
+<!-- Planned v0.6.0. Covers commits up to 1cc8bf3, plus the uncommitted naming pass 2 (abbreviated ID arguments spelled out, lineage IDs keyword-only in the cell and link editing methods). Update from there with: git log 1cc8bf3..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -17,6 +17,11 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
   - the `ID_prop` argument of `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()` → `id_prop`
   - the fields of the `Cell` and `Link` named tuples (e.g. returned by `get_divisions()`), and the `node_ID`, `lineage_ID`, `source_lineage_ID` and `target_lineage_ID` arguments and attributes of exceptions
   - models pickled with an earlier version keep the old names
+- **Naming:** arguments that abbreviated an ID are spelled out. Only calls that pass them by name break:
+  - `lid` → `lineage_id` (e.g. in `remove_lineage()` and `CellLineage()`), `lids` → `lineage_ids` (`get_divisions()`, `get_fusions()` and the `to_*_dataframe()` methods), `new_lid` → `new_lineage_id`, and `source_lid` and `target_lid` → `source_lineage_id` and `target_lineage_id`
+  - `cid` → `cell_id`, `cids` → `cell_ids`, and `source_cid` and `target_cid` → `source_cell_id` and `target_cell_id`. In `CycleLineage.get_links_within_cycle()` and `yield_links_within_cycle()`, `ccid` → `cycle_id`
+  - `nid` → `node_id`, e.g. in `is_root()`, `is_leaf()`, `get_descendants()` and the `compute()` method of calculators, and → `cell_id` in `Data.get_closest_cell()` and `get_closest_cells()`. `get_ancestors()` takes `node_id` in cell and cycle lineages too (`cid` and `ccid` before), so it is called the same way on both. Custom calculators can keep `nid` in their `compute()` method, since pycellin passes the node ID by position
+  - the `source_nid` and `target_nid` arguments and attributes of `TimeFlowError` → `source_node_id` and `target_node_id`
 - **Properties:** `pycellin.graph.properties` moved to `pycellin.properties`. The `pycellin.graph` package no longer exists
 - **Properties:** rename the `branch_*` properties to `cycle_*`, along with their `add_*()` methods, factories and calculators:
   - `branch_total_displacement` → `cycle_total_displacement`
@@ -36,6 +41,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** `add_cycle_mean_displacement()`, `add_cycle_total_displacement()` and `add_cycle_mean_speed()` raise `MissingPropertyError` when the property they're computed from (`cell_displacement` or `cell_speed`) isn't declared yet: add it first. `add_cycle_mean_speed()` now takes `speed_prop` as first argument, so pass `include_incoming_edge` by keyword
 - **Properties:** `Property` setters raise `TypeError` instead of `ValueError` when given a non-string value
 - **Model:** remove the `Model.recompute_property()` and `Model.export()` stubs, which did nothing. Use the `pycellin.export_*()` functions
+- **Model:** `add_cell()`, `remove_cell()`, `add_link()`, `remove_link()` and `split_lineage_from_cell()` take the lineage IDs, and the arguments after them, by keyword only, e.g. `model.remove_cell(5, lineage_id=0)`. Cell and lineage IDs are both integers, and these methods took them in different orders (`add_cell(lid, cid)` but `remove_cell(cid, lid)`), so a call written by analogy silently acted on another cell. `add_link()` now takes the two cell IDs first: `add_link(source_cell_id, target_cell_id, source_lineage_id=...)`. Calls written the old way fail with `TypeError`
 - **Lineages:** rename `CellLineage.get_sister_cells()` to `get_sisters()`, which also works on cycle lineages, where it returns the sister cell cycles
 - **Plotting:** rename `node_color_scale` to `node_colormap` in `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()`
 - **TrackMate:** `load_TrackMate_XML()` takes `lone_spots` and `tracks` instead of `keep_all_spots` and `keep_all_tracks`, which name what it loads in TrackMate's terms: `lone_spots` is `"none"` (default), `"visible"` or `"all"` for the spots outside tracks, and `tracks` is `"visible"` (default) or `"all"`. Visible spots and tracks passed the spot and track filters of TrackMate (`VISIBILITY` of 1, listed in `FilteredTracks`). Replace `keep_all_spots=True` with `lone_spots="all"`, and `keep_all_tracks=True` with `tracks="all"`. `lone_spots="visible"` is new: it adds the spots outside tracks that TrackMate shows, without those its spot filters hid
@@ -60,7 +66,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** `relabel_cells()` to give cells consecutive IDs, optionally unique across the whole model
 - **Model:** `remove_intercycle_links()` to remove the outgoing links of division cells
 - **Model:** `get_cell_lineages_from_ids()` and `get_cycle_lineages_from_ids()`
-- **Model:** `overwrite_lid` argument to `add_lineage()`
+- **Model:** `overwrite_lineage_id` argument to `add_lineage()`
 - **Model:** `lineage_props` argument to `to_cell_dataframe()`, `to_link_dataframe()` and `to_cycle_dataframe()` to include lineage properties in the DataFrame
 - **Model:** `to_cycle_pair_dataframe()` to export pairs of related cell cycles with the properties of both side by side, e.g. to correlate the area at birth of mothers and daughters. The relation is any cycle property listing related cell cycles: `mother_cycle`, `daughter_cycles`, `sister_cycles`, `cousin_cycles`, or a user-defined one. `unique_pairs=True` keeps a single row for pairs listed from both sides, such as sisters
 - **Metadata:** `label_img` and `label_img_path` standard metadata fields
@@ -125,7 +131,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 
 - **Model:** changing the time step with `set_time_step()` corrupted the `timepoint` values
 - **Model:** after `set_reference_time_property()`, `cycle_duration` kept the unit of the previous reference time property, although its values are computed from the new one
-- **Model:** `add_lineage()` failed with `with_CycleLineage=True` or with a lineage that had no lineage ID, and ignored its `lid` argument when given a lineage
+- **Model:** `add_lineage()` failed with `with_CycleLineage=True` or with a lineage that had no lineage ID, and ignored its `lineage_id` argument (`lid` in 0.5.1) when given a lineage
 - **Model:** `add_lineage()` silently replaced a lineage that already had the same ID. It now raises `ValueError`
 - **Model:** `to_cell_dataframe()`, `to_link_dataframe()`, `to_cycle_dataframe()` and `to_lineage_dataframe()` raised a pandas `FutureWarning` when a numeric property was None everywhere in a lineage. With no lineage to export, they now raise a `ValueError` that says so
 - **Model:** the columns of `to_link_dataframe()` came in a different order in each Python session. They now keep the order in which the link properties were added

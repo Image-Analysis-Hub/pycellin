@@ -175,7 +175,7 @@ class CycleTotalDisplacement(NodeGlobalPropCalculator):
         self.displacement_prop = displacement_prop
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, nid: int
+        self, data: Data, lineage: CycleLineage, node_id: int
     ) -> float:
         """
         Compute the total displacement of a cell during the cell cycle.
@@ -186,7 +186,7 @@ class CycleTotalDisplacement(NodeGlobalPropCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
@@ -196,7 +196,7 @@ class CycleTotalDisplacement(NodeGlobalPropCalculator):
             the cell cycle has no link with a displacement value.
         """
         disps = _get_cycle_edge_property_values(
-            self.displacement_prop, data, lineage, nid, self.include_incoming_edge
+            self.displacement_prop, data, lineage, node_id, self.include_incoming_edge
         )
         return _nansum(disps)
 
@@ -257,7 +257,7 @@ class CycleMeanDisplacement(NodeGlobalPropCalculator):
         self.displacement_prop = displacement_prop
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, nid: int
+        self, data: Data, lineage: CycleLineage, node_id: int
     ) -> float:
         """
         Compute the mean displacement of a cell during the cell cycle.
@@ -268,7 +268,7 @@ class CycleMeanDisplacement(NodeGlobalPropCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
@@ -278,7 +278,7 @@ class CycleMeanDisplacement(NodeGlobalPropCalculator):
             the cell cycle has no link with a displacement value.
         """
         disps = _get_cycle_edge_property_values(
-            self.displacement_prop, data, lineage, nid, self.include_incoming_edge
+            self.displacement_prop, data, lineage, node_id, self.include_incoming_edge
         )
         return _nanmean(disps)
 
@@ -418,7 +418,7 @@ class CycleMeanSpeed(NodeGlobalPropCalculator):
         self.speed_prop = speed_prop
 
     def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, nid: int
+        self, data: Data, lineage: CycleLineage, node_id: int
     ) -> float:
         """
         Compute the mean speed of a cell during the cell cycle.
@@ -429,7 +429,7 @@ class CycleMeanSpeed(NodeGlobalPropCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
@@ -439,7 +439,7 @@ class CycleMeanSpeed(NodeGlobalPropCalculator):
             has no link with a speed value.
         """
         speeds = _get_cycle_edge_property_values(
-            self.speed_prop, data, lineage, nid, self.include_incoming_edge
+            self.speed_prop, data, lineage, node_id, self.include_incoming_edge
         )
         return _nanmean(speeds)
 
@@ -495,7 +495,7 @@ class Straightness(NodeGlobalPropCalculator):
         self.coord_props = coord_props
 
     def compute(  # type: ignore[override]
-        self, data: Data, cycle_lin: CycleLineage, nid: int
+        self, data: Data, cycle_lin: CycleLineage, node_id: int
     ) -> float:
         """
         Compute the straightness of the cell displacement within a cell cycle.
@@ -504,9 +504,9 @@ class Straightness(NodeGlobalPropCalculator):
         ----------
         data : Data
             Data object containing the lineage.
-        lineage : CycleLineage
+        cycle_lin : CycleLineage
             Lineage graph containing the node of interest.
-        node : int
+        node_id : int
             Node ID (cycle_id) of the cell cycle of interest.
 
         Returns
@@ -517,7 +517,7 @@ class Straightness(NodeGlobalPropCalculator):
         """
         lin_id = cycle_lin.graph["lineage_id"]
         cell_lin = data.cell_data[lin_id]
-        cells = cycle_lin.nodes[nid]["cells"]
+        cells = cycle_lin.nodes[node_id]["cells"]
         distances = [
             math.dist(
                 _get_position(cell_lin, n1, self.coord_props),
@@ -598,7 +598,7 @@ class TurningAngle(NodeLocalPropCalculator):
         self.coord_props = coord_props
 
     def compute(  # type: ignore[override]
-        self, lineage: CellLineage, nid: int
+        self, lineage: CellLineage, node_id: int
     ) -> float:
         """
         Compute the angle between two consecutive displacement vectors at a cell detection.
@@ -607,7 +607,7 @@ class TurningAngle(NodeLocalPropCalculator):
         ----------
         lineage : CellLineage
             Lineage graph containing the node of interest.
-        nid : int
+        node_id : int
             Node ID (cell_id) of the cell of interest.
 
         Returns
@@ -618,8 +618,8 @@ class TurningAngle(NodeLocalPropCalculator):
             or dividing cell).
         """
         # Find the incoming and outgoing edges of the node of interest.
-        predecessors = list(lineage.predecessors(nid))
-        successors = list(lineage.successors(nid))
+        predecessors = list(lineage.predecessors(node_id))
+        successors = list(lineage.successors(node_id))
         if len(predecessors) == 0 or len(successors) != 1:
             # The angle is not defined for:
             # - the first node of the lineage (no incoming edge)
@@ -627,11 +627,11 @@ class TurningAngle(NodeLocalPropCalculator):
             # - a dividing node (more than one outgoing edges).
             return math.nan
         elif len(predecessors) > 1:
-            raise FusionError(nid, lineage.graph["lineage_id"])
+            raise FusionError(node_id, lineage.graph["lineage_id"])
 
         # Compute the angle between the incoming and outgoing edges.
         in_coords = np.array(_get_position(lineage, predecessors[0], self.coord_props))
-        nid_coords = np.array(_get_position(lineage, nid, self.coord_props))
+        nid_coords = np.array(_get_position(lineage, node_id, self.coord_props))
         out_coords = np.array(_get_position(lineage, successors[0], self.coord_props))
         vector_in = nid_coords - in_coords
         vector_out = out_coords - nid_coords
