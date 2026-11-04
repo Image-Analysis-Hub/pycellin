@@ -38,7 +38,8 @@ def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Line
 
 class PropertyCalculator(ABC):
     """
-    Abstract class to compute and enrich data from a model with the values of a property.
+    Abstract class to compute and enrich data from a model with the values of a
+    property.
     """
 
     _LOCAL_PROPERTY = None  # type: bool | None
@@ -340,7 +341,8 @@ class GlobalPropCalculator(PropertyCalculator):
     @abstractmethod
     def enrich(self, data: Data, **kwargs) -> None:
         """
-        Enrich the data with the value of a global property for all objects in all lineages.
+        Enrich the data with the value of a global property for all objects in all
+        lineages.
 
         Parameters
         ----------
@@ -375,7 +377,8 @@ class NodeGlobalPropCalculator(GlobalPropCalculator):
 
     def enrich(self, data: Data, **kwargs) -> None:
         """
-        Enrich the data with the value of a global property for all nodes in all lineages.
+        Enrich the data with the value of a global property for all nodes in all
+        lineages.
 
         Parameters
         ----------
@@ -414,7 +417,8 @@ class EdgeGlobalPropCalculator(GlobalPropCalculator):
 
     def enrich(self, data: Data, **kwargs) -> None:
         """
-        Enrich the data with the value of a global property for all edges in all lineages.
+        Enrich the data with the value of a global property for all edges in all
+        lineages.
 
         Parameters
         ----------

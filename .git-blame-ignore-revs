@@ -1,0 +1,5 @@
+# Commits that only change formatting, skipped by GitHub's blame view.
+# To skip them locally too: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Set line length to 88 and reformat with Ruff
+bfb28b4e91ad6bdf627b3ba24292ad13e99f5a33

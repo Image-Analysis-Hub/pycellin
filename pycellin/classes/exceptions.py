@@ -48,7 +48,10 @@ class FusionError(LineageStructureError):
             if lineage_id is None:
                 message = f"Node {node_id} has more than one parent node."
             else:
-                message = f"Node {node_id} in lineage {lineage_id} has more than one parent node."
+                message = (
+                    f"Node {node_id} in lineage {lineage_id} has more than one "
+                    "parent node."
+                )
         super().__init__(message)
 
 
@@ -136,7 +139,10 @@ class ProtectedPropertyError(AttributeError):
     def __init__(self, prop_name: str, message: str | None = None):
         self.property_name = prop_name
         if message is None:
-            message = f"The property '{prop_name}' is protected and cannot be modified nor removed."
+            message = (
+                f"The property '{prop_name}' is protected and cannot be modified "
+                "nor removed."
+            )
         super().__init__(message)
 
 

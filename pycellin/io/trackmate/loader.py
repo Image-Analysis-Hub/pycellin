@@ -477,7 +477,8 @@ def _convert_ROI_coordinates(
     """
     if "ROI_N_POINTS" not in attribs:
         raise KeyError(
-            f"No key 'ROI_N_POINTS' in the attributes of current element '{element.tag}'."
+            "No key 'ROI_N_POINTS' in the attributes of current element "
+            f"'{element.tag}'."
         )
 
     n_points = int(attribs["ROI_N_POINTS"])
@@ -817,7 +818,10 @@ def _update_props_metadata(
             props_md._change_prop_identifier(
                 f"EDGE_{axis.upper()}_LOCATION", f"link_{axis}"
             )
-            desc = f"{axis.upper()} coordinate of the link, i.e. mean coordinate of its two cells"
+            desc = (
+                f"{axis.upper()} coordinate of the link, "
+                "i.e. mean coordinate of its two cells"
+            )
             props_md._change_prop_description(f"link_{axis}", desc)
 
     # Lineage properties.
@@ -839,7 +843,10 @@ def _update_props_metadata(
             props_md._change_prop_identifier(
                 f"TRACK_{axis.upper()}_LOCATION", f"lineage_{axis}"
             )
-            desc = f"{axis.upper()} coordinate of the lineage, i.e. mean coordinate of its cells"
+            desc = (
+                f"{axis.upper()} coordinate of the lineage, "
+                "i.e. mean coordinate of its cells"
+            )
             props_md._change_prop_description(f"lineage_{axis}", desc)
 
 
@@ -860,7 +867,8 @@ def _update_location_related_props(
             data[f"cell_{axis}"] = data.pop(f"POSITION_{axis.upper()}", None)
 
     # Edges
-    # Mastodon does not have the EDGE_{axis}_LOCATION so we have to check existence first
+    # Mastodon does not have the EDGE_{axis}_LOCATION so we have to check
+    # existence first
     if lineage.edges():
         first_edge = next(iter(lineage.edges(data=True)))
         has_edge_location = any(
@@ -873,8 +881,8 @@ def _update_location_related_props(
                         f"EDGE_{axis.upper()}_LOCATION", None
                     )
         # else:
-        #     # If the EDGE_{axis}_LOCATION properties are not present, we compute the mean
-        #     # coordinate of the two nodes of the edge.
+        #     # If the EDGE_{axis}_LOCATION properties are not present, we compute
+        #     # the mean coordinate of the two nodes of the edge.
         #     for u, v, data in lineage.edges(data=True):
         #         for axis in ["x", "y", "z"]:
         #             coord_u = lineage.nodes[u][f"cell_{axis}"]
@@ -901,7 +909,9 @@ def _update_location_related_props(
         #     # Mastodon does not have the TRACK_{axis}_LOCATION, so we compute the mean
         #     # coordinate of the lineage.
         #     for axis in ["x", "y", "z"]:
-        #         coords = [data[f"cell_{axis}"] for _, data in lineage.nodes(data=True)]
+        #         coords = [
+        #             data[f"cell_{axis}"] for _, data in lineage.nodes(data=True)
+        #         ]
         #         lineage.graph[f"lineage_{axis}"] = sum(coords) / len(coords)
 
 

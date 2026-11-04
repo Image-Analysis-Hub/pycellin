@@ -369,7 +369,8 @@ def test_add_all_props(
     xml_data = (
         "<FeatureDeclarations>"
         "   <SpotFeatures>"
-        '       <Feature feature="QUALITY" name="Quality" isint="false" dimension="NONE"/>'
+        '       <Feature feature="QUALITY" name="Quality" isint="false" '
+        '                dimension="NONE"/>'
         '       <Feature feature="FRAME" name="Frame" isint="true" dimension="NONE"/>'
         "   </SpotFeatures>"
         "   <EdgeFeatures>"
@@ -379,7 +380,8 @@ def test_add_all_props(
         '                dimension="NONE"/>'
         "   </EdgeFeatures>"
         "   <TrackFeatures>"
-        '       <Feature feature="TRACK_INDEX" name="Track index" isint="true" dimension="NONE"/>'
+        '       <Feature feature="TRACK_INDEX" name="Track index" isint="true" '
+        '                dimension="NONE"/>'
         '       <Feature feature="NUMBER_SPOTS" name="Number of spots" isint="true" '
         '                dimension="NONE"/>'
         "   </TrackFeatures>"
@@ -761,7 +763,14 @@ def test_add_all_nodes_several_attributes():
 
 
 def test_add_all_nodes_only_id_attribute():
-    xml_data = '<data>   <frame>       <Spot ID="1000" />       <Spot ID="1001" />   </frame></data>'
+    xml_data = (
+        "<data>"
+        "   <frame>"
+        '       <Spot ID="1000" />'
+        '       <Spot ID="1001" />'
+        "   </frame>"
+        "</data>"
+    )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
 
@@ -1103,7 +1112,12 @@ def test_build_tracks_no_nodes_id():
 
 
 def test_build_tracks_no_edges():
-    xml_data = '<data>   <Track TRACK_ID="1" name="blob" />   <Track TRACK_ID="2" name="blub" /></data>'
+    xml_data = (
+        "<data>"
+        '   <Track TRACK_ID="1" name="blob" />'
+        '   <Track TRACK_ID="2" name="blub" />'
+        "</data>"
+    )
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
     _, element = next(it)
     track_props = {

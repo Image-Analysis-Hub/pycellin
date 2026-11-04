@@ -31,7 +31,8 @@ class PropsMetadata:
         A dictionary of properties where the keys are the property identifiers and
         the values are the Property objects.
     protected_props : list[str]
-        A list of property identifiers that are protected from being modified or removed.
+        A list of property identifiers that are protected from being modified or
+        removed.
     propagated_props : list[str]
         The identifiers of the cycle properties propagated to the cell lineages with
         `Model.propagate_cycle_properties()`, which `Model.update()` copies again.
@@ -178,8 +179,9 @@ class PropsMetadata:
         ----------
         prop_type : PropertyType or str or list[str]
             The type of the property. Can be:
-            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE,
-            or combinations like PropertyType.NODE | PropertyType.EDGE.
+            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE,
+              PropertyType.LINEAGE, or combinations like
+              PropertyType.NODE | PropertyType.EDGE.
             - String: "node", "edge", or "lineage"
             - List of strings: ["node", "lineage"] for multi-type properties
         exact_match : bool, default False
@@ -203,9 +205,10 @@ class PropsMetadata:
         # Validate PropertyType.
         if not isinstance(prop_type, PropertyType) or prop_type == PropertyType(0):
             raise ValueError(
-                "Property type must be a valid PropertyType Flag with at least one flag set. "
-                "Valid types: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE, "
-                "or strings/lists: 'node', 'edge', 'lineage', ['node', 'lineage']."
+                "Property type must be a valid PropertyType Flag with at least one "
+                "flag set. Valid types: PropertyType.NODE, PropertyType.EDGE, "
+                "PropertyType.LINEAGE, or strings/lists: 'node', 'edge', 'lineage', "
+                "['node', 'lineage']."
             )
 
         # Filter properties based on match type.
@@ -307,11 +310,17 @@ class PropsMetadata:
                 txt = "with a different type"
 
             if overwrite:
-                msg = f"A Property '{property.identifier}' already exists {txt}. Overwriting the old Property."
+                msg = (
+                    f"A Property '{property.identifier}' already exists {txt}. "
+                    "Overwriting the old Property."
+                )
                 warnings.warn(msg, stacklevel=2)
                 self.props[property.identifier] = property
             else:
-                msg = f"A Property '{property.identifier}' already exists {txt}. Not overwriting the old Property."
+                msg = (
+                    f"A Property '{property.identifier}' already exists {txt}. "
+                    "Not overwriting the old Property."
+                )
                 warnings.warn(msg, stacklevel=2)
         else:
             self.props[property.identifier] = property
@@ -395,9 +404,10 @@ class PropsMetadata:
         prop_id : str
             The identifier of the property to remove.
         prop_type : PropertyType, optional
-            If specified, only remove the property for the specified type. For multi-type
-            properties (e.g., NODE|LINEAGE), this allows converting to single-type
-            by removing one flag. If None (default), the property is removed entirely.
+            If specified, only remove the property for the specified type. For
+            multi-type properties (e.g., NODE|LINEAGE), this allows converting to
+            single-type by removing one flag. If None (default), the property is removed
+            entirely.
 
         Warns
         -----
@@ -635,7 +645,8 @@ class PropsMetadata:
         dict[str | None, list[str]]
             A dictionary where the keys are units (or None for unitless properties)
             and the values are lists of property identifiers. For example:
-            {'unit1': ['property1', 'property2'], 'unit2': ['property3'], None: ['property4']}.
+            {'unit1': ['property1', 'property2'], 'unit2': ['property3'],
+            None: ['property4']}.
         """
         units: dict[str | None, list[str]] = {}
         for prop in self.props.values():

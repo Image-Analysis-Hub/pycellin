@@ -102,7 +102,8 @@ def _relabel_nodes(
     lineages : list[CellLineage]
         List of lineage graphs to relabel in place.
     overlaps : dict[int, list[int]]
-        Dictionary mapping overlapping node IDs to the list of lineage indices they belong to.
+        Dictionary mapping overlapping node IDs to the list of lineage indices they
+        belong to.
     """
     next_available_id = _get_next_available_id(lineages)
     for nid, lids in sorted(overlaps.items()):
@@ -409,7 +410,8 @@ def _build_axes(
         for prop_name in channel_axes:
             if prop_name not in node_props:
                 raise ValueError(
-                    f"Unknown node property '{prop_name}', cannot be mapped to channel axis."
+                    f"Unknown node property '{prop_name}', cannot be mapped to "
+                    "channel axis."
                 )
             axes.append(
                 geff_spec.Axis(
@@ -421,7 +423,8 @@ def _build_axes(
         for prop_name in reversed(space_axes):
             if prop_name not in node_props:
                 raise ValueError(
-                    f"Unknown node property '{prop_name}', cannot be mapped to space axis."
+                    f"Unknown node property '{prop_name}', cannot be mapped to "
+                    "space axis."
                 )
             axes.append(
                 geff_spec.Axis(

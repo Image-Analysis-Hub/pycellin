@@ -568,7 +568,8 @@ def create_turning_angle_property(
 
 class TurningAngle(NodeLocalPropCalculator):
     """
-    Calculator to compute the angle between two consecutive displacement vectors of a cell.
+    Calculator to compute the angle between two consecutive displacement vectors of a
+    cell.
 
     The angle requires three consecutive detections of the cell. It is computed
     at a given cell detection as the angle between:
@@ -602,7 +603,8 @@ class TurningAngle(NodeLocalPropCalculator):
         self, lineage: CellLineage, node_id: int
     ) -> float:
         """
-        Compute the angle between two consecutive displacement vectors at a cell detection.
+        Compute the angle between two consecutive displacement vectors at a cell
+        detection.
 
         Parameters
         ----------

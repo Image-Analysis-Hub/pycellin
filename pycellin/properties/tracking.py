@@ -6,8 +6,9 @@ A collection of diverse tracking properties/attributes that can be added to
 lineage graphs.
 
 Vocabulary:
-- Property/Attribute: TrackMate (resp. networkX) uses the word property (resp. attribute) 
-  to refer to spot (resp. node), link (resp. edge) or track (resp. graph) information. 
+- Property/Attribute: TrackMate (resp. networkX) uses the word property (resp.
+  attribute) to refer to spot (resp. node), link (resp. edge) or track (resp. graph)
+  information.
   Both naming are used here, depending on the context.
 - Cell cycle: A cell cycle is a list of nodes between 2 successive divisions.
   It includes the second division but not the first one.
@@ -335,7 +336,8 @@ class IsCompleteCycle(NodeLocalPropCalculator):
         self, lineage: CellLineage | CycleLineage, node_id: int
     ) -> bool:
         """
-        Compute whether the cell cycle of a given cell, or a given cell cycle, is complete.
+        Compute whether the cell cycle of a given cell, or a given cell cycle, is
+        complete.
 
         Parameters
         ----------
@@ -542,7 +544,8 @@ class InterdivisionTime(NodeGlobalPropCalculator):
             )
         else:
             raise TypeError(
-                f"Lineage must be of type CellLineage or CycleLineage, not {type(lineage)}."
+                "Lineage must be of type CellLineage or CycleLineage, not "
+                f"{type(lineage)}."
             )
 
         return timepoint_curr_div - timepoint_prev_div
@@ -628,7 +631,8 @@ class DivisionRate(NodeGlobalPropCalculator):
             )
         else:
             raise TypeError(
-                f"Lineage must be of type CellLineage or CycleLineage, not {type(lineage)}."
+                "Lineage must be of type CellLineage or CycleLineage, not "
+                f"{type(lineage)}."
             )
 
         div_time = timepoint_curr_div - timepoint_prev_div

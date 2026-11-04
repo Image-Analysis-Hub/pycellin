@@ -408,7 +408,8 @@ def _identify_space_props(
             if space_key is not None and space_key not in assigned_keys:
                 if _graph_has_node_prop(geff_graph, space_key):
                     logger.info(
-                        f"Valid space property inferred from display hints: '{space_key}'.",
+                        "Valid space property inferred from display hints: "
+                        f"'{space_key}'.",
                         stacklevel=3,
                     )
                     assigned_keys.add(space_key)
@@ -521,14 +522,15 @@ def _resolve_prop_key(
     prop_type_str = property_type_to_strings(prop_type)
     if new_name not in props_dict:
         logger.warning(
-            f"Property '{original_key}' ({prop_type_str}) has been renamed to '{new_name}'.",
+            f"Property '{original_key}' ({prop_type_str}) has been renamed to "
+            f"'{new_name}'.",
             stacklevel=4,
         )
         return new_name
     if fallback not in props_dict:
         logger.warning(
-            f"Property '{original_key}' ({prop_type_str}) has been renamed to '{fallback}' "
-            f"('{new_name}' was already taken).",
+            f"Property '{original_key}' ({prop_type_str}) has been renamed to "
+            f"'{fallback}' ('{new_name}' was already taken).",
             stacklevel=4,
         )
         return fallback
@@ -592,7 +594,8 @@ def _extract_props_metadata(
                     current_prefix, other_prefix = "link", "cell"
                 else:
                     raise ValueError(
-                        f"Unsupported property type: {property_type_to_strings(prop_type)}. "
+                        "Unsupported property type: "
+                        f"{property_type_to_strings(prop_type)}. "
                         "Expected PropertyType.NODE or PropertyType.EDGE."
                     )
                 # Resolve a unique name for the new property.
@@ -644,7 +647,8 @@ def _extract_lin_props_metadata(
     rename_map: dict[PropertyType, dict[str, str]],
 ) -> None:
     """
-    Extract lineage properties metadata from a given dictionary and update the props_dict.
+    Extract lineage properties metadata from a given dictionary and update the
+    props_dict.
 
     Parameters
     ----------

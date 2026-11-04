@@ -64,3 +64,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 88
+
+[tool.ruff.lint]
+# Ruff's default rules, plus line length (E501) for code, docstrings and comments.
+extend-select = ["E501"]

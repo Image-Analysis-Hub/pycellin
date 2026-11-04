@@ -207,7 +207,8 @@ class Timepoint(NodeLocalPropCalculator):
 
         if time_step is None or time_step == 0:
             raise ValueError(
-                "'time_step' cannot be None nor zero for timepoint property calculation."
+                "'time_step' cannot be None nor zero for timepoint property "
+                "calculation."
             )
 
         self.time_step = time_step
@@ -223,8 +224,9 @@ class Timepoint(NodeLocalPropCalculator):
                 )
             if self.ref_time_prop not in lin.nodes[root]:
                 raise ValueError(
-                    f"Reference time property '{self.ref_time_prop}' not found in root node {root} "
-                    f"of lineage {lin.graph.get('lineage_id', 'of unknown ID')}."
+                    f"Reference time property '{self.ref_time_prop}' not found in "
+                    f"root node {root} of lineage "
+                    f"{lin.graph.get('lineage_id', 'of unknown ID')}."
                 )
             time = lin.nodes[root][self.ref_time_prop]
             if min_time is None or time < min_time:
@@ -416,7 +418,8 @@ def create_link_coord_property(
         identifier=f"link_{axis}",
         name=f"Link {axis}",
         description=(
-            f"{axis.upper()} coordinate of the link, i.e. mean coordinate of its two cells"
+            f"{axis.upper()} coordinate of the link, "
+            "i.e. mean coordinate of its two cells"
         ),
         provenance=provenance,
         prop_type="edge",
@@ -431,7 +434,9 @@ def _create_generic_link_coord_property() -> Property:
     return Property(
         identifier="link_{axis}",
         name="Link {axis}",
-        description="{axis} coordinate of the link, i.e. mean coordinate of its two cells",
+        description=(
+            "{axis} coordinate of the link, i.e. mean coordinate of its two cells"
+        ),
         provenance="pycellin",
         prop_type="edge",
         lin_type="CellLineage",
@@ -469,7 +474,8 @@ def create_lineage_coord_property(
         identifier=f"lineage_{axis}",
         name=f"Lineage {axis}",
         description=(
-            f"{axis.upper()} coordinate of the lineage, i.e. mean coordinate of its cells"
+            f"{axis.upper()} coordinate of the lineage, "
+            "i.e. mean coordinate of its cells"
         ),
         provenance=provenance,
         prop_type="lineage",
@@ -484,7 +490,9 @@ def _create_generic_lineage_coord_property() -> Property:
     return Property(
         identifier="lineage_{axis}",
         name="Lineage {axis}",
-        description="{axis} coordinate of the lineage, i.e. mean coordinate of its cells",
+        description=(
+            "{axis} coordinate of the lineage, i.e. mean coordinate of its cells"
+        ),
         provenance="pycellin",
         prop_type="lineage",
         lin_type="CellLineage",
@@ -516,7 +524,8 @@ def create_cycle_id_property(provenance: str = "pycellin") -> Property:
         identifier="cycle_id",
         name="Cycle ID",
         description=(
-            "Unique identifier of the cell cycle, i.e. cell_id of the last cell in the cell cycle"
+            "Unique identifier of the cell cycle, "
+            "i.e. cell_id of the last cell in the cell cycle"
         ),
         provenance=provenance,
         prop_type="node",

@@ -437,7 +437,8 @@ class TestRelabelNodes:
                 assert lin.nodes[node]["cell_name"] == f"ID{node}"
 
     def test_cell_name_partially_updated(self, model_non_unique_ids):
-        """Test that cell_name property is updated only for nodes with TrackMate syntax."""
+        """Test that cell_name property is updated only for nodes with TrackMate
+        syntax."""
         for lin in model_non_unique_ids.data.cell_data.values():
             for node in lin.nodes():
                 if node % 2 == 0:

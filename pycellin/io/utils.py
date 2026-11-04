@@ -187,8 +187,8 @@ def _identify_frame_prop(model: Model) -> str:
             break
         else:
             logger.info(
-                f"Property '{candidate}' found in metadata but not present on all nodes. "
-                f"Trying next candidate or falling back to 'timepoint'."
+                f"Property '{candidate}' found in metadata but not present on all "
+                "nodes. Trying next candidate or falling back to 'timepoint'."
             )
 
     # If no valid frame property found, fallback to "timepoint".
@@ -204,8 +204,8 @@ def _identify_frame_prop(model: Model) -> str:
             )
         else:
             raise KeyError(
-                f"No valid frame-like property found. Tried candidates: {candidates} and "
-                f"fallback 'timepoint'. "
+                "No valid frame-like property found. Tried candidates: "
+                f"{candidates} and fallback 'timepoint'. "
             )
 
     return frame_prop
@@ -323,7 +323,8 @@ def _split_graph_into_lineages(
     lin_props: list[dict[str, Any]] | None = None,
 ) -> list[CellLineage]:
     """
-    Split a graph into subgraphs representing lineages, and ensure consistent lineage ID assignment.
+    Split a graph into subgraphs representing lineages, and ensure consistent lineage ID
+    assignment.
 
     This function takes a directed graph and splits it into subgraphs,
     where each subgraph corresponds to a connected component. It also ensures

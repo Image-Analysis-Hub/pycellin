@@ -43,8 +43,9 @@ class Property:
             The provenance of the property (TrackMate, CTC, pycellin, custom...).
         prop_type : PropertyType or str or list[str]
             The type of the property. Can be:
-            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE,
-            or combinations like PropertyType.NODE | PropertyType.EDGE.
+            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE,
+              PropertyType.LINEAGE, or combinations like
+              PropertyType.NODE | PropertyType.EDGE.
             - String: "node", "edge", or "lineage"
             - List of strings: ["node", "lineage"] for multi-type properties
         lin_type : LineageType
@@ -72,10 +73,11 @@ class Property:
         # Validate PropertyType.
         if not isinstance(prop_type, PropertyType) or prop_type == PropertyType(0):
             raise ValueError(
-                "Property type must be a valid PropertyType Flag with at least one flag set. "
-                "Valid types: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE, "
-                "or combinations like PropertyType.NODE | PropertyType.EDGE, and "
-                "strings/lists: 'node', 'edge', 'lineage', ['node', 'lineage']."
+                "Property type must be a valid PropertyType Flag with at least one "
+                "flag set. Valid types: PropertyType.NODE, PropertyType.EDGE, "
+                "PropertyType.LINEAGE, or combinations like "
+                "PropertyType.NODE | PropertyType.EDGE, and strings/lists: "
+                "'node', 'edge', 'lineage', ['node', 'lineage']."
             )
         self.prop_type = prop_type
 

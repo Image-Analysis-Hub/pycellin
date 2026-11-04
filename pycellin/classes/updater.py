@@ -456,7 +456,8 @@ class ModelUpdater:
                 data,
                 nodes_to_enrich=nodes,  # self._added_cells,
                 edges_to_enrich=edges_to_process,  # self._added_links,
-                lineages_to_enrich=lins_to_process,  # self._added_lineages | self._modified_lineages
+                # self._added_lineages | self._modified_lineages
+                lineages_to_enrich=lins_to_process,
             )
 
         # In case of modifications in the structure of some cell lineages,

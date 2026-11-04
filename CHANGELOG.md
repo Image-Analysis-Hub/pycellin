@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to bfb28b4, plus the uncommitted README badge switch (Black to Ruff). Update from there with: git log bfb28b4..dev -->
+<!-- Planned v0.6.0. Covers commits up to 9a5b902, plus the uncommitted line-length step 2 (docstrings, comments and long strings wrapped at 88, E501 enabled, Style workflow, .git-blame-ignore-revs). Update from there with: git log 9a5b902..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -197,7 +197,8 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **CI:** bump `actions/setup-python` from 6 to 7
 - **CI:** the deploy workflow stops before building if the release tag doesn't match the package version
 - **CI:** fix releases starting the deploy workflow twice, which made one of the two runs fail at the PyPI upload
-- **Code style:** set the line length to 88 characters in `pyproject.toml`, reformat the code and notebooks with Ruff to fit it, and show Ruff's badge in the README instead of Black's
+- **CI:** new Style workflow that checks, on pushes and pull requests to `main`, that the code is formatted with Ruff and that no line is longer than 88 characters
+- **Code style:** wrap code, docstrings and comments at 88 characters. The line length is set in `pyproject.toml`, where Ruff also flags longer lines (E501). The code and notebooks are reformatted with Ruff, and the README shows Ruff's badge instead of Black's
 - fix typos, type hints, docstrings and formatting
 
 ### New Contributors

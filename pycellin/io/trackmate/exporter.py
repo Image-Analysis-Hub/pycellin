@@ -1003,7 +1003,8 @@ def _add_mandatory_props(props_md: PropsMetadata) -> None:
 
 def _update_location_props(props_md: PropsMetadata) -> None:
     """
-    Update location properties in the properties metadata to match TrackMate requirements.
+    Update location properties in the properties metadata to match TrackMate
+    requirements.
 
     This function renames the cell_x, cell_y, cell_z, link_x, link_y, link_z,
     lineage_x, lineage_y, and lineage_z properties to their TrackMate matching features.
@@ -1134,7 +1135,8 @@ def _add_radius_prop(model: Model) -> None:
 
 def _relabel_nodes(model) -> dict[int, dict[int, int]]:
     """
-    Relabel the nodes and return a mapping of old node IDs to new node IDs for each lineage.
+    Relabel the nodes and return a mapping of old node IDs to new node IDs for each
+    lineage.
 
     This is necessary because TrackMate requires unique spot IDs across all lineages.
     If the model has non-unique node IDs, we relabel them in place to ensure uniqueness.
@@ -1454,7 +1456,8 @@ def export_TrackMate_XML(
     -------
     model_copy : Model
         The model as it was exported, including all the modifications done by the
-        exporter (removal of incompatible properties, propagation of cycle properties...).
+        exporter (removal of incompatible properties, propagation of cycle
+        properties...).
         This is a copy of the original model, so the original model is not modified.
 
     Raises

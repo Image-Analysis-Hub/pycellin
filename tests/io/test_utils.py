@@ -107,7 +107,8 @@ def two_lin_graph_with_track_id():
 
 @pytest.fixture
 def expected_two_lins_with_track_id():
-    """Expected CellLineages resulting from splitting two_lineage_graph_with_track_id."""
+    """Expected CellLineages resulting from splitting
+    two_lineage_graph_with_track_id."""
     lin0 = CellLineage()
     lin0.add_node(1, TRACK_ID=0)
     lin0.add_node(2, TRACK_ID=0)
@@ -265,7 +266,8 @@ def model_with_orphaned_data(model):
 
 @pytest.fixture
 def model_with_lineage_id_config():
-    """Factory fixture for creating models with flexible lineage_id property configurations.
+    """Factory fixture for creating models with flexible lineage_id property
+    configurations.
 
     Returns a callable that creates a model with specified lineage_id properties.
     Parameters control whether lineage_id exists in node or graph properties.
@@ -610,7 +612,8 @@ class TestRemoveOrphanedMetadata:
         assert "lineage_id" in lineage_props
 
     def test_orphaned_data(self, model_with_orphaned_data):
-        """Test that metadata are unchanged when orphaned data properties are present."""
+        """Test that metadata are unchanged when orphaned data properties are
+        present."""
         before_node_props = (
             model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
                 "node"
@@ -663,7 +666,8 @@ class TestRemoveOrphanedMetadata:
     # TODO: review the tests below (until the end of the class)
 
     def test_multitype_property_in_both_node_and_lineage(self, model):
-        """Test multi-type property found in both nodes and lineage graph is NOT removed."""
+        """Test multi-type property found in both nodes and lineage graph is NOT
+        removed."""
         before_node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
         before_lineage_props = model.props_metadata._get_prop_dict_from_prop_type(
             "lineage"
@@ -979,7 +983,8 @@ class TestSplitGraphIntoLineages:
         assert is_equal(obt_1[0], expected)
 
     def test_inconsistent_node_ids_some_missing_key(self):
-        """Test ValueError when some nodes lack the key and those that have it disagree."""
+        """Test ValueError when some nodes lack the key and those that have it
+        disagree."""
         g = nx.DiGraph()
         g.add_edges_from([(1, 2), (2, 3)])
         g.nodes[1]["lineage_id"] = 0
@@ -992,7 +997,8 @@ class TestSplitGraphIntoLineages:
             _split_graph_into_lineages(g, lineage_id_key="lineage_id")
 
     def test_node_ids_disagree_with_graph_id(self):
-        """Test ValueError when graph has a lin ID but some nodes have a different one."""
+        """Test ValueError when graph has a lin ID but some nodes have a different
+        one."""
         g = nx.DiGraph()
         g.add_edges_from([(1, 2)])
         g.graph["lineage_id"] = 0
@@ -1006,7 +1012,8 @@ class TestSplitGraphIntoLineages:
             _split_graph_into_lineages(g, lineage_id_key="lineage_id")
 
     def test_nodes_all_have_key_but_disagree_with_each_other(self):
-        """Test ValueError when all nodes and graph have the key but nodes have different values."""
+        """Test ValueError when all nodes and graph have the key but nodes have
+        different values."""
         g = nx.DiGraph()
         g.add_edges_from([(1, 2)])
         g.graph["lineage_id"] = 0
@@ -1019,7 +1026,8 @@ class TestSplitGraphIntoLineages:
             _split_graph_into_lineages(g, lineage_id_key="lineage_id")
 
     def test_nodes_agree_but_differ_from_graph(self):
-        """Test ValueError when nodes are consistent with each other but differ from lin ID."""
+        """Test ValueError when nodes are consistent with each other but differ from lin
+        ID."""
         g = nx.DiGraph()
         g.add_edges_from([(1, 2)])
         g.graph["lineage_id"] = 0
@@ -1091,7 +1099,8 @@ class TestUpdateNodePropKey:
             assert lin_with_old_key.nodes[node]["new_key"] == old_key_values[i]
 
     def test_missing_old_key_skip(self, lin_with_mixed_keys):
-        """Test that nodes without old_key are skipped when enforce_old_key_existence=False."""
+        """Test that nodes without old_key are skipped when
+        enforce_old_key_existence=False."""
         _update_node_prop_key(lin_with_mixed_keys, "old_key", "new_key")
 
         assert lin_with_mixed_keys.nodes[1]["new_key"] == "value1"
@@ -1102,7 +1111,8 @@ class TestUpdateNodePropKey:
         assert "old_key" not in lin_with_mixed_keys.nodes[3]
 
     def test_enforce_old_key_existence(self, lin_with_mixed_keys):
-        """Test that missing old_key raises error when enforce_old_key_existence=True."""
+        """Test that missing old_key raises error when
+        enforce_old_key_existence=True."""
         err_msg = "Node 2 does not have the required key 'old_key'"
         with pytest.raises(ValueError, match=err_msg):
             _update_node_prop_key(
@@ -1113,7 +1123,8 @@ class TestUpdateNodePropKey:
             )
 
     def test_set_default_if_missing(self, lin_with_mixed_keys):
-        """Test setting default value when old_key is missing and set_default_if_missing=True."""
+        """Test setting default value when old_key is missing and
+        set_default_if_missing=True."""
         _update_node_prop_key(
             lin_with_mixed_keys,
             "old_key",
@@ -1190,7 +1201,8 @@ class TestUpdateLineagesIDsKey:
         assert "TRACK_ID" not in lin2.graph
 
     def test_no_key_multi_node(self):
-        """Test updating lineage IDs key when no TRACK_ID key is present in a multi-node lineage."""
+        """Test updating lineage IDs key when no TRACK_ID key is present in a multi-node
+        lineage."""
         lin1 = CellLineage()
         lin1.add_nodes_from([1, 2, 3])
         lin2 = CellLineage()
@@ -1204,7 +1216,8 @@ class TestUpdateLineagesIDsKey:
         assert "TRACK_ID" not in lin2.graph
 
     def test_no_key_one_node(self):
-        """Test updating lineage IDs key when no TRACK_ID key is present in a one-node lineage."""
+        """Test updating lineage IDs key when no TRACK_ID key is present in a one-node
+        lineage."""
         lin1 = CellLineage()
         lin1.add_node(1)
         lin2 = CellLineage()

@@ -144,7 +144,8 @@ class ModelMetadata:
 
     def __delattr__(self, name: str) -> None:
         """
-        Prevent deletion of dataclass fields, allow deletion of dynamically added fields.
+        Prevent deletion of dataclass fields, allow deletion of dynamically added
+        fields.
 
         Parameters
         ----------
@@ -185,7 +186,8 @@ class ModelMetadata:
 
     def get_all_metadata(self) -> dict[str, Any]:
         """
-        Return a dictionary of all metadata (both predefined and dynamically added fields).
+        Return a dictionary of all metadata (both predefined and dynamically added
+        fields).
 
         Returns
         -------

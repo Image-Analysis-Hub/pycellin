@@ -102,7 +102,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         >>> # Remove only from nodes.
         >>> lineage._remove_prop("node_property", PropertyType.NODE)
         >>> # Remove from both nodes and lineages.
-        >>> lineage._remove_prop("multi_property", PropertyType.NODE | PropertyType.LINEAGE)
+        >>> lineage._remove_prop(
+        ...     "multi_property", PropertyType.NODE | PropertyType.LINEAGE
+        ... )
         """
         # If no prop_type specified, remove from all locations.
         if prop_type is None:
@@ -756,7 +758,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 for prop in node_hover_props:
                     if prop not in node.attributes():
                         raise KeyError(
-                            f"Cannot plot: property {prop} is not present in the node attributes."
+                            f"Cannot plot: property {prop} is not present in the node "
+                            "attributes."
                         )
                     hover_text = f"{prop}: {node[prop]}<br>"
                     text += hover_text
@@ -808,7 +811,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 for prop in edge_hover_props:
                     if prop not in edge.attributes():
                         raise KeyError(
-                            f"Cannot plot: property {prop} is not present in the edge attributes."
+                            f"Cannot plot: property {prop} is not present in the edge "
+                            "attributes."
                         )
                     hover_text = f"{prop}: {edge[prop]}<br>"
                     text += hover_text
@@ -892,7 +896,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         template : str or go.layout.Template, optional
             Plotly template to use for the figure (default is "pycellin_white"). A
             "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on templates.
+            template details. See Plotly documentation for more information on
+            templates.
 
         Returns
         -------
@@ -1070,7 +1075,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         Plot the lineage as a tree using Plotly.
 
-        This method generates a tree figure with Reingold-Tilford layout and displays it.
+        This method generates a tree figure with Reingold-Tilford layout and displays
+        it.
 
         Parameters
         ----------
@@ -1120,7 +1126,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         template : str or go.layout.Template, optional
             Plotly template to use for the figure (default is "pycellin_white"). A
             "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on templates.
+            template details. See Plotly documentation for more information on
+            templates.
 
         See Also
         --------
@@ -1338,7 +1345,8 @@ class CellLineage(Lineage):
             # To avoid any unwanted modifications to the lineage, we raise an error.
             if self.has_edge(source_nid, target_nid):
                 raise ValueError(
-                    f"Link 'Cell {source_nid} -> Cell {target_nid}' already exists{txt_tgt}."
+                    f"Link 'Cell {source_nid} -> Cell {target_nid}' already "
+                    f"exists{txt_tgt}."
                 )
 
         # NetworkX does not raise an error if the cells don't exist,
@@ -1843,7 +1851,8 @@ class CellLineage(Lineage):
 
     def get_cell_cycle(self, cell_id: int) -> list[int]:
         """
-        Return all the cells in the cell cycle of the given cell, in chronological order.
+        Return all the cells in the cell cycle of the given cell, in chronological
+        order.
 
         A cell cycle is a lineage segment that starts at the root or at a
         division cell, ends at a division cell or at a leaf, and doesn't
@@ -2201,7 +2210,8 @@ class CellLineage(Lineage):
         template : str or go.layout.Template, optional
             Plotly template to use for the figure (default is "pycellin_white"). A
             "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on templates.
+            template details. See Plotly documentation for more information on
+            templates.
 
         Returns
         -------
@@ -2375,7 +2385,8 @@ class CellLineage(Lineage):
         template : str or go.layout.Template, optional
             Plotly template to use for the figure (default is "pycellin_white"). A
             "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on templates.
+            template details. See Plotly documentation for more information on
+            templates.
         Warnings
         --------
         In case of cell divisions, the hover text of the edges between the parent
@@ -2514,7 +2525,8 @@ class CellLineage(Lineage):
         template : str or go.layout.Template, optional
             Plotly template to use for the figure (default is "pycellin_white"). A
             "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on templates.
+            template details. See Plotly documentation for more information on
+            templates.
 
         Returns
         -------
@@ -2679,7 +2691,8 @@ class CellLineage(Lineage):
                 **node_style,
                 **default_division_overrides,
                 **user_division,
-                # Merge all three line dicts explicitly to preserve partial user overrides.
+                # Merge all three line dicts explicitly to preserve partial user
+                # overrides.
                 "line": {
                     **node_style["line"],
                     **default_division_overrides["line"],
@@ -3096,7 +3109,8 @@ class CycleLineage(Lineage):
         template : str or go.layout.Template, optional
             Plotly template to use for the figure (default is "pycellin_white"). A
             "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on templates.
+            template details. See Plotly documentation for more information on
+            templates.
 
         Returns
         -------
@@ -3206,7 +3220,8 @@ class CycleLineage(Lineage):
         template : str or go.layout.Template, optional
             Plotly template to use for the figure (default is "pycellin_white"). A
             "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on templates.
+            template details. See Plotly documentation for more information on
+            templates.
 
         Warnings
         --------

@@ -737,9 +737,8 @@ class BirthArea(NodeGlobalPropCalculator):
         """
         if lineage.is_root(node_id):
             return np.nan
-        return _get_cycle_node_property_values(self.area_prop, data, lineage, node_id)[
-            0
-        ]
+        areas = _get_cycle_node_property_values(self.area_prop, data, lineage, node_id)
+        return areas[0]
 
 
 def create_division_area_property(
@@ -809,9 +808,8 @@ class DivisionArea(NodeGlobalPropCalculator):
         """
         if lineage.is_leaf(node_id):
             return np.nan
-        return _get_cycle_node_property_values(self.area_prop, data, lineage, node_id)[
-            -1
-        ]
+        areas = _get_cycle_node_property_values(self.area_prop, data, lineage, node_id)
+        return areas[-1]
 
 
 def create_cell_contour_property(
@@ -1447,8 +1445,10 @@ def get_width_and_length(
             print(f"Length: {length:.2f} px i.e. {length * pixel_size:.2f} μm.\n")
 
             txt = (
-                f"Length: {length * pixel_size:.2f} μm\n{' ' * 10}i.e. {length:.2f} px"
-                f"\nWidth: {width * pixel_size:.2f} μm\n{' ' * 10}i.e. {width:.2f} px"
+                f"Length: {length * pixel_size:.2f} μm\n"
+                f"{' ' * 10}i.e. {length:.2f} px\n"
+                f"Width: {width * pixel_size:.2f} μm\n"
+                f"{' ' * 10}i.e. {width:.2f} px"
             )
             ax[0, 2].annotate(
                 txt,
@@ -1463,8 +1463,10 @@ def get_width_and_length(
 
             width2 = (np.sum(dist_on_skel2) / len(pixels_i2)) * 2 - 1
             txt2 = (
-                f"Length: {length2 * pixel_size:.2f} μm\n{' ' * 10}i.e. {length2:.2f} px"
-                f"\nWidth: {width2 * pixel_size:.2f} μm\n{' ' * 10}i.e. {width2:.2f} px"
+                f"Length: {length2 * pixel_size:.2f} μm\n"
+                f"{' ' * 10}i.e. {length2:.2f} px\n"
+                f"Width: {width2 * pixel_size:.2f} μm\n"
+                f"{' ' * 10}i.e. {width2:.2f} px"
             )
             ax[1, 2].annotate(
                 txt2,

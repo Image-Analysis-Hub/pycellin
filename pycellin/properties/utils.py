@@ -156,7 +156,9 @@ def _nansum(values: list[Any]) -> float:
 
 
 class PropertyExtractor(ast.NodeVisitor):
-    """AST visitor to extract property information from create_xxxxx_property functions."""
+    """
+    AST visitor to extract property information from create_xxxxx_property functions.
+    """
 
     def __init__(self) -> None:
         self.properties: dict[str, dict[str, str]] = {}
@@ -284,7 +286,8 @@ def _get_pycellin_props_by_lin_type(
     include_core : bool
         Whether to include core properties.
     lin_type_filter : list[str]
-        The lineage type to filter properties by ('Lineage', 'CellLineage', 'CycleLineage')
+        The lineage type to filter properties by ('Lineage', 'CellLineage',
+        'CycleLineage')
 
     Returns
     -------
@@ -313,12 +316,14 @@ def get_pycellin_cell_lineage_properties(
     """
     Return the pycellin properties that can be computed on cell lineages.
 
-    Automatically discovers properties by parsing create_xxxxx_property functions using AST.
+    Automatically discovers properties by parsing create_xxxxx_property functions using
+    AST.
 
     Parameters
     ----------
     include_core_properties : bool, optional
-        Whether to include core properties, i.e. properties automatically computed by pycellin.
+        Whether to include core properties, i.e. properties automatically computed by
+        pycellin.
         True by default.
     include_Lineage_properties : bool, optional
         Whether to include Lineage properties. True by default.
@@ -343,12 +348,14 @@ def get_pycellin_cycle_lineage_properties(
     """
     Return the pycellin properties that can be computed on cycle lineages.
 
-    Automatically discovers properties by parsing create_xxxxx_property functions using AST.
+    Automatically discovers properties by parsing create_xxxxx_property functions using
+    AST.
 
     Parameters
     ----------
     include_core_properties : bool, optional
-        Whether to include core properties, i.e. properties automatically computed by pycellin.
+        Whether to include core properties, i.e. properties automatically computed by
+        pycellin.
         True by default.
     include_Lineage_properties : bool, optional
         Whether to include Lineage properties. True by default.

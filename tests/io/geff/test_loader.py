@@ -683,14 +683,16 @@ class TestIdentifySpaceProps:
     """Test cases for _identify_space_props function."""
 
     def test_provided_keys_returned_as_is(self, graph_with_coords):
-        """When provided keys exist in the graph, return them unchanged with no logging."""
+        """When provided keys exist in the graph, return them unchanged with no
+        logging."""
         result = _identify_space_props(
             "position_x", "position_y", None, None, graph_with_coords
         )
         assert result == ("position_x", "position_y", None)
 
     def test_provided_z_key_returned(self, graph_with_3d_coords):
-        """When all three coordinate keys are provided and in the graph, return all three."""
+        """When all three coordinate keys are provided and in the graph, return all
+        three."""
         result = _identify_space_props(
             "position_x", "position_y", "position_z", None, graph_with_3d_coords
         )
@@ -707,7 +709,8 @@ class TestIdentifySpaceProps:
             _identify_space_props("position_x", None, None, None, graph_with_coords)
 
     def test_all_none_no_geff_md_returns_none_tuple(self, graph_with_coords):
-        """When all keys are None and geff_md is None, return (None, None, None) with no logging."""
+        """When all keys are None and geff_md is None, return (None, None, None) with no
+        logging."""
         result = _identify_space_props(None, None, None, None, graph_with_coords)
         assert result == (None, None, None)
 
@@ -1040,7 +1043,8 @@ class TestExtractPropsMetadata:
         self, caplog, geff_node_props_md, prop_position_x_edge, rename_map
     ):
         """When a node prop collides with an existing edge prop, both are renamed:
-        the new node prop becomes 'cell_<key>' and the edge prop becomes 'link_<key>'."""
+        the new node prop becomes 'cell_<key>' and the edge prop becomes
+        'link_<key>'."""
         props_dict = {"position_x": prop_position_x_edge}
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             _extract_props_metadata(
@@ -1066,7 +1070,8 @@ class TestExtractPropsMetadata:
         self, caplog, geff_node_props_md, prop_position_x_node, rename_map
     ):
         """When an edge key collides with an existing node prop, both are renamed:
-        the new edge prop becomes 'link_<key>' and the node prop becomes 'cell_<key>'."""
+        the new edge prop becomes 'link_<key>' and the node prop becomes
+        'cell_<key>'."""
         props_dict = {"position_x": prop_position_x_node}
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             _extract_props_metadata(
@@ -1206,7 +1211,8 @@ class TestExtractLinPropsMetadata:
         self, caplog, prop_position_x_node, rename_map
     ):
         """When a lineage prop collides with an existing node prop, both are renamed:
-        the new lineage prop becomes 'lin_<key>' and the node prop becomes 'cell_<key>'."""
+        the new lineage prop becomes 'lin_<key>' and the node prop becomes
+        'cell_<key>'."""
         props_dict = {"position_x": prop_position_x_node}
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             _extract_lin_props_metadata(
@@ -1232,7 +1238,8 @@ class TestExtractLinPropsMetadata:
         self, caplog, prop_position_x_edge, rename_map
     ):
         """When a lineage prop collides with an existing edge prop, both are renamed:
-        the new lineage prop becomes 'lin_<key>' and the edge prop becomes 'link_<key>'."""
+        the new lineage prop becomes 'lin_<key>' and the edge prop becomes
+        'link_<key>'."""
         props_dict = {"position_x": prop_position_x_edge}
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
             _extract_lin_props_metadata(
@@ -1525,7 +1532,8 @@ class TestGetPropUnit:
         assert result == "um"
 
     def test_returns_none_when_no_unit_found_anywhere(self, geff_node_props_md):
-        """When unit is None in node_props_md and the prop has no matching axis, return None."""
+        """When unit is None in node_props_md and the prop has no matching axis, return
+        None."""
         result = _get_prop_unit("frame", "time", geff_node_props_md, [])
         assert result is None
 
@@ -1540,7 +1548,8 @@ class TestGetPropUnit:
         assert result is None
 
     def test_assertion_error_on_duplicate_axes(self, duplicate_time_axes):
-        """When multiple axes match the prop name and axis type, raise AssertionError."""
+        """When multiple axes match the prop name and axis type, raise
+        AssertionError."""
         with pytest.raises(AssertionError):
             _get_prop_unit("frame", "time", None, duplicate_time_axes)
 
@@ -1692,7 +1701,8 @@ class TestExtractGenericMetadata:
         assert result["geff_extra"] == {"custom_key": "custom_value"}
 
     def test_geff_extra_is_empty_dict_when_no_extra_provided(self, geff_md_axes):
-        """When geff_md.extra is the default empty dict, 'geff_extra' is included but empty."""
+        """When geff_md.extra is the default empty dict, 'geff_extra' is included but
+        empty."""
         result = _extract_generic_metadata("/some/tracks.geff", geff_md_axes)
         assert result["geff_extra"] == {}
 
@@ -2166,7 +2176,8 @@ class TestStandardizePropertiesData:
         assert lin.nodes[1]["cell_id"] == 11
 
     def test_skips_standard_coordinate_renames(self):
-        """When x/y/z keys are already 'cell_x', 'cell_y', 'cell_z', they are left unchanged."""
+        """When x/y/z keys are already 'cell_x', 'cell_y', 'cell_z', they are left
+        unchanged."""
         lin = CellLineage()
         lin.add_node(1, lineage_id=0, cell_id=11, cell_x=1.0, cell_y=2.0, cell_z=3.0)
         lin.graph["lineage_id"] = 0
@@ -2241,7 +2252,8 @@ class TestStandardizePropertiesData:
         assert not {"x", "y", "z"} & set(lin.nodes[1])
 
     def test_assigns_fallback_lineage_id_for_single_node_lineage_without_key(self):
-        """When lin_id_key is absent from a single-node lineage graph, -node_id is used."""
+        """When lin_id_key is absent from a single-node lineage graph, -node_id is
+        used."""
         lin = CellLineage()
         lin.add_node(1, custom_lin_id=0, custom_cell_id=10)
 
@@ -2262,7 +2274,8 @@ class TestStandardizePropertiesData:
         assert lin.graph["lineage_id"] == -1
 
     def test_assigns_fallback_lineage_id_for_multi_node_lineage_without_key(self):
-        """When lin_id_key is absent from a multi-node lineage graph, next available id is used."""
+        """When lin_id_key is absent from a multi-node lineage graph, next available id
+        is used."""
         lin_with_id = CellLineage()
         lin_with_id.add_node(0, custom_lin_id=10, custom_cell_id=100)
         lin_with_id.add_node(1, custom_lin_id=10, custom_cell_id=101)
@@ -2315,7 +2328,8 @@ class TestStandardizePropsMetadata:
         assert props_md["cell_y"].identifier == "cell_y"
 
     def test_lin_id_standard_key_preserved(self, pycellin_standard_md, rename_map):
-        """When lineage_id_key is already 'lineage_id', key and metadata are preserved."""
+        """When lineage_id_key is already 'lineage_id', key and metadata are
+        preserved."""
         nb_props = len(pycellin_standard_md)
         _standardize_props_metadata(
             pycellin_standard_md,
@@ -2333,8 +2347,8 @@ class TestStandardizePropsMetadata:
         assert pycellin_standard_md["lineage_id"].provenance == "test"
 
     def test_lin_id_nonstandard_renamed(self, pycellin_non_standard_md, rename_map):
-        """When lineage_id_key is present but not 'lineage_id', it is renamed to 'lineage_id',
-        and its identifier is updated but metadata is preserved."""
+        """When lineage_id_key is present but not 'lineage_id', it is renamed to
+        'lineage_id', and its identifier is updated but metadata is preserved."""
         _standardize_props_metadata(
             pycellin_non_standard_md,
             lin_id_key="track_id",
@@ -2423,7 +2437,8 @@ class TestStandardizePropsMetadata:
         assert props_md["cell_id"].provenance == "geff"
 
     def test_coord_none_skips_all_coord_keys(self, rename_map):
-        """When all coord props are None, no standard coordinate key is added to props_md."""
+        """When all coord props are None, no standard coordinate key is added to
+        props_md."""
         props_md = {}
         _standardize_props_metadata(
             props_md,
@@ -2538,7 +2553,8 @@ class TestStandardizePropsMetadata:
         self, prop_position_x_node, rename_map
     ):
         """When a coordinate key is transformed by rename_map, the transformed key
-        is looked up in props_md, renamed to pycellin convention, and identifier updated."""
+        is looked up in props_md, renamed to pycellin convention, and identifier
+        updated."""
         props_md = {"old_pos_x": prop_position_x_node}
         rename_map[PropertyType.NODE]["old_pos_x"] = "position_x"
         props_md["position_x"] = Property(

@@ -1,0 +1,35 @@
+name: Style
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  ruff:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.14"
+
+    # Same version as the Ruff bundled with the VS Code extension: update both
+    # together, since Ruff's formatting can change between versions.
+    - name: Install Ruff
+      run: python -m pip install ruff==0.17.3
+
+    - name: Check formatting
+      run: ruff format --check
+
+    - name: Check line length
+      run: ruff check --select E501 --output-format github

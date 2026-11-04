@@ -370,7 +370,8 @@ class TestLineageGetLeaves:
 
 
 class TestLineageGetAncestors:
-    """Test cases for CellLineage.get_ancestors and CycleLineage.get_ancestors methods."""
+    """Test cases for CellLineage.get_ancestors and CycleLineage.get_ancestors
+    methods."""
 
     def test_normal_cell_lineage(self, cell_lin):
         """Test get_ancestors on normal CellLineage."""
@@ -535,7 +536,8 @@ class TestLineageGetAncestors:
 
 
 class TestLineageGetDescendants:
-    """Test cases for CellLineage.get_descendants and CycleLineage.get_descendants methods."""
+    """Test cases for CellLineage.get_descendants and CycleLineage.get_descendants
+    methods."""
 
     def test_normal_cell_lineage(self, cell_lin):
         """Test get_descendants on normal CellLineage."""
@@ -1017,7 +1019,8 @@ class TestCellLineageAddLink:
     def test_different_lineages_unconnected_node(
         self, cell_lin, cell_lin_unconnected_node
     ):
-        """Test _add_link between a lineage and an unconnected node of another lineage."""
+        """Test _add_link between a lineage and an unconnected node of another
+        lineage."""
         cell_lin._add_link(1, 17, target_lineage=cell_lin_unconnected_node)
         assert cell_lin.has_node(17)
         assert cell_lin.has_edge(1, 17)
@@ -1028,7 +1031,8 @@ class TestCellLineageAddLink:
     def test_different_lineages_unconnected_component(
         self, cell_lin, cell_lin_unconnected_component
     ):
-        """Test _add_link between a lineage and an unconnected component of another lineage."""
+        """Test _add_link between a lineage and an unconnected component of another
+        lineage."""
         cell_lin._add_link(1, 17, target_lineage=cell_lin_unconnected_component)
         assert cell_lin.has_node(17)
         assert cell_lin.has_node(18)
@@ -1169,11 +1173,13 @@ class TestCellLineageRemoveLink:
         self.check_correct_link_removal(cell_lin_div_root, 1, 17)
 
     def test_unconnected_component(self, cell_lin_unconnected_component):
-        """Test _remove_link on a valid link in a lineage with an unconnected component."""
+        """Test _remove_link on a valid link in a lineage with an unconnected
+        component."""
         self.check_correct_link_removal(cell_lin_unconnected_component, 17, 18)
 
     def test_unconnected_component_div(self, cell_lin_unconnected_component_div):
-        """Test _remove_link on a valid link in a lineage with an unconnected component and division root."""
+        """Test _remove_link on a valid link in a lineage with an unconnected component
+        and division root."""
         self.check_correct_link_removal(cell_lin_unconnected_component_div, 17, 18)
         self.check_correct_link_removal(cell_lin_unconnected_component_div, 19, 20)
         self.check_correct_link_removal(cell_lin_unconnected_component_div, 19, 22)
@@ -1910,7 +1916,8 @@ class TestCellLineageGetCellCycle:
         assert cell_lin_div_root.get_cell_cycle(17) == [17]
 
     def test_successive_divs_and_root(self, cell_lin_successive_divs_and_root):
-        """Test get_cell_cycle on lineage with successive divisions and division root."""
+        """Test get_cell_cycle on lineage with successive divisions and division
+        root."""
         assert cell_lin_successive_divs_and_root.get_cell_cycle(2) == [2]
         assert cell_lin_successive_divs_and_root.get_cell_cycle(3) == [3]
         assert cell_lin_successive_divs_and_root.get_cell_cycle(4) == [4, 5]
@@ -2029,7 +2036,8 @@ class TestCellLineageGetCellCycles:
         )
 
     def test_successive_divs_and_root(self, cell_lin_successive_divs_and_root):
-        """Test get_cell_cycles on lineage with successive divisions and division root."""
+        """Test get_cell_cycles on lineage with successive divisions and division
+        root."""
         lin = cell_lin_successive_divs_and_root
         expected = [
             [2],
@@ -2525,7 +2533,8 @@ class TestCycleLineageInit:
         assert cycle_lin.nodes[17]["generation"] == 1
 
     def test_successive_divs_and_root(self, cell_lin_successive_divs_and_root):
-        """Test CycleLineage creation on lineage with successive divisions and division root."""
+        """Test CycleLineage creation on lineage with successive divisions and division
+        root."""
         cycle_lin = CycleLineage(
             time_prop="timepoint",
             time_step=1,
@@ -2729,7 +2738,8 @@ class TestCycleLineageGetLinksWithinCycle:
         self,
         cell_lin_successive_divs_and_root,
     ):
-        """Test get_links_within_cycle on lineage with successive divisions and division root."""
+        """Test get_links_within_cycle on lineage with successive divisions and division
+        root."""
         cycle_lin = CycleLineage(
             time_prop="timepoint",
             time_step=1,

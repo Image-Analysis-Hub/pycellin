@@ -90,7 +90,8 @@ class TestCategorizePropsMockModel:
     """Test cases for Model._categorize_props() method using mocked Model."""
 
     def test_categorize_props_specific_subset(self, props_dict):
-        """Test that only requested properties are categorized, not all available ones."""
+        """Test that only requested properties are categorized, not all available
+        ones."""
         model = MagicMock(spec=Model)
         model.get_cycle_lineage_properties.return_value = props_dict
         model.get_node_properties.return_value = {

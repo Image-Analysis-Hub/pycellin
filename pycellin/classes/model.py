@@ -343,7 +343,8 @@ class Model:
         - sets the unit of the "cycle_duration", "cycle_start_time" and "cycle_end_time"
         properties, if declared, to the unit of the new reference time property, since
         their values are computed from it at the next `update()`
-        - updates the timepoint calculator property to use the new reference time property
+        - updates the timepoint calculator property to use the new reference time
+        property
 
         Parameters
         ----------
@@ -358,7 +359,8 @@ class Model:
         node_props = self.get_node_properties()
         if prop_id not in node_props:
             raise ValueError(
-                f"Cannot set reference time property: '{prop_id}' not found in model's node properties."
+                f"Cannot set reference time property: '{prop_id}' not found in "
+                "model's node properties."
             )
 
         old_ref_time_prop = self._reference_time_property
@@ -387,10 +389,10 @@ class Model:
 
         By default, the time step is calculated as the minimum difference between
         consecutive timepoints across all lineages.
-        If the timepoints are irregularly sampled, i.e. not evenly spaced regardless of gaps,
-        `variable_time_step` should be set to True. In this case, the greatest common divisor (GCD)
-        of the differences is used instead. However, this method is more computationally intensive
-        and should be used only when necessary.
+        If the timepoints are irregularly sampled, i.e. not evenly spaced regardless of
+        gaps, `variable_time_step` should be set to True. In this case, the greatest
+        common divisor (GCD) of the differences is used instead. However, this method is
+        more computationally intensive and should be used only when necessary.
 
         Parameters
         ----------
@@ -407,7 +409,8 @@ class Model:
         ------
         ValueError
             If no lineages are found in the model data.
-            If no valid time intervals are found (e.g., all nodes have the same timepoint).
+            If no valid time intervals are found (e.g., all nodes have the same
+            timepoint).
             If reference_time_property is not found in lineage nodes.
 
         Examples
@@ -417,12 +420,14 @@ class Model:
         >>> model._compute_time_step(variable_time_step=False)
         1
 
-        Regular time sampling with consistent base interval but gaps (variable_time_step=False):
+        Regular time sampling with consistent base interval but gaps
+        (variable_time_step=False):
         >>> # Time differences: [1, 2, 1, 3] → time_step = 1 (minimum)
         >>> model._compute_time_step(variable_time_step=False)
         1
 
-        Regular time sampling with consistent float interval but gaps (variable_time_step=False):
+        Regular time sampling with consistent float interval but gaps
+        (variable_time_step=False):
         >>> # Time differences: [1.5, 3.0, 1.5] → time_step = 1.5 (minimum)
         >>> model._compute_time_step(variable_time_step=False)
         1.5
@@ -449,10 +454,12 @@ class Model:
         - Regular timepoints like [0, 1, 2, 3, 4] (classic case)
         - Timepoints like [0, 1, 3, 4, 5, 7] (some gaps but consistent unit steps)
         - Timepoints like [0, 1.5, 3.0, 4.5] (non-integer but regular intervals)
-        - Timepoints like [0, 1, 1.5, 2.5, 4] (non-integer and gaps but regular intervals)
+        - Timepoints like [0, 1, 1.5, 2.5, 4] (non-integer and gaps but regular
+          intervals)
 
         When to use variable_time_step=True:
-        - Timepoints like [0, 1, 2.5, 3.5] (non-integer and gaps but no regular intervals)
+        - Timepoints like [0, 1, 2.5, 3.5] (non-integer and gaps but no regular
+          intervals)
           => cannot reach all timepoints by adding a fixed step of 1 from the minimum,
              we need a smaller step to reach all timepoints (0.5 in this case)
         - Timepoints like [0, 1.1, 2.5, 2.8] (non-integer and irregular intervals)
@@ -469,14 +476,16 @@ class Model:
             for source_node, target_node in lin.edges():
                 if time_prop not in lin.nodes[source_node]:
                     raise ValueError(
-                        f"Reference time property '{time_prop}' not found in node {source_node} "
-                        f"of lineage {lin.graph.get('lineage_id', 'of unknown ID')}."
+                        f"Reference time property '{time_prop}' not found in node "
+                        f"{source_node} of lineage "
+                        f"{lin.graph.get('lineage_id', 'of unknown ID')}."
                     )
                 source_time = lin.nodes[source_node][time_prop]
                 if time_prop not in lin.nodes[target_node]:
                     raise ValueError(
-                        f"Reference time property '{time_prop}' not found in node {target_node} "
-                        f"of lineage {lin.graph.get('lineage_id', 'of unknown ID')}."
+                        f"Reference time property '{time_prop}' not found in node "
+                        f"{target_node} of lineage "
+                        f"{lin.graph.get('lineage_id', 'of unknown ID')}."
                     )
                 target_time = lin.nodes[target_node][time_prop]
                 time_diff = abs(target_time - source_time)
@@ -491,7 +500,8 @@ class Model:
             # TODO: extract EPSILON as a constant
             EPSILON = 1e-12
             if all(abs(td - round(td)) < EPSILON for td in time_diffs):
-                # Treat numbers like 2.0000001 as integers for more efficient GCD calculation
+                # Treat numbers like 2.0000001 as integers for more efficient
+                # GCD calculation
                 time_step = gcd(*map(int, map(round, time_diffs)))
             else:
                 time_step = self._gcd_floats(time_diffs)
@@ -718,8 +728,9 @@ class Model:
                     continue
                 if prop.identifier in self._updater._calculators:
                     warnings.warn(
-                        f"The coordinate property '{prop.identifier}' has a calculator, "
-                        "which will overwrite the rescaled values at the next update.",
+                        f"The coordinate property '{prop.identifier}' has a "
+                        "calculator, which will overwrite the rescaled values at the "
+                        "next update.",
                         stacklevel=2,
                     )
                 self._multiply_prop_values(prop.identifier, prop.prop_type, axis_factor)
@@ -937,7 +948,8 @@ class Model:
         Returns
         -------
         dict[str, float]
-            The pixel size of the model as a dictionary with 'width', 'height', and 'depth' keys.
+            The pixel size of the model as a dictionary with 'width', 'height', and
+            'depth' keys.
             Returns None if no pixel sizes are defined.
         """
         pixel_size = {}
@@ -1624,7 +1636,8 @@ class Model:
         -----
         UserWarning
             If `with_CycleLineage` is True but the cycle data has not been added yet.
-            If `with_CycleLineage` is True but the time step of the model is not defined.
+            If `with_CycleLineage` is True but the time step of the model is not
+            defined.
             In both these cases, the cycle lineage is not computed.
         """
         # Determine the lineage ID to use.
@@ -2772,7 +2785,8 @@ class Model:
             New name for the property. If None, the name will be "Cell area".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cell_area_property`).
+            default value (see
+            :func:`pycellin.properties.morphology.create_cell_area_property`).
 
         Raises
         ------
@@ -2815,7 +2829,8 @@ class Model:
             New name for the property. If None, the name will be "Cycle mean area".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cycle_mean_area_property`).
+            default value (see
+            :func:`pycellin.properties.morphology.create_cycle_mean_area_property`).
 
         Raises
         ------
@@ -2860,7 +2875,8 @@ class Model:
             New name for the property. If None, the name will be "Birth area".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_birth_area_property`).
+            default value (see
+            :func:`pycellin.properties.morphology.create_birth_area_property`).
 
         Raises
         ------
@@ -2906,7 +2922,8 @@ class Model:
             New name for the property. If None, the name will be "Division area".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_division_area_property`).
+            default value (see
+            :func:`pycellin.properties.morphology.create_division_area_property`).
 
         Raises
         ------
@@ -2952,7 +2969,8 @@ class Model:
             New name for the property. If None, the name will be "Cell perimeter".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cell_perimeter_property`).
+            default value (see
+            :func:`pycellin.properties.morphology.create_cell_perimeter_property`).
 
         Raises
         ------
@@ -3001,7 +3019,8 @@ class Model:
             New name for the property. If None, the name will be "Cell circularity".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cell_circularity_property`).
+            default value (see
+            :func:`pycellin.properties.morphology.create_cell_circularity_property`).
 
         Raises
         ------
@@ -3049,7 +3068,8 @@ class Model:
             New name for the property. If None, the name will be "Cell solidity".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cell_solidity_property`).
+            default value (see
+            :func:`pycellin.properties.morphology.create_cell_solidity_property`).
 
         Raises
         ------
@@ -3099,7 +3119,8 @@ class Model:
             "Cell contour".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cell_contour_property`).
+            default value (see
+            :func:`pycellin.properties.morphology.create_cell_contour_property`).
 
         Raises
         ------
@@ -3146,7 +3167,8 @@ class Model:
             "Is complete cycle".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.tracking.create_is_complete_cycle_property`).
+            default value (see
+            :func:`pycellin.properties.tracking.create_is_complete_cycle_property`).
         """
         prop = tracking.create_is_complete_cycle_property(
             custom_identifier=custom_identifier,
@@ -3396,7 +3418,8 @@ class Model:
             New name for the property. If None, the name will be "Cell multipolygon".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cell_multipolygon_property`).
+            default value (see
+            :func:`pycellin.properties.morphology.create_cell_multipolygon_property`).
 
         Raises
         ------
@@ -3778,7 +3801,8 @@ class Model:
             "Cycle mean intensity".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.intensity.create_cycle_mean_intensity_property`).
+            default value (see
+            :func:`pycellin.properties.intensity.create_cycle_mean_intensity_property`).
 
         Raises
         ------
@@ -3826,7 +3850,8 @@ class Model:
             New name for the property. If None, the name will be "Birth intensity".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.intensity.create_birth_intensity_property`).
+            default value (see
+            :func:`pycellin.properties.intensity.create_birth_intensity_property`).
 
         Raises
         ------
@@ -3875,7 +3900,8 @@ class Model:
             "Division intensity".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.intensity.create_division_intensity_property`).
+            default value (see
+            :func:`pycellin.properties.intensity.create_division_intensity_property`).
 
         Raises
         ------
@@ -4185,7 +4211,8 @@ class Model:
             New name for the property. If None, the name will be "Cousin cycles".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_cousin_cycles_property`).
+            default value (see
+            :func:`pycellin.properties.topology.create_cousin_cycles_property`).
 
         Raises
         ------
@@ -4222,7 +4249,8 @@ class Model:
             New name for the property. If None, the name will be "Daughter cycles".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_daughter_cycles_property`).
+            default value (see
+            :func:`pycellin.properties.topology.create_daughter_cycles_property`).
 
         Raises
         ------
@@ -4353,7 +4381,8 @@ class Model:
             New name for the property. If None, the name will be "is division".
         custom_description : str, optional
             New description for the property. If None, the description will be
-            "Whether the cell is a division event, i.e. has more than one daughter cell".
+            "Whether the cell is a division event, i.e. has more than one daughter
+            cell".
         """
         prop = topo.create_is_division_property(
             custom_identifier=custom_identifier,
@@ -4447,7 +4476,8 @@ class Model:
             New name for the property. If None, the name will be "Lineage cell depth".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_lineage_cell_depth_property`).
+            default value (see
+            :func:`pycellin.properties.topology.create_lineage_cell_depth_property`).
         """
         prop = topo.create_lineage_cell_depth_property(
             custom_identifier=custom_identifier,
@@ -4479,7 +4509,8 @@ class Model:
             New name for the property. If None, the name will be "Lineage cycle depth".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_lineage_cycle_depth_property`).
+            default value (see
+            :func:`pycellin.properties.topology.create_lineage_cycle_depth_property`).
         """
         prop = topo.create_lineage_cycle_depth_property(
             custom_identifier=custom_identifier,
@@ -4516,7 +4547,8 @@ class Model:
             New name for the property. If None, the name will be "Lineage duration".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_lineage_duration_property`).
+            default value (see
+            :func:`pycellin.properties.topology.create_lineage_duration_property`).
 
         Raises
         ------
@@ -4584,7 +4616,8 @@ class Model:
             New name for the property. If None, the name will be "Location tag".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_location_tag_property`).
+            default value (see
+            :func:`pycellin.properties.topology.create_location_tag_property`).
 
         Raises
         ------
@@ -4677,7 +4710,8 @@ class Model:
             New name for the property. If None, the name will be "Mother cycle".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_mother_cycle_property`).
+            default value (see
+            :func:`pycellin.properties.topology.create_mother_cycle_property`).
 
         Raises
         ------
@@ -4724,7 +4758,8 @@ class Model:
             New name for the property. If None, the name will be "Normalized age".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.tracking.create_normalized_age_property`).
+            default value (see
+            :func:`pycellin.properties.tracking.create_normalized_age_property`).
 
         Raises
         ------
@@ -4768,7 +4803,8 @@ class Model:
             New name for the property. If None, the name will be "Number of cells".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_num_cells_property`).
+            default value (see
+            :func:`pycellin.properties.topology.create_num_cells_property`).
         """
         prop = topo.create_num_cells_property(
             custom_identifier=custom_identifier,
@@ -4796,10 +4832,12 @@ class Model:
             New identifier for the property. If None, the identifier will be
             "num_cycles".
         custom_name : str, optional
-            New name for the property. If None, the name will be "Number of cell cycles".
+            New name for the property. If None, the name will be "Number of cell
+            cycles".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_num_cycles_property`).
+            default value (see
+            :func:`pycellin.properties.topology.create_num_cycles_property`).
         """
         prop = topo.create_num_cycles_property(
             custom_identifier=custom_identifier,
@@ -4818,8 +4856,8 @@ class Model:
         """
         Add the num_divisions property to the model.
 
-        The num_divisions property is a cell lineage property that indicates the number of
-        cell divisions in the lineage.
+        The num_divisions property is a cell lineage property that indicates the number
+        of cell divisions in the lineage.
 
         Parameters
         ----------
@@ -4827,10 +4865,12 @@ class Model:
             New identifier for the property. If None, the identifier will be
             "num_divisions".
         custom_name : str, optional
-            New name for the property. If None, the name will be "Number of cell divisions".
+            New name for the property. If None, the name will be "Number of cell
+            divisions".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_num_divisions_property`).
+            default value (see
+            :func:`pycellin.properties.topology.create_num_divisions_property`).
         """
         prop = topo.create_num_divisions_property(
             custom_identifier=custom_identifier,
@@ -4861,7 +4901,8 @@ class Model:
             New name for the property. If None, the name will be "Number of gaps".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_num_gaps_property`).
+            default value (see
+            :func:`pycellin.properties.topology.create_num_gaps_property`).
         """
         prop = topo.create_num_gaps_property(
             custom_identifier=custom_identifier,
@@ -4892,7 +4933,8 @@ class Model:
             New name for the property. If None, the name will be "Number of leaves".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_num_leaves_property`).
+            default value (see
+            :func:`pycellin.properties.topology.create_num_leaves_property`).
         """
         prop = topo.create_num_leaves_property(
             custom_identifier=custom_identifier,
@@ -4973,7 +5015,8 @@ class Model:
             New name for the property. If None, the name will be "Sister cycles".
         custom_description : str, optional
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_sister_cycles_property`).
+            default value (see
+            :func:`pycellin.properties.topology.create_sister_cycles_property`).
 
         Raises
         ------
@@ -5214,7 +5257,8 @@ class Model:
             Identifier of the property to remove.
         prop_type : PropertyType | str | list[str], optional
             If specified, only remove the property for the specified type. Can be:
-            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE
+            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE,
+              PropertyType.LINEAGE
             - String: "node", "edge", or "lineage"
             - List of strings: ["node", "lineage"] for removing multiple types
             For multi-type properties (e.g., NODE|LINEAGE), this allows converting
@@ -5273,8 +5317,8 @@ class Model:
         else:
             if not (current_prop_type & prop_type_flag):
                 raise ValueError(
-                    f"Property '{prop_identifier}' does not have type(s) {prop_type_flag}. "
-                    f"Current type: {current_prop_type}"
+                    f"Property '{prop_identifier}' does not have type(s) "
+                    f"{prop_type_flag}. Current type: {current_prop_type}"
                 )
             types_to_remove = prop_type_flag
             new_prop_type = current_prop_type & ~prop_type_flag
@@ -5636,8 +5680,8 @@ class Model:
         number of cells in each cell cycle (`cycle_num_cells`). Otherwise you will
         introduce a bias in your quantification.
         Indeed, after propagation, cycle properties (like interdivision time) become
-        over-represented in long cell cycles since these properties are propagated on each
-        node of the cell cycle in cell lineages, whereas they are stored only once
+        over-represented in long cell cycles since these properties are propagated on
+        each node of the cell cycle in cell lineages, whereas they are stored only once
         per cell cycle on the cycle node in cycle lineages.
         """
         if not self.data.cycle_data:
@@ -6268,7 +6312,8 @@ class Model:
         ------
         ValueError
             If the model has no lineages, or none with an ID in `lineage_ids`.
-            If the `lineage_id`, `frame` or `cell_id` property is not found in the model.
+            If the `lineage_id`, `frame` or `cell_id` property is not found in the
+            model.
             If a property of `lineage_props` is not a lineage property of cell
             lineages, is not declared in the model, or clashes with an existing
             column.
@@ -6824,7 +6869,8 @@ class Model:
         template : str or go.layout.Template, optional
             Plotly template to use for the figure (default is "pycellin_white"). A
             "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on templates.
+            template details. See Plotly documentation for more information on
+            templates.
         width: int, optional
             Width of the figure in pixels (default is None, fallback to autosize).
         height: int, optional
@@ -6903,7 +6949,8 @@ class Model:
                 name=f"Mean {y_prop}",
                 line=line,
                 marker=marker,
-                connectgaps=True,  # continuous mean: no break where std is NaN ("keep" mode)
+                # continuous mean: no break where std is NaN ("keep" mode)
+                connectgaps=True,
                 showlegend=False,
             )
         )
@@ -7012,7 +7059,8 @@ class Model:
         template : str or go.layout.Template, optional
             Plotly template to use for the figure (default is "pycellin_white"). A
             "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on templates.
+            template details. See Plotly documentation for more information on
+            templates.
         width: int, optional
             Width of the figure in pixels (default is None, fallback to autosize).
         height: int, optional
