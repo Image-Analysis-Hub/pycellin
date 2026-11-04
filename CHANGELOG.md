@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 4617f96, plus the uncommitted line-length step 1 (88 set in pyproject.toml, code and notebooks reformatted with Ruff). Update from there with: git log 4617f96..dev -->
+<!-- Planned v0.6.0. Covers commits up to bfb28b4, plus the uncommitted README badge switch (Black to Ruff). Update from there with: git log bfb28b4..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -197,7 +197,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **CI:** bump `actions/setup-python` from 6 to 7
 - **CI:** the deploy workflow stops before building if the release tag doesn't match the package version
 - **CI:** fix releases starting the deploy workflow twice, which made one of the two runs fail at the PyPI upload
-- **Code style:** set the line length to 88 characters in `pyproject.toml`, and reformat the code and notebooks with Ruff to fit it
+- **Code style:** set the line length to 88 characters in `pyproject.toml`, reformat the code and notebooks with Ruff to fit it, and show Ruff's badge in the README instead of Black's
 - fix typos, type hints, docstrings and formatting
 
 ### New Contributors
