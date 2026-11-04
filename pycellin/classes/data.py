@@ -328,7 +328,8 @@ class Data:
             if time_window_type == "symmetric":
                 timepoints_to_search = list(
                     range(
-                        center_timepoint - time_window, center_timepoint + time_window + 1
+                        center_timepoint - time_window,
+                        center_timepoint + time_window + 1,
                     )
                 )
             elif time_window_type == "before":

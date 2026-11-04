@@ -423,9 +423,7 @@ class CycleMeanIntensity(NodeGlobalPropCalculator):
         "intensity_prop": ("node", "CellLineage")
     }
 
-    def __init__(
-        self, property: Property, intensity_prop: str = "cell_mean_intensity"
-    ):
+    def __init__(self, property: Property, intensity_prop: str = "cell_mean_intensity"):
         super().__init__(property)
         self.intensity_prop = intensity_prop
 

@@ -290,7 +290,9 @@ class ModelUpdater:
                         # ID is already taken, so we get a new one based on the
                         # next available lineage ID. We want a negative lineage ID
                         # since it is a one-cell lineage.
-                        new_cell_id = -data._get_next_available_lineage_id(positive=False)
+                        new_cell_id = -data._get_next_available_lineage_id(
+                            positive=False
+                        )
                         cell_props = split_lin._remove_cell(original_cell_id)
                         time_value = cell_props.pop(time_prop)
                         assert len(split_lin) == 0

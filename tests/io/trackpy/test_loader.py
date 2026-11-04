@@ -113,9 +113,7 @@ class TestLoadTrackpyDataframe:
         )
         model = load_trackpy_dataframe(df)
 
-        edges = {
-            edge for lin in model.data.cell_data.values() for edge in lin.edges
-        }
+        edges = {edge for lin in model.data.cell_data.values() for edge in lin.edges}
         # Rows 2 -> 3 -> 0 for particle 0, rows 1 -> 4 for particle 1.
         assert edges == {(2, 3), (3, 0), (1, 4)}
 

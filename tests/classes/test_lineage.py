@@ -251,7 +251,9 @@ class TestLineageRemoveProp:
 
     def test_multi_type_removal(self, cell_lin):
         """Test removing property from multiple types at once."""
-        cell_lin._remove_prop("multitype_prop", PropertyType.NODE | PropertyType.LINEAGE)
+        cell_lin._remove_prop(
+            "multitype_prop", PropertyType.NODE | PropertyType.LINEAGE
+        )
         for node in cell_lin.nodes:
             assert "multitype_prop" not in cell_lin.nodes[node]
         assert "multitype_prop" not in cell_lin.graph
@@ -846,9 +848,7 @@ class TestCellLineageAddCell:
     def test_with_timepoint(self, cell_lin):
         """Test _add_cell with specific timepoint."""
         next_id = cell_lin._get_next_available_node_id()
-        assert (
-            cell_lin._add_cell(time_prop="timepoint", time_prop_value=5) == next_id
-        )
+        assert cell_lin._add_cell(time_prop="timepoint", time_prop_value=5) == next_id
         assert cell_lin.nodes[next_id]["cell_id"] == next_id
         assert cell_lin.nodes[next_id]["timepoint"] == 5
 
@@ -1187,7 +1187,9 @@ class TestCellLineageGetBranchLineageHighlight:
 
     def test_multiple_targets_with_paired_source_cells(self, cell_lin):
         """Test highlighting multiple branches with paired source cells."""
-        highlighted = cell_lin.get_branch_lineage_highlight([6, 16], source_cells=[4, 14])
+        highlighted = cell_lin.get_branch_lineage_highlight(
+            [6, 16], source_cells=[4, 14]
+        )
 
         selected = [
             node
@@ -1342,7 +1344,9 @@ class TestCellLineageGetTreeFigure:
 
     def test_explicit_marker_color_wins_over_highlight(self, cell_lin):
         """Test that a caller-provided marker color is not overridden."""
-        fig = cell_lin.get_tree_figure(target_cells=6, node_marker_style={"color": "red"})
+        fig = cell_lin.get_tree_figure(
+            target_cells=6, node_marker_style={"color": "red"}
+        )
 
         assert fig.data[1].marker.color == "red"
 
@@ -1453,7 +1457,9 @@ class TestCellLineageGetHighlightMarkerColors:
 
     def test_custom_highlight_prop(self, cell_lin):
         """Test reading the highlight groups from a custom property name."""
-        highlighted = cell_lin.get_branch_lineage_highlight(6, highlight_prop="my_branch")
+        highlighted = cell_lin.get_branch_lineage_highlight(
+            6, highlight_prop="my_branch"
+        )
         colors = highlighted._get_highlight_marker_colors("my_branch")
 
         assert colors.count(HIGHLIGHT_COLORS[0]) == 6
@@ -1753,7 +1759,9 @@ class TestCellLineageSplitFromCell:
 
     def test_downstream_unconnected_component(self, cell_lin_unconnected_component):
         """Test split downstream from a node in an unconnected component."""
-        new_lin = cell_lin_unconnected_component._split_from_cell(17, split="downstream")
+        new_lin = cell_lin_unconnected_component._split_from_cell(
+            17, split="downstream"
+        )
         assert sorted(new_lin.nodes()) == [18]
         assert sorted(cell_lin_unconnected_component.nodes()) == list(range(1, 18))
 

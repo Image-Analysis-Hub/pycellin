@@ -367,7 +367,7 @@ def _build_axes(
     """
     Build a list of Axis objects for GEFF metadata.
 
-    The axes are ordered as in OME-Zarr: time, then channel, then space axes in reverse 
+    The axes are ordered as in OME-Zarr: time, then channel, then space axes in reverse
     order (z, y, x).
 
     Parameters

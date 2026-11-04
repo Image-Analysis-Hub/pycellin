@@ -869,7 +869,9 @@ def _update_location_related_props(
         if has_edge_location:
             for _, _, data in lineage.edges(data=True):
                 for axis in ["x", "y", "z"]:
-                    data[f"link_{axis}"] = data.pop(f"EDGE_{axis.upper()}_LOCATION", None)
+                    data[f"link_{axis}"] = data.pop(
+                        f"EDGE_{axis.upper()}_LOCATION", None
+                    )
         # else:
         #     # If the EDGE_{axis}_LOCATION properties are not present, we compute the mean
         #     # coordinate of the two nodes of the edge.
@@ -1150,7 +1152,9 @@ def _get_time_step(settings: ET._Element) -> float:
                 "The 'timeinterval' attribute is missing in the 'ImageData' element."
             )
         except ValueError:
-            raise ValueError("The 'timeinterval' attribute cannot be converted to float.")
+            raise ValueError(
+                "The 'timeinterval' attribute cannot be converted to float."
+            )
 
     raise KeyError("The 'ImageData' element is not found in the settings.")
 
@@ -1191,7 +1195,9 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
                     f"The {key_TM} attribute is missing in the 'ImageData' element."
                 )
             except ValueError:
-                raise ValueError(f"The {key_TM} attribute cannot be converted to float.")
+                raise ValueError(
+                    f"The {key_TM} attribute cannot be converted to float."
+                )
         return pixel_size
 
     raise KeyError("The 'ImageData' element is not found in the settings.")

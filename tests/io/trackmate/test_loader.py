@@ -292,7 +292,9 @@ class TestDimensionToUnit:
 # _convert_and_add_prop ####################################################
 
 
-def test_convert_and_add_prop_spot_feature(units: dict[str, str], prop_QUALITY: Property):
+def test_convert_and_add_prop_spot_feature(
+    units: dict[str, str], prop_QUALITY: Property
+):
     trackmate_feature = {
         "feature": "QUALITY",
         "name": "Quality",
@@ -1347,7 +1349,9 @@ def test_parse_model_tag_without_FilteredTracks(tmp_path):
     modified_path = tmp_path / "FakeTracks_without_FilteredTracks.xml"
     tree.write(str(modified_path), xml_declaration=True, encoding="UTF-8")
 
-    _, _, data = tml._parse_model_tag(modified_path, lone_spots="none", tracks="visible")
+    _, _, data = tml._parse_model_tag(
+        modified_path, lone_spots="none", tracks="visible"
+    )
 
     # The 96 spots of the 7 tracks.
     assert sum(len(lin) for lin in data.cell_data.values()) == 96
@@ -1367,7 +1371,9 @@ def test_parse_model_tag_spots_after_tracks(tmp_path):
     modified_path = tmp_path / "FakeTracks_spots_after_tracks.xml"
     tree.write(str(modified_path), xml_declaration=True, encoding="UTF-8")
 
-    _, _, data = tml._parse_model_tag(modified_path, lone_spots="none", tracks="visible")
+    _, _, data = tml._parse_model_tag(
+        modified_path, lone_spots="none", tracks="visible"
+    )
 
     track_sizes = {lin_id: len(lin) for lin_id, lin in data.cell_data.items()}
     assert track_sizes == {0: 74, 4: 10}

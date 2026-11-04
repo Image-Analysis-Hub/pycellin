@@ -1014,7 +1014,9 @@ class TestExportGEFF:
         # The absolute_age property is orphaned (no data in lineages), so it's removed.
         # All other properties are preserved, including multi-type ones (lineage_id).
         expected_props = {
-            k: v for k, v in simple_model.get_properties().items() if k != "absolute_age"
+            k: v
+            for k, v in simple_model.get_properties().items()
+            if k != "absolute_age"
         }
         assert expected_props == exported_model.get_properties()
 

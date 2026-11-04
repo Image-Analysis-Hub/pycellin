@@ -75,7 +75,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             assert isinstance(lineage_id, int), "The lineage ID must be an integer."
             self.graph["lineage_id"] = lineage_id
 
-    def _remove_prop(self, prop_name: str, prop_type: PropertyType | None = None) -> None:
+    def _remove_prop(
+        self, prop_name: str, prop_type: PropertyType | None = None
+    ) -> None:
         """
         Remove a property from the lineage graph based on the property type.
 
@@ -646,7 +648,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                     edge_idx += 1
 
         # Create index_to_nx_id mapping.
-        index_to_nx_id = {igraph_id: nx_id for igraph_id, nx_id in enumerate(node_order)}
+        index_to_nx_id = {
+            igraph_id: nx_id for igraph_id, nx_id in enumerate(node_order)
+        }
 
         return G, index_to_nx_id
 
@@ -1322,7 +1326,9 @@ class CellLineage(Lineage):
         source_lid, txt_src = CellLineage._get_lineage_id_and_err_msg(self)
 
         if target_lineage is not None:
-            target_lid, txt_tgt = CellLineage._get_lineage_id_and_err_msg(target_lineage)
+            target_lid, txt_tgt = CellLineage._get_lineage_id_and_err_msg(
+                target_lineage
+            )
         else:
             target_lineage = self
             target_lid = source_lid
@@ -1363,7 +1369,9 @@ class CellLineage(Lineage):
         ids_mapping = {}  # a dict of {old_id : new_id}
         if target_lineage != self:
             # Identify cell ID conflict between lineages.
-            target_descendants = nx.descendants(target_lineage, target_nid) | {target_nid}
+            target_descendants = nx.descendants(target_lineage, target_nid) | {
+                target_nid
+            }
             conflicting_ids = set(self.nodes()) & set(target_descendants)
             if conflicting_ids:
                 next_id = self._get_next_available_node_id()
@@ -1872,7 +1880,9 @@ class CellLineage(Lineage):
             predecessors = list(self.predecessors(cell_id))
             if len(predecessors) != 1:
                 raise FusionError(cell_id, lid)
-            while not self.is_division(*predecessors) and not self.is_root(*predecessors):
+            while not self.is_division(*predecessors) and not self.is_root(
+                *predecessors
+            ):
                 # While not the generation birth.
                 cell_cycle.append(*predecessors)
                 predecessors = list(self.predecessors(*predecessors))
@@ -1901,7 +1911,9 @@ class CellLineage(Lineage):
 
         return cell_cycle
 
-    def get_cell_cycles(self, ignore_incomplete_cycles: bool = False) -> list[list[int]]:
+    def get_cell_cycles(
+        self, ignore_incomplete_cycles: bool = False
+    ) -> list[list[int]]:
         """
         Return all the cells of each cell cycle in a lineage.
 
@@ -2621,7 +2633,9 @@ class CellLineage(Lineage):
 
             trace_color = get_highlight_color(index + 1)
 
-            trace_name = f"{y_label} ({target_cid})" if len(target_cids) > 1 else y_label
+            trace_name = (
+                f"{y_label} ({target_cid})" if len(target_cids) > 1 else y_label
+            )
             division_nodes = [self.is_division(node) for node in nodes]
             # Node style
             # Layer 1: Pycellin defaults (constants + per-trace color)

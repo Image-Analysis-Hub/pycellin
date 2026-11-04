@@ -372,7 +372,8 @@ def create_cycle_mean_speed_property(
     return Property(
         identifier=custom_identifier or "cycle_mean_speed",
         name=custom_name or "Cycle mean speed",
-        description=custom_description or "Mean speed of the cell during the cell cycle",
+        description=custom_description
+        or "Mean speed of the cell during the cell cycle",
         provenance="pycellin",
         prop_type="node",
         lin_type="CycleLineage",

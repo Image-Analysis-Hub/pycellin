@@ -218,9 +218,9 @@ def _infer_dtype(values: Iterable[Any]) -> str | None:
     Infer the data type of values, in Python type hint syntax.
 
     Booleans, integers (numpy integers included), real numbers and strings give "bool",
-    "int", "float" and "str" respectively. Integers mixed with real numbers give 
-    "float". Values of other types give their class name, prefixed by their module 
-    unless built in (e.g. "dict", "numpy.ndarray"). Values of several types give a 
+    "int", "float" and "str" respectively. Integers mixed with real numbers give
+    "float". Values of other types give their class name, prefixed by their module
+    unless built in (e.g. "dict", "numpy.ndarray"). Values of several types give a
     union of their data types (e.g. "int | str"). None values are ignored.
 
     Parameters

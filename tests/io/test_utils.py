@@ -144,7 +144,9 @@ def graph_with_props():
 def expected_props_lins():
     """Expected CellLineages resulting from splitting graph_with_properties."""
     lin0_exp = CellLineage()
-    lin0_exp.add_node(1, lineage_id=0, custom_prop="value1", x=10.5, count=0, flag=False)
+    lin0_exp.add_node(
+        1, lineage_id=0, custom_prop="value1", x=10.5, count=0, flag=False
+    )
     lin0_exp.add_node(2, lineage_id=0, custom_prop="value2", x=20.5, count=5, flag=True)
     lin0_exp.add_edge(
         1, 2, weight=1.5, edge_data="test", empty_str="", empty_list=[], none_val=None
@@ -576,7 +578,9 @@ class TestRemoveOrphanedMetadata:
         assert caplog.records[1].levelname == "WARNING"
         assert "Edge metadata with no corresponding data" in caplog.records[1].message
         assert caplog.records[2].levelname == "WARNING"
-        assert "Lineage metadata with no corresponding data" in caplog.records[2].message
+        assert (
+            "Lineage metadata with no corresponding data" in caplog.records[2].message
+        )
 
         node_props = (
             model_with_orphaned_metadata.props_metadata._get_prop_dict_from_prop_type(
@@ -608,10 +612,14 @@ class TestRemoveOrphanedMetadata:
     def test_orphaned_data(self, model_with_orphaned_data):
         """Test that metadata are unchanged when orphaned data properties are present."""
         before_node_props = (
-            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type("node")
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+                "node"
+            )
         )
         before_edge_props = (
-            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type("edge")
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+                "edge"
+            )
         )
         before_lineage_props = (
             model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
@@ -620,10 +628,14 @@ class TestRemoveOrphanedMetadata:
         )
         _remove_orphaned_metadata(model_with_orphaned_data)
         after_node_props = (
-            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type("node")
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+                "node"
+            )
         )
         after_edge_props = (
-            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type("edge")
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+                "edge"
+            )
         )
         after_lineage_props = (
             model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
@@ -704,7 +716,9 @@ class TestRemoveOrphanedMetadata:
             _remove_orphaned_metadata(model)
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
-        assert "Lineage metadata with no corresponding data" in caplog.records[0].message
+        assert (
+            "Lineage metadata with no corresponding data" in caplog.records[0].message
+        )
 
         node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
         lineage_props = model.props_metadata._get_prop_dict_from_prop_type("lineage")
@@ -728,13 +742,17 @@ class TestRemoveOrphanedMetadata:
         assert caplog.records[0].levelname == "WARNING"
         assert "Node metadata with no corresponding data" in caplog.records[0].message
         assert caplog.records[1].levelname == "WARNING"
-        assert "Lineage metadata with no corresponding data" in caplog.records[1].message
+        assert (
+            "Lineage metadata with no corresponding data" in caplog.records[1].message
+        )
 
 
 class TestSplitGraphIntoLineages:
     """Test cases for _split_graph_into_lineages function."""
 
-    def test_split_graph_into_lineages(self, two_lin_graph, lin_props, expected_two_lins):
+    def test_split_graph_into_lineages(
+        self, two_lin_graph, lin_props, expected_two_lins
+    ):
         """Test splitting graph into lineages."""
         g1_attr, g2_attr = lin_props
         obtained = _split_graph_into_lineages(
@@ -773,7 +791,9 @@ class TestSplitGraphIntoLineages:
 
     def test_no_lin_props(self, two_lin_graph, expected_two_lins):
         """Test splitting graph with no lineage properties."""
-        obtained = _split_graph_into_lineages(two_lin_graph, lineage_id_key="lineage_id")
+        obtained = _split_graph_into_lineages(
+            two_lin_graph, lineage_id_key="lineage_id"
+        )
 
         g1_exp, g2_exp = expected_two_lins
 

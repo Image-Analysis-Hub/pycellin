@@ -543,9 +543,7 @@ def _create_Spot(
     ET._Element
         The newly created Spot Element.
     """
-    n_attr = {
-        k: _value_to_str(v) for k, v in lineage.nodes[node].items() if k in keys
-    }
+    n_attr = {k: _value_to_str(v) for k, v in lineage.nodes[node].items() if k in keys}
     # A cell without contour may have None, e.g. when loaded from a TrackMate file.
     contour = lineage.nodes[node].get("cell_contour")
     if contour is not None:
@@ -634,9 +632,7 @@ def _write_AllTracks(
             # Track tags.
             xf.write(f"\n{' ' * 6}")
             t_attr = {
-                k: _value_to_str(v)
-                for k, v in lineage.graph.items()
-                if k in track_keys
+                k: _value_to_str(v) for k, v in lineage.graph.items() if k in track_keys
             }
             with xf.element("Track", t_attr):
                 # Edge tags.
@@ -815,7 +811,9 @@ def _update_lineages(lin: CellLineage) -> None:
     # Position properties.
     for axis in ["X", "Y", "Z"]:
         try:
-            lin.graph[f"TRACK_{axis}_LOCATION"] = lin.graph.pop(f"lineage_{axis.lower()}")
+            lin.graph[f"TRACK_{axis}_LOCATION"] = lin.graph.pop(
+                f"lineage_{axis.lower()}"
+            )
         except KeyError:
             pass  # not mandatory
 

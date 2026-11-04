@@ -542,7 +542,9 @@ def _integrate_seg_data(
         if len(node) < 1:
             raise ValueError(f"Label {label} not found in the graph for frame {frame}.")
         elif len(node) > 1:
-            raise ValueError(f"Multiple nodes found for label {label} in frame {frame}.")
+            raise ValueError(
+                f"Multiple nodes found for label {label} in frame {frame}."
+            )
         node = node[0]
         # Updating the nodes.
         graph.nodes[node]["cell_x"] = centroid[0]

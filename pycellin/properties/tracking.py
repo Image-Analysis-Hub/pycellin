@@ -120,8 +120,7 @@ class AbsoluteAge(NodeLocalPropCalculator):
             raise KeyError(f"Cell {node_id} not in the lineage.")
         root = lineage.get_root()
         age = (
-            lineage.nodes[node_id][self.time_prop]
-            - lineage.nodes[root][self.time_prop]
+            lineage.nodes[node_id][self.time_prop] - lineage.nodes[root][self.time_prop]
         )
         return age
 
@@ -471,7 +470,8 @@ def create_interdivision_time_property(
     return Property(
         identifier=custom_identifier or "interdivision_time",
         name=custom_name or "Interdivision time",
-        description=custom_description or "Time elapsed between two successive divisions",
+        description=custom_description
+        or "Time elapsed between two successive divisions",
         provenance="pycellin",
         prop_type="node",
         lin_type="CycleLineage",

@@ -381,7 +381,9 @@ def _identify_space_props(
     space_keys = [cell_x_key, cell_y_key, cell_z_key]
     provided_keys = [key for key in space_keys if key is not None]
     if provided_keys and (cell_x_key is None or cell_y_key is None):
-        raise ValueError("Space properties must include both x and y, and optionally z.")
+        raise ValueError(
+            "Space properties must include both x and y, and optionally z."
+        )
     if len(set(provided_keys)) != len(provided_keys):
         raise ValueError("Space properties must be distinct.")
 
@@ -1095,9 +1097,7 @@ def _get_cell_id_problem(geff_graph: nx.DiGraph, cell_id_key: str) -> str | None
     ):
         return f"Values in property '{cell_id_key}' are not all positive integers."
     if len(set(cell_ids)) != len(cell_ids):
-        return (
-            f"Duplicate values found in property '{cell_id_key}' across graph nodes."
-        )
+        return f"Duplicate values found in property '{cell_id_key}' across graph nodes."
     return None
 
 
@@ -1466,7 +1466,9 @@ def load_GEFF(
         'geff_lineage_id' property.
     """
     # Read the GEFF file.
-    geff_graph, geff_md = geff.read(geff_file, structure_validation=structure_validation)
+    geff_graph, geff_md = geff.read(
+        geff_file, structure_validation=structure_validation
+    )
     if not geff_md.directed:
         raise ValueError(
             "The GEFF graph is undirected: pycellin does not support undirected graphs."

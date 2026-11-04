@@ -737,9 +737,9 @@ class BirthArea(NodeGlobalPropCalculator):
         """
         if lineage.is_root(node_id):
             return np.nan
-        return _get_cycle_node_property_values(
-            self.area_prop, data, lineage, node_id
-        )[0]
+        return _get_cycle_node_property_values(self.area_prop, data, lineage, node_id)[
+            0
+        ]
 
 
 def create_division_area_property(
@@ -809,9 +809,9 @@ class DivisionArea(NodeGlobalPropCalculator):
         """
         if lineage.is_leaf(node_id):
             return np.nan
-        return _get_cycle_node_property_values(
-            self.area_prop, data, lineage, node_id
-        )[-1]
+        return _get_cycle_node_property_values(self.area_prop, data, lineage, node_id)[
+            -1
+        ]
 
 
 def create_cell_contour_property(
@@ -888,7 +888,8 @@ class CellContour(NodeLocalPropCalculator):
                 f"{type(poly).__name__}, but a contour needs a Polygon."
             )
         return [
-            (x - poly.centroid.x, y - poly.centroid.y) for (x, y) in poly.exterior.coords
+            (x - poly.centroid.x, y - poly.centroid.y)
+            for (x, y) in poly.exterior.coords
         ]
 
 
@@ -1385,7 +1386,9 @@ def get_width_and_length(
                 adjacency_dict2[(i, j)] = adj_px2
             if pruning2:
                 adjacency_dict2 = prune_skel(adjacency_dict2)
-            tip_px2 = [px for px, list_px in adjacency_dict2.items() if len(list_px) == 1]
+            tip_px2 = [
+                px for px, list_px in adjacency_dict2.items() if len(list_px) == 1
+            ]
             path2 = from_skel_to_path(adjacency_dict2, tip_px2[0])
             points2 = [Point((x, y)) for (y, x) in path2]
             xs = [point.x for point in points2]
@@ -1496,7 +1499,8 @@ def create_rod_width_property(
     return Property(
         identifier=custom_identifier or "rod_width",
         name=custom_name or "Rod width",
-        description=custom_description or "Width of the cell, for rod-shaped cells only",
+        description=custom_description
+        or "Width of the cell, for rod-shaped cells only",
         provenance="pycellin",
         prop_type="node",
         lin_type="CellLineage",
@@ -1551,7 +1555,8 @@ def create_rod_length_property(
     return Property(
         identifier=custom_identifier or "rod_length",
         name=custom_name or "Rod length",
-        description=custom_description or "Length of the cell, for rod-shaped cells only",
+        description=custom_description
+        or "Length of the cell, for rod-shaped cells only",
         provenance="pycellin",
         prop_type="node",
         lin_type="CellLineage",
@@ -1671,7 +1676,9 @@ if __name__ == "__main__":
     # Shoelace formula
     vertices = lineage.nodes[node]["cell_contour"]
     border = vertices + [vertices[0]]
-    area = sum([p1[0] * p2[1] - p1[1] * p2[0] for (p1, p2) in itertools.pairwise(border)])
+    area = sum(
+        [p1[0] * p2[1] - p1[1] * p2[0] for (p1, p2) in itertools.pairwise(border)]
+    )
     print(abs(area) / 2)
 
     # Perimeter shapely vs by hand

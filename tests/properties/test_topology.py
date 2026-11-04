@@ -103,11 +103,15 @@ class TestLocationTag:
         assert calculator.compute(make_lineage(2.0, 1.0, 1), 1) == "b"
 
     def test_compute_value_missing_from_tag_names_is_none(self, prop, mask):
-        calculator = LocationTag(prop, mask_img=mask, pixel_size=1.0, tag_names={1: "a"})
+        calculator = LocationTag(
+            prop, mask_img=mask, pixel_size=1.0, tag_names={1: "a"}
+        )
         assert calculator.compute(make_lineage(0.0, 0.0, 0), 1) is None
 
     def test_compute_with_tag_names_out_of_bounds_raises(self, prop, mask):
-        calculator = LocationTag(prop, mask_img=mask, pixel_size=1.0, tag_names={1: "a"})
+        calculator = LocationTag(
+            prop, mask_img=mask, pixel_size=1.0, tag_names={1: "a"}
+        )
         with pytest.raises(ValueError, match="x index 4"):
             calculator.compute(make_lineage(4.0, 0.0, 0), 1)
 

@@ -1881,7 +1881,8 @@ class Model:
             if cell_id is None:
                 # Determine the next available global cell_id.
                 next_cids = [
-                    lin._get_next_available_node_id() for lin in self.get_cell_lineages()
+                    lin._get_next_available_node_id()
+                    for lin in self.get_cell_lineages()
                 ]
                 cell_id = max(next_cids)
             else:
@@ -1991,7 +1992,9 @@ class Model:
             tmp_mapping = {cid: ("__tmp__", i) for i, cid in enumerate(ordered)}
             nx.relabel_nodes(lin, tmp_mapping, copy=False)
 
-            final_mapping = {("__tmp__", i): current_id + i for i in range(len(ordered))}
+            final_mapping = {
+                ("__tmp__", i): current_id + i for i in range(len(ordered))
+            }
             current_id += len(ordered)
             nx.relabel_nodes(lin, final_mapping, copy=False)
 
@@ -2149,7 +2152,9 @@ class Model:
                 raise KeyError(f"Lineage with ID {lid} does not exist.") from err
             edges = lineage._remove_intercycle_links()
             removed_links[lid] = edges
-            updater_links.extend(Link(source, target, lid) for source, target, _ in edges)
+            updater_links.extend(
+                Link(source, target, lid) for source, target, _ in edges
+            )
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
@@ -2407,9 +2412,11 @@ class Model:
             expected by the calculator.
         """
         prop_id = calculator.prop.identifier
-        for param, (input_id, prop_type, lin_type) in (
-            calculator.get_input_props().items()
-        ):
+        for param, (
+            input_id,
+            prop_type,
+            lin_type,
+        ) in calculator.get_input_props().items():
             if not isinstance(input_id, str):
                 msg = (
                     f"'{param}' must be the identifier of a property (str), "
@@ -3179,9 +3186,7 @@ class Model:
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-        self.add_custom_property(
-            motion.CellDisplacement(prop, self._get_coord_props())
-        )
+        self.add_custom_property(motion.CellDisplacement(prop, self._get_coord_props()))
 
     def add_cell_polygon(
         self,
@@ -6699,7 +6704,9 @@ class Model:
             return []
         return [int(value)]
 
-    def save_to_pickle(self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL) -> None:
+    def save_to_pickle(
+        self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL
+    ) -> None:
         """
         Save the model to a file by pickling it.
 
@@ -6848,7 +6855,12 @@ class Model:
         line = {"color": PYCELLIN_PURPLE, "width": 3, **(line or {})}
         base_color = line["color"]
         marker = {**(marker or {})}  # empty by default: markers inherit the line color
-        band_line = {"color": base_color, "width": 1, "dash": "dash", **(band_line or {})}
+        band_line = {
+            "color": base_color,
+            "width": 1,
+            "dash": "dash",
+            **(band_line or {}),
+        }
         band_fill_color = _color_to_rgba(base_color, alpha=band_opacity)
 
         # Subset.

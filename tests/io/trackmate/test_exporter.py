@@ -681,9 +681,7 @@ class TestExportTrackMateXML:
         for key in ("ID", "FRAME", "POSITION_X", "POSITION_Y", "RADIUS"):
             assert key in spot.attrib
 
-    def test_cells_without_visibility_exported_as_visible(
-        self, tmp_path, simple_model
-    ):
+    def test_cells_without_visibility_exported_as_visible(self, tmp_path, simple_model):
         """Test that cells without VISIBILITY, e.g. not from TrackMate, are visible."""
         xml_path = tmp_path / "model.xml"
         export_TrackMate_XML(
@@ -702,7 +700,8 @@ class TestExportTrackMateXML:
             model, xml_path, units={"space": "micrometer", "time": "second"}
         )
         visibilities = [
-            float(spot.get("VISIBILITY")) for spot in ET.parse(str(xml_path)).iter("Spot")
+            float(spot.get("VISIBILITY"))
+            for spot in ET.parse(str(xml_path)).iter("Spot")
         ]
         assert visibilities.count(0.0) == 1
         assert visibilities.count(1.0) == 106

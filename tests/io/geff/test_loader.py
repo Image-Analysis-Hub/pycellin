@@ -534,9 +534,7 @@ class TestIdentifyLinIdProp:
 
         assert result == "my_lin_id"
 
-    def test_none_prop_with_track_node_props_no_lineage_key(
-        self, caplog, graph_lin_id
-    ):
+    def test_none_prop_with_track_node_props_no_lineage_key(self, caplog, graph_lin_id):
         """When lin_id_prop is None and geff_track_node_props has no 'lineage' key,
         fall back to 'lineage_id' if present in graph and log."""
         with caplog.at_level(logging.INFO, logger="pycellin.io.geff.loader"):
@@ -919,7 +917,9 @@ class TestResolvePropKey:
     def test_new_name_free(self, caplog):
         """When new_name is not taken, return it and log."""
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.loader"):
-            result = _resolve_prop_key("cell_x", "fallback_x", {}, "x", PropertyType.NODE)
+            result = _resolve_prop_key(
+                "cell_x", "fallback_x", {}, "x", PropertyType.NODE
+            )
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "'x' (node) has been renamed to 'cell_x'" in caplog.records[0].message
@@ -935,7 +935,9 @@ class TestResolvePropKey:
             )
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
-        assert "'x' (edge) has been renamed to 'fallback_x'" in caplog.records[0].message
+        assert (
+            "'x' (edge) has been renamed to 'fallback_x'" in caplog.records[0].message
+        )
         assert "'link_x' was already taken" in caplog.records[0].message
 
         assert result == "fallback_x"
@@ -1115,7 +1117,9 @@ class TestExtractPropsMetadata:
         assert "link_position_x" in props_dict
         assert props_dict["link_position_x"].prop_type == PropertyType.EDGE
         assert "cell_position_x" in props_dict  # original unaffected
-        assert rename_map[PropertyType.NODE] == {"position_x": "pycellin_cell_position_x"}
+        assert rename_map[PropertyType.NODE] == {
+            "position_x": "pycellin_cell_position_x"
+        }
         assert rename_map[PropertyType.EDGE] == {"position_x": "link_position_x"}
         assert rename_map[PropertyType.LINEAGE] == {}
 
@@ -1143,7 +1147,9 @@ class TestExtractPropsMetadata:
 class TestExtractLinPropsMetadata:
     """Test cases for _extract_lin_props_metadata function."""
 
-    def test_empty_md_leaves_props_dict_unchanged(self, prop_position_x_node, rename_map):
+    def test_empty_md_leaves_props_dict_unchanged(
+        self, prop_position_x_node, rename_map
+    ):
         """When md is empty, props_dict is not modified."""
         props_dict = {"position_x": prop_position_x_node}
         _extract_lin_props_metadata({}, props_dict, rename_map)
@@ -1499,7 +1505,9 @@ class TestGetPropUnit:
         )
         assert result == "um"
 
-    def test_fallback_to_axes_when_prop_unit_is_none(self, geff_node_props_md, geff_axes):
+    def test_fallback_to_axes_when_prop_unit_is_none(
+        self, geff_node_props_md, geff_axes
+    ):
         """When node_props_md has the prop but unit is None, fall back to axes."""
         result = _get_prop_unit("frame", "time", geff_node_props_md, geff_axes)
         assert result == "second"
@@ -2526,7 +2534,9 @@ class TestStandardizePropsMetadata:
         assert props_md["cell_id"].identifier == "cell_id"
         assert props_md["cell_id"].provenance == "geff"
 
-    def test_coord_with_rename_map_transformation(self, prop_position_x_node, rename_map):
+    def test_coord_with_rename_map_transformation(
+        self, prop_position_x_node, rename_map
+    ):
         """When a coordinate key is transformed by rename_map, the transformed key
         is looked up in props_md, renamed to pycellin convention, and identifier updated."""
         props_md = {"old_pos_x": prop_position_x_node}

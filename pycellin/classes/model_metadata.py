@@ -276,7 +276,9 @@ class ModelMetadata:
         required_fields = {
             name
             for name, field_obj in cls.__dataclass_fields__.items()
-            if field_obj.default is field_obj.default_factory is None  # no default value
+            if field_obj.default
+            is field_obj.default_factory
+            is None  # no default value
         }
 
         # Check for missing required fields.

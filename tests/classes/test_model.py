@@ -795,7 +795,9 @@ class TestRescaleTime:
 
     def test_cycle_duration_rescaled(self, frame_time_model):
         frame_time_model.add_cycle_data()
-        durations = dict(frame_time_model.data.cycle_data[1].nodes(data="cycle_duration"))
+        durations = dict(
+            frame_time_model.data.cycle_data[1].nodes(data="cycle_duration")
+        )
         frame_time_model.rescale_time(5, time_unit="min")
         frame_time_model.update()
         cycle_lin = frame_time_model.data.cycle_data[1]
@@ -1167,9 +1169,7 @@ class TestAddLocationTag:
     def test_str_dtype_with_tag_names(self, pixel_space_model, tmp_path):
         mask_path = tmp_path / "mask.tif"
         tifffile.imwrite(mask_path, np.zeros((2, 50, 50), dtype=np.uint8))
-        pixel_space_model.add_location_tag(
-            mask_path=str(mask_path), tag_names={0: "a"}
-        )
+        pixel_space_model.add_location_tag(mask_path=str(mask_path), tag_names={0: "a"})
         assert pixel_space_model.get_property("location_tag").dtype == "str"
 
     def test_missing_tag_name_value_warns_at_caller(self, pixel_space_model, tmp_path):
@@ -1563,9 +1563,7 @@ class TestUpdate:
         two_lineages_model.update()
         assert two_lineages_model.data.cell_data[-5].nodes[5]["lineage_id"] == -5
 
-    def test_split_off_lineage_without_original_lineage_props(
-        self, two_lineages_model
-    ):
+    def test_split_off_lineage_without_original_lineage_props(self, two_lineages_model):
         two_lineages_model.data.cell_data[1].graph["lineage_name"] = "Track_1"
         two_lineages_model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         two_lineages_model.update()
@@ -1697,9 +1695,7 @@ class TestAddLineage:
         assert set(two_lineages_model.data.cell_data[2].nodes) == {10, 11}
         assert 2 in two_lineages_model.data.cycle_data
 
-    def test_cell_removed_before_lineage_added_back_computed(
-        self, two_lineages_model
-    ):
+    def test_cell_removed_before_lineage_added_back_computed(self, two_lineages_model):
         two_lineages_model.remove_cell(cell_id=11, lineage_id=2)
         lineage = two_lineages_model.remove_lineage(2)
         lineage.add_node(11, cell_id=11, time=1)
@@ -1708,9 +1704,7 @@ class TestAddLineage:
         two_lineages_model.update()
         assert two_lineages_model.data.cell_data[2].nodes[11]["cell_value"] == 1.0
 
-    def test_link_removed_before_lineage_added_back_computed(
-        self, two_lineages_model
-    ):
+    def test_link_removed_before_lineage_added_back_computed(self, two_lineages_model):
         two_lineages_model.remove_link(
             source_cell_id=10, target_cell_id=11, lineage_id=2
         )

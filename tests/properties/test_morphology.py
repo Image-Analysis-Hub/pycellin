@@ -245,9 +245,7 @@ class TestCellPolygonFromLabelImg:
             calculator.enrich(Data({1: lineage}), [(1, 1)])
         assert lineage.nodes[1]["test_property"].area == 8.5
 
-    def test_enrich_single_warning_for_pieces_and_holes(
-        self, label_img, prop_cell_lin
-    ):
+    def test_enrich_single_warning_for_pieces_and_holes(self, label_img, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=4, timepoint=0)
         lineage.add_node(2, label=5, timepoint=0)
@@ -262,9 +260,7 @@ class TestCellPolygonFromLabelImg:
         assert "a label made of several pieces (cell 1 of lineage 1)" in message
         assert "a label with holes (cell 2 of lineage 1)" in message
 
-    def test_enrich_no_warning_without_fragmented_label(
-        self, label_img, prop_cell_lin
-    ):
+    def test_enrich_no_warning_without_fragmented_label(self, label_img, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=3, timepoint=0)
         lineage.graph["lineage_id"] = 1
