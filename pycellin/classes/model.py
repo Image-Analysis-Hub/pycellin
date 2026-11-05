@@ -3189,14 +3189,14 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will take its
             default value (see
-            :func:`pycellin.properties.timing.create_is_complete_cycle_property`).
+            :func:`pycellin.properties.topology.create_is_complete_cycle_property`).
         """
-        prop = timing.create_is_complete_cycle_property(
+        prop = topo.create_is_complete_cycle_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
         )
-        self.add_custom_property(timing.IsCompleteCycle(prop))
+        self.add_custom_property(topo.IsCompleteCycle(prop))
 
     def add_cell_displacement(
         self,

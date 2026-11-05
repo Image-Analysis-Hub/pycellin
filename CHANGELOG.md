@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to ee50c5c, plus the uncommitted check of the IDs given to the lineage getters (`TypeError` for a non-integer ID). Update from there with: git log ee50c5c..dev -->
+<!-- Planned v0.6.0. Covers commits up to 45607e5, plus the uncommitted move of `is_complete_cycle` to `pycellin.properties.topology`. Update from there with: git log 45607e5..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -56,7 +56,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Exceptions:** the exceptions moved from `pycellin.classes.exceptions` to `pycellin.exceptions`, available as `pc.exceptions` (e.g. `pc.exceptions.UpdateRequiredError`)
 - **Lineages:** `get_root()` always returns one node: it raises `LineageStructureError` when the lineage doesn't have exactly one root, instead of returning a list. The new `get_roots()` always returns a list, like `get_leaves()`
 - **Lineages:** `CycleLineage.yield_links_within_cycle()` is removed: use `get_links_within_cycle()`
-- **Properties:** `pycellin.graph.properties` moved to `pycellin.properties`, and its `tracking` module is now `timing`. The `pycellin.graph` package no longer exists
+- **Properties:** `pycellin.graph.properties` moved to `pycellin.properties`, and its `tracking` module is now `timing`, except `is_complete_cycle`, now in `topology`. The `pycellin.graph` package no longer exists
 - **Properties:** rename the `branch_*` properties to `cycle_*`, along with their `add_*()` methods, factories and calculators:
   - `branch_total_displacement` → `cycle_total_displacement`
   - `branch_mean_displacement` → `cycle_mean_displacement`

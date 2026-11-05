@@ -7,12 +7,11 @@ import math
 import networkx as nx
 import pytest
 
-from pycellin.classes import CellLineage, CycleLineage, Data, Property
+from pycellin.classes import CellLineage, Data, Property
 from pycellin.properties.timing import (
     AbsoluteAge,
     DivisionRate,
     InterdivisionTime,
-    IsCompleteCycle,
     NormalizedAge,
     RelativeAge,
 )
@@ -62,17 +61,6 @@ def prop_cell_lin():
         dtype="int",
         unit="um",
     )
-
-
-@pytest.fixture
-def cycle_lin(cell_lin):
-    # Nothing special, just a lineage.
-    lineage = CycleLineage(
-        time_prop="frame",
-        time_step=1,
-        cell_lineage=cell_lin,
-    )
-    return lineage
 
 
 @pytest.fixture
@@ -196,45 +184,6 @@ class TestNormalizedAge:
     def test_get_input_props(self, prop_cell_lin):
         calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
         assert calculator.get_input_props() == {"time_prop": ("frame", "node", "cell")}
-
-
-# IsCompleteCycle #############################################################
-
-
-def test_is_complete_cycle_cell_lin(cell_lin, prop_cell_lin):
-    """Test IsCompleteCycle Calculator with CellLineage."""
-    calculator = IsCompleteCycle(prop_cell_lin)
-    # Complete cell cycles.
-    assert calculator.compute(cell_lin, node_id=4) is True  # division
-    assert calculator.compute(cell_lin, node_id=14) is True  # division
-    assert calculator.compute(cell_lin, node_id=7) is True  # intermediate
-    assert calculator.compute(cell_lin, node_id=13) is True  # intermediate
-    # Incomplete cell cycles.
-    assert calculator.compute(cell_lin, node_id=1) is False  # root
-    assert calculator.compute(cell_lin, node_id=6) is False  # leaf
-    assert calculator.compute(cell_lin, node_id=10) is False  # leaf
-    assert calculator.compute(cell_lin, node_id=2) is False  # division
-    assert calculator.compute(cell_lin, node_id=5) is False  # intermediate
-    # Non-existent node.
-    with pytest.raises(KeyError, match="Cell 99 not in the lineage."):
-        calculator.compute(cell_lin, node_id=99)
-
-
-def test_is_complete_cycle_cycle_lin(cycle_lin, prop_cycle_lin):
-    """Test IsCompleteCycle Calculator with CycleLineage."""
-    calculator = IsCompleteCycle(prop_cycle_lin)
-    # Complete cell cycles.
-    assert calculator.compute(cycle_lin, node_id=4) is True  # division
-    assert calculator.compute(cycle_lin, node_id=8) is True  # division
-    assert calculator.compute(cycle_lin, node_id=14) is True  # division
-    # Incomplete cell cycles.
-    assert calculator.compute(cycle_lin, node_id=2) is False  # division
-    assert calculator.compute(cycle_lin, node_id=6) is False  # leaf
-    assert calculator.compute(cycle_lin, node_id=10) is False  # leaf
-    assert calculator.compute(cycle_lin, node_id=15) is False  # leaf
-    # Non-existent node.
-    with pytest.raises(KeyError, match="Cycle 99 not in the lineage."):
-        calculator.compute(cycle_lin, node_id=99)
 
 
 # InterdivisionTime ###########################################################

@@ -4,6 +4,7 @@
 
 import logging
 
+import networkx as nx
 import numpy as np
 import pytest
 
@@ -11,11 +12,13 @@ from pycellin.classes import CellLineage, CycleLineage, Property
 from pycellin.properties.topology import (
     CousinCycles,
     DaughterCycles,
+    IsCompleteCycle,
     LocationTag,
     MotherCycle,
     SisterCycles,
     create_cousin_cycles_property,
     create_daughter_cycles_property,
+    create_is_complete_cycle_property,
     create_mother_cycle_property,
     create_sister_cycles_property,
 )
@@ -57,6 +60,76 @@ def cycle_lin():
     for mother in range(1, 8):
         lineage.add_edges_from([(mother, 2 * mother), (mother, 2 * mother + 1)])
     return lineage
+
+
+@pytest.fixture
+def branching_cell_lin():
+    lineage = CellLineage()
+    lineage.add_edges_from(
+        [
+            (1, 2),
+            (2, 3),
+            (3, 4),
+            (4, 5),
+            (5, 6),
+            (4, 7),
+            (7, 8),
+            (8, 9),
+            (8, 10),
+            (2, 11),
+            (11, 12),
+            (12, 13),
+            (13, 14),
+            (14, 15),
+            (14, 16),
+        ]
+    )
+    for n in lineage.nodes:
+        lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 1, n)
+        lineage.nodes[n]["cell_id"] = n
+    lineage.graph["lineage_id"] = 1
+    return lineage
+
+
+# IsCompleteCycle #############################################################
+
+
+class TestIsCompleteCycle:
+    def test_compute_cell_lineage(self, branching_cell_lin):
+        cell_lin = branching_cell_lin
+        calculator = IsCompleteCycle(create_is_complete_cycle_property())
+        # Complete cell cycles.
+        assert calculator.compute(cell_lin, node_id=4) is True  # division
+        assert calculator.compute(cell_lin, node_id=14) is True  # division
+        assert calculator.compute(cell_lin, node_id=7) is True  # intermediate
+        assert calculator.compute(cell_lin, node_id=13) is True  # intermediate
+        # Incomplete cell cycles.
+        assert calculator.compute(cell_lin, node_id=1) is False  # root
+        assert calculator.compute(cell_lin, node_id=6) is False  # leaf
+        assert calculator.compute(cell_lin, node_id=10) is False  # leaf
+        assert calculator.compute(cell_lin, node_id=2) is False  # division
+        assert calculator.compute(cell_lin, node_id=5) is False  # intermediate
+        # Non-existent node.
+        with pytest.raises(KeyError, match="Cell 99 not in the lineage."):
+            calculator.compute(cell_lin, node_id=99)
+
+    def test_compute_cycle_lineage(self, branching_cell_lin):
+        cycle_lin = CycleLineage(
+            time_prop="frame", time_step=1, cell_lineage=branching_cell_lin
+        )
+        calculator = IsCompleteCycle(create_is_complete_cycle_property())
+        # Complete cell cycles.
+        assert calculator.compute(cycle_lin, node_id=4) is True  # division
+        assert calculator.compute(cycle_lin, node_id=8) is True  # division
+        assert calculator.compute(cycle_lin, node_id=14) is True  # division
+        # Incomplete cell cycles.
+        assert calculator.compute(cycle_lin, node_id=2) is False  # division
+        assert calculator.compute(cycle_lin, node_id=6) is False  # leaf
+        assert calculator.compute(cycle_lin, node_id=10) is False  # leaf
+        assert calculator.compute(cycle_lin, node_id=15) is False  # leaf
+        # Non-existent node.
+        with pytest.raises(KeyError, match="Cycle 99 not in the lineage."):
+            calculator.compute(cycle_lin, node_id=99)
 
 
 # LocationTag #################################################################
