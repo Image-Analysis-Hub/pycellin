@@ -7,7 +7,7 @@ The factories exported here build the `Property` declarations of pycellin core
 properties: the ones loaders create, and the ones you need to declare yourself
 when building a `Model` from scratch or writing a loader for a new format.
 
-Every other pycellin property (morphology, motion, topology, tracking) is added
+Every other pycellin property (morphology, motion, topology, timing) is added
 through its dedicated `Model.add_<identifier>()` method, which builds the
 declaration and registers the matching calculator in one step. Use
 `get_pycellin_cell_lineage_properties()` and

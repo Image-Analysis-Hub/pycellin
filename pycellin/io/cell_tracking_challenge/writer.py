@@ -18,9 +18,9 @@ https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content
 import numbers
 from pathlib import Path
 
-from pycellin.classes.exceptions import FusionError
 from pycellin.classes.lineage import CellLineage
 from pycellin.classes.model import Model
+from pycellin.exceptions import FusionError
 from pycellin.io.utils import _check_up_to_date
 
 # TODO: need to extensively test this.
@@ -275,7 +275,7 @@ def write_ctc(
             f"'frame_offset' must be an integer, not {type(frame_offset).__name__}."
         )
     _check_up_to_date(model)
-    lineages = [lineage for lineage in model.data.cell_data.values()]
+    lineages = [lineage for lineage in model.data.cell_lineages.values()]
     timepoints = [lin.nodes[cid]["timepoint"] for lin in lineages for cid in lin.nodes]
     if timepoints and min(timepoints) + frame_offset < 0:
         min_timepoint = min(timepoints)

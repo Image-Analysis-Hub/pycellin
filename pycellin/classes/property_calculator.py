@@ -27,11 +27,11 @@ def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Line
         Keys are the lineage IDs.
     """
     if lineage_type == "cell":
-        return data.cell_data
+        return data.cell_lineages
     elif lineage_type == "cycle":
-        return data.cycle_data
+        return data.cycle_lineages
     elif lineage_type == "both":
-        return {**data.cell_data, **data.cycle_data}
+        return {**data.cell_lineages, **data.cycle_lineages}
     else:
         raise ValueError("Invalid lineage type.")
 
@@ -287,17 +287,19 @@ class LineageLocalPropCalculator(LocalPropCalculator):
             The value of the local property for the lineage.
         """
 
-    def enrich(self, data: Data, lineages_to_enrich: list[int], **kwargs) -> None:
+    def enrich(self, data: Data, lineage_ids_to_enrich: list[int], **kwargs) -> None:
         """
-        Enrich the data with the value of a local property for all lineages.
+        Enrich the data with the value of a local property for the given lineages.
 
         Parameters
         ----------
         data : Data
             Data object containing the lineages.
+        lineage_ids_to_enrich : list[int]
+            IDs of the lineages to enrich.
         """
         lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
-        for lin_id in lineages_to_enrich:
+        for lin_id in lineage_ids_to_enrich:
             lin = lineages[lin_id]
             lin.graph[self.property.identifier] = self.compute(lin)
 

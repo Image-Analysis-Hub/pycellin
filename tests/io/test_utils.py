@@ -7,13 +7,7 @@ import numpy as np
 import pytest
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
-from pycellin.classes.exceptions import UpdateRequiredError
-from pycellin.properties.core import (
-    create_cell_coord_property,
-    create_lineage_id_property,
-    create_link_coord_property,
-    create_timepoint_property,
-)
+from pycellin.exceptions import UpdateRequiredError
 from pycellin.io.utils import (
     _add_lineage_props,
     _check_up_to_date,
@@ -27,7 +21,13 @@ from pycellin.io.utils import (
     _update_lineages_ids_key,
     _update_node_prop_key,
 )
-from pycellin.utils import is_equal
+from pycellin.properties.core import (
+    create_cell_coord_property,
+    create_lineage_id_property,
+    create_link_coord_property,
+    create_timepoint_property,
+)
+from tests.utils import is_equal
 
 # Fixtures ####################################################################
 
@@ -196,8 +196,8 @@ def model():
     lin2.add_edge(3, 4, link_x=2.0)
     lin2.graph["lineage_id"] = 1
 
-    cell_data = {0: lin1, 1: lin2}
-    data = Data(cell_data)
+    cell_lineages = {0: lin1, 1: lin2}
+    data = Data(cell_lineages)
     props_metadata = PropsMetadata()
     props_metadata._add_prop(create_timepoint_property(provenance="Test"))
     props_metadata._add_prop(
@@ -258,9 +258,9 @@ def model_with_orphaned_metadata(model):
 @pytest.fixture
 def model_with_orphaned_data(model):
     """Model with some data properties that have no corresponding metadata."""
-    model.data.cell_data[0].nodes[1]["node_prop_no_metadata"] = "value"
-    model.data.cell_data[0].edges[1, 2]["edge_prop_no_metadata"] = 100
-    model.data.cell_data[0].graph["lineage_prop_no_metadata"] = False
+    model.data.cell_lineages[0].nodes[1]["node_prop_no_metadata"] = "value"
+    model.data.cell_lineages[0].edges[1, 2]["edge_prop_no_metadata"] = 100
+    model.data.cell_lineages[0].graph["lineage_prop_no_metadata"] = False
     return model
 
 
@@ -301,8 +301,8 @@ def model_with_lineage_id_config():
         if lin2_graph_lin_id:
             lin2.graph["lineage_id"] = 1
 
-        cell_data = {0: lin1, 1: lin2}
-        data = Data(cell_data)
+        cell_lineages = {0: lin1, 1: lin2}
+        data = Data(cell_lineages)
         props_metadata = PropsMetadata()
         props_metadata._add_prop(create_timepoint_property(provenance="Test"))
         props_metadata._add_prop(

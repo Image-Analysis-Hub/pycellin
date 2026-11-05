@@ -7,7 +7,7 @@ import warnings
 import pytest
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
-from pycellin.classes.exceptions import UpdateRequiredError
+from pycellin.exceptions import UpdateRequiredError
 from pycellin.io.trackpy.writer import to_trackpy
 from pycellin.properties.core import (
     create_cell_coord_property,
@@ -163,7 +163,7 @@ class TestToTrackpy:
 
     def test_3d_positions_put_z_first(self, model_with_positions):
         """Test that the z position comes before y and x."""
-        for lin in model_with_positions.data.cell_data.values():
+        for lin in model_with_positions.data.cell_lineages.values():
             for cell_id in lin.nodes:
                 lin.nodes[cell_id]["cell_z"] = 0.5
         model_with_positions.props_metadata._add_prop(
@@ -188,7 +188,7 @@ class TestToTrackpy:
         assert cells == [[1], [2, 4], [3]]
         assert df["lineage_id_pycellin"].tolist() == [1, 1, 1, 1]
         # The model given to the export keeps its division.
-        assert sorted(model_with_division.data.cell_data[1].edges()) == [
+        assert sorted(model_with_division.data.cell_lineages[1].edges()) == [
             (1, 2),
             (1, 3),
             (2, 4),

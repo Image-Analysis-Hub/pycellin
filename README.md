@@ -77,7 +77,7 @@ for lin in model.get_cell_lineages():
     plot(lin)
 
 # Compute and plot the cell cycle lineages.
-model.add_cycle_data()
+model.add_cycle_lineages()
 for clin in model.get_cycle_lineages():
     plot(clin)
 

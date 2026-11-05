@@ -5,10 +5,10 @@ from typing import Any, get_args
 from pycellin.custom_types import (
     LineageType,
     PropertyType,
-    property_type_from_string,
-    property_type_to_strings,
+    _property_type_from_string,
+    _property_type_to_strings,
 )
-from pycellin.utils import _normalize_dtype, check_literal_type
+from pycellin.utils import _check_literal_type, _normalize_dtype
 
 # Unit and data type of properties whose declaration is unknown (e.g. TrackMate stubs).
 _UNKNOWN = "unknown"
@@ -68,7 +68,7 @@ class Property:
 
         # Convert string/list to PropertyType Flag if needed.
         if isinstance(prop_type, (str, list)):
-            prop_type = property_type_from_string(prop_type)
+            prop_type = _property_type_from_string(prop_type)
 
         # Validate PropertyType.
         if not isinstance(prop_type, PropertyType) or prop_type == PropertyType(0):
@@ -81,7 +81,7 @@ class Property:
             )
         self.prop_type = prop_type
 
-        if not check_literal_type(lineage_type, LineageType):
+        if not _check_literal_type(lineage_type, LineageType):
             raise ValueError(
                 f"Lineage type must be one of {', '.join(get_args(LineageType))}."
             )
@@ -166,7 +166,7 @@ class Property:
             f"  Name: {self.name}\n"
             f"  Description: {self.description}\n"
             f"  Provenance: {self.provenance}\n"
-            f"  Type: {property_type_to_strings(self.prop_type)}\n"
+            f"  Type: {_property_type_to_strings(self.prop_type)}\n"
             f"  Lineage type: {self.lineage_type}\n"
             f"  Data type: {self.dtype}\n"
             f"  Unit: {self.unit}"

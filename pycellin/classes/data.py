@@ -16,25 +16,23 @@ class Data:
 
     Attributes
     ----------
-    cell_data : dict[int, CellLineage]
+    cell_lineages : dict[int, CellLineage]
         The cell lineages stored.
-    cycle_data : dict[int, CycleLineage] | None
+    cycle_lineages : dict[int, CycleLineage] | None
         The cycle lineages stored, if any.
     """
 
-    def __init__(self, cell_data: dict[int, CellLineage]) -> None:
+    def __init__(self, cell_lineages: dict[int, CellLineage]) -> None:
         """
         Initialize a Data object.
 
         Parameters
         ----------
-        cell_data : dict[int, CellLineage]
+        cell_lineages : dict[int, CellLineage]
             The cell lineages to store.
-        add_cycle_data : bool, optional
-            Whether to compute and store the cycle lineages, by default False.
         """
-        self.cell_data = cell_data
-        self.cycle_data: dict[int, CycleLineage] | None = None
+        self.cell_lineages = cell_lineages
+        self.cycle_lineages: dict[int, CycleLineage] | None = None
 
     def __deepcopy__(self, memo) -> "Data":
         """
@@ -52,29 +50,33 @@ class Data:
             A deep copy of the Data object with all cell lineages and
             cycle lineages (if present) independently copied.
         """
-        # Cell_data
-        cell_data_copy = {
-            lid: copy.deepcopy(lineage, memo) for lid, lineage in self.cell_data.items()
+        # Cell lineages.
+        cell_lineages_copy = {
+            lid: copy.deepcopy(lineage, memo)
+            for lid, lineage in self.cell_lineages.items()
         }
 
-        # Cycle_data
-        cycle_data_copy = None
-        if self.cycle_data is not None:
-            cycle_data_copy = {
+        # Cycle lineages.
+        cycle_lineages_copy = None
+        if self.cycle_lineages is not None:
+            cycle_lineages_copy = {
                 lid: copy.deepcopy(cycle_lineage, memo)
-                for lid, cycle_lineage in self.cycle_data.items()
+                for lid, cycle_lineage in self.cycle_lineages.items()
             }
 
-        new_data = Data(cell_data_copy)
-        new_data.cycle_data = cycle_data_copy
+        new_data = Data(cell_lineages_copy)
+        new_data.cycle_lineages = cycle_lineages_copy
 
         return new_data
 
     def __repr__(self) -> str:
-        return f"Data(cell_data={self.cell_data!r}, cycle_data={self.cycle_data!r})"
+        return (
+            f"Data(cell_lineages={self.cell_lineages!r}, "
+            f"cycle_lineages={self.cycle_lineages!r})"
+        )
 
     def __str__(self) -> str:
-        if self.cycle_data:
+        if self.cycle_lineages:
             txt = f" and {self.number_of_lineages()} cycle lineages"
         else:
             txt = ""
@@ -98,8 +100,8 @@ class Data:
             by default None i.e. all lineages.
         """
         if lids is None:
-            lids = list(self.cell_data.keys())
-        self.cycle_data = {
+            lids = list(self.cell_lineages.keys())
+        self.cycle_lineages = {
             lin_id: self._compute_cycle_lineage(time_prop, time_step, lin_id)
             for lin_id in lids
         }
@@ -124,7 +126,7 @@ class Data:
         CycleLineage
             The cycle lineage corresponding to the cell lineage.
         """
-        return CycleLineage(time_prop, time_step, self.cell_data[lid])
+        return CycleLineage(time_prop, time_step, self.cell_lineages[lid])
 
     def _freeze_lineage_data(self):
         """
@@ -134,7 +136,7 @@ class Data:
         nodes and edges cannot be added or removed. However, graph, node and edge
         attributes can still be modified.
         """
-        for lineage in self.cell_data.values():
+        for lineage in self.cell_lineages.values():
             if not nx.is_frozen(lineage):
                 nx.freeze(lineage)
 
@@ -142,7 +144,7 @@ class Data:
     #     """
     #     Unfreeze all cell lineages.
     #     """
-    #     for lineage in self.cell_data.values():
+    #     for lineage in self.cell_lineages.values():
     #         Lineage.unfreeze(lineage)
 
     def copy(self, deep: bool = True) -> "Data":
@@ -179,14 +181,14 @@ class Data:
         Warning
             If the number of cell lineages and cycle lineages do not match.
         """
-        if self.cycle_data and len(self.cell_data) != len(self.cycle_data):
+        if self.cycle_lineages and len(self.cell_lineages) != len(self.cycle_lineages):
             msg = (
-                f"Number of cell lineages ({len(self.cell_data)}) "
-                f"and cycle lineages ({len(self.cycle_data)}) do not match. "
+                f"Number of cell lineages ({len(self.cell_lineages)}) "
+                f"and cycle lineages ({len(self.cycle_lineages)}) do not match. "
                 "An update of the model is required. "
             )
             warnings.warn(msg)
-        return len(self.cell_data)
+        return len(self.cell_lineages)
 
     def _get_next_available_lineage_id(self, positive: bool) -> int:
         """
@@ -220,14 +222,14 @@ class Data:
         and are equal to the negative of the cell ID.
         """
         new_lin_id: int
-        if len(self.cell_data) == 0:
+        if len(self.cell_lineages) == 0:
             new_lin_id = 1 if positive else -1
         else:
             if positive:
-                new_lin_id = max(self.cell_data.keys()) + 1
+                new_lin_id = max(self.cell_lineages.keys()) + 1
                 new_lin_id = max(new_lin_id, 1)
             else:
-                new_lin_id = min(self.cell_data.keys()) - 1
+                new_lin_id = min(self.cell_lineages.keys()) - 1
                 new_lin_id = min(new_lin_id, -1)
         return new_lin_id
 
@@ -351,7 +353,7 @@ class Data:
         # i.e. nodes that are in the time window
         # and in the lineages to search in.
         if not lineages_to_search:
-            lineages_to_search = list(self.cell_data.values())
+            lineages_to_search = list(self.cell_lineages.values())
         candidate_cells = {}
         for lin in lineages_to_search:
             nodes = [

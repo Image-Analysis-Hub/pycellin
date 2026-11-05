@@ -5,7 +5,7 @@ import warnings
 from typing import get_args
 
 from pycellin.classes.property import Property
-from pycellin.custom_types import LineageType, PropertyType, property_type_from_string
+from pycellin.custom_types import LineageType, PropertyType, _property_type_from_string
 from pycellin.properties.core import (
     create_cells_property,
     create_cycle_duration_property,
@@ -17,7 +17,7 @@ from pycellin.properties.core import (
     create_generation_property,
     create_last_cell_property,
 )
-from pycellin.utils import check_literal_type
+from pycellin.utils import _check_literal_type
 
 
 class PropsMetadata:
@@ -27,7 +27,7 @@ class PropsMetadata:
 
     Attributes
     ----------
-    props : dict[str, Property]
+    properties : dict[str, Property]
         A dictionary of properties where the keys are the property identifiers and
         the values are the Property objects.
     protected_props : list[str]
@@ -46,17 +46,17 @@ class PropsMetadata:
 
     def __init__(
         self,
-        props: dict[str, Property] | None = None,
+        properties: dict[str, Property] | None = None,
         protected_props: list[str] | None = None,
         propagated_props: list[str] | None = None,
     ) -> None:
-        self.props = props if props is not None else {}
+        self.properties = properties if properties is not None else {}
         self._protected_props = protected_props if protected_props is not None else []
         self._propagated_props = (
             propagated_props if propagated_props is not None else []
         )
         for prop in self._protected_props:
-            if prop not in self.props:
+            if prop not in self.properties:
                 msg = (
                     f"Protected property '{prop}' does not exist in the declared "
                     "properties. Removing it from the list of protected properties."
@@ -81,12 +81,13 @@ class PropsMetadata:
             protected properties lists independently copied.
         """
         props_copy = {
-            prop_id: copy.deepcopy(prop, memo) for prop_id, prop in self.props.items()
+            prop_id: copy.deepcopy(prop, memo)
+            for prop_id, prop in self.properties.items()
         }
         protected_props_copy = copy.deepcopy(self._protected_props, memo)
         propagated_props_copy = copy.deepcopy(self._propagated_props, memo)
         return PropsMetadata(
-            props=props_copy,
+            properties=props_copy,
             protected_props=protected_props_copy,
             propagated_props=propagated_props_copy,
         )
@@ -107,7 +108,7 @@ class PropsMetadata:
     def __eq__(self, other):
         if not isinstance(other, PropsMetadata):
             return False
-        return self.props == other.props
+        return self.properties == other.properties
 
     def __repr__(self) -> str:
         """
@@ -118,7 +119,7 @@ class PropsMetadata:
         str
             A string representation of the PropsMetadata object.
         """
-        return f"PropsMetadata(props={self.props!r})"
+        return f"PropsMetadata(properties={self.properties!r})"
 
     def __str__(self) -> str:
         """
@@ -161,7 +162,7 @@ class PropsMetadata:
         bool
             True if the property has been declared, False otherwise.
         """
-        return prop_id in self.props
+        return prop_id in self.properties
 
     def _get_prop_dict_from_prop_type(
         self,
@@ -200,7 +201,7 @@ class PropsMetadata:
         """
         # Convert string/list to PropertyType Flag if needed.
         if isinstance(prop_type, (str, list)):
-            prop_type = property_type_from_string(prop_type)
+            prop_type = _property_type_from_string(prop_type)
 
         # Validate PropertyType.
         if not isinstance(prop_type, PropertyType) or prop_type == PropertyType(0):
@@ -213,9 +214,13 @@ class PropsMetadata:
 
         # Filter properties based on match type.
         if exact_match:
-            props = {k: v for k, v in self.props.items() if v.prop_type == prop_type}
+            props = {
+                k: v for k, v in self.properties.items() if v.prop_type == prop_type
+            }
         else:
-            props = {k: v for k, v in self.props.items() if v.prop_type & prop_type}
+            props = {
+                k: v for k, v in self.properties.items() if v.prop_type & prop_type
+            }
 
         return props
 
@@ -239,11 +244,13 @@ class PropsMetadata:
         ValueError
             If the lineage type is invalid.
         """
-        if not check_literal_type(lineage_type, LineageType):
+        if not _check_literal_type(lineage_type, LineageType):
             raise ValueError(
                 f"Lineage type must be one of {', '.join(get_args(LineageType))}."
             )
-        props = {k: v for k, v in self.props.items() if lineage_type == v.lineage_type}
+        props = {
+            k: v for k, v in self.properties.items() if lineage_type == v.lineage_type
+        }
         return props
 
     def _get_protected_props(self) -> list[str]:
@@ -302,8 +309,8 @@ class PropsMetadata:
             If a property with the same identifier already exists and overwrite=False.
             The existing property will NOT be overwritten.
         """
-        if property.identifier in self.props:
-            old_prop = self.props[property.identifier]
+        if property.identifier in self.properties:
+            old_prop = self.properties[property.identifier]
             if property.prop_type == old_prop.prop_type:
                 txt = "with the same type"
             else:
@@ -315,7 +322,7 @@ class PropsMetadata:
                     "Overwriting the old Property."
                 )
                 warnings.warn(msg, stacklevel=2)
-                self.props[property.identifier] = property
+                self.properties[property.identifier] = property
             else:
                 msg = (
                     f"A Property '{property.identifier}' already exists {txt}. "
@@ -323,7 +330,7 @@ class PropsMetadata:
                 )
                 warnings.warn(msg, stacklevel=2)
         else:
-            self.props[property.identifier] = property
+            self.properties[property.identifier] = property
 
     def _add_props(
         self,
@@ -384,7 +391,7 @@ class PropsMetadata:
             The unit of the time property (e.g. 'frame', 'minute', 'hour', etc.).
         """
         for prop in self._create_cycle_lineage_props(time_unit):
-            if prop.identifier not in self.props:
+            if prop.identifier not in self.properties:
                 self._add_prop(prop)
                 self._protect_prop(prop.identifier)
 
@@ -421,7 +428,7 @@ class PropsMetadata:
         ValueError
             If prop_type is specified but the property doesn't have those flags.
         """
-        if prop_id not in self.props:
+        if prop_id not in self.properties:
             raise KeyError(
                 f"Property '{prop_id}' does not exist in the declared properties."
             )
@@ -435,12 +442,12 @@ class PropsMetadata:
 
         # If no prop_type specified, remove entirely.
         if prop_type is None:
-            del self.props[prop_id]
+            del self.properties[prop_id]
             self._forget_propagated_prop(prop_id)
             return
 
         # Determine new type for the property.
-        current_prop_type = self.props[prop_id].prop_type
+        current_prop_type = self.properties[prop_id].prop_type
         if not (current_prop_type & prop_type):
             raise ValueError(
                 f"Property '{prop_id}' does not have type(s) {prop_type}. "
@@ -450,10 +457,10 @@ class PropsMetadata:
 
         # Update or remove the property.
         if new_prop_type == PropertyType(0):
-            del self.props[prop_id]
+            del self.properties[prop_id]
             self._forget_propagated_prop(prop_id)
         else:
-            self.props[prop_id].prop_type = new_prop_type
+            self.properties[prop_id].prop_type = new_prop_type
 
     def _forget_propagated_prop(self, prop_id: str) -> None:
         """
@@ -508,7 +515,7 @@ class PropsMetadata:
         UserWarning
             If the property is protected and cannot be modified.
         """
-        if prop_id not in self.props:
+        if prop_id not in self.properties:
             raise KeyError(
                 f"Property '{prop_id}' does not exist in the declared properties."
             )
@@ -519,8 +526,8 @@ class PropsMetadata:
             )
             warnings.warn(msg)
         else:
-            self.props[new_id] = self.props.pop(prop_id)
-            self.props[new_id]._change_identifier(new_id)
+            self.properties[new_id] = self.properties.pop(prop_id)
+            self.properties[new_id]._change_identifier(new_id)
             if prop_id in self._propagated_props:
                 self._forget_propagated_prop(prop_id)
                 self._add_propagated_prop(new_id)
@@ -536,7 +543,7 @@ class PropsMetadata:
         new_name : str
             The new name for the property.
         """
-        if prop_id not in self.props:
+        if prop_id not in self.properties:
             raise KeyError(
                 f"Property '{prop_id}' does not exist in the declared properties."
             )
@@ -547,7 +554,7 @@ class PropsMetadata:
             )
             warnings.warn(msg)
         else:
-            self.props[prop_id]._change_name(new_name)
+            self.properties[prop_id]._change_name(new_name)
 
     def _change_prop_description(
         self,
@@ -572,7 +579,7 @@ class PropsMetadata:
             If the property is protected and cannot be modified
             (i.e. it is in the list of protected properties).
         """
-        if prop_id not in self.props:
+        if prop_id not in self.properties:
             raise KeyError(
                 f"Property '{prop_id}' does not exist in the declared properties."
             )
@@ -583,7 +590,7 @@ class PropsMetadata:
             )
             warnings.warn(msg)
         else:
-            self.props[prop_id]._change_description(new_description)
+            self.properties[prop_id]._change_description(new_description)
 
     def _protect_prop(self, prop_id: str) -> None:
         """
@@ -599,7 +606,7 @@ class PropsMetadata:
         UserWarning
             If the property does not exist in the declared properties.
         """
-        if prop_id not in self.props:
+        if prop_id not in self.properties:
             msg = (
                 f"Property '{prop_id}' does not exist in the declared properties "
                 "and cannot be protected."
@@ -623,7 +630,7 @@ class PropsMetadata:
         UserWarning
             If the property does not exist in the declared properties.
         """
-        if prop_id not in self.props:
+        if prop_id not in self.properties:
             msg = (
                 f"Property '{prop_id}' does not exist in the declared properties "
                 "and cannot be unprotected."
@@ -633,7 +640,7 @@ class PropsMetadata:
         if prop_id in self._protected_props:
             self._protected_props.remove(prop_id)
 
-    def _get_units_per_props(self) -> dict[str | None, list[str]]:
+    def _get_props_per_unit(self) -> dict[str | None, list[str]]:
         """
         Return a dict of units and the properties associated with each unit.
 
@@ -649,7 +656,7 @@ class PropsMetadata:
             None: ['property4']}.
         """
         units: dict[str | None, list[str]] = {}
-        for prop in self.props.values():
+        for prop in self.properties.values():
             if prop.unit in units:
                 units[prop.unit].append(prop.identifier)
             else:

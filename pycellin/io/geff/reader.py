@@ -11,7 +11,6 @@ References:
 - geff Documentation: https://live-image-tracking-tools.github.io/geff/latest/
 """
 
-import importlib.metadata
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -21,21 +20,22 @@ import geff
 import geff_spec
 import networkx as nx
 
+from pycellin import __version__
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
-from pycellin.custom_types import PropertyType, property_type_to_strings
-from pycellin.properties.core import (
-    create_cell_coord_property,
-    create_cell_id_property,
-    create_lineage_id_property,
-)
+from pycellin.custom_types import PropertyType, _property_type_to_strings
 from pycellin.io.utils import (
+    _check_fusions,
     _graph_has_node_prop,
     _split_graph_into_lineages,
     _update_edge_prop_key,
     _update_lineage_prop_key,
     _update_lineages_ids_key,
     _update_node_prop_key,
-    check_fusions,
+)
+from pycellin.properties.core import (
+    create_cell_coord_property,
+    create_cell_id_property,
+    create_lineage_id_property,
 )
 
 logger = logging.getLogger(__name__)
@@ -519,7 +519,7 @@ def _resolve_prop_key(
         If both new_name and fallback are already taken in props_dict, a KeyError
         is raised indicating that the property cannot be registered in the metadata.
     """
-    prop_type_str = property_type_to_strings(prop_type)
+    prop_type_str = _property_type_to_strings(prop_type)
     if new_name not in props_dict:
         logger.warning(
             f"Property '{original_key}' ({prop_type_str}) has been renamed to "
@@ -595,7 +595,7 @@ def _extract_props_metadata(
                 else:
                     raise ValueError(
                         "Unsupported property type: "
-                        f"{property_type_to_strings(prop_type)}. "
+                        f"{_property_type_to_strings(prop_type)}. "
                         "Expected PropertyType.NODE or PropertyType.EDGE."
                     )
                 # Resolve a unique name for the new property.
@@ -636,7 +636,7 @@ def _extract_props_metadata(
                 raise KeyError(
                     f"Cannot register property '{key}': an identical identifier "
                     f"already exists in properties dictionary for "
-                    f"{property_type_to_strings(prop_type)}s. "
+                    f"{_property_type_to_strings(prop_type)}s. "
                     "Please ensure unique property identifiers."
                 )
 
@@ -932,22 +932,13 @@ def _extract_generic_metadata(
     -------
     dict[str, Any]
         Dictionary containing generic metadata.
-
-    Raises
-    ------
-    importlib.metadata.PackageNotFoundError
-        If the pycellin package is not found when trying to get its version.
     """
     metadata: dict[str, Any] = {}
     metadata["name"] = Path(geff_file).stem
     metadata["file_path"] = geff_file
     metadata["provenance"] = "geff"
     metadata["date"] = str(datetime.now())
-    try:
-        version = importlib.metadata.version("pycellin")
-    except importlib.metadata.PackageNotFoundError:
-        version = "unknown"
-    metadata["pycellin_version"] = version
+    metadata["pycellin_version"] = __version__
     metadata["geff_version"] = geff_md.geff_version
     if geff_md.extra is not None:
         metadata["geff_extra"] = geff_md.extra
@@ -1531,10 +1522,10 @@ def read_geff(
     # Create the model.
     model = Model(
         model_metadata=generic_md,
-        props_metadata=PropsMetadata(props=props_md),
+        props_metadata=PropsMetadata(properties=props_md),
         data=Data({lin.graph["lineage_id"]: lin for lin in lineages}),
     )
-    check_fusions(model)  # pycellin DOES NOT support fusion events
+    _check_fusions(model)  # pycellin DOES NOT support fusion events
 
     return model
 
@@ -1565,5 +1556,5 @@ if __name__ == "__main__":
     print("\nModel metadata:")
     print(model.model_metadata)
     print("\nProperties and their types:")
-    for prop_id, prop in model.props_metadata.props.items():
+    for prop_id, prop in model.props_metadata.properties.items():
         print(f"  - {prop_id}  -> {prop.prop_type}")

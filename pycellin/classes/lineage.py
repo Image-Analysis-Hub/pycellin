@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import warnings
 from abc import ABCMeta, abstractmethod
-from collections.abc import Iterator
 from itertools import pairwise
 from typing import Any, Literal
 
@@ -13,14 +12,14 @@ import plotly.express as px  # import Plotly colormaps
 import plotly.graph_objects as go
 from igraph import Graph
 
-from pycellin.classes.exceptions import (
+from pycellin.classes.property import Property
+from pycellin.custom_types import PropertyType
+from pycellin.exceptions import (
     FusionError,
     LineageStructureError,
     MissingPropertyError,
     TimeFlowError,
 )
-from pycellin.classes.property import Property
-from pycellin.custom_types import PropertyType
 from pycellin.styling import (
     BRANCH_PROFILE_DIVISION_MARKER,
     BRANCH_PROFILE_DIVISION_SIZE_INCREASE,
@@ -33,22 +32,22 @@ _DEFAULT_UNMAPPED_COLOR = "dimgrey"
 # Style argument for get_branch_profile_figure / plot_branch_profile
 # (node_marker_style, division_marker_style, line_style): one dict applied to
 # every branch, or a list with one entry (dict or None) per target cell.
-BranchStyle = dict[str, Any] | list[dict[str, Any] | None] | None
+_BranchStyle = dict[str, Any] | list[dict[str, Any] | None] | None
 
 # TODO: all the visualization functionalities will be refined and moved to a dedicated
 # subpackage.
 
-UNSELECTED_HIGHLIGHT_COLOR = "lightgray"
-HIGHLIGHT_COLORS = [
+_UNSELECTED_HIGHLIGHT_COLOR = "lightgray"
+_HIGHLIGHT_COLORS = [
     PYCELLIN_PURPLE
 ] + px.colors.qualitative.Safe  # 12 Total IDs: 1 purple + 11 from Safe palette
 
 
-def get_highlight_color(group: int) -> str:
+def _get_highlight_color(group: int) -> str:
     if group <= 0:
-        return UNSELECTED_HIGHLIGHT_COLOR
+        return _UNSELECTED_HIGHLIGHT_COLOR
 
-    return HIGHLIGHT_COLORS[(group - 1) % len(HIGHLIGHT_COLORS)]
+    return _HIGHLIGHT_COLORS[(group - 1) % len(_HIGHLIGHT_COLORS)]
 
 
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
@@ -129,7 +128,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         if PropertyType.LINEAGE in prop_type:
             self.graph.pop(prop_name, None)
 
-    def get_root(self, ignore_lone_nodes: bool = False) -> int | list[int]:
+    def get_root(self, ignore_lone_nodes: bool = False) -> int:
         """
         Return the root of the lineage.
 
@@ -137,7 +136,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         least one outgoing edge.
         A lineage normally has one and exactly one root node. However, when in the
         process of modifying the lineage topology, a lineage can temporarily have
-        more than one.
+        more than one: `get_roots()` returns them all.
 
         Parameters
         ----------
@@ -147,9 +146,44 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Returns
         -------
-        int or list[int]
-            The root node of the lineage. If the lineage has more than one root,
-            a list of root nodes is returned
+        int
+            The root node of the lineage.
+
+        Raises
+        ------
+        LineageStructureError
+            If the lineage doesn't have exactly one root, e.g. if it is empty.
+        """
+        roots = self.get_roots(ignore_lone_nodes=ignore_lone_nodes)
+        if len(roots) == 1:
+            return roots[0]
+        lineage_id = self.graph.get("lineage_id", "of unknown ID")
+        lineage = f"{type(self).__name__} {lineage_id}"
+        if not roots:
+            raise LineageStructureError(f"{lineage} has no root.")
+        raise LineageStructureError(
+            f"{lineage} has {len(roots)} roots: {roots}. "
+            "Use get_roots() to get them all."
+        )
+
+    def get_roots(self, ignore_lone_nodes: bool = False) -> list[int]:
+        """
+        Return the roots of the lineage.
+
+        A root is a node with no incoming edges and usually at least one outgoing edge.
+        A lineage normally has exactly one root, which `get_root()` returns, but it can
+        temporarily have more than one, or none if it is empty.
+
+        Parameters
+        ----------
+        ignore_lone_nodes : bool, optional
+            True to ignore nodes with no incoming and outgoing edges, False otherwise.
+            False by default.
+
+        Returns
+        -------
+        list[int]
+            The list of root nodes in the lineage.
         """
         if ignore_lone_nodes:
             roots = [
@@ -159,10 +193,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             ]
         else:
             roots = [n for n in self.nodes() if self.in_degree(n) == 0]
-        if len(roots) == 1:
-            return roots[0]
-        else:
-            return roots
+        return roots
 
     def get_leaves(self, ignore_lone_nodes: bool = False) -> list[int]:
         """
@@ -573,11 +604,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             get_min_leaf_id(node_id)
 
         # Get roots (but usually there should be only one).
-        root = self.get_root(ignore_lone_nodes=True)
-        if isinstance(root, list):
-            roots = sorted(root)
-        else:
-            roots = [root]
+        roots = sorted(self.get_roots(ignore_lone_nodes=True))
 
         # Create deterministic node ordering using DFS with sorted children.
         node_order: list[int] = []
@@ -1636,7 +1663,7 @@ class CellLineage(Lineage):
         branch.graph["source_cell_id"] = source_cell
         return branch
 
-    def get_branch_lineage_highlight(
+    def get_highlighted_lineage(
         self,
         target_cells: int | list[int],
         source_cells: int | list[int] | None = None,
@@ -1742,7 +1769,7 @@ class CellLineage(Lineage):
         gray; each selected group gets its own color from the Pycellin highlight
         palette.
 
-        Meant to be called on a lineage returned by `get_branch_lineage_highlight`,
+        Meant to be called on a lineage returned by `get_highlighted_lineage`,
         which is where the highlight property comes from. Callers who want their
         own colors per group should instead pass a {group: color} dict as the
         `node_colormap` of `get_tree_figure`.
@@ -1765,7 +1792,7 @@ class CellLineage(Lineage):
 
         See Also
         --------
-        get_branch_lineage_highlight : Mark single-cell branches in a lineage copy.
+        get_highlighted_lineage : Mark single-cell branches in a lineage copy.
         get_tree_figure : Generate the tree figure the colors are meant for.
         """
         _, index_to_nx_id = self._create_deterministic_igraph()
@@ -1778,7 +1805,7 @@ class CellLineage(Lineage):
                 raise MissingPropertyError(
                     highlight_prop, node_id=cid, lineage_id=self.graph.get("lineage_id")
                 ) from None
-            colors.append(get_highlight_color(group))
+            colors.append(_get_highlight_color(group))
         return colors
 
     def get_divisions(self, cell_ids: list[int] | None = None) -> list[int]:
@@ -2227,7 +2254,7 @@ class CellLineage(Lineage):
         See Also
         --------
         plot : Generate the same figure and display it.
-        get_branch_lineage_highlight : Mark single-cell branches in a lineage copy.
+        get_highlighted_lineage : Mark single-cell branches in a lineage copy.
         """
         if y_prop is None:
             from pycellin.properties.core import create_timepoint_property
@@ -2238,7 +2265,7 @@ class CellLineage(Lineage):
         if target_cells is not None:
             # Keep using the tree plotting path, but first make a copy of the
             # lineage where the selected single-cell branch(es) are marked.
-            lineage_to_plot = self.get_branch_lineage_highlight(
+            lineage_to_plot = self.get_highlighted_lineage(
                 target_cells,
                 generations=generations,
                 highlight_prop=highlight_prop,
@@ -2447,9 +2474,9 @@ class CellLineage(Lineage):
         generations: int | None = None,
         title: str | None = None,
         mode: str = "lines+markers",
-        node_marker_style: BranchStyle = None,
-        division_marker_style: BranchStyle = None,
-        line_style: BranchStyle = None,
+        node_marker_style: _BranchStyle = None,
+        division_marker_style: _BranchStyle = None,
+        line_style: _BranchStyle = None,
         node_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_legend: bool | None = None,
@@ -2643,7 +2670,7 @@ class CellLineage(Lineage):
                         text += f"<br>{prop}: {lineage.nodes[node][prop]}"
                 node_hover_text.append(text)
 
-            trace_color = get_highlight_color(index + 1)
+            trace_color = _get_highlight_color(index + 1)
 
             trace_name = (
                 f"{y_label} ({target_cid})" if len(target_cids) > 1 else y_label
@@ -2755,9 +2782,9 @@ class CellLineage(Lineage):
         generations: int | None = None,
         title: str | None = None,
         mode: str = "lines+markers",
-        node_marker_style: BranchStyle = None,
-        division_marker_style: BranchStyle = None,
-        line_style: BranchStyle = None,
+        node_marker_style: _BranchStyle = None,
+        division_marker_style: _BranchStyle = None,
+        line_style: _BranchStyle = None,
         node_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_legend: bool | None = None,
@@ -2841,7 +2868,7 @@ class CellLineage(Lineage):
 
     @staticmethod
     def _expand_branch_style(
-        style: BranchStyle, arg_name: str, n_targets: int
+        style: _BranchStyle, arg_name: str, n_targets: int
     ) -> list[dict[str, Any]]:
         # Expand a branch-style argument to one plain dict per target cell.
         # None or a single dict is broadcast to every trace; a list is paired
@@ -2938,10 +2965,6 @@ class CycleLineage(Lineage):
                 self.nodes[n]["cycle_start_time"] = cell_lineage.nodes[first][time_prop]
                 self.nodes[n]["cycle_end_time"] = cell_lineage.nodes[last][time_prop]
                 root = self.get_root()
-                if isinstance(root, list):
-                    raise LineageStructureError(
-                        "A cycle lineage cannot have multiple roots."
-                    )
                 self.nodes[n]["generation"] = nx.shortest_path_length(self, root, n)
 
     def __str__(self) -> str:
@@ -3013,24 +3036,6 @@ class CycleLineage(Lineage):
             A list of links between the cells of a cell cycle.
         """
         return list(pairwise(self.nodes[cycle_id]["cells"]))
-
-    def yield_links_within_cycle(self, cycle_id: int) -> Iterator[tuple[int, int]]:
-        """
-        Yield all the links between the cells of a cell cycle.
-
-        This doesn't include the link from the previous cell cycle to the current one.
-
-        Parameters
-        ----------
-        cycle_id : int
-            The ID of the cell cycle for which to retrieve links.
-
-        Yields
-        ------
-        tuple(int, int)
-            The links between the cells of a cell cycle.
-        """
-        yield from pairwise(self.nodes[cycle_id]["cells"])
 
     def get_tree_figure(
         self,

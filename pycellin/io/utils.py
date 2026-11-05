@@ -6,13 +6,13 @@ from typing import Any
 import networkx as nx
 
 from pycellin.classes import CellLineage, Model
-from pycellin.classes.exceptions import UpdateRequiredError
-from pycellin.custom_types import PropertyType, property_type_from_string
+from pycellin.custom_types import PropertyType, _property_type_from_string
+from pycellin.exceptions import UpdateRequiredError
 
 logger = logging.getLogger(__name__)
 
 
-def check_fusions(model: Model) -> None:
+def _check_fusions(model: Model) -> None:
     """
     Check if the model contains fusions and issue a warning if so.
 
@@ -179,7 +179,7 @@ def _identify_frame_prop(model: Model) -> str:
     frame_prop = None
     for candidate in candidates:
         has_prop = True
-        for lin in model.data.cell_data.values():
+        for lin in model.data.cell_lineages.values():
             has_prop = _graph_has_node_prop(lin, candidate) and has_prop
 
         if has_prop:
@@ -195,7 +195,7 @@ def _identify_frame_prop(model: Model) -> str:
     if frame_prop is None:
         frame_prop = "timepoint"
         has_prop = True
-        for lin in model.data.cell_data.values():
+        for lin in model.data.cell_lineages.values():
             has_prop = _graph_has_node_prop(lin, frame_prop) and has_prop
 
         if has_prop:
@@ -229,7 +229,7 @@ def _get_props_from_data(model: Model) -> tuple[set[str], set[str], set[str]]:
     edge_props_data = set()
     lineage_props_data = set()
 
-    for lineage in model.data.cell_data.values():
+    for lineage in model.data.cell_lineages.values():
         for node in lineage.nodes:
             node_props_data.update(lineage.nodes[node].keys())
         for edge in lineage.edges:
@@ -303,7 +303,7 @@ def _remove_orphaned_metadata(model: Model) -> None:
                 f"{orphaned_props}. They will be removed from the model metadata.",
                 stacklevel=2,
             )
-            prop_type = property_type_from_string(prop_type_str)
+            prop_type = _property_type_from_string(prop_type_str)
             protected = [
                 prop_id
                 for prop_id in orphaned_props

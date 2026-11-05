@@ -11,7 +11,6 @@ from typing import ClassVar, Literal
 import numpy as np
 
 from pycellin.classes.data import Data
-from pycellin.classes.exceptions import FusionError
 from pycellin.classes.lineage import CellLineage, CycleLineage
 from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import (
@@ -19,6 +18,7 @@ from pycellin.classes.property_calculator import (
     NodeGlobalPropCalculator,
     NodeLocalPropCalculator,
 )
+from pycellin.exceptions import FusionError
 from pycellin.properties.utils import (
     _get_cycle_edge_property_values,
     _nanmean,
@@ -513,7 +513,7 @@ class Straightness(NodeGlobalPropCalculator):
             Returns NaN if the total distance traveled is null.
         """
         lin_id = lineage.graph["lineage_id"]
-        cell_lin = data.cell_data[lin_id]
+        cell_lin = data.cell_lineages[lin_id]
         cells = lineage.nodes[node_id]["cells"]
         distances = [
             math.dist(

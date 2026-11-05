@@ -8,19 +8,9 @@ import pytest
 from geff.validate.data import ValidationConfig
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
-from pycellin.classes.exceptions import UpdateRequiredError
 from pycellin.custom_types import PropertyType
-from pycellin.properties.core import (
-    create_cell_coord_property,
-    create_frame_property,
-    create_lineage_id_property,
-    create_link_coord_property,
-    create_timepoint_property,
-)
-from pycellin.properties.motion import create_cell_displacement_property
-from pycellin.properties.tracking import (
-    create_absolute_age_property,
-)
+from pycellin.exceptions import UpdateRequiredError
+from pycellin.io.geff.reader import read_geff
 from pycellin.io.geff.writer import (
     _add_tracklet_ids,
     _build_axes,
@@ -38,7 +28,17 @@ from pycellin.io.geff.writer import (
     _to_geff_dtype,
     write_geff,
 )
-from pycellin.io.geff.reader import read_geff
+from pycellin.properties.core import (
+    create_cell_coord_property,
+    create_frame_property,
+    create_lineage_id_property,
+    create_link_coord_property,
+    create_timepoint_property,
+)
+from pycellin.properties.motion import create_cell_displacement_property
+from pycellin.properties.timing import (
+    create_absolute_age_property,
+)
 
 # Fixtures ####################################################################
 
@@ -181,8 +181,8 @@ def simple_model():
     lin2.add_edge(3, 4, link_x=2.0)
     lin2.graph["lineage_id"] = 1
 
-    cell_data = {0: lin1, 1: lin2}
-    data = Data(cell_data)
+    cell_lineages = {0: lin1, 1: lin2}
+    data = Data(cell_lineages)
     props_metadata = PropsMetadata()
     props_metadata._add_prop(create_timepoint_property())
     props_metadata._add_prop(create_cell_coord_property(axis="x", unit="micrometer"))
@@ -200,7 +200,7 @@ def simple_model():
 @pytest.fixture
 def model_with_xyz(simple_model):
     """Create a model with x, y, z coordinates."""
-    for lin in simple_model.data.cell_data.values():
+    for lin in simple_model.data.cell_lineages.values():
         for node in lin.nodes():
             lin.nodes[node]["cell_y"] = 5.0
             lin.nodes[node]["cell_z"] = 1.0
@@ -388,7 +388,7 @@ class TestRemoveUnsupportedProps:
                 dtype="unknown",
             )
         )
-        lin = simple_model.data.cell_data[0]
+        lin = simple_model.data.cell_lineages[0]
         lin.nodes[1]["daughter_ids"] = [2]
         lin.edges[1, 2]["LINK_FEATURE"] = 1.5
 
@@ -418,13 +418,13 @@ class TestRemoveUnsupportedProps:
                 dtype="list[str]",
             )
         )
-        simple_model.data.cell_data[0].graph["lineage_tags"] = ["a", "b"]
+        simple_model.data.cell_lineages[0].graph["lineage_tags"] = ["a", "b"]
 
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
             _remove_unsupported_props(simple_model)
 
         assert "lineage_tags" in simple_model.get_properties()
-        assert simple_model.data.cell_data[0].graph["lineage_tags"] == ["a", "b"]
+        assert simple_model.data.cell_lineages[0].graph["lineage_tags"] == ["a", "b"]
         assert not caplog.records
 
     def test_protected_prop_removed(self, simple_model, list_prop):
@@ -442,7 +442,7 @@ class TestRemoveNoneValues:
 
     def test_none_values_removed(self, simple_model):
         """Test that None values of cells and links are removed, not other values."""
-        lin = simple_model.data.cell_data[0]
+        lin = simple_model.data.cell_lineages[0]
         lin.nodes[1]["cell_x"] = None
         lin.edges[1, 2]["link_x"] = None
 
@@ -451,7 +451,7 @@ class TestRemoveNoneValues:
         assert "cell_x" not in lin.nodes[1]
         assert lin.nodes[2]["cell_x"] == 12.0
         assert "link_x" not in lin.edges[1, 2]
-        assert simple_model.data.cell_data[1].edges[3, 4]["link_x"] == 2.0
+        assert simple_model.data.cell_lineages[1].edges[3, 4]["link_x"] == 2.0
 
 
 class TestGetTrackletIds:
@@ -501,7 +501,7 @@ class TestAddTrackletIds:
         integer cell property."""
         _add_tracklet_ids(simple_model)
 
-        for lin, expected in zip(simple_model.data.cell_data.values(), (2, 4)):
+        for lin, expected in zip(simple_model.data.cell_lineages.values(), (2, 4)):
             values = [attrs["tracklet_id"] for _, attrs in lin.nodes(data=True)]
             assert values == [expected, expected]
         prop = simple_model.get_property("tracklet_id")
@@ -522,7 +522,7 @@ class TestAddTrackletIds:
                 dtype="int",
             )
         )
-        lin = simple_model.data.cell_data[0]
+        lin = simple_model.data.cell_lineages[0]
         lin.nodes[1]["tracklet_id"] = 99
         lin.nodes[2]["tracklet_id"] = 2
 
@@ -555,7 +555,7 @@ class TestGetDefaultSpaceAxes:
 
     def test_missing_z_value(self, model_with_xyz, caplog):
         """A cell without cell_z drops the z axis, with a warning."""
-        del model_with_xyz.data.cell_data[0].nodes[1]["cell_z"]
+        del model_with_xyz.data.cell_lineages[0].nodes[1]["cell_z"]
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
             space_axes = _get_default_space_axes(model_with_xyz)
         assert space_axes == ["cell_x", "cell_y"]
@@ -565,7 +565,7 @@ class TestGetDefaultSpaceAxes:
 
     def test_missing_y_value(self, model_with_xyz, caplog):
         """A cell without cell_y drops all the space axes, with a warning."""
-        del model_with_xyz.data.cell_data[0].nodes[1]["cell_y"]
+        del model_with_xyz.data.cell_lineages[0].nodes[1]["cell_y"]
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
             space_axes = _get_default_space_axes(model_with_xyz)
         assert space_axes == []
@@ -895,9 +895,9 @@ class TestBuildGeffMetadata:
 
         assert metadata.track_node_props == {"lineage": "lineage_id"}
 
-    def test_no_tracklet_from_cycle_data(self, simple_model):
-        """Cycle data alone doesn't declare a tracklet property."""
-        simple_model.add_cycle_data()
+    def test_no_tracklet_from_cycle_lineages(self, simple_model):
+        """Cycle lineages alone don't declare a tracklet property."""
+        simple_model.add_cycle_lineages()
         metadata = _build_geff_metadata(simple_model)
 
         assert "tracklet" not in metadata.track_node_props
@@ -934,7 +934,7 @@ class TestBuildGeffMetadata:
         """Test with multiple time and space axes."""
         model_with_xyz.props_metadata._add_prop(create_frame_property())
 
-        for lin in model_with_xyz.data.cell_data.values():
+        for lin in model_with_xyz.data.cell_lineages.values():
             for node in lin.nodes():
                 lin.nodes[node]["frame"] = lin.nodes[node]["timepoint"] + 10
 
@@ -983,17 +983,17 @@ class TestWriteGeff:
         # Check that the original model's data is unchanged. It's not an exhaustive
         # check since we are only checking the number of nodes and edges.
         original_node_count = sum(
-            len(lin.nodes) for lin in simple_model.data.cell_data.values()
+            len(lin.nodes) for lin in simple_model.data.cell_lineages.values()
         )
         export_node_count = sum(
-            len(lin.nodes) for lin in exported_model.data.cell_data.values()
+            len(lin.nodes) for lin in exported_model.data.cell_lineages.values()
         )
         assert original_node_count == export_node_count
         original_edge_count = sum(
-            len(lin.edges) for lin in simple_model.data.cell_data.values()
+            len(lin.edges) for lin in simple_model.data.cell_lineages.values()
         )
         export_edge_count = sum(
-            len(lin.edges) for lin in exported_model.data.cell_data.values()
+            len(lin.edges) for lin in exported_model.data.cell_lineages.values()
         )
         assert original_edge_count == export_edge_count
 
@@ -1054,7 +1054,7 @@ class TestWriteGeff:
         assert reloaded.get_space_unit() == "micrometer"
         cells = [
             attrs
-            for lin in reloaded.data.cell_data.values()
+            for lin in reloaded.data.cell_lineages.values()
             for _, attrs in lin.nodes(data=True)
         ]
         assert sorted(attrs["cell_x"] for attrs in cells) == [10.0, 12.0, 20.0, 22.0]
@@ -1077,7 +1077,7 @@ class TestWriteGeff:
         """Test export with variable length properties."""
         geff_out = str(tmp_path / "test.geff")
         simple_model.props_metadata._add_prop(var_length_prop)
-        for lin in simple_model.data.cell_data.values():
+        for lin in simple_model.data.cell_lineages.values():
             for node in lin.nodes():
                 lin.nodes[node][var_length_prop.identifier] = [
                     [0, 0],
@@ -1100,7 +1100,7 @@ class TestWriteGeff:
         """Test that properties GEFF cannot store are skipped, with a warning."""
         geff_out = str(tmp_path / "test.geff")
         simple_model.props_metadata._add_prop(list_prop)
-        for lin in simple_model.data.cell_data.values():
+        for lin in simple_model.data.cell_lineages.values():
             for node in lin.nodes:
                 lin.nodes[node]["daughter_ids"] = list(lin.successors(node))
 
@@ -1118,8 +1118,8 @@ class TestWriteGeff:
     def test_export_writes_none_as_missing(self, simple_model, tmp_path):
         """Test that None values are written as missing values."""
         geff_out = str(tmp_path / "test.geff")
-        simple_model.data.cell_data[0].nodes[1]["cell_x"] = None
-        simple_model.data.cell_data[0].edges[1, 2]["link_x"] = None
+        simple_model.data.cell_lineages[0].nodes[1]["cell_x"] = None
+        simple_model.data.cell_lineages[0].edges[1, 2]["link_x"] = None
 
         write_geff(simple_model, geff_out)
 
@@ -1129,7 +1129,7 @@ class TestWriteGeff:
         assert "link_x" not in graph.edges[1, 2]
         assert graph.edges[3, 4]["link_x"] == 2.0
         # The original model is not modified.
-        assert simple_model.data.cell_data[0].nodes[1]["cell_x"] is None
+        assert simple_model.data.cell_lineages[0].nodes[1]["cell_x"] is None
 
     def test_model_requiring_update_raises(self, simple_model, tmp_path):
         """Test that a model requiring an update is not exported."""
@@ -1151,7 +1151,7 @@ class TestWriteGeff:
         assert simple_model.get_property("tracklet_id") is None
         assert all(
             "tracklet_id" not in attrs
-            for lin in simple_model.data.cell_data.values()
+            for lin in simple_model.data.cell_lineages.values()
             for _, attrs in lin.nodes(data=True)
         )
 
@@ -1163,7 +1163,7 @@ class TestWriteGeff:
         lin.add_node(2, timepoint=1, cell_x=22.0, lineage_id=1)
         lin.add_edge(1, 2, link_x=2.0)
         lin.graph["lineage_id"] = 1
-        simple_model.data.cell_data[1] = lin
+        simple_model.data.cell_lineages[1] = lin
         geff_out = str(tmp_path / "test.geff")
         write_geff(simple_model, geff_out, tracklets=True)
 
@@ -1177,7 +1177,7 @@ class TestWriteGeff:
     ):
         """Without tracklets, a propagated cycle_id is written as an ordinary
         property, and no tracklet property is declared."""
-        simple_model.add_cycle_data()
+        simple_model.add_cycle_lineages()
         simple_model.propagate_cycle_properties(["cycle_id"])
         geff_out = str(tmp_path / "test.geff")
         write_geff(simple_model, geff_out)
@@ -1193,15 +1193,15 @@ class TestWriteGeff:
         write_geff(simple_model, geff_out, tracklets=True)
 
         reloaded = read_geff(geff_out)
-        reloaded.add_cycle_data()
+        reloaded.add_cycle_lineages()
 
         cells = [
             attrs
-            for lin in reloaded.data.cell_data.values()
+            for lin in reloaded.data.cell_lineages.values()
             for _, attrs in lin.nodes(data=True)
         ]
         assert sorted(attrs["tracklet_id"] for attrs in cells) == [2, 2, 4, 4]
-        assert reloaded.has_cycle_data()
+        assert reloaded.has_cycle_lineages()
 
     def test_tracklets_with_link_property_named_tracklet_id_raises(
         self, simple_model, tmp_path

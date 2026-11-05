@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
-"""Unit test for tracking property classes from pycellin.properties."""
+"""Unit test for timing property classes from pycellin.properties."""
 
 import math
 
+import networkx as nx
 import pytest
 
-import networkx as nx
-
-from pycellin.properties.tracking import (
+from pycellin.classes import CellLineage, CycleLineage, Data, Property
+from pycellin.properties.timing import (
     AbsoluteAge,
-    RelativeAge,
-    NormalizedAge,
-    IsCompleteCycle,
-    InterdivisionTime,
     DivisionRate,
+    InterdivisionTime,
+    IsCompleteCycle,
+    NormalizedAge,
+    RelativeAge,
 )
-from pycellin.classes import Property, Data, CellLineage, CycleLineage
-
 
 # Fixtures ####################################################################
 
@@ -289,7 +286,7 @@ def test_interdivision_time_cycle_lin(cell_lin, prop_cycle_lin):
     calculator = InterdivisionTime(prop_cycle_lin, time_prop="frame")
     data = Data({1: cell_lin})
     data._add_cycle_lineages(time_prop="frame", time_step=1)
-    cycle_lin = data.cycle_data[1]
+    cycle_lin = data.cycle_lineages[1]
     # Complete cell cycles.
     assert calculator.compute(data, cycle_lin, node_id=4) == 2  # division
     assert calculator.compute(data, cycle_lin, node_id=8) == 2  # division
@@ -353,7 +350,7 @@ def test_division_rate_cycle_lin(cell_lin, prop_cycle_lin):
     calculator = DivisionRate(prop_cycle_lin, time_prop="frame")
     data = Data({1: cell_lin})
     data._add_cycle_lineages(time_prop="frame", time_step=1)
-    cycle_lin = data.cycle_data[1]
+    cycle_lin = data.cycle_lineages[1]
     # Complete cell cycles.
     assert calculator.compute(data, cycle_lin, node_id=4) == 1 / 2  # division
     assert calculator.compute(data, cycle_lin, node_id=8) == 1 / 2  # division

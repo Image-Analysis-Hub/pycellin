@@ -21,8 +21,8 @@ import geff_spec
 import networkx as nx
 
 from pycellin.classes import CellLineage, Model, Property
-from pycellin.classes.exceptions import ProtectedPropertyError
 from pycellin.custom_types import PropertyType
+from pycellin.exceptions import ProtectedPropertyError
 from pycellin.io.utils import _check_up_to_date, _remove_orphaned_metadata
 from pycellin.utils import _normalize_dtype
 
@@ -204,7 +204,7 @@ def _remove_none_values(model: Model) -> None:
     model : Model
         Model to modify.
     """
-    for lineage in model.data.cell_data.values():
+    for lineage in model.data.cell_lineages.values():
         attrs_dicts = [attrs for _, attrs in lineage.nodes(data=True)]
         attrs_dicts += [attrs for _, _, attrs in lineage.edges(data=True)]
         for attrs in attrs_dicts:
@@ -289,13 +289,13 @@ def _add_tracklet_ids(model: Model) -> None:
     tracklet ID.
     """
     num_changed = 0
-    for lineage in model.data.cell_data.values():
+    for lineage in model.data.cell_lineages.values():
         for cid, tracklet_id in _get_tracklet_ids(lineage).items():
             attrs = lineage.nodes[cid]
             if _TRACKLET_PROP in attrs and attrs[_TRACKLET_PROP] != tracklet_id:
                 num_changed += 1
             attrs[_TRACKLET_PROP] = tracklet_id
-    model.props_metadata.props[_TRACKLET_PROP] = _create_tracklet_property()
+    model.props_metadata.properties[_TRACKLET_PROP] = _create_tracklet_property()
     if num_changed:
         logger.warning(
             "With tracklets=True, the GEFF file has the tracklet IDs computed at "
@@ -334,7 +334,7 @@ def _get_default_space_axes(model: Model) -> list[str]:
     declared = [key for key in ("cell_x", "cell_y", "cell_z") if key in node_props]
     cells = [
         attrs
-        for lin in model.data.cell_data.values()
+        for lin in model.data.cell_lineages.values()
         for _, attrs in lin.nodes(data=True)
     ]
     incomplete = {
@@ -683,7 +683,7 @@ def write_geff(
     values are written as missing values.
     """
     _check_up_to_date(model)
-    if not model.data.cell_data:
+    if not model.data.cell_lineages:
         raise ValueError("Model contains no lineage data to export.")
     if tracklets:
         prop = model.get_property(_TRACKLET_PROP)
@@ -706,7 +706,7 @@ def write_geff(
         _remove_orphaned_metadata(model_copy)
         # All the lineages must also be in the same graph. However, some nodes can
         # have the same identifier across different lineages.
-        lineages = list(model_copy.data.cell_data.values())
+        lineages = list(model_copy.data.cell_lineages.values())
         _solve_node_overlaps(lineages)
         if tracklets:
             # Tracklet IDs are cell IDs, now unique across lineages.

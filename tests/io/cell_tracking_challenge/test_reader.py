@@ -57,7 +57,7 @@ def ctc_data(tmp_path):
 def _get_cells(model):
     return {
         attrs["cell_id"]: attrs
-        for lin in model.data.cell_data.values()
+        for lin in model.data.cell_lineages.values()
         for _, attrs in lin.nodes(data=True)
     }
 

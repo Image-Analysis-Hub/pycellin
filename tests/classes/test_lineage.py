@@ -7,14 +7,14 @@ import plotly.io as pio
 import pytest
 
 from pycellin.classes import CellLineage, CycleLineage
-from pycellin.classes.exceptions import (
+from pycellin.classes.lineage import _HIGHLIGHT_COLORS, _UNSELECTED_HIGHLIGHT_COLOR
+from pycellin.custom_types import PropertyType
+from pycellin.exceptions import (
     FusionError,
     LineageStructureError,
     MissingPropertyError,
     TimeFlowError,
 )
-from pycellin.classes.lineage import HIGHLIGHT_COLORS, UNSELECTED_HIGHLIGHT_COLOR
-from pycellin.custom_types import PropertyType
 from pycellin.properties.core import create_time_property, create_timepoint_property
 from pycellin.styling import PYCELLIN_PURPLE
 
@@ -300,13 +300,16 @@ class TestLineageGetRoot:
 
     def test_empty_lineage(self, empty_cell_lin):
         """Test get_root on empty lineage."""
-        assert empty_cell_lin.get_root() == []
-        assert empty_cell_lin.get_root(ignore_lone_nodes=True) == []
+        with pytest.raises(LineageStructureError, match="no root"):
+            empty_cell_lin.get_root()
+        with pytest.raises(LineageStructureError, match="no root"):
+            empty_cell_lin.get_root(ignore_lone_nodes=True)
 
     def test_single_node(self, one_node_cell_lin):
         """Test get_root on single node lineage."""
         assert one_node_cell_lin.get_root() == 1
-        assert one_node_cell_lin.get_root(ignore_lone_nodes=True) == []
+        with pytest.raises(LineageStructureError, match="no root"):
+            one_node_cell_lin.get_root(ignore_lone_nodes=True)
 
     def test_lineage_with_gap(self, cell_lin_gap):
         """Test get_root on lineage with gaps."""
@@ -320,13 +323,45 @@ class TestLineageGetRoot:
 
     def test_unconnected_node(self, cell_lin_unconnected_node):
         """Test get_root on lineage with unconnected node."""
-        assert cell_lin_unconnected_node.get_root() == [1, 17]
+        with pytest.raises(LineageStructureError, match=r"2 roots: \[1, 17\]"):
+            cell_lin_unconnected_node.get_root()
         assert cell_lin_unconnected_node.get_root(ignore_lone_nodes=True) == 1
 
     def test_unconnected_component(self, cell_lin_unconnected_component):
         """Test get_root on lineage with unconnected component."""
-        assert cell_lin_unconnected_component.get_root() == [1, 17]
-        assert cell_lin_unconnected_component.get_root(ignore_lone_nodes=True) == [
+        with pytest.raises(LineageStructureError, match=r"2 roots: \[1, 17\]"):
+            cell_lin_unconnected_component.get_root()
+        with pytest.raises(LineageStructureError, match=r"2 roots: \[1, 17\]"):
+            cell_lin_unconnected_component.get_root(ignore_lone_nodes=True)
+
+
+class TestLineageGetRoots:
+    """Test cases for Lineage.get_roots method."""
+
+    def test_normal_lineage(self, cell_lin):
+        """Test get_roots on normal lineage."""
+        assert cell_lin.get_roots() == [1]
+        assert cell_lin.get_roots(ignore_lone_nodes=True) == [1]
+
+    def test_empty_lineage(self, empty_cell_lin):
+        """Test get_roots on empty lineage."""
+        assert empty_cell_lin.get_roots() == []
+        assert empty_cell_lin.get_roots(ignore_lone_nodes=True) == []
+
+    def test_single_node(self, one_node_cell_lin):
+        """Test get_roots on single node lineage."""
+        assert one_node_cell_lin.get_roots() == [1]
+        assert one_node_cell_lin.get_roots(ignore_lone_nodes=True) == []
+
+    def test_unconnected_node(self, cell_lin_unconnected_node):
+        """Test get_roots on lineage with unconnected node."""
+        assert cell_lin_unconnected_node.get_roots() == [1, 17]
+        assert cell_lin_unconnected_node.get_roots(ignore_lone_nodes=True) == [1]
+
+    def test_unconnected_component(self, cell_lin_unconnected_component):
+        """Test get_roots on lineage with unconnected component."""
+        assert cell_lin_unconnected_component.get_roots() == [1, 17]
+        assert cell_lin_unconnected_component.get_roots(ignore_lone_nodes=True) == [
             1,
             17,
         ]
@@ -1188,14 +1223,12 @@ class TestCellLineageRemoveLink:
 # CellLineage advanced operations
 
 
-class TestCellLineageGetBranchLineageHighlight:
-    """Test cases for CellLineage.get_branch_lineage_highlight method."""
+class TestCellLineageGetHighlightedLineage:
+    """Test cases for CellLineage.get_highlighted_lineage method."""
 
     def test_multiple_targets_with_paired_source_cells(self, cell_lin):
         """Test highlighting multiple branches with paired source cells."""
-        highlighted = cell_lin.get_branch_lineage_highlight(
-            [6, 16], source_cells=[4, 14]
-        )
+        highlighted = cell_lin.get_highlighted_lineage([6, 16], source_cells=[4, 14])
 
         selected = [
             node
@@ -1218,12 +1251,12 @@ class TestCellLineageGetBranchLineageHighlight:
     def test_source_cell_list_requires_target_list(self, cell_lin):
         """Test that a source-cell list requires a target-cell list."""
         with pytest.raises(ValueError, match="target_cells is also a list"):
-            cell_lin.get_branch_lineage_highlight(6, source_cells=[4])
+            cell_lin.get_highlighted_lineage(6, source_cells=[4])
 
     def test_source_cell_list_must_match_targets_length(self, cell_lin):
         """Test that paired source-cell and target-cell lists have equal length."""
         with pytest.raises(ValueError, match="same length"):
-            cell_lin.get_branch_lineage_highlight([6, 16], source_cells=[4])
+            cell_lin.get_highlighted_lineage([6, 16], source_cells=[4])
 
 
 class TestGetPropIdAndLabel:
@@ -1309,9 +1342,9 @@ class TestCellLineageGetTreeFigure:
         )
         # The branch from the root down to cell 6.
         for cid in [1, 2, 3, 4, 5, 6]:
-            assert colors[cid] == HIGHLIGHT_COLORS[0]
+            assert colors[cid] == _HIGHLIGHT_COLORS[0]
         for cid in [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]:
-            assert colors[cid] == UNSELECTED_HIGHLIGHT_COLOR
+            assert colors[cid] == _UNSELECTED_HIGHLIGHT_COLOR
 
     def test_target_cells_leaves_original_lineage_untouched(self, cell_lin):
         """Test that highlighting does not add the property to the lineage."""
@@ -1326,9 +1359,9 @@ class TestCellLineageGetTreeFigure:
         fig = cell_lin.get_tree_figure(target_cells=[6, 16], source_cells=[4, 14])
 
         assert set(fig.data[1].marker.color) == {
-            HIGHLIGHT_COLORS[0],
-            HIGHLIGHT_COLORS[1],
-            UNSELECTED_HIGHLIGHT_COLOR,
+            _HIGHLIGHT_COLORS[0],
+            _HIGHLIGHT_COLORS[1],
+            _UNSELECTED_HIGHLIGHT_COLOR,
         }
 
     def test_generations_restricts_highlighted_branch(self, cell_lin):
@@ -1344,9 +1377,9 @@ class TestCellLineageGetTreeFigure:
         )
         # Only the last cell cycle, from the division at cell 4 down to cell 6.
         for cid in [5, 6]:
-            assert colors[cid] == HIGHLIGHT_COLORS[0]
+            assert colors[cid] == _HIGHLIGHT_COLORS[0]
         for cid in [1, 2, 3]:
-            assert colors[cid] == UNSELECTED_HIGHLIGHT_COLOR
+            assert colors[cid] == _UNSELECTED_HIGHLIGHT_COLOR
 
     def test_explicit_marker_color_wins_over_highlight(self, cell_lin):
         """Test that a caller-provided marker color is not overridden."""
@@ -1368,8 +1401,8 @@ class TestCellLineageGetTreeFigure:
         fig = cell_lin.get_tree_figure(target_cells=6, highlight_prop="my_branch")
 
         assert set(fig.data[1].marker.color) == {
-            HIGHLIGHT_COLORS[0],
-            UNSELECTED_HIGHLIGHT_COLOR,
+            _HIGHLIGHT_COLORS[0],
+            _UNSELECTED_HIGHLIGHT_COLOR,
         }
 
     def test_no_target_cells_keeps_single_default_color(self, cell_lin):
@@ -1446,7 +1479,7 @@ class TestCellLineageGetHighlightMarkerColors:
 
     def test_colors_follow_tree_figure_node_order(self, cell_lin):
         """Test that the colors match the node order of the tree figure."""
-        highlighted = cell_lin.get_branch_lineage_highlight(6)
+        highlighted = cell_lin.get_highlighted_lineage(6)
         colors = highlighted._get_highlight_marker_colors()
         fig = highlighted.get_tree_figure(node_marker_style={"color": colors})
 
@@ -1455,20 +1488,18 @@ class TestCellLineageGetHighlightMarkerColors:
 
     def test_unselected_cells_get_gray(self, cell_lin):
         """Test that cells outside the selected branch are grayed out."""
-        highlighted = cell_lin.get_branch_lineage_highlight(6)
+        highlighted = cell_lin.get_highlighted_lineage(6)
         colors = highlighted._get_highlight_marker_colors()
 
-        assert colors.count(HIGHLIGHT_COLORS[0]) == 6
-        assert colors.count(UNSELECTED_HIGHLIGHT_COLOR) == len(cell_lin) - 6
+        assert colors.count(_HIGHLIGHT_COLORS[0]) == 6
+        assert colors.count(_UNSELECTED_HIGHLIGHT_COLOR) == len(cell_lin) - 6
 
     def test_custom_highlight_prop(self, cell_lin):
         """Test reading the highlight groups from a custom property name."""
-        highlighted = cell_lin.get_branch_lineage_highlight(
-            6, highlight_prop="my_branch"
-        )
+        highlighted = cell_lin.get_highlighted_lineage(6, highlight_prop="my_branch")
         colors = highlighted._get_highlight_marker_colors("my_branch")
 
-        assert colors.count(HIGHLIGHT_COLORS[0]) == 6
+        assert colors.count(_HIGHLIGHT_COLORS[0]) == 6
 
     def test_missing_highlight_prop_raises(self, cell_lin):
         """Test that a lineage without the highlight property is rejected."""
@@ -1495,15 +1526,15 @@ class TestCellLineageGetBranchProfileFigure:
         # for the first branch) get a white fill and a ring in the branch color
         # (here the highlight color, since node markers are not recolored).
         assert list(fig.data[0].marker.color) == [
-            HIGHLIGHT_COLORS[0],
+            _HIGHLIGHT_COLORS[0],
             "white",
-            HIGHLIGHT_COLORS[0],
+            _HIGHLIGHT_COLORS[0],
             "white",
-            HIGHLIGHT_COLORS[0],
-            HIGHLIGHT_COLORS[0],
+            _HIGHLIGHT_COLORS[0],
+            _HIGHLIGHT_COLORS[0],
         ]
-        assert set(fig.data[1].marker.color) == {HIGHLIGHT_COLORS[1], "white"}
-        assert all(c == HIGHLIGHT_COLORS[0] for c in fig.data[0].marker.line.color)
+        assert set(fig.data[1].marker.color) == {_HIGHLIGHT_COLORS[1], "white"}
+        assert all(c == _HIGHLIGHT_COLORS[0] for c in fig.data[0].marker.line.color)
         assert fig.layout.showlegend is True
 
     def test_multiple_targets_with_paired_source_cells(self, cell_lin):
@@ -1522,23 +1553,23 @@ class TestCellLineageGetBranchProfileFigure:
         # node markers.
         assert list(fig.data[0].marker.color) == [
             "white",
-            HIGHLIGHT_COLORS[0],
-            HIGHLIGHT_COLORS[0],
+            _HIGHLIGHT_COLORS[0],
+            _HIGHLIGHT_COLORS[0],
         ]
-        assert list(fig.data[1].marker.color) == ["white", HIGHLIGHT_COLORS[1]]
+        assert list(fig.data[1].marker.color) == ["white", _HIGHLIGHT_COLORS[1]]
         assert list(fig.data[0].marker.symbol) == ["circle-cross", "circle", "circle"]
         assert list(fig.data[1].marker.symbol) == ["circle-cross", "circle"]
         assert list(fig.data[0].marker.size) == [12, 10, 10]
         assert list(fig.data[1].marker.size) == [12, 10]
         assert list(fig.data[0].marker.line.color) == [
-            HIGHLIGHT_COLORS[0],
-            HIGHLIGHT_COLORS[0],
-            HIGHLIGHT_COLORS[0],
+            _HIGHLIGHT_COLORS[0],
+            _HIGHLIGHT_COLORS[0],
+            _HIGHLIGHT_COLORS[0],
         ]
         assert list(fig.data[0].marker.line.width) == [2, 0, 0]
         assert list(fig.data[1].marker.line.color) == [
-            HIGHLIGHT_COLORS[1],
-            HIGHLIGHT_COLORS[1],
+            _HIGHLIGHT_COLORS[1],
+            _HIGHLIGHT_COLORS[1],
         ]
         assert list(fig.data[1].marker.line.width) == [2, 0]
 
@@ -1572,8 +1603,8 @@ class TestCellLineageGetBranchProfileFigure:
         assert list(fig.data[0].marker.size) == [12, 10, 10]
         assert list(fig.data[0].marker.line.color) == [
             "red",
-            HIGHLIGHT_COLORS[0],
-            HIGHLIGHT_COLORS[0],
+            _HIGHLIGHT_COLORS[0],
+            _HIGHLIGHT_COLORS[0],
         ]
         assert list(fig.data[0].marker.line.width) == [4, 0, 0]
 
@@ -1604,7 +1635,7 @@ class TestCellLineageGetBranchProfileFigure:
         )
 
         assert set(fig.data[0].marker.color) == {"green", "white"}
-        assert set(fig.data[1].marker.color) == {HIGHLIGHT_COLORS[1], "white"}
+        assert set(fig.data[1].marker.color) == {_HIGHLIGHT_COLORS[1], "white"}
 
     def test_style_list_length_must_match_targets(self, cell_lin):
         """Test that a style list must have one entry per target cell."""

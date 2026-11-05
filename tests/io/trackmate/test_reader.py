@@ -3,8 +3,8 @@
 """Unit test for TrackMate XML file loader."""
 
 import io
-from copy import deepcopy
 import logging
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -15,8 +15,7 @@ from lxml import etree as ET
 import pycellin.io.trackmate.reader as tml
 from pycellin.classes import CellLineage, Data, Property, PropsMetadata
 from pycellin.custom_types import PropertyType
-from pycellin.utils import is_equal
-
+from tests.utils import is_equal
 
 # Fixtures #####################################################################
 
@@ -618,11 +617,11 @@ def test_declare_undeclared_attributes(caplog):
     assert graph.nodes[1]["label"] == "a"
     assert graph.edges[1, 2]["weight"] == 0.5
     assert tracks_attributes[0]["score"] == 2
-    dtypes = {key: props_md.props[key].dtype for key in props_md.props}
+    dtypes = {key: props_md.properties[key].dtype for key in props_md.properties}
     assert dtypes == {"count": "int", "label": "str", "weight": "float", "score": "int"}
-    assert props_md.props["weight"].prop_type == PropertyType.EDGE
-    assert props_md.props["score"].prop_type == PropertyType.LINEAGE
-    assert all(prop.unit is None for prop in props_md.props.values())
+    assert props_md.properties["weight"].prop_type == PropertyType.EDGE
+    assert props_md.properties["score"].prop_type == PropertyType.LINEAGE
+    assert all(prop.unit is None for prop in props_md.properties.values())
     assert len(caplog.records) == 1
     assert "'count' (spots, int)" in caplog.records[0].message
     assert "'score' (tracks, int)" in caplog.records[0].message
@@ -641,7 +640,7 @@ def test_declare_undeclared_attributes_of_spots_and_tracks():
         {"node": {"extra"}, "lineage": {"extra"}}, graph, tracks_attributes, props_md
     )
 
-    prop = props_md.props["extra"]
+    prop = props_md.properties["extra"]
     assert prop.prop_type == PropertyType.NODE | PropertyType.LINEAGE
     assert prop.dtype == "float"
     assert graph.nodes[1]["extra"] == 1.0
@@ -661,7 +660,7 @@ def test_declare_undeclared_attributes_of_filtered_track_ignored(caplog):
             {"lineage": {"extra"}}, graph, tracks_attributes, props_md
         )
 
-    assert "extra" not in props_md.props
+    assert "extra" not in props_md.properties
     assert not caplog.records
 
 
@@ -1289,20 +1288,24 @@ def test_parse_model_tag_all_lone_spots_and_tracks():
     # 107 spots: 96 in 7 tracks that keep their TrackMate ID, and 11 lone spots
     # whose lineage ID is -cell_id.
     track_sizes = {
-        lin_id: len(lin) for lin_id, lin in data.cell_data.items() if lin_id >= 0
+        lin_id: len(lin) for lin_id, lin in data.cell_lineages.items() if lin_id >= 0
     }
     assert track_sizes == {0: 74, 1: 2, 2: 4, 3: 2, 4: 10, 5: 2, 6: 2}
-    lone_spots = {lin_id: lin for lin_id, lin in data.cell_data.items() if lin_id < 0}
+    lone_spots = {
+        lin_id: lin for lin_id, lin in data.cell_lineages.items() if lin_id < 0
+    }
     assert len(lone_spots) == 11
     for lin_id, lin in lone_spots.items():
         assert list(lin.nodes) == [-lin_id]
     # The lineage ID of each lineage and of its cells matches its key in the data.
-    for lin_id, lin in data.cell_data.items():
+    for lin_id, lin in data.cell_lineages.items():
         assert lin.graph["lineage_id"] == lin_id
         cell_lin_ids = {cell_lin_id for _, cell_lin_id in lin.nodes(data="lineage_id")}
         assert cell_lin_ids == {lin_id}
     # Only tracks 0 and 4 are listed in FilteredTracks.
-    visible = {lid for lid, lin in data.cell_data.items() if lin.graph["FilteredTrack"]}
+    visible = {
+        lid for lid, lin in data.cell_lineages.items() if lin.graph["FilteredTrack"]
+    }
     assert visible == {0, 4}
 
 
@@ -1323,10 +1326,10 @@ def test_parse_model_tag_lone_spots_and_tracks(lone_spots, tracks, num_cells):
     xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
     _, _, data = tml._parse_model_tag(xml_path, lone_spots=lone_spots, tracks=tracks)
 
-    assert sum(len(lin) for lin in data.cell_data.values()) == num_cells
+    assert sum(len(lin) for lin in data.cell_lineages.values()) == num_cells
     lone_spot_visibilities = {
         visibility
-        for lin in data.cell_data.values()
+        for lin in data.cell_lineages.values()
         if len(lin) == 1
         for _, visibility in lin.nodes(data="VISIBILITY")
     }
@@ -1350,7 +1353,7 @@ def test_parse_model_tag_lone_spots_without_visibility(tmp_path):
     )
 
     # The 84 spots of the visible tracks, and the 11 spots outside tracks.
-    assert sum(len(lin) for lin in data.cell_data.values()) == 95
+    assert sum(len(lin) for lin in data.cell_lineages.values()) == 95
 
 
 def test_parse_model_tag_without_FilteredTracks(tmp_path):
@@ -1368,8 +1371,8 @@ def test_parse_model_tag_without_FilteredTracks(tmp_path):
     )
 
     # The 96 spots of the 7 tracks.
-    assert sum(len(lin) for lin in data.cell_data.values()) == 96
-    assert all(lin.graph["FilteredTrack"] for lin in data.cell_data.values())
+    assert sum(len(lin) for lin in data.cell_lineages.values()) == 96
+    assert all(lin.graph["FilteredTrack"] for lin in data.cell_lineages.values())
 
 
 def test_parse_model_tag_spots_after_tracks(tmp_path):
@@ -1389,7 +1392,7 @@ def test_parse_model_tag_spots_after_tracks(tmp_path):
         modified_path, lone_spots="none", tracks="visible"
     )
 
-    track_sizes = {lin_id: len(lin) for lin_id, lin in data.cell_data.items()}
+    track_sizes = {lin_id: len(lin) for lin_id, lin in data.cell_lineages.items()}
     assert track_sizes == {0: 74, 4: 10}
 
 
@@ -1413,7 +1416,7 @@ def test_parse_model_tag_undeclared_attributes(tmp_path):
     )
 
     dtypes = {
-        key: props_md.props[key].dtype
+        key: props_md.properties[key].dtype
         for key in ("spot_int", "spot_text", "edge_float", "track_int")
     }
     assert dtypes == {
@@ -1422,7 +1425,7 @@ def test_parse_model_tag_undeclared_attributes(tmp_path):
         "edge_float": "float",
         "track_int": "int",
     }
-    for lin in data.cell_data.values():
+    for lin in data.cell_lineages.values():
         for _, attrs in lin.nodes(data=True):
             assert attrs["spot_text"] == f"spot{attrs['spot_int']}"
         assert all(value == 1.5 for *_, value in lin.edges(data="edge_float"))
@@ -1563,7 +1566,7 @@ class TestAddMissingPositionT:
 
         assert lin.nodes[1]["POSITION_T"] == 0.0
         assert lin.nodes[2]["POSITION_T"] == 7.5
-        prop = props_md.props["POSITION_T"]
+        prop = props_md.properties["POSITION_T"]
         assert (prop.dtype, prop.unit, prop.provenance) == ("float", "min", "pycellin")
 
     def test_warns_when_computed(self, caplog):
@@ -1604,7 +1607,7 @@ class TestReadTrackmateXml:
         """Return the attributes of the cells of `model`, by lineage and cell IDs."""
         return {
             (lin_id, cell_id): cell
-            for lin_id, lin in model.data.cell_data.items()
+            for lin_id, lin in model.data.cell_lineages.items()
             for cell_id, cell in lin.nodes(data=True)
         }
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
-"""Unit tests for ModelUpdater class from updater.py module."""
+"""Unit tests for _ModelUpdater class from updater.py module."""
 
 from typing import ClassVar
 
 from pycellin.classes import Property
 from pycellin.classes.property_calculator import NodeLocalPropCalculator
-from pycellin.classes.updater import ModelUpdater
+from pycellin.classes.updater import _ModelUpdater
 
 
 def _create_calculator(identifier: str, input_prop: str | None = None):
@@ -46,11 +46,11 @@ class Copy(NodeLocalPropCalculator):
 
 
 class TestOrderCalculators:
-    """Test cases for ModelUpdater._order_calculators() method."""
+    """Test cases for _ModelUpdater._order_calculators() method."""
 
     def test_registration_order_kept_without_dependencies(self):
         """Test that calculators that read no property keep their order."""
-        updater = ModelUpdater()
+        updater = _ModelUpdater()
         for identifier in ["b", "c", "a"]:
             updater.register_calculator(_create_calculator(identifier))
         assert list(updater._calculators) == ["b", "c", "a"]
@@ -58,7 +58,7 @@ class TestOrderCalculators:
     def test_input_moved_before_its_reader(self):
         """Test that a calculator registered after a reader of its property runs
         before it."""
-        updater = ModelUpdater()
+        updater = _ModelUpdater()
         updater.register_calculator(_create_calculator("other"))
         updater.register_calculator(_create_calculator("copy", input_prop="x"))
         updater.register_calculator(_create_calculator("x"))
@@ -68,7 +68,7 @@ class TestOrderCalculators:
         """Test that the input is moved before its reader rather than the reader after
         the input, so that the calculators registered in between still run after the
         reader."""
-        updater = ModelUpdater()
+        updater = _ModelUpdater()
         updater.register_calculator(_create_calculator("copy", input_prop="x"))
         updater.register_calculator(_create_calculator("other"))
         updater.register_calculator(_create_calculator("x"))
@@ -76,7 +76,7 @@ class TestOrderCalculators:
 
     def test_chain_of_readers(self):
         """Test that each calculator runs after the ones it reads, through a chain."""
-        updater = ModelUpdater()
+        updater = _ModelUpdater()
         updater.register_calculator(_create_calculator("c", input_prop="b"))
         updater.register_calculator(_create_calculator("b", input_prop="a"))
         updater.register_calculator(_create_calculator("a"))
@@ -84,7 +84,7 @@ class TestOrderCalculators:
 
     def test_replaced_calculator_stays_before_its_reader(self):
         """Test that registering a calculator again keeps it before its readers."""
-        updater = ModelUpdater()
+        updater = _ModelUpdater()
         updater.register_calculator(_create_calculator("x"))
         updater.register_calculator(_create_calculator("copy", input_prop="x"))
         new_calc = _create_calculator("x")
@@ -94,7 +94,7 @@ class TestOrderCalculators:
 
     def test_timepoint_stays_first(self):
         """Test that the timepoint calculator stays first."""
-        updater = ModelUpdater()
+        updater = _ModelUpdater()
         updater.register_calculator(_create_calculator("copy", input_prop="x"))
         updater.register_calculator(_create_calculator("x"))
         updater.register_calculator(_create_calculator("timepoint"))
@@ -102,7 +102,7 @@ class TestOrderCalculators:
 
     def test_circular_dependencies_keep_all_calculators(self):
         """Test that calculators reading each other are all kept."""
-        updater = ModelUpdater()
+        updater = _ModelUpdater()
         updater.register_calculator(_create_calculator("a", input_prop="b"))
         updater.register_calculator(_create_calculator("b", input_prop="a"))
         assert sorted(updater._calculators) == ["a", "b"]

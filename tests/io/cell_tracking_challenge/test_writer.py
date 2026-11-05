@@ -6,9 +6,9 @@ import numpy as np
 import pytest
 
 from pycellin.classes import CellLineage, Data, Model, PropsMetadata
-from pycellin.classes.exceptions import UpdateRequiredError
-from pycellin.io.cell_tracking_challenge.writer import write_ctc
+from pycellin.exceptions import UpdateRequiredError
 from pycellin.io.cell_tracking_challenge.reader import read_ctc
+from pycellin.io.cell_tracking_challenge.writer import write_ctc
 from pycellin.properties.core import (
     create_cell_id_property,
     create_lineage_id_property,

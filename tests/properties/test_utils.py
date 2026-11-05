@@ -41,17 +41,17 @@ def data():
 
 class TestGetCycleNodePropertyValues:
     def test_several_cells(self, data):
-        cycle_lin = data.cycle_data[1]
+        cycle_lin = data.cycle_lineages[1]
         values = _get_cycle_node_property_values("cell_area", data, cycle_lin, 4)
         assert values == [1.0, 2.0, 3.0, 4.0]
 
     def test_single_cell(self, data):
-        cycle_lin = data.cycle_data[1]
+        cycle_lin = data.cycle_lineages[1]
         values = _get_cycle_node_property_values("cell_area", data, cycle_lin, 7)
         assert values == [7.0]
 
     def test_missing_property(self, data):
-        cycle_lin = data.cycle_data[1]
+        cycle_lin = data.cycle_lineages[1]
         with pytest.raises(KeyError, match="'cell_perimeter' does not exist"):
             _get_cycle_node_property_values("cell_perimeter", data, cycle_lin, 4)
 
@@ -61,35 +61,35 @@ class TestGetCycleNodePropertyValues:
 
 class TestGetCycleEdgePropertyValues:
     def test_several_links(self, data):
-        cycle_lin = data.cycle_data[1]
+        cycle_lin = data.cycle_lineages[1]
         values = _get_cycle_edge_property_values(
             "cell_speed", data, cycle_lin, 4, include_incoming_edge=False
         )
         assert values == [2.0, 3.0, 4.0]
 
     def test_no_link(self, data):
-        cycle_lin = data.cycle_data[1]
+        cycle_lin = data.cycle_lineages[1]
         values = _get_cycle_edge_property_values(
             "cell_speed", data, cycle_lin, 7, include_incoming_edge=False
         )
         assert values == []
 
     def test_include_incoming_edge(self, data):
-        cycle_lin = data.cycle_data[1]
+        cycle_lin = data.cycle_lineages[1]
         values = _get_cycle_edge_property_values(
             "cell_speed", data, cycle_lin, 6, include_incoming_edge=True
         )
         assert values == [6.0, 5.0]
 
     def test_include_incoming_edge_on_root(self, data):
-        cycle_lin = data.cycle_data[1]
+        cycle_lin = data.cycle_lineages[1]
         values = _get_cycle_edge_property_values(
             "cell_speed", data, cycle_lin, 4, include_incoming_edge=True
         )
         assert values == [2.0, 3.0, 4.0]
 
     def test_missing_property(self, data):
-        cycle_lin = data.cycle_data[1]
+        cycle_lin = data.cycle_lineages[1]
         with pytest.raises(KeyError, match="'cell_displacement' does not exist"):
             _get_cycle_edge_property_values(
                 "cell_displacement", data, cycle_lin, 4, include_incoming_edge=False

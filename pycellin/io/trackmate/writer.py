@@ -18,12 +18,12 @@ from typing import Any
 import networkx as nx
 from lxml import etree as ET
 
-from pycellin.classes.exceptions import ProtectedPropertyError
 from pycellin.classes.lineage import CellLineage
 from pycellin.classes.model import Model
 from pycellin.classes.property import Property
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.custom_types import PropertyType
+from pycellin.exceptions import ProtectedPropertyError
 from pycellin.io.utils import (
     _check_up_to_date,
     _identify_frame_prop,
@@ -494,7 +494,7 @@ def _get_exported_keys(model: Model) -> dict[str, set[str]]:
         "lineage": {"Model", "FilteredTrack"},
     }
     ignored: dict[str, set[str]] = {"node": set(), "edge": set(), "lineage": set()}
-    for lin in model.data.cell_data.values():
+    for lin in model.data.cell_lineages.values():
         attrs_dicts = {
             "node": [attrs for _, attrs in lin.nodes(data=True)],
             "edge": [attrs for _, _, attrs in lin.edges(data=True)],
@@ -835,7 +835,7 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
     # Track cells with missing position properties: {lineage_id: set of node IDs}.
     missing_positions = {}
 
-    for lin in model.data.cell_data.values():
+    for lin in model.data.cell_lineages.values():
         nodes_with_missing_pos = _update_nodes(lin, frame_prop)
         if nodes_with_missing_pos:
             missing_positions[lin.graph["lineage_id"]] = nodes_with_missing_pos
@@ -1071,7 +1071,7 @@ def _update_props_metadata(model: Model, frame_prop: str) -> None:
     # TRACK_ID comes from lineage_id which is stored both as a node property
     # and a lineage property. TrackMate only needs it on the lineages so we update
     # the property type.
-    model.props_metadata.props["TRACK_ID"].prop_type = PropertyType.LINEAGE
+    model.props_metadata.properties["TRACK_ID"].prop_type = PropertyType.LINEAGE
     _add_mandatory_props(model.props_metadata)
     _update_location_props(model.props_metadata)
 
@@ -1102,7 +1102,7 @@ def _add_radius_prop(model: Model) -> None:
     if radius_prop_name is not None:
         if radius_prop_name != "RADIUS":
             model.props_metadata._change_prop_identifier(radius_prop_name, "RADIUS")
-            for lin in model.data.cell_data.values():
+            for lin in model.data.cell_lineages.values():
                 _update_node_prop_key(
                     lin,
                     old_key=radius_prop_name,
@@ -1125,7 +1125,7 @@ def _add_radius_prop(model: Model) -> None:
         model.props_metadata._add_prop(radius_prop)
 
     # Ensure all nodes have the RADIUS property set to 1.0 if missing.
-    for lin in model.data.cell_data.values():
+    for lin in model.data.cell_lineages.values():
         for node in lin.nodes():
             if "RADIUS" not in lin.nodes[node]:
                 lin.nodes[node]["RADIUS"] = 1.0
@@ -1158,7 +1158,7 @@ def _relabel_nodes(model) -> dict[int, dict[int, int]]:
     """
     # Count the occurrences of each node ID in the data.
     count_ids: Counter[int] = Counter()
-    for lin in model.data.cell_data.values():
+    for lin in model.data.cell_lineages.values():
         count_ids.update(list(lin.nodes()))
     dupes = [item for item, count in count_ids.items() if count > 1]
 
@@ -1174,7 +1174,7 @@ def _relabel_nodes(model) -> dict[int, dict[int, int]]:
         "Relabeling nodes to ensure unique IDs across all lineages export. "
         "Previous IDs are preserved in 'pycellin_cell_id' for reference."
     )
-    for lin_id, lin in model.data.cell_data.items():
+    for lin_id, lin in model.data.cell_lineages.items():
         mapping: dict[int, int] = {}  # {old_node_id: new_node_id}
         full_mapping[lin_id] = mapping
         for node in lin.nodes():
@@ -1193,7 +1193,7 @@ def _relabel_nodes(model) -> dict[int, dict[int, int]]:
     # Manual update of the specific node property cell_name
     # when it has a TrackMate syntax: "ID{cell_name}"".
     if model.has_property("cell_name"):
-        for lin_id, lin in model.data.cell_data.items():
+        for lin_id, lin in model.data.cell_lineages.items():
             for node in lin.nodes():
                 if "cell_name" in lin.nodes[node]:
                     old_id = lin.nodes[node]["pycellin_cell_id"]
@@ -1483,7 +1483,7 @@ def write_trackmate_xml(
     TrackMate has a single spatial unit and a single temporal unit for all its
     features, while each pycellin property has its own unit. The values are written
     as they are, without conversion: check that the units of the properties match
-    `space_unit` and `time_unit`, e.g. with `model.get_units_per_properties()`.
+    `space_unit` and `time_unit`, e.g. with `model.get_properties_per_unit()`.
 
     TrackMate only supports numeric features. Non-numeric properties (strings,
     lists, polygons...) are not exported, except TrackMate's own properties and
@@ -1521,14 +1521,18 @@ def write_trackmate_xml(
             xf.write("\n  ")
             with xf.element("Model", tm_units):
                 _write_FeatureDeclarations(xf, model_copy)
-                _write_AllSpots(xf, model_copy.data.cell_data, exported_keys["node"])
+                _write_AllSpots(
+                    xf, model_copy.data.cell_lineages, exported_keys["node"]
+                )
                 _write_AllTracks(
                     xf,
-                    model_copy.data.cell_data,
+                    model_copy.data.cell_lineages,
                     exported_keys["lineage"],
                     exported_keys["edge"],
                 )
-                _write_FilteredTracks(xf, model_copy.data.cell_data, has_FilteredTrack)
+                _write_FilteredTracks(
+                    xf, model_copy.data.cell_lineages, has_FilteredTrack
+                )
             xf.write("\n  ")
             _write_Settings(
                 xf,
@@ -1573,9 +1577,6 @@ if __name__ == "__main__":
     print("Model metadata:")
     print(model.model_metadata)
 
-    xml_out = Path("sample_data/results") / "output.xml"
-    write_trackmate_xml(model, xml_out)
-
-    # with tempfile.TemporaryDirectory() as tmp_dir:
-    #     xml_out = Path(tmp_dir) / "output.xml"
-    #     write_trackmate_xml(model, xml_out)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        xml_out = Path(tmp_dir) / "output.xml"
+        write_trackmate_xml(model, xml_out)

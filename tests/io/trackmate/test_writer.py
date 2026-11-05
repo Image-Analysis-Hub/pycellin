@@ -10,7 +10,8 @@ import pytest
 from lxml import etree as ET
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
-from pycellin.classes.exceptions import UpdateRequiredError
+from pycellin.exceptions import UpdateRequiredError
+from pycellin.io.trackmate.reader import read_trackmate_xml
 from pycellin.io.trackmate.writer import (
     _relabel_nodes,
     _remove_non_numeric_props,
@@ -19,7 +20,6 @@ from pycellin.io.trackmate.writer import (
     _write_FeatureDeclarations,
     write_trackmate_xml,
 )
-from pycellin.io.trackmate.reader import read_trackmate_xml
 from pycellin.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
@@ -39,8 +39,8 @@ def simple_model():
     lin.add_edge(1, 2, SPOT_SOURCE_ID=1, SPOT_TARGET_ID=2)
     lin.graph["lineage_id"] = 0
 
-    cell_data = {0: lin}
-    data = Data(cell_data)
+    cell_lineages = {0: lin}
+    data = Data(cell_lineages)
     props_metadata = PropsMetadata()
     props_metadata._add_prop(create_timepoint_property())
     props_metadata._add_prop(create_cell_coord_property(axis="x", unit="pixel"))
@@ -74,7 +74,7 @@ def model_unique_ids(simple_model):
         ]
     )
     lin.graph["lineage_id"] = 1
-    simple_model.data.cell_data[1] = lin
+    simple_model.data.cell_lineages[1] = lin
     return simple_model
 
 
@@ -96,7 +96,7 @@ def model_non_unique_ids(simple_model):
         ]
     )
     lin.graph["lineage_id"] = 1
-    simple_model.data.cell_data[1] = lin
+    simple_model.data.cell_lineages[1] = lin
 
     cell_name_prop = Property(
         identifier="cell_name",
@@ -114,9 +114,9 @@ def model_non_unique_ids(simple_model):
 
 
 @pytest.fixture
-def model_with_cycle_data(model_unique_ids):
+def model_with_cycle_lineages(model_unique_ids):
     """Create a model with cycle lineages and their mother_cycle property."""
-    model_unique_ids.add_cycle_data()
+    model_unique_ids.add_cycle_lineages()
     model_unique_ids.add_mother_cycle()
     model_unique_ids.update()
     return model_unique_ids
@@ -349,7 +349,7 @@ class TestRelabelNodes:
 
     def test_unique_ids_no_relabel(self, model_unique_ids):
         """Test that nodes with unique IDs are not relabeled."""
-        lin = model_unique_ids.data.cell_data[0]
+        lin = model_unique_ids.data.cell_lineages[0]
         original_nodes = set(lin.nodes())
         original_cell_ids = {node: lin.nodes[node]["cell_id"] for node in lin.nodes()}
 
@@ -363,12 +363,12 @@ class TestRelabelNodes:
     def test_non_unique_ids_across_lineages(self, model_non_unique_ids):
         """Test that nodes with duplicate IDs across lineages are relabeled uniquely."""
         original_ids = []
-        for lin in model_non_unique_ids.data.cell_data.values():
+        for lin in model_non_unique_ids.data.cell_lineages.values():
             original_ids.extend(lin.nodes())
         _relabel_nodes(model_non_unique_ids)
 
         new_ids = []
-        for lin in model_non_unique_ids.data.cell_data.values():
+        for lin in model_non_unique_ids.data.cell_lineages.values():
             new_ids.extend(lin.nodes())
 
         assert len(original_ids) != len(set(original_ids))
@@ -379,7 +379,7 @@ class TestRelabelNodes:
         """Test that original cell_id is preserved in pycellin_cell_id."""
         # Collect original cell_ids for each lineage before relabeling
         original_cell_ids_by_lin = {}
-        for lin_id, lin in model_non_unique_ids.data.cell_data.items():
+        for lin_id, lin in model_non_unique_ids.data.cell_lineages.items():
             # Store the cell_ids in the order nodes appear
             original_cell_ids_by_lin[lin_id] = [
                 lin.nodes[node]["cell_id"] for node in lin.nodes()
@@ -388,7 +388,7 @@ class TestRelabelNodes:
         _relabel_nodes(model_non_unique_ids)
 
         # After relabeling, verify that pycellin_cell_id matches original cell_ids
-        for lin_id, lin in model_non_unique_ids.data.cell_data.items():
+        for lin_id, lin in model_non_unique_ids.data.cell_lineages.items():
             for node in lin.nodes():
                 assert "pycellin_cell_id" in lin.nodes[node]
                 # The pycellin_cell_id should be one of the original cell_ids
@@ -402,21 +402,21 @@ class TestRelabelNodes:
         _relabel_nodes(model_non_unique_ids)
 
         # After relabeling, cell_id should match the new node ID
-        for lin in model_non_unique_ids.data.cell_data.values():
+        for lin in model_non_unique_ids.data.cell_lineages.values():
             for node in lin.nodes():
                 assert lin.nodes[node]["cell_id"] == node
 
     def test_with_cycle_lins(self, model_non_unique_ids):
         """Test that cycle lineage nodes are also relabeled.."""
-        model_non_unique_ids.add_cycle_data()
+        model_non_unique_ids.add_cycle_lineages()
         original_ids = []
-        for lin in model_non_unique_ids.data.cycle_data.values():
+        for lin in model_non_unique_ids.data.cycle_lineages.values():
             original_ids.extend(lin.nodes())
 
         _relabel_nodes(model_non_unique_ids)
 
         new_ids = []
-        for lin in model_non_unique_ids.data.cycle_data.values():
+        for lin in model_non_unique_ids.data.cycle_lineages.values():
             new_ids.extend(lin.nodes())
 
         assert len(original_ids) != len(set(original_ids))
@@ -425,13 +425,13 @@ class TestRelabelNodes:
 
     def test_cell_name_updated(self, model_non_unique_ids):
         """Test that cell_name property is updated to "ID{node}"."""
-        for lin in model_non_unique_ids.data.cell_data.values():
+        for lin in model_non_unique_ids.data.cell_lineages.values():
             for node in lin.nodes():
                 lin.nodes[node]["cell_name"] = f"ID{node}"
 
         _relabel_nodes(model_non_unique_ids)
 
-        for lin in model_non_unique_ids.data.cell_data.values():
+        for lin in model_non_unique_ids.data.cell_lineages.values():
             for node in lin.nodes():
                 assert "cell_name" in lin.nodes[node]
                 assert lin.nodes[node]["cell_name"] == f"ID{node}"
@@ -439,7 +439,7 @@ class TestRelabelNodes:
     def test_cell_name_partially_updated(self, model_non_unique_ids):
         """Test that cell_name property is updated only for nodes with TrackMate
         syntax."""
-        for lin in model_non_unique_ids.data.cell_data.values():
+        for lin in model_non_unique_ids.data.cell_lineages.values():
             for node in lin.nodes():
                 if node % 2 == 0:
                     lin.nodes[node]["cell_name"] = f"ID{node}"  # TrackMate syntax
@@ -453,7 +453,7 @@ class TestRelabelNodes:
             for old_id, new_id in nodes.items()
         }
 
-        for lin in model_non_unique_ids.data.cell_data.values():
+        for lin in model_non_unique_ids.data.cell_lineages.values():
             for node in lin.nodes():
                 if "ID" in lin.nodes[node]["cell_name"]:
                     assert lin.nodes[node]["cell_name"] == f"ID{node}"
@@ -476,17 +476,17 @@ class TestWriteFeatureDeclarations:
             part.tag: [feat.get("feature") for feat in part] for part in declarations
         }
 
-    def test_cell_lineage_properties_are_declared(self, model_with_cycle_data):
+    def test_cell_lineage_properties_are_declared(self, model_with_cycle_lineages):
         """Test that the properties of cell lineages are declared."""
-        features = self._get_declared_features(model_with_cycle_data)
+        features = self._get_declared_features(model_with_cycle_lineages)
 
         assert {"cell_x", "cell_y", "lineage_id"} <= set(features["SpotFeatures"])
         assert "lineage_id" in features["TrackFeatures"]
 
-    def test_cycle_lineage_properties_are_not_declared(self, model_with_cycle_data):
+    def test_cycle_lineage_properties_are_not_declared(self, model_with_cycle_lineages):
         """Test that cycle properties are not declared, as cells have no values."""
         for prop_type in ["edge", "lineage"]:
-            model_with_cycle_data.props_metadata._add_prop(
+            model_with_cycle_lineages.props_metadata._add_prop(
                 Property(
                     identifier=f"cycle_{prop_type}_prop",
                     name=f"Cycle {prop_type} property",
@@ -498,7 +498,7 @@ class TestWriteFeatureDeclarations:
                 )
             )
 
-        features = self._get_declared_features(model_with_cycle_data)
+        features = self._get_declared_features(model_with_cycle_lineages)
 
         declared = {feat for part in features.values() for feat in part}
         cycle_props = {
@@ -511,11 +511,11 @@ class TestWriteFeatureDeclarations:
         }
         assert not declared & cycle_props
 
-    def test_propagated_cycle_properties_are_declared(self, model_with_cycle_data):
+    def test_propagated_cycle_properties_are_declared(self, model_with_cycle_lineages):
         """Test that cycle properties propagated to cell lineages are declared."""
-        model_with_cycle_data.propagate_cycle_properties(["generation"])
+        model_with_cycle_lineages.propagate_cycle_properties(["generation"])
 
-        features = self._get_declared_features(model_with_cycle_data)
+        features = self._get_declared_features(model_with_cycle_lineages)
 
         assert "generation" in features["SpotFeatures"]
         assert "cycle_duration" not in features["SpotFeatures"]
@@ -524,17 +524,17 @@ class TestWriteFeatureDeclarations:
 class TestWriteTrackmateXml:
     """Test cases for write_trackmate_xml function."""
 
-    def test_cycle_data_can_be_computed_after_reload(
-        self, tmp_path, model_with_cycle_data
+    def test_cycle_lineages_can_be_computed_after_reload(
+        self, tmp_path, model_with_cycle_lineages
     ):
         """Test that cycle properties can be computed again on the reloaded model."""
         xml_path = tmp_path / "model.xml"
         write_trackmate_xml(
-            model_with_cycle_data, xml_path, space_unit="pixel", time_unit="frame"
+            model_with_cycle_lineages, xml_path, space_unit="pixel", time_unit="frame"
         )
         model = read_trackmate_xml(xml_path)
 
-        model.add_cycle_data()
+        model.add_cycle_lineages()
         model.add_mother_cycle()
         model.update()
 
@@ -544,12 +544,12 @@ class TestWriteTrackmateXml:
         assert sorted(zip(pairs["cycle_id_1"], pairs["cycle_id_2"])) == [(5, 4), (8, 4)]
 
     def test_propagated_cycle_properties_must_be_removed_after_reload(
-        self, tmp_path, model_with_cycle_data
+        self, tmp_path, model_with_cycle_lineages
     ):
         """Test that cycle properties propagated in the file must be removed first."""
         xml_path = tmp_path / "model.xml"
         write_trackmate_xml(
-            model_with_cycle_data,
+            model_with_cycle_lineages,
             xml_path,
             space_unit="pixel",
             time_unit="frame",
@@ -557,15 +557,15 @@ class TestWriteTrackmateXml:
         )
         model = read_trackmate_xml(xml_path)
         with pytest.raises(ValueError, match="remove them first"):
-            model.add_cycle_data()
+            model.add_cycle_lineages()
 
-        cycle_props = model_with_cycle_data.get_cycle_lineage_properties(
+        cycle_props = model_with_cycle_lineages.get_cycle_lineage_properties(
             single_type=True
         )
         for prop_id in cycle_props:
             if model.has_property(prop_id):
                 model.remove_property(prop_id)
-        model.add_cycle_data()
+        model.add_cycle_lineages()
         model.add_mother_cycle()
         model.update()
 
@@ -601,7 +601,7 @@ class TestWriteTrackmateXml:
                 dtype="int",
             )
         )
-        simple_model.data.cell_data[0].graph["FilteredTrack"] = False
+        simple_model.data.cell_lineages[0].graph["FilteredTrack"] = False
         lid = simple_model.add_lineage()
         coords = {"cell_x": 0.0, "cell_y": 0.0}
         simple_model.add_cell(
@@ -619,8 +619,8 @@ class TestWriteTrackmateXml:
             simple_model, xml_path, space_unit="pixel", time_unit="frame"
         )
         model = read_trackmate_xml(xml_path, tracks="all")
-        assert model.data.cell_data[0].graph["FilteredTrack"] is False
-        assert model.data.cell_data[lid].graph["FilteredTrack"] is True
+        assert model.data.cell_lineages[0].graph["FilteredTrack"] is False
+        assert model.data.cell_lineages[lid].graph["FilteredTrack"] is True
 
     def test_reloaded_cells_without_contour_exported_again(
         self, tmp_path, simple_model
@@ -632,13 +632,13 @@ class TestWriteTrackmateXml:
         model = read_trackmate_xml(tmp_path / "first.xml")
         write_trackmate_xml(model, tmp_path / "second.xml", **units)
         reloaded = read_trackmate_xml(tmp_path / "second.xml")
-        contours = dict(reloaded.data.cell_data[0].nodes(data="cell_contour"))
+        contours = dict(reloaded.data.cell_lineages[0].nodes(data="cell_contour"))
         assert contours == {1: None, 2: None}
 
     def test_undeclared_attributes_not_exported(self, tmp_path, simple_model, caplog):
         """Test that attributes without a property declaration are not exported,
         with a warning naming them, so that TrackMate can read the file."""
-        lin = simple_model.data.cell_data[0]
+        lin = simple_model.data.cell_lineages[0]
         for _, attrs in lin.nodes(data=True):
             attrs["note"] = "text"
         lin.edges[1, 2]["link_note"] = 1.0

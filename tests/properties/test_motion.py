@@ -140,13 +140,13 @@ class TestCycleTotalDisplacement:
         calculator = CycleTotalDisplacement(
             prop_cycle_lin, displacement_prop="my_motion"
         )
-        assert calculator.compute(data, data.cycle_data[1], node_id=3) == 5.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=3) == 5.0
 
     def test_compute_cycle_without_link(self, data, prop_cycle_lin):
         calculator = CycleTotalDisplacement(
             prop_cycle_lin, displacement_prop="my_motion"
         )
-        assert math.isnan(calculator.compute(data, data.cycle_data[1], node_id=4))
+        assert math.isnan(calculator.compute(data, data.cycle_lineages[1], node_id=4))
 
     def test_get_input_props(self, prop_cycle_lin):
         calculator = CycleTotalDisplacement(prop_cycle_lin)
@@ -163,7 +163,7 @@ class TestCycleMeanDisplacement:
         calculator = CycleMeanDisplacement(
             prop_cycle_lin, displacement_prop="my_motion"
         )
-        assert calculator.compute(data, data.cycle_data[1], node_id=3) == 2.5
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=3) == 2.5
 
     def test_compute_cycle_without_link(self, data, prop_cycle_lin):
         calculator = CycleMeanDisplacement(
@@ -171,7 +171,7 @@ class TestCycleMeanDisplacement:
         )
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            result = calculator.compute(data, data.cycle_data[1], node_id=4)
+            result = calculator.compute(data, data.cycle_lineages[1], node_id=4)
         assert math.isnan(result)
 
 
@@ -181,19 +181,19 @@ class TestCycleMeanDisplacement:
 class TestCycleMeanSpeed:
     def test_compute_custom_speed_prop(self, data, prop_cycle_lin):
         calculator = CycleMeanSpeed(prop_cycle_lin, speed_prop="my_motion")
-        assert calculator.compute(data, data.cycle_data[1], node_id=3) == 2.5
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=3) == 2.5
 
     def test_compute_include_incoming_edge(self, data, prop_cycle_lin):
         calculator = CycleMeanSpeed(
             prop_cycle_lin, include_incoming_edge=True, speed_prop="my_motion"
         )
-        assert calculator.compute(data, data.cycle_data[1], node_id=4) == 4.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=4) == 4.0
 
     def test_compute_cycle_without_link(self, data, prop_cycle_lin):
         calculator = CycleMeanSpeed(prop_cycle_lin, speed_prop="my_motion")
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            result = calculator.compute(data, data.cycle_data[1], node_id=4)
+            result = calculator.compute(data, data.cycle_lineages[1], node_id=4)
         assert math.isnan(result)
 
 
@@ -204,21 +204,21 @@ class TestStraightness:
     def test_compute_3d(self, data, prop_cycle_lin):
         # Cycle 3 goes from (0, 0, 0) to (2, 1, 2), then to (4, 0, 0): 6 traveled,
         # 4 from start to end.
-        lineage = data.cell_data[1]
+        lineage = data.cell_lineages[1]
         for cell, position in {1: (0, 0, 0), 2: (2, 1, 2), 3: (4, 0, 0)}.items():
             lineage.nodes[cell].update(zip(("cell_x", "cell_y", "cell_z"), position))
         calculator = Straightness(prop_cycle_lin)
-        result = calculator.compute(data, data.cycle_data[1], node_id=3)
+        result = calculator.compute(data, data.cycle_lineages[1], node_id=3)
         assert result == pytest.approx(4 / 6)
 
     def test_compute_2d(self, data, prop_cycle_lin):
         # Cycle 3 goes from (0, 0) to (3, 4), then to (6, 0): 10 traveled, 6 from
         # start to end.
-        lineage = data.cell_data[1]
+        lineage = data.cell_lineages[1]
         for cell, position in {1: (0, 0), 2: (3, 4), 3: (6, 0)}.items():
             lineage.nodes[cell].update(zip(("cell_x", "cell_y"), position))
         calculator = Straightness(prop_cycle_lin, coord_props=("cell_x", "cell_y"))
-        result = calculator.compute(data, data.cycle_data[1], node_id=3)
+        result = calculator.compute(data, data.cycle_lineages[1], node_id=3)
         assert result == pytest.approx(0.6)
 
 

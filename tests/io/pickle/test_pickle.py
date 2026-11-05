@@ -66,7 +66,7 @@ class TestPickle:
 
         model.remove_link(1, 2, lineage_id=1)
         model.update()
-        assert sorted(len(lin) for lin in model.data.cell_data.values()) == [1, 1]
+        assert sorted(len(lin) for lin in model.data.cell_lineages.values()) == [1, 1]
 
     def test_protocol(self, tmp_path, simple_model):
         """Test that the file is written with the given pickle protocol."""

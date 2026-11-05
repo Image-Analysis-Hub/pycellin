@@ -1,3 +1,12 @@
+import importlib.metadata
+
+# Set before the other imports: submodules read it while the package is loading.
+try:
+    __version__ = importlib.metadata.version("pycellin")
+except importlib.metadata.PackageNotFoundError:
+    __version__ = "development"
+
+from . import exceptions
 from .classes.data import Data
 from .classes.lineage import CellLineage, CycleLineage
 from .classes.model import Model
@@ -41,6 +50,8 @@ __all__ = [
     "NodeLocalPropCalculator",
     "Property",
     "PropsMetadata",
+    "__version__",
+    "exceptions",
     "from_trackpy",
     "get_pycellin_cell_lineage_properties",
     "get_pycellin_cycle_lineage_properties",

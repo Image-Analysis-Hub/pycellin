@@ -60,7 +60,7 @@ class TestFromTrackpy:
     def test_no_reserved_column(self, trackpy_df):
         """Without reserved columns, pycellin creates its own properties."""
         model = from_trackpy(trackpy_df)
-        (lin,) = model.data.cell_data.values()
+        (lin,) = model.data.cell_lineages.values()
         assert [lin.nodes[n]["cell_id"] for n in sorted(lin.nodes)] == [0, 1]
         assert all(lin.nodes[n]["lineage_id"] == lin.graph["lineage_id"] for n in lin)
 
@@ -86,7 +86,7 @@ class TestFromTrackpy:
         model = from_trackpy(trackpy_df)
 
         assert model.get_property("label").dtype == "int"
-        (lin,) = model.data.cell_data.values()
+        (lin,) = model.data.cell_lineages.values()
         labels = [lin.nodes[n]["label"] for n in sorted(lin.nodes)]
         assert labels == [5, 6]
         assert all(type(label) is int for label in labels)
@@ -113,7 +113,9 @@ class TestFromTrackpy:
         )
         model = from_trackpy(df)
 
-        edges = {edge for lin in model.data.cell_data.values() for edge in lin.edges}
+        edges = {
+            edge for lin in model.data.cell_lineages.values() for edge in lin.edges
+        }
         # Rows 2 -> 3 -> 0 for particle 0, rows 1 -> 4 for particle 1.
         assert edges == {(2, 3), (3, 0), (1, 4)}
 
@@ -127,7 +129,7 @@ class TestFromTrackpy:
         reloaded = read_trackmate_xml(xml_path)
 
         assert reloaded.get_property("particle").dtype == "int"
-        (lin,) = reloaded.data.cell_data.values()
+        (lin,) = reloaded.data.cell_lineages.values()
         masses = sorted(attrs["mass"] for _, attrs in lin.nodes(data=True))
         assert masses == [100.0, 110.0]
 
@@ -136,7 +138,7 @@ class TestFromTrackpy:
         frames, which is the reference time property of the model."""
         model = from_trackpy(trackpy_df, time_step=2.0, reference_time_prop="t")
         assert model.reference_time_prop == "t"
-        (lin,) = model.data.cell_data.values()
+        (lin,) = model.data.cell_lineages.values()
         assert sorted(t for _, t in lin.nodes(data="t")) == [0.0, 2.0]
 
     def test_reference_time_prop_naming_a_column_raises(self, trackpy_full_df):

@@ -21,13 +21,13 @@ class PropertyType(Flag):
 
     def __str__(self) -> str:
         """Return a string representation of the PropertyType."""
-        result = property_type_to_strings(self)
+        result = _property_type_to_strings(self)
         if isinstance(result, list):
             return " | ".join(result)
         return result
 
 
-def property_type_from_string(value: str | list[str]) -> PropertyType:
+def _property_type_from_string(value: str | list[str]) -> PropertyType:
     """
     Convert string or list of strings to PropertyType Flag.
 
@@ -49,9 +49,9 @@ def property_type_from_string(value: str | list[str]) -> PropertyType:
 
     Examples
     --------
-    >>> property_type_from_string("node")
+    >>> _property_type_from_string("node")
     <PropertyType.NODE: 1>
-    >>> property_type_from_string(["node", "lineage"])
+    >>> _property_type_from_string(["node", "lineage"])
     <PropertyType.LINEAGE|NODE: 5>
     """
     mapping = {
@@ -73,12 +73,12 @@ def property_type_from_string(value: str | list[str]) -> PropertyType:
         raise TypeError(f"Expected str or list[str], got {type(value).__name__}")
 
 
-def property_type_to_strings(value: PropertyType) -> str | list[str]:
+def _property_type_to_strings(value: PropertyType) -> str | list[str]:
     """
     Convert PropertyType Flag to string or list of strings.
 
     Returns a string for monotype properties and a list for multitype properties.
-    This mirrors the input format accepted by property_type_from_string().
+    This mirrors the input format accepted by _property_type_from_string().
 
     Parameters
     ----------
@@ -93,9 +93,9 @@ def property_type_to_strings(value: PropertyType) -> str | list[str]:
 
     Examples
     --------
-    >>> property_type_to_strings(PropertyType.NODE)
+    >>> _property_type_to_strings(PropertyType.NODE)
     'node'
-    >>> property_type_to_strings(PropertyType.NODE | PropertyType.LINEAGE)
+    >>> _property_type_to_strings(PropertyType.NODE | PropertyType.LINEAGE)
     ['node', 'lineage']
     """
     mapping = {

@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from pycellin.utils import get_pycellin_version
+from pycellin import __version__
 
 
 def _are_values_equal(value1: Any, value2: Any) -> bool:
@@ -111,7 +111,7 @@ class ModelMetadata:
     space_unit: str | None = None
 
     # Standard optional fields, for traceability.
-    pycellin_version: str = field(default_factory=get_pycellin_version)
+    pycellin_version: str = __version__
     creation_timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     name: str | None = None
     provenance: str | None = None

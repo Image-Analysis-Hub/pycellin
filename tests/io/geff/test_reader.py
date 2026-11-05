@@ -2592,22 +2592,24 @@ class TestReadGeff:
         lineages when they can."""
         model = read_geff(geff_valid_ids)
 
-        assert set(model.data.cell_data) == {1, 2}
-        lin = model.data.cell_data[1]
+        assert set(model.data.cell_lineages) == {1, 2}
+        lin = model.data.cell_lineages[1]
         assert set(lin.nodes) == {10, 11}
         assert all(lin.nodes[n]["cell_id"] == n for n in lin.nodes)
         assert all(lin.nodes[n]["lineage_id"] == 1 for n in lin.nodes)
-        assert not any(prop.startswith("geff_") for prop in model.props_metadata.props)
+        assert not any(
+            prop.startswith("geff_") for prop in model.props_metadata.properties
+        )
 
     def test_clashing_ids_are_kept(self, geff_clashing_ids):
         """The 'cell_id' and 'lineage_id' properties of the file that cannot
         identify cells and lineages are kept as 'geff_cell_id' and 'geff_lineage_id'."""
         model = read_geff(geff_clashing_ids)
 
-        assert len(model.data.cell_data) == 2
+        assert len(model.data.cell_lineages) == 2
         nodes = {
             n: data
-            for lin in model.data.cell_data.values()
+            for lin in model.data.cell_lineages.values()
             for n, data in lin.nodes(data=True)
         }
         assert {n: data["geff_cell_id"] for n, data in nodes.items()} == {
@@ -2620,7 +2622,7 @@ class TestReadGeff:
         assert all(data["cell_id"] == n for n, data in nodes.items())
         assert nodes[0]["lineage_id"] == nodes[1]["lineage_id"]
         assert nodes[0]["lineage_id"] != nodes[2]["lineage_id"]
-        props = model.props_metadata.props
+        props = model.props_metadata.properties
         assert props["geff_cell_id"].identifier == "geff_cell_id"
         assert props["geff_lineage_id"].identifier == "geff_lineage_id"
         assert props["cell_id"].provenance == "geff"

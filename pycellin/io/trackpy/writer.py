@@ -23,7 +23,7 @@ from pycellin.classes.model import Model
 from pycellin.io.utils import _check_up_to_date, _identify_frame_prop
 
 
-def safekeep_original_lineage_ids(model: Model) -> None:
+def _safekeep_original_lineage_ids(model: Model) -> None:
     """
     Add original lineage IDs to the nodes of the model.
 
@@ -35,12 +35,12 @@ def safekeep_original_lineage_ids(model: Model) -> None:
     model : Model
         The pycellin model to modify.
     """
-    for lin_id, lin in model.data.cell_data.items():
+    for lin_id, lin in model.data.cell_lineages.items():
         for node in lin.nodes():
             lin.nodes[node]["lineage_id_pycellin"] = lin_id
 
 
-def remove_division_events(model: Model) -> None:
+def _remove_division_events(model: Model) -> None:
     """
     Remove division events by deleting edges involved in divisions.
 
@@ -63,7 +63,7 @@ def remove_division_events(model: Model) -> None:
         model.update()
 
 
-def renumber_negative_lineage_ids(model: Model) -> None:
+def _renumber_negative_lineage_ids(model: Model) -> None:
     """
     Ensure lineage IDs are positive.
 
@@ -81,17 +81,17 @@ def renumber_negative_lineage_ids(model: Model) -> None:
         if lin.graph["lineage_id"] < 0
     ]
     for lin_id in one_node_lin_ids:
-        lin = model.get_cell_lineage_from_id(lin_id)
+        lin = model.get_cell_lineage(lin_id)
         assert lin is not None
         new_lin_id = model.get_next_available_lineage_id()
         # Update the lineage ID in the graph.
         lin.graph["lineage_id"] = new_lin_id
-        # Update the lineage ID in the cell data.
-        model.data.cell_data.pop(lin_id)
-        model.data.cell_data[new_lin_id] = lin
+        # Update the lineage ID in the dictionary of cell lineages.
+        model.data.cell_lineages.pop(lin_id)
+        model.data.cell_lineages[new_lin_id] = lin
 
 
-def rename_columns_if_exist(df: pd.DataFrame, columns_map: dict) -> pd.DataFrame:
+def _rename_columns_if_exist(df: pd.DataFrame, columns_map: dict) -> pd.DataFrame:
     """
     Helper function to rename columns if they exist in the DataFrame.
 
@@ -113,7 +113,7 @@ def rename_columns_if_exist(df: pd.DataFrame, columns_map: dict) -> pd.DataFrame
     return df
 
 
-def drop_columns_if_exist(df: pd.DataFrame, columns: list) -> pd.DataFrame:
+def _drop_columns_if_exist(df: pd.DataFrame, columns: list) -> pd.DataFrame:
     """
     Helper function to drop columns if they exist in the DataFrame.
 
@@ -135,7 +135,7 @@ def drop_columns_if_exist(df: pd.DataFrame, columns: list) -> pd.DataFrame:
     return df
 
 
-def format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
+def _format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
     """
     Format the DataFrame to be compatible with trackpy.
 
@@ -152,13 +152,13 @@ def format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
         The formatted DataFrame.
     """
     # Drop unnecessary columns.
-    df = drop_columns_if_exist(df, ["cell_contour", "particle"])
+    df = _drop_columns_if_exist(df, ["cell_contour", "particle"])
     # If we already have the "particle" column, it means the data is coming from
     # trackpy, but it might not be up to date. Safer to remove it then recreate
     # it from "lineage_id".
 
     # Rename columns to match trackpy format.
-    df = rename_columns_if_exist(
+    df = _rename_columns_if_exist(
         df,
         {
             "cell_x": "x",
@@ -209,14 +209,14 @@ def to_trackpy(model: Model) -> pd.DataFrame:
     _check_up_to_date(model)
     # Prepare the model for export.
     model_copy = copy.deepcopy(model)  # Don't want to modify the original model.
-    safekeep_original_lineage_ids(model_copy)
-    remove_division_events(model_copy)  # Trackpy does not support division events.
-    renumber_negative_lineage_ids(model_copy)
+    _safekeep_original_lineage_ids(model_copy)
+    _remove_division_events(model_copy)  # Trackpy does not support division events.
+    _renumber_negative_lineage_ids(model_copy)
 
     # Creation of the trackpy DataFrame.
     df = model_copy.to_cell_dataframe()
     frame_prop = _identify_frame_prop(model_copy)
-    df = format_dataframe(df, frame_prop)
+    df = _format_dataframe(df, frame_prop)
 
     return df
 

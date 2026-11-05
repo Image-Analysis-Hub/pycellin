@@ -664,35 +664,35 @@ class TestCellContour:
 class TestCycleMeanArea:
     def test_compute(self, data, prop_cycle_lin):
         calculator = CycleMeanArea(prop_cycle_lin)
-        cycle_lin = data.cycle_data[1]
+        cycle_lin = data.cycle_lineages[1]
         assert calculator.compute(data, cycle_lin, node_id=4) == 2.5
         assert calculator.compute(data, cycle_lin, node_id=6) == 5.5
         assert calculator.compute(data, cycle_lin, node_id=7) == 7.0
 
     def test_compute_ignores_nan(self, data, prop_cycle_lin):
-        data.cell_data[1].nodes[3]["cell_area"] = math.nan
+        data.cell_lineages[1].nodes[3]["cell_area"] = math.nan
         calculator = CycleMeanArea(prop_cycle_lin)
-        result = calculator.compute(data, data.cycle_data[1], node_id=4)
+        result = calculator.compute(data, data.cycle_lineages[1], node_id=4)
         assert result == pytest.approx(7 / 3)
 
     def test_compute_only_nan(self, data, prop_cycle_lin):
-        data.cell_data[1].nodes[7]["cell_area"] = math.nan
+        data.cell_lineages[1].nodes[7]["cell_area"] = math.nan
         calculator = CycleMeanArea(prop_cycle_lin)
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            result = calculator.compute(data, data.cycle_data[1], node_id=7)
+            result = calculator.compute(data, data.cycle_lineages[1], node_id=7)
         assert math.isnan(result)
 
     def test_compute_custom_area_prop(self, data, prop_cycle_lin):
-        for n in data.cell_data[1].nodes:
-            data.cell_data[1].nodes[n]["my_area"] = 10.0 * n
+        for n in data.cell_lineages[1].nodes:
+            data.cell_lineages[1].nodes[n]["my_area"] = 10.0 * n
         calculator = CycleMeanArea(prop_cycle_lin, area_prop="my_area")
-        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 55.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 55.0
 
     def test_enrich(self, data, prop_cycle_lin):
         calculator = CycleMeanArea(prop_cycle_lin)
         calculator.enrich(data)
-        cycle_lin = data.cycle_data[1]
+        cycle_lin = data.cycle_lineages[1]
         assert cycle_lin.nodes[4]["test_property"] == 2.5
         assert cycle_lin.nodes[6]["test_property"] == 5.5
         assert cycle_lin.nodes[7]["test_property"] == 7.0
@@ -704,27 +704,27 @@ class TestCycleMeanArea:
 class TestBirthArea:
     def test_compute_complete_cycle(self, data, prop_cycle_lin):
         calculator = BirthArea(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 5.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 5.0
 
     def test_compute_leaf_cycle(self, data, prop_cycle_lin):
         calculator = BirthArea(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], node_id=7) == 7.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=7) == 7.0
 
     def test_compute_root_cycle(self, data, prop_cycle_lin):
         calculator = BirthArea(prop_cycle_lin)
-        assert math.isnan(calculator.compute(data, data.cycle_data[1], node_id=4))
+        assert math.isnan(calculator.compute(data, data.cycle_lineages[1], node_id=4))
 
     def test_compute_missing_cell_area(self, data, prop_cycle_lin):
-        del data.cell_data[1].nodes[5]["cell_area"]
+        del data.cell_lineages[1].nodes[5]["cell_area"]
         calculator = BirthArea(prop_cycle_lin)
         with pytest.raises(KeyError, match="'cell_area' does not exist"):
-            calculator.compute(data, data.cycle_data[1], node_id=6)
+            calculator.compute(data, data.cycle_lineages[1], node_id=6)
 
     def test_compute_custom_area_prop(self, data, prop_cycle_lin):
-        for n in data.cell_data[1].nodes:
-            data.cell_data[1].nodes[n]["my_area"] = 10.0 * n
+        for n in data.cell_lineages[1].nodes:
+            data.cell_lineages[1].nodes[n]["my_area"] = 10.0 * n
         calculator = BirthArea(prop_cycle_lin, area_prop="my_area")
-        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 50.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 50.0
 
 
 # DivisionArea ################################################################
@@ -733,24 +733,24 @@ class TestBirthArea:
 class TestDivisionArea:
     def test_compute_complete_cycle(self, data, prop_cycle_lin):
         calculator = DivisionArea(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 6.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 6.0
 
     def test_compute_root_cycle(self, data, prop_cycle_lin):
         calculator = DivisionArea(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], node_id=4) == 4.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=4) == 4.0
 
     def test_compute_leaf_cycle(self, data, prop_cycle_lin):
         calculator = DivisionArea(prop_cycle_lin)
-        assert math.isnan(calculator.compute(data, data.cycle_data[1], node_id=7))
+        assert math.isnan(calculator.compute(data, data.cycle_lineages[1], node_id=7))
 
     def test_compute_missing_cell_area(self, data, prop_cycle_lin):
-        del data.cell_data[1].nodes[6]["cell_area"]
+        del data.cell_lineages[1].nodes[6]["cell_area"]
         calculator = DivisionArea(prop_cycle_lin)
         with pytest.raises(KeyError, match="'cell_area' does not exist"):
-            calculator.compute(data, data.cycle_data[1], node_id=6)
+            calculator.compute(data, data.cycle_lineages[1], node_id=6)
 
     def test_compute_custom_area_prop(self, data, prop_cycle_lin):
-        for n in data.cell_data[1].nodes:
-            data.cell_data[1].nodes[n]["my_area"] = 10.0 * n
+        for n in data.cell_lineages[1].nodes:
+            data.cell_lineages[1].nodes[n]["my_area"] = 10.0 * n
         calculator = DivisionArea(prop_cycle_lin, area_prop="my_area")
-        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 60.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 60.0

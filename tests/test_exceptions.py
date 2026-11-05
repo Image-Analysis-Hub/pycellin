@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-"""Unit test for exception classes from classes.exceptions."""
+"""Unit test for exception classes from pycellin.exceptions."""
 
 import pytest
 
-from pycellin.classes.exceptions import MissingPropertyError
+from pycellin.exceptions import MissingPropertyError
 
 # MissingPropertyError ########################################################
 

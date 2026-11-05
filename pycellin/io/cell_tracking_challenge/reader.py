@@ -727,5 +727,5 @@ if __name__ == "__main__":
     print("\nModel metadata:")
     print(model.model_metadata)
     print("\nProperties and their types:")
-    for prop_id, prop in model.props_metadata.props.items():
+    for prop_id, prop in model.props_metadata.properties.items():
         print(f"  - {prop_id}  -> {prop.prop_type}")

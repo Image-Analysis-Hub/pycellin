@@ -6,9 +6,9 @@ import math
 from typing import ClassVar
 
 from pycellin.classes.data import Data
-from pycellin.classes.exceptions import UpdateRequiredError
 from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import NodeLocalPropCalculator
+from pycellin.exceptions import UpdateRequiredError
 
 
 def create_frame_property(provenance: str = "pycellin") -> Property:
@@ -216,13 +216,14 @@ class Timepoint(NodeLocalPropCalculator):
         self.reference_time_prop = reference_time_prop
 
         min_time = None
-        for lin in data.cell_data.values():
-            root = lin.get_root()
-            if isinstance(root, list):
+        for lin in data.cell_lineages.values():
+            roots = lin.get_roots()
+            if len(roots) != 1:
                 raise UpdateRequiredError(
-                    f"Lineage {lin.graph['lineage_id']} has several root nodes. "
+                    f"Lineage {lin.graph['lineage_id']} has {len(roots)} root nodes. "
                     f"Timepoint calculation requires a single root node."
                 )
+            root = roots[0]
             if self.reference_time_prop not in lin.nodes[root]:
                 raise ValueError(
                     f"Reference time property '{self.reference_time_prop}' not found "

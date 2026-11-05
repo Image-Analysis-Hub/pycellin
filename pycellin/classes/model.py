@@ -18,19 +18,19 @@ import pycellin.properties.morphology as morpho
 import pycellin.properties.topology as topo
 import pycellin.properties.utils as futils
 from pycellin.classes.data import Data
-from pycellin.classes.exceptions import (
-    FusionError,
-    MissingPropertyError,
-    ProtectedPropertyError,
-)
 from pycellin.classes.lineage import CellLineage, CycleLineage, Lineage
 from pycellin.classes.model_metadata import ModelMetadata
 from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.props_metadata import PropsMetadata
-from pycellin.classes.updater import ModelUpdater
-from pycellin.custom_types import Cell, Link, PropertyType, property_type_from_string
-from pycellin.properties import intensity, motion, tracking
+from pycellin.classes.updater import _ModelUpdater
+from pycellin.custom_types import Cell, Link, PropertyType, _property_type_from_string
+from pycellin.exceptions import (
+    FusionError,
+    MissingPropertyError,
+    ProtectedPropertyError,
+)
+from pycellin.properties import intensity, motion, timing
 from pycellin.properties.core import (
     Timepoint,
     create_timepoint_property,
@@ -38,7 +38,7 @@ from pycellin.properties.core import (
 from pycellin.styling import PYCELLIN_PURPLE
 from pycellin.utils import _color_to_rgba, _infer_dtype, _unit_uses
 
-L = TypeVar("L", bound="Lineage")
+_L = TypeVar("_L", bound="Lineage")
 
 # Provenance of models built by Model.merge() and of the lineage properties it creates.
 _MERGE_PROVENANCE = "pycellin merge"
@@ -130,7 +130,7 @@ class Model:
 
         # Determine time_step if not provided in metadata.
         if time_step is None:
-            if self.data.cell_data:
+            if self.data.cell_lineages:
                 # Create temporary metadata for _compute_time_step().
                 temp_metadata = ModelMetadata(reference_time_prop=reference_time_prop)
                 self.model_metadata = temp_metadata
@@ -171,11 +171,11 @@ class Model:
         self.props_metadata = (
             props_metadata.copy() if props_metadata is not None else PropsMetadata()
         )
-        self._updater = ModelUpdater()
+        self._updater = _ModelUpdater()
         self.variable_time_step = variable_time_step
 
         # Update to actually compute the "timepoint" property.
-        if self.data.cell_data and "timepoint" not in self.get_node_properties():
+        if self.data.cell_lineages and "timepoint" not in self.get_node_properties():
             self.add_custom_property(
                 Timepoint(
                     property=create_timepoint_property(),
@@ -463,7 +463,7 @@ class Model:
         - Timepoints like [0, 1.1, 3.42, 4.0, 7.61] (completely random intervals)
         """
         # TODO: Should time_step be recomputed when doing an update?
-        lineages = self.data.cell_data.values()
+        lineages = self.data.cell_lineages.values()
         if not lineages:
             raise ValueError("Cannot compute time step: no lineages found.")
 
@@ -535,7 +535,7 @@ class Model:
         # that the next update() rebuilds it from the current data and recomputes all
         # values.
         self._updater._calculators.pop("timepoint", None)
-        if self.data.cell_data:
+        if self.data.cell_lineages:
             self.prepare_full_data_update()
 
     def rescale_time(
@@ -620,7 +620,7 @@ class Model:
         self._multiply_prop_values(time_prop, PropertyType.NODE, factor)
         if time_unit is not None:
             self.model_metadata.time_unit = time_unit
-            prop = self.props_metadata.props.get(time_prop)
+            prop = self.props_metadata.properties.get(time_prop)
             if prop is not None:
                 prop.unit = time_unit
             self._set_cycle_time_units(time_unit)
@@ -631,7 +631,7 @@ class Model:
             # time step and minimum time are outdated (in the old unit), so that
             # update() can rebuild it with correct values.
             self.set_time_step(time_step * factor)
-        elif self.data.cell_data:
+        elif self.data.cell_lineages:
             self.prepare_full_data_update()
 
         self._warn_outdated_units(
@@ -720,7 +720,7 @@ class Model:
         for axis in ("x", "y", "z"):
             axis_factor = z_factor if axis == "z" else factor
             for element in ("cell", "link", "lineage"):
-                prop = self.props_metadata.props.get(f"{element}_{axis}")
+                prop = self.props_metadata.properties.get(f"{element}_{axis}")
                 if prop is None:
                     continue
                 if prop.identifier in self._updater._calculators:
@@ -745,7 +745,7 @@ class Model:
         if space_unit is not None:
             metadata.space_unit = space_unit
 
-        if self.data.cell_data:
+        if self.data.cell_lineages:
             self.prepare_full_data_update()
 
         self._warn_outdated_units(old_space_unit, space_unit, rescaled_props)
@@ -756,7 +756,8 @@ class Model:
 
         The values of "cycle_duration", "cycle_start_time" and "cycle_end_time" are
         computed from the reference time property, so they share its unit. The
-        properties that are not declared, e.g. before `add_cycle_data()`, are skipped.
+        properties that are not declared, e.g. before `add_cycle_lineages()`, are
+        skipped.
 
         Parameters
         ----------
@@ -764,7 +765,7 @@ class Model:
             The unit of the reference time property.
         """
         for prop_id in ("cycle_duration", "cycle_start_time", "cycle_end_time"):
-            prop = self.props_metadata.props.get(prop_id)
+            prop = self.props_metadata.properties.get(prop_id)
             if prop is not None:
                 prop.unit = time_unit
 
@@ -796,7 +797,7 @@ class Model:
             return
         outdated = [
             prop
-            for prop_id, prop in self.props_metadata.props.items()
+            for prop_id, prop in self.props_metadata.properties.items()
             if prop_id not in updated_props
             and prop_id in self._updater._calculators
             and prop.unit is not None
@@ -842,7 +843,7 @@ class Model:
         factor : int | float
             The factor to multiply the values by.
         """
-        for lin in self.data.cell_data.values():
+        for lin in self.data.cell_lineages.values():
             elements_props = []
             if PropertyType.NODE in prop_type:
                 elements_props.extend(props for _, props in lin.nodes(data=True))
@@ -854,7 +855,7 @@ class Model:
                 if props.get(prop_id) is not None:
                     props[prop_id] *= factor
 
-        prop = self.props_metadata.props.get(prop_id)
+        prop = self.props_metadata.properties.get(prop_id)
         if prop is not None and prop.dtype == "int" and isinstance(factor, float):
             prop.dtype = "float"
 
@@ -981,21 +982,23 @@ class Model:
         """
         return self.model_metadata.time_step
 
-    def get_units_per_properties(self) -> dict[str, list[str]]:
+    def get_properties_per_unit(self) -> dict[str | None, list[str]]:
         """
-        Return a dict of units and the properties associated with each unit.
+        Return the identifiers of the properties associated with each unit.
 
         The method iterates over the node, edge, and lineage properties
         of the properties declaration object, grouping them by unit.
 
         Returns
         -------
-        dict[str, list[str]]
-            A dictionary where the keys are units and the values are lists
-            of property identifiers. For example:
-            {'unit1': ['property1', 'property2'], 'unit2': ['property3']}.
+        dict[str | None, list[str]]
+            A dictionary where the keys are units (or None for unitless properties)
+            and the values are lists of property identifiers, not `Property` objects.
+            For example:
+            {'unit1': ['property1', 'property2'], 'unit2': ['property3'],
+            None: ['property4']}.
         """
-        return self.props_metadata._get_units_per_props()
+        return self.props_metadata._get_props_per_unit()
 
     def get_property(self, prop: str) -> Property | None:
         """
@@ -1011,7 +1014,7 @@ class Model:
         Property | None
             The property with the specified identifier, or None if not found.
         """
-        return self.props_metadata.props.get(prop)
+        return self.props_metadata.properties.get(prop)
 
     def get_properties(self) -> dict[str, Property]:
         """
@@ -1022,7 +1025,7 @@ class Model:
         dict[str, Property]
             Dictionary of the properties present in the model.
         """
-        return self.props_metadata.props
+        return self.props_metadata.properties
 
     def get_cell_lineage_properties(
         self,
@@ -1141,32 +1144,7 @@ class Model:
         else:
             return self.props_metadata._get_prop_dict_from_prop_type("lineage")
 
-    def get_cell_lineages(self) -> list[CellLineage]:
-        """
-        Return the cell lineages present in the model.
-
-        Returns
-        -------
-        list[CellLineage]
-            List of the cell lineages present in the model.
-        """
-        return list(self.data.cell_data.values())
-
-    def get_cycle_lineages(self) -> list[CycleLineage]:
-        """
-        Return the cycle lineages present in the model.
-
-        Returns
-        -------
-        list[CellLineage]
-            List of the cycle lineages present in the model.
-        """
-        if self.data.cycle_data is None:
-            return []
-        else:
-            return list(self.data.cycle_data.values())
-
-    def get_cell_lineage_from_id(self, lineage_id: int) -> CellLineage | None:
+    def get_cell_lineage(self, lineage_id: int) -> CellLineage | None:
         """
         Return the cell lineage with the specified ID.
 
@@ -1177,40 +1155,15 @@ class Model:
 
         Returns
         -------
-        CellLineage
-            The cell lineage with the specified ID.
+        CellLineage | None
+            The cell lineage with the specified ID, or None if it isn't in the model.
         """
-        if lineage_id in self.data.cell_data:
-            return self.data.cell_data[lineage_id]
+        if lineage_id in self.data.cell_lineages:
+            return self.data.cell_lineages[lineage_id]
         else:
             return None
 
-    def get_cell_lineages_from_ids(
-        self, lineage_ids: list[int], ignore_missing: bool = True
-    ) -> list[CellLineage | None]:
-        """
-        Return a list of cell lineages with the specified IDs.
-
-        Parameters
-        ----------
-        lineage_ids : list[int]
-            IDs of the lineages to return.
-        ignore_missing: bool, optional
-            True to ignore missing lineages (default is True). If True, the returned
-            list may be shorter than `lineage_ids`. If False, the returned list will be
-            aligned with `lineage_ids` but may contain None values.
-
-        Returns
-        -------
-        list[CellLineage | None]
-            The cell lineages with the specified IDs.
-        """
-        lins = [self.get_cell_lineage_from_id(lid) for lid in lineage_ids]
-        if ignore_missing:
-            lins = [lin for lin in lins if lin is not None]
-        return lins
-
-    def get_cycle_lineage_from_id(self, lineage_id: int) -> CycleLineage | None:
+    def get_cycle_lineage(self, lineage_id: int) -> CycleLineage | None:
         """
         Return the cycle lineage with the specified ID.
 
@@ -1221,77 +1174,114 @@ class Model:
 
         Returns
         -------
-        CycleLineage
-            The cycle lineage with the specified ID.
+        CycleLineage | None
+            The cycle lineage with the specified ID, or None if it isn't in the model.
         """
-        if self.data.cycle_data and lineage_id in self.data.cycle_data:
-            return self.data.cycle_data[lineage_id]
+        if self.data.cycle_lineages and lineage_id in self.data.cycle_lineages:
+            return self.data.cycle_lineages[lineage_id]
         else:
             return None
 
-    def get_cycle_lineages_from_ids(
-        self, lineage_ids: list[int], ignore_missing: bool = True
-    ) -> list[CycleLineage | None]:
+    def get_cell_lineages(
+        self, lineage_ids: list[int] | None = None, ignore_missing: bool = True
+    ) -> list[CellLineage | None]:
         """
-        Return a list of cycle lineages with the specified IDs.
+        Return the cell lineages of the model, or those with the specified IDs.
 
         Parameters
         ----------
-        lineage_ids : list[int]
-            IDs of the lineages to return.
-        ignore_missing: bool, optional
+        lineage_ids : list[int], optional
+            IDs of the lineages to return. If None, all the cell lineages of the model
+            are returned (default is None).
+        ignore_missing : bool, optional
             True to ignore missing lineages (default is True). If True, the returned
             list may be shorter than `lineage_ids`. If False, the returned list will be
-            aligned with `lineage_ids` but may contain None values.
+            aligned with `lineage_ids` but may contain None values. Not used when
+            `lineage_ids` is None.
+
+        Returns
+        -------
+        list[CellLineage | None]
+            The cell lineages. The list only holds None values if `lineage_ids` is
+            given and `ignore_missing` is False.
+        """
+        if lineage_ids is None:
+            return list(self.data.cell_lineages.values())
+        lins = [self.get_cell_lineage(lid) for lid in lineage_ids]
+        if ignore_missing:
+            lins = [lin for lin in lins if lin is not None]
+        return lins
+
+    def get_cycle_lineages(
+        self, lineage_ids: list[int] | None = None, ignore_missing: bool = True
+    ) -> list[CycleLineage | None]:
+        """
+        Return the cycle lineages of the model, or those with the specified IDs.
+
+        Parameters
+        ----------
+        lineage_ids : list[int], optional
+            IDs of the lineages to return. If None, all the cycle lineages of the model
+            are returned (default is None).
+        ignore_missing : bool, optional
+            True to ignore missing lineages (default is True). If True, the returned
+            list may be shorter than `lineage_ids`. If False, the returned list will be
+            aligned with `lineage_ids` but may contain None values. Not used when
+            `lineage_ids` is None.
 
         Returns
         -------
         list[CycleLineage | None]
-            The cycle lineages with the specified IDs.
+            The cycle lineages. The list only holds None values if `lineage_ids` is
+            given and `ignore_missing` is False.
         """
-        lins = [self.get_cycle_lineage_from_id(lid) for lid in lineage_ids]
+        if lineage_ids is None:
+            if self.data.cycle_lineages is None:
+                return []
+            return list(self.data.cycle_lineages.values())
+        lins = [self.get_cycle_lineage(lid) for lid in lineage_ids]
         if ignore_missing:
             lins = [lin for lin in lins if lin is not None]
         return lins
 
     @staticmethod
-    def _get_lineages_from_lin_prop(
-        lineages: list[L],
-        lin_prop: str,
-        lin_prop_value: Any,
-    ) -> list[L]:
+    def _get_lineages_by_property(
+        lineages: list[_L],
+        prop: str,
+        value: Any,
+    ) -> list[_L]:
         """
         Return the lineages with the specified property value.
 
         Parameters
         ----------
-        lineages : list[T]
+        lineages : list[Lineage]
             The lineages.
-        lin_prop : str
+        prop : str
             The identifier of the property to check.
-        lin_prop_value : Any
+        value : Any
             The value of the property to check.
 
         Returns
         -------
-        list[T]
+        list[Lineage]
             The lineages with the specified property value.
         """
-        return [lin for lin in lineages if lin.graph[lin_prop] == lin_prop_value]
+        return [lin for lin in lineages if lin.graph[prop] == value]
 
-    def get_cell_lineages_from_lin_prop(
+    def get_cell_lineages_by_property(
         self,
-        lin_prop: str,
-        lin_prop_value: Any,
+        prop: str,
+        value: Any,
     ) -> list[CellLineage]:
         """
         Return the cell lineages with the specified property value.
 
         Parameters
         ----------
-        lin_prop : str
+        prop : str
             The identifier of the property to check.
-        lin_prop_value : Any
+        value : Any
             The value of the property to check.
 
         Returns
@@ -1299,23 +1289,23 @@ class Model:
         list[CellLineage]
             The cell lineage(s) with the specified property value.
         """
-        return self._get_lineages_from_lin_prop(
-            list(self.data.cell_data.values()), lin_prop, lin_prop_value
+        return self._get_lineages_by_property(
+            list(self.data.cell_lineages.values()), prop, value
         )
 
-    def get_cycle_lineages_from_lin_prop(
+    def get_cycle_lineages_by_property(
         self,
-        lin_prop: str,
-        lin_prop_value: Any,
+        prop: str,
+        value: Any,
     ) -> list[CycleLineage]:
         """
         Return the cycle lineages with the specified property value.
 
         Parameters
         ----------
-        lin_prop : str
+        prop : str
             The identifier of the property to check.
-        lin_prop_value : Any
+        value : Any
             The value of the property to check.
 
         Returns
@@ -1323,10 +1313,10 @@ class Model:
         list[CycleLineage]
             The cycle lineages with the specified property value.
         """
-        if self.data.cycle_data is None:
+        if self.data.cycle_lineages is None:
             return []
-        return self._get_lineages_from_lin_prop(
-            list(self.data.cycle_data.values()), lin_prop, lin_prop_value
+        return self._get_lineages_by_property(
+            list(self.data.cycle_lineages.values()), prop, value
         )
 
     def get_cell_lineage_ids(self) -> list[int]:
@@ -1338,10 +1328,7 @@ class Model:
         list[int]
             List of the IDs of the cell lineages present in the model.
         """
-        return list(self.data.cell_data.keys())
-
-    get_lineage_ids = get_cell_lineage_ids
-    get_lineage_ids.__doc__ = "Alias for get_cell_lineage_ids"
+        return list(self.data.cell_lineages.keys())
 
     def get_cycle_lineage_ids(self) -> list[int]:
         """
@@ -1352,9 +1339,9 @@ class Model:
         list[int]
             List of the IDs of the cycle lineages present in the model.
         """
-        if self.data.cycle_data is None:
+        if self.data.cycle_lineages is None:
             return []
-        return list(self.data.cycle_data.keys())
+        return list(self.data.cycle_lineages.keys())
 
     def get_next_available_lineage_id(self, positive: bool = True) -> int:
         """
@@ -1419,12 +1406,12 @@ class Model:
             return
         self._updater._full_data_update = True
         self._updater._update_required = True
-        for lin_id, lin in self.data.cell_data.items():
+        for lin_id, lin in self.data.cell_lineages.items():
             for nid in lin.nodes:
                 self._updater._added_cells.add(Cell(nid, lin_id))
             for edge in lin.edges:
                 self._updater._added_links.add(Link(edge[0], edge[1], lin_id))
-        self._updater._added_lineages = set(self.data.cell_data.keys())
+        self._updater._added_lineages = set(self.data.cell_lineages.keys())
 
     def is_update_required(self) -> bool:
         """
@@ -1559,10 +1546,10 @@ class Model:
                 "but is required for cycle lineage computation."
             )
         # The timepoint property is always declared and protected, unless it is the
-        # reference time property (see ModelUpdater._update()).
+        # reference time property (see _ModelUpdater._update()).
         if (
             self.model_metadata.reference_time_prop != "timepoint"
-            and self.data.cell_data
+            and self.data.cell_lineages
             and not self.props_metadata._has_prop("timepoint")
         ):
             self.props_metadata._add_prop(create_timepoint_property())
@@ -1575,7 +1562,7 @@ class Model:
         )
         # The cycle properties propagated to the cells were computed again on the
         # cycle lineages: they are copied to the cells again.
-        if self.data.cycle_data:
+        if self.data.cycle_lineages:
             cycle_props = self.get_cycle_lineage_properties()
             propagated_props = [
                 prop_id
@@ -1634,7 +1621,8 @@ class Model:
         Warns
         -----
         UserWarning
-            If `with_cycle_lineage` is True but the cycle data has not been added yet.
+            If `with_cycle_lineage` is True but the cycle lineages have not been added
+            yet.
             If `with_cycle_lineage` is True but the time step of the model is not
             defined.
             In both these cases, the cycle lineage is not computed.
@@ -1667,16 +1655,16 @@ class Model:
             )
 
         # Update the data.
-        self.data.cell_data[lineage_id] = lineage
+        self.data.cell_lineages[lineage_id] = lineage
         if lineage.graph.get("lineage_id") != lineage_id:
             lineage.graph["lineage_id"] = lineage_id
             nx.set_node_attributes(lineage, lineage_id, "lineage_id")
 
         if with_cycle_lineage:
-            if self.data.cycle_data is None:
+            if self.data.cycle_lineages is None:
                 warnings.warn(
-                    f"Cannot add cycle lineage {lineage_id} when cycle data "
-                    "has not been added yet."
+                    f"Cannot add cycle lineage {lineage_id} when the cycle lineages "
+                    "have not been added yet."
                 )
             else:
                 timestep = self.get_time_step()
@@ -1689,7 +1677,7 @@ class Model:
                     cycle_lineage = self.data._compute_cycle_lineage(
                         self.reference_time_prop, timestep, lineage_id
                     )
-                    self.data.cycle_data[lineage_id] = cycle_lineage
+                    self.data.cycle_lineages[lineage_id] = cycle_lineage
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
@@ -1719,11 +1707,11 @@ class Model:
             exist in the model.
         """
         try:
-            lineage = self.data.cell_data.pop(lineage_id)
+            lineage = self.data.cell_lineages.pop(lineage_id)
         except KeyError:
             raise KeyError(f"Lineage with ID {lineage_id} does not exist.")
-        if self.data.cycle_data and lineage_id in self.data.cycle_data:
-            self.data.cycle_data.pop(lineage_id)
+        if self.data.cycle_lineages and lineage_id in self.data.cycle_lineages:
+            self.data.cycle_lineages.pop(lineage_id)
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
@@ -1796,7 +1784,7 @@ class Model:
         # and split is downstream is not handled correctly (we end up with
         # a lineage with several disconnected components.
         try:
-            lineage = self.data.cell_data[lineage_id]
+            lineage = self.data.cell_lineages[lineage_id]
         except KeyError as err:
             raise KeyError(f"Lineage with ID {lineage_id} does not exist.") from err
 
@@ -1807,7 +1795,7 @@ class Model:
         new_lineage.graph["lineage_id"] = new_lineage_id
 
         # Update the model data.
-        self.data.cell_data[new_lineage_id] = new_lineage
+        self.data.cell_lineages[new_lineage_id] = new_lineage
         # The update of the cycle lineages (if needed) will be
         # done by the updater.
 
@@ -1865,7 +1853,7 @@ class Model:
         The timepoint of the cell is computed at the next ``update()``.
         """
         try:
-            lineage = self.data.cell_data[lineage_id]
+            lineage = self.data.cell_lineages[lineage_id]
         except KeyError as err:
             raise KeyError(f"Lineage with ID {lineage_id} does not exist.") from err
 
@@ -1944,7 +1932,7 @@ class Model:
             If the lineage with the specified ID does not exist in the model.
         """
         try:
-            lineage = self.data.cell_data[lineage_id]
+            lineage = self.data.cell_lineages[lineage_id]
         except KeyError as err:
             raise KeyError(f"Lineage with ID {lineage_id} does not exist.") from err
 
@@ -2051,21 +2039,21 @@ class Model:
             If a property in the link_attributes is not declared.
         """
         try:
-            source_lineage = self.data.cell_data[source_lineage_id]
+            source_lineage = self.data.cell_lineages[source_lineage_id]
         except KeyError as err:
             raise KeyError(
                 f"Lineage with ID {source_lineage_id} does not exist."
             ) from err
         if target_lineage_id is not None:
             try:
-                target_lineage = self.data.cell_data[target_lineage_id]
+                target_lineage = self.data.cell_lineages[target_lineage_id]
             except KeyError as err:
                 raise KeyError(
                     f"Lineage with ID {target_lineage_id} does not exist."
                 ) from err
         else:
             target_lineage_id = source_lineage_id
-            target_lineage = self.data.cell_data[source_lineage_id]
+            target_lineage = self.data.cell_lineages[source_lineage_id]
 
         if prop_values is not None:
             for prop in prop_values:
@@ -2121,7 +2109,7 @@ class Model:
             If the link between the two cells does not exist.
         """
         try:
-            lineage = self.data.cell_data[lineage_id]
+            lineage = self.data.cell_lineages[lineage_id]
         except KeyError as err:
             raise KeyError(f"Lineage with ID {lineage_id} does not exist.") from err
         link_attrs = lineage._remove_link(source_cell_id, target_cell_id)
@@ -2153,13 +2141,13 @@ class Model:
             A dictionary containing the property values of the removed links.
         """
         if lineage_ids is None:
-            lineage_ids = list(self.data.cell_data.keys())
+            lineage_ids = list(self.data.cell_lineages.keys())
 
         removed_links = {}
         updater_links = []
         for lid in lineage_ids:
             try:
-                lineage = self.data.cell_data[lid]
+                lineage = self.data.cell_lineages[lid]
             except KeyError as err:
                 raise KeyError(f"Lineage with ID {lid} does not exist.") from err
             edges = lineage._remove_intercycle_links()
@@ -2198,10 +2186,10 @@ class Model:
         """
         fusions = []
         if lineage_ids is None:
-            lineage_ids = list(self.data.cell_data.keys())
+            lineage_ids = list(self.data.cell_lineages.keys())
         for lin_id in lineage_ids:
             try:
-                lineage = self.data.cell_data[lin_id]
+                lineage = self.data.cell_lineages[lin_id]
             except KeyError as err:
                 msg = f"Lineage with ID {lin_id} does not exist."
                 raise KeyError(msg) from err
@@ -2233,10 +2221,10 @@ class Model:
         """
         divisions = []
         if lineage_ids is None:
-            lineage_ids = list(self.data.cell_data.keys())
+            lineage_ids = list(self.data.cell_lineages.keys())
         for lin_id in lineage_ids:
             try:
-                lineage = self.data.cell_data[lin_id]
+                lineage = self.data.cell_lineages[lin_id]
             except KeyError as err:
                 msg = f"Lineage with ID {lin_id} does not exist."
                 raise KeyError(msg) from err
@@ -2293,10 +2281,10 @@ class Model:
             lineage type, since its declaration is replaced.
         """
         prop = calculator.property
-        if prop.lineage_type == "cycle" and not self.data.cycle_data:
+        if prop.lineage_type == "cycle" and not self.data.cycle_lineages:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with model.add_cycle_data()."
+                "Please compute them first with model.add_cycle_lineages()."
             )
         self._check_input_props(calculator)
         declared = self.get_property(prop.identifier)
@@ -2372,7 +2360,7 @@ class Model:
             return False
         if prop_id in self._updater._calculators:
             return False
-        for lin in self.data.cell_data.values():
+        for lin in self.data.cell_lineages.values():
             if prop_id in lin.graph:
                 return False
             if any(prop_id in cell for _, cell in lin.nodes(data=True)):
@@ -2463,7 +2451,7 @@ class Model:
                         f"not been declared. To fix this, {fix}."
                     ),
                 )
-            if property_type_from_string(prop_type) not in input_prop.prop_type:
+            if _property_type_from_string(prop_type) not in input_prop.prop_type:
                 raise ValueError(
                     f"'{prop_id}' requires '{param}' to be a property with "
                     f"prop_type '{prop_type}', but '{input_id}' has prop_type "
@@ -2559,14 +2547,14 @@ class Model:
         # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
         time = self._get_input_prop(time_prop)
 
-        prop = tracking.create_absolute_age_property(
+        prop = timing.create_absolute_age_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             dtype=time.dtype if time else "float",
             unit=time.unit if time else None,
         )
-        self.add_custom_property(tracking.AbsoluteAge(prop, time_prop=time_prop))
+        self.add_custom_property(timing.AbsoluteAge(prop, time_prop=time_prop))
 
     def add_turning_angle(
         self,
@@ -3167,14 +3155,14 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will take its
             default value (see
-            :func:`pycellin.properties.tracking.create_is_complete_cycle_property`).
+            :func:`pycellin.properties.timing.create_is_complete_cycle_property`).
         """
-        prop = tracking.create_is_complete_cycle_property(
+        prop = timing.create_is_complete_cycle_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
         )
-        self.add_custom_property(tracking.IsCompleteCycle(prop))
+        self.add_custom_property(timing.IsCompleteCycle(prop))
 
     def add_cell_displacement(
         self,
@@ -4302,13 +4290,13 @@ class Model:
         time_prop = time_prop or self.reference_time_prop
         time_unit = self._get_prop_unit(time_prop)
 
-        prop = tracking.create_division_rate_property(
+        prop = timing.create_division_rate_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=f"1/{time_unit}" if time_unit else None,
         )
-        self.add_custom_property(tracking.DivisionRate(prop, time_prop=time_prop))
+        self.add_custom_property(timing.DivisionRate(prop, time_prop=time_prop))
 
     def add_interdivision_time(
         self,
@@ -4349,7 +4337,7 @@ class Model:
         # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
         time = self._get_input_prop(time_prop)
 
-        prop = tracking.create_interdivision_time_property(
+        prop = timing.create_interdivision_time_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
@@ -4357,7 +4345,7 @@ class Model:
             unit=time.unit if time else None,
         )
 
-        self.add_custom_property(tracking.InterdivisionTime(prop, time_prop=time_prop))
+        self.add_custom_property(timing.InterdivisionTime(prop, time_prop=time_prop))
 
     def add_is_division(
         self,
@@ -4758,7 +4746,7 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will take its
             default value (see
-            :func:`pycellin.properties.tracking.create_normalized_age_property`).
+            :func:`pycellin.properties.timing.create_normalized_age_property`).
 
         Raises
         ------
@@ -4768,13 +4756,13 @@ class Model:
             If `time_prop` is not a node property of cell lineages.
         """
         time_prop = time_prop or self.reference_time_prop
-        prop = tracking.create_normalized_age_property(
+        prop = timing.create_normalized_age_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
         )
         self.add_custom_property(
-            tracking.NormalizedAge(
+            timing.NormalizedAge(
                 prop,
                 time_prop=time_prop,
                 ignore_incomplete_cycles=ignore_incomplete_cycles,
@@ -4984,14 +4972,14 @@ class Model:
         # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
         time = self._get_input_prop(time_prop)
 
-        prop = tracking.create_relative_age_property(
+        prop = timing.create_relative_age_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             dtype=time.dtype if time else "float",
             unit=time.unit if time else None,
         )
-        self.add_custom_property(tracking.RelativeAge(prop, time_prop=time_prop))
+        self.add_custom_property(timing.RelativeAge(prop, time_prop=time_prop))
 
     def add_sister_cycles(
         self,
@@ -5125,11 +5113,11 @@ class Model:
         cycle_lin_props = list(futils.get_pycellin_cycle_lineage_properties().keys())
         if prop not in cell_lin_props + cycle_lin_props:
             raise KeyError(f"Property {prop} is not a predefined property of pycellin.")
-        elif prop in cycle_lin_props and not self.data.cycle_data:
+        elif prop in cycle_lin_props and not self.data.cycle_lineages:
             raise ValueError(
                 f"Property {prop} is a property of cycle lineages, "
                 "but the cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with model.add_cycle_data()."
+                "Please compute them first with model.add_cycle_lineages()."
             )
         self._get_prop_method(prop)(**kwargs)
 
@@ -5296,19 +5284,19 @@ class Model:
         if prop_type is None:
             prop_type_flag = None
         elif isinstance(prop_type, (str, list)):
-            prop_type_flag = property_type_from_string(prop_type)
+            prop_type_flag = _property_type_from_string(prop_type)
         else:
             prop_type_flag = prop_type
 
         # Get current property info before any modifications.
-        property = self.props_metadata.props[prop]
+        property = self.props_metadata.properties[prop]
         current_prop_type = property.prop_type
         lineage_type = property.lineage_type
 
         # Determine which types to remove.
         if prop_type_flag is None:
             types_to_remove = current_prop_type
-            delete_calculator = True
+            unregister_calculator = True
         else:
             if not (current_prop_type & prop_type_flag):
                 raise ValueError(
@@ -5317,7 +5305,7 @@ class Model:
                 )
             types_to_remove = prop_type_flag
             new_prop_type = current_prop_type & ~prop_type_flag
-            delete_calculator = new_prop_type == PropertyType(0)
+            unregister_calculator = new_prop_type == PropertyType(0)
 
         # Update the metadata.
         self.props_metadata._remove_prop(prop, prop_type_flag)
@@ -5325,16 +5313,16 @@ class Model:
         # Update the data.
         match lineage_type:
             case "cell":
-                for lin in self.data.cell_data.values():
+                for lin in self.data.cell_lineages.values():
                     lin._remove_prop(prop, types_to_remove)
-            case "cycle" if self.data.cycle_data:
-                for clin in self.data.cycle_data.values():
+            case "cycle" if self.data.cycle_lineages:
+                for clin in self.data.cycle_lineages.values():
                     clin._remove_prop(prop, types_to_remove)
             case "both":
-                for lin in self.data.cell_data.values():
+                for lin in self.data.cell_lineages.values():
                     lin._remove_prop(prop, types_to_remove)
-                if self.data.cycle_data:
-                    for clin in self.data.cycle_data.values():
+                if self.data.cycle_lineages:
+                    for clin in self.data.cycle_lineages.values():
                         clin._remove_prop(prop, types_to_remove)
             case _:
                 raise ValueError(
@@ -5342,9 +5330,9 @@ class Model:
                 )
 
         # Update the updater only if property was completely removed.
-        if delete_calculator:
+        if unregister_calculator:
             try:
-                self._updater.delete_calculator(prop)
+                self._updater.unregister_calculator(prop)
             except KeyError:
                 # No calculator doesn't mean there is something wrong,
                 # maybe it's just an imported property.
@@ -5355,7 +5343,7 @@ class Model:
     # def remove_properties(self, props_info: list[str | dict[str, Any]]) -> None:
     #     pass
 
-    def add_cycle_data(self) -> None:
+    def add_cycle_lineages(self) -> None:
         """
         Compute and add the cycle lineages of the model.
 
@@ -5412,15 +5400,15 @@ class Model:
                 f"calculator: {names}. If they are cycle properties propagated to cell "
                 "lineages, e.g. loaded from an exported file, remove them first with "
                 "model.remove_property(), as well as the other cycle properties "
-                "propagated there: add_cycle_data() and the add_*() methods compute "
-                "them again."
+                "propagated there: add_cycle_lineages() and the add_*() methods "
+                "compute them again."
             )
         for prop_id in unused:
             self.props_metadata._remove_prop(prop_id)
         self.data._add_cycle_lineages(time_prop, time_step)
         self.props_metadata._add_cycle_lineage_props(time_unit)
 
-    def has_cycle_data(self) -> bool:
+    def has_cycle_lineages(self) -> bool:
         """
         Check if the model has cycle lineages.
 
@@ -5429,7 +5417,7 @@ class Model:
         bool
             True if the model has cycle lineages, False otherwise.
         """
-        return bool(self.data.cycle_data)
+        return bool(self.data.cycle_lineages)
 
     def _categorize_props(
         self, props: list[str] | None
@@ -5678,10 +5666,10 @@ class Model:
         each node of the cell cycle in cell lineages, whereas they are stored only once
         per cell cycle on the cycle node in cycle lineages.
         """
-        if not self.data.cycle_data:
+        if not self.data.cycle_lineages:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with model.add_cycle_data()."
+                "Please compute them first with model.add_cycle_lineages()."
             )
         if self._updater._update_required and update:
             self.update()
@@ -5699,7 +5687,7 @@ class Model:
         # of just "cycle" since the properties are now present on cycle
         # AND cell lineages. They are recorded for update() to copy them again.
         for prop in propagated_props:
-            self.props_metadata.props[prop].lineage_type = "both"
+            self.props_metadata.properties[prop].lineage_type = "both"
             self.props_metadata._add_propagated_prop(prop)
 
     def _copy_cycle_props_to_cells(self, props: list[str] | None) -> set[str]:
@@ -5724,10 +5712,10 @@ class Model:
             If the first cell of a cycle has more than one incoming link.
         """
         node_props, edge_props, lin_props = self._categorize_props(props)
-        cycle_data = self.data.cycle_data or {}
+        cycle_lineages = self.data.cycle_lineages or {}
         copied_props: set[str] = set()
-        for lin_id, lin in self.data.cell_data.items():
-            clin = cycle_data.get(lin_id)
+        for lin_id, lin in self.data.cell_lineages.items():
+            clin = cycle_lineages.get(lin_id)
             if clin is None:
                 continue
             if node_props:
@@ -5949,14 +5937,14 @@ class Model:
         # TODO: let such calculators get their data per lineage (e.g. from a label
         # image path stored on lineages), so that they can be kept when merging.
         external_calcs1 = set()
-        if model2.data.cell_data:
+        if model2.data.cell_lineages:
             external_calcs1 = {
                 prop_id
                 for prop_id, calc in model1._updater._calculators.items()
                 if calc.uses_external_data()
             }
         external_calcs2 = set()
-        if model1.data.cell_data:
+        if model1.data.cell_lineages:
             external_calcs2 = {
                 prop_id
                 for prop_id in props_to_add
@@ -5967,7 +5955,7 @@ class Model:
         # model1 or planned for a previous lineage, are replaced by new ones.
         # Single-cell lineages keep the convention lineage ID = -cell ID: if that ID is
         # not available, their cell is renumbered, as when splitting lineages in
-        # ModelUpdater._update(). Only model2, a copy, is modified here.
+        # _ModelUpdater._update(). Only model2, a copy, is modified here.
         used_lids = set(model1.get_cell_lineage_ids())
         lineages_to_add = []
         for lin in model2.get_cell_lineages():
@@ -5990,7 +5978,8 @@ class Model:
         # properties with a calculator are added, the merged model gets cycle lineages
         # for all its lineages. They are built now so that a lineage whose cycle lineage
         # cannot be built stops the merge before any modification.
-        with_cycles = bool(model1.data.cycle_data or model2.data.cycle_data) or any(
+        has_cycles = bool(model1.data.cycle_lineages or model2.data.cycle_lineages)
+        with_cycles = has_cycles or any(
             dict_calcs2[prop_id].property.lineage_type == "cycle"
             for prop_id in props_to_add
             if prop_id in dict_calcs2
@@ -6005,8 +5994,10 @@ class Model:
                     "step of this model is not defined."
                 )
             lineages = list(lineages_to_add)
-            if not model1.data.cycle_data:
-                lineages += [(lin, lid) for lid, lin in model1.data.cell_data.items()]
+            if not model1.data.cycle_lineages:
+                lineages += [
+                    (lin, lid) for lid, lin in model1.data.cell_lineages.items()
+                ]
             for lin, lid in lineages:
                 cycle_lin = CycleLineage(time_prop, time_step, lin)
                 cycle_lin.graph["lineage_id"] = lid
@@ -6110,15 +6101,15 @@ class Model:
 
         # Calculators using external data.
         for prop_id in external_calcs1:
-            model1._updater.delete_calculator(prop_id)
+            model1._updater.unregister_calculator(prop_id)
 
         # Lineages, with their cycle lineages.
         for lin, lid in lineages_to_add:
             model1.add_lineage(lin, lid, overwrite_lineage_id=True)
         if with_cycles:
-            if model1.data.cycle_data is None:
-                model1.data.cycle_data = {}
-            model1.data.cycle_data.update(cycle_lineages_to_add)
+            if model1.data.cycle_lineages is None:
+                model1.data.cycle_lineages = {}
+            model1.data.cycle_lineages.update(cycle_lineages_to_add)
             time_unit = model1.model_metadata.time_unit
             model1.props_metadata._add_cycle_lineage_props(time_unit)
 
@@ -6274,7 +6265,7 @@ class Model:
         for prop in props:
             values = {
                 lin_id: lin.graph[prop]
-                for lin_id, lin in self.data.cell_data.items()
+                for lin_id, lin in self.data.cell_lineages.items()
                 if prop in lin.graph
             }
             new_columns[prop] = df["lineage_id"].map(values)
@@ -6315,7 +6306,7 @@ class Model:
         """
         records = [
             {**cell_props, "lineage_id": lin_id}
-            for lin_id, lineage in self.data.cell_data.items()
+            for lin_id, lineage in self.data.cell_lineages.items()
             if not lineage_ids or lin_id in lineage_ids
             for cell_props in lineage.nodes.values()
         ]
@@ -6378,7 +6369,7 @@ class Model:
         """
         lineages = [
             (lin_id, lineage)
-            for lin_id, lineage in self.data.cell_data.items()
+            for lin_id, lineage in self.data.cell_lineages.items()
             if not lineage_ids or lin_id in lineage_ids
         ]
         if not lineages:
@@ -6440,7 +6431,7 @@ class Model:
         """
         records = [
             lineage.graph
-            for lin_id, lineage in self.data.cell_data.items()
+            for lin_id, lineage in self.data.cell_lineages.items()
             if not lineage_ids or lin_id in lineage_ids
         ]
         if not records:
@@ -6499,14 +6490,14 @@ class Model:
             lineages, is not declared in the model, or clashes with an existing
             column.
         """
-        if not self.data.cycle_data:
+        if not self.data.cycle_lineages:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with model.add_cycle_data()."
+                "Please compute them first with model.add_cycle_lineages()."
             )
         records = [
             {**cycle_props, "lineage_id": lin_id}
-            for lin_id, lineage in self.data.cycle_data.items()
+            for lin_id, lineage in self.data.cycle_lineages.items()
             if not lineage_ids or lin_id in lineage_ids
             for cycle_props in lineage.nodes.values()
         ]
@@ -6657,7 +6648,7 @@ class Model:
         # rather than from the DataFrame, where None turns integer IDs into floats.
         lineages = [
             (lin_id, lineage)
-            for lin_id, lineage in self.data.cycle_data.items()
+            for lin_id, lineage in self.data.cycle_lineages.items()
             if not lineage_ids or lin_id in lineage_ids
         ]
         has_values = False
@@ -6754,7 +6745,7 @@ class Model:
     #     # TODO: implement
     #     pass
 
-    def get_mean_cell_prop_over_time_fig(
+    def get_mean_over_time_figure(
         self,
         y_prop: str,
         time_prop: str | None = None,
@@ -6932,8 +6923,8 @@ class Model:
                 )
             )
         # Layout.
-        x_unit = self.props_metadata.props[time_prop].unit
-        y_unit = self.props_metadata.props[y_prop].unit
+        x_unit = self.props_metadata.properties[time_prop].unit
+        y_unit = self.props_metadata.properties[y_prop].unit
         fig.update_layout(
             title=title if title else f"Mean {y_prop} over time",
             xaxis_title=f"{time_prop} ({x_unit})" if x_unit else time_prop,
@@ -6945,7 +6936,7 @@ class Model:
 
         return fig
 
-    def plot_mean_cell_prop_over_time(
+    def plot_mean_over_time(
         self,
         y_prop: str,
         time_prop: str | None = None,
@@ -7018,7 +7009,7 @@ class Model:
         height: int, optional
             Height of the figure in pixels (default is None, fallback to autosize).
         """
-        fig = self.get_mean_cell_prop_over_time_fig(
+        fig = self.get_mean_over_time_figure(
             y_prop=y_prop,
             time_prop=time_prop,
             subset=subset,

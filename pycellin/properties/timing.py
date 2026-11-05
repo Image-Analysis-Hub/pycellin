@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-A collection of diverse tracking properties/attributes that can be added to 
-lineage graphs.
+A collection of time-related properties/attributes that can be added to lineage graphs.
 
 Vocabulary:
 - Property/Attribute: TrackMate (resp. networkX) uses the word property (resp.
@@ -35,13 +33,13 @@ from typing import ClassVar
 import numpy as np
 
 from pycellin.classes.data import Data
-from pycellin.classes.exceptions import FusionError
 from pycellin.classes.lineage import CellLineage, CycleLineage
 from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import (
     NodeGlobalPropCalculator,
     NodeLocalPropCalculator,
 )
+from pycellin.exceptions import FusionError
 
 # TODO: should I add the word Calc or Calculator to the class names?
 # TODO: add calculator for mandatory cycle lineage properties (e.g. cycle_num_cells)
@@ -443,7 +441,7 @@ def _get_cycle_lin_timepoints(
     if nid not in lineage.nodes:
         raise KeyError(f"Cycle {nid} not in the lineage.")
     cells = lineage.nodes[nid]["cells"]
-    cell_lin = data.cell_data[lineage.graph["lineage_id"]]
+    cell_lin = data.cell_lineages[lineage.graph["lineage_id"]]
     frame_current_div = cell_lin.nodes[cells[-1]][time_prop]
     ancestors = list(lineage.predecessors(nid))
     if len(ancestors) > 1:

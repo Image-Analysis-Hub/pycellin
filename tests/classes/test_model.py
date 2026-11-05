@@ -15,12 +15,12 @@ import tifffile
 from shapely.geometry import MultiPolygon, Polygon
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
-from pycellin.classes.exceptions import MissingPropertyError
 from pycellin.classes.property_calculator import (
     EdgeLocalPropCalculator,
     NodeLocalPropCalculator,
 )
 from pycellin.custom_types import PropertyType
+from pycellin.exceptions import MissingPropertyError
 from pycellin.properties.core import (
     Time,
     create_cell_coord_property,
@@ -33,7 +33,7 @@ from pycellin.properties.morphology import (
     CycleMeanArea,
     create_cycle_mean_area_property,
 )
-from pycellin.properties.tracking import (
+from pycellin.properties.timing import (
     create_absolute_age_property,
     create_interdivision_time_property,
 )
@@ -214,7 +214,7 @@ def lineage_props_model():
         )
 
     props_md = PropsMetadata(
-        props={
+        properties={
             "lin_prop": make_prop("lin_prop", PropertyType.LINEAGE, "cell"),
             "shared_prop": make_prop("shared_prop", PropertyType.LINEAGE, "both"),
             "node_prop": make_prop("node_prop", PropertyType.NODE, "cell"),
@@ -280,7 +280,7 @@ class TestToCellDataframe:
             )
 
     def test_missing_mandatory_cell_prop_raises(self, lineage_props_model):
-        for lin in lineage_props_model.data.cell_data.values():
+        for lin in lineage_props_model.data.cell_lineages.values():
             for nid in lin.nodes:
                 del lin.nodes[nid]["cell_id"]
         with pytest.raises(ValueError, match="not found in the model: 'cell_id'"):
@@ -294,7 +294,7 @@ class TestToCellDataframe:
         # Like a propagated mother_cycle: None on root cells, so on all the cells
         # of the single-cell lineage -4.
         for lid, nid in [(1, 1), (-4, 4)]:
-            lineage_props_model.data.cell_data[lid].nodes[nid]["node_prop"] = None
+            lineage_props_model.data.cell_lineages[lid].nodes[nid]["node_prop"] = None
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             df = lineage_props_model.to_cell_dataframe()
@@ -320,7 +320,7 @@ class TestToLinkDataframe:
 
     def test_columns_follow_link_props_order(self, lineage_props_model):
         props = ["speed", "angle", "time", "cost", "distance"]
-        lin = lineage_props_model.data.cell_data[1]
+        lin = lineage_props_model.data.cell_lineages[1]
         for source, target in lin.edges:
             lin.edges[source, target].update({prop: 1.0 for prop in props})
         df = lineage_props_model.to_link_dataframe()
@@ -343,7 +343,7 @@ class TestToLineageDataframe:
     """Test cases for Model.to_lineage_dataframe() method."""
 
     def test_missing_lineage_id_raises(self, lineage_props_model):
-        for lin in lineage_props_model.data.cell_data.values():
+        for lin in lineage_props_model.data.cell_lineages.values():
             del lin.graph["lineage_id"]
         with pytest.raises(ValueError, match="not found in the model: 'lineage_id'"):
             lineage_props_model.to_lineage_dataframe()
@@ -353,19 +353,19 @@ class TestToLineageDataframe:
             lineage_props_model.to_lineage_dataframe(lineage_ids=[99])
 
     def test_prop_none_in_a_lineage_does_not_warn(self, lineage_props_model):
-        lineage_props_model.data.cell_data[-4].graph["lin_prop"] = None
+        lineage_props_model.data.cell_lineages[-4].graph["lin_prop"] = None
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             df = lineage_props_model.to_lineage_dataframe()
         assert df["lin_prop"].isna().tolist() == [True, False]
 
 
-class TestAddCycleData:
-    """Test cases for Model.add_cycle_data() method."""
+class TestAddCycleLineages:
+    """Test cases for Model.add_cycle_lineages() method."""
 
     def test_first_and_last_cell_declared_and_protected(self, lineage_props_model):
         model = lineage_props_model
-        model.add_cycle_data()
+        model.add_cycle_lineages()
         protected_props = model.props_metadata._get_protected_props()
         for prop_id in ["first_cell", "last_cell"]:
             prop = model.get_property(prop_id)
@@ -384,34 +384,34 @@ class TestAddCycleData:
         model = lineage_props_model
         # E.g. a cycle property propagated to cell lineages, loaded from a file.
         model.props_metadata._add_prop(_create_test_property("generation", "node"))
-        for _, cell in model.data.cell_data[1].nodes(data=True):
+        for _, cell in model.data.cell_lineages[1].nodes(data=True):
             cell["generation"] = 0
         with pytest.raises(ValueError, match="calculator: 'generation'") as exc_info:
-            model.add_cycle_data()
+            model.add_cycle_lineages()
         assert "model.remove_property()" in str(exc_info.value)
         assert model.get_property("generation").lineage_type == "cell"
-        assert not model.has_cycle_data()
+        assert not model.has_cycle_lineages()
 
     def test_prop_declared_otherwise_with_calculator_raises(self, lineage_props_model):
         # Not computed yet, so without values.
         prop = _create_test_property("generation", "node", dtype="list[int]")
         lineage_props_model.add_custom_property(RootRelation(prop, []))
         with pytest.raises(ValueError, match="calculator: 'generation'"):
-            lineage_props_model.add_cycle_data()
+            lineage_props_model.add_cycle_lineages()
 
     def test_unused_prop_declared_otherwise_replaced(self, lineage_props_model):
         model = lineage_props_model
         # E.g. declared in a file without values.
         model.props_metadata._add_prop(_create_test_property("generation", "node"))
-        model.add_cycle_data()
+        model.add_cycle_lineages()
         assert model.get_property("generation").lineage_type == "cycle"
         assert "generation" in model.props_metadata._get_protected_props()
 
     def test_propagated_prop_kept(self, lineage_props_model):
         model = lineage_props_model
-        model.add_cycle_data()
+        model.add_cycle_lineages()
         model.propagate_cycle_properties(["generation"])
-        model.add_cycle_data()
+        model.add_cycle_lineages()
         assert model.get_property("generation").lineage_type == "both"
 
 
@@ -420,7 +420,7 @@ class TestToCycleDataframe:
 
     def test_lineage_props_added_as_columns(self, lineage_props_model):
         model = lineage_props_model
-        model.add_cycle_data()
+        model.add_cycle_lineages()
         df = model.to_cycle_dataframe(lineage_props=["lin_prop"])
 
         lin_rows = df[df["lineage_id"] == 1]
@@ -429,14 +429,14 @@ class TestToCycleDataframe:
         assert df.loc[df["lineage_id"] == -4, "lin_prop"].tolist() == [2.5]
 
     def test_no_matching_lineage_raises(self, lineage_props_model):
-        lineage_props_model.add_cycle_data()
+        lineage_props_model.add_cycle_lineages()
         with pytest.raises(ValueError, match="No cell cycles to export"):
             lineage_props_model.to_cycle_dataframe(lineage_ids=[99])
 
     def test_column_all_none_in_a_lineage_does_not_warn(self, lineage_props_model):
         # Lineage -4 has a single cell cycle, which has no mother cycle.
         model = lineage_props_model
-        model.add_cycle_data()
+        model.add_cycle_lineages()
         model.add_mother_cycle()
         model.update()
         with warnings.catch_warnings():
@@ -479,11 +479,11 @@ def relatives_model():
     )
     model = Model(
         model_metadata={"time_step": 1},
-        props_metadata=PropsMetadata(props={"lin_prop": lin_prop}),
+        props_metadata=PropsMetadata(properties={"lin_prop": lin_prop}),
         data=Data({1: lin, -11: single_lin}),
         reference_time_prop="frame",
     )
-    model.add_cycle_data()
+    model.add_cycle_lineages()
     model.add_mother_cycle()
     model.add_daughter_cycles()
     model.add_sister_cycles()
@@ -710,7 +710,7 @@ class TestToCyclePairDataframe:
                 suffixes=("", "_mother"),
             )
 
-    def test_no_cycle_data_raises(self, lineage_props_model):
+    def test_no_cycle_lineages_raises(self, lineage_props_model):
         with pytest.raises(ValueError, match="Cycle lineages have not been computed"):
             lineage_props_model.to_cycle_pair_dataframe("mother_cycle")
 
@@ -734,7 +734,7 @@ def frame_time_model():
     time_prop.dtype = "int"
     return Model(
         model_metadata={"time_step": 1, "time_unit": "frame"},
-        props_metadata=PropsMetadata(props={"time": time_prop}),
+        props_metadata=PropsMetadata(properties={"time": time_prop}),
         data=Data({1: lin}),
         reference_time_prop="time",
     )
@@ -745,7 +745,7 @@ class TestRescaleTime:
 
     def test_time_values_multiplied(self, frame_time_model):
         frame_time_model.rescale_time(5)
-        lin = frame_time_model.data.cell_data[1]
+        lin = frame_time_model.data.cell_lineages[1]
         assert dict(lin.nodes(data="time")) == {1: 15, 2: 20, 3: 25, 4: 25}
 
     def test_time_step_multiplied(self, frame_time_model):
@@ -757,22 +757,22 @@ class TestRescaleTime:
         assert frame_time_model.is_update_required()
 
     def test_timepoints_unchanged_after_update(self, frame_time_model):
-        lin = frame_time_model.data.cell_data[1]
+        lin = frame_time_model.data.cell_lineages[1]
         timepoints = dict(lin.nodes(data="timepoint"))
         frame_time_model.rescale_time(5)
         frame_time_model.update()
-        lin = frame_time_model.data.cell_data[1]
+        lin = frame_time_model.data.cell_lineages[1]
         assert dict(lin.nodes(data="timepoint")) == timepoints
 
     def test_timepoints_unchanged_after_partial_update(self, frame_time_model):
-        lin = frame_time_model.data.cell_data[1]
+        lin = frame_time_model.data.cell_lineages[1]
         timepoints = dict(lin.nodes(data="timepoint"))
         frame_time_model.rescale_time(5)
         time_copy_prop = create_time_property(unit=None, custom_identifier="time_copy")
         calc = Time(time_copy_prop, time_prop="time", factor=1)
         frame_time_model.add_custom_property(calc)
         frame_time_model.update(["time_copy"])
-        lin = frame_time_model.data.cell_data[1]
+        lin = frame_time_model.data.cell_lineages[1]
         assert dict(lin.nodes(data="timepoint")) == timepoints
         assert dict(lin.nodes(data="time_copy")) == {1: 15, 2: 20, 3: 25, 4: 25}
 
@@ -795,37 +795,37 @@ class TestRescaleTime:
         assert frame_time_model.get_property("time").dtype == "int"
 
     def test_cycle_duration_rescaled(self, frame_time_model):
-        frame_time_model.add_cycle_data()
+        frame_time_model.add_cycle_lineages()
         durations = dict(
-            frame_time_model.data.cycle_data[1].nodes(data="cycle_duration")
+            frame_time_model.data.cycle_lineages[1].nodes(data="cycle_duration")
         )
         frame_time_model.rescale_time(5, time_unit="min")
         frame_time_model.update()
-        cycle_lin = frame_time_model.data.cycle_data[1]
+        cycle_lin = frame_time_model.data.cycle_lineages[1]
         assert dict(cycle_lin.nodes(data="cycle_duration")) == {
             cid: duration * 5 for cid, duration in durations.items()
         }
         assert frame_time_model.get_property("cycle_duration").unit == "min"
 
     def test_cycle_start_time_rescaled(self, frame_time_model):
-        frame_time_model.add_cycle_data()
-        cycle_lin = frame_time_model.data.cycle_data[1]
+        frame_time_model.add_cycle_lineages()
+        cycle_lin = frame_time_model.data.cycle_lineages[1]
         start_times = dict(cycle_lin.nodes(data="cycle_start_time"))
         frame_time_model.rescale_time(5, time_unit="min")
         frame_time_model.update()
-        cycle_lin = frame_time_model.data.cycle_data[1]
+        cycle_lin = frame_time_model.data.cycle_lineages[1]
         assert dict(cycle_lin.nodes(data="cycle_start_time")) == {
             cid: start_time * 5 for cid, start_time in start_times.items()
         }
         assert frame_time_model.get_property("cycle_start_time").unit == "min"
 
     def test_cycle_end_time_rescaled(self, frame_time_model):
-        frame_time_model.add_cycle_data()
-        cycle_lin = frame_time_model.data.cycle_data[1]
+        frame_time_model.add_cycle_lineages()
+        cycle_lin = frame_time_model.data.cycle_lineages[1]
         end_times = dict(cycle_lin.nodes(data="cycle_end_time"))
         frame_time_model.rescale_time(5, time_unit="min")
         frame_time_model.update()
-        cycle_lin = frame_time_model.data.cycle_data[1]
+        cycle_lin = frame_time_model.data.cycle_lineages[1]
         assert dict(cycle_lin.nodes(data="cycle_end_time")) == {
             cid: end_time * 5 for cid, end_time in end_times.items()
         }
@@ -855,7 +855,7 @@ class TestRescaleTime:
         frame_time_model.add_absolute_age()
         frame_time_model.add_relative_age()
         # The units of the cycle durations and times are set by rescale_time().
-        frame_time_model.add_cycle_data()
+        frame_time_model.add_cycle_lineages()
         with pytest.warns(UserWarning) as record:
             frame_time_model.rescale_time(5, time_unit="min")
         assert [str(warning.message) for warning in record] == [
@@ -866,7 +866,7 @@ class TestRescaleTime:
         ]
 
     def test_outdated_unit_warns_for_one_property(self, frame_time_model):
-        frame_time_model.add_cycle_data()
+        frame_time_model.add_cycle_lineages()
         frame_time_model.add_division_rate()
         with pytest.warns(UserWarning) as record:
             frame_time_model.rescale_time(5, time_unit="min")
@@ -921,7 +921,7 @@ def two_times_model():
     }
     return Model(
         model_metadata={"time_step": 5, "time_unit": "min"},
-        props_metadata=PropsMetadata(props=props),
+        props_metadata=PropsMetadata(properties=props),
         data=Data({1: lin}),
         reference_time_prop="time",
     )
@@ -931,30 +931,30 @@ class TestSetReferenceTimeProp:
     """Test cases for Model.set_reference_time_prop() method."""
 
     def test_cycle_duration_in_new_reference(self, two_times_model):
-        two_times_model.add_cycle_data()
+        two_times_model.add_cycle_lineages()
         two_times_model.set_reference_time_prop("frame")
         two_times_model.update()
-        cycle_lin = two_times_model.data.cycle_data[1]
+        cycle_lin = two_times_model.data.cycle_lineages[1]
         assert dict(cycle_lin.nodes(data="cycle_duration")) == {2: 1, 4: 0, 5: 1}
         assert two_times_model.get_property("cycle_duration").unit == "frame"
 
     def test_cycle_start_time_in_new_reference(self, two_times_model):
-        two_times_model.add_cycle_data()
+        two_times_model.add_cycle_lineages()
         two_times_model.set_reference_time_prop("frame")
         two_times_model.update()
-        cycle_lin = two_times_model.data.cycle_data[1]
+        cycle_lin = two_times_model.data.cycle_lineages[1]
         assert dict(cycle_lin.nodes(data="cycle_start_time")) == {2: 0, 4: 2, 5: 2}
         assert two_times_model.get_property("cycle_start_time").unit == "frame"
 
     def test_cycle_end_time_in_new_reference(self, two_times_model):
-        two_times_model.add_cycle_data()
+        two_times_model.add_cycle_lineages()
         two_times_model.set_reference_time_prop("frame")
         two_times_model.update()
-        cycle_lin = two_times_model.data.cycle_data[1]
+        cycle_lin = two_times_model.data.cycle_lineages[1]
         assert dict(cycle_lin.nodes(data="cycle_end_time")) == {2: 1, 4: 2, 5: 3}
         assert two_times_model.get_property("cycle_end_time").unit == "frame"
 
-    def test_without_cycle_data(self, two_times_model):
+    def test_without_cycle_lineages(self, two_times_model):
         two_times_model.set_reference_time_prop("frame")
         assert two_times_model.get_time_unit() == "frame"
         assert two_times_model.get_property("cycle_duration") is None
@@ -1052,7 +1052,7 @@ def pixel_space_model():
             "pixel_height": 1.0,
             "pixel_depth": 2.0,
         },
-        props_metadata=PropsMetadata(props=props),
+        props_metadata=PropsMetadata(properties=props),
         data=Data({1: lin}),
         reference_time_prop="frame",
     )
@@ -1063,14 +1063,14 @@ class TestRescaleSpace:
 
     def test_cell_coordinates_multiplied(self, pixel_space_model):
         pixel_space_model.rescale_space(2)
-        lin = pixel_space_model.data.cell_data[1]
+        lin = pixel_space_model.data.cell_lineages[1]
         assert lin.nodes[1]["cell_x"] == 20
         assert lin.nodes[1]["cell_y"] == 40
         assert lin.nodes[1]["cell_z"] == 4
 
     def test_z_factor_applied_to_z_only(self, pixel_space_model):
         pixel_space_model.rescale_space(2, z_factor=10)
-        lin = pixel_space_model.data.cell_data[1]
+        lin = pixel_space_model.data.cell_lineages[1]
         assert lin.nodes[2]["cell_x"] == 60
         assert lin.nodes[2]["cell_z"] == 40
         assert lin.edges[1, 2]["link_z"] == 30
@@ -1078,13 +1078,13 @@ class TestRescaleSpace:
 
     def test_link_coordinates_multiplied(self, pixel_space_model):
         pixel_space_model.rescale_space(2)
-        lin = pixel_space_model.data.cell_data[1]
+        lin = pixel_space_model.data.cell_lineages[1]
         assert lin.edges[1, 2]["link_x"] == 40
         assert lin.edges[1, 2]["link_y"] == 60
 
     def test_lineage_coordinates_multiplied(self, pixel_space_model):
         pixel_space_model.rescale_space(2)
-        lin = pixel_space_model.data.cell_data[1]
+        lin = pixel_space_model.data.cell_lineages[1]
         assert lin.graph["lineage_x"] == 40
         assert lin.graph["lineage_y"] == 60
 
@@ -1232,11 +1232,13 @@ def input_props_model():
     ]
     model = Model(
         model_metadata={"time_step": 1, "time_unit": "frame"},
-        props_metadata=PropsMetadata(props={prop.identifier: prop for prop in props}),
+        props_metadata=PropsMetadata(
+            properties={prop.identifier: prop for prop in props}
+        ),
         data=Data({1: lin}),
         reference_time_prop="time",
     )
-    model.add_cycle_data()
+    model.add_cycle_lineages()
     return model
 
 
@@ -1334,7 +1336,7 @@ class TestAddCustomProperty:
         # E.g. a cycle property propagated to cell lineages, loaded from a file.
         prop = _create_test_property("mother_cycle", "node", dtype="int")
         input_props_model.props_metadata._add_prop(prop)
-        for _, cell in input_props_model.data.cell_data[1].nodes(data=True):
+        for _, cell in input_props_model.data.cell_lineages[1].nodes(data=True):
             cell["mother_cycle"] = 2
         with pytest.raises(ValueError, match="declared as a node property of cell"):
             input_props_model.add_mother_cycle()
@@ -1348,7 +1350,7 @@ class TestAddCustomProperty:
         input_props_model.add_mother_cycle()
         input_props_model.update()
         assert input_props_model.get_property("mother_cycle").lineage_type == "cycle"
-        assert input_props_model.data.cycle_data[1].nodes[3]["mother_cycle"] == 2
+        assert input_props_model.data.cycle_lineages[1].nodes[3]["mother_cycle"] == 2
 
     def test_readding_propagated_prop_keeps_lineage_type(self, input_props_model):
         input_props_model.add_mother_cycle()
@@ -1421,7 +1423,7 @@ def two_lineages_model():
     time_prop.dtype = "int"
     model = Model(
         model_metadata={"time_step": 1, "time_unit": "frame"},
-        props_metadata=PropsMetadata(props={"time": time_prop}),
+        props_metadata=PropsMetadata(properties={"time": time_prop}),
         data=Data({1: lin1, 2: lin2}),
         reference_time_prop="time",
     )
@@ -1431,7 +1433,7 @@ def two_lineages_model():
     model.add_custom_property(
         ConstantLinkValue(_create_test_property("link_value", "edge"), 1.0)
     )
-    model.add_cycle_data()
+    model.add_cycle_lineages()
     model.update()
     return model
 
@@ -1443,12 +1445,12 @@ class TestUpdate:
         input_props_model.add_interdivision_time()
         input_props_model.update()
         interdivision_times = dict(
-            input_props_model.data.cycle_data[1].nodes(data="interdivision_time")
+            input_props_model.data.cycle_lineages[1].nodes(data="interdivision_time")
         )
         # The cycle lineages are rebuilt at the first update after adding a property.
         input_props_model.add_mother_cycle()
         input_props_model.update(["mother_cycle"])
-        cycle_lin = input_props_model.data.cycle_data[1]
+        cycle_lin = input_props_model.data.cycle_lineages[1]
         assert dict(cycle_lin.nodes(data="interdivision_time")) == pytest.approx(
             interdivision_times, nan_ok=True
         )
@@ -1460,7 +1462,7 @@ class TestUpdate:
         input_props_model.update(["absolute_age"])
         assert input_props_model.is_update_required()
         input_props_model.update()
-        lin = input_props_model.data.cell_data[1]
+        lin = input_props_model.data.cell_lineages[1]
         assert dict(lin.nodes(data="relative_age")) == {1: 0, 2: 1, 3: 0, 4: 0}
 
     def test_partial_update_of_all_props_completes(self, input_props_model):
@@ -1477,8 +1479,8 @@ class TestUpdate:
             source_cell_id=3, source_lineage_id=1, target_cell_id=5
         )
         input_props_model.update(["absolute_age"])
-        assert input_props_model.data.cell_data[1].nodes[5]["absolute_age"] == 3
-        cycle_lin = input_props_model.data.cycle_data[1]
+        assert input_props_model.data.cell_lineages[1].nodes[5]["absolute_age"] == 3
+        cycle_lin = input_props_model.data.cycle_lineages[1]
         assert all(
             "interdivision_time" in cycle for _, cycle in cycle_lin.nodes(data=True)
         )
@@ -1487,13 +1489,13 @@ class TestUpdate:
         input_props_model.add_absolute_age()
         with pytest.warns(UserWarning, match="not been declared and will be ignored"):
             input_props_model.update(["unknown", "absolute_age"])
-        assert input_props_model.data.cell_data[1].nodes[3]["absolute_age"] == 2
+        assert input_props_model.data.cell_lineages[1].nodes[3]["absolute_age"] == 2
 
     def test_prop_without_calculator_ignored(self, input_props_model):
         input_props_model.add_absolute_age()
         with pytest.warns(UserWarning, match="no calculator and will be ignored"):
             input_props_model.update(["my_area", "absolute_age"])
-        assert input_props_model.data.cell_data[1].nodes[3]["absolute_age"] == 2
+        assert input_props_model.data.cell_lineages[1].nodes[3]["absolute_age"] == 2
 
     def test_only_props_without_calculator_no_update(self, input_props_model):
         input_props_model.add_absolute_age()
@@ -1503,7 +1505,7 @@ class TestUpdate:
         assert any("no calculator" in message for message in messages)
         assert any("No properties to update" in message for message in messages)
         assert input_props_model.is_update_required()
-        assert "absolute_age" not in input_props_model.data.cell_data[1].nodes[3]
+        assert "absolute_age" not in input_props_model.data.cell_lineages[1].nodes[3]
 
     def test_input_computed_before_its_reader(self, input_props_model):
         # 'my_area' has values but no calculator, as if loaded from a file.
@@ -1514,7 +1516,7 @@ class TestUpdate:
         with pytest.warns(UserWarning, match="Overwriting the old Property"):
             input_props_model.add_custom_property(ConstantValue(area_prop, 10.0))
         input_props_model.update()
-        lin = input_props_model.data.cell_data[1]
+        lin = input_props_model.data.cell_lineages[1]
         assert set(dict(lin.nodes(data="area_copy")).values()) == {10.0}
 
     def test_undeclared_reader_kept_after_what_it_reads(self, input_props_model):
@@ -1527,7 +1529,7 @@ class TestUpdate:
         with pytest.warns(UserWarning, match="Overwriting the old Property"):
             input_props_model.add_custom_property(ConstantValue(area_prop, 10.0))
         input_props_model.update()
-        lin = input_props_model.data.cell_data[1]
+        lin = input_props_model.data.cell_lineages[1]
         assert set(dict(lin.nodes(data="doubled_area")).values()) == {20.0}
 
     def test_split_off_lineage_with_removed_id_computed(self, two_lineages_model):
@@ -1540,9 +1542,9 @@ class TestUpdate:
             source_cell_id=3, source_lineage_id=1, target_cell_id=6
         )
         two_lineages_model.update()
-        assert set(two_lineages_model.data.cell_data[2].nodes) == {3, 6}
-        assert two_lineages_model.data.cell_data[2].nodes[6]["cell_value"] == 1.0
-        assert 2 in two_lineages_model.data.cycle_data
+        assert set(two_lineages_model.data.cell_lineages[2].nodes) == {3, 6}
+        assert two_lineages_model.data.cell_lineages[2].nodes[6]["cell_value"] == 1.0
+        assert 2 in two_lineages_model.data.cycle_lineages
 
     def test_split_off_lineage_cells_get_its_id(self, two_lineages_model):
         # Removing link 1 -> 4 splits off cells 4 and 5 into a new lineage.
@@ -1550,7 +1552,7 @@ class TestUpdate:
         two_lineages_model.update()
         new_lid, new_lin = next(
             (lid, lin)
-            for lid, lin in two_lineages_model.data.cell_data.items()
+            for lid, lin in two_lineages_model.data.cell_lineages.items()
             if 4 in lin
         )
         assert new_lid not in (1, 2)
@@ -1560,17 +1562,19 @@ class TestUpdate:
         # Removing link 4 -> 5 splits off cell 5 into lineage -5.
         two_lineages_model.remove_link(source_cell_id=4, target_cell_id=5, lineage_id=1)
         two_lineages_model.update()
-        assert two_lineages_model.data.cell_data[-5].nodes[5]["lineage_id"] == -5
+        assert two_lineages_model.data.cell_lineages[-5].nodes[5]["lineage_id"] == -5
 
     def test_split_off_lineage_without_original_lineage_props(self, two_lineages_model):
-        two_lineages_model.data.cell_data[1].graph["lineage_name"] = "Track_1"
+        two_lineages_model.data.cell_lineages[1].graph["lineage_name"] = "Track_1"
         two_lineages_model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         two_lineages_model.update()
         new_lin = next(
-            lin for lin in two_lineages_model.data.cell_data.values() if 4 in lin
+            lin for lin in two_lineages_model.data.cell_lineages.values() if 4 in lin
         )
         assert "lineage_name" not in new_lin.graph
-        assert two_lineages_model.data.cell_data[1].graph["lineage_name"] == "Track_1"
+        assert (
+            two_lineages_model.data.cell_lineages[1].graph["lineage_name"] == "Track_1"
+        )
 
     @pytest.mark.parametrize("props_to_update", [None, ["cell_value"]])
     def test_propagated_props_copied_again(self, two_lineages_model, props_to_update):
@@ -1581,10 +1585,10 @@ class TestUpdate:
         # Cell 1 divides into cells 2 and 4: without 1 -> 4, 1 -> 2 -> 3 is one cycle.
         model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         model.update(props_to_update)
-        lin = model.data.cell_data[1]
+        lin = model.data.cell_lineages[1]
         assert dict(lin.nodes(data="cycle_id")) == {1: 3, 2: 3, 3: 3}
         assert dict(lin.nodes(data="generation")) == {1: 0, 2: 0, 3: 0}
-        new_lin = next(lin for lin in model.data.cell_data.values() if 4 in lin)
+        new_lin = next(lin for lin in model.data.cell_lineages.values() if 4 in lin)
         assert dict(new_lin.nodes(data="cycle_id")) == {4: 5, 5: 5}
         assert dict(new_lin.nodes(data="generation")) == {4: 0, 5: 0}
 
@@ -1594,17 +1598,17 @@ class TestUpdate:
         model.add_cell(lineage_id=1, cell_id=6, time_value=3)
         model.add_link(source_cell_id=5, source_lineage_id=1, target_cell_id=6)
         model.update()
-        lin = model.data.cell_data[1]
+        lin = model.data.cell_lineages[1]
         assert dict(lin.nodes(data="cycle_id")) == {1: 1, 2: 3, 3: 3, 4: 6, 5: 6, 6: 6}
 
     def test_propagated_prop_with_calculator_copied_again(self, two_lineages_model):
         model = two_lineages_model
         model.add_mother_cycle()
         model.propagate_cycle_properties(["mother_cycle"])
-        assert model.data.cell_data[1].nodes[4]["mother_cycle"] == 1
+        assert model.data.cell_lineages[1].nodes[4]["mother_cycle"] == 1
         model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         model.update()
-        new_lin = next(lin for lin in model.data.cell_data.values() if 4 in lin)
+        new_lin = next(lin for lin in model.data.cell_lineages.values() if 4 in lin)
         assert dict(new_lin.nodes(data="mother_cycle")) == {4: None, 5: None}
 
     def test_cycle_props_not_propagated_stay_off_cells(self, two_lineages_model):
@@ -1612,7 +1616,7 @@ class TestUpdate:
         model.propagate_cycle_properties(["cycle_id"])
         model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         model.update()
-        for lin in model.data.cell_data.values():
+        for lin in model.data.cell_lineages.values():
             assert all("generation" not in cell for _, cell in lin.nodes(data=True))
 
 
@@ -1631,14 +1635,14 @@ class TestPropagateCycleProperties:
         prop = _create_test_property("both_prop", "node", lineage_type="both")
         model.add_custom_property(ConstantValue(prop, 2.0))
         model.update()
-        for lin in model.data.cell_data.values():
+        for lin in model.data.cell_lineages.values():
             for _, cell in lin.nodes(data=True):
                 cell["both_prop"] = 5.0
         model.propagate_cycle_properties()
         model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         model.update()
         assert "both_prop" not in model.props_metadata._get_propagated_props()
-        for lin in model.data.cell_data.values():
+        for lin in model.data.cell_lineages.values():
             assert set(dict(lin.nodes(data="both_prop")).values()) == {5.0}
 
     def test_removed_prop_dropped_from_record(self, two_lineages_model):
@@ -1656,7 +1660,7 @@ class TestPropagateCycleProperties:
         ):
             model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
             model.update()
-            lin = model.data.cell_data[1]
+            lin = model.data.cell_lineages[1]
             assert dict(lin.nodes(data="cycle_id")) == {1: 3, 2: 3, 3: 3}
 
     def test_model_pickled_without_record(self, two_lineages_model):
@@ -1668,7 +1672,7 @@ class TestPropagateCycleProperties:
         assert model.props_metadata._get_propagated_props() == []
         model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         model.update()
-        assert model.data.cell_data[1].nodes[1]["cycle_id"] == 1
+        assert model.data.cell_lineages[1].nodes[1]["cycle_id"] == 1
 
     def test_record_merged(self, two_lineages_model):
         """Test that a property propagated in the merged model only is copied to the
@@ -1680,7 +1684,7 @@ class TestPropagateCycleProperties:
         merged = model1.merge(model2)
         assert merged.props_metadata._get_propagated_props() == ["mother_cycle"]
         merged.update()
-        for lin in merged.data.cell_data.values():
+        for lin in merged.data.cell_lineages.values():
             assert all("mother_cycle" in cell for _, cell in lin.nodes(data=True))
 
 
@@ -1691,8 +1695,8 @@ class TestAddLineage:
         lineage = two_lineages_model.remove_lineage(2)
         two_lineages_model.add_lineage(lineage)
         two_lineages_model.update()
-        assert set(two_lineages_model.data.cell_data[2].nodes) == {10, 11}
-        assert 2 in two_lineages_model.data.cycle_data
+        assert set(two_lineages_model.data.cell_lineages[2].nodes) == {10, 11}
+        assert 2 in two_lineages_model.data.cycle_lineages
 
     def test_cell_removed_before_lineage_added_back_computed(self, two_lineages_model):
         two_lineages_model.remove_cell(cell_id=11, lineage_id=2)
@@ -1701,7 +1705,7 @@ class TestAddLineage:
         lineage.add_edge(10, 11)
         two_lineages_model.add_lineage(lineage)
         two_lineages_model.update()
-        assert two_lineages_model.data.cell_data[2].nodes[11]["cell_value"] == 1.0
+        assert two_lineages_model.data.cell_lineages[2].nodes[11]["cell_value"] == 1.0
 
     def test_link_removed_before_lineage_added_back_computed(self, two_lineages_model):
         two_lineages_model.remove_link(
@@ -1711,7 +1715,9 @@ class TestAddLineage:
         lineage.add_edge(10, 11)
         two_lineages_model.add_lineage(lineage)
         two_lineages_model.update()
-        assert two_lineages_model.data.cell_data[2].edges[10, 11]["link_value"] == 1.0
+        assert (
+            two_lineages_model.data.cell_lineages[2].edges[10, 11]["link_value"] == 1.0
+        )
 
 
 class TestRemoveLineage:
@@ -1724,7 +1730,7 @@ class TestRemoveLineage:
         )
         two_lineages_model.remove_lineage(2)
         two_lineages_model.update()
-        assert sorted(two_lineages_model.data.cell_data) == [1]
+        assert sorted(two_lineages_model.data.cell_lineages) == [1]
         assert not two_lineages_model.is_update_required()
 
 
@@ -1736,21 +1742,23 @@ class TestSplitLineageFromCell:
         two_lineages_model.remove_lineage(2)
         two_lineages_model.split_lineage_from_cell(cell_id=4, lineage_id=1)
         two_lineages_model.update()
-        assert set(two_lineages_model.data.cell_data[2].nodes) == {4, 5}
-        assert 2 in two_lineages_model.data.cycle_data
+        assert set(two_lineages_model.data.cell_lineages[2].nodes) == {4, 5}
+        assert 2 in two_lineages_model.data.cycle_lineages
 
     def test_new_lineage_without_original_lineage_props(self, two_lineages_model):
-        two_lineages_model.data.cell_data[1].graph["lineage_name"] = "Track_1"
+        two_lineages_model.data.cell_lineages[1].graph["lineage_name"] = "Track_1"
         new_lineage = two_lineages_model.split_lineage_from_cell(
             cell_id=4, lineage_id=1
         )
         assert new_lineage.graph == {"lineage_id": 3}
-        assert two_lineages_model.data.cell_data[1].graph["lineage_name"] == "Track_1"
+        assert (
+            two_lineages_model.data.cell_lineages[1].graph["lineage_name"] == "Track_1"
+        )
 
     def test_cells_get_new_lineage_id_at_update(self, two_lineages_model):
         two_lineages_model.split_lineage_from_cell(cell_id=4, lineage_id=1)
         two_lineages_model.update()
-        new_lineage = two_lineages_model.data.cell_data[3]
+        new_lineage = two_lineages_model.data.cell_lineages[3]
         assert dict(new_lineage.nodes(data="lineage_id")) == {4: 3, 5: 3}
 
 
@@ -1764,7 +1772,7 @@ class TestAddCell:
             source_cell_id=4, source_lineage_id=1, target_cell_id=5
         )
         two_lineages_model.update()
-        cell = two_lineages_model.data.cell_data[1].nodes[5]
+        cell = two_lineages_model.data.cell_lineages[1].nodes[5]
         assert cell["timepoint"] == 2
         assert cell["cell_value"] == 1.0
 
@@ -1799,7 +1807,7 @@ class TestAddLink:
             source_cell_id=4, source_lineage_id=1, target_cell_id=5
         )
         two_lineages_model.update()
-        assert two_lineages_model.data.cell_data[1].edges[4, 5]["link_value"] == 1.0
+        assert two_lineages_model.data.cell_lineages[1].edges[4, 5]["link_value"] == 1.0
 
     def test_cells_moved_from_other_lineage_get_its_id(self, two_lineages_model):
         # Cell 12 is split off into lineage -12, then moves to lineage 1 with the link.
@@ -1812,7 +1820,7 @@ class TestAddLink:
             target_lineage_id=-12,
         )
         two_lineages_model.update()
-        assert two_lineages_model.data.cell_data[1].nodes[12]["lineage_id"] == 1
+        assert two_lineages_model.data.cell_lineages[1].nodes[12]["lineage_id"] == 1
 
     def test_cells_and_link_added_then_moved_computed(self, two_lineages_model):
         # Cells 12 and 13 and their link, added to lineage 2, move to lineage 1 with
@@ -1829,7 +1837,7 @@ class TestAddLink:
             target_lineage_id=2,
         )
         two_lineages_model.update()
-        lineage = two_lineages_model.data.cell_data[1]
+        lineage = two_lineages_model.data.cell_lineages[1]
         assert lineage.nodes[13]["cell_value"] == 1.0
         assert lineage.edges[12, 13]["link_value"] == 1.0
 
@@ -1844,7 +1852,7 @@ class TestAddCellArea:
     def test_custom_polygon_prop(self, input_props_model):
         input_props_model.add_cell_area(polygon_prop="my_polygon")
         input_props_model.update()
-        assert input_props_model.data.cell_data[1].nodes[3]["cell_area"] == 3.0
+        assert input_props_model.data.cell_lineages[1].nodes[3]["cell_area"] == 3.0
 
     def test_unit_from_polygon_prop(self, input_props_model):
         input_props_model.add_cell_area(polygon_prop="my_polygon")
@@ -1861,7 +1869,9 @@ class TestAddCellCircularity:
     def test_custom_polygon_prop(self, input_props_model):
         input_props_model.add_cell_circularity(polygon_prop="my_polygon")
         input_props_model.update()
-        circularity = input_props_model.data.cell_data[1].nodes[3]["cell_circularity"]
+        circularity = input_props_model.data.cell_lineages[1].nodes[3][
+            "cell_circularity"
+        ]
         # 3x1 rectangle: area 3, perimeter 8.
         assert circularity == pytest.approx(4 * np.pi * 3 / 8**2)
 
@@ -1880,7 +1890,7 @@ class TestAddCellSolidity:
     def test_custom_polygon_prop(self, input_props_model):
         input_props_model.add_cell_solidity(polygon_prop="my_polygon")
         input_props_model.update()
-        assert input_props_model.data.cell_data[1].nodes[3]["cell_solidity"] == 1.0
+        assert input_props_model.data.cell_lineages[1].nodes[3]["cell_solidity"] == 1.0
 
     def test_no_unit(self, input_props_model):
         input_props_model.add_cell_solidity(polygon_prop="my_polygon")
@@ -1898,12 +1908,16 @@ class TestAddCycleMeanArea:
         input_props_model.add_cell_area(polygon_prop="my_polygon")
         input_props_model.add_cycle_mean_area()
         input_props_model.update()
-        assert input_props_model.data.cycle_data[1].nodes[2]["cycle_mean_area"] == 1.5
+        assert (
+            input_props_model.data.cycle_lineages[1].nodes[2]["cycle_mean_area"] == 1.5
+        )
 
     def test_custom_area_prop(self, input_props_model):
         input_props_model.add_cycle_mean_area(area_prop="my_area")
         input_props_model.update()
-        assert input_props_model.data.cycle_data[1].nodes[2]["cycle_mean_area"] == 1.5
+        assert (
+            input_props_model.data.cycle_lineages[1].nodes[2]["cycle_mean_area"] == 1.5
+        )
 
     def test_unit_from_area_prop(self, input_props_model):
         input_props_model.add_cycle_mean_area(area_prop="my_area")
@@ -1922,7 +1936,7 @@ class TestAddCycleMeanSpeed:
             speed_prop="my_speed", include_incoming_edge=True
         )
         input_props_model.update()
-        cycle_lin = input_props_model.data.cycle_data[1]
+        cycle_lin = input_props_model.data.cycle_lineages[1]
         assert cycle_lin.nodes[2]["cycle_mean_speed"] == 1.0
         assert cycle_lin.nodes[4]["cycle_mean_speed"] == 3.0
 
@@ -1945,7 +1959,7 @@ def contour_model(input_props_model):
         input_props_model.props_metadata._add_prop(
             _create_test_property(identifier, "node", dtype=dtype, unit="um")
         )
-    for nid, cell in input_props_model.data.cell_data[1].nodes(data=True):
+    for nid, cell in input_props_model.data.cell_lineages[1].nodes(data=True):
         cell["cell_x"] = float(nid)
         cell["cell_y"] = 0.0
         cell["cell_contour"] = [(-1, -0.5), (1, -0.5), (1, 0.5), (-1, 0.5)]
@@ -1959,7 +1973,7 @@ class TestAddCellPolygon:
         input_props_model.props_metadata._add_prop(
             _create_test_property("label", "node", dtype="int")
         )
-        lin = input_props_model.data.cell_data[1]
+        lin = input_props_model.data.cell_lineages[1]
         for nid in lin.nodes:
             lin.nodes[nid]["label"] = 1
         label_image = np.zeros((3, 6, 6), dtype=np.uint32)
@@ -1973,7 +1987,7 @@ class TestAddCellPolygon:
     def test_contour_source(self, contour_model):
         contour_model.add_cell_polygon(source="contour")
         contour_model.update()
-        polygon = contour_model.data.cell_data[1].nodes[3]["cell_polygon"]
+        polygon = contour_model.data.cell_lineages[1].nodes[3]["cell_polygon"]
         assert polygon.bounds == (2.0, -0.5, 4.0, 0.5)
         prop = contour_model.get_property("cell_polygon")
         assert prop.unit == "um"
@@ -1983,12 +1997,12 @@ class TestAddCellPolygon:
         contour_model.add_cell_polygon(source="contour")
         contour_model.add_cell_area()
         contour_model.update()
-        assert contour_model.data.cell_data[1].nodes[3]["cell_area"] == 2.0
+        assert contour_model.data.cell_lineages[1].nodes[3]["cell_area"] == 2.0
 
     def test_contour_source_through_add_pycellin_property(self, contour_model):
         contour_model.add_pycellin_property("cell_polygon", source="contour")
         contour_model.update()
-        polygon = contour_model.data.cell_data[1].nodes[1]["cell_polygon"]
+        polygon = contour_model.data.cell_lineages[1].nodes[1]["cell_polygon"]
         assert polygon.area == 2.0
 
     def test_contour_source_missing_contour_prop_raises(self, input_props_model):
@@ -2036,7 +2050,7 @@ class TestAddCellMultipolygon:
         input_props_model.props_metadata._add_prop(
             _create_test_property("label", "node", dtype="int")
         )
-        lin = input_props_model.data.cell_data[1]
+        lin = input_props_model.data.cell_lineages[1]
         for nid, label in [(1, 1), (2, 1), (3, 1), (4, 2)]:
             lin.nodes[nid]["label"] = label
         label_image = np.zeros((3, 6, 6), dtype=np.uint32)
@@ -2071,7 +2085,7 @@ def intensity_model(input_props_model):
     input_props_model.props_metadata._add_prop(
         _create_test_property("label", "node", dtype="int")
     )
-    lin = input_props_model.data.cell_data[1]
+    lin = input_props_model.data.cell_lineages[1]
     for nid, label in [(1, 1), (2, 1), (3, 1), (4, 2)]:
         lin.nodes[nid]["label"] = label
     # Cells 1 and 2 are at timepoints 0 and 1, cells 3 and 4 at timepoint 2.
@@ -2091,7 +2105,7 @@ class TestAddCellTotalIntensity:
         model, label_image, intensity_image = intensity_model
         model.add_cell_total_intensity(intensity_image, label_image=label_image)
         model.update()
-        lin = model.data.cell_data[1]
+        lin = model.data.cell_lineages[1]
         # Cell 1: pixels of values 0, 1, 6 and 7.
         assert lin.nodes[1]["cell_total_intensity"] == 14.0
         # Cell 4: pixels of values 93, 94, 99 and 100.
@@ -2110,7 +2124,7 @@ class TestAddCellTotalIntensity:
             custom_identifier="total_from_shapes",
         )
         model.update()
-        for _, cell in model.data.cell_data[1].nodes(data=True):
+        for _, cell in model.data.cell_lineages[1].nodes(data=True):
             assert cell["total_from_shapes"] == cell["cell_total_intensity"]
 
     def test_polygon_source_in_pixels(self, intensity_model):
@@ -2122,7 +2136,7 @@ class TestAddCellTotalIntensity:
                 "pixel_shape", "node", dtype="shapely.Polygon", unit="pixel"
             )
         )
-        lin = model.data.cell_data[1]
+        lin = model.data.cell_lineages[1]
         for nid in lin.nodes:
             # Contains the centers of the pixels (1, 1) and (1, 2).
             lin.nodes[nid]["pixel_shape"] = Polygon(
@@ -2142,7 +2156,7 @@ class TestAddCellTotalIntensity:
             intensity_image_path=str(path), label_image=label_image
         )
         model.update()
-        assert model.data.cell_data[1].nodes[1]["cell_total_intensity"] == 14.0
+        assert model.data.cell_lineages[1].nodes[1]["cell_total_intensity"] == 14.0
 
     def test_description_says_where_pixels_come_from(self, intensity_model):
         model, label_image, intensity_image = intensity_model
@@ -2195,7 +2209,7 @@ class TestAddCellMeanIntensity:
         model, label_image, intensity_image = intensity_model
         model.add_cell_mean_intensity(intensity_image, label_image=label_image)
         model.update()
-        lin = model.data.cell_data[1]
+        lin = model.data.cell_lineages[1]
         assert lin.nodes[1]["cell_mean_intensity"] == 3.5
         assert lin.nodes[4]["cell_mean_intensity"] == 96.5
 
@@ -2210,7 +2224,7 @@ class TestAddCycleMeanIntensity:
     def test_custom_intensity_prop(self, input_props_model):
         input_props_model.add_cycle_mean_intensity(intensity_prop="my_area")
         input_props_model.update()
-        cycle_lin = input_props_model.data.cycle_data[1]
+        cycle_lin = input_props_model.data.cycle_lineages[1]
         assert cycle_lin.nodes[2]["cycle_mean_intensity"] == 1.5
 
     def test_unit_from_intensity_prop(self, input_props_model):
@@ -2228,7 +2242,7 @@ class TestAddBirthIntensity:
     def test_custom_intensity_prop(self, input_props_model):
         input_props_model.add_birth_intensity(intensity_prop="my_area")
         input_props_model.update()
-        cycle_lin = input_props_model.data.cycle_data[1]
+        cycle_lin = input_props_model.data.cycle_lineages[1]
         assert cycle_lin.nodes[3]["birth_intensity"] == 3.0
         assert np.isnan(cycle_lin.nodes[2]["birth_intensity"])
 
@@ -2243,7 +2257,7 @@ class TestAddDivisionIntensity:
     def test_custom_intensity_prop(self, input_props_model):
         input_props_model.add_division_intensity(intensity_prop="my_area")
         input_props_model.update()
-        cycle_lin = input_props_model.data.cycle_data[1]
+        cycle_lin = input_props_model.data.cycle_lineages[1]
         assert cycle_lin.nodes[2]["division_intensity"] == 2.0
         assert np.isnan(cycle_lin.nodes[3]["division_intensity"])
 
@@ -2254,7 +2268,7 @@ class TestAddAbsoluteAge:
     def test_default_time_prop_is_reference(self, input_props_model):
         input_props_model.add_absolute_age()
         input_props_model.update()
-        assert input_props_model.data.cell_data[1].nodes[3]["absolute_age"] == 2
+        assert input_props_model.data.cell_lineages[1].nodes[3]["absolute_age"] == 2
 
     def test_dtype_and_unit_from_time_prop(self, input_props_model):
         input_props_model.add_absolute_age()
@@ -2269,7 +2283,7 @@ class TestAddAbsoluteAge:
             source_cell_id=5, source_lineage_id=1, target_cell_id=1
         )
         input_props_model.update()
-        lin = input_props_model.data.cell_data[1]
+        lin = input_props_model.data.cell_lineages[1]
         assert dict(lin.nodes(data="absolute_age")) == {1: 1, 2: 2, 3: 3, 4: 3, 5: 0}
 
     def test_missing_time_prop_raises(self, input_props_model):
@@ -2289,7 +2303,7 @@ class TestAddNormalizedAge:
     def test_default_time_prop_is_reference(self, input_props_model):
         input_props_model.add_normalized_age()
         input_props_model.update()
-        lin = input_props_model.data.cell_data[1]
+        lin = input_props_model.data.cell_lineages[1]
         # Cycle 2 = [1, 2] goes from time 0 to time 1, cycle 3 = [3] is a single cell.
         assert lin.nodes[1]["normalized_age"] == 0
         assert lin.nodes[2]["normalized_age"] == 1
@@ -2299,7 +2313,9 @@ class TestAddNormalizedAge:
         input_props_model.add_normalized_age(ignore_incomplete_cycles=True)
         input_props_model.update()
         # Cycle 2 = [1, 2] starts at the root.
-        assert np.isnan(input_props_model.data.cell_data[1].nodes[1]["normalized_age"])
+        assert np.isnan(
+            input_props_model.data.cell_lineages[1].nodes[1]["normalized_age"]
+        )
 
     def test_float_dtype_and_no_unit(self, input_props_model):
         input_props_model.add_normalized_age()
@@ -2323,14 +2339,14 @@ class TestAddRelativeAge:
     def test_new_division_updates_its_cycle(self, input_props_model):
         input_props_model.add_relative_age()
         input_props_model.update()
-        assert input_props_model.data.cell_data[1].nodes[2]["relative_age"] == 1
+        assert input_props_model.data.cell_lineages[1].nodes[2]["relative_age"] == 1
         # Cell 1 divides into cells 2 and 5: cycle [1, 2] becomes [1] and [2].
         input_props_model.add_cell(lineage_id=1, cell_id=5, time_value=1)
         input_props_model.add_link(
             source_cell_id=1, source_lineage_id=1, target_cell_id=5
         )
         input_props_model.update()
-        assert input_props_model.data.cell_data[1].nodes[2]["relative_age"] == 0
+        assert input_props_model.data.cell_lineages[1].nodes[2]["relative_age"] == 0
 
 
 class TestAddCellSpeed:
@@ -2353,7 +2369,7 @@ class TestAddCellSpeed:
     def test_2d_model(self, contour_model):
         contour_model.add_cell_speed()
         contour_model.update()
-        lin = contour_model.data.cell_data[1]
+        lin = contour_model.data.cell_lineages[1]
         assert lin.edges[1, 2]["cell_speed"] == 1.0
         assert lin.edges[2, 4]["cell_speed"] == 2.0
 
@@ -2374,14 +2390,14 @@ class TestAddCellDisplacement:
     def test_2d_model(self, contour_model):
         contour_model.add_cell_displacement()
         contour_model.update()
-        lin = contour_model.data.cell_data[1]
+        lin = contour_model.data.cell_lineages[1]
         assert lin.edges[1, 2]["cell_displacement"] == 1.0
         assert lin.edges[2, 4]["cell_displacement"] == 2.0
 
     def test_3d_model(self, pixel_space_model):
         pixel_space_model.add_cell_displacement()
         pixel_space_model.update()
-        lin = pixel_space_model.data.cell_data[1]
+        lin = pixel_space_model.data.cell_lineages[1]
         # From (10, 20, 2) to (30, 40, 4).
         assert lin.edges[1, 2]["cell_displacement"] == pytest.approx(804**0.5)
 
@@ -2395,7 +2411,7 @@ class TestAddTurningAngle:
         calculator = contour_model._updater._calculators["turning_angle"]
         assert calculator.coord_props == ("cell_x", "cell_y")
         # Cell 2 divides, and the other cells lack an incoming or outgoing link.
-        lin = contour_model.data.cell_data[1]
+        lin = contour_model.data.cell_lineages[1]
         assert all(np.isnan(angle) for _, angle in lin.nodes(data="turning_angle"))
 
 
@@ -2406,7 +2422,7 @@ class TestAddStraightness:
         contour_model.add_straightness()
         contour_model.update()
         # Cycle 2 goes straight from cell 1, at x = 1, to cell 2, at x = 2.
-        assert contour_model.data.cycle_data[1].nodes[2]["straightness"] == 1.0
+        assert contour_model.data.cycle_lineages[1].nodes[2]["straightness"] == 1.0
 
 
 class TestAddMotherCycle:
@@ -2415,7 +2431,7 @@ class TestAddMotherCycle:
     def test_values(self, input_props_model):
         input_props_model.add_mother_cycle()
         input_props_model.update()
-        cycle_lin = input_props_model.data.cycle_data[1]
+        cycle_lin = input_props_model.data.cycle_lineages[1]
         assert cycle_lin.nodes[2]["mother_cycle"] is None
         assert cycle_lin.nodes[3]["mother_cycle"] == 2
         assert cycle_lin.nodes[4]["mother_cycle"] == 2
@@ -2427,7 +2443,7 @@ class TestAddDaughterCycles:
     def test_values(self, input_props_model):
         input_props_model.add_daughter_cycles()
         input_props_model.update()
-        cycle_lin = input_props_model.data.cycle_data[1]
+        cycle_lin = input_props_model.data.cycle_lineages[1]
         assert dict(cycle_lin.nodes(data="daughter_cycles")) == {
             2: [3, 4],
             3: [],
@@ -2441,7 +2457,7 @@ class TestAddSisterCycles:
     def test_values(self, input_props_model):
         input_props_model.add_sister_cycles()
         input_props_model.update()
-        cycle_lin = input_props_model.data.cycle_data[1]
+        cycle_lin = input_props_model.data.cycle_lineages[1]
         assert dict(cycle_lin.nodes(data="sister_cycles")) == {2: [], 3: [4], 4: [3]}
 
 
@@ -2461,7 +2477,7 @@ class TestAddCousinCycles:
             degree=2, custom_identifier="second_cousin_cycles"
         )
         input_props_model.update()
-        cycle_lin = input_props_model.data.cycle_data[1]
+        cycle_lin = input_props_model.data.cycle_lineages[1]
         assert cycle_lin.nodes[5]["cousin_cycles"] == [7, 8]
         assert cycle_lin.nodes[5]["second_cousin_cycles"] == []
 
@@ -2477,12 +2493,12 @@ class TestAddLineageDuration:
     def test_default_time_prop_is_reference(self, two_times_model):
         two_times_model.add_lineage_duration()
         two_times_model.update()
-        assert two_times_model.data.cell_data[1].graph["lineage_duration"] == 15
+        assert two_times_model.data.cell_lineages[1].graph["lineage_duration"] == 15
 
     def test_custom_time_prop(self, two_times_model):
         two_times_model.add_lineage_duration(time_prop="frame")
         two_times_model.update()
-        assert two_times_model.data.cell_data[1].graph["lineage_duration"] == 3
+        assert two_times_model.data.cell_lineages[1].graph["lineage_duration"] == 3
 
     def test_dtype_and_unit_from_time_prop(self, two_times_model):
         two_times_model.add_lineage_duration()

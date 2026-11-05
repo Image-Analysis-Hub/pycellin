@@ -16,22 +16,22 @@ from pycellin.classes import (
 )
 from pycellin.custom_types import PropertyType
 from pycellin.io.utils import (
+    _check_fusions,
     _split_graph_into_lineages,
     _update_lineage_prop_key,
     _update_lineages_ids_key,
     _update_node_prop_key,
-    check_fusions,
 )
 from pycellin.properties.core import create_cell_id_property, create_time_property
 from pycellin.properties.morphology import create_cell_contour_property
-from pycellin.utils import check_literal_type
+from pycellin.utils import _check_literal_type
 
 logger = logging.getLogger(__name__)
 
 # What the loader keeps of the spots outside tracks, and of the tracks. As in TrackMate,
 # visible spots have a VISIBILITY of 1, and visible tracks are listed in FilteredTracks.
-LoneSpotsOption = Literal["none", "visible", "all"]
-TracksOption = Literal["visible", "all"]
+_LoneSpotsOption = Literal["none", "visible", "all"]
+_TracksOption = Literal["visible", "all"]
 
 
 def _get_units(
@@ -546,7 +546,7 @@ def _add_all_nodes(
             # as defined in the properties metadata.
             attribs = deepcopy(element.attrib)
             try:
-                _convert_attributes(attribs, props_md.props, "node", undeclared)
+                _convert_attributes(attribs, props_md.properties, "node", undeclared)
             except ValueError as err:
                 print(f"ERROR: {err} Please check the XML file.")
                 raise
@@ -622,7 +622,7 @@ def _add_edge(
     """
     attribs = deepcopy(element.attrib)
     try:
-        _convert_attributes(attribs, props_md.props, "edge", undeclared)
+        _convert_attributes(attribs, props_md.properties, "edge", undeclared)
     except ValueError as err:
         print(f"ERROR: {err} Please check the XML file.")
         raise
@@ -702,7 +702,7 @@ def _build_tracks(
         if element.tag == "Track" and event == "start":
             attribs = deepcopy(element.attrib)
             try:
-                _convert_attributes(attribs, props_md.props, "lineage", undeclared)
+                _convert_attributes(attribs, props_md.properties, "lineage", undeclared)
             except ValueError as err:
                 print(f"ERROR: {err} Please check the XML file.")
                 raise
@@ -813,7 +813,7 @@ def _update_props_metadata(
         props_md._add_prop(roi_coord_prop)
 
     # Edge properties.
-    if "EDGE_X_LOCATION" in props_md.props:
+    if "EDGE_X_LOCATION" in props_md.properties:
         for axis in ["x", "y", "z"]:
             props_md._change_prop_identifier(
                 f"EDGE_{axis.upper()}_LOCATION", f"link_{axis}"
@@ -827,7 +827,9 @@ def _update_props_metadata(
     # Lineage properties.
     props_md._change_prop_identifier("TRACK_ID", "lineage_id")
     props_md._change_prop_description("lineage_id", "Unique identifier of the lineage")
-    props_md.props["lineage_id"].prop_type = PropertyType.NODE | PropertyType.LINEAGE
+    props_md.properties["lineage_id"].prop_type = (
+        PropertyType.NODE | PropertyType.LINEAGE
+    )
     prop_filtered_track = Property(
         identifier="FilteredTrack",
         name="FilteredTrack",
@@ -838,7 +840,7 @@ def _update_props_metadata(
         dtype="int",
     )
     props_md._add_prop(prop_filtered_track)
-    if "TRACK_X_LOCATION" in props_md.props:
+    if "TRACK_X_LOCATION" in props_md.properties:
         for axis in ["x", "y", "z"]:
             props_md._change_prop_identifier(
                 f"TRACK_{axis.upper()}_LOCATION", f"lineage_{axis}"
@@ -917,8 +919,8 @@ def _update_location_related_props(
 
 def _filter_spots_and_tracks(
     graph: nx.DiGraph,
-    lone_spots: LoneSpotsOption,
-    tracks: TracksOption,
+    lone_spots: _LoneSpotsOption,
+    tracks: _TracksOption,
     visible_tracks: set[int] | None,
 ) -> None:
     """
@@ -958,8 +960,8 @@ def _filter_spots_and_tracks(
 
 def _parse_model_tag(
     xml_path: str | Path,
-    lone_spots: LoneSpotsOption,
-    tracks: TracksOption,
+    lone_spots: _LoneSpotsOption,
+    tracks: _TracksOption,
 ) -> tuple[dict[str, str], PropsMetadata, Data]:
     """
     Read an XML file and convert the model data into several graphs.
@@ -1241,7 +1243,7 @@ def _add_missing_position_t(
     If POSITION_T is computed, since its values don't come from the file.
     """
     cells = [
-        cell for lin in data.cell_data.values() for _, cell in lin.nodes(data=True)
+        cell for lin in data.cell_lineages.values() for _, cell in lin.nodes(data=True)
     ]
     if not cells or any("POSITION_T" in cell for cell in cells):
         return
@@ -1267,8 +1269,8 @@ def read_trackmate_xml(
     path: str | Path,
     *,
     reference_time_prop: str = "POSITION_T",
-    lone_spots: LoneSpotsOption = "none",
-    tracks: TracksOption = "visible",
+    lone_spots: _LoneSpotsOption = "none",
+    tracks: _TracksOption = "visible",
 ) -> Model:
     """
     Read a TrackMate XML file and convert the tracks data to directed acyclic graphs.
@@ -1312,11 +1314,11 @@ def read_trackmate_xml(
     ValueError
         If `lone_spots` or `tracks` is not one of its options.
     """
-    if not check_literal_type(lone_spots, LoneSpotsOption):
+    if not _check_literal_type(lone_spots, _LoneSpotsOption):
         raise ValueError(
             f"'lone_spots' must be 'none', 'visible' or 'all', not {lone_spots!r}."
         )
-    if not check_literal_type(tracks, TracksOption):
+    if not _check_literal_type(tracks, _TracksOption):
         raise ValueError(f"'tracks' must be 'visible' or 'all', not {tracks!r}.")
     units, props_md, data = _parse_model_tag(path, lone_spots, tracks)
 
@@ -1356,7 +1358,7 @@ def read_trackmate_xml(
         metadata[tag_name] = element_string
 
     model = Model(metadata, props_md, data)
-    check_fusions(model)  # pycellin DOES NOT support fusion events
+    _check_fusions(model)  # pycellin DOES NOT support fusion events
 
     return model
 
@@ -1382,5 +1384,5 @@ if __name__ == "__main__":
     print("\nModel metadata:")
     print(model.model_metadata)
     print("\nProperties and their types:")
-    for prop_id, prop in model.props_metadata.props.items():
+    for prop_id, prop in model.props_metadata.properties.items():
         print(f"  - {prop_id}  -> {prop.prop_type}")

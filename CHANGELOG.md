@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 6c09b43, plus the uncommitted rename pass 4 (property vocabulary and options: `prop`, `lineage_type` values, `single_type`, `image`, `unique_in_model`, rod, plot and metadata names). Update from there with: git log 6c09b43..dev -->
+<!-- Planned v0.6.0. Covers commits up to c450f16, plus the uncommitted rename pass 5 (methods, attributes and privacy: lineage getters, `get_root`/`get_roots`, `cell_lineages`, `add_cycle_lineages`, `PropsMetadata.properties`, underscores, `pycellin.exceptions`, `properties.timing`). Update from there with: git log c450f16..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -13,12 +13,12 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 
 - **Naming:** `ID` is now written in lowercase in all pycellin names, following PEP 8:
   - the core properties `cell_ID`, `lineage_ID` and `cycle_ID` are renamed `cell_id`, `lineage_id` and `cycle_id`, in DataFrames and exported files too. So are the `source_cell_ID` and `target_cell_ID` columns of `to_link_dataframe()`, the `pycellin_cell_ID` property of TrackMate exports and the `lineage_ID_Pycellin` column of trackpy exports, now `lineage_id_pycellin`
-  - `Model` methods: `get_cell_lineage_from_ID()` → `get_cell_lineage_from_id()`, and likewise `get_cycle_lineage_from_ID()`, `get_cell_lineage_IDs()`, `get_lineage_IDs()`, `get_cycle_lineage_IDs()` and `get_next_available_lineage_ID()`
+  - `Model` methods: `get_cell_lineage_IDs()` → `get_cell_lineage_ids()`, and likewise `get_cycle_lineage_IDs()` and `get_next_available_lineage_ID()`
   - the `ID_prop` argument of `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()` → `id_prop`
   - the fields of the `Cell` and `Link` named tuples (e.g. returned by `get_divisions()`), and the `node_ID`, `lineage_ID`, `source_lineage_ID` and `target_lineage_ID` arguments and attributes of exceptions
 - **Naming:** arguments that abbreviated an ID are spelled out. Only calls that pass them by name break:
   - `lid` → `lineage_id` (e.g. in `remove_lineage()` and `CellLineage()`), `lids` → `lineage_ids` (`get_divisions()`, `get_fusions()` and the `to_*_dataframe()` methods), `new_lid` → `new_lineage_id`, and `source_lid` and `target_lid` → `source_lineage_id` and `target_lineage_id`
-  - `cid` → `cell_id`, `cids` → `cell_ids`, and `source_cid` and `target_cid` → `source_cell_id` and `target_cell_id`. In `CycleLineage.get_links_within_cycle()` and `yield_links_within_cycle()`, `ccid` → `cycle_id`
+  - `cid` → `cell_id`, `cids` → `cell_ids`, and `source_cid` and `target_cid` → `source_cell_id` and `target_cell_id`. In `CycleLineage.get_links_within_cycle()`, `ccid` → `cycle_id`
   - `nid` → `node_id`, e.g. in `is_root()`, `is_leaf()`, `get_descendants()` and the `compute()` method of calculators, and → `cell_id` in `Data.get_closest_cell()` and `get_closest_cells()`. `get_ancestors()` takes `node_id` in cell and cycle lineages too (`cid` and `ccid` before), so it is called the same way on both. Custom calculators can keep `nid` in their `compute()` method, since pycellin passes the node ID by position
   - the `source_nid` and `target_nid` arguments and attributes of `TimeFlowError` → `source_node_id` and `target_node_id`
 - **Naming:** the reading and writing functions follow PEP 8, with one verb pair: `read_*()` and `write_*()` for files, `from_*()` and `to_*()` for DataFrames:
@@ -45,7 +45,18 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
   - `plot()` and `get_tree_figure()` of `CellLineage` and `CycleLineage`, and `CellLineage.plot_branch_profile()` and `get_branch_profile_figure()`: `showlegend` → `show_legend`, like `show_horizontal_grid`
   - `Straightness.compute()`: `cycle_lin` → `lineage`, as in every other `compute()`
 - **Naming:** metadata fields: `file_location` → `file_path`, the `TrackMate_version` field written by `read_trackmate_xml()` → `trackmate_version`, as `geff_version` and `pycellin_version`, and the `label_imgs_location` field written by `read_ctc()` → `label_images_location`
-- **Properties:** `pycellin.graph.properties` moved to `pycellin.properties`. The `pycellin.graph` package no longer exists
+- **Naming:** the `Model` lineage getters are shorter, and the plural ones return all the lineages or those with the given IDs:
+  - `get_cell_lineage_from_ID()` → `get_cell_lineage()` and `get_cycle_lineage_from_ID()` → `get_cycle_lineage()`
+  - `get_cell_lineages_from_lin_prop(lin_prop, lin_prop_value)` → `get_cell_lineages_by_property(prop, value)`, and likewise for cycle lineages
+  - the `get_lineage_IDs()` alias is removed: use `get_cell_lineage_ids()`
+- **Naming:** lineages are called lineages wherever they are stored: `Data.cell_data` → `Data.cell_lineages` (also the argument of `Data()`), `Data.cycle_data` → `Data.cycle_lineages`, `Model.add_cycle_data()` → `add_cycle_lineages()` and `Model.has_cycle_data()` → `has_cycle_lineages()`. Custom global calculators that read `data.cell_data` must read `data.cell_lineages`
+- **Naming:** `PropsMetadata.props` → `PropsMetadata.properties`, also as an argument of `PropsMetadata()`, since it holds `Property` objects
+- **Naming:** `Model.get_units_per_properties()` → `get_properties_per_unit()`, which says what it returns
+- **Naming:** names only meant for pycellin's own use now start with an underscore, e.g. `check_literal_type()`, `check_fusions()`, `property_type_from_string()`, `property_type_to_strings()` and `ModelUpdater`. `pycellin.utils.is_equal()`, only used by the tests, moved to the tests, and `pycellin.utils.get_pycellin_version()` is replaced by `pc.__version__`
+- **Exceptions:** the exceptions moved from `pycellin.classes.exceptions` to `pycellin.exceptions`, available as `pc.exceptions` (e.g. `pc.exceptions.UpdateRequiredError`)
+- **Lineages:** `get_root()` always returns one node: it raises `LineageStructureError` when the lineage doesn't have exactly one root, instead of returning a list. The new `get_roots()` always returns a list, like `get_leaves()`
+- **Lineages:** `CycleLineage.yield_links_within_cycle()` is removed: use `get_links_within_cycle()`
+- **Properties:** `pycellin.graph.properties` moved to `pycellin.properties`, and its `tracking` module is now `timing`. The `pycellin.graph` package no longer exists
 - **Properties:** rename the `branch_*` properties to `cycle_*`, along with their `add_*()` methods, factories and calculators:
   - `branch_total_displacement` → `cycle_total_displacement`
   - `branch_mean_displacement` → `cycle_mean_displacement`
@@ -84,12 +95,12 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
   - critical metadata (reference time property, time step and unit, pixel size, space unit) must match; other differing metadata values are stored as lineage properties
   - property declarations are checked for compatibility (property type, lineage type, unit, dtype)
   - calculators that rely on external data (e.g. a label image) are not kept
-  - cycle data is handled when only one of the models has some
+  - cycle lineages are handled when only one of the models has some
 - **Model:** `rescale_time()` and `rescale_space()` to convert time or space values into another unit (e.g. frames to minutes, pixels to µm). Rescale right after loading: the properties added before keep their unit, and a warning names those to add again to update it
 - **Model:** `remove_lineages()`
 - **Model:** `relabel_cells()` to give cells consecutive IDs, optionally unique across the whole model
 - **Model:** `remove_intercycle_links()` to remove the outgoing links of division cells
-- **Model:** `get_cell_lineages_from_ids()` and `get_cycle_lineages_from_ids()`
+- **Model:** `get_cell_lineages()` and `get_cycle_lineages()` take an optional `lineage_ids` argument, to get only the lineages with these IDs
 - **Model:** `overwrite_lineage_id` argument to `add_lineage()`
 - **Model:** `lineage_props` argument to `to_cell_dataframe()`, `to_link_dataframe()` and `to_cycle_dataframe()` to include lineage properties in the DataFrame
 - **Model:** `to_cycle_pair_dataframe()` to export pairs of related cell cycles with the properties of both side by side, e.g. to correlate the area at birth of mothers and daughters. The relation is any cycle property listing related cell cycles: `mother_cycle`, `daughter_cycles`, `sister_cycles`, `cousin_cycles`, or a user-defined one. `unique_pairs=True` keeps a single row for pairs listed from both sides, such as sisters
@@ -98,8 +109,8 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** `Property.get_incompatibilities()` to compare two property declarations
 - **Properties:** `pycellin.properties` now exposes the 17 core property factories (`create_cell_id_property()`, `create_time_property()`, ...), to declare properties when building a model from scratch or writing a loader
 - **Properties:** `time` core property with its calculator
-- **Properties:** `cycle_start_time` and `cycle_end_time` core properties, the times of the first and last cells of the cycle in the reference time unit. Like `cycle_duration`, they are computed by `add_cycle_data()`
-- **Properties:** `first_cell` and `last_cell` core properties, the cell IDs of the first and last cells of the cycle. `last_cell` has the same value as `cycle_id`, but says what it is. Like `cells`, they are computed by `add_cycle_data()`. Propagated to the cells, they pick the first or last cell of each cycle in `to_cell_dataframe()`: `df[df["cell_id"] == df["first_cell"]]`
+- **Properties:** `cycle_start_time` and `cycle_end_time` core properties, the times of the first and last cells of the cycle in the reference time unit. Like `cycle_duration`, they are computed by `add_cycle_lineages()`
+- **Properties:** `first_cell` and `last_cell` core properties, the cell IDs of the first and last cells of the cycle. `last_cell` has the same value as `cycle_id`, but says what it is. Like `cells`, they are computed by `add_cycle_lineages()`. Propagated to the cells, they pick the first or last cell of each cycle in `to_cell_dataframe()`: `df[df["cell_id"] == df["first_cell"]]`
 - **Properties:** morphology properties `cell_polygon`, `cell_multipolygon`, `cell_contour`, `cell_area`, `cell_perimeter`, `cell_circularity` and `cell_solidity`
   - `cell_polygon` is computed from a label image or from cell contours (e.g. loaded from TrackMate or CTC data). From a label image, it keeps the largest piece of each label and fills its holes, with a warning listing the cells concerned
   - `cell_multipolygon` is computed from a label image and keeps every piece and hole of each label
@@ -114,13 +125,14 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** `location_tag`, a cell property read from a mask image. `mask_path_metadata_field` reads the mask path from the model metadata, and a `tag_names` dict maps pixel values to region names
 - **Properties:** `normalized_age`, the relative age of a cell divided by the duration of its cell cycle, from 0 at the first cell of the cycle to 1 at the last one. With `ignore_incomplete_cycles=True`, the cells of cycles that start at the root or end with a leaf get NaN
 - **Properties:** `uses_external_data()` class method on calculators
+- **Packaging:** `pc.__version__` gives the installed version of pycellin
 - **Exceptions:** `MissingPropertyError` (a `KeyError`), raised when a required property is missing from a node, an edge or the model
-- **Lineages:** `Lineage.get_depth()`, `CellLineage.get_gaps()` and `CellLineage.get_duration()`
+- **Lineages:** `Lineage.get_depth()`, `Lineage.get_roots()`, `CellLineage.get_gaps()` and `CellLineage.get_duration()`
 - **Lineages:** `get_cousins()` on cell and cycle lineages: first cousins (same grandmother, different mother) by default, more distant ones with `degree`, or all of them with `degree=None`. In cell lineages, only the cousin cells at the same timepoint are returned
 - **Plotting:** `pycellin.styling` module with pycellin colors and two Plotly templates, `pycellin_white` (the new default) and `pycellin_dark`
-- **Plotting:** `Model.plot_mean_cell_prop_over_time()` and `Model.get_mean_cell_prop_over_time_fig()` to plot the mean and std of a cell property over time
+- **Plotting:** `Model.plot_mean_over_time()` and `Model.get_mean_over_time_figure()` to plot the mean and std of a cell property over time
 - **Plotting:** `CellLineage.plot_branch_profile()` and `CellLineage.get_branch_profile_figure()` to plot a cell property along one or several branches, with per-branch styling of markers and lines
-- **Plotting:** `CellLineage.get_branch_lineage()` and `CellLineage.get_branch_lineage_highlight()` to extract or highlight the branch leading to a cell
+- **Plotting:** `CellLineage.get_branch_lineage()` and `CellLineage.get_highlighted_lineage()` to extract or highlight the branch leading to a cell
 - **Plotting:** branch highlights in `CellLineage.plot()` and `get_tree_figure()`, with `target_cells`, `source_cells`, `generations` and `highlight_prop` arguments
 - **Plotting:** support for single-cell lineages
 - **Plotting:** `y_prop` of `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()` also accepts a property identifier, used as axis label. With a `Property`, the hover text now shows its unit too
@@ -160,7 +172,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** `to_cell_dataframe()`, `to_link_dataframe()`, `to_cycle_dataframe()` and `to_lineage_dataframe()` raised a pandas `FutureWarning` when a numeric property was None everywhere in a lineage. With no lineage to export, they now raise a `ValueError` that says so
 - **Model:** with pandas 3.1 or later, `to_cell_dataframe()`, `to_link_dataframe()`, `to_cycle_dataframe()` and `to_lineage_dataframe()` raised a `Pandas4Warning`, since they used pandas' `inplace` argument, deprecated in pandas 3.1 and removed in pandas 4
 - **Model:** the columns of `to_link_dataframe()` came in a different order in each Python session. They now keep the order in which the link properties were added
-- **Model:** `add_cycle_data()` silently kept the properties already declared under the identifiers of its cycle properties, e.g. cycle properties propagated to cell lineages in an exported file and loaded back, so pycellin treated them as cell lineage properties. Such a declaration is now replaced when unused (no values in cell lineages, no calculator), and `add_cycle_data()` raises `ValueError` otherwise, asking to remove it first with `remove_property()`
+- **Model:** `add_cycle_lineages()` (`add_cycle_data()` in 0.5.1) silently kept the properties already declared under the identifiers of its cycle properties, e.g. cycle properties propagated to cell lineages in an exported file and loaded back, so pycellin treated them as cell lineage properties. Such a declaration is now replaced when unused (no values in cell lineages, no calculator), and `add_cycle_lineages()` raises `ValueError` otherwise, asking to remove it first with `remove_property()`
 - **Model:** adding a property already declared, e.g. calling an `add_*()` method again with other arguments, registered the new calculator but kept the first declaration. The declaration is now replaced too, with a warning. A property declared with another property type or lineage type is replaced only when unused, and raises `ValueError` otherwise
 - **Model:** `update()` with a list of properties erased the values of the other cycle properties wherever it rebuilt cycle lineages (all of them after adding a property), left the other properties uncomputed on new or changed cells, and then reported the model as up to date. All the cycle properties are now computed again on rebuilt cycle lineages, and the model still requires an update, which computes the rest. A listed property without calculator, e.g. loaded from a file, made the update fail midway with `KeyError`: it is now ignored with a warning
 - **Model:** a cell, link or lineage removed and then added back with the same ID before `update()` was still treated as removed: `update()` left the cell or link without property values, and deleted the lineage. This also happened without reusing an ID on purpose: once the lineage with the highest ID is removed, the next new lineage gets that ID back (the docstring of `get_next_available_lineage_id()` wrongly said it never does). So `update()` deleted a lineage split off with `split_lineage_from_cell()`, and left a lineage it split itself without cycle lineage and its new cells without property values
@@ -175,7 +187,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **TrackMate:** `turning_angle` (`angle` in 0.5.1) in degrees was exported as a TrackMate angle, which TrackMate reads as radians
 - **TrackMate:** with `keep_all_spots=True` (now `lone_spots="all"`), spots without a track got lineage IDs already used by tracks, so some lineages were silently lost. Their lineage ID is now -cell ID
 - **TrackMate:** the exporter wrote missing values (None) as the string 'None', which TrackMate can't read. They are now written as NaN, which the loader reads back as None for integer properties instead of failing
-- **TrackMate:** without `propagate_cycle_props=True`, the exporter declared the cycle properties as spot features although no spot had their values. In the reloaded model, these declarations remained after `add_cycle_data()`, so pycellin treated the cycle properties as cell lineage properties: `propagate_cycle_properties()` skipped them, or raised when they were listed. Cycle properties are now only declared when propagated
+- **TrackMate:** without `propagate_cycle_props=True`, the exporter declared the cycle properties as spot features although no spot had their values. In the reloaded model, these declarations remained after `add_cycle_lineages()` (`add_cycle_data()` in 0.5.1), so pycellin treated the cycle properties as cell lineage properties: `propagate_cycle_properties()` skipped them, or raised when they were listed. Cycle properties are now only declared when propagated
 - **TrackMate:** the loader failed on files without `POSITION_T`, which TrackMate doesn't require. It is now computed from `FRAME` and the frame interval of the image, with a warning
 - **TrackMate:** the exporter failed with `KeyError` on a model loaded from TrackMate to which a lineage had been added, since that lineage had no `FilteredTrack` flag. A lineage without the flag is now exported as a visible track
 - **TrackMate:** a model loaded from a TrackMate file with cells without contour (`ROI_N_POINTS` of 0, as the exporter writes them) couldn't be exported to TrackMate again: their contour, loaded as None, made the exporter fail with `TypeError`
@@ -209,6 +221,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **trackpy:** exporting a model without divisions, e.g. one loaded from trackpy, warned that the model was already up to date
 - **Packaging:** the PyPI page had broken links: Documentation and Examples led to a site that doesn't exist, the README links to the notebooks didn't open them, and the README logo didn't show. Examples now opens the notebooks on GitHub, Documentation is removed until there is a documentation site, and a Changelog link is added
 - **Docs:** the installation steps of the README, also shown on the PyPI page, created a conda environment without Python, so `pip install pycellin` used the pip of another environment, if any. The environment is now created with Python 3.14
+- **Docs:** `Model.get_cell_lineage_ids()` had lost its docstring to the alias that pointed to it
 - **Docs:** some examples of `add_pycellin_property()` and `add_pycellin_properties()` didn't work:
   - their docstrings used an `in_time_unit` argument, which `add_absolute_age()` and `add_relative_age()` don't have, so the examples raised `TypeError`
   - the docstring of `add_pycellin_properties()` and "Managing properties" added a `cell_cycle_completeness` property, which doesn't exist (`cycle_completeness` in 0.5.1, now `is_complete_cycle`)

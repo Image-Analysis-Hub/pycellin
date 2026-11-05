@@ -371,18 +371,18 @@ class TestCellIntensityFromPolygon:
 class TestCycleMeanIntensity:
     def test_compute(self, data, prop_cycle_lin):
         calculator = CycleMeanIntensity(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], node_id=4) == 2.5
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=4) == 2.5
 
     def test_compute_ignores_nan(self, data, prop_cycle_lin):
-        data.cell_data[1].nodes[1]["cell_mean_intensity"] = np.nan
+        data.cell_lineages[1].nodes[1]["cell_mean_intensity"] = np.nan
         calculator = CycleMeanIntensity(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], node_id=4) == 3.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=4) == 3.0
 
     def test_compute_custom_intensity_prop(self, data, prop_cycle_lin):
         calculator = CycleMeanIntensity(
             prop_cycle_lin, intensity_prop="cell_total_intensity"
         )
-        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 55.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 55.0
 
     def test_get_input_props(self, prop_cycle_lin):
         calculator = CycleMeanIntensity(prop_cycle_lin)
@@ -397,21 +397,21 @@ class TestCycleMeanIntensity:
 class TestBirthIntensity:
     def test_compute_complete_cycle(self, data, prop_cycle_lin):
         calculator = BirthIntensity(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 50.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 50.0
 
     def test_compute_leaf_cycle(self, data, prop_cycle_lin):
         calculator = BirthIntensity(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], node_id=7) == 70.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=7) == 70.0
 
     def test_compute_root_cycle(self, data, prop_cycle_lin):
         calculator = BirthIntensity(prop_cycle_lin)
-        assert math.isnan(calculator.compute(data, data.cycle_data[1], node_id=4))
+        assert math.isnan(calculator.compute(data, data.cycle_lineages[1], node_id=4))
 
     def test_compute_custom_intensity_prop(self, data, prop_cycle_lin):
         calculator = BirthIntensity(
             prop_cycle_lin, intensity_prop="cell_mean_intensity"
         )
-        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 5.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 5.0
 
 
 # DivisionIntensity ###########################################################
@@ -420,18 +420,18 @@ class TestBirthIntensity:
 class TestDivisionIntensity:
     def test_compute_complete_cycle(self, data, prop_cycle_lin):
         calculator = DivisionIntensity(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 60.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 60.0
 
     def test_compute_root_cycle(self, data, prop_cycle_lin):
         calculator = DivisionIntensity(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], node_id=4) == 40.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=4) == 40.0
 
     def test_compute_leaf_cycle(self, data, prop_cycle_lin):
         calculator = DivisionIntensity(prop_cycle_lin)
-        assert math.isnan(calculator.compute(data, data.cycle_data[1], node_id=7))
+        assert math.isnan(calculator.compute(data, data.cycle_lineages[1], node_id=7))
 
     def test_compute_custom_intensity_prop(self, data, prop_cycle_lin):
         calculator = DivisionIntensity(
             prop_cycle_lin, intensity_prop="cell_mean_intensity"
         )
-        assert calculator.compute(data, data.cycle_data[1], node_id=6) == 6.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 6.0

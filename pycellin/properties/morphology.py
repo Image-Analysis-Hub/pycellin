@@ -1084,7 +1084,7 @@ class CellSolidity(NodeLocalPropCalculator):
 # - move area_increment to a notebook as an example of custom property
 
 
-def from_roi_to_array(roi, width, height):
+def _from_roi_to_array(roi, width, height):
     # Actual drawing of the object and conversion to a numpy array.
     img = Image.new("L", (width, height), "black")
     img_draw = ImageDraw.Draw(img)
@@ -1097,7 +1097,7 @@ def from_roi_to_array(roi, width, height):
     return img
 
 
-def adjacent_pixels(img, pixel):
+def _adjacent_pixels(img, pixel):
     i, j = pixel
     adj_px = []
     for k, l in product(range(i - 1, i + 2), range(j - 1, j + 2)):
@@ -1115,7 +1115,7 @@ def adjacent_pixels(img, pixel):
     return adj_px
 
 
-def prune_skel(adjacency_dict):
+def _prune_skel(adjacency_dict):
     # We only want to keep the main skeleton which is the longest path
     # of the graph. To find it, we are looking for the longest shortest
     # path between 2 extremities of the graph. For this, we switch to
@@ -1131,7 +1131,7 @@ def prune_skel(adjacency_dict):
     return nx.to_dict_of_lists(skel_graph, nodelist=longest_path)
 
 
-def from_skel_to_path(adjacency_dict, first_px):
+def _from_skel_to_path(adjacency_dict, first_px):
     # Ordering the skeleton pixels by following along the skeleton,
     # from one tip to another.
     path = [first_px]
@@ -1150,7 +1150,7 @@ def from_skel_to_path(adjacency_dict, first_px):
     return path
 
 
-def from_path_to_line(path, tol):
+def _from_path_to_line(path, tol):
     # Creation of a geometrical line out of the skeleton path.
     line = LineString([Point((x, y)) for (y, x) in path])
     # To get a better approximation of the object lenght, we simplify
@@ -1159,7 +1159,7 @@ def from_path_to_line(path, tol):
     return simplified_line
 
 
-def get_width_and_length(
+def _get_width_and_length(
     node_id: int,
     lineage: CellLineage,
     pixel_size: float,
@@ -1233,7 +1233,7 @@ def get_width_and_length(
     img_height = y_max - y_min + 1 + 4
     # Placing the object in the center of the image.
     roi = [(x - x_min + 2, y - y_min + 2) for (x, y) in roi]
-    img = from_roi_to_array(roi, img_width, img_height)
+    img = _from_roi_to_array(roi, img_width, img_height)
 
     if debug:
         import matplotlib.pyplot as plt
@@ -1273,7 +1273,7 @@ def get_width_and_length(
     pixels_i, pixels_j = np.nonzero(skel)
     pruning = False
     for i, j in zip(pixels_i, pixels_j):
-        adj_px = adjacent_pixels(skel, (i, j))
+        adj_px = _adjacent_pixels(skel, (i, j))
         connectivity = len(adj_px)
         if connectivity > 2:
             # There is a side branching so we will need to prune it later
@@ -1288,7 +1288,7 @@ def get_width_and_length(
             print("PRUNING")
             print(adjacency_dict)
             # print(len(adjacency_dict))
-        adjacency_dict = prune_skel(adjacency_dict)
+        adjacency_dict = _prune_skel(adjacency_dict)
         if debug:
             print(adjacency_dict)
             # print(len(adjacency_dict))
@@ -1344,7 +1344,7 @@ def get_width_and_length(
         # from one tip to another.
         # The skeleton has been pruned so there should be only 2 tips.
         assert len(tip_px) == 2
-        path = from_skel_to_path(adjacency_dict, tip_px[0])
+        path = _from_skel_to_path(adjacency_dict, tip_px[0])
         if debug:
             points = [Point((x, y)) for (y, x) in path]
             xs = [point.x for point in points]
@@ -1355,7 +1355,7 @@ def get_width_and_length(
             ax[0, 2].axis("off")
 
         # Simplification of the path.
-        line = from_path_to_line(path, tolerance)
+        line = _from_path_to_line(path, tolerance)
         if debug:
             ax[0, 2].scatter(*line.xy, color="purple", marker="x", s=10)
             ax[0, 2].plot(*line.xy, color="purple")
@@ -1378,17 +1378,17 @@ def get_width_and_length(
             pixels_i2, pixels_j2 = np.nonzero(skel2)
             pruning2 = False
             for i, j in zip(pixels_i2, pixels_j2):
-                adj_px2 = adjacent_pixels(skel2, (i, j))
+                adj_px2 = _adjacent_pixels(skel2, (i, j))
                 connectivity2 = len(adj_px2)
                 if connectivity2 > 2:
                     pruning2 = True
                 adjacency_dict2[(i, j)] = adj_px2
             if pruning2:
-                adjacency_dict2 = prune_skel(adjacency_dict2)
+                adjacency_dict2 = _prune_skel(adjacency_dict2)
             tip_px2 = [
                 px for px, list_px in adjacency_dict2.items() if len(list_px) == 1
             ]
-            path2 = from_skel_to_path(adjacency_dict2, tip_px2[0])
+            path2 = _from_skel_to_path(adjacency_dict2, tip_px2[0])
             points2 = [Point((x, y)) for (y, x) in path2]
             xs = [point.x for point in points2]
             ys = [point.y for point in points2]
@@ -1396,7 +1396,7 @@ def get_width_and_length(
             ax[1, 2].invert_yaxis()
             ax[1, 2].set_aspect("equal")
             ax[1, 2].axis("off")
-            line2 = from_path_to_line(path2, tolerance)
+            line2 = _from_path_to_line(path2, tolerance)
             ax[1, 2].scatter(*line2.xy, color="purple", marker="x", s=10)
             ax[1, 2].plot(*line2.xy, color="purple")
             ax[1, 2].contour(img, [0.5], colors="b")
@@ -1538,7 +1538,7 @@ class RodWidth(NodeLocalPropCalculator):
     def compute(  # type: ignore[override]
         self, lineage: CellLineage, node_id: int
     ) -> float:
-        return get_width_and_length(
+        return _get_width_and_length(
             node_id,
             lineage,
             self.pixel_size,
@@ -1595,7 +1595,7 @@ class RodLength(NodeLocalPropCalculator):
     def compute(  # type: ignore[override]
         self, lineage: CellLineage, node_id: int
     ) -> float:
-        return get_width_and_length(
+        return _get_width_and_length(
             node_id,
             lineage,
             self.pixel_size,
@@ -1670,7 +1670,7 @@ if __name__ == "__main__":
     xml = "sample_data/FakeTracks.xml"
 
     model = read_trackmate_xml(xml, lone_spots="all", tracks="all")
-    lineage = model.data.cell_data[0]
+    lineage = model.data.cell_lineages[0]
     # print(lineage.nodes[2004]["cell_contour"])
     node = 2035
     print(lineage.nodes[node]["area"])

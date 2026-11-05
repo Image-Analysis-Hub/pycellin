@@ -8,8 +8,8 @@ from typing import Any
 import numpy as np
 
 from pycellin.classes.data import Data
-from pycellin.classes.exceptions import FusionError
 from pycellin.classes.lineage import CycleLineage
+from pycellin.exceptions import FusionError
 
 
 def _get_cycle_node_property_values(
@@ -43,7 +43,7 @@ def _get_cycle_node_property_values(
         If the property does not exist in the cell lineage.
     """
     lin_id = lineage.graph["lineage_id"]
-    cell_lin = data.cell_data[lin_id]
+    cell_lin = data.cell_lineages[lin_id]
     try:
         values = [cell_lin.nodes[cid][prop_name] for cid in lineage.nodes[nid]["cells"]]
     except KeyError:
@@ -87,11 +87,11 @@ def _get_cycle_edge_property_values(
         If the property does not exist in the cell lineage.
     """
     lin_id = lineage.graph["lineage_id"]
-    cell_lin = data.cell_data[lin_id]
+    cell_lin = data.cell_lineages[lin_id]
     try:
         values = [
             cell_lin.edges[edge][prop_name]
-            for edge in lineage.yield_links_within_cycle(nid)
+            for edge in lineage.get_links_within_cycle(nid)
         ]
     except KeyError:
         raise KeyError(
@@ -155,7 +155,7 @@ def _nansum(values: list[Any]) -> float:
     return np.nansum(array).item()
 
 
-class PropertyExtractor(ast.NodeVisitor):
+class _PropertyExtractor(ast.NodeVisitor):
     """
     AST visitor to extract property information from create_xxxxx_property functions.
     """
@@ -265,7 +265,7 @@ def _discover_props_via_ast(include_core: bool) -> dict[str, dict[str, str]]:
             continue
         try:
             tree = ast.parse(py_file.read_text(encoding="utf-8"))
-            extractor = PropertyExtractor()
+            extractor = _PropertyExtractor()
             extractor.visit(tree)
             all_props.update(extractor.properties)
         except (FileNotFoundError, OSError, SyntaxError, UnicodeDecodeError):
