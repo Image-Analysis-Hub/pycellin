@@ -1,6 +1,7 @@
 import logging
 import numbers
 from collections import Counter
+from collections.abc import Iterable
 from typing import Any
 
 import networkx as nx
@@ -544,13 +545,13 @@ def _has_lin_id(lineage: nx.DiGraph, lineage_id_key: str) -> bool:
     return any(lin_id is not None for _, lin_id in lineage.nodes(data=lineage_id_key))
 
 
-def _get_int_ids(ids: set[Any]) -> list[int]:
+def _get_int_ids(ids: Iterable[Any]) -> list[int]:
     """
-    Return the integer IDs of a set of IDs, NumPy integers included.
+    Return the integer IDs among some IDs, NumPy integers included.
 
     Parameters
     ----------
-    ids : set[Any]
+    ids : Iterable[Any]
         The IDs, which can be of any type.
 
     Returns

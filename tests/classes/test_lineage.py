@@ -3,6 +3,7 @@
 """Unit test for CellLineage and CycleLineage classes from lineage.py module."""
 
 import networkx as nx
+import numpy as np
 import plotly.io as pio
 import pytest
 
@@ -218,6 +219,21 @@ def cycle_lin_balanced(cell_lin_balanced):
 # Test classes ###############################################################
 
 # Base Lineage functionality
+
+
+class TestLineageInit:
+    """Test cases for the lineage ID given to the Lineage constructor."""
+
+    @pytest.mark.parametrize("lineage_id", [3, np.int64(3), np.int32(3)])
+    def test_integer_stored_as_python_int(self, lineage_id):
+        lineage = CellLineage(lineage_id=lineage_id)
+        assert lineage.graph["lineage_id"] == 3
+        assert type(lineage.graph["lineage_id"]) is int
+
+    @pytest.mark.parametrize("lineage_id", [3.0, "3", True])
+    def test_non_integer_raises(self, lineage_id):
+        with pytest.raises(TypeError, match="'lineage_id' must be an integer"):
+            CellLineage(lineage_id=lineage_id)
 
 
 class TestLineageRemoveProp:

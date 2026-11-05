@@ -1647,6 +1647,8 @@ class Model:
 
         Raises
         ------
+        TypeError
+            If the lineage ID, provided or from the lineage, is not an integer.
         ValueError
             If `lineage_id` is provided and conflicts with the lineage's existing
             internal `lineage_id` and `overwrite_lineage_id` is False.
@@ -1683,6 +1685,8 @@ class Model:
             if lineage_id is None:
                 lineage_id = self.get_next_available_lineage_id()
 
+        _check_integer(lineage_id, "lineage_id")
+        lineage_id = int(lineage_id)
         if lineage_id in self.get_cell_lineage_ids():
             raise ValueError(
                 f"Lineage with ID {lineage_id} already exists in the model."
@@ -1691,8 +1695,8 @@ class Model:
         # Update the data.
         self.data.cell_lineages[lineage_id] = lineage
         if lineage.graph.get("lineage_id") != lineage_id:
-            lineage.graph["lineage_id"] = lineage_id
             nx.set_node_attributes(lineage, lineage_id, "lineage_id")
+        lineage.graph["lineage_id"] = lineage_id
 
         if with_cycle_lineage:
             if self.data.cycle_lineages is None:
@@ -1813,6 +1817,10 @@ class Model:
         ------
         KeyError
             If the lineage with the specified ID does not exist in the model.
+        TypeError
+            If `new_lineage_id` is not an integer.
+        ValueError
+            If `new_lineage_id` is already in use by a lineage of the model.
         """
         # TODO: unclear method... and the case where the cell is a division
         # and split is downstream is not handled correctly (we end up with
@@ -1821,6 +1829,13 @@ class Model:
             lineage = self.data.cell_lineages[lineage_id]
         except KeyError as err:
             raise KeyError(f"Lineage with ID {lineage_id} does not exist.") from err
+        if new_lineage_id is not None:
+            _check_integer(new_lineage_id, "new_lineage_id")
+            new_lineage_id = int(new_lineage_id)
+            if new_lineage_id in self.data.cell_lineages:
+                raise ValueError(
+                    f"Lineage with ID {new_lineage_id} already exists in the model."
+                )
 
         # Create the new lineage.
         new_lineage = lineage._split_from_cell(cell_id, split)

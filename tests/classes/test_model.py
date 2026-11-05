@@ -1759,6 +1759,38 @@ class TestAddLineage:
             two_lineages_model.data.cell_lineages[2].edges[10, 11]["link_value"] == 1.0
         )
 
+    @pytest.mark.parametrize("with_lineage", [False, True])
+    def test_numpy_id_stored_as_python_int(self, two_lineages_model, with_lineage):
+        model = two_lineages_model
+        lineage = CellLineage() if with_lineage else None
+        model.add_lineage(lineage, lineage_id=np.int64(7))
+        # A NumPy ID would also make the next available ID a NumPy integer.
+        assert model.add_lineage() == 8
+        assert {type(lid) for lid in model.get_cell_lineage_ids()} == {int}
+        assert type(model.data.cell_lineages[7].graph["lineage_id"]) is int
+
+    def test_numpy_id_of_lineage_stored_as_python_int(self, two_lineages_model):
+        model = two_lineages_model
+        lineage = CellLineage()
+        lineage.graph["lineage_id"] = np.int64(7)
+        model.add_lineage(lineage)
+        assert {type(lid) for lid in model.get_cell_lineage_ids()} == {int}
+        assert type(lineage.graph["lineage_id"]) is int
+
+    @pytest.mark.parametrize("wrong_id", [7.0, "7", True])
+    def test_non_integer_id_raises(self, two_lineages_model, wrong_id):
+        model = two_lineages_model
+        lineage_with_id = CellLineage()
+        lineage_with_id.graph["lineage_id"] = wrong_id
+        message = "'lineage_id' must be an integer"
+        with pytest.raises(TypeError, match=message):
+            model.add_lineage(lineage_id=wrong_id)
+        with pytest.raises(TypeError, match=message):
+            model.add_lineage(CellLineage(), lineage_id=wrong_id)
+        with pytest.raises(TypeError, match=message):
+            model.add_lineage(lineage_with_id)
+        assert model.get_cell_lineage_ids() == [1, 2]
+
 
 class TestRemoveLineage:
     """Test cases for Model.remove_lineage() method."""
@@ -1800,6 +1832,31 @@ class TestSplitLineageFromCell:
         two_lineages_model.update()
         new_lineage = two_lineages_model.data.cell_lineages[3]
         assert dict(new_lineage.nodes(data="lineage_id")) == {4: 3, 5: 3}
+
+    def test_numpy_id_stored_as_python_int(self, two_lineages_model):
+        model = two_lineages_model
+        new_lineage = model.split_lineage_from_cell(
+            cell_id=4, lineage_id=1, new_lineage_id=np.int64(7)
+        )
+        assert {type(lid) for lid in model.get_cell_lineage_ids()} == {int}
+        assert type(new_lineage.graph["lineage_id"]) is int
+
+    def test_id_in_use_raises_and_keeps_lineages(self, two_lineages_model):
+        with pytest.raises(ValueError, match="Lineage with ID 2 already exists"):
+            two_lineages_model.split_lineage_from_cell(
+                cell_id=4, lineage_id=1, new_lineage_id=2
+            )
+        lineages = two_lineages_model.data.cell_lineages
+        assert set(lineages[1].nodes) == {1, 2, 3, 4, 5}
+        assert set(lineages[2].nodes) == {10, 11}
+
+    @pytest.mark.parametrize("wrong_id", [7.0, "7", True])
+    def test_non_integer_id_raises_and_keeps_cells(self, two_lineages_model, wrong_id):
+        with pytest.raises(TypeError, match="'new_lineage_id' must be an integer"):
+            two_lineages_model.split_lineage_from_cell(
+                cell_id=4, lineage_id=1, new_lineage_id=wrong_id
+            )
+        assert set(two_lineages_model.data.cell_lineages[1].nodes) == {1, 2, 3, 4, 5}
 
 
 class TestAddCell:

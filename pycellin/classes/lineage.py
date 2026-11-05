@@ -26,6 +26,7 @@ from pycellin.styling import (
     BRANCH_PROFILE_NODE_MARKER,
     PYCELLIN_PURPLE,
 )
+from pycellin.utils import _check_integer
 
 _DEFAULT_UNMAPPED_COLOR = "dimgrey"
 
@@ -67,12 +68,18 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             A NetworkX directed graph to initialize the lineage with,
             by default None.
         lineage_id : int, optional
-            The ID of the lineage, by default None.
+            The ID of the lineage, by default None. NumPy integers are stored as
+            Python integers.
+
+        Raises
+        ------
+        TypeError
+            If `lineage_id` is not an integer.
         """
         super().__init__(incoming_graph_data=nx_digraph)
         if lineage_id is not None:
-            assert isinstance(lineage_id, int), "The lineage ID must be an integer."
-            self.graph["lineage_id"] = lineage_id
+            _check_integer(lineage_id, "lineage_id")
+            self.graph["lineage_id"] = int(lineage_id)
 
     def _remove_prop(
         self, prop_name: str, prop_type: PropertyType | None = None
