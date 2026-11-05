@@ -14,6 +14,29 @@ def _check_literal_type(value, literal_type) -> bool:
     raise TypeError(f"{literal_type} is not a Literal type")
 
 
+def _check_integer(value: Any, name: str) -> None:
+    """
+    Check that a value is an integer.
+
+    NumPy integers are accepted, since they are what the integers of a DataFrame are.
+    Booleans are rejected, although bool is a subclass of int.
+
+    Parameters
+    ----------
+    value : Any
+        The value to check.
+    name : str
+        The name of the value, for the error message.
+
+    Raises
+    ------
+    TypeError
+        If the value is not an integer.
+    """
+    if isinstance(value, bool) or not isinstance(value, numbers.Integral):
+        raise TypeError(f"'{name}' must be an integer, not {type(value).__name__}.")
+
+
 def _color_to_rgba(color: str, alpha: float) -> str:
     """
     Convert an 'rgb(r,g,b)' or '#rrggbb' color to an 'rgba(r,g,b,a)' string.

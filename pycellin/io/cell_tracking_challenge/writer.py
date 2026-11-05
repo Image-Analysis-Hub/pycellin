@@ -15,13 +15,13 @@ References:
 https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content%20conventions.pdf
 """
 
-import numbers
 from pathlib import Path
 
 from pycellin.classes.lineage import CellLineage
 from pycellin.classes.model import Model
 from pycellin.exceptions import FusionError
 from pycellin.io.utils import _check_up_to_date
+from pycellin.utils import _check_integer
 
 # TODO: need to extensively test this.
 # TODO: check beforehand for fusions and gap just after division. No need to start
@@ -270,10 +270,7 @@ def write_ctc(
     ValueError
         If `frame_offset` gives cells a negative frame.
     """
-    if isinstance(frame_offset, bool) or not isinstance(frame_offset, numbers.Integral):
-        raise TypeError(
-            f"'frame_offset' must be an integer, not {type(frame_offset).__name__}."
-        )
+    _check_integer(frame_offset, "frame_offset")
     _check_up_to_date(model)
     lineages = [lineage for lineage in model.data.cell_lineages.values()]
     timepoints = [lin.nodes[cid]["timepoint"] for lin in lineages for cid in lin.nodes]

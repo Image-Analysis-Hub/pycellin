@@ -1688,6 +1688,46 @@ class TestPropagateCycleProperties:
             assert all("mother_cycle" in cell for _, cell in lin.nodes(data=True))
 
 
+class TestLineageGettersIds:
+    """Test cases for the lineage IDs accepted by the Model lineage getters."""
+
+    @pytest.mark.parametrize("wrong_id", [1.0, "1", None, True])
+    def test_non_integer_id_raises(self, two_lineages_model, wrong_id):
+        model = two_lineages_model
+        for getter in (model.get_cell_lineage, model.get_cycle_lineage):
+            with pytest.raises(TypeError, match="must be an integer"):
+                getter(wrong_id)
+        for getter in (model.get_cell_lineages, model.get_cycle_lineages):
+            with pytest.raises(TypeError, match="must be an integer"):
+                getter([wrong_id])
+
+    def test_lineage_instead_of_id_raises(self, two_lineages_model):
+        model = two_lineages_model
+        lin = model.get_cell_lineage(1)
+        clin = model.get_cycle_lineage(1)
+        with pytest.raises(TypeError, match="not CellLineage"):
+            model.get_cell_lineage(lin)
+        with pytest.raises(TypeError, match="not CycleLineage"):
+            model.get_cycle_lineage(clin)
+        with pytest.raises(TypeError, match="not CellLineage"):
+            model.get_cell_lineages([lin])
+        # Not in a list: a lineage is iterable over its cell IDs, all integers.
+        with pytest.raises(TypeError, match="not CellLineage"):
+            model.get_cell_lineages(lin)
+        with pytest.raises(TypeError, match="not CycleLineage"):
+            model.get_cycle_lineages(clin)
+
+    def test_numpy_integers_accepted(self, two_lineages_model):
+        model = two_lineages_model
+        assert model.get_cell_lineage(np.int64(1)) is model.get_cell_lineage(1)
+        assert model.get_cycle_lineage(np.int32(1)) is model.get_cycle_lineage(1)
+        assert model.get_cell_lineages(np.array([1, 2])) == model.get_cell_lineages()
+
+    def test_unknown_integer_id_gives_none(self, two_lineages_model):
+        assert two_lineages_model.get_cell_lineage(99) is None
+        assert two_lineages_model.get_cycle_lineage(99) is None
+
+
 class TestAddLineage:
     """Test cases for Model.add_lineage() method."""
 

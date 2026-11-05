@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to c450f16, plus the uncommitted rename pass 5 (methods, attributes and privacy: lineage getters, `get_root`/`get_roots`, `cell_lineages`, `add_cycle_lineages`, `PropsMetadata.properties`, underscores, `pycellin.exceptions`, `properties.timing`). Update from there with: git log c450f16..dev -->
+<!-- Planned v0.6.0. Covers commits up to ee50c5c, plus the uncommitted check of the IDs given to the lineage getters (`TypeError` for a non-integer ID). Update from there with: git log ee50c5c..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -75,6 +75,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** `Property` setters raise `TypeError` instead of `ValueError` when given a non-string value
 - **Model:** remove the `Model.recompute_property()` and `Model.export()` stubs, which did nothing. Use the `pycellin.write_*()` functions
 - **Model:** `add_cell()`, `remove_cell()`, `add_link()`, `remove_link()` and `split_lineage_from_cell()` take the lineage IDs, and the arguments after them, by keyword only, e.g. `model.remove_cell(5, lineage_id=0)`. Cell and lineage IDs are both integers, and these methods took them in different orders (`add_cell(lid, cid)` but `remove_cell(cid, lid)`), so a call written by analogy silently acted on another cell. `add_link()` now takes the two cell IDs first: `add_link(source_cell_id, target_cell_id, source_lineage_id=...)`. Calls written the old way fail with `TypeError`
+- **Model:** `get_cell_lineage()`, `get_cycle_lineage()`, `get_cell_lineages()` and `get_cycle_lineages()` raise `TypeError` for a lineage ID that isn't an integer, e.g. a lineage or a float, and for a lineage given instead of a list of IDs. They used to return None or an empty list, or even other lineages. NumPy integers work, and an unknown ID still gives None
 - **Lineages:** rename `CellLineage.get_sister_cells()` to `get_sisters()`, which also works on cycle lineages, where it returns the sister cell cycles
 - **Plotting:** rename `node_color_scale` to `node_colormap` in `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()`
 - **TrackMate:** `read_trackmate_xml()` takes `lone_spots` and `tracks` instead of `keep_all_spots` and `keep_all_tracks`, which name what it loads in TrackMate's terms: `lone_spots` is `"none"` (default), `"visible"` or `"all"` for the spots outside tracks, and `tracks` is `"visible"` (default) or `"all"`. Visible spots and tracks passed the spot and track filters of TrackMate (`VISIBILITY` of 1, listed in `FilteredTracks`). Replace `keep_all_spots=True` with `lone_spots="all"`, and `keep_all_tracks=True` with `tracks="all"`. `lone_spots="visible"` is new: it adds the spots outside tracks that TrackMate shows, without those its spot filters hid

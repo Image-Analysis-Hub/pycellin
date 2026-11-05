@@ -36,7 +36,7 @@ from pycellin.properties.core import (
     create_timepoint_property,
 )
 from pycellin.styling import PYCELLIN_PURPLE
-from pycellin.utils import _color_to_rgba, _infer_dtype, _unit_uses
+from pycellin.utils import _check_integer, _color_to_rgba, _infer_dtype, _unit_uses
 
 _L = TypeVar("_L", bound="Lineage")
 
@@ -1157,7 +1157,13 @@ class Model:
         -------
         CellLineage | None
             The cell lineage with the specified ID, or None if it isn't in the model.
+
+        Raises
+        ------
+        TypeError
+            If `lineage_id` is not an integer, e.g. if it is a lineage.
         """
+        _check_integer(lineage_id, "lineage_id")
         if lineage_id in self.data.cell_lineages:
             return self.data.cell_lineages[lineage_id]
         else:
@@ -1176,7 +1182,13 @@ class Model:
         -------
         CycleLineage | None
             The cycle lineage with the specified ID, or None if it isn't in the model.
+
+        Raises
+        ------
+        TypeError
+            If `lineage_id` is not an integer, e.g. if it is a lineage.
         """
+        _check_integer(lineage_id, "lineage_id")
         if self.data.cycle_lineages and lineage_id in self.data.cycle_lineages:
             return self.data.cycle_lineages[lineage_id]
         else:
@@ -1204,9 +1216,20 @@ class Model:
         list[CellLineage | None]
             The cell lineages. The list only holds None values if `lineage_ids` is
             given and `ignore_missing` is False.
+
+        Raises
+        ------
+        TypeError
+            If `lineage_ids` is a lineage, or if one of its values is not an integer.
         """
         if lineage_ids is None:
             return list(self.data.cell_lineages.values())
+        # A lineage is iterable over its cell IDs, which would be taken for lineage IDs.
+        if isinstance(lineage_ids, Lineage):
+            raise TypeError(
+                "'lineage_ids' must be a list of integers, "
+                f"not {type(lineage_ids).__name__}."
+            )
         lins = [self.get_cell_lineage(lid) for lid in lineage_ids]
         if ignore_missing:
             lins = [lin for lin in lins if lin is not None]
@@ -1234,11 +1257,22 @@ class Model:
         list[CycleLineage | None]
             The cycle lineages. The list only holds None values if `lineage_ids` is
             given and `ignore_missing` is False.
+
+        Raises
+        ------
+        TypeError
+            If `lineage_ids` is a lineage, or if one of its values is not an integer.
         """
         if lineage_ids is None:
             if self.data.cycle_lineages is None:
                 return []
             return list(self.data.cycle_lineages.values())
+        # A lineage is iterable over its cell IDs, which would be taken for lineage IDs.
+        if isinstance(lineage_ids, Lineage):
+            raise TypeError(
+                "'lineage_ids' must be a list of integers, "
+                f"not {type(lineage_ids).__name__}."
+            )
         lins = [self.get_cycle_lineage(lid) for lid in lineage_ids]
         if ignore_missing:
             lins = [lin for lin in lins if lin is not None]
