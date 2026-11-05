@@ -1694,6 +1694,22 @@ class TestPropagateCycleProperties:
             assert all("mother_cycle" in cell for _, cell in lin.nodes(data=True))
 
 
+class TestMergeCalculators:
+    """Test cases for the calculators a merge adds to a model."""
+
+    def test_reading_property_without_calculator(self, two_lineages_model):
+        """Test that a calculator reading a property without calculator is added with
+        it, when merging in place into a model that has neither."""
+        other_model = copy.deepcopy(two_lineages_model)
+        other_model.props_metadata._add_prop(_create_test_property("input", "node"))
+        other_model.add_custom_property(
+            InputCopy(_create_test_property("input_copy", "node"), "input")
+        )
+        two_lineages_model.merge(other_model, in_place=True)
+        assert two_lineages_model.has_property("input")
+        assert "input_copy" in two_lineages_model._updater._calculators
+
+
 class TestExternalDataOnMergedModel:
     """Test cases for properties reading external data on a merged model."""
 

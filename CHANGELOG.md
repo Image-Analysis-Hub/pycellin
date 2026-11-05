@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 2dec97d, plus the uncommitted warning when a property reading an image is added to a merged model. Update from there with: git log 2dec97d..dev -->
+<!-- Planned v0.6.0. Covers commits up to c5181fd, plus the uncommitted order in which `merge()` declares properties (no entry: `merge()` is new in this version). Update from there with: git log c5181fd..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 

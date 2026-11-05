@@ -6185,14 +6185,15 @@ class Model:
             model1.props_metadata._add_cycle_lineage_props(time_unit)
 
         # Properties.
-        # Model2's calculators are registered in model2's order, since properties
+        # Properties without calculator come first, since calculators can read them.
+        # Model2's calculators are then registered in model2's order, since properties
         # are computed in calculator registration order.
-        props_order = [prop_id for prop_id in dict_calcs2 if prop_id in props_to_add]
-        props_order += [
+        props_order = [
             prop_id
             for prop_id in props2
             if prop_id in props_to_add and prop_id not in dict_calcs2
         ]
+        props_order += [prop_id for prop_id in dict_calcs2 if prop_id in props_to_add]
         for prop_id in props_order:
             # Skip the core cycle lineage properties declared with the cycle lineages.
             if model1.has_property(prop_id):
