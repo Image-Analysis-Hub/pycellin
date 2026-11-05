@@ -152,6 +152,16 @@ def cell_lin_unconnected_component_div(cell_lin_unconnected_component):
 
 
 @pytest.fixture
+def cell_lin_fusion():
+    # Separate cells 1 and 2 merge into cell 3.
+    lineage = CellLineage(lineage_id=1)
+    for cell_id in (1, 2, 3, 4):
+        lineage.add_node(cell_id, timepoint=cell_id, cell_id=cell_id)
+    lineage.add_edges_from([(1, 3), (2, 3), (3, 4)])
+    return lineage
+
+
+@pytest.fixture
 def cell_lin_balanced():
     # Three rounds of divisions numbered like a binary heap: cell n divides into
     # cells 2n and 2n + 1, from 1 -> (2, 3) to 7 -> (14, 15). Then cells 8 to 15
@@ -349,6 +359,11 @@ class TestLineageGetRoot:
             cell_lin_unconnected_component.get_root()
         with pytest.raises(LineageStructureError, match=r"2 roots: \[1, 17\]"):
             cell_lin_unconnected_component.get_root(ignore_lone_nodes=True)
+
+    def test_fusion(self, cell_lin_fusion):
+        """Test get_root on lineage whose several roots come from a fusion."""
+        with pytest.raises(FusionError, match=r"2 roots: \[1, 2\].*fusions.*\[3\]"):
+            cell_lin_fusion.get_root()
 
 
 class TestLineageGetRoots:
@@ -1042,6 +1057,16 @@ class TestCellLineageAddLink:
         with pytest.raises(FusionError):
             cell_lin._add_link(5, 12)
 
+    def test_fusion_error_different_lineages(self, cell_lin):
+        """Test the FusionError names the lineage of the target cell."""
+        new_lin = CellLineage(lineage_id=2)
+        new_lin.add_node(19, timepoint=1, cell_id=19)
+        new_lin.add_node(20, timepoint=2, cell_id=20)
+        new_lin.add_edge(19, 20)
+        with pytest.raises(FusionError, match="Cell 20 in lineage 2 already") as err:
+            cell_lin._add_link(1, 20, target_lineage=new_lin)
+        assert err.value.lineage_id == 2
+
     def test_time_flow_error(self, cell_lin):
         """Test _add_link raises TimeFlowError for time flow violations."""
         cell_lin.add_node(17, timepoint=1, cell_id=17)
@@ -1237,6 +1262,20 @@ class TestCellLineageRemoveLink:
 
 
 # CellLineage advanced operations
+
+
+class TestCellLineageGetBranchLineage:
+    """Test cases for CellLineage.get_branch_lineage method."""
+
+    def test_fusion_error(self, cell_lin_fusion):
+        """Test a fusion that keeps the ancestors of the cell from forming a path."""
+        with pytest.raises(FusionError, match="Node 3 "):
+            cell_lin_fusion.get_branch_lineage(4)
+
+    def test_path_through_fusion(self, cell_lin_fusion):
+        """Test a fusion is no problem while the selected cells form a path."""
+        branch = cell_lin_fusion.get_branch_lineage(4, source_cell=2)
+        assert list(branch.nodes) == [2, 3, 4]
 
 
 class TestCellLineageGetHighlightedLineage:

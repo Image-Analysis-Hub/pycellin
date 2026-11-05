@@ -29,11 +29,13 @@ def _check_fusions(model: Model) -> None:
     all_fusions = model.get_fusions()
     if all_fusions:
         # TODO: link toward correct documentation when it is written.
+        num = len(all_fusions)
         fusion_warning = (
-            f"Unsupported data, {len(all_fusions)} cell fusions detected. "
-            "It is advised to deal with them before any other processing, "
+            f"Unsupported data, {num} cell fusion{'s' if num > 1 else ''} detected. "
+            "It is advised to deal with fusions before any other processing, "
             "especially for tracking related properties. Crashes and incorrect "
-            "results can occur. See documentation for more details."
+            "results can occur. Use model.get_fusions() to list them and "
+            "model.remove_link() to correct them."
         )
         logger.warning(fusion_warning)
 

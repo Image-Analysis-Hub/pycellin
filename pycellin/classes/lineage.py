@@ -161,6 +161,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ------
         LineageStructureError
             If the lineage doesn't have exactly one root, e.g. if it is empty.
+            It is a `FusionError` when the lineage has several roots and cell fusions.
         """
         roots = self.get_roots(ignore_lone_nodes=ignore_lone_nodes)
         if len(roots) == 1:
@@ -169,6 +170,16 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         lineage = f"{type(self).__name__} {lineage_id}"
         if not roots:
             raise LineageStructureError(f"{lineage} has no root.")
+        fusions = self.get_fusions()
+        if fusions:
+            raise FusionError(
+                fusions[0],
+                self.graph.get("lineage_id"),
+                f"{lineage} has {len(roots)} roots: {roots}, probably because of its "
+                f"cell fusions, i.e. cells with more than one parent: {fusions}. Use "
+                "get_roots() to get all the roots and model.remove_link() to correct "
+                "the fusions.",
+            )
         raise LineageStructureError(
             f"{lineage} has {len(roots)} roots: {roots}. "
             "Use get_roots() to get them all."
@@ -1395,7 +1406,13 @@ class CellLineage(Lineage):
 
         # Check that the link will not create a fusion event.
         if target_lineage.in_degree(target_nid) != 0:
-            raise FusionError(target_nid, source_lid)
+            raise FusionError(
+                target_nid,
+                target_lid,
+                f"Cell {target_nid}{txt_tgt} already has a parent cell, so a link from "
+                f"cell {source_nid}{txt_src} can't be added: Pycellin doesn't support "
+                "cell fusions.",
+            )
 
         # Check that the link respects the flow of time.
         if (
@@ -1621,6 +1638,8 @@ class CellLineage(Lineage):
             If generations is not a positive integer or None, if generations
             and source_cell are both given, or if source_cell is not upstream of
             target_cell.
+        FusionError
+            If a cell fusion keeps the selected cells from forming a path.
         """
         if generations is not None and source_cell is not None:
             raise ValueError("generations and source_cell cannot both be specified.")
@@ -1665,6 +1684,11 @@ class CellLineage(Lineage):
         for node in selected_path:
             branch.add_node(node, **self.nodes[node])
         for source, target in pairwise(selected_path):
+            if not self.has_edge(source, target):
+                # The cells don't form a path, because of a cell with several parents.
+                fusions = [c for c in selected_path[1:] if self.in_degree[c] > 1]
+                if fusions:
+                    raise FusionError(fusions[0], self.graph.get("lineage_id"))
             branch.add_edge(source, target, **self.edges[source, target])
         branch.graph["source_lineage_id"] = self.graph.get("lineage_id")
         branch.graph["target_cell_id"] = target_cell
@@ -2587,6 +2611,8 @@ class CellLineage(Lineage):
             not upstream of its target.
         MissingPropertyError
             If a name in `node_hover_props` is absent from a plotted node.
+        FusionError
+            If a cell fusion keeps the cells of a branch from forming a path.
 
         See Also
         --------
