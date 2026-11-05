@@ -233,7 +233,10 @@ def _add_all_props(
         # Features stored in the FeatureDeclarations tag.
         props = _get_props_dict(iterator, element)
         for prop in props:
-            _convert_and_add_prop(prop, element.tag, props_md, units)
+            # 'name' is the display name of spots and tracks, not a feature, but files
+            # written by earlier versions of pycellin can declare it.
+            if prop["feature"] != "name" or element.tag == "EdgeFeatures":
+                _convert_and_add_prop(prop, element.tag, props_md, units)
 
         # Feature used in Spot tags but not declared in the FeatureDeclarations tag.
         if element.tag == "SpotFeatures":
@@ -299,7 +302,10 @@ def _convert_attributes(
     """
     # TODO: Rewrite this.
     for key, value in attributes.items():
-        if key in props:
+        if key == "name" and prop_type != "edge":
+            # Display name of spots and tracks, even when links have a 'name' property.
+            pass
+        elif key in props:
             match props[key].dtype:
                 case "int":
                     # Missing values are written as NaN, which int() can't parse.
@@ -314,9 +320,6 @@ def _convert_attributes(
         elif key == "ID":
             # IDs are always integers.
             attributes[key] = int(value)  # type: ignore
-        elif key == "name":
-            # "name" is a string so we don't need to convert it.
-            pass
         elif key == "ROI_N_POINTS":
             # This attribute is a special case (stored as a tag text instead of tag
             # attribute) and will be converted later, in _add_ROI_coordinates().

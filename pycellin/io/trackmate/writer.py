@@ -362,7 +362,9 @@ def _write_FeatureDeclarations(
 
     Only the properties of cell lineages are declared, since TrackMate has no
     cycle lineages. Cycle properties are declared once propagated to the cell
-    lineages, which gives them the lineage type "both".
+    lineages, which gives them the lineage type "both". A property called 'name' on
+    cells or lineages isn't declared either: it is written as the display name of spots
+    or tracks, which TrackMate doesn't read as a feature.
 
     Parameters
     ----------
@@ -396,6 +398,8 @@ def _write_FeatureDeclarations(
                 for prop in props.values():
                     if prop.lineage_type == "cycle":
                         continue  # no values on spots, edges or tracks
+                    if prop.identifier == "name" and f_type != "EdgeFeatures":
+                        continue  # display name of spots and tracks, not a feature
                     trackmate_feat = _convert_prop_to_feat(prop)
                     if trackmate_feat:
                         if first_feat_written:
@@ -882,8 +886,12 @@ def _remove_non_numeric_props(model: Model) -> None:
         if prop.provenance != "TrackMate" and not _is_numeric_dtype(prop.dtype)
     ]
     # The only exception is 'name' which is a string property that TrackMate can handle
-    # as the display name of a spot or a track.
-    to_remove = [name for name in to_remove if name != "name"]
+    # as the display name of a spot or a track, but not of a link.
+    to_remove = [
+        name
+        for name in to_remove
+        if name != "name" or model.get_property(name).prop_type == PropertyType.EDGE
+    ]
     if to_remove:
         for name in to_remove:
             try:
@@ -1487,7 +1495,9 @@ def write_trackmate_xml(
 
     TrackMate only supports numeric features. Non-numeric properties (strings,
     lists, polygons...) are not exported, except TrackMate's own properties and
-    'name'. Boolean properties are exported as integers (1 for True, 0 for False).
+    'name' on cells or lineages, written as the display name of spots or tracks that
+    have no 'cell_name' or 'lineage_name'. Boolean properties are exported as integers
+    (1 for True, 0 for False).
     Attributes of cells, links and lineages without a property declaration are not
     exported either, and a warning names them.
     For example, a location tag added with `tag_names` holds strings and is not

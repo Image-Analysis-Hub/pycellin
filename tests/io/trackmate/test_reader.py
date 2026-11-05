@@ -397,6 +397,26 @@ def test_add_all_props(
     assert obtained == expected
 
 
+def test_add_all_props_name_declared():
+    """Test that 'name', declared as a feature by some files, gives no property: it
+    would convert the display names of spots and tracks."""
+    xml_data = (
+        "<FeatureDeclarations>"
+        "   <TrackFeatures>"
+        '       <Feature feature="name" name="Name" isint="false" dimension="NONE"/>'
+        "   </TrackFeatures>"
+        "</FeatureDeclarations>"
+    )
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+
+    obtained = PropsMetadata()
+    tml._add_all_props(it, element, obtained, {})
+
+    assert "name" not in obtained.properties
+    assert "lineage_name" in obtained.properties
+
+
 def test_add_all_props_empty():
     xml_data = "<FeatureDeclarations></FeatureDeclarations>"
     it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])

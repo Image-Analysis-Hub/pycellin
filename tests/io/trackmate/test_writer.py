@@ -2,6 +2,7 @@
 
 """Unit test for TrackMate XML file exporter."""
 
+import copy
 import io
 import logging
 from pathlib import Path
@@ -634,6 +635,107 @@ class TestWriteTrackmateXml:
         reloaded = read_trackmate_xml(tmp_path / "second.xml")
         contours = dict(reloaded.data.cell_lineages[0].nodes(data="cell_contour"))
         assert contours == {1: None, 2: None}
+
+    def test_merged_model_can_be_reloaded(self, tmp_path, simple_model):
+        """Test that the model names a merge stores on lineages become track names,
+        without declaring 'name' as a feature, which the loader couldn't read."""
+        simple_model.model_metadata.name = "model"
+        merged = simple_model.merge(copy.deepcopy(simple_model))
+        merged.update()
+        xml_path = tmp_path / "model.xml"
+        write_trackmate_xml(merged, xml_path, space_unit="pixel", time_unit="frame")
+
+        tree = ET.parse(str(xml_path))
+        assert all(feat.get("feature") != "name" for feat in tree.iter("Feature"))
+        model = read_trackmate_xml(xml_path)
+        names = [lin.graph["lineage_name"] for lin in model.get_cell_lineages()]
+        assert names == ["model", "model"]
+
+    def test_cell_property_called_name_can_be_reloaded(self, tmp_path, simple_model):
+        """Test that a cell property called 'name' becomes the name of the spots,
+        without being declared as a feature, which the loader couldn't read."""
+        simple_model.props_metadata._add_prop(
+            Property(
+                identifier="name",
+                name="Name",
+                description="Name",
+                provenance="test",
+                prop_type="node",
+                lineage_type="cell",
+                dtype="str",
+            )
+        )
+        lin = simple_model.data.cell_lineages[0]
+        for cid, attrs in lin.nodes(data=True):
+            attrs["name"] = f"cell{cid}"
+        xml_path = tmp_path / "model.xml"
+        write_trackmate_xml(
+            simple_model, xml_path, space_unit="pixel", time_unit="frame"
+        )
+
+        tree = ET.parse(str(xml_path))
+        assert all(feat.get("feature") != "name" for feat in tree.iter("Feature"))
+        model = read_trackmate_xml(xml_path)
+        lin = model.data.cell_lineages[0]
+        assert dict(lin.nodes(data="cell_name")) == {1: "cell1", 2: "cell2"}
+
+    @staticmethod
+    def _add_link_property_called_name(model, dtype, value):
+        """Add a link property called 'name', to a model with named spots."""
+        model.props_metadata._add_prop(
+            Property(
+                identifier="name",
+                name="Name",
+                description="Name",
+                provenance="test",
+                prop_type="edge",
+                lineage_type="cell",
+                dtype=dtype,
+            )
+        )
+        lin = model.data.cell_lineages[0]
+        lin.edges[1, 2]["name"] = value
+        for cid, attrs in lin.nodes(data=True):
+            attrs["cell_name"] = f"ID{cid}"
+
+    def test_numeric_link_property_called_name_is_a_feature(
+        self, tmp_path, simple_model
+    ):
+        """Test that 'name' is an ordinary feature on links, which have no display name,
+        and that it doesn't change how the names of the spots are read."""
+        self._add_link_property_called_name(simple_model, "float", 0.5)
+        xml_path = tmp_path / "model.xml"
+        write_trackmate_xml(
+            simple_model, xml_path, space_unit="pixel", time_unit="frame"
+        )
+
+        tree = ET.parse(str(xml_path))
+        declared = {feat.get("feature") for feat in tree.find(".//EdgeFeatures")}
+        assert "name" in declared
+        model = read_trackmate_xml(xml_path)
+        assert model.get_property("name").provenance == "TrackMate"
+        lin = model.data.cell_lineages[0]
+        assert lin.edges[1, 2]["name"] == 0.5
+        assert dict(lin.nodes(data="cell_name")) == {1: "ID1", 2: "ID2"}
+
+    def test_string_link_property_called_name_not_exported(
+        self, tmp_path, simple_model, caplog
+    ):
+        """Test that a string 'name' on links is removed like any non-numeric property,
+        with a warning, without removing the names of the spots."""
+        self._add_link_property_called_name(simple_model, "str", "link")
+        xml_path = tmp_path / "model.xml"
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"):
+            write_trackmate_xml(
+                simple_model, xml_path, space_unit="pixel", time_unit="frame"
+            )
+
+        assert "Ignoring property: name" in caplog.text
+        tree = ET.parse(str(xml_path))
+        assert all("name" not in edge.attrib for edge in tree.iter("Edge"))
+        assert all(feat.get("feature") != "name" for feat in tree.iter("Feature"))
+        lin = read_trackmate_xml(xml_path).data.cell_lineages[0]
+        assert dict(lin.nodes(data="cell_name")) == {1: "ID1", 2: "ID2"}
 
     def test_undeclared_attributes_not_exported(self, tmp_path, simple_model, caplog):
         """Test that attributes without a property declaration are not exported,
