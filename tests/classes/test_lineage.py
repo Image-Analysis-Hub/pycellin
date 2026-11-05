@@ -2007,6 +2007,12 @@ class TestCellLineageGetCellCycle:
         with pytest.raises(FusionError):
             cell_lin.get_cell_cycle(12)
 
+    def test_fusion_error_names_fusion_cell(self, cell_lin):
+        """Test the FusionError names the fusion cell, not the given cell."""
+        cell_lin.add_edge(3, 12)
+        with pytest.raises(FusionError, match="Node 12 "):
+            cell_lin.get_cell_cycle(14)
+
 
 class TestCellLineageGetCellCycles:
     """Test cases for CellLineage.get_cell_cycles method."""

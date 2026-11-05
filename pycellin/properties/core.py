@@ -218,21 +218,23 @@ class Timepoint(NodeLocalPropCalculator):
         min_time = None
         for lin in data.cell_lineages.values():
             roots = lin.get_roots()
-            if len(roots) != 1:
+            # Several roots mean that an update has to split the lineage, unless they
+            # come from a cell fusion: unsupported data, but it's read with a warning.
+            if not roots or (len(roots) > 1 and not lin.get_fusions()):
                 raise UpdateRequiredError(
                     f"Lineage {lin.graph['lineage_id']} has {len(roots)} root nodes. "
                     f"Timepoint calculation requires a single root node."
                 )
-            root = roots[0]
-            if self.reference_time_prop not in lin.nodes[root]:
-                raise ValueError(
-                    f"Reference time property '{self.reference_time_prop}' not found "
-                    f"in root node {root} of lineage "
-                    f"{lin.graph.get('lineage_id', 'of unknown ID')}."
-                )
-            time = lin.nodes[root][self.reference_time_prop]
-            if min_time is None or time < min_time:
-                min_time = time
+            for root in roots:
+                if self.reference_time_prop not in lin.nodes[root]:
+                    raise ValueError(
+                        f"Reference time property '{self.reference_time_prop}' not "
+                        f"found in root node {root} of lineage "
+                        f"{lin.graph.get('lineage_id', 'of unknown ID')}."
+                    )
+                time = lin.nodes[root][self.reference_time_prop]
+                if min_time is None or time < min_time:
+                    min_time = time
 
         if min_time is None:
             raise ValueError("No valid time values found in lineage data.")

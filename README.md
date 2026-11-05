@@ -32,7 +32,7 @@ Pycellin can read from and write to:
 - [TrackMate](https://imagej.net/plugins/trackmate/) XMLs.
 
 
-Although Pycellin was designed with bacteria / cell lineages in mind, it can be used with more diverse tracking data. The main requirement is that the data can be modeled by directed rooted trees. So while Pycellin is built to support cell divisions, **it does not support cell fusions**, also called merging events: a cell at a specific timepoint cannot have more than one parent. Please correct them in your tracking software before using Pycellin. Some data with fusions can still be read, with a warning: `get_fusions()` then lists them and you can correct them with `remove_link()`, but until you do, crashes and incorrect results can occur.
+Although Pycellin was designed with bacteria / cell lineages in mind, it can be used with more diverse tracking data. The main requirement is that the data can be modeled by directed rooted trees. So while Pycellin is built to support cell divisions, **it does not fully support cell fusions**, also called merging events: a cell at a specific timepoint cannot have more than one parent. Please correct them in your tracking software before using Pycellin. Data with fusions can still be read, with a warning: `get_fusions()` then lists them and you can correct them with `remove_link()`, but until you do, crashes and incorrect results can occur.
 
 
 ## Installation

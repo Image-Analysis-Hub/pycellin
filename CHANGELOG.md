@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to e4c2994, plus the uncommitted README changes. Update from there with: git log e4c2994..dev -->
+<!-- Planned v0.6.0. Covers commits up to 507f6b4, plus the uncommitted changes on cell fusions. Update from there with: git log 507f6b4..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -184,6 +184,8 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** `update()` failed with `KeyError` when cells or links added since the last update had been moved to another lineage by `add_link()`, or when a link had been added to a lineage removed since
 - **Model:** `update()` didn't update the cycle properties propagated to the cells with `propagate_cycle_properties()`, although the "Managing properties" notebook said it did: after a change, e.g. `remove_link()`, the cells kept the values of their former cell cycle, and cells added later got none. `update()` now copies them again once computed on the cycle lineages. Only the properties propagated that way are copied, and `propagate_cycle_properties()` without `props` now leaves out the properties of lineage type `"both"` (`"Lineage"` in 0.5.1), whose cell values it overwrote with those of the cycles
 - **Model:** `add_pycellin_properties()` given a dictionary instead of a list, as the "Managing properties" notebook showed, silently ignored the arguments of the properties, e.g. angles came in radians instead of degrees. It now raises `TypeError`, as it does for a string, which it split into letters, and for list items other than strings and dictionaries, which it skipped. No property is added then
+- **Model:** TrackMate and GEFF data where separate cells merge, i.e. a cell fusion that gives its lineage several roots, couldn't be loaded: the loaders failed with an `UpdateRequiredError` about root nodes, which didn't mention fusions. Like other fusions, they are now loaded with a warning, and `get_fusions()` and `remove_link()` can be used to correct them
+- **Model:** the `FusionError` of `get_cell_cycle()`, and so of `get_cell_cycles()` and `add_cycle_lineages()` (`add_cycle_data()` in 0.5.1), could name the wrong cell: the cell it started from instead of the one with several parents
 - **Properties:** `turning_angle` (`angle` in 0.5.1), `absolute_age` and `relative_age` were recomputed for every lineage at each update, as their calculators were global instead of local
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells
 - **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning

@@ -143,7 +143,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         least one outgoing edge.
         A lineage normally has one and exactly one root node. However, when in the
         process of modifying the lineage topology, a lineage can temporarily have
-        more than one: `get_roots()` returns them all.
+        more than one. Cell fusions, which aren't supported, can also lead to several
+        roots. `get_roots()` returns them all.
 
         Parameters
         ----------
@@ -179,7 +180,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         A root is a node with no incoming edges and usually at least one outgoing edge.
         A lineage normally has exactly one root, which `get_root()` returns, but it can
-        temporarily have more than one, or none if it is empty.
+        temporarily have more than one, or none if it is empty. Cell fusions, which
+        aren't supported, can also lead to several roots.
 
         Parameters
         ----------
@@ -1906,7 +1908,8 @@ class CellLineage(Lineage):
         Raises
         ------
         FusionError
-            If the given cell has more than one predecessor.
+            If the given cell or an earlier cell of its cell cycle has more than one
+            predecessor.
         """
         # TODO: factorize
         lid, _ = CellLineage._get_lineage_id_and_err_msg(self)
@@ -1930,7 +1933,7 @@ class CellLineage(Lineage):
                 cell_cycle.append(*predecessors)
                 predecessors = list(self.predecessors(*predecessors))
                 if len(predecessors) != 1:
-                    raise FusionError(cell_id, lid)
+                    raise FusionError(cell_cycle[-1], lid)
             if self.is_root(*predecessors) and not self.is_division(*predecessors):
                 cell_cycle.append(*predecessors)
             cell_cycle.reverse()  # We built it from the end.

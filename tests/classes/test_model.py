@@ -20,7 +20,7 @@ from pycellin.classes.property_calculator import (
     NodeLocalPropCalculator,
 )
 from pycellin.custom_types import PropertyType
-from pycellin.exceptions import MissingPropertyError
+from pycellin.exceptions import MissingPropertyError, UpdateRequiredError
 from pycellin.properties.core import (
     Time,
     create_cell_coord_property,
@@ -1875,6 +1875,38 @@ class TestRemoveLineage:
         two_lineages_model.update()
         assert sorted(two_lineages_model.data.cell_lineages) == [1]
         assert not two_lineages_model.is_update_required()
+
+
+class TestSeveralRoots:
+    """Test cases for Model() on lineages with several roots."""
+
+    @staticmethod
+    def _lineage(cells, links):
+        lineage = CellLineage(lineage_id=0)
+        for cell_id, frame in cells:
+            lineage.add_node(cell_id, cell_id=cell_id, lineage_id=0, frame=frame)
+        lineage.add_edges_from(links)
+        return lineage
+
+    def test_fusion_time_origin_from_all_roots(self):
+        """Separate cells merging, and the earliest root isn't the first one."""
+        lineage = self._lineage(
+            [(1, 5), (2, 3), (3, 6), (4, 7)], [(1, 3), (2, 3), (3, 4)]
+        )
+        model = Model(data=Data({0: lineage}), reference_time_prop="frame")
+        nodes = model.data.cell_lineages[0].nodes
+        assert {cell: nodes[cell]["timepoint"] for cell in nodes} == {
+            1: 2,
+            2: 0,
+            3: 3,
+            4: 4,
+        }
+
+    def test_no_fusion_raises(self):
+        """Several roots without a fusion: the lineage needs an update to be split."""
+        lineage = self._lineage([(1, 0), (2, 1), (3, 0), (4, 1)], [(1, 2), (3, 4)])
+        with pytest.raises(UpdateRequiredError, match="2 root nodes"):
+            Model(data=Data({0: lineage}), reference_time_prop="frame")
 
 
 class TestSplitLineageFromCell:
