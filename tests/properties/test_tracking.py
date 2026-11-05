@@ -61,7 +61,7 @@ def prop_cell_lin():
         description="test property",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
         unit="um",
     )
@@ -86,7 +86,7 @@ def prop_cycle_lin():
         description="test property",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="int",
         unit="um",
     )
@@ -198,9 +198,7 @@ class TestNormalizedAge:
 
     def test_get_input_props(self, prop_cell_lin):
         calculator = NormalizedAge(prop_cell_lin, time_prop="frame")
-        assert calculator.get_input_props() == {
-            "time_prop": ("frame", "node", "CellLineage")
-        }
+        assert calculator.get_input_props() == {"time_prop": ("frame", "node", "cell")}
 
 
 # IsCompleteCycle #############################################################

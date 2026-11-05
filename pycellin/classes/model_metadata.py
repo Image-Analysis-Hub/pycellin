@@ -70,7 +70,7 @@ class ModelMetadata:
         Human-readable name for the model.
     provenance : str | None, default None
         Information about the origin or processing history of the data.
-    file_location : str | None, default None
+    file_path : str | None, default None
         Path or location where the associated data files are stored.
 
     Examples
@@ -115,9 +115,9 @@ class ModelMetadata:
     creation_timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     name: str | None = None
     provenance: str | None = None
-    file_location: str | None = None
-    label_img_path: str | None = None
-    label_img: np.ndarray | None = None
+    file_path: str | None = None
+    label_image_path: str | None = None
+    label_image: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         """

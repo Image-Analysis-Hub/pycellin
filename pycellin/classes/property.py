@@ -24,7 +24,7 @@ class Property:
         description: str,
         provenance: str,
         prop_type: PropertyType | str | list[str],
-        lin_type: LineageType,
+        lineage_type: LineageType,
         dtype: str,
         unit: str | None = None,
     ) -> None:
@@ -48,9 +48,9 @@ class Property:
               PropertyType.NODE | PropertyType.EDGE.
             - String: "node", "edge", or "lineage"
             - List of strings: ["node", "lineage"] for multi-type properties
-        lin_type : LineageType
-            The type of lineage the property is associated with: `CellLineage`,
-            `CycleLineage`, or `Lineage` for both.
+        lineage_type : LineageType
+            The type of lineage the property is associated with: "cell" for cell
+            lineages, "cycle" for cycle lineages, or "both".
         dtype : str
             The data type of the property (int, float, string).
         unit : str, optional
@@ -81,11 +81,11 @@ class Property:
             )
         self.prop_type = prop_type
 
-        if not check_literal_type(lin_type, LineageType):
+        if not check_literal_type(lineage_type, LineageType):
             raise ValueError(
                 f"Lineage type must be one of {', '.join(get_args(LineageType))}."
             )
-        self.lin_type = lin_type
+        self.lineage_type = lineage_type
         self.dtype = dtype
         self.unit = unit
 
@@ -98,7 +98,7 @@ class Property:
             and self.description == other.description
             and self.provenance == other.provenance
             and self.prop_type == other.prop_type
-            and self.lin_type == other.lin_type
+            and self.lineage_type == other.lineage_type
             and self.dtype == other.dtype
             and self.unit == other.unit
         )
@@ -126,7 +126,7 @@ class Property:
         """
         incompatibilities = {
             field: (getattr(self, field), getattr(other, field))
-            for field in ("prop_type", "lin_type")
+            for field in ("prop_type", "lineage_type")
             if getattr(self, field) != getattr(other, field)
         }
         if _UNKNOWN not in (self.unit, other.unit) and self.unit != other.unit:
@@ -148,7 +148,7 @@ class Property:
         return (
             f"Property(identifier={self.identifier!r}, name={self.name!r}, "
             f"description={self.description!r}, provenance={self.provenance!r}, "
-            f"prop_type={self.prop_type!r}, lin_type={self.lin_type!r}, "
+            f"prop_type={self.prop_type!r}, lineage_type={self.lineage_type!r}, "
             f"dtype={self.dtype!r}, unit={self.unit!r})"
         )
 
@@ -167,7 +167,7 @@ class Property:
             f"  Description: {self.description}\n"
             f"  Provenance: {self.provenance}\n"
             f"  Type: {property_type_to_strings(self.prop_type)}\n"
-            f"  Lineage type: {self.lin_type}\n"
+            f"  Lineage type: {self.lineage_type}\n"
             f"  Data type: {self.dtype}\n"
             f"  Unit: {self.unit}"
         )
@@ -269,7 +269,7 @@ class Property:
                 self.identifier == other.identifier
                 and self.description == other.description
                 and self.provenance == other.provenance
-                and self.lin_type == other.lin_type
+                and self.lineage_type == other.lineage_type
                 and self.dtype == other.dtype
                 and self.unit == other.unit
             )

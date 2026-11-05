@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 4828eb6, plus the uncommitted rename pass 3 (IO: read_*/write_*/from_*/to_* functions and their modules, `path`, keyword-only options, `reference_time_prop`, TrackMate writer units, pickles). Update from there with: git log 4828eb6..dev -->
+<!-- Planned v0.6.0. Covers commits up to 6c09b43, plus the uncommitted rename pass 4 (property vocabulary and options: `prop`, `lineage_type` values, `single_type`, `image`, `unique_in_model`, rod, plot and metadata names). Update from there with: git log 6c09b43..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -30,6 +30,21 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
   - their modules are renamed alike, `loader` → `reader` and `exporter` → `writer` (e.g. `pycellin.io.geff.reader`), and the pickle functions are in `pycellin.io.pickle`
   - their file argument is `path` (`xml_path`, `geff_file`, `geff_out`, `ctc_path` and `ctc_file_out` before). Only the file or the DataFrame, and the model for the writers, can be given by position: the other arguments are keyword-only, e.g. `read_ctc(path, labels_path=...)`
 - **Naming:** `reference_time_property` → `reference_time_prop`, since it holds the identifier of the property, like the other `*_prop` arguments: the `Model` attribute and argument, `set_reference_time_property()` → `set_reference_time_prop()`, the `ModelMetadata` field, and the argument and attribute (`ref_time_prop`) of the `Timepoint` calculator. The readers take it too: `read_geff(reference_time_prop=...)` (`time_prop` in 0.5.1)
+- **Naming:** arguments and attributes that hold a property identifier are named `prop`, and those that hold a `Property` object `property`:
+  - `get_property()`, `has_property()`, `remove_property()` and `add_pycellin_property()` take `prop` instead of `prop_identifier`, and `set_reference_time_prop()` instead of `prop_id`. Only calls that pass it by name break
+  - `ProtectedPropertyError` takes `prop` instead of `prop_name` and stores it as `prop` instead of `property_name`, as does the new `MissingPropertyError`
+  - calculators store their `Property` as `self.property` instead of `self.prop`, like their `property` argument: custom calculators that read `self.prop` must read `self.property`
+- **Naming:** the lineage type of a property is `lineage_type` instead of `lin_type`, in `Property()` and on `Property` objects, and its values are lowercase like those of the property type: `"cell"`, `"cycle"` and `"both"` instead of `"CellLineage"`, `"CycleLineage"` and `"Lineage"`. So are those of `INPUT_PROPS`, e.g. `{"area_prop": ("node", "cell")}`
+- **Naming:** `single_type=True` leaves out the properties that have several types in every property getter: `get_cell_lineage_properties()` and `get_cycle_lineage_properties()` take it instead of `include_Lineage_props=False`, and `get_pycellin_cell_lineage_properties()` and `get_pycellin_cycle_lineage_properties()` instead of `include_Lineage_properties=False`, as `get_node_properties()` already did. By default, the properties of lineage type `"both"` are still returned
+- **Naming:** more arguments spelled out or aligned with the rest of pycellin:
+  - `write_trackmate_xml()`: `img_path`, `img_path_field`, `img_shape` and `img_shape_field` → `image_path`, `image_path_field`, `image_shape` and `image_shape_field`
+  - `add_cell()`: `global_cid` → `unique_in_model`, as in the new `relabel_cells()`
+  - `add_lineage()`: `with_CycleLineage` → `with_cycle_lineage`
+  - `get_ancestors()`: `sorted` → `sort`, which no longer shadows the built-in `sorted()`
+  - `add_rod_length()`, `add_rod_width()` and the `RodLength` and `RodWidth` calculators: `skel_algo` → `skeleton_method` and `method_width` → `width_method`. `create_rod_length_property()` and `create_rod_width_property()` take an optional `custom_identifier`, as the other factories do, and `unit` by keyword only
+  - `plot()` and `get_tree_figure()` of `CellLineage` and `CycleLineage`, and `CellLineage.plot_branch_profile()` and `get_branch_profile_figure()`: `showlegend` → `show_legend`, like `show_horizontal_grid`
+  - `Straightness.compute()`: `cycle_lin` → `lineage`, as in every other `compute()`
+- **Naming:** metadata fields: `file_location` → `file_path`, the `TrackMate_version` field written by `read_trackmate_xml()` → `trackmate_version`, as `geff_version` and `pycellin_version`, and the `label_imgs_location` field written by `read_ctc()` → `label_images_location`
 - **Properties:** `pycellin.graph.properties` moved to `pycellin.properties`. The `pycellin.graph` package no longer exists
 - **Properties:** rename the `branch_*` properties to `cycle_*`, along with their `add_*()` methods, factories and calculators:
   - `branch_total_displacement` → `cycle_total_displacement`
@@ -78,7 +93,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** `overwrite_lineage_id` argument to `add_lineage()`
 - **Model:** `lineage_props` argument to `to_cell_dataframe()`, `to_link_dataframe()` and `to_cycle_dataframe()` to include lineage properties in the DataFrame
 - **Model:** `to_cycle_pair_dataframe()` to export pairs of related cell cycles with the properties of both side by side, e.g. to correlate the area at birth of mothers and daughters. The relation is any cycle property listing related cell cycles: `mother_cycle`, `daughter_cycles`, `sister_cycles`, `cousin_cycles`, or a user-defined one. `unique_pairs=True` keeps a single row for pairs listed from both sides, such as sisters
-- **Metadata:** `label_img` and `label_img_path` standard metadata fields
+- **Metadata:** `label_image` and `label_image_path` standard metadata fields
 - **Metadata:** `ModelMetadata.diff()` to list the metadata fields that differ between two models
 - **Properties:** `Property.get_incompatibilities()` to compare two property declarations
 - **Properties:** `pycellin.properties` now exposes the 17 core property factories (`create_cell_id_property()`, `create_time_property()`, ...), to declare properties when building a model from scratch or writing a loader
@@ -140,7 +155,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 
 - **Model:** changing the time step with `set_time_step()` corrupted the `timepoint` values
 - **Model:** after `set_reference_time_prop()` (`set_reference_time_property()` in 0.5.1), `cycle_duration` kept the unit of the previous reference time property, although its values are computed from the new one
-- **Model:** `add_lineage()` failed with `with_CycleLineage=True` or with a lineage that had no lineage ID, and ignored its `lineage_id` argument (`lid` in 0.5.1) when given a lineage
+- **Model:** `add_lineage()` failed with `with_cycle_lineage=True` (`with_CycleLineage` in 0.5.1) or with a lineage that had no lineage ID, and ignored its `lineage_id` argument (`lid` in 0.5.1) when given a lineage
 - **Model:** `add_lineage()` silently replaced a lineage that already had the same ID. It now raises `ValueError`
 - **Model:** `to_cell_dataframe()`, `to_link_dataframe()`, `to_cycle_dataframe()` and `to_lineage_dataframe()` raised a pandas `FutureWarning` when a numeric property was None everywhere in a lineage. With no lineage to export, they now raise a `ValueError` that says so
 - **Model:** with pandas 3.1 or later, `to_cell_dataframe()`, `to_link_dataframe()`, `to_cycle_dataframe()` and `to_lineage_dataframe()` raised a `Pandas4Warning`, since they used pandas' `inplace` argument, deprecated in pandas 3.1 and removed in pandas 4
@@ -151,7 +166,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** a cell, link or lineage removed and then added back with the same ID before `update()` was still treated as removed: `update()` left the cell or link without property values, and deleted the lineage. This also happened without reusing an ID on purpose: once the lineage with the highest ID is removed, the next new lineage gets that ID back (the docstring of `get_next_available_lineage_id()` wrongly said it never does). So `update()` deleted a lineage split off with `split_lineage_from_cell()`, and left a lineage it split itself without cycle lineage and its new cells without property values
 - **Model:** cells moved to another lineage, by a split in `update()` (e.g. after `remove_link()`), by `split_lineage_from_cell()` or by `add_link()` between two lineages, kept the `lineage_id` of their old lineage, so a GEFF file exported afterwards couldn't be read back correctly. `update()` now sets it. A split-off lineage also copied the lineage properties of the original lineage, e.g. TrackMate's track name, index and number of spots, so TrackMate exports had several tracks with the same name and index: it now starts with its new ID only
 - **Model:** `update()` failed with `KeyError` when cells or links added since the last update had been moved to another lineage by `add_link()`, or when a link had been added to a lineage removed since
-- **Model:** `update()` didn't update the cycle properties propagated to the cells with `propagate_cycle_properties()`, although the "Managing properties" notebook said it did: after a change, e.g. `remove_link()`, the cells kept the values of their former cell cycle, and cells added later got none. `update()` now copies them again once computed on the cycle lineages. Only the properties propagated that way are copied, and `propagate_cycle_properties()` without `props` now leaves out the properties declared with the `Lineage` type, whose cell values it overwrote with those of the cycles
+- **Model:** `update()` didn't update the cycle properties propagated to the cells with `propagate_cycle_properties()`, although the "Managing properties" notebook said it did: after a change, e.g. `remove_link()`, the cells kept the values of their former cell cycle, and cells added later got none. `update()` now copies them again once computed on the cycle lineages. Only the properties propagated that way are copied, and `propagate_cycle_properties()` without `props` now leaves out the properties of lineage type `"both"` (`"Lineage"` in 0.5.1), whose cell values it overwrote with those of the cycles
 - **Model:** `add_pycellin_properties()` given a dictionary instead of a list, as the "Managing properties" notebook showed, silently ignored the arguments of the properties, e.g. angles came in radians instead of degrees. It now raises `TypeError`, as it does for a string, which it split into letters, and for list items other than strings and dictionaries, which it skipped. No property is added then
 - **Properties:** `turning_angle` (`angle` in 0.5.1), `absolute_age` and `relative_age` were recomputed for every lineage at each update, as their calculators were global instead of local
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells
@@ -184,7 +199,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
   - each label was matched to its cell by scanning all the cells, so the loading time grew with the square of their number (over a minute for 8,000 cells). It now grows linearly
   - 3D label images failed with "too many values to unpack", and a stack holding all the frames with that error or, when its name had no frame number, with "Can't parse frame value". The loader now says that only 2D label images, one per frame, are supported
   - a `labels_path` that wasn't a folder was silently ignored when the space unit and pixel sizes were given, leaving cell positions and contours declared without values. It now raises `ValueError`
-  - the `label_imgs_location` metadata field was missing when the space unit and pixel sizes were given
+  - the `label_images_location` metadata field (`label_imgs_location` in 0.5.1) was missing when the space unit and pixel sizes were given
 - **CTC:** the exporter wrote negative frames for cells with negative timepoints, e.g. in a lineage added with earlier times than the rest of the model. It now raises `ValueError`, giving the smallest `frame_offset` that avoids them
 - **trackpy:** the loader failed when given a `time_step`, which it applied to frames, and gave cells no `lineage_id`
 - **trackpy:** the loader silently overwrote the DataFrame columns named like the properties it creates (`cell_id`, `lineage_id` and `timepoint`; `cell_ID` and `lineage_ID` in 0.5.1). It now raises `ValueError`

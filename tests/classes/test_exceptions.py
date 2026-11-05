@@ -24,7 +24,7 @@ class TestMissingPropertyError:
 
     def test_custom_message(self):
         err = MissingPropertyError("cell_area", message="Add 'cell_area' first.")
-        assert err.prop_name == "cell_area"
+        assert err.prop == "cell_area"
         assert err.message == "Add 'cell_area' first."
 
     def test_str_is_message(self):

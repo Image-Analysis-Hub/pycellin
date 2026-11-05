@@ -835,7 +835,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         edge_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
-        showlegend: bool = True,
+        show_legend: bool = True,
         width: int | None = None,
         height: int | None = None,
         template: str | go.layout.Template = "pycellin_white",
@@ -887,7 +887,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             Plotly template.
         show_horizontal_grid : bool, optional
             True to display the horizontal grid, False otherwise. True by default.
-        showlegend : bool, optional
+        show_legend : bool, optional
             True to display the legend, False otherwise. True by default.
         width : int, optional
             The width of the plot. If None, defaults to current Plotly template.
@@ -1024,7 +1024,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         fig.update_layout(
             title=title,
             annotations=node_annotations,
-            showlegend=showlegend,
+            showlegend=show_legend,
             plot_bgcolor=plot_bgcolor,
             hovermode="closest",  # not ideal but the other modes are worse
             width=width,
@@ -1067,7 +1067,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         edge_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
-        showlegend: bool = True,
+        show_legend: bool = True,
         width: int | None = None,
         height: int | None = None,
         template: str | go.layout.Template = "pycellin_white",
@@ -1117,7 +1117,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             Plotly template.
         show_horizontal_grid : bool, optional
             True to display the horizontal grid, False otherwise. True by default.
-        showlegend : bool, optional
+        show_legend : bool, optional
             True to display the legend, False otherwise. True by default.
         width : int, optional
             The width of the plot. If None, defaults to current Plotly template.
@@ -1147,7 +1147,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             edge_hover_props=edge_hover_props,
             plot_bgcolor=plot_bgcolor,
             show_horizontal_grid=show_horizontal_grid,
-            showlegend=showlegend,
+            show_legend=show_legend,
             width=width,
             height=height,
             template=template,
@@ -1500,7 +1500,7 @@ class CellLineage(Lineage):
         self.remove_nodes_from(nodes)
         return new_lineage  # type: ignore
 
-    def get_ancestors(self, node_id: int, sorted=True) -> list[int]:
+    def get_ancestors(self, node_id: int, sort=True) -> list[int]:
         """
         Return all the ancestors of a given cell.
 
@@ -1512,7 +1512,7 @@ class CellLineage(Lineage):
         ----------
         node_id : int
             ID of the cell for which to retrieve ancestor cells.
-        sorted : bool, optional
+        sort : bool, optional
             True to return the ancestors in chronological order, False otherwise.
             True by default.
 
@@ -1535,7 +1535,7 @@ class CellLineage(Lineage):
             ancestors = super().get_ancestors(node_id)
         except nx.NetworkXError as err:
             raise KeyError(f"Cell {node_id} is not in the lineage.") from err
-        if sorted:
+        if sort:
             try:
                 ancestors.sort(key=lambda n: self.nodes[n]["timepoint"])
             except KeyError:
@@ -2125,7 +2125,7 @@ class CellLineage(Lineage):
         edge_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
-        showlegend: bool = True,
+        show_legend: bool = True,
         width: int | None = None,
         height: int | None = None,
         template: str | go.layout.Template = "pycellin_white",
@@ -2201,7 +2201,7 @@ class CellLineage(Lineage):
             Plotly template.
         show_horizontal_grid : bool, optional
             True to display the horizontal grid, False otherwise. True by default.
-        showlegend : bool, optional
+        show_legend : bool, optional
             True to display the legend, False otherwise. True by default.
         width : int, optional
             The width of the plot. If None, defaults to current Plotly template.
@@ -2280,7 +2280,7 @@ class CellLineage(Lineage):
             edge_hover_props=edge_hover_props,
             plot_bgcolor=plot_bgcolor,
             show_horizontal_grid=show_horizontal_grid,
-            showlegend=showlegend,
+            show_legend=show_legend,
             width=width,
             height=height,
             template=template,
@@ -2305,7 +2305,7 @@ class CellLineage(Lineage):
         edge_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
-        showlegend: bool = True,
+        show_legend: bool = True,
         width: int | None = None,
         height: int | None = None,
         template: str | go.layout.Template = "pycellin_white",
@@ -2376,7 +2376,7 @@ class CellLineage(Lineage):
             Plotly template.
         show_horizontal_grid : bool, optional
             True to display the horizontal grid, False otherwise. True by default.
-        showlegend : bool, optional
+        show_legend : bool, optional
             True to display the legend, False otherwise. True by default.
         width : int, optional
             The width of the plot. If None, defaults to current Plotly template.
@@ -2431,7 +2431,7 @@ class CellLineage(Lineage):
             edge_hover_props=edge_hover_props,
             plot_bgcolor=plot_bgcolor,
             show_horizontal_grid=show_horizontal_grid,
-            showlegend=showlegend,
+            show_legend=show_legend,
             width=width,
             height=height,
             template=template,
@@ -2452,7 +2452,7 @@ class CellLineage(Lineage):
         line_style: BranchStyle = None,
         node_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
-        showlegend: bool | None = None,
+        show_legend: bool | None = None,
         width: int | None = None,
         height: int | None = None,
         template: str | go.layout.Template = "pycellin_white",
@@ -2515,7 +2515,7 @@ class CellLineage(Lineage):
             shows the cell ID and the plotted x and y values.
         plot_bgcolor : str, optional
             The background color of the plot area.
-        showlegend : bool, optional
+        show_legend : bool, optional
             True to display the legend, False to hide it. If None, the legend is
             shown only when several target cells are plotted.
         width : int, optional
@@ -2636,7 +2636,7 @@ class CellLineage(Lineage):
                     for prop in node_hover_props:
                         if prop not in lineage.nodes[node]:
                             raise MissingPropertyError(
-                                prop_name=prop,
+                                prop=prop,
                                 node_id=node,
                                 lineage_id=lineage.graph["lineage_id"],
                             )
@@ -2739,7 +2739,7 @@ class CellLineage(Lineage):
             xaxis_title=x_label,
             yaxis_title=y_label,
             plot_bgcolor=plot_bgcolor,
-            showlegend=len(target_cids) > 1 if showlegend is None else showlegend,
+            showlegend=len(target_cids) > 1 if show_legend is None else show_legend,
             width=width,
             height=height,
             template=template,
@@ -2760,7 +2760,7 @@ class CellLineage(Lineage):
         line_style: BranchStyle = None,
         node_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
-        showlegend: bool | None = None,
+        show_legend: bool | None = None,
         width: int | None = None,
         height: int | None = None,
         template: str | go.layout.Template = "pycellin_white",
@@ -2802,7 +2802,7 @@ class CellLineage(Lineage):
             line_style=line_style,
             node_hover_props=node_hover_props,
             plot_bgcolor=plot_bgcolor,
-            showlegend=showlegend,
+            show_legend=show_legend,
             width=width,
             height=height,
             template=template,
@@ -2954,7 +2954,7 @@ class CycleLineage(Lineage):
 
     # Methods to freeze / unfreeze?
 
-    def get_ancestors(self, node_id: int, sorted=True) -> list[int]:
+    def get_ancestors(self, node_id: int, sort=True) -> list[int]:
         """
         Return all the ancestor cell cycles of a given cell cycle.
 
@@ -2966,7 +2966,7 @@ class CycleLineage(Lineage):
         ----------
         node_id : int
             ID of the cell cycle for which to retrieve ancestor cell cycle.
-        sorted : bool, optional
+        sort : bool, optional
             True to return the ancestors in chronological order, False otherwise.
             True by default.
 
@@ -2989,7 +2989,7 @@ class CycleLineage(Lineage):
             ancestors = super().get_ancestors(node_id)
         except nx.NetworkXError as err:
             raise KeyError(f"Cell cycle {node_id} is not in the lineage.") from err
-        if sorted:
+        if sort:
             try:
                 ancestors.sort(key=lambda n: self.nodes[n]["generation"])
             except KeyError:
@@ -3047,7 +3047,7 @@ class CycleLineage(Lineage):
         edge_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
-        showlegend: bool = True,
+        show_legend: bool = True,
         width: int | None = None,
         height: int | None = None,
         template: str | go.layout.Template = "pycellin_white",
@@ -3100,7 +3100,7 @@ class CycleLineage(Lineage):
             Plotly template.
         show_horizontal_grid : bool, optional
             True to display the horizontal grid, False otherwise. True by default.
-        showlegend : bool, optional
+        show_legend : bool, optional
             True to display the legend, False otherwise. True by default.
         width : int, optional
             The width of the plot. If None, defaults to current Plotly template.
@@ -3142,7 +3142,7 @@ class CycleLineage(Lineage):
             edge_hover_props=edge_hover_props,
             plot_bgcolor=plot_bgcolor,
             show_horizontal_grid=show_horizontal_grid,
-            showlegend=showlegend,
+            show_legend=show_legend,
             width=width,
             height=height,
             template=template,
@@ -3163,7 +3163,7 @@ class CycleLineage(Lineage):
         edge_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_horizontal_grid: bool = True,
-        showlegend: bool = True,
+        show_legend: bool = True,
         width: int | None = None,
         height: int | None = None,
         template: str | go.layout.Template = "pycellin_white",
@@ -3211,7 +3211,7 @@ class CycleLineage(Lineage):
             Plotly template.
         show_horizontal_grid : bool, optional
             True to display the horizontal grid, False otherwise. True by default.
-        showlegend : bool, optional
+        show_legend : bool, optional
             True to display the legend, False otherwise. True by default.
         width : int, optional
             The width of the plot. If None, defaults to current Plotly template.
@@ -3263,7 +3263,7 @@ class CycleLineage(Lineage):
             edge_hover_props=edge_hover_props,
             plot_bgcolor=plot_bgcolor,
             show_horizontal_grid=show_horizontal_grid,
-            showlegend=showlegend,
+            show_legend=show_legend,
             width=width,
             height=height,
             template=template,

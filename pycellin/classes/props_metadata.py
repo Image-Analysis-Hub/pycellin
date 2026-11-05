@@ -219,13 +219,13 @@ class PropsMetadata:
 
         return props
 
-    def _get_prop_dict_from_lin_type(self, lin_type: LineageType) -> dict:
+    def _get_prop_dict_from_lin_type(self, lineage_type: LineageType) -> dict:
         """
         Return the dictionary of properties corresponding to the specified lineage type.
 
         Parameters
         ----------
-        lin_type : LineageType
+        lineage_type : LineageType
             The type of the lineage properties to return (CellLineage,
             CycleLineage or Lineage).
 
@@ -239,11 +239,11 @@ class PropsMetadata:
         ValueError
             If the lineage type is invalid.
         """
-        if not check_literal_type(lin_type, LineageType):
+        if not check_literal_type(lineage_type, LineageType):
             raise ValueError(
                 f"Lineage type must be one of {', '.join(get_args(LineageType))}."
             )
-        props = {k: v for k, v in self.props.items() if lin_type == v.lin_type}
+        props = {k: v for k, v in self.props.items() if lineage_type == v.lineage_type}
         return props
 
     def _get_protected_props(self) -> list[str]:

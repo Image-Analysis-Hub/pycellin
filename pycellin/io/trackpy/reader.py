@@ -283,7 +283,7 @@ def _create_PropsMetadata(
             description=description,
             provenance="trackpy",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             # The loader casts the particle IDs to int.
             dtype="int" if column == "particle" else dtype,
             unit=metadata["space_unit"] if is_length else None,

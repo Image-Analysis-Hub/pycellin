@@ -194,7 +194,7 @@ def _convert_and_add_prop(
         description=trackmate_prop["name"],
         provenance="TrackMate",
         prop_type=prop_type,
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype=prop_dtype,
         unit=_dimension_to_unit(trackmate_prop, units),
     )
@@ -243,7 +243,7 @@ def _add_all_props(
                 description="Name of the spot",
                 provenance="TrackMate",
                 prop_type="node",
-                lin_type="CellLineage",
+                lineage_type="cell",
                 dtype="string",
             )
             props_md._add_prop(name_prop)
@@ -256,7 +256,7 @@ def _add_all_props(
                 description="Name of the track",
                 provenance="TrackMate",
                 prop_type="lineage",
-                lin_type="CellLineage",
+                lineage_type="cell",
                 dtype="string",
             )
             props_md._add_prop(name_prop)
@@ -443,7 +443,7 @@ def _declare_undeclared_attributes(
             description="Attribute not declared in the TrackMate file",
             provenance="unknown",
             prop_type=types,
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype=dtype,
         )
         props_md._add_prop(prop)
@@ -807,7 +807,7 @@ def _update_props_metadata(
         )
     if segmentation:
         roi_coord_prop = create_cell_contour_property(
-            custom_provenance="TrackMate",
+            provenance="TrackMate",
             unit=units["spatialunits"],
         )
         props_md._add_prop(roi_coord_prop)
@@ -834,7 +834,7 @@ def _update_props_metadata(
         description="True if the track was not filtered out in TrackMate",
         provenance="TrackMate",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
     props_md._add_prop(prop_filtered_track)
@@ -1347,9 +1347,9 @@ def read_trackmate_xml(
     metadata["pixel_depth"] = pixel_size.get("pixel_depth")
     # Traceability info.
     metadata["name"] = Path(path).stem
-    metadata["file_location"] = path
+    metadata["file_path"] = path
     metadata["provenance"] = "TrackMate"
-    metadata["TrackMate_version"] = _get_trackmate_version(path)
+    metadata["trackmate_version"] = _get_trackmate_version(path)
     # The rest of the tags.
     for tag_name, tag in dict_tags.items():
         element_string = ET.tostring(tag, encoding="utf-8").decode()

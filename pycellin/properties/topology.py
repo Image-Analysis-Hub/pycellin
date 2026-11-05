@@ -29,7 +29,7 @@ def create_is_division_property(
         or "Whether the cell is a division event, i.e. has more than one daughter cell",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="bool",
     )
 
@@ -69,7 +69,7 @@ def create_is_leaf_property(
         or "Whether the cell is a leaf cell, i.e. has no daughter cells",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="bool",
     )
 
@@ -109,7 +109,7 @@ def create_is_root_property(
         or "Whether the cell is a root cell, i.e. has no parent cell",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="bool",
     )
 
@@ -149,7 +149,7 @@ def create_num_cells_property(
         description=custom_description or "Number of cells in the lineage",
         provenance="pycellin",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
@@ -187,7 +187,7 @@ def create_num_cycles_property(
         description=custom_description or "Number of cell cycles in the lineage",
         provenance="pycellin",
         prop_type="lineage",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="int",
     )
 
@@ -223,7 +223,7 @@ def create_num_divisions_property(
         description=custom_description or "Number of cell divisions in the lineage",
         provenance="pycellin",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
@@ -261,7 +261,7 @@ def create_num_gaps_property(
         or "Number of gaps (missing detections) in the lineage",
         provenance="pycellin",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
@@ -298,7 +298,7 @@ def create_num_leaves_property(
         or "Number of leaf cells (cells without daughter cells) in the lineage",
         provenance="pycellin",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
@@ -336,7 +336,7 @@ def create_lineage_cell_depth_property(
         "a terminal cell (leaf)",
         provenance="pycellin",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
@@ -375,7 +375,7 @@ def create_lineage_cycle_depth_property(
         "to a terminal cell (leaf), i.e. the highest generation + 1",
         provenance="pycellin",
         prop_type="lineage",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="int",
     )
 
@@ -415,7 +415,7 @@ def create_lineage_duration_property(
         "recent descendant (leaf)",
         provenance="pycellin",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype=dtype,
         unit=unit,
     )
@@ -434,9 +434,7 @@ class LineageDuration(LineageLocalPropCalculator):
         of the cells (e.g. "frame", "POSITION_T").
     """
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "time_prop": ("node", "CellLineage")
-    }
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"time_prop": ("node", "cell")}
 
     def __init__(self, property: Property, time_prop: str):
         super().__init__(property)
@@ -493,7 +491,7 @@ def create_location_tag_property(
         or "A tag indicating the location of a cell in the image",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype=dtype,
     )
 
@@ -511,16 +509,16 @@ class LocationTag(NodeLocalPropCalculator):
 
     Parameters
     ----------
-    prop: Property
+    property : Property
         Property object to which the calculator is associated.
-    mask_img: np.ndarray
+    mask_image : np.ndarray
         The mask image that defines the location tags. It must be a tif stack with
         dimensions (time, height, width), where each pixel value represents a
         location tag. The first frame/slice of the mask image must correspond to the
         first timepoint in the model.
-    pixel_size: float
+    pixel_size : float
         The size of a pixel in the image.
-    tag_names: dict[int, str], optional
+    tag_names : dict[int, str], optional
         Mapping from mask pixel values to tag names. If None (default), the tag is
         the raw pixel value.
 
@@ -542,13 +540,13 @@ class LocationTag(NodeLocalPropCalculator):
 
     def __init__(
         self,
-        prop: Property,
-        mask_img: np.ndarray,
+        property: Property,
+        mask_image: np.ndarray,
         pixel_size: float,
         tag_names: dict[int, str] | None = None,
     ):
-        super().__init__(prop)
-        self.mask = mask_img
+        super().__init__(property)
+        self.mask = mask_image
         self.pixel_size = pixel_size
         if tag_names is not None:
             if not tag_names:
@@ -651,7 +649,7 @@ def create_mother_cycle_property(
         "or None for the root cell cycle",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="int",
     )
 
@@ -690,7 +688,7 @@ def create_daughter_cycles_property(
         or "IDs of the cell cycles born from the division ending the cell cycle",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="list[int]",
     )
 
@@ -729,7 +727,7 @@ def create_sister_cycles_property(
         or "IDs of the other cell cycles born from the same division as the cell cycle",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="list[int]",
     )
 
@@ -769,7 +767,7 @@ def create_cousin_cycles_property(
         "share an ancestor with the cell cycle, but not its mother",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="list[int]",
     )
 

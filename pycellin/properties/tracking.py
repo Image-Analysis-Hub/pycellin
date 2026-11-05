@@ -61,7 +61,7 @@ def create_absolute_age_property(
         or "Age of the cell since the start of the lineage",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype=dtype,
         unit=unit,
     )
@@ -77,9 +77,7 @@ class AbsoluteAge(NodeLocalPropCalculator):
     (e.g. "frame", "time", etc.).
     """
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "time_prop": ("node", "CellLineage")
-    }
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"time_prop": ("node", "cell")}
 
     def __init__(self, property: Property, time_prop: str):
         """
@@ -140,7 +138,7 @@ def create_relative_age_property(
         or "Age of the cell since the start of the current cell cycle",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype=dtype,
         unit=unit,
     )
@@ -157,9 +155,7 @@ class RelativeAge(NodeLocalPropCalculator):
     (e.g. "frame", "time", etc.).
     """
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "time_prop": ("node", "CellLineage")
-    }
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"time_prop": ("node", "cell")}
 
     def __init__(self, property: Property, time_prop: str):
         """
@@ -220,7 +216,7 @@ def create_normalized_age_property(
         "0 for the first cell of the cycle, 1 for the last one",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
 
@@ -238,9 +234,7 @@ class NormalizedAge(NodeLocalPropCalculator):
     no time, such as a cell cycle of a single cell.
     """
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "time_prop": ("node", "CellLineage")
-    }
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"time_prop": ("node", "cell")}
 
     def __init__(
         self,
@@ -315,7 +309,7 @@ def create_is_complete_cycle_property(
         "and ends with a division",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="bool",
     )
 
@@ -476,7 +470,7 @@ def create_interdivision_time_property(
         or "Time elapsed between two successive divisions",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype=dtype,
         unit=unit,
     )
@@ -492,9 +486,7 @@ class InterdivisionTime(NodeGlobalPropCalculator):
     (e.g. "frame", "time", etc.).
     """
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "time_prop": ("node", "CellLineage")
-    }
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"time_prop": ("node", "cell")}
 
     def __init__(self, property: Property, time_prop: str):
         """
@@ -563,7 +555,7 @@ def create_division_rate_property(
         description=custom_description or "Number of divisions per time unit",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
         unit=unit,
     )
@@ -579,9 +571,7 @@ class DivisionRate(NodeGlobalPropCalculator):
     (e.g. "frame", "time", etc.).
     """
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "time_prop": ("node", "CellLineage")
-    }
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"time_prop": ("node", "cell")}
 
     def __init__(self, property: Property, time_prop: str):
         """

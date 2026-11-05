@@ -362,7 +362,7 @@ def _write_FeatureDeclarations(
 
     Only the properties of cell lineages are declared, since TrackMate has no
     cycle lineages. Cycle properties are declared once propagated to the cell
-    lineages, which makes them `Lineage` properties.
+    lineages, which gives them the lineage type "both".
 
     Parameters
     ----------
@@ -394,7 +394,7 @@ def _write_FeatureDeclarations(
                         raise ValueError(f"Unknown feature type: {f_type}")
                 first_feat_written = False
                 for prop in props.values():
-                    if prop.lin_type == "CycleLineage":
+                    if prop.lineage_type == "cycle":
                         continue  # no values on spots, edges or tracks
                     trackmate_feat = _convert_prop_to_feat(prop)
                     if trackmate_feat:
@@ -484,9 +484,7 @@ def _get_exported_keys(model: Model) -> dict[str, set[str]]:
     ):
         # Cycle lineage properties are not declared, see _write_FeatureDeclarations().
         exported_keys[prop_type].update(
-            prop_id
-            for prop_id, prop in props.items()
-            if prop.lin_type != "CycleLineage"
+            prop_id for prop_id, prop in props.items() if prop.lineage_type != "cycle"
         )
 
     # Attributes written in another way, or not at all on purpose.
@@ -970,7 +968,7 @@ def _add_mandatory_props(props_md: PropsMetadata) -> None:
             description="Source spot ID",
             provenance="TrackMate",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
             unit="NONE",
         )
@@ -982,7 +980,7 @@ def _add_mandatory_props(props_md: PropsMetadata) -> None:
             description="Target spot ID",
             provenance="TrackMate",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
             unit="NONE",
         )
@@ -994,7 +992,7 @@ def _add_mandatory_props(props_md: PropsMetadata) -> None:
             description="Visibility",
             provenance="TrackMate",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
             unit="NONE",
         )
@@ -1038,7 +1036,7 @@ def _update_location_props(props_md: PropsMetadata) -> None:
                         description=f"Cell {axis.upper()} coordinate",
                         provenance="TrackMate",
                         prop_type="node",
-                        lin_type="CellLineage",
+                        lineage_type="cell",
                         dtype="float",
                         unit="pixel",
                     )
@@ -1120,7 +1118,7 @@ def _add_radius_prop(model: Model) -> None:
             description="Radius",
             provenance="TrackMate",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="float",
             unit=model.get_space_unit(),
         )
@@ -1211,7 +1209,7 @@ def _relabel_nodes(model) -> dict[int, dict[int, int]]:
         description="Original cell ID before relabeling for TrackMate export",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
     model.props_metadata._add_prop(prop)
@@ -1257,10 +1255,10 @@ def _prepare_model_for_export(
 def _write_Settings(
     xf: ET.xmlfile,
     model: Model,
-    img_path: str | Path | None = None,
-    img_path_field: str | None = None,
-    img_shape: tuple[int, int, int, int, int] | None = None,
-    img_shape_field: str | None = None,
+    image_path: str | Path | None = None,
+    image_path_field: str | None = None,
+    image_shape: tuple[int, int, int, int, int] | None = None,
+    image_shape_field: str | None = None,
 ) -> None:
     """
     Write the Settings XML tag into a TrackMate XML file.
@@ -1271,18 +1269,18 @@ def _write_Settings(
         Context manager for the XML file to write.
     model : Model
         Model containing the data to write.
-    img_path : str | Path | None, optional
+    image_path : str | Path | None, optional
         Path to the image file associated with the model. Default is None.
-        If provided, will be used instead of `img_path_field`.
-    img_path_field : str | None, optional
+        If provided, will be used instead of `image_path_field`.
+    image_path_field : str | None, optional
         Name of the model metadata field that contains the image path. Default is None.
-        Not needed if `img_path` is provided.
-    img_shape : tuple[int, int, int, int, int] | None, optional
+        Not needed if `image_path` is provided.
+    image_shape : tuple[int, int, int, int, int] | None, optional
         Shape of the image associated with the model, in the format (T, C, Z, Y, X).
-        Default is None. If provided, will be used instead of `img_shape_field`.
-    img_shape_field : str | None, optional
+        Default is None. If provided, will be used instead of `image_shape_field`.
+    image_shape_field : str | None, optional
         Name of the model metadata field that contains the image shape. Default is None.
-        Not needed if `img_shape` is provided.
+        Not needed if `image_shape` is provided.
     """
     metadata = model.model_metadata.to_dict()
     if "Settings" in metadata:
@@ -1290,34 +1288,34 @@ def _write_Settings(
         xf.write(xml_element)
         return
 
-    if img_path is None:
-        if img_path_field is None:
-            img_path = ""
+    if image_path is None:
+        if image_path_field is None:
+            image_path = ""
         else:
-            img_path = metadata.get(img_path_field, "")
-    if not img_path:
+            image_path = metadata.get(image_path_field, "")
+    if not image_path:
         filename = ""
         folder = ""
     else:
-        filename = str(Path(img_path).name)
-        folder = str(Path(img_path).parent)
+        filename = str(Path(image_path).name)
+        folder = str(Path(image_path).parent)
 
-    if img_shape is None:
-        if img_shape_field is None:
-            img_shape = (0, 0, 0, 0, 0)
+    if image_shape is None:
+        if image_shape_field is None:
+            image_shape = (0, 0, 0, 0, 0)
         else:
-            img_shape = metadata.get(img_shape_field, (0, 0, 0, 0, 0))
-    if not img_shape:
+            image_shape = metadata.get(image_shape_field, (0, 0, 0, 0, 0))
+    if not image_shape:
         n_frames = "0"  # T
         # TrackMate doesn't need the number of channels.
         n_slices = "0"  # Z
         height = "0"  # Y
         width = "0"  # X
     else:
-        n_frames = str(img_shape[0])
-        n_slices = str(img_shape[2])
-        height = str(img_shape[3])
-        width = str(img_shape[4])
+        n_frames = str(image_shape[0])
+        n_slices = str(image_shape[2])
+        height = str(image_shape[3])
+        width = str(image_shape[4])
 
     with xf.element("Settings"):
         xf.write("\n    ")
@@ -1414,10 +1412,10 @@ def write_trackmate_xml(
     *,
     space_unit: str | None = None,
     time_unit: str | None = None,
-    img_path: str | Path | None = None,
-    img_path_field: str | None = None,
-    img_shape: tuple[int, int, int, int, int] | None = None,
-    img_shape_field: str | None = None,
+    image_path: str | Path | None = None,
+    image_path_field: str | None = None,
+    image_shape: tuple[int, int, int, int, int] | None = None,
+    image_shape_field: str | None = None,
     propagate_cycle_props: bool = False,
 ) -> Model:
     """
@@ -1435,21 +1433,21 @@ def write_trackmate_xml(
     time_unit : str, optional
         Temporal unit of the TrackMate model, e.g. "min". Defaults to the time unit
         of the model, or "frame", with a warning, if the model has none.
-    img_path : str | Path | None, optional
+    image_path : str | Path | None, optional
         Path to the image file associated with the model. Default is None.
-        If provided, will be used instead of `img_path_field`.
-    img_path_field : str | None, optional
+        If provided, will be used instead of `image_path_field`.
+    image_path_field : str | None, optional
         Name of the model metadata field that contains the image path. Default is None.
-        Not needed if `img_path` is provided.
-    img_shape : tuple[int, int, int, int, int] | None, optional
+        Not needed if `image_path` is provided.
+    image_shape : tuple[int, int, int, int, int] | None, optional
         Shape of the image associated with the model, in the format (T, C, Z, Y, X).
-        Default is None. If provided, will be used instead of `img_shape_field`.
+        Default is None. If provided, will be used instead of `image_shape_field`.
         Not needed to open the XML in TrackMate, but useful for MATLAB scripting
         and the like.
-    img_shape_field : str | None, optional
+    image_shape_field : str | None, optional
         Name of the model metadata field that contains the image shape. Default is None.
-        Not needed if `img_shape` is provided. Not needed to open the XML in TrackMate,
-        but useful for MATLAB scripting and the like.
+        Not needed if `image_shape` is provided. Not needed to open the XML in
+        TrackMate, but useful for MATLAB scripting and the like.
     propagate_cycle_props : bool, optional
         If True, cycle properties will be propagated to cell lineages before export.
         Useful if you want to export the cycle properties to TrackMate
@@ -1507,8 +1505,8 @@ def write_trackmate_xml(
             time_unit, model_copy.get_time_unit(), "time", "frame"
         ),
     }
-    if hasattr(model_copy.model_metadata, "TrackMate_version"):
-        tm_version = model_copy.model_metadata.TrackMate_version
+    if hasattr(model_copy.model_metadata, "trackmate_version"):
+        tm_version = model_copy.model_metadata.trackmate_version
     else:
         tm_version = "unknown"
     has_FilteredTrack = model_copy.has_property("FilteredTrack")
@@ -1533,7 +1531,12 @@ def write_trackmate_xml(
                 _write_FilteredTracks(xf, model_copy.data.cell_data, has_FilteredTrack)
             xf.write("\n  ")
             _write_Settings(
-                xf, model_copy, img_path, img_path_field, img_shape, img_shape_field
+                xf,
+                model_copy,
+                image_path,
+                image_path_field,
+                image_shape,
+                image_shape_field,
             )
 
             xf.write("\n  ")
@@ -1570,6 +1573,9 @@ if __name__ == "__main__":
     print("Model metadata:")
     print(model.model_metadata)
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        xml_out = Path(tmp_dir) / "output.xml"
-        write_trackmate_xml(model, xml_out)
+    xml_out = Path("sample_data/results") / "output.xml"
+    write_trackmate_xml(model, xml_out)
+
+    # with tempfile.TemporaryDirectory() as tmp_dir:
+    #     xml_out = Path(tmp_dir) / "output.xml"
+    #     write_trackmate_xml(model, xml_out)

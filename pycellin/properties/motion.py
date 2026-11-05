@@ -66,7 +66,7 @@ def create_cell_displacement_property(
         or "Displacement of the cell between two consecutive detections",
         provenance="pycellin",
         prop_type="edge",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit=unit,
     )
@@ -132,7 +132,7 @@ def create_cycle_total_displacement_property(
         or "Displacement of the cell during the cell cycle",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
         unit=unit,
     )
@@ -148,7 +148,7 @@ class CycleTotalDisplacement(NodeGlobalPropCalculator):
     """
 
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "displacement_prop": ("edge", "CellLineage")
+        "displacement_prop": ("edge", "cell")
     }
 
     def __init__(
@@ -214,7 +214,7 @@ def create_cycle_mean_displacement_property(
         or "Mean displacement of the cell during the cell cycle",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
         unit=unit,
     )
@@ -230,7 +230,7 @@ class CycleMeanDisplacement(NodeGlobalPropCalculator):
     """
 
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "displacement_prop": ("edge", "CellLineage")
+        "displacement_prop": ("edge", "cell")
     }
 
     def __init__(
@@ -296,7 +296,7 @@ def create_cell_speed_property(
         or "Speed of the cell between two consecutive detections",
         provenance="pycellin",
         prop_type="edge",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit=unit,
     )
@@ -311,9 +311,7 @@ class CellSpeed(EdgeLocalPropCalculator):
     and the time property, not from the cell displacement property.
     """
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "time_prop": ("node", "CellLineage")
-    }
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"time_prop": ("node", "cell")}
 
     def __init__(
         self,
@@ -376,7 +374,7 @@ def create_cycle_mean_speed_property(
         or "Mean speed of the cell during the cell cycle",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
         unit=unit,
     )
@@ -391,9 +389,7 @@ class CycleMeanSpeed(NodeGlobalPropCalculator):
     has no link with a speed value, e.g. a cell cycle of a single cell.
     """
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "speed_prop": ("edge", "CellLineage")
-    }
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"speed_prop": ("edge", "cell")}
 
     def __init__(
         self,
@@ -457,7 +453,7 @@ def create_straightness_property(
         or "Straightness of the cell trajectory during the cell cycle",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
     )
 
@@ -496,7 +492,7 @@ class Straightness(NodeGlobalPropCalculator):
         self.coord_props = coord_props
 
     def compute(  # type: ignore[override]
-        self, data: Data, cycle_lin: CycleLineage, node_id: int
+        self, data: Data, lineage: CycleLineage, node_id: int
     ) -> float:
         """
         Compute the straightness of the cell displacement within a cell cycle.
@@ -505,7 +501,7 @@ class Straightness(NodeGlobalPropCalculator):
         ----------
         data : Data
             Data object containing the lineage.
-        cycle_lin : CycleLineage
+        lineage : CycleLineage
             Lineage graph containing the node of interest.
         node_id : int
             Node ID (cycle_id) of the cell cycle of interest.
@@ -516,9 +512,9 @@ class Straightness(NodeGlobalPropCalculator):
             Straightness of the displacement.
             Returns NaN if the total distance traveled is null.
         """
-        lin_id = cycle_lin.graph["lineage_id"]
+        lin_id = lineage.graph["lineage_id"]
         cell_lin = data.cell_data[lin_id]
-        cells = cycle_lin.nodes[node_id]["cells"]
+        cells = lineage.nodes[node_id]["cells"]
         distances = [
             math.dist(
                 _get_position(cell_lin, n1, self.coord_props),
@@ -560,7 +556,7 @@ def create_turning_angle_property(
         or "Angle of the cell trajectory between two consecutive displacements",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit=unit,
     )

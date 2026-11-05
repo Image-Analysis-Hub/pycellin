@@ -12,8 +12,8 @@ import tifffile
 
 from pycellin.io.cell_tracking_challenge.reader import (
     _extract_seg_data,
-    _get_label_img_paths,
-    _integrate_label_imgs_metadata,
+    _get_label_image_paths,
+    _integrate_label_images_metadata,
     read_ctc,
 )
 
@@ -21,7 +21,7 @@ from pycellin.io.cell_tracking_challenge.reader import (
 
 
 @pytest.fixture
-def label_img_path(tmp_path):
+def label_image_path(tmp_path):
     # Label 1 is a 2x3 rectangle (rows 2-3, columns 5-7). Label 2 is made of
     # a 3x3 square (rows 6-8, columns 1-3) and of a single pixel (row 9, column 10).
     img = np.zeros((10, 12), dtype=np.uint16)
@@ -33,7 +33,7 @@ def label_img_path(tmp_path):
     return str(path)
 
 
-def _write_label_imgs(labels_path, **imwrite_kwargs):
+def _write_label_images(labels_path, **imwrite_kwargs):
     # Label 1 is a 2x3 rectangle (rows 2-3) that moves one column to the right
     # between frames 0 and 1. Label 2 is a 3x3 square (rows 6-8, columns 1-3).
     for frame in range(2):
@@ -50,7 +50,7 @@ def ctc_data(tmp_path):
     ctc_path.write_text("1 0 1 0\n2 0 1 0\n")
     labels_path = tmp_path / "labels"
     labels_path.mkdir()
-    _write_label_imgs(labels_path)
+    _write_label_images(labels_path)
     return ctc_path, labels_path
 
 
@@ -62,33 +62,33 @@ def _get_cells(model):
     }
 
 
-# _get_label_img_paths ########################################################
+# _get_label_image_paths ########################################################
 
 
-class TestGetLabelImgPaths:
-    def test_label_imgs_sorted_by_name(self, ctc_data):
+class TestGetLabelImagePaths:
+    def test_label_images_sorted_by_name(self, ctc_data):
         _, labels_path = ctc_data
-        paths = _get_label_img_paths(labels_path)
+        paths = _get_label_image_paths(labels_path)
         assert [path.name for path in paths] == ["mask000.tif", "mask001.tif"]
 
     def test_file_raises(self, ctc_data):
         _, labels_path = ctc_data
         with pytest.raises(ValueError, match="is not a folder"):
-            _get_label_img_paths(labels_path / "mask000.tif")
+            _get_label_image_paths(labels_path / "mask000.tif")
 
     def test_missing_folder_raises(self, tmp_path):
         with pytest.raises(ValueError, match="is not a folder"):
-            _get_label_img_paths(tmp_path / "missing")
+            _get_label_image_paths(tmp_path / "missing")
 
     def test_folder_without_tif_raises(self, tmp_path):
         with pytest.raises(ValueError, match="No label images found"):
-            _get_label_img_paths(tmp_path)
+            _get_label_image_paths(tmp_path)
 
 
-# _integrate_label_imgs_metadata ##############################################
+# _integrate_label_images_metadata ##############################################
 
 
-class TestIntegrateLabelImgsMetadata:
+class TestIntegrateLabelImagesMetadata:
     def test_resolution_with_unit(self, tmp_path):
         path = tmp_path / "mask000.tif"
         tifffile.imwrite(
@@ -98,7 +98,7 @@ class TestIntegrateLabelImgsMetadata:
             resolutionunit="CENTIMETER",
         )
         metadata = {}
-        _integrate_label_imgs_metadata(metadata, path)
+        _integrate_label_images_metadata(metadata, path)
         assert metadata == {
             "space_unit": "cm",
             "pixel_width": 0.5,
@@ -116,7 +116,7 @@ class TestIntegrateLabelImgsMetadata:
             metadata={"unit": "micron", "spacing": 2.0},
         )
         metadata = {}
-        _integrate_label_imgs_metadata(metadata, path)
+        _integrate_label_images_metadata(metadata, path)
         assert metadata == {
             "space_unit": "micron",
             "pixel_width": 0.25,
@@ -136,7 +136,7 @@ class TestIntegrateLabelImgsMetadata:
             metadata=None,
         )
         metadata = {}
-        _integrate_label_imgs_metadata(metadata, path)
+        _integrate_label_images_metadata(metadata, path)
         assert metadata["space_unit"] == "µm"
 
     def test_resolution_without_unit_ignored(self, tmp_path):
@@ -146,7 +146,7 @@ class TestIntegrateLabelImgsMetadata:
             path, np.zeros((4, 4), dtype=np.uint16), imagej=True, resolution=(4.0, 4.0)
         )
         metadata = {}
-        _integrate_label_imgs_metadata(metadata, path)
+        _integrate_label_images_metadata(metadata, path)
         assert metadata == {
             "space_unit": "pixel",
             "pixel_width": 1.0,
@@ -164,7 +164,7 @@ class TestIntegrateLabelImgsMetadata:
         )
         metadata = {}
         with pytest.warns(UserWarning, match="given in inches"):
-            _integrate_label_imgs_metadata(metadata, path)
+            _integrate_label_images_metadata(metadata, path)
         assert metadata == {
             "space_unit": "pixel",
             "pixel_width": 1.0,
@@ -183,7 +183,7 @@ class TestIntegrateLabelImgsMetadata:
         metadata = {"space_unit": "um", "pixel_width": 0.1, "pixel_height": 0.1}
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            _integrate_label_imgs_metadata(metadata, path)
+            _integrate_label_images_metadata(metadata, path)
         assert metadata["pixel_depth"] == 1.0
 
     def test_given_values_kept(self, tmp_path):
@@ -195,7 +195,7 @@ class TestIntegrateLabelImgsMetadata:
             resolutionunit="CENTIMETER",
         )
         metadata = {"space_unit": "um", "pixel_width": 0.1, "pixel_height": 0.1}
-        _integrate_label_imgs_metadata(metadata, path)
+        _integrate_label_images_metadata(metadata, path)
         assert metadata == {
             "space_unit": "um",
             "pixel_width": 0.1,
@@ -208,33 +208,33 @@ class TestIntegrateLabelImgsMetadata:
 
 
 class TestExtractSegData:
-    def test_labels_and_centroids(self, label_img_path):
-        labels, centroids, _ = _extract_seg_data(label_img_path)
+    def test_labels_and_centroids(self, label_image_path):
+        labels, centroids, _ = _extract_seg_data(label_image_path)
         assert labels == [1, 2]
         assert centroids[0] == pytest.approx([6.0, 2.5])
 
-    def test_contour_relative_to_centroid(self, label_img_path):
-        _, _, contours = _extract_seg_data(label_img_path)
+    def test_contour_relative_to_centroid(self, label_image_path):
+        _, _, contours = _extract_seg_data(label_image_path)
         xs, ys = zip(*contours[0])
         assert (min(xs), max(xs), min(ys), max(ys)) == pytest.approx(
             (-1.5, 1.5, -1.0, 1.0)
         )
 
-    def test_label_in_several_pieces_keeps_largest(self, label_img_path):
-        _, centroids, contours = _extract_seg_data(label_img_path)
+    def test_label_in_several_pieces_keeps_largest(self, label_image_path):
+        _, centroids, contours = _extract_seg_data(label_image_path)
         x0 = centroids[1][0]
         xs, _ = zip(*contours[1])
         # The single pixel at column 10 is not part of the contour.
         assert max(xs) + x0 == pytest.approx(3.5)
 
-    def test_label_in_several_pieces_logs_warning(self, label_img_path, caplog):
+    def test_label_in_several_pieces_logs_warning(self, label_image_path, caplog):
         with caplog.at_level(logging.WARNING):
-            _extract_seg_data(label_img_path)
+            _extract_seg_data(label_image_path)
         assert "Labels [2]" in caplog.text
 
-    def test_pixel_size(self, label_img_path):
+    def test_pixel_size(self, label_image_path):
         _, centroids, contours = _extract_seg_data(
-            label_img_path, pixel_width=0.5, pixel_height=2.0
+            label_image_path, pixel_width=0.5, pixel_height=2.0
         )
         assert centroids[0] == pytest.approx([3.0, 5.0])
         xs, ys = zip(*contours[0])
@@ -287,11 +287,11 @@ class TestReadCtc:
         )
         for prop_id in ("cell_x", "cell_y", "cell_contour"):
             assert model.get_property(prop_id).unit == "um"
-        assert model.model_metadata.label_imgs_location == labels_path
+        assert model.model_metadata.label_images_location == labels_path
 
-    def test_pixel_size_read_from_label_imgs(self, ctc_data):
+    def test_pixel_size_read_from_label_images(self, ctc_data):
         ctc_path, labels_path = ctc_data
-        _write_label_imgs(
+        _write_label_images(
             labels_path, resolution=(2.0, 0.5), resolutionunit="CENTIMETER"
         )
         model = read_ctc(ctc_path, labels_path=labels_path)
@@ -304,7 +304,7 @@ class TestReadCtc:
 
     def test_resolution_in_inches_ignored(self, ctc_data):
         ctc_path, labels_path = ctc_data
-        _write_label_imgs(labels_path, resolution=(72.0, 72.0), resolutionunit="INCH")
+        _write_label_images(labels_path, resolution=(72.0, 72.0), resolutionunit="INCH")
         with pytest.warns(UserWarning, match="given in inches") as record:
             model = read_ctc(ctc_path, labels_path=labels_path)
 

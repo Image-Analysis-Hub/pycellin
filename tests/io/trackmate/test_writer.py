@@ -104,7 +104,7 @@ def model_non_unique_ids(simple_model):
         description="Cell name from TrackMate",
         provenance="TrackMate",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="str",
         unit=None,
     )
@@ -131,7 +131,7 @@ def numeric_float64_prop():
         description="Cell intensity",
         provenance="test",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float64",
         unit=None,
     )
@@ -146,7 +146,7 @@ def numeric_float32_prop():
         description="Cell area",
         provenance="test",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float32",
         unit="pixel",
     )
@@ -161,7 +161,7 @@ def bool_prop():
         description="Whether the cell is dividing",
         provenance="test",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="bool",
         unit=None,
     )
@@ -176,7 +176,7 @@ def string_prop():
         description="Cell label",
         provenance="test",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="string",
         unit=None,
     )
@@ -191,7 +191,7 @@ def trackmate_string_prop():
         description="Spot name",
         provenance="TrackMate",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="string",
         unit=None,
     )
@@ -206,7 +206,7 @@ def object_prop():
         description="Cell category",
         provenance="test",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="object",
         unit=None,
     )
@@ -221,7 +221,7 @@ def dict_prop():
         description="Cell metadata",
         provenance="test",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="dict",
         unit=None,
     )
@@ -236,7 +236,7 @@ def list_prop():
         description="Cell tags",
         provenance="test",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="list",
         unit=None,
     )
@@ -493,7 +493,7 @@ class TestWriteFeatureDeclarations:
                     description=f"Cycle {prop_type} property",
                     provenance="test",
                     prop_type=prop_type,
-                    lin_type="CycleLineage",
+                    lineage_type="cycle",
                     dtype="float",
                 )
             )
@@ -538,8 +538,8 @@ class TestWriteTrackmateXml:
         model.add_mother_cycle()
         model.update()
 
-        assert model.get_property("generation").lin_type == "CycleLineage"
-        assert model.get_property("mother_cycle").lin_type == "CycleLineage"
+        assert model.get_property("generation").lineage_type == "cycle"
+        assert model.get_property("mother_cycle").lineage_type == "cycle"
         pairs = model.to_cycle_pair_dataframe("mother_cycle")
         assert sorted(zip(pairs["cycle_id_1"], pairs["cycle_id_2"])) == [(5, 4), (8, 4)]
 
@@ -560,7 +560,7 @@ class TestWriteTrackmateXml:
             model.add_cycle_data()
 
         cycle_props = model_with_cycle_data.get_cycle_lineage_properties(
-            include_Lineage_props=False
+            single_type=True
         )
         for prop_id in cycle_props:
             if model.has_property(prop_id):
@@ -597,7 +597,7 @@ class TestWriteTrackmateXml:
                 description="True if the track was not filtered out in TrackMate",
                 provenance="TrackMate",
                 prop_type="lineage",
-                lin_type="CellLineage",
+                lineage_type="cell",
                 dtype="int",
             )
         )

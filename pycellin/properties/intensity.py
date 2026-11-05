@@ -29,7 +29,7 @@ def create_cell_total_intensity_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
-    custom_provenance: str | None = None,
+    provenance: str | None = None,
     unit: str | None = None,
 ) -> Property:
     return Property(
@@ -37,9 +37,9 @@ def create_cell_total_intensity_property(
         name=custom_name or "Cell total intensity",
         description=custom_description
         or "Sum of the pixel values of the cell in an intensity image",
-        provenance=custom_provenance or "pycellin",
+        provenance=provenance or "pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit=unit,
     )
@@ -49,7 +49,7 @@ def create_cell_mean_intensity_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
-    custom_provenance: str | None = None,
+    provenance: str | None = None,
     unit: str | None = None,
 ) -> Property:
     return Property(
@@ -57,9 +57,9 @@ def create_cell_mean_intensity_property(
         name=custom_name or "Cell mean intensity",
         description=custom_description
         or "Mean of the pixel values of the cell in an intensity image",
-        provenance=custom_provenance or "pycellin",
+        provenance=provenance or "pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit=unit,
     )
@@ -183,7 +183,7 @@ class _CellIntensityCalculator(NodeLocalPropCalculator):
         Property object to which the calculator is associated.
     statistic : {"total", "mean"}
         Statistic computed on the pixel values of each cell: their sum or their mean.
-    intensity_img : np.ndarray
+    intensity_image : np.ndarray
         The intensity image, with time as first axis.
     background : float, optional
         Value subtracted from each pixel value before computing the statistic.
@@ -202,7 +202,7 @@ class _CellIntensityCalculator(NodeLocalPropCalculator):
         self,
         property: Property,
         statistic: Literal["total", "mean"],
-        intensity_img: np.ndarray,
+        intensity_image: np.ndarray,
         background: float = 0.0,
     ):
         super().__init__(property)
@@ -211,7 +211,7 @@ class _CellIntensityCalculator(NodeLocalPropCalculator):
                 f"'statistic' must be one of 'total', 'mean', got {statistic!r}."
             )
         self.statistic = statistic
-        self.intensity_img = intensity_img
+        self.intensity_image = intensity_image
         self.background = background
 
     @abstractmethod
@@ -259,7 +259,7 @@ class _CellIntensityCalculator(NodeLocalPropCalculator):
         return float(values.sum() if self.statistic == "total" else values.mean())
 
 
-class CellIntensityFromLabelImg(_CellIntensityCalculator):
+class CellIntensityFromLabelImage(_CellIntensityCalculator):
     """
     A calculator for the cell intensity properties, which takes the pixels of each
     cell from a label image.
@@ -273,11 +273,11 @@ class CellIntensityFromLabelImg(_CellIntensityCalculator):
         Property object to which the calculator is associated.
     statistic : {"total", "mean"}
         Statistic computed on the pixel values of each cell: their sum or their mean.
-    intensity_img : np.ndarray
+    intensity_image : np.ndarray
         The intensity image, with the same shape as the label image.
     label_prop : str
         Name of the property that stores cell labels.
-    label_img : np.ndarray
+    label_image : np.ndarray
         The label image.
     background : float, optional
         Value subtracted from each pixel value before computing the statistic.
@@ -289,30 +289,28 @@ class CellIntensityFromLabelImg(_CellIntensityCalculator):
         If `statistic` is not "total" or "mean".
     """
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "label_prop": ("node", "CellLineage")
-    }
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"label_prop": ("node", "cell")}
 
     def __init__(
         self,
         property: Property,
         statistic: Literal["total", "mean"],
-        intensity_img: np.ndarray,
+        intensity_image: np.ndarray,
         label_prop: str,
-        label_img: np.ndarray,
+        label_image: np.ndarray,
         background: float = 0.0,
     ):
-        super().__init__(property, statistic, intensity_img, background)
+        super().__init__(property, statistic, intensity_image, background)
         self.label_prop = label_prop
-        self.label_img = label_img
+        self.label_image = label_image
         # Bounding boxes of the labels of each timepoint, computed on first use.
         self._label_slices: dict[int, list[tuple[slice, ...] | None]] = {}
 
     def _cell_pixels(self, lineage: CellLineage, nid: int) -> np.ndarray:
         t, bbox, mask = _find_label(
-            self.label_img, self._label_slices, lineage, nid, self.label_prop
+            self.label_image, self._label_slices, lineage, nid, self.label_prop
         )
-        return self.intensity_img[t][bbox][mask]
+        return self.intensity_image[t][bbox][mask]
 
 
 class CellIntensityFromPolygon(_CellIntensityCalculator):
@@ -333,7 +331,7 @@ class CellIntensityFromPolygon(_CellIntensityCalculator):
         Property object to which the calculator is associated.
     statistic : {"total", "mean"}
         Statistic computed on the pixel values of each cell: their sum or their mean.
-    intensity_img : np.ndarray
+    intensity_image : np.ndarray
         The intensity image, with axes (t, y, x).
     polygon_prop : str
         Identifier of the node property holding the cell shapes as
@@ -351,19 +349,19 @@ class CellIntensityFromPolygon(_CellIntensityCalculator):
     """
 
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "polygon_prop": ("node", "CellLineage")
+        "polygon_prop": ("node", "cell")
     }
 
     def __init__(
         self,
         property: Property,
         statistic: Literal["total", "mean"],
-        intensity_img: np.ndarray,
+        intensity_image: np.ndarray,
         polygon_prop: str,
         pixel_size: float,
         background: float = 0.0,
     ):
-        super().__init__(property, statistic, intensity_img, background)
+        super().__init__(property, statistic, intensity_image, background)
         self.polygon_prop = polygon_prop
         self.pixel_size = pixel_size
 
@@ -372,14 +370,14 @@ class CellIntensityFromPolygon(_CellIntensityCalculator):
             shape = lineage.nodes[nid][self.polygon_prop]
         except KeyError:
             raise KeyError(
-                f"Cannot compute '{self.prop.identifier}': missing "
+                f"Cannot compute '{self.property.identifier}': missing "
                 f"'{self.polygon_prop}' property for cell {nid}, "
                 f"lineage {lineage.graph['lineage_id']}. "
                 f"Please compute the '{self.polygon_prop}' property first."
             )
         if shape is None:
             return None
-        frame = self.intensity_img[lineage.nodes[nid]["timepoint"]]
+        frame = self.intensity_image[lineage.nodes[nid]["timepoint"]]
         return _shape_pixels(shape, frame, self.pixel_size)
 
 
@@ -396,7 +394,7 @@ def create_cycle_mean_intensity_property(
         or "Mean intensity of the cell during the cell cycle",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
         unit=unit,
     )
@@ -420,7 +418,7 @@ class CycleMeanIntensity(NodeGlobalPropCalculator):
     """
 
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "intensity_prop": ("node", "CellLineage")
+        "intensity_prop": ("node", "cell")
     }
 
     def __init__(self, property: Property, intensity_prop: str = "cell_mean_intensity"):
@@ -467,7 +465,7 @@ def create_birth_intensity_property(
         or "Intensity of the cell at the start of the cell cycle, right after division",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
         unit=unit,
     )
@@ -491,7 +489,7 @@ class BirthIntensity(NodeGlobalPropCalculator):
     """
 
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "intensity_prop": ("node", "CellLineage")
+        "intensity_prop": ("node", "cell")
     }
 
     def __init__(
@@ -541,7 +539,7 @@ def create_division_intensity_property(
         or "Intensity of the cell at the end of the cell cycle, right before division",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
         unit=unit,
     )
@@ -565,7 +563,7 @@ class DivisionIntensity(NodeGlobalPropCalculator):
     """
 
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "intensity_prop": ("node", "CellLineage")
+        "intensity_prop": ("node", "cell")
     }
 
     def __init__(

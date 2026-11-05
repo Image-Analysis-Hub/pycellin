@@ -53,7 +53,7 @@ def props_dict():
         description="Edge property for testing",
         provenance="test",
         prop_type=PropertyType.EDGE,
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
     )
 
@@ -63,7 +63,7 @@ def props_dict():
         description="Lineage property for testing",
         provenance="test",
         prop_type=PropertyType.LINEAGE,
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="bool",
     )
 
@@ -73,7 +73,7 @@ def props_dict():
         description="Multi-type property for testing",
         provenance="test",
         prop_type=PropertyType.NODE | PropertyType.EDGE,
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
     )
 
@@ -202,26 +202,26 @@ def lineage_props_model():
     single_lin.graph["lin_prop"] = 2.5
     single_lin.graph["mixed_prop"] = "lineage-4"
 
-    def make_prop(identifier, prop_type, lin_type):
+    def make_prop(identifier, prop_type, lineage_type):
         return Property(
             identifier=identifier,
             name=identifier,
             description=f"{identifier} for testing",
             provenance="test",
             prop_type=prop_type,
-            lin_type=lin_type,
+            lineage_type=lineage_type,
             dtype="float",
         )
 
     props_md = PropsMetadata(
         props={
-            "lin_prop": make_prop("lin_prop", PropertyType.LINEAGE, "CellLineage"),
-            "shared_prop": make_prop("shared_prop", PropertyType.LINEAGE, "Lineage"),
-            "node_prop": make_prop("node_prop", PropertyType.NODE, "CellLineage"),
+            "lin_prop": make_prop("lin_prop", PropertyType.LINEAGE, "cell"),
+            "shared_prop": make_prop("shared_prop", PropertyType.LINEAGE, "both"),
+            "node_prop": make_prop("node_prop", PropertyType.NODE, "cell"),
             "mixed_prop": make_prop(
-                "mixed_prop", PropertyType.NODE | PropertyType.LINEAGE, "CellLineage"
+                "mixed_prop", PropertyType.NODE | PropertyType.LINEAGE, "cell"
             ),
-            "cycle_prop": make_prop("cycle_prop", PropertyType.LINEAGE, "CycleLineage"),
+            "cycle_prop": make_prop("cycle_prop", PropertyType.LINEAGE, "cycle"),
         }
     )
     return Model(
@@ -370,7 +370,7 @@ class TestAddCycleData:
         for prop_id in ["first_cell", "last_cell"]:
             prop = model.get_property(prop_id)
             assert prop.prop_type == PropertyType.NODE
-            assert prop.lin_type == "CycleLineage"
+            assert prop.lineage_type == "cycle"
             assert prop.dtype == "int"
             assert prop_id in protected_props
 
@@ -389,7 +389,7 @@ class TestAddCycleData:
         with pytest.raises(ValueError, match="calculator: 'generation'") as exc_info:
             model.add_cycle_data()
         assert "model.remove_property()" in str(exc_info.value)
-        assert model.get_property("generation").lin_type == "CellLineage"
+        assert model.get_property("generation").lineage_type == "cell"
         assert not model.has_cycle_data()
 
     def test_prop_declared_otherwise_with_calculator_raises(self, lineage_props_model):
@@ -404,7 +404,7 @@ class TestAddCycleData:
         # E.g. declared in a file without values.
         model.props_metadata._add_prop(_create_test_property("generation", "node"))
         model.add_cycle_data()
-        assert model.get_property("generation").lin_type == "CycleLineage"
+        assert model.get_property("generation").lineage_type == "cycle"
         assert "generation" in model.props_metadata._get_protected_props()
 
     def test_propagated_prop_kept(self, lineage_props_model):
@@ -412,7 +412,7 @@ class TestAddCycleData:
         model.add_cycle_data()
         model.propagate_cycle_properties(["generation"])
         model.add_cycle_data()
-        assert model.get_property("generation").lin_type == "Lineage"
+        assert model.get_property("generation").lineage_type == "both"
 
 
 class TestToCycleDataframe:
@@ -474,7 +474,7 @@ def relatives_model():
         description="lin_prop for testing",
         provenance="test",
         prop_type=PropertyType.LINEAGE,
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
     model = Model(
@@ -515,7 +515,7 @@ def root_relation_property():
         description="Cell cycles listed by the root cell cycle, for testing",
         provenance="test",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="list[int]",
     )
 
@@ -699,7 +699,7 @@ class TestToCyclePairDataframe:
             description="Named like a suffixed column",
             provenance="test",
             prop_type="node",
-            lin_type="CycleLineage",
+            lineage_type="cycle",
             dtype="int",
         )
         relatives_model.props_metadata._add_prop(clashing)
@@ -1186,7 +1186,7 @@ class TestAddLocationTag:
 def _create_test_property(
     identifier: str,
     prop_type: str | list[str],
-    lin_type: str = "CellLineage",
+    lineage_type: str = "cell",
     dtype: str = "float",
     unit: str | None = None,
 ) -> Property:
@@ -1197,7 +1197,7 @@ def _create_test_property(
         description=identifier,
         provenance="test",
         prop_type=prop_type,
-        lin_type=lin_type,
+        lineage_type=lineage_type,
         dtype=dtype,
         unit=unit,
     )
@@ -1263,16 +1263,16 @@ class TestCheckInputProps:
         with pytest.raises(ValueError, match="prop_type 'node'"):
             input_props_model._check_input_props(calc)
 
-    def test_wrong_lin_type_raises(self, input_props_model):
+    def test_wrong_lineage_type_raises(self, input_props_model):
         calc = CycleMeanArea(
             create_cycle_mean_area_property(), area_prop="cycle_num_cells"
         )
-        with pytest.raises(ValueError, match="lin_type 'CellLineage'"):
+        with pytest.raises(ValueError, match="lineage_type 'cell'"):
             input_props_model._check_input_props(calc)
 
-    def test_lineage_lin_type_accepted(self, input_props_model):
+    def test_both_lineage_type_accepted(self, input_props_model):
         input_props_model.props_metadata._add_prop(
-            _create_test_property("any_lin_area", "node", lin_type="Lineage")
+            _create_test_property("any_lin_area", "node", lineage_type="both")
         )
         calc = CycleMeanArea(
             create_cycle_mean_area_property(), area_prop="any_lin_area"
@@ -1347,7 +1347,7 @@ class TestAddCustomProperty:
         input_props_model.props_metadata._add_prop(prop)
         input_props_model.add_mother_cycle()
         input_props_model.update()
-        assert input_props_model.get_property("mother_cycle").lin_type == "CycleLineage"
+        assert input_props_model.get_property("mother_cycle").lineage_type == "cycle"
         assert input_props_model.data.cycle_data[1].nodes[3]["mother_cycle"] == 2
 
     def test_readding_propagated_prop_keeps_lineage_type(self, input_props_model):
@@ -1355,15 +1355,13 @@ class TestAddCustomProperty:
         input_props_model.propagate_cycle_properties(["mother_cycle"])
         with pytest.warns(UserWarning, match="Overwriting the old Property"):
             input_props_model.add_mother_cycle()
-        assert input_props_model.get_property("mother_cycle").lin_type == "Lineage"
+        assert input_props_model.get_property("mother_cycle").lineage_type == "both"
 
 
 class InputCopy(NodeLocalPropCalculator):
     """User-defined property copying another node property of cell lineages."""
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "input_prop": ("node", "CellLineage")
-    }
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"input_prop": ("node", "cell")}
 
     def __init__(self, property, input_prop):
         super().__init__(property)
@@ -1630,7 +1628,7 @@ class TestPropagateCycleProperties:
         keeps the values of its cells when all the cycle properties are propagated,
         and at updates."""
         model = two_lineages_model
-        prop = _create_test_property("both_prop", "node", lin_type="Lineage")
+        prop = _create_test_property("both_prop", "node", lineage_type="both")
         model.add_custom_property(ConstantValue(prop, 2.0))
         model.update()
         for lin in model.data.cell_data.values():
@@ -1769,6 +1767,27 @@ class TestAddCell:
         cell = two_lineages_model.data.cell_data[1].nodes[5]
         assert cell["timepoint"] == 2
         assert cell["cell_value"] == 1.0
+
+
+class TestGetLineageTypeProperties:
+    """Test cases for Model.get_cell_lineage_properties() and
+    get_cycle_lineage_properties()."""
+
+    def test_both_type_left_out_with_single_type(self, two_lineages_model):
+        """Test that properties of lineage type "both" are returned by default, and
+        left out with single_type=True."""
+        model = two_lineages_model
+        model.props_metadata._add_prop(
+            _create_test_property("shared", "lineage", lineage_type="both")
+        )
+        for getter, own in [
+            (model.get_cell_lineage_properties, "cell_value"),
+            (model.get_cycle_lineage_properties, "cycle_id"),
+        ]:
+            assert {"shared", own} <= set(getter())
+            single = getter(single_type=True)
+            assert own in single
+            assert "shared" not in single
 
 
 class TestAddLink:
@@ -1936,16 +1955,16 @@ def contour_model(input_props_model):
 class TestAddCellPolygon:
     """Test cases for Model.add_cell_polygon() method."""
 
-    def test_label_img_source(self, input_props_model):
+    def test_label_image_source(self, input_props_model):
         input_props_model.props_metadata._add_prop(
             _create_test_property("label", "node", dtype="int")
         )
         lin = input_props_model.data.cell_data[1]
         for nid in lin.nodes:
             lin.nodes[nid]["label"] = 1
-        label_img = np.zeros((3, 6, 6), dtype=np.uint32)
-        label_img[:, 1:3, 1:4] = 1
-        input_props_model.add_cell_polygon(label_img=label_img)
+        label_image = np.zeros((3, 6, 6), dtype=np.uint32)
+        label_image[:, 1:3, 1:4] = 1
+        input_props_model.add_cell_polygon(label_image=label_image)
         input_props_model.update()
         assert lin.nodes[1]["cell_polygon"].bounds == (0.5, 0.5, 3.5, 2.5)
         description = input_props_model.get_property("cell_polygon").description
@@ -1993,18 +2012,18 @@ class TestAddCellPolygon:
         with pytest.raises(ValueError, match="'source' must be one of"):
             contour_model.add_cell_polygon(source="contours")
 
-    def test_label_img_param_with_contour_source_raises(self, contour_model):
+    def test_label_image_param_with_contour_source_raises(self, contour_model):
         with pytest.raises(
             ValueError,
-            match="'label_prop', 'label_img_path' are not used with source='contour'",
+            match="'label_prop', 'label_image_path' are not used with source='contour'",
         ):
             contour_model.add_cell_polygon(
-                source="contour", label_prop="label", label_img_path="labels.tif"
+                source="contour", label_prop="label", label_image_path="labels.tif"
             )
 
-    def test_contour_param_with_label_img_source_raises(self, contour_model):
+    def test_contour_param_with_label_image_source_raises(self, contour_model):
         with pytest.raises(
-            ValueError, match="'contour_prop' is not used with source='label_img'"
+            ValueError, match="'contour_prop' is not used with source='label_image'"
         ):
             contour_model.add_cell_polygon(contour_prop="cell_contour")
 
@@ -2020,12 +2039,12 @@ class TestAddCellMultipolygon:
         lin = input_props_model.data.cell_data[1]
         for nid, label in [(1, 1), (2, 1), (3, 1), (4, 2)]:
             lin.nodes[nid]["label"] = label
-        label_img = np.zeros((3, 6, 6), dtype=np.uint32)
-        label_img[0, 0:2, 0:2] = label_img[0, 4, 4] = 1
-        label_img[1, 1:3, 1:3] = 1
-        label_img[2, 0:2, 0:2] = 1
-        label_img[2, 3:5, 3:5] = 2
-        input_props_model.add_cell_multipolygon(label_img=label_img)
+        label_image = np.zeros((3, 6, 6), dtype=np.uint32)
+        label_image[0, 0:2, 0:2] = label_image[0, 4, 4] = 1
+        label_image[1, 1:3, 1:3] = 1
+        label_image[2, 0:2, 0:2] = 1
+        label_image[2, 3:5, 3:5] = 2
+        input_props_model.add_cell_multipolygon(label_image=label_image)
         input_props_model.update()
         multipolygon = lin.nodes[1]["cell_multipolygon"]
         assert isinstance(multipolygon, MultiPolygon)
@@ -2034,7 +2053,7 @@ class TestAddCellMultipolygon:
     def test_missing_label_prop_raises(self, input_props_model):
         with pytest.raises(MissingPropertyError, match="set 'label_prop'"):
             input_props_model.add_cell_multipolygon(
-                label_img=np.zeros((3, 6, 6), dtype=np.uint32)
+                label_image=np.zeros((3, 6, 6), dtype=np.uint32)
             )
 
     def test_no_label_image_raises(self, input_props_model):
@@ -2056,21 +2075,21 @@ def intensity_model(input_props_model):
     for nid, label in [(1, 1), (2, 1), (3, 1), (4, 2)]:
         lin.nodes[nid]["label"] = label
     # Cells 1 and 2 are at timepoints 0 and 1, cells 3 and 4 at timepoint 2.
-    label_img = np.zeros((3, 6, 6), dtype=np.uint32)
-    label_img[0, 0:2, 0:2] = 1
-    label_img[1, 1:3, 1:3] = 1
-    label_img[2, 0:2, 0:2] = 1
-    label_img[2, 3:5, 3:5] = 2
-    intensity_img = np.arange(108, dtype=np.float64).reshape(3, 6, 6)
-    return input_props_model, label_img, intensity_img
+    label_image = np.zeros((3, 6, 6), dtype=np.uint32)
+    label_image[0, 0:2, 0:2] = 1
+    label_image[1, 1:3, 1:3] = 1
+    label_image[2, 0:2, 0:2] = 1
+    label_image[2, 3:5, 3:5] = 2
+    intensity_image = np.arange(108, dtype=np.float64).reshape(3, 6, 6)
+    return input_props_model, label_image, intensity_image
 
 
 class TestAddCellTotalIntensity:
     """Test cases for Model.add_cell_total_intensity() method."""
 
-    def test_label_img_source(self, intensity_model):
-        model, label_img, intensity_img = intensity_model
-        model.add_cell_total_intensity(intensity_img, label_img=label_img)
+    def test_label_image_source(self, intensity_model):
+        model, label_image, intensity_image = intensity_model
+        model.add_cell_total_intensity(intensity_image, label_image=label_image)
         model.update()
         lin = model.data.cell_data[1]
         # Cell 1: pixels of values 0, 1, 6 and 7.
@@ -2078,14 +2097,14 @@ class TestAddCellTotalIntensity:
         # Cell 4: pixels of values 93, 94, 99 and 100.
         assert lin.nodes[4]["cell_total_intensity"] == 386.0
 
-    def test_polygon_source_same_as_label_img(self, intensity_model):
-        model, label_img, intensity_img = intensity_model
+    def test_polygon_source_same_as_label_image(self, intensity_model):
+        model, label_image, intensity_image = intensity_model
         model.model_metadata.space_unit = "um"
         model.model_metadata.pixel_width = model.model_metadata.pixel_height = 2.0
-        model.add_cell_multipolygon(label_img=label_img)
-        model.add_cell_total_intensity(intensity_img, label_img=label_img)
+        model.add_cell_multipolygon(label_image=label_image)
+        model.add_cell_total_intensity(intensity_image, label_image=label_image)
         model.add_cell_total_intensity(
-            intensity_img,
+            intensity_image,
             source="polygon",
             polygon_prop="cell_multipolygon",
             custom_identifier="total_from_shapes",
@@ -2096,7 +2115,7 @@ class TestAddCellTotalIntensity:
 
     def test_polygon_source_in_pixels(self, intensity_model):
         """Test that shapes in pixels are not scaled by the pixel size."""
-        model, _, intensity_img = intensity_model
+        model, _, intensity_image = intensity_model
         model.model_metadata.pixel_width = model.model_metadata.pixel_height = 2.0
         model.props_metadata._add_prop(
             _create_test_property(
@@ -2110,25 +2129,25 @@ class TestAddCellTotalIntensity:
                 [(0.5, 0.5), (2.5, 0.5), (2.5, 1.5), (0.5, 1.5)]
             )
         model.add_cell_total_intensity(
-            intensity_img, source="polygon", polygon_prop="pixel_shape"
+            intensity_image, source="polygon", polygon_prop="pixel_shape"
         )
         model.update()
         assert lin.nodes[1]["cell_total_intensity"] == 7.0 + 8.0
 
-    def test_intensity_img_path(self, intensity_model, tmp_path):
-        model, label_img, intensity_img = intensity_model
+    def test_intensity_image_path(self, intensity_model, tmp_path):
+        model, label_image, intensity_image = intensity_model
         path = tmp_path / "intensity.tif"
-        tifffile.imwrite(path, intensity_img, photometric="minisblack")
+        tifffile.imwrite(path, intensity_image, photometric="minisblack")
         model.add_cell_total_intensity(
-            intensity_img_path=str(path), label_img=label_img
+            intensity_image_path=str(path), label_image=label_image
         )
         model.update()
         assert model.data.cell_data[1].nodes[1]["cell_total_intensity"] == 14.0
 
     def test_description_says_where_pixels_come_from(self, intensity_model):
-        model, label_img, intensity_img = intensity_model
+        model, label_image, intensity_image = intensity_model
         model.add_cell_total_intensity(
-            intensity_img, label_img=label_img, background=10
+            intensity_image, label_image=label_image, background=10
         )
         description = model.get_property("cell_total_intensity").description
         assert description.endswith(
@@ -2136,43 +2155,45 @@ class TestAddCellTotalIntensity:
         )
 
     def test_no_intensity_image_raises(self, intensity_model):
-        model, label_img, _ = intensity_model
+        model, label_image, _ = intensity_model
         with pytest.raises(ValueError, match="No intensity image provided"):
-            model.add_cell_total_intensity(label_img=label_img)
+            model.add_cell_total_intensity(label_image=label_image)
 
     def test_image_shape_mismatch_raises(self, intensity_model):
-        model, label_img, intensity_img = intensity_model
+        model, label_image, intensity_image = intensity_model
         with pytest.raises(ValueError, match="must have the same shape"):
-            model.add_cell_total_intensity(intensity_img[:, :5], label_img=label_img)
-
-    def test_polygon_source_needs_3_axes(self, intensity_model):
-        model, _, intensity_img = intensity_model
-        with pytest.raises(ValueError, match="must have 3 axes"):
             model.add_cell_total_intensity(
-                intensity_img[:, np.newaxis], source="polygon"
+                intensity_image[:, :5], label_image=label_image
             )
 
-    def test_label_img_param_with_polygon_source_raises(self, intensity_model):
-        model, label_img, intensity_img = intensity_model
+    def test_polygon_source_needs_3_axes(self, intensity_model):
+        model, _, intensity_image = intensity_model
+        with pytest.raises(ValueError, match="must have 3 axes"):
+            model.add_cell_total_intensity(
+                intensity_image[:, np.newaxis], source="polygon"
+            )
+
+    def test_label_image_param_with_polygon_source_raises(self, intensity_model):
+        model, label_image, intensity_image = intensity_model
         with pytest.raises(
-            ValueError, match="'label_img' is not used with source='polygon'"
+            ValueError, match="'label_image' is not used with source='polygon'"
         ):
             model.add_cell_total_intensity(
-                intensity_img, source="polygon", label_img=label_img
+                intensity_image, source="polygon", label_image=label_image
             )
 
     def test_missing_polygon_prop_suggests_add_cell_polygon(self, intensity_model):
-        model, _, intensity_img = intensity_model
+        model, _, intensity_image = intensity_model
         with pytest.raises(MissingPropertyError, match=r"model\.add_cell_polygon\(\)"):
-            model.add_cell_total_intensity(intensity_img, source="polygon")
+            model.add_cell_total_intensity(intensity_image, source="polygon")
 
 
 class TestAddCellMeanIntensity:
     """Test cases for Model.add_cell_mean_intensity() method."""
 
-    def test_label_img_source(self, intensity_model):
-        model, label_img, intensity_img = intensity_model
-        model.add_cell_mean_intensity(intensity_img, label_img=label_img)
+    def test_label_image_source(self, intensity_model):
+        model, label_image, intensity_image = intensity_model
+        model.add_cell_mean_intensity(intensity_image, label_image=label_image)
         model.update()
         lin = model.data.cell_data[1]
         assert lin.nodes[1]["cell_mean_intensity"] == 3.5

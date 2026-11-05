@@ -50,7 +50,7 @@ _RESOLUTION_UNITS = {3: "cm", 4: "mm", 5: "µm"}
 # TODO: what if the first frame is empty...?
 
 
-def _get_label_img_paths(labels_path: str | Path) -> list[Path]:
+def _get_label_image_paths(labels_path: str | Path) -> list[Path]:
     """
     Return the paths of the label images of a folder, sorted by name.
 
@@ -80,8 +80,8 @@ def _get_label_img_paths(labels_path: str | Path) -> list[Path]:
     return list_paths
 
 
-def _integrate_label_imgs_metadata(
-    metadata: dict[str, Any], label_img_path: str | Path
+def _integrate_label_images_metadata(
+    metadata: dict[str, Any], label_image_path: str | Path
 ) -> None:
     """
     Fill the space unit and pixel size missing from the metadata with a label image's.
@@ -97,7 +97,7 @@ def _integrate_label_imgs_metadata(
     metadata : dict[str, Any]
         The metadata dictionary of the model. Its values have priority over the ones
         of the label image.
-    label_img_path : str | Path
+    label_image_path : str | Path
         The path to a label image.
 
     Warns
@@ -106,7 +106,7 @@ def _integrate_label_imgs_metadata(
         If the resolution of the label image, in inches, is ignored while the
         metadata lacks the space unit or the pixel width or height.
     """
-    with tifffile.TiffFile(label_img_path) as tif:
+    with tifffile.TiffFile(label_image_path) as tif:
         tags = tif.pages[0].tags
         imagej_md = tif.imagej_metadata or {}
 
@@ -129,8 +129,8 @@ def _integrate_label_imgs_metadata(
         calibrated = {"space_unit", "pixel_width", "pixel_height"} <= metadata.keys()
         if resolution_unit == 2 and not calibrated:
             warnings.warn(
-                f"Ignoring the resolution of label image '{label_img_path}', given in "
-                "inches: it is most likely a print default such as 72 dpi, not a "
+                f"Ignoring the resolution of label image '{label_image_path}', given "
+                "in inches: it is most likely a print default such as 72 dpi, not a "
                 "pixel size. Give 'space_unit', 'pixel_width' and 'pixel_height' to "
                 "read_ctc() to calibrate the cell positions.",
                 stacklevel=4,
@@ -196,7 +196,7 @@ def _create_metadata(
     """
     metadata: dict[str, Any] = {}
     metadata["name"] = Path(file_path).stem
-    metadata["file_location"] = file_path
+    metadata["file_path"] = file_path
     metadata["provenance"] = "CTC"
 
     if time_unit is not None:
@@ -223,12 +223,12 @@ def _create_metadata(
         complete_metadata_flag[3] = 1
 
     if labels_path is not None:
-        metadata["label_imgs_location"] = labels_path
+        metadata["label_images_location"] = labels_path
     if sum(complete_metadata_flag) < 4:
         if labels_path is not None:
             # Hopefully all label images have the same metadata.
-            label_img_path = _get_label_img_paths(labels_path)[0]
-            _integrate_label_imgs_metadata(metadata, label_img_path)
+            label_image_path = _get_label_image_paths(labels_path)[0]
+            _integrate_label_images_metadata(metadata, label_image_path)
         else:
             if complete_metadata_flag[0] == 0:
                 metadata["space_unit"] = "pixel"
@@ -280,7 +280,7 @@ def _create_PropsMetadata(
             unit=space_unit, axis="y", provenance="CTC"
         )
         cell_contour_prop = create_cell_contour_property(
-            unit=space_unit, custom_provenance="CTC"
+            unit=space_unit, provenance="CTC"
         )
         props_md._add_props([cell_x_prop, cell_y_prop, cell_contour_prop])
 
@@ -400,7 +400,7 @@ def _remove_track_attributes(graph: nx.DiGraph) -> None:
 
 
 def _extract_seg_data(
-    label_img_path: str,
+    label_image_path: str,
     pixel_width: float = 1.0,
     pixel_height: float = 1.0,
 ) -> tuple[list[int], list[list[float]], list[list[tuple[float, float]]]]:
@@ -413,7 +413,7 @@ def _extract_seg_data(
 
     Parameters
     ----------
-    label_img_path : str
+    label_image_path : str
         The path to the label image file.
     pixel_width : float, optional
         The pixel width in the space unit. Default is 1.0.
@@ -435,13 +435,13 @@ def _extract_seg_data(
     ValueError
         If the label image is not 2D.
     """
-    label_img = tifffile.imread(label_img_path)
-    if label_img.ndim != 2:
+    label_image = tifffile.imread(label_image_path)
+    if label_image.ndim != 2:
         raise ValueError(
-            f"Label image '{label_img_path}' has shape {label_img.shape}: only 2D "
+            f"Label image '{label_image_path}' has shape {label_image.shape}: only 2D "
             "label images, one per frame, are supported for now."
         )
-    regions = regionprops(label_img)
+    regions = regionprops(label_image)
     labels = []
     centroids = []
     contours = []
@@ -469,7 +469,7 @@ def _extract_seg_data(
         contours.append(contour)
     if fragmented_labels:
         logger.warning(
-            f"Labels {fragmented_labels} of '{label_img_path}' are made of several "
+            f"Labels {fragmented_labels} of '{label_image_path}' are made of several "
             "pieces: their contour only covers the largest piece."
         )
     return labels, centroids, contours
@@ -633,9 +633,9 @@ def read_ctc(
         while the space unit or the pixel width or height is not given.
     """
     # The label images are checked before the CTC file is read.
-    label_img_paths = []
+    label_image_paths = []
     if labels_path is not None:
-        label_img_paths = _get_label_img_paths(labels_path)
+        label_image_paths = _get_label_image_paths(labels_path)
 
     graph = nx.DiGraph()
     current_node_id = 0
@@ -667,21 +667,21 @@ def read_ctc(
     )
 
     # Adding the segmentation data, if any, in the space unit.
-    if label_img_paths:
+    if label_image_paths:
         cells = _index_cells(graph)
         pattern = r"(\d+)\.tif"
-        for label_img_path in label_img_paths:
+        for label_image_path in label_image_paths:
             # The image is read first, so that a stack holding all the frames gets
             # the error on its shape rather than on its name.
             labels, centroids, contours = _extract_seg_data(
-                str(label_img_path), md["pixel_width"], md["pixel_height"]
+                str(label_image_path), md["pixel_width"], md["pixel_height"]
             )
-            match = re.search(pattern, str(label_img_path))
+            match = re.search(pattern, str(label_image_path))
             try:
                 frame = int(match.group(1))
             except AttributeError:
                 raise ValueError(
-                    f"Can't parse frame value: file name {label_img_path} "
+                    f"Can't parse frame value: file name {label_image_path} "
                     f"does not match the expected pattern."
                 )
             _integrate_seg_data(graph, cells, frame, labels, centroids, contours)

@@ -377,146 +377,146 @@ class TestLineageGetAncestors:
         """Test get_ancestors on normal CellLineage."""
         # Root.
         assert cell_lin.get_ancestors(1) == []
-        assert cell_lin.get_ancestors(1, sorted=False) == []
+        assert cell_lin.get_ancestors(1, sort=False) == []
         # Division.
         assert cell_lin.get_ancestors(2) == [1]
-        assert cell_lin.get_ancestors(2, sorted=False) == [1]
+        assert cell_lin.get_ancestors(2, sort=False) == [1]
         assert cell_lin.get_ancestors(4) == [1, 2, 3]
-        assert sorted(cell_lin.get_ancestors(4, sorted=False)) == [1, 2, 3]
+        assert sorted(cell_lin.get_ancestors(4, sort=False)) == [1, 2, 3]
         assert cell_lin.get_ancestors(14) == [1, 2, 11, 12, 13]
-        assert sorted(cell_lin.get_ancestors(14, sorted=False)) == [1, 2, 11, 12, 13]
+        assert sorted(cell_lin.get_ancestors(14, sort=False)) == [1, 2, 11, 12, 13]
         # Just after division.
         assert cell_lin.get_ancestors(3) == [1, 2]
-        assert sorted(cell_lin.get_ancestors(3, sorted=False)) == [1, 2]
+        assert sorted(cell_lin.get_ancestors(3, sort=False)) == [1, 2]
         assert cell_lin.get_ancestors(11) == [1, 2]
-        assert sorted(cell_lin.get_ancestors(11, sorted=False)) == [1, 2]
+        assert sorted(cell_lin.get_ancestors(11, sort=False)) == [1, 2]
         assert cell_lin.get_ancestors(5) == [1, 2, 3, 4]
-        assert sorted(cell_lin.get_ancestors(5, sorted=False)) == [1, 2, 3, 4]
+        assert sorted(cell_lin.get_ancestors(5, sort=False)) == [1, 2, 3, 4]
         assert cell_lin.get_ancestors(9) == [1, 2, 3, 4, 7, 8]
-        assert sorted(cell_lin.get_ancestors(9, sorted=False)) == [1, 2, 3, 4, 7, 8]
+        assert sorted(cell_lin.get_ancestors(9, sort=False)) == [1, 2, 3, 4, 7, 8]
         # Leaves.
         assert cell_lin.get_ancestors(6) == [1, 2, 3, 4, 5]
-        assert sorted(cell_lin.get_ancestors(6, sorted=False)) == [1, 2, 3, 4, 5]
+        assert sorted(cell_lin.get_ancestors(6, sort=False)) == [1, 2, 3, 4, 5]
         assert cell_lin.get_ancestors(10) == [1, 2, 3, 4, 7, 8]
-        assert sorted(cell_lin.get_ancestors(10, sorted=False)) == [1, 2, 3, 4, 7, 8]
+        assert sorted(cell_lin.get_ancestors(10, sort=False)) == [1, 2, 3, 4, 7, 8]
         # Other.
         assert cell_lin.get_ancestors(12) == [1, 2, 11]
-        assert sorted(cell_lin.get_ancestors(12, sorted=False)) == [1, 2, 11]
+        assert sorted(cell_lin.get_ancestors(12, sort=False)) == [1, 2, 11]
         assert cell_lin.get_ancestors(13) == [1, 2, 11, 12]
-        assert sorted(cell_lin.get_ancestors(13, sorted=False)) == [1, 2, 11, 12]
+        assert sorted(cell_lin.get_ancestors(13, sort=False)) == [1, 2, 11, 12]
 
     def test_normal_cycle_lineage(self, cycle_lin):
         """Test get_ancestors on normal CycleLineage."""
         # Root.
         assert cycle_lin.get_ancestors(1) == []
-        assert cycle_lin.get_ancestors(1, sorted=False) == []
+        assert cycle_lin.get_ancestors(1, sort=False) == []
         # Leaves.
         assert cycle_lin.get_ancestors(4) == [1, 2]
-        assert sorted(cycle_lin.get_ancestors(4, sorted=False)) == [1, 2]
+        assert sorted(cycle_lin.get_ancestors(4, sort=False)) == [1, 2]
         assert cycle_lin.get_ancestors(5) == [1, 2]
-        assert sorted(cycle_lin.get_ancestors(5, sorted=False)) == [1, 2]
+        assert sorted(cycle_lin.get_ancestors(5, sort=False)) == [1, 2]
         # Other.
         assert cycle_lin.get_ancestors(2) == [1]
-        assert cycle_lin.get_ancestors(2, sorted=False) == [1]
+        assert cycle_lin.get_ancestors(2, sort=False) == [1]
 
     def test_single_node(self, one_node_cell_lin, one_node_cycle_lin):
         """Test get_ancestors on single node lineages."""
         # CellLineage
         assert one_node_cell_lin.get_ancestors(1) == []
-        assert one_node_cell_lin.get_ancestors(1, sorted=False) == []
+        assert one_node_cell_lin.get_ancestors(1, sort=False) == []
         # CycleLineage
         assert one_node_cycle_lin.get_ancestors(1) == []
-        assert one_node_cycle_lin.get_ancestors(1, sorted=False) == []
+        assert one_node_cycle_lin.get_ancestors(1, sort=False) == []
 
     def test_lineage_with_gap(self, cell_lin_gap):
         """Test get_ancestors on lineage with gaps."""
         # Root.
         assert cell_lin_gap.get_ancestors(1) == []
-        assert cell_lin_gap.get_ancestors(1, sorted=False) == []
+        assert cell_lin_gap.get_ancestors(1, sort=False) == []
         # Division.
         assert cell_lin_gap.get_ancestors(4) == [1, 2, 3]
-        assert cell_lin_gap.get_ancestors(4, sorted=False) == [1, 2, 3]
+        assert cell_lin_gap.get_ancestors(4, sort=False) == [1, 2, 3]
         assert cell_lin_gap.get_ancestors(8) == [1, 2, 3, 4]
-        assert sorted(cell_lin_gap.get_ancestors(8, sorted=False)) == [1, 2, 3, 4]
+        assert sorted(cell_lin_gap.get_ancestors(8, sort=False)) == [1, 2, 3, 4]
         assert cell_lin_gap.get_ancestors(14) == [1, 2, 11]
-        assert sorted(cell_lin_gap.get_ancestors(14, sorted=False)) == [1, 2, 11]
+        assert sorted(cell_lin_gap.get_ancestors(14, sort=False)) == [1, 2, 11]
         # Just after division.
         assert cell_lin_gap.get_ancestors(3) == [1, 2]
-        assert sorted(cell_lin_gap.get_ancestors(3, sorted=False)) == [1, 2]
+        assert sorted(cell_lin_gap.get_ancestors(3, sort=False)) == [1, 2]
         assert cell_lin_gap.get_ancestors(11) == [1, 2]
-        assert sorted(cell_lin_gap.get_ancestors(11, sorted=False)) == [1, 2]
+        assert sorted(cell_lin_gap.get_ancestors(11, sort=False)) == [1, 2]
         # Leaves.
         assert cell_lin_gap.get_ancestors(6) == [1, 2, 3, 4]
-        assert sorted(cell_lin_gap.get_ancestors(6, sorted=False)) == [1, 2, 3, 4]
+        assert sorted(cell_lin_gap.get_ancestors(6, sort=False)) == [1, 2, 3, 4]
         assert cell_lin_gap.get_ancestors(9) == [1, 2, 3, 4, 8]
-        assert sorted(cell_lin_gap.get_ancestors(9, sorted=False)) == [1, 2, 3, 4, 8]
+        assert sorted(cell_lin_gap.get_ancestors(9, sort=False)) == [1, 2, 3, 4, 8]
         assert cell_lin_gap.get_ancestors(15) == [1, 2, 11, 14]
-        assert sorted(cell_lin_gap.get_ancestors(15, sorted=False)) == [1, 2, 11, 14]
+        assert sorted(cell_lin_gap.get_ancestors(15, sort=False)) == [1, 2, 11, 14]
 
     def test_division_root(self, cell_lin_div_root):
         """Test get_ancestors on lineage with division at root."""
         assert cell_lin_div_root.get_ancestors(1) == []
-        assert cell_lin_div_root.get_ancestors(1, sorted=False) == []
+        assert cell_lin_div_root.get_ancestors(1, sort=False) == []
         assert cell_lin_div_root.get_ancestors(2) == [1]
-        assert sorted(cell_lin_div_root.get_ancestors(2, sorted=False)) == [1]
+        assert sorted(cell_lin_div_root.get_ancestors(2, sort=False)) == [1]
         assert cell_lin_div_root.get_ancestors(17) == [1]
-        assert sorted(cell_lin_div_root.get_ancestors(17, sorted=False)) == [1]
+        assert sorted(cell_lin_div_root.get_ancestors(17, sort=False)) == [1]
 
     def test_successive_divisions_and_root(self, cell_lin_successive_divs_and_root):
         """Test get_ancestors on lineage with successive divisions."""
         lin = cell_lin_successive_divs_and_root
         # Root.
         assert lin.get_ancestors(2) == []
-        assert lin.get_ancestors(2, sorted=False) == []
+        assert lin.get_ancestors(2, sort=False) == []
         # Divisions.
         assert lin.get_ancestors(3) == [2]
-        assert lin.get_ancestors(3, sorted=False) == [2]
+        assert lin.get_ancestors(3, sort=False) == [2]
         assert lin.get_ancestors(5) == [2, 3, 4]
-        assert sorted(lin.get_ancestors(5, sorted=False)) == [2, 3, 4]
+        assert sorted(lin.get_ancestors(5, sort=False)) == [2, 3, 4]
         assert lin.get_ancestors(8) == [2, 3]
-        assert sorted(lin.get_ancestors(8, sorted=False)) == [2, 3]
+        assert sorted(lin.get_ancestors(8, sort=False)) == [2, 3]
         # Leaves.
         assert lin.get_ancestors(6) == [2, 3, 4, 5]
-        assert sorted(lin.get_ancestors(6, sorted=False)) == [2, 3, 4, 5]
+        assert sorted(lin.get_ancestors(6, sort=False)) == [2, 3, 4, 5]
         assert lin.get_ancestors(7) == [2, 3, 4, 5]
-        assert sorted(lin.get_ancestors(7, sorted=False)) == [2, 3, 4, 5]
+        assert sorted(lin.get_ancestors(7, sort=False)) == [2, 3, 4, 5]
         assert lin.get_ancestors(9) == [2, 3, 8]
-        assert sorted(lin.get_ancestors(9, sorted=False)) == [2, 3, 8]
+        assert sorted(lin.get_ancestors(9, sort=False)) == [2, 3, 8]
         assert lin.get_ancestors(10) == [2, 3, 8]
-        assert sorted(lin.get_ancestors(10, sorted=False)) == [2, 3, 8]
+        assert sorted(lin.get_ancestors(10, sort=False)) == [2, 3, 8]
         assert lin.get_ancestors(11) == [2]
-        assert lin.get_ancestors(11, sorted=False) == [2]
+        assert lin.get_ancestors(11, sort=False) == [2]
 
     def test_triple_division(self, cell_lin_triple_div, cycle_lin_triple_div):
         """Test get_ancestors on lineage with triple division."""
         # CellLineage
         lin = cell_lin_triple_div
         assert lin.get_ancestors(4) == [1, 2, 3]
-        assert sorted(lin.get_ancestors(4, sorted=False)) == [1, 2, 3]
+        assert sorted(lin.get_ancestors(4, sort=False)) == [1, 2, 3]
         assert lin.get_ancestors(5) == [1, 2, 3, 4]
-        assert sorted(lin.get_ancestors(5, sorted=False)) == [1, 2, 3, 4]
+        assert sorted(lin.get_ancestors(5, sort=False)) == [1, 2, 3, 4]
         assert lin.get_ancestors(7) == [1, 2, 3, 4]
-        assert sorted(lin.get_ancestors(7, sorted=False)) == [1, 2, 3, 4]
+        assert sorted(lin.get_ancestors(7, sort=False)) == [1, 2, 3, 4]
         assert lin.get_ancestors(18) == [1, 2, 3, 4, 17]
-        assert sorted(lin.get_ancestors(18, sorted=False)) == [1, 2, 3, 4, 17]
+        assert sorted(lin.get_ancestors(18, sort=False)) == [1, 2, 3, 4, 17]
         # CycleLineage
         lin = cycle_lin_triple_div
         assert lin.get_ancestors(4) == [1, 2]
-        assert lin.get_ancestors(4, sorted=False) == [1, 2]
+        assert lin.get_ancestors(4, sort=False) == [1, 2]
         assert lin.get_ancestors(6) == [1, 2]
-        assert lin.get_ancestors(6, sorted=False) == [1, 2]
+        assert lin.get_ancestors(6, sort=False) == [1, 2]
 
     def test_unconnected_node(self, cell_lin_unconnected_node):
         """Test get_ancestors on lineage with unconnected node."""
         assert cell_lin_unconnected_node.get_ancestors(17) == []
-        assert cell_lin_unconnected_node.get_ancestors(17, sorted=False) == []
+        assert cell_lin_unconnected_node.get_ancestors(17, sort=False) == []
 
     def test_unconnected_component(self, cell_lin_unconnected_component):
         """Test get_ancestors on lineage with unconnected component."""
         assert cell_lin_unconnected_component.get_ancestors(17) == []
-        assert cell_lin_unconnected_component.get_ancestors(17, sorted=False) == []
+        assert cell_lin_unconnected_component.get_ancestors(17, sort=False) == []
         assert cell_lin_unconnected_component.get_ancestors(18) == [17]
-        assert cell_lin_unconnected_component.get_ancestors(18, sorted=False) == [17]
+        assert cell_lin_unconnected_component.get_ancestors(18, sort=False) == [17]
 
     def test_node_id_error(self, cell_lin, cycle_lin):
         """Test get_ancestors raises KeyError for non-existent node."""

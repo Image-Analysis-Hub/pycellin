@@ -230,7 +230,7 @@ def _create_tracklet_property() -> Property:
         ),
         provenance="pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 

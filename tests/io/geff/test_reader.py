@@ -169,7 +169,7 @@ def prop_geff_cell_id():
         description="cell_id",
         provenance="geff",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int64",
     )
 
@@ -183,7 +183,7 @@ def prop_cell_position_x():
         description="cell_position_x",
         provenance="test",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
 
@@ -197,7 +197,7 @@ def prop_lin_position_x():
         description="lin_position_x",
         provenance="test",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
 
@@ -211,7 +211,7 @@ def prop_position_x_node():
         description="position_x",
         provenance="test",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit="um",
     )
@@ -226,7 +226,7 @@ def prop_position_x_edge():
         description="position_x",
         provenance="test",
         prop_type="edge",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
 
@@ -240,7 +240,7 @@ def prop_position_x_lineage():
         description="position_x",
         provenance="test",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
 
@@ -254,7 +254,7 @@ def prop_pycellin_cell_position_x():
         description="pycellin_cell_position_x",
         provenance="test",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
 
@@ -268,7 +268,7 @@ def prop_pycellin_lin_position_x():
         description="pycellin_lin_position_x",
         provenance="test",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
 
@@ -282,7 +282,7 @@ def prop_speed():
         description="speed",
         provenance="test",
         prop_type="edge",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
 
@@ -308,7 +308,7 @@ def pycellin_non_standard_md(prop_position_x_node):
             description="Unique identifier of the track",
             provenance="test",
             prop_type="lineage",
-            lin_type="Lineage",
+            lineage_type="both",
             dtype="int",
         ),
         "node_id": Property(
@@ -317,7 +317,7 @@ def pycellin_non_standard_md(prop_position_x_node):
             description="Unique identifier of the cell",
             provenance="test",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
         "position_x": prop_position_x_node,
@@ -1661,11 +1661,11 @@ class TestExtractGenericMetadata:
         result = _extract_generic_metadata("/some/path/my_tracking.geff", geff_md_axes)
         assert result["name"] == "my_tracking"
 
-    def test_file_location_matches_input(self, geff_md_axes):
-        """The 'file_location' key equals the geff_file argument exactly."""
+    def test_file_path_matches_input(self, geff_md_axes):
+        """The 'file_path' key equals the geff_file argument exactly."""
         path = "/some/path/my_tracking.geff"
         result = _extract_generic_metadata(path, geff_md_axes)
-        assert result["file_location"] == path
+        assert result["file_path"] == path
 
     def test_provenance_is_geff(self, geff_md_axes):
         """The 'provenance' key is always 'geff'."""
@@ -1724,7 +1724,7 @@ class TestBuildGenericMetadata:
         )
         for key in (
             "name",
-            "file_location",
+            "file_path",
             "provenance",
             "date",
             "pycellin_version",
@@ -2563,7 +2563,7 @@ class TestStandardizePropsMetadata:
             description="position_x",
             provenance="test",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="float",
             unit="um",
         )

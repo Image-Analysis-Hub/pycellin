@@ -17,7 +17,7 @@ def _create_calculator(identifier: str, input_prop: str | None = None):
         description=identifier,
         provenance="test",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
     if input_prop is None:
@@ -35,9 +35,7 @@ class Constant(NodeLocalPropCalculator):
 class Copy(NodeLocalPropCalculator):
     """User-defined property copying another node property."""
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "input_prop": ("node", "CellLineage")
-    }
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"input_prop": ("node", "cell")}
 
     def __init__(self, property, input_prop):
         super().__init__(property)

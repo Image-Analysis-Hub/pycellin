@@ -226,7 +226,7 @@ def model_with_orphaned_metadata(model):
             description="This doesn't exist in data",
             provenance="Test",
             prop_type="node",
-            lin_type="Lineage",
+            lineage_type="both",
             dtype="string",
         )
     )
@@ -237,7 +237,7 @@ def model_with_orphaned_metadata(model):
             description="This doesn't exist in data",
             provenance="Test",
             prop_type="edge",
-            lin_type="Lineage",
+            lineage_type="both",
             dtype="string",
         )
     )
@@ -248,7 +248,7 @@ def model_with_orphaned_metadata(model):
             description="This doesn't exist in data",
             provenance="Test",
             prop_type="lineage",
-            lin_type="Lineage",
+            lineage_type="both",
             dtype="string",
         )
     )

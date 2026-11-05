@@ -130,17 +130,17 @@ class ProtectedPropertyError(AttributeError):
 
     Parameters
     ----------
-    property_name : str
-        The name of the property that is protected.
+    prop : str
+        The identifier of the property that is protected.
     message : str, optional
         Custom error message. If not provided, a default message is displayed.
     """
 
-    def __init__(self, prop_name: str, message: str | None = None):
-        self.property_name = prop_name
+    def __init__(self, prop: str, message: str | None = None):
+        self.prop = prop
         if message is None:
             message = (
-                f"The property '{prop_name}' is protected and cannot be modified "
+                f"The property '{prop}' is protected and cannot be modified "
                 "nor removed."
             )
         super().__init__(message)
@@ -152,8 +152,8 @@ class MissingPropertyError(KeyError):
 
     Parameters
     ----------
-    prop_name : str
-        The name of the missing property.
+    prop : str
+        The identifier of the missing property.
     node_id : int, optional
         The ID of the node where the property is missing. None when the property
         is missing from the model rather than from a specific node.
@@ -165,18 +165,18 @@ class MissingPropertyError(KeyError):
 
     def __init__(
         self,
-        prop_name: str,
+        prop: str,
         node_id: int | None = None,
         lineage_id: int | None = None,
         message: str | None = None,
     ):
-        self.prop_name = prop_name
+        self.prop = prop
         self.node_id = node_id
         self.lineage_id = lineage_id
         if message is None:
             node_txt = f" for node {node_id}" if node_id is not None else ""
             lin_txt = f" in lineage {lineage_id}" if lineage_id is not None else ""
-            message = f"Required property '{prop_name}' is missing{node_txt}{lin_txt}."
+            message = f"Required property '{prop}' is missing{node_txt}{lin_txt}."
         self.message = message
         super().__init__(message)
 

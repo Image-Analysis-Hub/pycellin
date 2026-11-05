@@ -18,7 +18,7 @@ def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Line
         Data object containing the lineages.
     lineage_type : str
         Type of lineage to extract from the data object.
-        Can be "CellLineage", "CycleLineage", or "Lineage" (applies to both).
+        Can be "cell", "cycle", or "both" (cell and cycle lineages).
 
     Returns
     -------
@@ -26,11 +26,11 @@ def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Line
         Dictionary of lineages extracted from the data object.
         Keys are the lineage IDs.
     """
-    if lineage_type == "CellLineage":
+    if lineage_type == "cell":
         return data.cell_data
-    elif lineage_type == "CycleLineage":
+    elif lineage_type == "cycle":
         return data.cycle_data
-    elif lineage_type == "Lineage":
+    elif lineage_type == "both":
         return {**data.cell_data, **data.cycle_data}
     else:
         raise ValueError("Invalid lineage type.")
@@ -51,14 +51,14 @@ class PropertyCalculator(ABC):
     # Properties read by the calculator whose identifier is chosen by the user.
     # Maps the name of the calculator attribute holding the identifier of such
     # a property to the property type and lineage type the property must have,
-    # e.g. {"area_prop": ("node", "CellLineage")}.
+    # e.g. {"area_prop": ("node", "cell")}.
     # Model.add_custom_property() checks that these properties are declared.
     # Subclasses repeat the ClassVar annotation, without which Ruff warns about
     # a mutable class attribute (RUF012).
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {}
 
     def __init__(self, property: Property):
-        self.prop = property
+        self.property = property
 
     @classmethod
     def is_for_local_property(cls) -> bool | None:
@@ -104,8 +104,8 @@ class PropertyCalculator(ABC):
             lineage type are the ones the input property must have.
         """
         return {
-            attr: (getattr(self, attr), prop_type, lin_type)
-            for attr, (prop_type, lin_type) in self.INPUT_PROPS.items()
+            attr: (getattr(self, attr), prop_type, lineage_type)
+            for attr, (prop_type, lineage_type) in self.INPUT_PROPS.items()
         }
 
     @abstractmethod
@@ -218,10 +218,10 @@ class NodeLocalPropCalculator(LocalPropCalculator):
             List of tuples containing the node ID and the lineage ID of the nodes
             to enrich with the property value.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.prop.lin_type)
+        lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
         for nid, lin_id in nodes_to_enrich:
             lin = lineages[lin_id]
-            lin.nodes[nid][self.prop.identifier] = self.compute(lin, nid)
+            lin.nodes[nid][self.property.identifier] = self.compute(lin, nid)
 
 
 class EdgeLocalPropCalculator(LocalPropCalculator):
@@ -260,11 +260,11 @@ class EdgeLocalPropCalculator(LocalPropCalculator):
             List of tuples containing the source node ID, the target node ID and
             the lineage ID of the edges to enrich with the property value.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.prop.lin_type)
+        lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
         for source, target, lin_id in edges_to_enrich:
             link = (source, target)
             lin = lineages[lin_id]
-            lin.edges[link][self.prop.identifier] = self.compute(lin, link)
+            lin.edges[link][self.property.identifier] = self.compute(lin, link)
 
 
 class LineageLocalPropCalculator(LocalPropCalculator):
@@ -296,10 +296,10 @@ class LineageLocalPropCalculator(LocalPropCalculator):
         data : Data
             Data object containing the lineages.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.prop.lin_type)
+        lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
         for lin_id in lineages_to_enrich:
             lin = lineages[lin_id]
-            lin.graph[self.prop.identifier] = self.compute(lin)
+            lin.graph[self.property.identifier] = self.compute(lin)
 
 
 class GlobalPropCalculator(PropertyCalculator):
@@ -385,10 +385,10 @@ class NodeGlobalPropCalculator(GlobalPropCalculator):
         data : Data
             Data object containing the lineages to enrich.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.prop.lin_type)
+        lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
         for lin in lineages.values():
             for nid in lin.nodes:
-                lin.nodes[nid][self.prop.identifier] = self.compute(data, lin, nid)
+                lin.nodes[nid][self.property.identifier] = self.compute(data, lin, nid)
 
 
 class EdgeGlobalPropCalculator(GlobalPropCalculator):
@@ -425,10 +425,12 @@ class EdgeGlobalPropCalculator(GlobalPropCalculator):
         data : Data
             Data object containing the lineages to enrich.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.prop.lin_type)
+        lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
         for lin in lineages.values():
             for edge in lin.edges:
-                lin.edges[edge][self.prop.identifier] = self.compute(data, lin, edge)
+                lin.edges[edge][self.property.identifier] = self.compute(
+                    data, lin, edge
+                )
 
 
 class LineageGlobalPropCalculator(GlobalPropCalculator):
@@ -463,6 +465,6 @@ class LineageGlobalPropCalculator(GlobalPropCalculator):
         data : Data
             Data object containing the lineages to enrich.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.prop.lin_type)
+        lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
         for lin in lineages.values():
-            lin.graph[self.prop.identifier] = self.compute(data, lin)
+            lin.graph[self.property.identifier] = self.compute(data, lin)

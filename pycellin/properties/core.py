@@ -35,7 +35,7 @@ def create_frame_property(provenance: str = "pycellin") -> Property:
         description="Frame number of the cell",
         provenance=provenance,
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
         unit="frame",
     )
@@ -80,7 +80,7 @@ def create_time_property(
         description=custom_description or "Time of the detection",
         provenance=provenance,
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit=unit,
     )
@@ -114,9 +114,7 @@ class Time(NodeLocalPropCalculator):
     lead to incorrect time values.
     """
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "time_prop": ("node", "CellLineage")
-    }
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"time_prop": ("node", "cell")}
 
     def __init__(
         self,
@@ -151,8 +149,11 @@ class Time(NodeLocalPropCalculator):
         float
             The computed time value for the given node.
         """
-        if not self.force_recompute and self.prop.identifier in lineage.nodes[node_id]:
-            return lineage.nodes[node_id][self.prop.identifier]
+        if (
+            not self.force_recompute
+            and self.property.identifier in lineage.nodes[node_id]
+        ):
+            return lineage.nodes[node_id][self.property.identifier]
 
         if self.time_prop not in lineage.nodes[node_id]:
             raise KeyError(
@@ -187,7 +188,7 @@ def create_timepoint_property(provenance: str = "pycellin") -> Property:
         description="Timepoint of the detection",
         provenance=provenance,
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
         unit=None,
     )
@@ -303,7 +304,7 @@ def create_cell_id_property(provenance: str = "pycellin") -> Property:
         description="Unique identifier of the cell",
         provenance=provenance,
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
@@ -332,7 +333,7 @@ def create_lineage_id_property(provenance: str = "pycellin") -> Property:
         description="Unique identifier of the lineage",
         provenance=provenance,
         prop_type=["node", "lineage"],
-        lin_type="Lineage",
+        lineage_type="both",
         dtype="int",
     )
 
@@ -368,7 +369,7 @@ def create_cell_coord_property(
         description=f"{axis.upper()} coordinate of the cell",
         provenance=provenance,
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit=unit,
     )
@@ -382,7 +383,7 @@ def _create_generic_cell_coord_property() -> Property:
         description="{axis} coordinate of the cell",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit="space unit",
     )
@@ -423,7 +424,7 @@ def create_link_coord_property(
         ),
         provenance=provenance,
         prop_type="edge",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit=unit,
     )
@@ -439,7 +440,7 @@ def _create_generic_link_coord_property() -> Property:
         ),
         provenance="pycellin",
         prop_type="edge",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit="space unit",
     )
@@ -479,7 +480,7 @@ def create_lineage_coord_property(
         ),
         provenance=provenance,
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit=unit,
     )
@@ -495,7 +496,7 @@ def _create_generic_lineage_coord_property() -> Property:
         ),
         provenance="pycellin",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit="space unit",
     )
@@ -529,7 +530,7 @@ def create_cycle_id_property(provenance: str = "pycellin") -> Property:
         ),
         provenance=provenance,
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="int",
     )
 
@@ -558,7 +559,7 @@ def create_cells_property(provenance: str = "pycellin") -> Property:
         description="cell_ids of the cells in the cell cycle, in chronological order",
         provenance=provenance,
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="list[int]",
     )
 
@@ -587,7 +588,7 @@ def create_first_cell_property(provenance: str = "pycellin") -> Property:
         description="cell_id of the first cell in the cell cycle",
         provenance=provenance,
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="int",
     )
 
@@ -617,7 +618,7 @@ def create_last_cell_property(provenance: str = "pycellin") -> Property:
         description="cell_id of the last cell in the cell cycle, i.e. its cycle_id",
         provenance=provenance,
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="int",
     )
 
@@ -646,7 +647,7 @@ def create_cycle_num_cells_property(provenance: str = "pycellin") -> Property:
         description="Number of cells in the cell cycle, minding gaps",
         provenance=provenance,
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="int",
     )
 
@@ -679,7 +680,7 @@ def create_cycle_duration_property(
         description="Duration of the cell cycle, regardless of gaps",
         provenance=provenance,
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
         unit=time_unit,
     )
@@ -713,7 +714,7 @@ def create_cycle_start_time_property(
         description="Time of the first cell in the cell cycle",
         provenance=provenance,
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
         unit=time_unit,
     )
@@ -747,7 +748,7 @@ def create_cycle_end_time_property(
         description="Time of the last cell in the cell cycle",
         provenance=provenance,
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
         unit=time_unit,
     )
@@ -781,6 +782,6 @@ def create_generation_property(provenance: str = "pycellin") -> Property:
         ),
         provenance=provenance,
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="int",
     )

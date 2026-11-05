@@ -79,7 +79,7 @@ def model_with_positions():
             description="Identifier of the particle, given by trackpy linking",
             provenance="trackpy",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
     ]:

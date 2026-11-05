@@ -47,7 +47,7 @@ def prop_cycle_lin():
         description="test property",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
     )
 
@@ -60,7 +60,7 @@ def prop_cell_lin_edge():
         description="test property",
         provenance="pycellin",
         prop_type="edge",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
 
@@ -73,7 +73,7 @@ def prop_cell_lin_node():
         description="test property",
         provenance="pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
 
@@ -151,7 +151,7 @@ class TestCycleTotalDisplacement:
     def test_get_input_props(self, prop_cycle_lin):
         calculator = CycleTotalDisplacement(prop_cycle_lin)
         assert calculator.get_input_props() == {
-            "displacement_prop": ("cell_displacement", "edge", "CellLineage")
+            "displacement_prop": ("cell_displacement", "edge", "cell")
         }
 
 

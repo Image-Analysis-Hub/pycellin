@@ -34,7 +34,7 @@ def prop_QUALITY():
         description="Quality",
         provenance="TrackMate",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
 
@@ -47,7 +47,7 @@ def prop_FRAME():
         description="Frame",
         provenance="TrackMate",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
         unit="frame",
     )
@@ -61,7 +61,7 @@ def prop_spot_name():
         description="Name of the spot",
         provenance="TrackMate",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="string",
     )
 
@@ -83,7 +83,7 @@ def prop_SPOT_SOURCE_ID():
         description="Source spot ID",
         provenance="TrackMate",
         prop_type="edge",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
@@ -96,7 +96,7 @@ def prop_SPOT_TARGET_ID():
         description="Target spot ID",
         provenance="TrackMate",
         prop_type="edge",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
@@ -117,7 +117,7 @@ def prop_TRACK_INDEX():
         description="Track index",
         provenance="TrackMate",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
@@ -130,7 +130,7 @@ def prop_NUMBER_SPOTS():
         description="Number of spots",
         provenance="TrackMate",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
@@ -143,7 +143,7 @@ def prop_track_name():
         description="Name of the track",
         provenance="TrackMate",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="string",
     )
 
@@ -451,7 +451,7 @@ def test_convert_attributes():
             description="",
             provenance="",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="float",
         ),
         "prop_int": Property(
@@ -460,7 +460,7 @@ def test_convert_attributes():
             description="",
             provenance="",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
         "prop_neg": Property(
@@ -469,7 +469,7 @@ def test_convert_attributes():
             description="",
             provenance="",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
         "prop_string": Property(
@@ -478,7 +478,7 @@ def test_convert_attributes():
             description="",
             provenance="",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="string",
         ),
     }
@@ -520,7 +520,7 @@ def test_convert_attributes_int_nan_is_none():
             description="",
             provenance="",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         )
     }
@@ -539,7 +539,7 @@ def test_convert_attributes_ValueError():
             description="",
             provenance="",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="integer",
         )
     }
@@ -559,7 +559,7 @@ def test_convert_attributes_undeclared_attribute(caplog):
             description="",
             provenance="",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="float",
         ),
     }
@@ -734,7 +734,7 @@ def test_add_all_nodes_several_attributes():
             description="",
             provenance="",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="float",
         ),
         "y": Property(
@@ -743,7 +743,7 @@ def test_add_all_nodes_several_attributes():
             description="",
             provenance="",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
     }
@@ -826,7 +826,7 @@ def test_add_edge():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="float",
         ),
         "y": Property(
@@ -835,7 +835,7 @@ def test_add_edge():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
         "SPOT_SOURCE_ID": Property(
@@ -844,7 +844,7 @@ def test_add_edge():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
         "SPOT_TARGET_ID": Property(
@@ -853,7 +853,7 @@ def test_add_edge():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
     }
@@ -882,7 +882,7 @@ def test_add_edge_no_node_id():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="float",
         ),
         "y": Property(
@@ -891,7 +891,7 @@ def test_add_edge_no_node_id():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
         "SPOT_SOURCE_ID": Property(
@@ -900,7 +900,7 @@ def test_add_edge_no_node_id():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
     }
@@ -926,7 +926,7 @@ def test_add_edge_no_edge_attributes():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
         "SPOT_TARGET_ID": Property(
@@ -935,7 +935,7 @@ def test_add_edge_no_edge_attributes():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
     }
@@ -978,7 +978,7 @@ def test_build_tracks_several_attributes():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="float",
         ),
         "y": Property(
@@ -987,7 +987,7 @@ def test_build_tracks_several_attributes():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
         "SPOT_SOURCE_ID": Property(
@@ -996,7 +996,7 @@ def test_build_tracks_several_attributes():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
         "SPOT_TARGET_ID": Property(
@@ -1005,7 +1005,7 @@ def test_build_tracks_several_attributes():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
     }
@@ -1016,7 +1016,7 @@ def test_build_tracks_several_attributes():
             description="",
             provenance="",
             prop_type="lineage",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         )
     }
@@ -1070,7 +1070,7 @@ def test_build_tracks_no_nodes_id():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="float",
         ),
         "y": Property(
@@ -1079,7 +1079,7 @@ def test_build_tracks_no_nodes_id():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
     }
@@ -1090,7 +1090,7 @@ def test_build_tracks_no_nodes_id():
             description="",
             provenance="",
             prop_type="lineage",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         )
     }
@@ -1127,7 +1127,7 @@ def test_build_tracks_no_edges():
             description="",
             provenance="",
             prop_type="lineage",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         )
     }
@@ -1172,7 +1172,7 @@ def test_build_tracks_no_track_id():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="float",
         ),
         "y": Property(
@@ -1181,7 +1181,7 @@ def test_build_tracks_no_track_id():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
         "SPOT_SOURCE_ID": Property(
@@ -1190,7 +1190,7 @@ def test_build_tracks_no_track_id():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
         "SPOT_TARGET_ID": Property(
@@ -1199,7 +1199,7 @@ def test_build_tracks_no_track_id():
             description="",
             provenance="",
             prop_type="edge",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         ),
     }

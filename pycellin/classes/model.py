@@ -327,7 +327,7 @@ class Model:
             "Use the 'set_reference_time_prop()' method instead."
         )
 
-    def set_reference_time_prop(self, prop_id: str) -> None:
+    def set_reference_time_prop(self, prop: str) -> None:
         """
         Set the reference time property of the model.
 
@@ -345,7 +345,7 @@ class Model:
 
         Parameters
         ----------
-        prop_id : str
+        prop : str
             The identifier of the property to set as the reference time property.
 
         Raises
@@ -354,23 +354,23 @@ class Model:
             If the specified property is not found in the model's node properties.
         """
         node_props = self.get_node_properties()
-        if prop_id not in node_props:
+        if prop not in node_props:
             raise ValueError(
-                f"Cannot set reference time property: '{prop_id}' not found in "
+                f"Cannot set reference time property: '{prop}' not found in "
                 "model's node properties."
             )
 
         old_reference_time_prop = self._reference_time_prop
-        self._reference_time_prop = prop_id
-        self.model_metadata.reference_time_prop = prop_id
+        self._reference_time_prop = prop
+        self.model_metadata.reference_time_prop = prop
 
-        self.props_metadata._protect_prop(prop_id)
+        self.props_metadata._protect_prop(prop)
         if old_reference_time_prop != "timepoint":
             self.props_metadata._unprotect_prop(old_reference_time_prop)
 
         self.set_time_step()
-        self.model_metadata.time_unit = node_props[prop_id].unit
-        self._set_cycle_time_units(node_props[prop_id].unit)
+        self.model_metadata.time_unit = node_props[prop].unit
+        self._set_cycle_time_units(node_props[prop].unit)
 
         calc = Timepoint(
             property=create_timepoint_property(),
@@ -997,13 +997,13 @@ class Model:
         """
         return self.props_metadata._get_units_per_props()
 
-    def get_property(self, prop_identifier: str) -> Property | None:
+    def get_property(self, prop: str) -> Property | None:
         """
         Return the property with the specified identifier.
 
         Parameters
         ----------
-        prop_identifier : str
+        prop : str
             The identifier of the property to return.
 
         Returns
@@ -1011,7 +1011,7 @@ class Model:
         Property | None
             The property with the specified identifier, or None if not found.
         """
-        return self.props_metadata.props.get(prop_identifier)
+        return self.props_metadata.props.get(prop)
 
     def get_properties(self) -> dict[str, Property]:
         """
@@ -1026,48 +1026,50 @@ class Model:
 
     def get_cell_lineage_properties(
         self,
-        include_Lineage_props: bool = True,
+        single_type: bool = False,
     ) -> dict[str, Property]:
         """
         Return the cell lineages properties present in the model.
 
         Parameters
         ----------
-        include_Lineage_props : bool, optional
-            True to return Lineage properties along with CellLineage ones,
-            False to only return CellLineage properties (default is True).
+        single_type : bool, optional
+            True to only return the properties of lineage type "cell". False to also
+            return those of lineage type "both", which belong to cell and cycle
+            lineages alike (default is False).
 
         Returns
         -------
         dict[str, Property]
             Dictionary of the cell lineages properties present in the model.
         """
-        props = self.props_metadata._get_prop_dict_from_lin_type("CellLineage")
-        if include_Lineage_props:
-            props.update(self.props_metadata._get_prop_dict_from_lin_type("Lineage"))
+        props = self.props_metadata._get_prop_dict_from_lin_type("cell")
+        if not single_type:
+            props.update(self.props_metadata._get_prop_dict_from_lin_type("both"))
         return props
 
     def get_cycle_lineage_properties(
         self,
-        include_Lineage_props: bool = True,
+        single_type: bool = False,
     ) -> dict[str, Property]:
         """
         Return the cycle lineages properties present in the model.
 
         Parameters
         ----------
-        include_Lineage_props : bool, optional
-            True to return Lineage properties along with CycleLineage ones,
-            False to only return CycleLineage properties (default is True).
+        single_type : bool, optional
+            True to only return the properties of lineage type "cycle". False to also
+            return those of lineage type "both", which belong to cell and cycle
+            lineages alike (default is False).
 
         Returns
         -------
         dict[str, Property]
             Dictionary of the cycle lineages properties present in the model.
         """
-        props = self.props_metadata._get_prop_dict_from_lin_type("CycleLineage")
-        if include_Lineage_props:
-            props.update(self.props_metadata._get_prop_dict_from_lin_type("Lineage"))
+        props = self.props_metadata._get_prop_dict_from_lin_type("cycle")
+        if not single_type:
+            props.update(self.props_metadata._get_prop_dict_from_lin_type("both"))
         return props
 
     def get_node_properties(self, single_type: bool = False) -> dict[str, Property]:
@@ -1389,14 +1391,14 @@ class Model:
 
     def has_property(
         self,
-        prop_identifier: str,
+        prop: str,
     ) -> bool:
         """
         Check if the model contains the specified property.
 
         Parameters
         ----------
-        prop_identifier : str
+        prop : str
             The identifier of the property to check.
 
         Returns
@@ -1404,7 +1406,7 @@ class Model:
         bool
             True if the property is in the model, False otherwise.
         """
-        return self.props_metadata._has_prop(prop_identifier)
+        return self.props_metadata._has_prop(prop)
 
     def prepare_full_data_update(self) -> None:
         """
@@ -1594,7 +1596,7 @@ class Model:
         lineage: CellLineage | None = None,
         lineage_id: int | None = None,
         overwrite_lineage_id: bool = False,
-        with_CycleLineage: bool = False,
+        with_cycle_lineage: bool = False,
     ) -> int:
         """
         Add a lineage to the model.
@@ -1614,7 +1616,7 @@ class Model:
             the provided `lineage_id`. If False, raise a ValueError if `lineage_id`
             conflicts with the lineage's existing internal `lineage_id` (default is
             False).
-        with_CycleLineage : bool, optional
+        with_cycle_lineage : bool, optional
             True to compute the cycle lineage, False otherwise (default is False).
 
         Returns
@@ -1632,8 +1634,8 @@ class Model:
         Warns
         -----
         UserWarning
-            If `with_CycleLineage` is True but the cycle data has not been added yet.
-            If `with_CycleLineage` is True but the time step of the model is not
+            If `with_cycle_lineage` is True but the cycle data has not been added yet.
+            If `with_cycle_lineage` is True but the time step of the model is not
             defined.
             In both these cases, the cycle lineage is not computed.
         """
@@ -1670,7 +1672,7 @@ class Model:
             lineage.graph["lineage_id"] = lineage_id
             nx.set_node_attributes(lineage, lineage_id, "lineage_id")
 
-        if with_CycleLineage:
+        if with_cycle_lineage:
             if self.data.cycle_data is None:
                 warnings.warn(
                     f"Cannot add cycle lineage {lineage_id} when cycle data "
@@ -1822,7 +1824,7 @@ class Model:
         *,
         lineage_id: int,
         cell_id: int | None = None,
-        global_cid: bool = False,
+        unique_in_model: bool = False,
         time_value: int | float = 0,
         prop_values: dict[str, Any] | None = None,
     ) -> int:
@@ -1835,7 +1837,7 @@ class Model:
             The ID of the lineage to which the cell belongs.
         cell_id : int, optional
             The ID of the cell to add (default is None).
-        global_cid : bool, optional
+        unique_in_model : bool, optional
             If True, the cell ID will be unique across all lineages in the model.
             If False, the cell ID will only be unique within the specified lineage
             (default is False).
@@ -1887,7 +1889,7 @@ class Model:
                 f"compute a new time step compatible with all time values."
             )
 
-        if global_cid is True:
+        if unique_in_model is True:
             if cell_id is None:
                 # Determine the next available global cell_id.
                 next_cids = [
@@ -1955,7 +1957,7 @@ class Model:
 
         return cell_attrs
 
-    def relabel_cells(self, start_id: int = 0, unique_ids: bool = False) -> None:
+    def relabel_cells(self, start_id: int = 0, unique_in_model: bool = False) -> None:
         """
         Relabel the cells in the model to have consecutive IDs.
 
@@ -1963,7 +1965,7 @@ class Model:
         ----------
         start_id: int, optional
             The starting ID for the relabeling (default is 0).
-        unique_ids : bool, optional
+        unique_in_model : bool, optional
             If True, cell IDs will be unique across all lineages in the model.
             If False, cell IDs will only be unique within each lineage
             (default is False).
@@ -1981,7 +1983,7 @@ class Model:
         ties broken by the ``reference_time_prop`` value and then by the
         original cell ID. This guarantees reproducible IDs across runs and
         across differently-built but structurally-identical lineages.
-        When ``unique_ids`` is True, lineages are processed in order of their
+        When ``unique_in_model`` is True, lineages are processed in order of their
         lineage ID, so global IDs are also reproducible.
         """
         self.update()  # better to start from a clean state, just in case
@@ -1990,7 +1992,7 @@ class Model:
         for lin in sorted(
             self.get_cell_lineages(), key=lambda graph: graph.graph["lineage_id"]
         ):
-            if not unique_ids:
+            if not unique_in_model:
                 current_id = start_id
 
             ordered = list(
@@ -2258,7 +2260,7 @@ class Model:
         If the property is already declared with the same property type and lineage
         type, e.g. added before with other arguments, its declaration and calculator
         are replaced, with a warning. A cycle property propagated to cell lineages
-        stays declared as a `Lineage` property. If the property is declared with
+        stays declared with the lineage type "both". If the property is declared with
         another property type or lineage type, e.g. loaded from a file, the
         declaration is replaced only if it is unused: not protected, without
         calculator and without values in cell lineages.
@@ -2290,8 +2292,8 @@ class Model:
             If the property is already declared with the same property type and
             lineage type, since its declaration is replaced.
         """
-        prop = calculator.prop
-        if prop.lin_type == "CycleLineage" and not self.data.cycle_data:
+        prop = calculator.property
+        if prop.lineage_type == "cycle" and not self.data.cycle_data:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with model.add_cycle_data()."
@@ -2301,7 +2303,7 @@ class Model:
         if declared is not None:
             if self._is_same_kind(declared, prop):
                 # A cycle property propagated to cell lineages stays declared on both.
-                prop.lin_type = declared.lin_type
+                prop.lineage_type = declared.lineage_type
             elif self._is_unused_prop(prop.identifier):
                 self.props_metadata._remove_prop(prop.identifier)
             else:
@@ -2323,10 +2325,10 @@ class Model:
         """
         Check whether a property is of the same kind as a declared one.
 
-        Both must have the same property type and lineage type. A declared `Lineage`
-        property, e.g. a cycle property propagated to cell lineages, is also of the
-        same kind as a cycle lineage property, since the updater computes `Lineage`
-        properties on cycle lineages.
+        Both must have the same property type and lineage type. A property declared
+        with the lineage type "both", e.g. a cycle property propagated to cell
+        lineages, is also of the same kind as a cycle lineage property, since the
+        updater computes "both" properties on cycle lineages.
 
         Parameters
         ----------
@@ -2342,9 +2344,9 @@ class Model:
         """
         if declared.prop_type != prop.prop_type:
             return False
-        if declared.lin_type == "Lineage":
-            return prop.lin_type in ("CycleLineage", "Lineage")
-        return declared.lin_type == prop.lin_type
+        if declared.lineage_type == "both":
+            return prop.lineage_type in ("cycle", "both")
+        return declared.lineage_type == prop.lineage_type
 
     def _is_unused_prop(self, prop_id: str) -> bool:
         """
@@ -2395,11 +2397,11 @@ class Model:
             Description of the property, e.g. "node property of cell lineages".
         """
         lineages = {
-            "CellLineage": "cell lineages",
-            "CycleLineage": "cycle lineages",
-            "Lineage": "cell and cycle lineages",
+            "cell": "cell lineages",
+            "cycle": "cycle lineages",
+            "both": "cell and cycle lineages",
         }
-        return f"{prop.prop_type} property of {lineages[prop.lin_type]}"
+        return f"{prop.prop_type} property of {lineages[prop.lineage_type]}"
 
     def _check_input_props(self, calculator: PropertyCalculator) -> None:
         """
@@ -2421,11 +2423,11 @@ class Model:
             If an input property does not have the property type or lineage type
             expected by the calculator.
         """
-        prop_id = calculator.prop.identifier
+        prop_id = calculator.property.identifier
         for param, (
             input_id,
             prop_type,
-            lin_type,
+            lineage_type,
         ) in calculator.get_input_props().items():
             if not isinstance(input_id, str):
                 msg = (
@@ -2467,11 +2469,11 @@ class Model:
                     f"prop_type '{prop_type}', but '{input_id}' has prop_type "
                     f"'{input_prop.prop_type}'."
                 )
-            if input_prop.lin_type not in (lin_type, "Lineage"):
+            if input_prop.lineage_type not in (lineage_type, "both"):
                 raise ValueError(
                     f"'{prop_id}' requires '{param}' to be a property with "
-                    f"lin_type '{lin_type}', but '{input_id}' has lin_type "
-                    f"'{input_prop.lin_type}'."
+                    f"lineage_type '{lineage_type}', but '{input_id}' has lineage_type "
+                    f"'{input_prop.lineage_type}'."
                 )
 
     def _get_input_prop(self, prop_identifier: Any) -> Property | None:
@@ -3209,10 +3211,10 @@ class Model:
 
     def add_cell_polygon(
         self,
-        source: Literal["label_img", "contour"] = "label_img",
+        source: Literal["label_image", "contour"] = "label_image",
         label_prop: str | None = None,
-        label_img: np.ndarray | None = None,
-        label_img_path: str | None = None,
+        label_image: np.ndarray | None = None,
+        label_image_path: str | None = None,
         contour_prop: str | None = None,
         force_recompute: bool = False,
         custom_identifier: str | None = None,
@@ -3225,7 +3227,7 @@ class Model:
         The cell polygon is the shape of the cell as a shapely.Polygon. It is
         computed from one of these sources:
 
-        - "label_img": the outline of the cell label in a label image. Holes are
+        - "label_image": the outline of the cell label in a label image. Holes are
           filled and, when a label is made of several pieces, only the largest one
           is kept: a warning lists the cells concerned when the model is updated.
           Pixels that touch only by a corner belong to the same piece. To keep all
@@ -3246,19 +3248,19 @@ class Model:
 
         Parameters
         ----------
-        source : {"label_img", "contour"}, optional
-            Source of the cell polygons. Defaults to "label_img".
+        source : {"label_image", "contour"}, optional
+            Source of the cell polygons. Defaults to "label_image".
         label_prop : str, optional
             Name of the property that stores cell labels. Must match the labels in
             the label image. Defaults to "label". Only used with
-            source="label_img".
-        label_img : np.ndarray, optional
-            The label image. If None, the method will fallback to `label_img_path`
+            source="label_image".
+        label_image : np.ndarray, optional
+            The label image. If None, the method will fallback to `label_image_path`
             or attempt to find it in the model's metadata. Only used with
-            source="label_img".
-        label_img_path: str, optional
+            source="label_image".
+        label_image_path: str, optional
             The path to the label image (tif stack). If None, the method will attempt
-            to find it in the model's metadata. Only used with source="label_img".
+            to find it in the model's metadata. Only used with source="label_image".
         contour_prop : str, optional
             Identifier of the cell lineage node property holding the cell contours.
             Defaults to "cell_contour". Only used with source="contour".
@@ -3280,7 +3282,7 @@ class Model:
             If `source` is not one of the sources above, or if a parameter
             of another source is set.
         ValueError
-            If `label_img` and `label_img_path` are not provided nor defined in the
+            If `label_image` and `label_image_path` are not provided nor defined in the
             model's metadata.
         ValueError
             If pixels are not isotropic in x and y.
@@ -3295,16 +3297,16 @@ class Model:
         self._check_source_params(
             source,
             {
-                "label_img": {
+                "label_image": {
                     "label_prop": label_prop,
-                    "label_img": label_img,
-                    "label_img_path": label_img_path,
+                    "label_image": label_image,
+                    "label_image_path": label_image_path,
                 },
                 "contour": {"contour_prop": contour_prop},
             },
         )
 
-        if source == "label_img":
+        if source == "label_image":
             prop = morpho.create_cell_polygon_property(
                 custom_identifier=custom_identifier,
                 custom_name=custom_name,
@@ -3312,10 +3314,10 @@ class Model:
                 or "Cell shape as a shapely.Polygon, computed from a label image",
                 unit=self.model_metadata.space_unit or "pixel",
             )
-            calc = morpho.CellPolygonFromLabelImg(
+            calc = morpho.CellPolygonFromLabelImage(
                 prop,
                 label_prop="label" if label_prop is None else label_prop,
-                label_img=self._resolve_label_img(label_img, label_img_path),
+                label_image=self._resolve_label_image(label_image, label_image_path),
                 pixel_size=self._get_xy_pixel_size(),
                 force_recompute=force_recompute,
             )
@@ -3377,8 +3379,8 @@ class Model:
     def add_cell_multipolygon(
         self,
         label_prop: str = "label",
-        label_img: np.ndarray | None = None,
-        label_img_path: str | None = None,
+        label_image: np.ndarray | None = None,
+        label_image_path: str | None = None,
         force_recompute: bool = False,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
@@ -3399,10 +3401,10 @@ class Model:
         label_prop: str
             Name of the property that stores cell labels. Must match the labels in
             the label image. Defaults to "label".
-        label_img : np.ndarray, optional
-            The label image. If None, the method will fallback to `label_img_path`
+        label_image : np.ndarray, optional
+            The label image. If None, the method will fallback to `label_image_path`
             or attempt to find it in the model's metadata.
-        label_img_path: str, optional
+        label_image_path: str, optional
             The path to the label image (tif stack). If None, the method will attempt
             to find it in the model's metadata.
         force_recompute : bool
@@ -3421,7 +3423,7 @@ class Model:
         Raises
         ------
         ValueError
-            If `label_img` and `label_img_path` are not provided nor defined in the
+            If `label_image` and `label_image_path` are not provided nor defined in the
             model's metadata.
         ValueError
             If pixels are not isotropic in x and y.
@@ -3436,10 +3438,10 @@ class Model:
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-        calc = morpho.CellMultiPolygonFromLabelImg(
+        calc = morpho.CellMultiPolygonFromLabelImage(
             prop,
             label_prop=label_prop,
-            label_img=self._resolve_label_img(label_img, label_img_path),
+            label_image=self._resolve_label_image(label_image, label_image_path),
             pixel_size=self._get_xy_pixel_size(),
             force_recompute=force_recompute,
         )
@@ -3447,12 +3449,12 @@ class Model:
 
     def add_cell_total_intensity(
         self,
-        intensity_img: np.ndarray | None = None,
-        intensity_img_path: str | None = None,
-        source: Literal["label_img", "polygon"] = "label_img",
+        intensity_image: np.ndarray | None = None,
+        intensity_image_path: str | None = None,
+        source: Literal["label_image", "polygon"] = "label_image",
         label_prop: str | None = None,
-        label_img: np.ndarray | None = None,
-        label_img_path: str | None = None,
+        label_image: np.ndarray | None = None,
+        label_image_path: str | None = None,
         polygon_prop: str | None = None,
         background: float = 0.0,
         custom_identifier: str | None = None,
@@ -3467,7 +3469,7 @@ class Model:
         measures the amount of fluorophore in the cell. The pixels of each cell are
         taken from one of these sources:
 
-        - "label_img": the pixels of the cell label in a label image, with all the
+        - "label_image": the pixels of the cell label in a label image, with all the
           pieces of the label and without its holes. Images can be 2D or 3D.
         - "polygon": the pixels whose center is inside the cell shape, a
           shapely.Polygon or shapely.MultiPolygon. A pixel whose center is exactly
@@ -3483,27 +3485,27 @@ class Model:
 
         Parameters
         ----------
-        intensity_img : np.ndarray, optional
+        intensity_image : np.ndarray, optional
             The intensity image, with time as first axis: (t, y, x), or (t, z, y, x)
-            with source="label_img". Pass the same array to several intensity
+            with source="label_image". Pass the same array to several intensity
             properties to load the image only once.
-        intensity_img_path : str, optional
+        intensity_image_path : str, optional
             The path to the intensity image (tif stack). Only used if
-            `intensity_img` is None.
-        source : {"label_img", "polygon"}, optional
-            Source of the pixels of each cell. Defaults to "label_img".
+            `intensity_image` is None.
+        source : {"label_image", "polygon"}, optional
+            Source of the pixels of each cell. Defaults to "label_image".
         label_prop : str, optional
             Name of the property that stores cell labels. Must match the labels in
             the label image. Defaults to "label". Only used with
-            source="label_img".
-        label_img : np.ndarray, optional
+            source="label_image".
+        label_image : np.ndarray, optional
             The label image, with the same shape as the intensity image. If None,
-            the method will fallback to `label_img_path` or attempt to find it in
-            the model's metadata. Only used with source="label_img".
-        label_img_path : str, optional
+            the method will fallback to `label_image_path` or attempt to find it in
+            the model's metadata. Only used with source="label_image".
+        label_image_path : str, optional
             The path to the label image (tif stack). If None, the method will
             attempt to find it in the model's metadata. Only used with
-            source="label_img".
+            source="label_image".
         polygon_prop : str, optional
             Identifier of the cell lineage node property holding the cell shapes as
             shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
@@ -3527,9 +3529,9 @@ class Model:
             If `source` is not one of the sources above, or if a parameter
             of another source is set.
         ValueError
-            If `intensity_img` and `intensity_img_path` are not provided.
+            If `intensity_image` and `intensity_image_path` are not provided.
         ValueError
-            If `label_img` and `label_img_path` are not provided nor defined in the
+            If `label_image` and `label_image_path` are not provided nor defined in the
             model's metadata.
         ValueError
             If the intensity image and the label image have different shapes, or if
@@ -3550,12 +3552,12 @@ class Model:
         self._add_cell_intensity(
             prop,
             "total",
-            intensity_img,
-            intensity_img_path,
+            intensity_image,
+            intensity_image_path,
             source,
             label_prop,
-            label_img,
-            label_img_path,
+            label_image,
+            label_image_path,
             polygon_prop,
             background,
             describe_pixels=custom_description is None,
@@ -3563,12 +3565,12 @@ class Model:
 
     def add_cell_mean_intensity(
         self,
-        intensity_img: np.ndarray | None = None,
-        intensity_img_path: str | None = None,
-        source: Literal["label_img", "polygon"] = "label_img",
+        intensity_image: np.ndarray | None = None,
+        intensity_image_path: str | None = None,
+        source: Literal["label_image", "polygon"] = "label_image",
         label_prop: str | None = None,
-        label_img: np.ndarray | None = None,
-        label_img_path: str | None = None,
+        label_image: np.ndarray | None = None,
+        label_image_path: str | None = None,
         polygon_prop: str | None = None,
         background: float = 0.0,
         custom_identifier: str | None = None,
@@ -3583,7 +3585,7 @@ class Model:
         measures the concentration of fluorophore in the cell. The pixels of each
         cell are taken from one of these sources:
 
-        - "label_img": the pixels of the cell label in a label image, with all the
+        - "label_image": the pixels of the cell label in a label image, with all the
           pieces of the label and without its holes. Images can be 2D or 3D.
         - "polygon": the pixels whose center is inside the cell shape, a
           shapely.Polygon or shapely.MultiPolygon. A pixel whose center is exactly
@@ -3599,27 +3601,27 @@ class Model:
 
         Parameters
         ----------
-        intensity_img : np.ndarray, optional
+        intensity_image : np.ndarray, optional
             The intensity image, with time as first axis: (t, y, x), or (t, z, y, x)
-            with source="label_img". Pass the same array to several intensity
+            with source="label_image". Pass the same array to several intensity
             properties to load the image only once.
-        intensity_img_path : str, optional
+        intensity_image_path : str, optional
             The path to the intensity image (tif stack). Only used if
-            `intensity_img` is None.
-        source : {"label_img", "polygon"}, optional
-            Source of the pixels of each cell. Defaults to "label_img".
+            `intensity_image` is None.
+        source : {"label_image", "polygon"}, optional
+            Source of the pixels of each cell. Defaults to "label_image".
         label_prop : str, optional
             Name of the property that stores cell labels. Must match the labels in
             the label image. Defaults to "label". Only used with
-            source="label_img".
-        label_img : np.ndarray, optional
+            source="label_image".
+        label_image : np.ndarray, optional
             The label image, with the same shape as the intensity image. If None,
-            the method will fallback to `label_img_path` or attempt to find it in
-            the model's metadata. Only used with source="label_img".
-        label_img_path : str, optional
+            the method will fallback to `label_image_path` or attempt to find it in
+            the model's metadata. Only used with source="label_image".
+        label_image_path : str, optional
             The path to the label image (tif stack). If None, the method will
             attempt to find it in the model's metadata. Only used with
-            source="label_img".
+            source="label_image".
         polygon_prop : str, optional
             Identifier of the cell lineage node property holding the cell shapes as
             shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
@@ -3643,9 +3645,9 @@ class Model:
             If `source` is not one of the sources above, or if a parameter
             of another source is set.
         ValueError
-            If `intensity_img` and `intensity_img_path` are not provided.
+            If `intensity_image` and `intensity_image_path` are not provided.
         ValueError
-            If `label_img` and `label_img_path` are not provided nor defined in the
+            If `label_image` and `label_image_path` are not provided nor defined in the
             model's metadata.
         ValueError
             If the intensity image and the label image have different shapes, or if
@@ -3666,12 +3668,12 @@ class Model:
         self._add_cell_intensity(
             prop,
             "mean",
-            intensity_img,
-            intensity_img_path,
+            intensity_image,
+            intensity_image_path,
             source,
             label_prop,
-            label_img,
-            label_img_path,
+            label_image,
+            label_image_path,
             polygon_prop,
             background,
             describe_pixels=custom_description is None,
@@ -3681,12 +3683,12 @@ class Model:
         self,
         prop: Property,
         statistic: Literal["total", "mean"],
-        intensity_img: np.ndarray | None,
-        intensity_img_path: str | None,
+        intensity_image: np.ndarray | None,
+        intensity_image_path: str | None,
         source: str,
         label_prop: str | None,
-        label_img: np.ndarray | None,
-        label_img_path: str | None,
+        label_image: np.ndarray | None,
+        label_image_path: str | None,
         polygon_prop: str | None,
         background: float,
         describe_pixels: bool,
@@ -3700,9 +3702,9 @@ class Model:
             The cell intensity property to add.
         statistic : {"total", "mean"}
             Statistic computed on the pixel values of each cell.
-        intensity_img, intensity_img_path, source, label_prop
+        intensity_image, intensity_image_path, source, label_prop
             See `add_cell_total_intensity()`.
-        label_img, label_img_path, polygon_prop, background
+        label_image, label_image_path, polygon_prop, background
             See `add_cell_total_intensity()`.
         describe_pixels : bool
             True to add to the description of the property where the pixels of each
@@ -3716,30 +3718,30 @@ class Model:
         self._check_source_params(
             source,
             {
-                "label_img": {
+                "label_image": {
                     "label_prop": label_prop,
-                    "label_img": label_img,
-                    "label_img_path": label_img_path,
+                    "label_image": label_image,
+                    "label_image_path": label_image_path,
                 },
                 "polygon": {"polygon_prop": polygon_prop},
             },
         )
-        img = self._resolve_intensity_img(intensity_img, intensity_img_path)
+        img = self._resolve_intensity_image(intensity_image, intensity_image_path)
 
         calc: intensity._CellIntensityCalculator
-        if source == "label_img":
-            labels = self._resolve_label_img(label_img, label_img_path)
+        if source == "label_image":
+            labels = self._resolve_label_image(label_image, label_image_path)
             if img.shape != labels.shape:
                 raise ValueError(
                     "The intensity image and the label image must have the same "
                     f"shape, but their shapes are {img.shape} and {labels.shape}."
                 )
-            calc = intensity.CellIntensityFromLabelImg(
+            calc = intensity.CellIntensityFromLabelImage(
                 prop,
                 statistic,
                 img,
                 label_prop="label" if label_prop is None else label_prop,
-                label_img=labels,
+                label_image=labels,
                 background=background,
             )
             pixels_txt = "taking the pixels of each cell from a label image"
@@ -3960,17 +3962,17 @@ class Model:
             )
 
     @staticmethod
-    def _resolve_intensity_img(
-        intensity_img: np.ndarray | None, intensity_img_path: str | None
+    def _resolve_intensity_image(
+        intensity_image: np.ndarray | None, intensity_image_path: str | None
     ) -> np.ndarray:
         """
         Return the intensity image to use, from the array or from its path.
 
         Parameters
         ----------
-        intensity_img : np.ndarray | None
-            The intensity image. If None, `intensity_img_path` is used.
-        intensity_img_path : str | None
+        intensity_image : np.ndarray | None
+            The intensity image. If None, `intensity_image_path` is used.
+        intensity_image_path : str | None
             The path to the intensity image (tif stack).
 
         Returns
@@ -3981,28 +3983,28 @@ class Model:
         Raises
         ------
         ValueError
-            If `intensity_img` and `intensity_img_path` are not provided.
+            If `intensity_image` and `intensity_image_path` are not provided.
         """
-        if intensity_img is not None:
-            return intensity_img
-        if intensity_img_path is None:
+        if intensity_image is not None:
+            return intensity_image
+        if intensity_image_path is None:
             raise ValueError(
-                "No intensity image provided. Please provide 'intensity_img' or "
-                "'intensity_img_path'."
+                "No intensity image provided. Please provide 'intensity_image' or "
+                "'intensity_image_path'."
             )
-        return tifffile.imread(intensity_img_path)
+        return tifffile.imread(intensity_image_path)
 
-    def _resolve_label_img(
-        self, label_img: np.ndarray | None, label_img_path: str | None
+    def _resolve_label_image(
+        self, label_image: np.ndarray | None, label_image_path: str | None
     ) -> np.ndarray:
         """
         Return the label image to use, from the arguments or the model metadata.
 
         Parameters
         ----------
-        label_img : np.ndarray | None
-            The label image. If None, `label_img_path` is used.
-        label_img_path : str | None
+        label_image : np.ndarray | None
+            The label image. If None, `label_image_path` is used.
+        label_image_path : str | None
             The path to the label image (tif stack). If None as well, the label
             image or its path is taken from the model metadata.
 
@@ -4014,21 +4016,21 @@ class Model:
         Raises
         ------
         ValueError
-            If `label_img` and `label_img_path` are not provided nor defined in the
+            If `label_image` and `label_image_path` are not provided nor defined in the
             model's metadata.
         """
-        if label_img is not None:
-            return label_img
-        if label_img_path is None:
-            if getattr(self.model_metadata, "label_img", None) is not None:
-                return self.model_metadata.label_img
-            label_img_path = getattr(self.model_metadata, "label_img_path", None)
-            if label_img_path is None:
+        if label_image is not None:
+            return label_image
+        if label_image_path is None:
+            if getattr(self.model_metadata, "label_image", None) is not None:
+                return self.model_metadata.label_image
+            label_image_path = getattr(self.model_metadata, "label_image_path", None)
+            if label_image_path is None:
                 raise ValueError(
-                    "No label image provided. Please provide 'label_img' or "
-                    "'label_img_path', or set them in the model metadata."
+                    "No label image provided. Please provide 'label_image' or "
+                    "'label_image_path', or set them in the model metadata."
                 )
-        return tifffile.imread(label_img_path).astype(np.uint32)
+        return tifffile.imread(label_image_path).astype(np.uint32)
 
     def _get_coord_props(self) -> tuple[str, ...]:
         """
@@ -4066,9 +4068,9 @@ class Model:
 
     def add_rod_length(
         self,
-        skel_algo: str = "zhang",
+        skeleton_method: str = "zhang",
         tolerance: float = 0.5,
-        method_width: str = "mean",
+        width_method: str = "mean",
         width_ignore_tips: bool = False,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
@@ -4087,9 +4089,9 @@ class Model:
         calc = morpho.RodLength(
             prop,
             size_x,
-            skel_algo=skel_algo,
+            skeleton_method=skeleton_method,
             tolerance=tolerance,
-            method_width=method_width,
+            width_method=width_method,
             width_ignore_tips=width_ignore_tips,
         )
         self.add_custom_property(calc)
@@ -4150,9 +4152,9 @@ class Model:
 
     def add_rod_width(
         self,
-        skel_algo: str = "zhang",
+        skeleton_method: str = "zhang",
         tolerance: float = 0.5,
-        method_width: str = "mean",
+        width_method: str = "mean",
         width_ignore_tips: bool = False,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
@@ -4171,9 +4173,9 @@ class Model:
         calc = morpho.RodWidth(
             prop,
             size_x,
-            skel_algo=skel_algo,
+            skeleton_method=skeleton_method,
             tolerance=tolerance,
-            method_width=method_width,
+            width_method=width_method,
             width_ignore_tips=width_ignore_tips,
         )
         self.add_custom_property(calc)
@@ -4667,7 +4669,7 @@ class Model:
                     f"but got type {type(mask_md_value).__name__}."
                 )
 
-        mask_img = tifffile.imread(mask_path).astype(np.uint32)
+        mask_image = tifffile.imread(mask_path).astype(np.uint32)
 
         size_x = self.get_pixel_width() or 1.0
         size_y = self.get_pixel_height() or 1.0
@@ -4682,7 +4684,7 @@ class Model:
         )
         self.add_custom_property(
             topo.LocationTag(
-                prop, mask_img=mask_img, pixel_size=size_x, tag_names=tag_names
+                prop, mask_image=mask_image, pixel_size=size_x, tag_names=tag_names
             )
         )
 
@@ -5098,17 +5100,17 @@ class Model:
         else:
             raise AttributeError(f"Method {method_name} not found in Model class.")
 
-    def add_pycellin_property(self, prop_identifier: str, **kwargs: Any) -> None:
+    def add_pycellin_property(self, prop: str, **kwargs: Any) -> None:
         """
         Add a single predefined pycellin property to the model.
 
         Parameters
         ----------
-        prop_identifier : str
+        prop : str
             Identifier of the property to add. Needs to be an available property.
         **kwargs
             Keyword arguments passed to the method that adds the property,
-            `add_<prop_identifier>()`, whose docstring lists them. For example,
+            `add_<prop>()`, whose docstring lists them. For example,
             `unit="degree"` for "turning_angle".
 
         Raises
@@ -5121,17 +5123,15 @@ class Model:
         """
         cell_lin_props = list(futils.get_pycellin_cell_lineage_properties().keys())
         cycle_lin_props = list(futils.get_pycellin_cycle_lineage_properties().keys())
-        if prop_identifier not in cell_lin_props + cycle_lin_props:
-            raise KeyError(
-                f"Property {prop_identifier} is not a predefined property of pycellin."
-            )
-        elif prop_identifier in cycle_lin_props and not self.data.cycle_data:
+        if prop not in cell_lin_props + cycle_lin_props:
+            raise KeyError(f"Property {prop} is not a predefined property of pycellin.")
+        elif prop in cycle_lin_props and not self.data.cycle_data:
             raise ValueError(
-                f"Property {prop_identifier} is a property of cycle lineages, "
+                f"Property {prop} is a property of cycle lineages, "
                 "but the cycle lineages have not been computed yet. "
                 "Please compute the cycle lineages first with model.add_cycle_data()."
             )
-        self._get_prop_method(prop_identifier)(**kwargs)
+        self._get_prop_method(prop)(**kwargs)
 
     def add_pycellin_properties(
         self, props_info: list[str | dict[str, dict[str, Any]]]
@@ -5169,7 +5169,7 @@ class Model:
 
         >>> model.add_pycellin_properties(
         ...     [
-        ...         {"rod_length": {"skel_algo": "lee", "tolerance": 0.6}},
+        ...         {"rod_length": {"skeleton_method": "lee", "tolerance": 0.6}},
         ...         {"turning_angle": {"unit": "degree"}},
         ...     ]
         ... )
@@ -5236,7 +5236,7 @@ class Model:
 
     def remove_property(
         self,
-        prop_identifier: str,
+        prop: str,
         prop_type: PropertyType | str | list[str] | None = None,
     ) -> None:
         """
@@ -5250,7 +5250,7 @@ class Model:
 
         Parameters
         ----------
-        prop_identifier : str
+        prop : str
             Identifier of the property to remove.
         prop_type : PropertyType | str | list[str], optional
             If specified, only remove the property for the specified type. Can be:
@@ -5286,12 +5286,10 @@ class Model:
         >>> model.remove_property("my_property", ["node", "edge"])
         """
         # Preliminary checks.
-        if not self.props_metadata._has_prop(prop_identifier):
-            raise ValueError(
-                f"There is no property {prop_identifier} in the declared properties."
-            )
-        if prop_identifier in self.props_metadata._get_protected_props():
-            raise ProtectedPropertyError(prop_identifier)
+        if not self.props_metadata._has_prop(prop):
+            raise ValueError(f"There is no property {prop} in the declared properties.")
+        if prop in self.props_metadata._get_protected_props():
+            raise ProtectedPropertyError(prop)
 
         # Convert string/list to PropertyType if needed.
         prop_type_flag: PropertyType | None
@@ -5303,9 +5301,9 @@ class Model:
             prop_type_flag = prop_type
 
         # Get current property info before any modifications.
-        prop = self.props_metadata.props[prop_identifier]
-        current_prop_type = prop.prop_type
-        lin_type = prop.lin_type
+        property = self.props_metadata.props[prop]
+        current_prop_type = property.prop_type
+        lineage_type = property.lineage_type
 
         # Determine which types to remove.
         if prop_type_flag is None:
@@ -5314,7 +5312,7 @@ class Model:
         else:
             if not (current_prop_type & prop_type_flag):
                 raise ValueError(
-                    f"Property '{prop_identifier}' does not have type(s) "
+                    f"Property '{prop}' does not have type(s) "
                     f"{prop_type_flag}. Current type: {current_prop_type}"
                 )
             types_to_remove = prop_type_flag
@@ -5322,32 +5320,31 @@ class Model:
             delete_calculator = new_prop_type == PropertyType(0)
 
         # Update the metadata.
-        self.props_metadata._remove_prop(prop_identifier, prop_type_flag)
+        self.props_metadata._remove_prop(prop, prop_type_flag)
 
         # Update the data.
-        match lin_type:
-            case "CellLineage":
+        match lineage_type:
+            case "cell":
                 for lin in self.data.cell_data.values():
-                    lin._remove_prop(prop_identifier, types_to_remove)
-            case "CycleLineage" if self.data.cycle_data:
+                    lin._remove_prop(prop, types_to_remove)
+            case "cycle" if self.data.cycle_data:
                 for clin in self.data.cycle_data.values():
-                    clin._remove_prop(prop_identifier, types_to_remove)
-            case "Lineage":
+                    clin._remove_prop(prop, types_to_remove)
+            case "both":
                 for lin in self.data.cell_data.values():
-                    lin._remove_prop(prop_identifier, types_to_remove)
+                    lin._remove_prop(prop, types_to_remove)
                 if self.data.cycle_data:
                     for clin in self.data.cycle_data.values():
-                        clin._remove_prop(prop_identifier, types_to_remove)
+                        clin._remove_prop(prop, types_to_remove)
             case _:
                 raise ValueError(
-                    "Lineage type not recognized. Must be 'CellLineage', 'CycleLineage'"
-                    "or 'Lineage'."
+                    "Lineage type not recognized. Must be 'cell', 'cycle' or 'both'."
                 )
 
         # Update the updater only if property was completely removed.
         if delete_calculator:
             try:
-                self._updater.delete_calculator(prop_identifier)
+                self._updater.delete_calculator(prop)
             except KeyError:
                 # No calculator doesn't mean there is something wrong,
                 # maybe it's just an imported property.
@@ -5637,14 +5634,14 @@ class Model:
           cell lineage graph.
 
         Values missing on the cycle lineage are skipped. The lineage type of the
-        properties that were propagated becomes `Lineage`, since the properties are
+        properties that were propagated becomes "both", since the properties are
         then present on both cycle and cell lineages.
 
         `update()` keeps the propagated values up to date: once it has computed the
         cycle properties again, it copies the properties propagated with this method
         again to the cell lineages, including to the cells added since. A propagated
         property that the update doesn't compute, e.g. without calculator, keeps its
-        previous values on the cells. A property declared with the `Lineage` type,
+        previous values on the cells. A property declared with the "both" type,
         and not propagated, is left as it is.
 
         Parameters
@@ -5694,15 +5691,15 @@ class Model:
             props = [
                 prop_id
                 for prop_id, prop in self.get_cycle_lineage_properties().items()
-                if prop.lin_type == "CycleLineage" or prop_id in already_propagated
+                if prop.lineage_type == "cycle" or prop_id in already_propagated
             ]
         propagated_props = self._copy_cycle_props_to_cells(props)
 
-        # Update the properties declaration: now the property type is `Lineage`
-        # instead of just `CycleLineage` since the properties are now present on cycle
+        # Update the properties declaration: now the lineage type is "both" instead
+        # of just "cycle" since the properties are now present on cycle
         # AND cell lineages. They are recorded for update() to copy them again.
         for prop in propagated_props:
-            self.props_metadata.props[prop].lin_type = "Lineage"
+            self.props_metadata.props[prop].lineage_type = "both"
             self.props_metadata._add_propagated_prop(prop)
 
     def _copy_cycle_props_to_cells(self, props: list[str] | None) -> set[str]:
@@ -5813,7 +5810,7 @@ class Model:
 
         The merged model is not updated: call ``update()`` to compute the property
         values of the added lineages. To make cell IDs unique across all lineages, call
-        ``relabel_cells(unique_ids=True)`` on the merged model.
+        ``relabel_cells(unique_in_model=True)`` on the merged model.
 
         Regarding lineages:
         Lineages of ``model`` whose lineage ID is already used get a new ID. Single-cell
@@ -5830,9 +5827,9 @@ class Model:
         When the value of a field for the merged model differs from its value in one of
         the models, the values of each model are stored on its lineages, in a lineage
         property with the "pycellin merge" provenance. Lineages already storing a field
-        from a previous merge keep their values. Label images (``label_img``) are never
-        stored on lineages. The data type of these lineage properties is inferred from
-        the stored values, in Python type hint syntax (e.g. "float", "int | str").
+        from a previous merge keep their values. Label images (``label_image``) are
+        never stored on lineages. The data type of these lineage properties is inferred
+        from the stored values, in Python type hint syntax (e.g. "float", "int | str").
 
         Regarding cycle lineages:
         If one of the models has cycle lineages, the merged model has cycle lineages
@@ -5994,7 +5991,7 @@ class Model:
         # for all its lineages. They are built now so that a lineage whose cycle lineage
         # cannot be built stops the merge before any modification.
         with_cycles = bool(model1.data.cycle_data or model2.data.cycle_data) or any(
-            dict_calcs2[prop_id].prop.lin_type == "CycleLineage"
+            dict_calcs2[prop_id].property.lineage_type == "cycle"
             for prop_id in props_to_add
             if prop_id in dict_calcs2
         )
@@ -6071,7 +6068,9 @@ class Model:
             changed_fields.update(
                 field for field in md_diff if source_values.get(field) is not None
             )
-        lineage_fields = (merge_props1 | merge_props2 | changed_fields) - {"label_img"}
+        lineage_fields = (merge_props1 | merge_props2 | changed_fields) - {
+            "label_image"
+        }
 
         # Lineage properties of model1 once the properties of model2 are added.
         lin_props = {
@@ -6167,7 +6166,7 @@ class Model:
                     description=field,
                     provenance=_MERGE_PROVENANCE,
                     prop_type=PropertyType.LINEAGE,
-                    lin_type="CellLineage",
+                    lineage_type="cell",
                     dtype=_infer_dtype(values),
                 )
                 model1.props_metadata._add_prop(new_prop)
@@ -6765,9 +6764,9 @@ class Model:
         clip_std_band: bool = True,
         nan_std_handling: Literal["drop", "keep", "zero"] = "keep",
         title: str | None = None,
-        line: dict | None = None,
-        marker: dict | None = None,
-        band_line: dict | None = None,
+        line_style: dict | None = None,
+        marker_style: dict | None = None,
+        band_line_style: dict | None = None,
         band_opacity: float = 0.1,
         template: str | go.layout.Template = "pycellin_white",
         width: int | None = None,
@@ -6803,16 +6802,16 @@ class Model:
         title : str, optional
             The title of the figure. If None, a default title is generated based on the
             y_prop (default is None).
-        line : dict, optional
+        line_style : dict, optional
             Plotly line properties for the mean line (e.g. "color", "width", "dash").
             Merged over the defaults {"color": "#862CC6", "width": 3}. The
             "color" is also used as the base color for the std band. Colors must be
             given as 'rgb(r,g,b)' or '#rrggbb'.
-        marker : dict, optional
+        marker_style : dict, optional
             Plotly marker properties for the mean line's markers (e.g. "color",
             "size", "symbol"). Merged over Plotly's defaults; if "color" is omitted,
             markers inherit the mean line color automatically.
-        band_line : dict, optional
+        band_line_style : dict, optional
             Plotly line properties for the std band border (upper/lower edges).
             Merged over the defaults {"width": 1, "dash": "dash"} (thin dashed border
             in the mean line color). Set "width" to 0 to hide the border.
@@ -6851,14 +6850,15 @@ class Model:
             )
 
         # Merge user style dicts over defaults.
-        line = {"color": PYCELLIN_PURPLE, "width": 3, **(line or {})}
-        base_color = line["color"]
-        marker = {**(marker or {})}  # empty by default: markers inherit the line color
-        band_line = {
+        line_style = {"color": PYCELLIN_PURPLE, "width": 3, **(line_style or {})}
+        base_color = line_style["color"]
+        # Empty by default: markers inherit the line color.
+        marker_style = {**(marker_style or {})}
+        band_line_style = {
             "color": base_color,
             "width": 1,
             "dash": "dash",
-            **(band_line or {}),
+            **(band_line_style or {}),
         }
         band_fill_color = _color_to_rgba(base_color, alpha=band_opacity)
 
@@ -6900,8 +6900,8 @@ class Model:
                 y=df_agg["mean"],
                 mode="lines+markers",
                 name=f"Mean {y_prop}",
-                line=line,
-                marker=marker,
+                line=line_style,
+                marker=marker_style,
                 # continuous mean: no break where std is NaN ("keep" mode)
                 connectgaps=True,
                 showlegend=False,
@@ -6915,7 +6915,7 @@ class Model:
                     y=df_agg["upper"],
                     fill=None,
                     mode="lines",
-                    line=band_line,
+                    line=band_line_style,
                     connectgaps=False,  # break the band where std is NaN ("keep" mode)
                     showlegend=False,
                 )
@@ -6926,7 +6926,7 @@ class Model:
                     y=df_agg["lower"],
                     fill="tonexty",
                     mode="lines",
-                    line=band_line,
+                    line=band_line_style,
                     fillcolor=band_fill_color,
                     connectgaps=False,  # break the band where std is NaN ("keep" mode)
                     showlegend=False,
@@ -6955,9 +6955,9 @@ class Model:
         clip_std_band: bool = True,
         nan_std_handling: Literal["drop", "keep", "zero"] = "keep",
         title: str | None = None,
-        line: dict | None = None,
-        marker: dict | None = None,
-        band_line: dict | None = None,
+        line_style: dict | None = None,
+        marker_style: dict | None = None,
+        band_line_style: dict | None = None,
         band_opacity: float = 0.1,
         template: str | go.layout.Template = "pycellin_white",
         width: int | None = None,
@@ -6993,16 +6993,16 @@ class Model:
         title : str, optional
             The title of the figure. If None, a default title is generated based on the
             y_prop (default is None).
-        line : dict, optional
+        line_style : dict, optional
             Plotly line properties for the mean line (e.g. "color", "width", "dash").
             Merged over the defaults {"color": "#862CC6", "width": 3}. The
             "color" is also used as the base color for the std band. Colors must be
             given as 'rgb(r,g,b)' or '#rrggbb'.
-        marker : dict, optional
+        marker_style : dict, optional
             Plotly marker properties for the mean line's markers (e.g. "color",
             "size", "symbol"). Merged over Plotly's defaults; if "color" is omitted,
             markers inherit the mean line color automatically.
-        band_line : dict, optional
+        band_line_style : dict, optional
             Plotly line properties for the std band border (upper/lower edges).
             Merged over the defaults {"width": 1, "dash": "dash"} (thin dashed border
             in the mean line color). Set "width" to 0 to hide the border.
@@ -7027,9 +7027,9 @@ class Model:
             clip_std_band=clip_std_band,
             nan_std_handling=nan_std_handling,
             title=title,
-            line=line,
-            marker=marker,
-            band_line=band_line,
+            line_style=line_style,
+            marker_style=marker_style,
+            band_line_style=band_line_style,
             band_opacity=band_opacity,
             template=template,
             width=width,

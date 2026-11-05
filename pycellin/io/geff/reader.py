@@ -580,7 +580,7 @@ def _extract_props_metadata(
                 description=prop.description or prop.name or key,
                 provenance="geff",
                 prop_type=prop_type,
-                lin_type="CellLineage",
+                lineage_type="cell",
                 dtype=prop.dtype,
                 unit=prop.unit or None,
             )
@@ -612,7 +612,7 @@ def _extract_props_metadata(
                     description=prop.description or prop.name or key,
                     provenance="geff",
                     prop_type=prop_type,
-                    lin_type="CellLineage",
+                    lineage_type="cell",
                     dtype=prop.dtype,
                     unit=prop.unit or None,
                 )
@@ -675,7 +675,7 @@ def _extract_lin_props_metadata(
                 description=prop.get("description") or prop.get("name") or key,
                 provenance="geff",
                 prop_type=PropertyType.LINEAGE,
-                lin_type="CellLineage",
+                lineage_type="cell",
                 dtype=prop.get("dtype"),
                 unit=prop.get("unit") or None,
             )
@@ -695,7 +695,7 @@ def _extract_lin_props_metadata(
                     description=prop.get("description") or prop.get("name") or key,
                     provenance="geff",
                     prop_type=PropertyType.LINEAGE,
-                    lin_type="CellLineage",
+                    lineage_type="cell",
                     dtype=prop.get("dtype"),
                     unit=prop.get("unit") or None,
                 )
@@ -940,7 +940,7 @@ def _extract_generic_metadata(
     """
     metadata: dict[str, Any] = {}
     metadata["name"] = Path(geff_file).stem
-    metadata["file_location"] = geff_file
+    metadata["file_path"] = geff_file
     metadata["provenance"] = "geff"
     metadata["date"] = str(datetime.now())
     try:

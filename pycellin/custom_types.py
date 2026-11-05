@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 from collections import namedtuple
 from enum import Flag, auto
 from typing import Literal
 
-
-LineageType = Literal["CellLineage", "CycleLineage", "Lineage"]
+LineageType = Literal["cell", "cycle", "both"]
 
 
 class PropertyType(Flag):

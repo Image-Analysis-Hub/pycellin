@@ -202,7 +202,7 @@ class PropertyExtractor(ast.NodeVisitor):
 
         info: dict[str, str] = {}
         for kw in call.keywords:
-            fields = ["identifier", "description", "lin_type"]
+            fields = ["identifier", "description", "lineage_type"]
             if kw.arg in fields:
                 value = self._extract_value(kw.value)
                 if value is not None:
@@ -286,8 +286,8 @@ def _get_pycellin_props_by_lin_type(
     include_core : bool
         Whether to include core properties.
     lin_type_filter : list[str]
-        The lineage type to filter properties by ('Lineage', 'CellLineage',
-        'CycleLineage')
+        The lineage type to filter properties by ('both', 'cell',
+        'cycle')
 
     Returns
     -------
@@ -299,8 +299,8 @@ def _get_pycellin_props_by_lin_type(
     filtered_props: dict[str, str] = {}
 
     for prop_info in all_properties.values():
-        lin_type = prop_info.get("lin_type")
-        if lin_type in lin_type_filter:
+        lineage_type = prop_info.get("lineage_type")
+        if lineage_type in lin_type_filter:
             identifier = prop_info.get("identifier")
             description = prop_info.get("description")
             if identifier and description:
@@ -311,7 +311,7 @@ def _get_pycellin_props_by_lin_type(
 
 def get_pycellin_cell_lineage_properties(
     include_core_properties: bool = True,
-    include_Lineage_properties: bool = True,
+    single_type: bool = False,
 ) -> dict[str, str]:
     """
     Return the pycellin properties that can be computed on cell lineages.
@@ -325,8 +325,10 @@ def get_pycellin_cell_lineage_properties(
         Whether to include core properties, i.e. properties automatically computed by
         pycellin.
         True by default.
-    include_Lineage_properties : bool, optional
-        Whether to include Lineage properties. True by default.
+    single_type : bool, optional
+        True to only return the properties of lineage type "cell". False to also
+        return those of lineage type "both", which belong to cell and cycle lineages
+        alike (default is False).
 
     Returns
     -------
@@ -334,16 +336,14 @@ def get_pycellin_cell_lineage_properties(
         Dictionary of properties of the cell lineages,
         with properties name as keys and properties description as values.
     """
-    lin_types = (
-        ["CellLineage", "Lineage"] if include_Lineage_properties else ["CellLineage"]
-    )
+    lin_types = ["cell"] if single_type else ["cell", "both"]
     props = _get_pycellin_props_by_lin_type(include_core_properties, lin_types)
     return props
 
 
 def get_pycellin_cycle_lineage_properties(
     include_core_properties: bool = True,
-    include_Lineage_properties: bool = True,
+    single_type: bool = False,
 ) -> dict[str, str]:
     """
     Return the pycellin properties that can be computed on cycle lineages.
@@ -357,8 +357,10 @@ def get_pycellin_cycle_lineage_properties(
         Whether to include core properties, i.e. properties automatically computed by
         pycellin.
         True by default.
-    include_Lineage_properties : bool, optional
-        Whether to include Lineage properties. True by default.
+    single_type : bool, optional
+        True to only return the properties of lineage type "cycle". False to also
+        return those of lineage type "both", which belong to cell and cycle lineages
+        alike (default is False).
 
     Returns
     -------
@@ -366,7 +368,5 @@ def get_pycellin_cycle_lineage_properties(
         Dictionary of properties of the cycle lineages,
         with properties name as keys and properties description as values.
     """
-    lin_types = (
-        ["CycleLineage", "Lineage"] if include_Lineage_properties else ["CycleLineage"]
-    )
+    lin_types = ["cycle"] if single_type else ["cycle", "both"]
     return _get_pycellin_props_by_lin_type(include_core_properties, lin_types)

@@ -27,7 +27,7 @@ class ModelUpdater:
         self._removed_lineages = set()
         self._modified_lineages = set()
 
-        self._calculators = {}  # {prop_name: PropertyCalculator}
+        self._calculators = {}  # {prop: PropertyCalculator}
 
         # Cell properties are computed before cycle properties, whatever the order of
         # the calculators (see _order_calculators()). So if a cell property depends on
@@ -143,7 +143,7 @@ class ModelUpdater:
         calculator : PropertyCalculator
             The calculator to use to compute the property.
         """
-        self._calculators[calculator.prop.identifier] = calculator
+        self._calculators[calculator.property.identifier] = calculator
         self._order_calculators()
 
     def _order_calculators(self) -> None:
@@ -182,24 +182,24 @@ class ModelUpdater:
             place(prop_id)
         self._calculators = ordered
 
-    def delete_calculator(self, prop_name: str) -> None:
+    def delete_calculator(self, prop: str) -> None:
         """
         Delete the calculator for a property.
 
         Parameters
         ----------
-        prop_name : str
-            The name of the property for which to delete the calculator.
+        prop : str
+            The identifier of the property for which to delete the calculator.
 
         Raises
         ------
         KeyError
             If the property has no registered calculator.
         """
-        if prop_name in self._calculators:
-            del self._calculators[prop_name]
+        if prop in self._calculators:
+            del self._calculators[prop]
         else:
-            raise KeyError(f"Property {prop_name} has no registered calculator.")
+            raise KeyError(f"Property {prop} has no registered calculator.")
 
     def _update(
         self,
@@ -365,13 +365,13 @@ class ModelUpdater:
             cell_calculators = [
                 calc
                 for calc in self._calculators.values()
-                if calc.prop.lin_type == "CellLineage"
+                if calc.property.lineage_type == "cell"
             ]
         else:
             cell_calculators = [
                 calc
                 for prop_id, calc in self._calculators.items()
-                if prop_id in props_to_update and calc.prop.lin_type == "CellLineage"
+                if prop_id in props_to_update and calc.property.lineage_type == "cell"
             ]
 
         # The timepoint property is computed first, since other properties rely on it.
@@ -488,14 +488,14 @@ class ModelUpdater:
                 cycle_calculators = [
                     calc
                     for calc in self._calculators.values()
-                    if calc.prop.lin_type in ("CycleLineage", "Lineage")
+                    if calc.property.lineage_type in ("cycle", "both")
                 ]
             else:
                 cycle_calculators = [
                     calc
                     for prop_id, calc in self._calculators.items()
                     if prop_id in props_to_update
-                    and calc.prop.lin_type in ("CycleLineage", "Lineage")
+                    and calc.property.lineage_type in ("cycle", "both")
                 ]
             # Since cycle lineages are recreated at each update, every element
             # of the lineages need to be updated with its properties.
@@ -527,7 +527,7 @@ class ModelUpdater:
             or all(
                 calc in cell_calculators
                 for calc in self._calculators.values()
-                if calc.prop.lin_type == "CellLineage"
+                if calc.property.lineage_type == "cell"
             )
         )
 

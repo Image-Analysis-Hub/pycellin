@@ -84,7 +84,7 @@ def node_props():
             description="Time in seconds",
             provenance="Test",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="float",
             unit="second",
         ),
@@ -94,7 +94,7 @@ def node_props():
             description="Channel 1 intensity",
             provenance="Test",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="float",
             unit=None,
         ),
@@ -104,7 +104,7 @@ def node_props():
             description="Channel 2 intensity",
             provenance="Test",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="float",
             unit=None,
         ),
@@ -125,7 +125,7 @@ def mixed_props():
             description="Cell label",
             provenance="Test",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="string",
             unit=None,
         ),
@@ -146,7 +146,7 @@ def var_length_prop():
         description="List of coordinates of the cell contours",
         provenance="Test",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit="micrometer",
     )
@@ -161,7 +161,7 @@ def list_prop():
         description="IDs of the daughter cells",
         provenance="Test",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="list[int]",
     )
 
@@ -384,7 +384,7 @@ class TestRemoveUnsupportedProps:
                 description="Link feature not declared in a TrackMate file",
                 provenance="TrackMate",
                 prop_type="edge",
-                lin_type="CellLineage",
+                lineage_type="cell",
                 dtype="unknown",
             )
         )
@@ -414,7 +414,7 @@ class TestRemoveUnsupportedProps:
                 description="Tags of the lineage",
                 provenance="Test",
                 prop_type="lineage",
-                lin_type="CellLineage",
+                lineage_type="cell",
                 dtype="list[str]",
             )
         )
@@ -506,7 +506,7 @@ class TestAddTrackletIds:
             assert values == [expected, expected]
         prop = simple_model.get_property("tracklet_id")
         assert prop.prop_type == PropertyType.NODE
-        assert prop.lin_type == "CellLineage"
+        assert prop.lineage_type == "cell"
         assert prop.dtype == "int"
 
     def test_different_values_replaced_with_warning(self, simple_model, caplog):
@@ -518,7 +518,7 @@ class TestAddTrackletIds:
                 description="Tracklet ID from another tool",
                 provenance="geff",
                 prop_type="node",
-                lin_type="CellLineage",
+                lineage_type="cell",
                 dtype="int",
             )
         )
@@ -763,7 +763,7 @@ class TestBuildPropsMetadata:
             description="Name of the lineage",
             provenance="Test",
             prop_type="lineage",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="string",
         )
         node_props_md, edge_props_md = _build_props_metadata(mixed_props)
@@ -779,7 +779,7 @@ class TestBuildPropsMetadata:
             description="Name of the lineage",
             provenance="Test",
             prop_type=["node", "lineage"],
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="string",
         )
         node_props_md, edge_props_md = _build_props_metadata(mixed_props)
@@ -1214,7 +1214,7 @@ class TestWriteGeff:
                 description="Tracklet ID of the link",
                 provenance="Test",
                 prop_type="edge",
-                lin_type="CellLineage",
+                lineage_type="cell",
                 dtype="int",
             )
         )
