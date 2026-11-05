@@ -6068,9 +6068,8 @@ class Model:
             changed_fields.update(
                 field for field in md_diff if source_values.get(field) is not None
             )
-        lineage_fields = (merge_props1 | merge_props2 | changed_fields) - {
-            "label_image"
-        }
+        lineage_fields = merge_props1 | merge_props2 | changed_fields
+        lineage_fields -= {"label_image"}
 
         # Lineage properties of model1 once the properties of model2 are added.
         lin_props = {
