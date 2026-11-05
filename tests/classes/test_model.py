@@ -1384,6 +1384,12 @@ class ConstantValue(NodeLocalPropCalculator):
         return self.value
 
 
+class ExternalValue(ConstantValue):
+    """User-defined property reading external data, e.g. an image."""
+
+    _USES_EXTERNAL_DATA = True
+
+
 class DoubledAreaCopy(NodeLocalPropCalculator):
     """User-defined property doubling 'area_copy', which it reads without declaring
     it."""
@@ -1686,6 +1692,55 @@ class TestPropagateCycleProperties:
         merged.update()
         for lin in merged.data.cell_lineages.values():
             assert all("mother_cycle" in cell for _, cell in lin.nodes(data=True))
+
+
+class TestExternalDataOnMergedModel:
+    """Test cases for properties reading external data on a merged model."""
+
+    MESSAGE = "reads one image for all the lineages"
+
+    @staticmethod
+    def _calculator(calculator_class=ExternalValue):
+        return calculator_class(_create_test_property("external", "node"), 1.0)
+
+    @staticmethod
+    def _merge_with_copy(model):
+        """Merge a model with a copy of itself, after naming it: what merge() stores on
+        the lineages of unnamed models depends on the clock."""
+        model.model_metadata.name = "model"
+        return model.merge(copy.deepcopy(model))
+
+    def test_warns(self, two_lineages_model):
+        merged = self._merge_with_copy(two_lineages_model)
+        with pytest.warns(UserWarning, match=self.MESSAGE):
+            merged.add_custom_property(self._calculator())
+
+    def test_different_label_image_paths_warn(self, two_lineages_model):
+        other_model = copy.deepcopy(two_lineages_model)
+        two_lineages_model.model_metadata.label_image_path = "labels1.tif"
+        other_model.model_metadata.label_image_path = "labels2.tif"
+        merged = two_lineages_model.merge(other_model)
+        with pytest.warns(UserWarning, match=self.MESSAGE):
+            merged.add_custom_property(self._calculator())
+
+    @pytest.mark.filterwarnings("error")
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [("label_image_path", "labels.tif"), ("label_image", np.zeros((1, 2, 2)))],
+    )
+    def test_shared_label_image_doesnt_warn(self, two_lineages_model, field, value):
+        setattr(two_lineages_model.model_metadata, field, value)
+        merged = self._merge_with_copy(two_lineages_model)
+        merged.add_custom_property(self._calculator())
+
+    @pytest.mark.filterwarnings("error")
+    def test_no_external_data_doesnt_warn(self, two_lineages_model):
+        merged = self._merge_with_copy(two_lineages_model)
+        merged.add_custom_property(self._calculator(ConstantValue))
+
+    @pytest.mark.filterwarnings("error")
+    def test_model_not_merged_doesnt_warn(self, two_lineages_model):
+        two_lineages_model.add_custom_property(self._calculator())
 
 
 class TestLineageGettersIds:

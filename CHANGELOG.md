@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 7d48637, plus the uncommitted checks of the lineage IDs entering a model (`add_lineage()`, `split_lineage_from_cell()`, `CellLineage()`, `read_geff()`). Update from there with: git log 7d48637..dev -->
+<!-- Planned v0.6.0. Covers commits up to 2dec97d, plus the uncommitted warning when a property reading an image is added to a merged model. Update from there with: git log 2dec97d..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -92,7 +92,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 
 ### Added
 
-- **Model:** `merge()` to merge two models, and `split()` to split a model into several models from groups of lineage IDs
+- **Model:** `merge()` to merge two models, and `split()` to split a model into several models from groups of lineage IDs. Properties reading an image, e.g. cell polygons from a label image, should be added to each model before merging: added to a merged model, they read the same image for all its lineages, with a warning
   - lineage ID collisions are resolved, and single-cell lineages keep the lineage ID = -cell ID convention
   - critical metadata (reference time property, time step and unit, pixel size, space unit) must match; other differing metadata values are stored as lineage properties
   - property declarations are checked for compatibility (property type, lineage type, unit, dtype)

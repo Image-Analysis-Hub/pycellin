@@ -2328,6 +2328,9 @@ class Model:
         UserWarning
             If the property is already declared with the same property type and
             lineage type, since its declaration is replaced.
+            If the calculator uses external data (e.g. a label image) and the model
+            comes from a merge without a shared label image, since that data may not
+            match all the lineages.
         """
         prop = calculator.property
         if prop.lineage_type == "cycle" and not self.data.cycle_lineages:
@@ -2336,6 +2339,23 @@ class Model:
                 "Please compute them first with model.add_cycle_lineages()."
             )
         self._check_input_props(calculator)
+        # Without a shared label image, the lineages may come from different images.
+        if (
+            calculator.uses_external_data()
+            and self.model_metadata.label_image is None
+            and self.model_metadata.label_image_path is None
+            and any(
+                lin_prop.provenance == _MERGE_PROVENANCE
+                for lin_prop in self.get_lineage_properties().values()
+            )
+        ):
+            warnings.warn(
+                f"'{prop.identifier}' reads one image for all the lineages of this "
+                "merged model. If they come from different images, its values will be "
+                "wrong for some of them: add the property to each model before merging "
+                "instead.",
+                stacklevel=2,
+            )
         declared = self.get_property(prop.identifier)
         if declared is not None:
             if self._is_same_kind(declared, prop):
@@ -5883,7 +5903,9 @@ class Model:
         Calculators using external data (e.g. a label image or a mask) are not kept in
         the merged model, since that data belongs to only one of the models. Their
         property values are kept, but are not computed again until the properties are
-        added again.
+        added again. Added to the merged model, such a property reads one image for all
+        its lineages: when the models come from different images, add it to each model
+        before merging instead.
         """
         if in_place:
             model1 = self
