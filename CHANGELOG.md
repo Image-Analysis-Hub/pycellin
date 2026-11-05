@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 4e14b06, plus the uncommitted TrackMate fix of a property called `name`. Update from there with: git log 4e14b06..dev -->
+<!-- Planned v0.6.0. Covers commits up to e4c2994, plus the uncommitted README changes. Update from there with: git log e4c2994..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -227,6 +227,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **trackpy:** exporting a model without divisions, e.g. one loaded from trackpy, warned that the model was already up to date
 - **Packaging:** the PyPI page had broken links: Documentation and Examples led to a site that doesn't exist, the README links to the notebooks didn't open them, and the README logo didn't show. Examples now opens the notebooks on GitHub, Documentation is removed until there is a documentation site, and a Changelog link is added
 - **Docs:** the installation steps of the README, also shown on the PyPI page, created a conda environment without Python, so `pip install pycellin` used the pip of another environment, if any. The environment is now created with Python 3.14
+- **Docs:** the code example of the README, also shown on the PyPI page, raised `NameError`: it called a `plot()` function that doesn't exist instead of `lin.plot()`. The link to Ershov et al., 2022 was broken too
 - **Docs:** `Model.get_cell_lineage_ids()` had lost its docstring to the alias that pointed to it
 - **Docs:** some examples of `add_pycellin_property()` and `add_pycellin_properties()` didn't work:
   - their docstrings used an `in_time_unit` argument, which `add_absolute_age()` and `add_relative_age()` don't have, so the examples raised `TypeError`
@@ -236,6 +237,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 
 - **Tests:** new tests for the new properties, plotting, exceptions, utils, the CTC and trackpy readers, the trackpy writer, `read_geff()` end to end, the pickle functions, and the signatures of the reading and writing functions
 - **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks, remove the unfinished "Creating a model from scratch" and "Working with TrackMate data" notebooks (the latter covered by "Getting started") and the State column of the README notebook table, explain when a calculator should be local or global, and replace `angle` with `turning_angle` in the examples of "Managing properties"
+- **Docs:** expand the README: what a cycle lineage is, what pycellin can do, how to upgrade from 0.5.1, what to do with cell fusions, and credits for GEFF and the _C. elegans_ and FakeTracks sample data
 - **Properties:** make the `is_complete_cycle` calculator local, since it only reads its own lineage. Its values and update cost are unchanged
 - **Packaging:** find packages automatically in `pyproject.toml`
 - **Packaging:** declare the license as an SPDX expression (`BSD-3-Clause`) instead of the deprecated classifier. Building pycellin now needs setuptools >= 77
