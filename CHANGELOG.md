@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to b0114b6, plus the uncommitted removal of variable_length_props and new minimum geff version. Update from there with: git log b0114b6..dev -->
+<!-- Planned v0.6.0. Covers commits up to 7f795b4, plus the uncommitted Ruff bump in CI. Update from there with: git log 7f795b4..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
