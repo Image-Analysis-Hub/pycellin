@@ -472,7 +472,6 @@ def _build_display_hints(
 
 def _build_props_metadata(
     properties: dict[str, Property],
-    var_length_props: list[str] | None = None,
 ) -> tuple[dict[str, geff_spec.PropMetadata], dict[str, geff_spec.PropMetadata]]:
     """
     Build property metadata for GEFF from a pycellin model.
@@ -481,9 +480,6 @@ def _build_props_metadata(
     ----------
     properties : dict[str, Property]
         Dictionary of property identifiers to Property objects.
-    var_length_props : list[str] | None, optional
-        List of property identifiers that are variable in length (i.e., their values
-        are lists or arrays). If None, no properties are considered variable length.
 
     Returns
     -------
@@ -499,7 +495,6 @@ def _build_props_metadata(
         prop_md = geff_spec.PropMetadata(
             identifier=prop_id,
             dtype=_to_geff_dtype(prop.dtype),
-            varlength=prop_id in var_length_props if var_length_props else False,
             unit=prop.unit,
             name=prop.name,
             description=prop.description,
@@ -520,7 +515,6 @@ def _build_geff_metadata(
     time_axes: str | list[str] | None = None,
     space_axes: list[str] | None = None,
     channel_axes: list[str] | None = None,
-    var_length_props: list[str] | None = None,
     tracklets: bool = False,
 ) -> geff.GeffMetadata:
     """
@@ -549,9 +543,6 @@ def _build_geff_metadata(
         These should be properties in the model that represent different channels
         or modalities (e.g., "chan_1", "chan_2"). If None, no channel axes will be
         included in the GEFF metadata.
-    var_length_props : list[str] | None, optional
-        List of property identifiers that are variable in length (i.e., their values
-        are lists or arrays). If None, no properties are considered variable length.
     tracklets : bool, optional
         Whether to declare the 'tracklet_id' cell property as the GEFF tracklet
         property. The cells must already have it, see `_add_tracklet_ids()`.
@@ -583,7 +574,7 @@ def _build_geff_metadata(
 
     # Property metadata.
     props = model.get_cell_lineage_properties()
-    node_props_md, edge_props_md = _build_props_metadata(props, var_length_props)
+    node_props_md, edge_props_md = _build_props_metadata(props)
 
     # Identifiers of lineages and tracklets.
     track_node_props = {"lineage": "lineage_id"}
@@ -607,7 +598,6 @@ def write_geff(
     time_axes: str | list[str] | None = None,
     space_axes: list[str] | None = None,
     channel_axes: list[str] | None = None,
-    variable_length_props: list[str] | None = None,
     tracklets: bool = False,
     zarr_format: Literal[2, 3] = 2,
 ) -> Model:
@@ -640,9 +630,6 @@ def write_geff(
         or modalities (e.g., "chan_1", "chan_2"). If None, no channel axes will be
         included in the GEFF metadata. They are written between the time and the
         space axes, as in OME-Zarr.
-    variable_length_props : list[str] | None, optional
-        List of property identifiers that are variable in length (i.e., their values
-        are lists or arrays). If None, no properties are considered variable length.
     tracklets : bool, optional
         Whether to write the tracklets in a 'tracklet_id' cell property, declared
         as the GEFF tracklet property. A tracklet is a cell cycle, identified like
@@ -680,7 +667,8 @@ def write_geff(
     any other property: use `tracklets=True` to declare the tracklets in the GEFF
     file. Properties whose data type GEFF cannot store, such as `list[int]` or
     shapely geometries, are not exported either, and a warning names them. None
-    values are written as missing values.
+    values are written as missing values. Properties with a variable length, such as
+    `cell_contour`, need nothing special: geff detects them from their values.
     """
     _check_up_to_date(model)
     if not model.data.cell_lineages:
@@ -718,7 +706,6 @@ def write_geff(
             time_axes=time_axes,
             space_axes=space_axes,
             channel_axes=channel_axes,
-            var_length_props=variable_length_props,
             tracklets=tracklets,
         )
 
@@ -762,5 +749,4 @@ if __name__ == "__main__":
             model,
             geff_out,
             space_axes=["cell_x", "cell_y", "cell_z"],
-            variable_length_props=["cell_contour"],
         )

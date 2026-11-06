@@ -793,20 +793,6 @@ class TestBuildPropsMetadata:
 
         assert node_props_md["label"].dtype == "str"
 
-    def test_variable_length_properties(self, node_props, var_length_prop):
-        """Test marking properties as variable length."""
-        props = {
-            "cell_contours": var_length_prop,
-            "timepoint": node_props["timepoint"],
-        }
-
-        node_props_md, _ = _build_props_metadata(
-            props, var_length_props=["cell_contours"]
-        )
-
-        assert node_props_md["cell_contours"].varlength is True
-        assert node_props_md["timepoint"].varlength is False
-
     def test_metadata_attributes(self, mixed_props):
         """Test that all metadata attributes are correctly set."""
         node_props_md, _ = _build_props_metadata(mixed_props)
@@ -1071,10 +1057,10 @@ class TestWriteGeff:
         assert len(time_axes) == 1
         assert time_axes[0].name == "timepoint"
 
-    def test_export_with_variable_length_props(
+    def test_export_variable_length_values(
         self, simple_model, var_length_prop, tmp_path
     ):
-        """Test export with variable length properties."""
+        """Test export of a property whose values have different lengths."""
         geff_out = str(tmp_path / "test.geff")
         simple_model.props_metadata._add_prop(var_length_prop)
         for lin in simple_model.data.cell_lineages.values():
@@ -1084,15 +1070,11 @@ class TestWriteGeff:
                     [1, 0],
                     [1, 1],
                     [0, 1],
-                ]
-        write_geff(
-            simple_model,
-            geff_out,
-            variable_length_props=[var_length_prop.identifier],
-        )
+                ][:node]
+        write_geff(simple_model, geff_out)
 
         graph, metadata = geff.read(geff_out)
-        assert var_length_prop.identifier in metadata.node_props_metadata
+        assert metadata.node_props_metadata[var_length_prop.identifier].varlength
 
     def test_export_skips_unsupported_props(
         self, caplog, simple_model, list_prop, tmp_path

@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 55813f4, plus the uncommitted messages about cell fusions. Update from there with: git log 55813f4..dev -->
+<!-- Planned v0.6.0. Covers commits up to b0114b6, plus the uncommitted removal of variable_length_props and new minimum geff version. Update from there with: git log b0114b6..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -85,6 +85,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **CTC:** with label images (`labels_path`), cell positions and contours are now in the space unit: their pixel coordinates are multiplied by the pixel size. They were in pixels while the model had the space unit given to the loader, so properties computed from them, such as `cell_displacement`, got that unit for values in pixels
 - **trackpy:** the loader now uses a new `time` property (frame × time step) as the reference time property, instead of `frame`, and renames the trackpy coordinates `x`, `y`, `z` to `cell_x`, `cell_y`, `cell_z`
 - **Export:** `write_ctc()`, `write_geff()`, `write_trackmate_xml()` and `to_trackpy()` raise `UpdateRequiredError` when the model requires an update: call `model.update()` first. Most of them exported the changes not yet processed as they were, e.g. a lineage left in two parts by `remove_link()`, so a GEFF file written that way couldn't be read back correctly
+- **GEFF:** `write_geff()` no longer has a `variable_length_props` argument, which the "Getting started" notebook called mandatory: it never had any effect, since geff detects variable-length properties from their values. Just remove it from your calls
 - **Pickles:** models pickled with pycellin 0.5.1 can't be read, since modules moved (`pycellin.graph` no longer exists) and names changed (e.g. `cell_ID`, `cycle_length`): read their original files again
 - **Exceptions:** pycellin exceptions now subclass the matching built-in exception: `LineageStructureError` (so `FusionError` and `TimeFlowError`) is a `ValueError`, `UpdateRequiredError` a `RuntimeError`, `ProtectedPropertyError` an `AttributeError`
 - **Logging:** pycellin no longer adds a `NullHandler` to its logger, so warnings logged by pycellin are shown on stderr by default
@@ -164,6 +165,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **GEFF:** `write_geff()` writes the axes in the order of the GEFF specification, which follows OME-Zarr: time, channel, then space axes from z to x (e.g. t, z, y, x), as the dimensions of an image. `space_axes` still lists the x, y and z properties in that order, and the display hints are unchanged
 - **Dependencies:** declare numpy, pillow, tifffile and geff-spec, which pycellin imports directly but only got through other packages
 - **Dependencies:** raise the minimum versions of pandas (2.2.2), scikit-image (0.24), shapely (2.0.4) and plotly (5.12) to the first ones that work with NumPy 2. The previous minimums allowed installs that failed at `import pycellin`
+- **Dependencies:** raise the minimum versions of geff (1.1.4.1.1) and geff-spec (1.1.1). With earlier versions, GEFF files lost the unit, name and description of the properties
 - **Dependencies:** the test dependencies moved from the `test` extra to a `test` dependency group, installed from a clone of the repository with `pip install -e . --group test` (pip >= 25.1)
 
 ### Fixed
