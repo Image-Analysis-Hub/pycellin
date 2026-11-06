@@ -1097,6 +1097,40 @@ class TestWriteGeff:
         # The original model is not modified.
         assert "daughter_ids" in simple_model.get_properties()
 
+    def test_cycle_props_left_out_by_default(self, caplog, simple_model, tmp_path):
+        """Test that cycle properties are left out by default, with a warning."""
+        geff_out = str(tmp_path / "test.geff")
+        simple_model.add_cycle_lineages()
+
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
+            write_geff(simple_model, geff_out)
+
+        _, metadata = geff.read(geff_out)
+        assert "cycle_id" not in metadata.node_props_metadata
+        assert "propagate_cycle_props=True" in caplog.text
+
+    def test_propagate_cycle_props(self, caplog, simple_model, tmp_path):
+        """Test that cycle properties are written on the cells of the file, without
+        changing the original model."""
+        geff_out = str(tmp_path / "test.geff")
+        simple_model.add_cycle_lineages()
+
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
+            exported_model = write_geff(
+                simple_model, geff_out, propagate_cycle_props=True
+            )
+
+        graph, metadata = geff.read(geff_out)
+        assert "cycle_id" in metadata.node_props_metadata
+        cycle_ids = {node: graph.nodes[node]["cycle_id"] for node in graph.nodes}
+        assert cycle_ids == {1: 2, 2: 2, 3: 4, 4: 4}
+        assert "propagate_cycle_props=True" not in caplog.text
+        assert exported_model.get_property("cycle_id").lineage_type == "both"
+        # The original model is not modified.
+        assert simple_model.get_property("cycle_id").lineage_type == "cycle"
+        for lin in simple_model.data.cell_lineages.values():
+            assert all("cycle_id" not in attrs for _, attrs in lin.nodes(data=True))
+
     def test_export_writes_none_as_missing(self, simple_model, tmp_path):
         """Test that None values are written as missing values."""
         geff_out = str(tmp_path / "test.geff")

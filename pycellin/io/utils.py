@@ -316,8 +316,8 @@ def _remove_orphaned_metadata(model: Model) -> None:
         plural = len(not_exported) > 1
         logger.warning(
             f"Cycle propert{'ies are' if plural else 'y is'} not exported: "
-            f"{', '.join(not_exported)}. Use model.propagate_cycle_properties() "
-            f"before the export to write {'them' if plural else 'it'} on the cells.",
+            f"{', '.join(not_exported)}. Use propagate_cycle_props=True to write "
+            f"{'them' if plural else 'it'} on the cells.",
             stacklevel=2,
         )
     for location, orphaned_props, cycle_props in (

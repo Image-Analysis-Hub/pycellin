@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 6a3c241, plus the uncommitted GEFF export messages. Update from there with: git log 6a3c241..dev -->
+<!-- Planned v0.6.0. Covers commits up to 85d36d4, plus the uncommitted propagate_cycle_props argument of write_geff. Update from there with: git log 85d36d4..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -145,6 +145,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **TrackMate:** default tracker in the exported XML, so the TrackMate wizard can be navigated back
 - **TrackMate:** dimension mappings for the new properties
 - **GEFF:** `tracklets` argument to `write_geff()`, to write the tracklets (the cell cycles) in a `tracklet_id` cell property declared as the GEFF tracklet property. Like `cycle_id`, a tracklet is identified by the ID of its last cell. The tracklets are computed at export from the cell lineages, so they don't need cycle lineages and are always up to date
+- **GEFF:** `propagate_cycle_props` argument to `write_geff()`, as in `write_trackmate_xml()`, to write the cycle properties on the cells of the file without changing the model
 - **CTC:** `frame_offset` argument to `write_ctc()`, the frame of timepoint 0, added to the timepoints of the cells to give their CTC frames. Timepoints start at 0 at the earliest cell, so data that starts at a later frame, e.g. a CTC file whose first frame is 5, was exported from frame 0, out of line with its images. Pass that first frame, or in general the frame of any cell minus its timepoint
 - **trackpy:** `reference_time_prop` argument to `from_trackpy()`, to name the time property it builds from the frames
 - **Dependencies:** `notebooks` extra with what the example notebooks need: JupyterLab, ipykernel, and nbformat, without which Plotly can't show figures in notebooks. Install it with `pip install "pycellin[notebooks]"`
@@ -216,7 +217,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **GEFF:** the exporter didn't write the metadata of properties with several types (`LINEAGE | NODE`, `LINEAGE | EDGE`)
 - **GEFF:** the exporter failed with a `RuntimeError` that named no property on cell or link properties whose data type GEFF can't store, such as `cells` after `propagate_cycle_properties()` or TrackMate features loaded with the `unknown` data type, and on None values. Such properties are now skipped with a warning naming them, and None values are written as missing values
 - **GEFF:** the exporter declared `cycle_id` (`cycle_ID` in 0.5.1) as the tracklet property of every model with cycle lineages, but cells only have it once propagated, so most files declared tracklets they didn't contain. Even propagated, the values could be out of date or repeated across lineages (e.g. after `merge()`), which fails geff's tracklet validation. A tracklet property is now only declared with `tracklets=True`, which writes its own `tracklet_id` property
-- **GEFF:** on every export of a model with cycle lineages, the exporter warned that the cycle properties had "no corresponding data" and "will be removed from the model metadata". They do have values, they just aren't exported, and the model keeps them. The warning now says that, and how to export them with `propagate_cycle_properties()`. Properties without any value, e.g. those that TrackMate declares without using them, only get an INFO message now, and lineage properties, which are never exported, no message at all
+- **GEFF:** on every export of a model with cycle lineages, the exporter warned that the cycle properties had "no corresponding data" and "will be removed from the model metadata". They do have values, they just aren't exported, and the model keeps them. The warning now says that, and how to export them with `propagate_cycle_props=True`. Properties without any value, e.g. those that TrackMate declares without using them, only get an INFO message now, and lineage properties, which are never exported, no message at all
 - **CTC:** the loader gave cells no `timepoint`, although it was the reference time property, and no `lineage_id`
 - **CTC:** the loader failed on labels with holes or made of several pieces. Their contour is now the outline of the largest piece, holes filled, and a warning lists them
 - **CTC:** loading label images (`labels_path`):

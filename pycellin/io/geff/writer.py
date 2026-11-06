@@ -599,6 +599,7 @@ def write_geff(
     space_axes: list[str] | None = None,
     channel_axes: list[str] | None = None,
     tracklets: bool = False,
+    propagate_cycle_props: bool = False,
     zarr_format: Literal[2, 3] = 2,
 ) -> Model:
     """
@@ -638,6 +639,11 @@ def write_geff(
         lineages, so they don't need cycle lineages and are always up to date. An
         existing 'tracklet_id' cell property is replaced in the GEFF file, with a
         warning if some of its values differ. Default is False.
+    propagate_cycle_props : bool, optional
+        If True, cycle properties will be propagated to cell lineages before export,
+        on the copy of the model. Useful if you want to export the cycle properties
+        to GEFF, which has no cycle lineages. Default is False: cycle properties are
+        not exported, and a warning names them.
     zarr_format : Literal[2, 3], optional
         The Zarr format version to use for the GEFF file. Default is 2.
 
@@ -656,20 +662,32 @@ def write_geff(
         If the model contains no lineage data.
         If `tracklets` is True and the model has a 'tracklet_id' property that
         isn't only a cell property.
+        If `propagate_cycle_props` is True and the model has no cycle lineages.
     RuntimeError
         If the GEFF export process fails.
+
+    Warnings
+    --------
+    Quantitative analysis of cell cycle properties should not be done on cell
+    lineages after propagation of cycle properties, UNLESS you account for the
+    number of cells in each cell cycle (`cycle_num_cells`). Otherwise you will
+    introduce a bias in your quantification.
+    Indeed, after propagation, cycle properties (like interdivision time) become
+    over-represented in long cell cycles since these properties are propagated on each
+    node of the cell cycle in cell lineages, whereas they are stored only once
+    per cell cycle on the cycle node in cycle lineages.
 
     Notes
     -----
     Only cell and link properties are exported: lineage properties are not, and
-    cycle properties only once propagated to the cells with
-    `Model.propagate_cycle_properties()`, with a warning naming those left out. A
-    propagated 'cycle_id' is written like any other property: use `tracklets=True`
-    to declare the tracklets in the GEFF file. Properties whose data type GEFF
-    cannot store, such as `list[int]` or shapely geometries, are not exported
-    either, and a warning names them. Properties without any value, e.g. those that
-    TrackMate declares without using them, are left out as well. None values are
-    written as missing values. Properties with a variable length, such as
+    cycle properties only once propagated to the cells, with `propagate_cycle_props`
+    or `Model.propagate_cycle_properties()`. A warning names the cycle properties
+    left out. A propagated 'cycle_id' is written like any other property: use
+    `tracklets=True` to declare the tracklets in the GEFF file. Properties whose
+    data type GEFF cannot store, such as `list[int]` or shapely geometries, are not
+    exported either, and a warning names them. Properties without any value, e.g.
+    those that TrackMate declares without using them, are left out as well. None
+    values are written as missing values. Properties with a variable length, such as
     `cell_contour`, need nothing special: geff detects them from their values.
     """
     _check_up_to_date(model)
@@ -684,10 +702,12 @@ def write_geff(
                 "property. Rename it, or export with tracklets=False."
             )
 
-    try:
-        # We don't want to modify the original model.
-        model_copy = copy.deepcopy(model)
+    # We don't want to modify the original model.
+    model_copy = copy.deepcopy(model)
+    if propagate_cycle_props:
+        model_copy.propagate_cycle_properties()
 
+    try:
         # GEFF can store neither some data types nor None values.
         _remove_unsupported_props(model_copy)
         _remove_none_values(model_copy)

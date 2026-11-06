@@ -119,7 +119,11 @@ pc.write_trackmate_xml(
 )
 
 # ... or to another file format.
-pc.write_geff(model, "sample_data/Ecoli_growth_on_agar_pad_enriched.geff")
+pc.write_geff(
+    model,
+    "sample_data/Ecoli_growth_on_agar_pad_enriched.geff",
+    propagate_cycle_props=True,
+)
 ```
 
 

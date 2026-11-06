@@ -645,8 +645,7 @@ class TestRemoveOrphanedMetadata:
 
         warning = (
             "Cycle properties are not exported: cycle_edge_prop, cycle_node_prop. "
-            "Use model.propagate_cycle_properties() before the export to write "
-            "them on the cells."
+            "Use propagate_cycle_props=True to write them on the cells."
         )
         assert [(record.levelname, record.message) for record in caplog.records] == [
             ("WARNING", warning),
