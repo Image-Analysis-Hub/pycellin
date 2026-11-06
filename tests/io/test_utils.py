@@ -499,7 +499,9 @@ class TestGetPropsFromData:
 
     def test_get_props_from_data(self, model):
         """Test extracting properties from model data."""
-        node_props, edge_props, lineage_props = _get_props_from_data(model)
+        node_props, edge_props, lineage_props = _get_props_from_data(
+            model.data.cell_lineages.values()
+        )
 
         assert "timepoint" in node_props
         assert "cell_x" in node_props
@@ -517,7 +519,9 @@ class TestGetPropsFromData:
         data = Data({})
         model = Model(data=data, reference_time_prop="timepoint")
 
-        node_props, edge_props, lineage_props = _get_props_from_data(model)
+        node_props, edge_props, lineage_props = _get_props_from_data(
+            model.data.cell_lineages.values()
+        )
 
         assert len(node_props) == 0
         assert len(edge_props) == 0
@@ -572,17 +576,18 @@ class TestRemoveOrphanedMetadata:
 
     def test_remove_orphaned_metadata(self, caplog, model_with_orphaned_metadata):
         """Test removing orphaned properties from metadata."""
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.utils"):
             _remove_orphaned_metadata(model_with_orphaned_metadata)
-        assert len(caplog.records) == 3
-        assert caplog.records[0].levelname == "WARNING"
-        assert "Node metadata with no corresponding data" in caplog.records[0].message
-        assert caplog.records[1].levelname == "WARNING"
-        assert "Edge metadata with no corresponding data" in caplog.records[1].message
-        assert caplog.records[2].levelname == "WARNING"
-        assert (
-            "Lineage metadata with no corresponding data" in caplog.records[2].message
-        )
+        assert [(record.levelname, record.message) for record in caplog.records] == [
+            (
+                "INFO",
+                "Ignoring property without any value on cells: orphaned_node_prop.",
+            ),
+            (
+                "INFO",
+                "Ignoring property without any value on links: orphaned_edge_prop.",
+            ),
+        ]
 
         node_props = (
             model_with_orphaned_metadata.props_metadata._get_prop_dict_from_prop_type(
@@ -610,6 +615,51 @@ class TestRemoveOrphanedMetadata:
         assert "cell_x" in node_props
         assert "link_x" in edge_props
         assert "lineage_id" in lineage_props
+
+    def test_values_on_cycle_lineages(self, caplog, model):
+        """Test that a warning only names the properties with values on cycles."""
+        for prop_id, prop_type in (
+            ("cycle_node_prop", "node"),
+            ("cycle_edge_prop", "edge"),
+            ("empty_node_prop", "node"),
+            ("empty_edge_prop", "edge"),
+        ):
+            model.props_metadata._add_prop(
+                Property(
+                    identifier=prop_id,
+                    name=prop_id,
+                    description="This doesn't exist in cell data",
+                    provenance="Test",
+                    prop_type=prop_type,
+                    lineage_type="cycle",
+                    dtype="float",
+                )
+            )
+        cycle_lineage = nx.DiGraph()
+        cycle_lineage.add_edge(0, 1, cycle_edge_prop=1.0)
+        cycle_lineage.nodes[0]["cycle_node_prop"] = 1.0
+        model.data.cycle_lineages = {0: cycle_lineage}
+
+        with caplog.at_level(logging.INFO, logger="pycellin.io.utils"):
+            _remove_orphaned_metadata(model)
+
+        warning = (
+            "Cycle properties are not exported: cycle_edge_prop, cycle_node_prop. "
+            "Use model.propagate_cycle_properties() before the export to write "
+            "them on the cells."
+        )
+        assert [(record.levelname, record.message) for record in caplog.records] == [
+            ("WARNING", warning),
+            ("INFO", "Ignoring property without any value on cells: empty_node_prop."),
+            ("INFO", "Ignoring property without any value on links: empty_edge_prop."),
+        ]
+        for prop_id in (
+            "cycle_node_prop",
+            "cycle_edge_prop",
+            "empty_node_prop",
+            "empty_edge_prop",
+        ):
+            assert not model.props_metadata._has_prop(prop_id)
 
     def test_orphaned_data(self, model_with_orphaned_data):
         """Test that metadata are unchanged when orphaned data properties are
@@ -693,11 +743,11 @@ class TestRemoveOrphanedMetadata:
             lin2_node_lin_id=False,
             lin2_graph_lin_id=True,
         )
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.utils"):
             _remove_orphaned_metadata(model)
         assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "Node metadata with no corresponding data" in caplog.records[0].message
+        assert caplog.records[0].levelname == "INFO"
+        assert "without any value on cells: lineage_id" in caplog.records[0].message
 
         node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
         lineage_props = model.props_metadata._get_prop_dict_from_prop_type("lineage")
@@ -716,13 +766,9 @@ class TestRemoveOrphanedMetadata:
             lin2_graph_lin_id=False,
         )
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.utils"):
             _remove_orphaned_metadata(model)
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert (
-            "Lineage metadata with no corresponding data" in caplog.records[0].message
-        )
+        assert not caplog.records
 
         node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
         lineage_props = model.props_metadata._get_prop_dict_from_prop_type("lineage")
@@ -740,15 +786,11 @@ class TestRemoveOrphanedMetadata:
             lin2_node_lin_id=False,
             lin2_graph_lin_id=False,
         )
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.utils"):
             _remove_orphaned_metadata(model)
-        assert len(caplog.records) == 2
-        assert caplog.records[0].levelname == "WARNING"
-        assert "Node metadata with no corresponding data" in caplog.records[0].message
-        assert caplog.records[1].levelname == "WARNING"
-        assert (
-            "Lineage metadata with no corresponding data" in caplog.records[1].message
-        )
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "INFO"
+        assert "without any value on cells: lineage_id" in caplog.records[0].message
 
 
 class TestSplitGraphIntoLineages:

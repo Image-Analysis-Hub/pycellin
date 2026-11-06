@@ -214,25 +214,27 @@ def _identify_frame_prop(model: Model) -> str:
     return frame_prop
 
 
-def _get_props_from_data(model: Model) -> tuple[set[str], set[str], set[str]]:
+def _get_props_from_data(
+    lineages: Iterable[nx.DiGraph],
+) -> tuple[set[str], set[str], set[str]]:
     """
-    Collect all property keys present in the model's data.
+    Collect all property keys present in lineages.
 
     Parameters
     ----------
-    model : Model
-        The pycellin model to scan.
+    lineages : Iterable[nx.DiGraph]
+        The cell or cycle lineages to scan.
 
     Returns
     -------
     tuple[set[str], set[str], set[str]]
-        Sets of node, edge, and lineage property keys found in the data.
+        Sets of node, edge, and lineage property keys found in the lineages.
     """
     node_props_data = set()
     edge_props_data = set()
     lineage_props_data = set()
 
-    for lineage in model.data.cell_lineages.values():
+    for lineage in lineages:
         for node in lineage.nodes:
             node_props_data.update(lineage.nodes[node].keys())
         for edge in lineage.edges:
@@ -263,7 +265,7 @@ def _graph_has_node_prop(graph: nx.Graph, key: str) -> bool:
 
 def _remove_orphaned_metadata(model: Model) -> None:
     """
-    Remove properties from metadata that are not present in any lineage.
+    Remove properties from metadata that are not present in any cell lineage.
 
     If a multitype property has some of its types with no corresponding data,
     only the types with no data will be removed from the property. If all types
@@ -278,6 +280,13 @@ def _remove_orphaned_metadata(model: Model) -> None:
     ----------
     model : Model
         The pycellin model to update.
+
+    Warns
+    -----
+    If some of the cell and link properties removed have values on the cycle
+    lineages, since an export leaves these values out. Properties without any value
+    only get an info message, as nothing is lost, and lineage properties no message,
+    as they are not exported anyway.
     """
     node_props_md = model.props_metadata._get_prop_dict_from_prop_type(
         PropertyType.NODE
@@ -288,11 +297,40 @@ def _remove_orphaned_metadata(model: Model) -> None:
     lineage_props_md = model.props_metadata._get_prop_dict_from_prop_type(
         PropertyType.LINEAGE
     ).keys()
-    node_props_data, edge_props_data, lineage_props_data = _get_props_from_data(model)
+    node_props_data, edge_props_data, lineage_props_data = _get_props_from_data(
+        model.data.cell_lineages.values()
+    )
+    cycle_node_props, cycle_edge_props, _ = _get_props_from_data(
+        (model.data.cycle_lineages or {}).values()
+    )
 
-    orphaned_node_props = list(node_props_md - node_props_data)
-    orphaned_edge_props = list(edge_props_md - edge_props_data)
-    orphaned_lineage_props = list(lineage_props_md - lineage_props_data)
+    orphaned_node_props = sorted(node_props_md - node_props_data)
+    orphaned_edge_props = sorted(edge_props_md - edge_props_data)
+    orphaned_lineage_props = sorted(lineage_props_md - lineage_props_data)
+
+    not_exported = sorted(
+        (cycle_node_props & set(orphaned_node_props))
+        | (cycle_edge_props & set(orphaned_edge_props))
+    )
+    if not_exported:
+        plural = len(not_exported) > 1
+        logger.warning(
+            f"Cycle propert{'ies are' if plural else 'y is'} not exported: "
+            f"{', '.join(not_exported)}. Use model.propagate_cycle_properties() "
+            f"before the export to write {'them' if plural else 'it'} on the cells.",
+            stacklevel=2,
+        )
+    for location, orphaned_props, cycle_props in (
+        ("cells", orphaned_node_props, cycle_node_props),
+        ("links", orphaned_edge_props, cycle_edge_props),
+    ):
+        without_value = [prop for prop in orphaned_props if prop not in cycle_props]
+        if without_value:
+            logger.info(
+                f"Ignoring propert{'ies' if len(without_value) > 1 else 'y'} without "
+                f"any value on {location}: {', '.join(without_value)}.",
+                stacklevel=2,
+            )
 
     mapping = {
         "node": orphaned_node_props,
@@ -301,11 +339,6 @@ def _remove_orphaned_metadata(model: Model) -> None:
     }
     for prop_type_str, orphaned_props in mapping.items():
         if orphaned_props:
-            logger.warning(
-                f"{prop_type_str.capitalize()} metadata with no corresponding data: "
-                f"{orphaned_props}. They will be removed from the model metadata.",
-                stacklevel=2,
-            )
             prop_type = _property_type_from_string(prop_type_str)
             protected = [
                 prop_id

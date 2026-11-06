@@ -663,11 +663,13 @@ def write_geff(
     -----
     Only cell and link properties are exported: lineage properties are not, and
     cycle properties only once propagated to the cells with
-    `Model.propagate_cycle_properties()`. A propagated 'cycle_id' is written like
-    any other property: use `tracklets=True` to declare the tracklets in the GEFF
-    file. Properties whose data type GEFF cannot store, such as `list[int]` or
-    shapely geometries, are not exported either, and a warning names them. None
-    values are written as missing values. Properties with a variable length, such as
+    `Model.propagate_cycle_properties()`, with a warning naming those left out. A
+    propagated 'cycle_id' is written like any other property: use `tracklets=True`
+    to declare the tracklets in the GEFF file. Properties whose data type GEFF
+    cannot store, such as `list[int]` or shapely geometries, are not exported
+    either, and a warning names them. Properties without any value, e.g. those that
+    TrackMate declares without using them, are left out as well. None values are
+    written as missing values. Properties with a variable length, such as
     `cell_contour`, need nothing special: geff detects them from their values.
     """
     _check_up_to_date(model)
