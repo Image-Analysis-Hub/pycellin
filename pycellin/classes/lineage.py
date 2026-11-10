@@ -1435,8 +1435,12 @@ class CellLineage(Lineage):
             }
             conflicting_ids = set(self.nodes()) & set(target_descendants)
             if conflicting_ids:
+                # New IDs must not be used by the cells moved either, or relabeling
+                # would merge two cells.
                 next_id = self._get_next_available_node_id()
                 for id in conflicting_ids:
+                    while next_id in target_descendants:
+                        next_id += 1
                     ids_mapping[id] = next_id
                     next_id += 1
 

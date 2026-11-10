@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 54578bb, plus the uncommitted fix of the NetworkXUnfeasible crashes. Update from there with: git log 54578bb..dev -->
+<!-- Planned v0.6.0. Covers commits up to 57668af, plus the uncommitted fix of add_link() losing cells. Update from there with: git log 57668af..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -191,6 +191,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** TrackMate and GEFF data where separate cells merge, i.e. a cell fusion that gives its lineage several roots, couldn't be loaded: the loaders failed with an `UpdateRequiredError` about root nodes, which didn't mention fusions. Like other fusions, they are now loaded with a warning, and `get_fusions()` and `remove_link()` can be used to correct them
 - **Model:** the `FusionError` of `get_cell_cycle()`, and so of `get_cell_cycles()` and `add_cycle_lineages()` (`add_cycle_data()` in 0.5.1), could name the wrong cell: the cell it started from instead of the one with several parents
 - **Model:** the `FusionError` of `add_link()` between two lineages named the source lineage, although the cell it was about is in the target lineage. It also said this cell had more than one parent, when it had one and the link was refused
+- **Model:** `add_link()` between two lineages with cell IDs in common, e.g. with the default IDs of `add_cell()` or after the new `relabel_cells()`, could lose cells. The cells of the target lineage given a new ID, to avoid the IDs of the source lineage, could get the ID of another of the cells moved and merge with it: `add_link()` then failed with an unclear error after removing the cells from the target lineage, or silently kept one cell instead of two. New IDs now skip the IDs of the cells moved too
 - **Properties:** `turning_angle` (`angle` in 0.5.1), `absolute_age` and `relative_age` were recomputed for every lineage at each update, as their calculators were global instead of local
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells
 - **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning

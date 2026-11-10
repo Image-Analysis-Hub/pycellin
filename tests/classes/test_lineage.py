@@ -1169,6 +1169,27 @@ class TestCellLineageAddLink:
         assert cell_lin.nodes[2]["cell_id"] == 2
         assert cell_lin.nodes[2]["timepoint"] == 1
 
+    def test_new_ids_used_by_target_lineage(self, cell_lin):
+        """Test _add_link when the next free IDs of the source lineage are used by the
+        target lineage."""
+        new_lin = CellLineage(lineage_id=2)
+        new_lin.add_node(5, timepoint=1, cell_id=5)
+        new_lin.add_node(17, timepoint=2, cell_id=17)
+        new_lin.add_edge(5, 17)
+        ids_mapping = cell_lin._add_link(1, 5, target_lineage=new_lin)
+        # 17 would be the next free ID of the source lineage, but cell 17 is moved too.
+        assert ids_mapping == {5: 18}
+        assert len(new_lin.nodes) == 0
+        assert cell_lin.has_edge(1, 18)
+        assert cell_lin.has_edge(18, 17)
+        assert cell_lin.nodes[18]["cell_id"] == 18
+        assert cell_lin.nodes[18]["timepoint"] == 1
+        assert cell_lin.nodes[17]["cell_id"] == 17
+        assert cell_lin.nodes[17]["timepoint"] == 2
+        # Cell 5 is untouched.
+        assert cell_lin.nodes[5]["cell_id"] == 5
+        assert cell_lin.nodes[5]["timepoint"] == 4
+
     def test_same_ids(self, cell_lin):
         """Test _add_link between different lineages with the same single ID."""
         new_lin = CellLineage(lineage_id=2)
