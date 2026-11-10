@@ -26,6 +26,8 @@ from pycellin.custom_types import PropertyType
 from pycellin.exceptions import ProtectedPropertyError
 from pycellin.io.utils import (
     _check_up_to_date,
+    _get_cycle_props_message,
+    _get_props_from_data,
     _identify_frame_prop,
     _relabel_nodes_in_place,
     _update_node_prop_key,
@@ -860,6 +862,46 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
         logger.warning(msg)
 
 
+def _warn_cycle_props_left_out(model: Model) -> None:
+    """
+    Warn about the cycle properties that the export leaves out, if any.
+
+    Only the properties of cell lineages are exported, see
+    _write_FeatureDeclarations(), so cycle properties are left out unless they were
+    propagated to the cells first. As for GEFF, the properties named are the cell
+    and link properties with values on cycle lineages only.
+
+    Parameters
+    ----------
+    model : Model
+        Model to export, after the propagation of cycle properties, if any.
+
+    Warns
+    -----
+    If some cell or link properties have values on cycle lineages only.
+    """
+    if not model.data.cycle_lineages:
+        return
+    cycle_node_props, cycle_edge_props, _ = _get_props_from_data(
+        model.data.cycle_lineages.values()
+    )
+    cell_node_props, cell_edge_props, _ = _get_props_from_data(
+        model.data.cell_lineages.values()
+    )
+    node_props_md = model.props_metadata._get_prop_dict_from_prop_type(
+        PropertyType.NODE
+    ).keys()
+    edge_props_md = model.props_metadata._get_prop_dict_from_prop_type(
+        PropertyType.EDGE
+    ).keys()
+    left_out = sorted(
+        ((node_props_md & cycle_node_props) - cell_node_props)
+        | ((edge_props_md & cycle_edge_props) - cell_edge_props)
+    )
+    if left_out:
+        logger.warning(_get_cycle_props_message(left_out))
+
+
 def _remove_non_numeric_props(model: Model) -> None:
     """
     Completely remove non-numeric properties from the model.
@@ -873,7 +915,9 @@ def _remove_non_numeric_props(model: Model) -> None:
     -----
     If some properties are not numeric and will not be exported to TrackMate.
     This is the case for properties with string, list, or other non-numeric
-    values that TrackMate cannot handle.
+    values that TrackMate cannot handle. Cycle properties that were not
+    propagated are removed without being named, since they are not exported
+    anyway.
 
     Notes
     -----
@@ -894,19 +938,28 @@ def _remove_non_numeric_props(model: Model) -> None:
         if name != "name" or model.get_property(name).prop_type == PropertyType.EDGE
     ]
     if to_remove:
+        # Cycle properties are not exported anyway, see _write_FeatureDeclarations(),
+        # and _warn_cycle_props_left_out() names those with values. Once propagated,
+        # they have the lineage type "both".
+        to_name = [
+            name
+            for name in to_remove
+            if model.get_property(name).lineage_type != "cycle"
+        ]
         for name in to_remove:
             try:
                 model.remove_property(name)
             except ProtectedPropertyError:
                 model.props_metadata._unprotect_prop(name)
                 model.remove_property(name)
-        plural = len(to_remove) > 1
-        msg = (
-            f"Ignoring propert{'ies' if plural else 'y'}: "
-            f"{', '.join(to_remove)}. {'They are' if plural else 'It is'} "
-            f"not numeric and won't be supported by TrackMate."
-        )
-        logger.warning(msg)
+        if to_name:
+            plural = len(to_name) > 1
+            msg = (
+                f"Ignoring propert{'ies' if plural else 'y'}: "
+                f"{', '.join(to_name)}. {'They are' if plural else 'It is'} "
+                f"not numeric and won't be supported by TrackMate."
+            )
+            logger.warning(msg)
 
 
 def _rename_props(props_md: PropsMetadata, frame_prop: str) -> None:
@@ -1253,6 +1306,7 @@ def _prepare_model_for_export(
     _relabel_nodes(model)  # TrackMate needs unique spot IDs across all lineages
     if propagate:
         model.propagate_cycle_properties()
+    _warn_cycle_props_left_out(model)
 
     frame_prop = _identify_frame_prop(model)
     _add_radius_prop(model)
@@ -1461,7 +1515,8 @@ def write_trackmate_xml(
         If True, cycle properties will be propagated to cell lineages before export.
         Useful if you want to export the cycle properties to TrackMate
         and have them accessible in the tracks. Default is False: cycle properties
-        are not exported, since TrackMate has no cycle lineages.
+        are not exported, since TrackMate has no cycle lineages, and a warning names
+        them.
 
     Returns
     -------

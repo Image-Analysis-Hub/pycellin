@@ -593,6 +593,53 @@ class TestWriteTrackmateXml:
         pairs = model.to_cycle_pair_dataframe("mother_cycle")
         assert sorted(zip(pairs["cycle_id_1"], pairs["cycle_id_2"])) == [(5, 4), (8, 4)]
 
+    def test_cycle_props_left_out_by_default(
+        self, tmp_path, model_with_cycle_lineages, caplog
+    ):
+        """Test that a warning names the cycle properties left out and how to export
+        them, and that the non-numeric ones are not named as unsupported."""
+        xml_path = tmp_path / "model.xml"
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"):
+            write_trackmate_xml(
+                model_with_cycle_lineages,
+                xml_path,
+                space_unit="pixel",
+                time_unit="frame",
+            )
+
+        messages = [record.message for record in caplog.records]
+        warning = (
+            "Cycle properties are not exported: cells, cycle_duration, "
+            "cycle_end_time, cycle_id, cycle_num_cells, cycle_start_time, first_cell, "
+            "generation, last_cell, mother_cycle. Use propagate_cycle_props=True to "
+            "write them on the cells."
+        )
+        assert warning in messages
+        assert not any("not numeric" in message for message in messages)
+
+    def test_propagated_cycle_props_not_named_as_left_out(
+        self, tmp_path, model_with_cycle_lineages, caplog
+    ):
+        """Test that propagated cycle properties are not named as left out, and that
+        the non-numeric ones are named as unsupported."""
+        xml_path = tmp_path / "model.xml"
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"):
+            write_trackmate_xml(
+                model_with_cycle_lineages,
+                xml_path,
+                space_unit="pixel",
+                time_unit="frame",
+                propagate_cycle_props=True,
+            )
+
+        messages = [record.message for record in caplog.records]
+        assert not any("Cycle propert" in message for message in messages)
+        warning = (
+            "Ignoring property: cells. It is not numeric and won't be supported by "
+            "TrackMate."
+        )
+        assert warning in messages
+
     def test_model_requiring_update_raises(self, tmp_path, simple_model):
         """Test that a model requiring an update is not exported."""
         simple_model.prepare_full_data_update()

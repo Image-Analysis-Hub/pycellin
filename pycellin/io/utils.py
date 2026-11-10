@@ -291,6 +291,28 @@ def _relabel_nodes_in_place(graph: nx.Graph, mapping: dict[int, int]) -> None:
         nx.relabel_nodes(graph, final_mapping, copy=False)
 
 
+def _get_cycle_props_message(props: list[str]) -> str:
+    """
+    Return the warning about the cycle properties left out of an export.
+
+    Parameters
+    ----------
+    props : list[str]
+        The identifiers of the cycle properties left out, at least one.
+
+    Returns
+    -------
+    str
+        The warning, which also says how to export these properties.
+    """
+    plural = len(props) > 1
+    return (
+        f"Cycle propert{'ies are' if plural else 'y is'} not exported: "
+        f"{', '.join(props)}. Use propagate_cycle_props=True to write "
+        f"{'them' if plural else 'it'} on the cells."
+    )
+
+
 def _remove_orphaned_metadata(model: Model) -> None:
     """
     Remove properties from metadata that are not present in any cell lineage.
@@ -341,13 +363,7 @@ def _remove_orphaned_metadata(model: Model) -> None:
         | (cycle_edge_props & set(orphaned_edge_props))
     )
     if not_exported:
-        plural = len(not_exported) > 1
-        logger.warning(
-            f"Cycle propert{'ies are' if plural else 'y is'} not exported: "
-            f"{', '.join(not_exported)}. Use propagate_cycle_props=True to write "
-            f"{'them' if plural else 'it'} on the cells.",
-            stacklevel=2,
-        )
+        logger.warning(_get_cycle_props_message(not_exported), stacklevel=2)
     for location, orphaned_props, cycle_props in (
         ("cells", orphaned_node_props, cycle_node_props),
         ("links", orphaned_edge_props, cycle_edge_props),
