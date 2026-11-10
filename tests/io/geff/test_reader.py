@@ -2068,6 +2068,25 @@ class TestEnsureValidCellID:
         assert g.nodes[10] == {"id": 10, "geff_cell_id": 0}
         assert g.nodes[11] == {"id": 11, "geff_cell_id": 0}
 
+    def test_cell_ids_swapping_node_keys(self):
+        """When values swap node keys, which NetworkX refuses in place, relabel."""
+        g = nx.DiGraph()
+        g.add_node(0, id=1, frame=0)
+        g.add_node(1, id=0, frame=1)
+        g.add_node(2, id=2, frame=2)
+        g.add_edge(0, 1, length=1.0)
+        g.add_edge(1, 2, length=2.0)
+
+        result = _ensure_valid_cell_id(g, "id", {})
+
+        assert result == "id"
+        assert dict(g.nodes(data=True)) == {
+            0: {"id": 0, "frame": 1},
+            1: {"id": 1, "frame": 0},
+            2: {"id": 2, "frame": 2},
+        }
+        assert sorted(g.edges(data="length")) == [(0, 2, 2.0), (1, 0, 1.0)]
+
     def test_empty_graph(self):
         """When graph is empty, return the cell_id_key without modification."""
         g = nx.Graph()

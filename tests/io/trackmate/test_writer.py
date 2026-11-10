@@ -424,6 +424,26 @@ class TestRelabelNodes:
         assert len(original_ids) == len(new_ids)
         assert len(new_ids) == len(set(new_ids))
 
+    def test_ids_forming_a_loop(self, model_non_unique_ids):
+        """Test old and new IDs forming a loop, which NetworkX refuses in place."""
+        lin = CellLineage()
+        lin.add_node(1, timepoint=1, cell_x=1.0, cell_y=1.5, lineage_id=0, cell_id=1)
+        lin.add_node(0, timepoint=0, cell_x=0.0, cell_y=0.5, lineage_id=0, cell_id=0)
+        lin.add_edge(0, 1)
+        lin.graph["lineage_id"] = 0
+        model_non_unique_ids.data.cell_lineages[0] = lin
+
+        mapping = _relabel_nodes(model_non_unique_ids)
+
+        # New IDs follow the order of the nodes: cells 0 and 1 swap their IDs.
+        assert mapping[0] == {1: 0, 0: 1}
+        relabeled = model_non_unique_ids.data.cell_lineages[0]
+        assert list(relabeled.edges) == [(1, 0)]
+        for node, old_id, cell_x in ((0, 1, 1.0), (1, 0, 0.0)):
+            assert relabeled.nodes[node]["cell_id"] == node
+            assert relabeled.nodes[node]["pycellin_cell_id"] == old_id
+            assert relabeled.nodes[node]["cell_x"] == cell_x
+
     def test_cell_name_updated(self, model_non_unique_ids):
         """Test that cell_name property is updated to "ID{node}"."""
         for lin in model_non_unique_ids.data.cell_lineages.values():

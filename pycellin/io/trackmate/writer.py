@@ -27,6 +27,7 @@ from pycellin.exceptions import ProtectedPropertyError
 from pycellin.io.utils import (
     _check_up_to_date,
     _identify_frame_prop,
+    _relabel_nodes_in_place,
     _update_node_prop_key,
 )
 from pycellin.utils import _is_numeric_dtype, _normalize_dtype
@@ -1188,7 +1189,7 @@ def _relabel_nodes(model) -> dict[int, dict[int, int]]:
         for node in lin.nodes():
             mapping[node] = new_id
             new_id += 1
-        nx.relabel_nodes(lin, mapping, copy=False)
+        _relabel_nodes_in_place(lin, mapping)
 
         # The relabeling must be propagated to the cell_id property.
         for node in lin.nodes():

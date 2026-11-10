@@ -27,6 +27,7 @@ from pycellin.io.utils import (
     _check_fusions,
     _get_int_ids,
     _graph_has_node_prop,
+    _relabel_nodes_in_place,
     _split_graph_into_lineages,
     _update_edge_prop_key,
     _update_lineage_prop_key,
@@ -1209,7 +1210,7 @@ def _ensure_valid_cell_id(
     elif cell_id_key != "cell_id":
         _rename_reserved_prop(geff_graph, props_md, "cell_id")
     mapping = {node: geff_graph.nodes[node][cell_id_key] for node in geff_graph.nodes}
-    nx.relabel_nodes(geff_graph, mapping, copy=False)
+    _relabel_nodes_in_place(geff_graph, mapping)
     return cell_id_key
 
 
