@@ -6803,20 +6803,6 @@ class Model:
             return []
         return [int(value)]
 
-    # def export(self, path: str, format: str) -> None:
-    #     """
-    #     Export the model to a file in a specific format (e.g. TrackMate).
-
-    #     Parameters
-    #     ----------
-    #     path : str
-    #         Path to export the model.
-    #     format : str
-    #         Format of the exported file.
-    #     """
-    #     # TODO: implement
-    #     pass
-
     def get_mean_over_time_figure(
         self,
         y_prop: str,

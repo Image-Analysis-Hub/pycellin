@@ -1657,39 +1657,3 @@ class RodLength(NodeLocalPropCalculator):
 #     for lin in lineages:
 #         for node in lin.nodes:
 #             lin.nodes[node]["AREA_INCREMENT"] = get_area_increment(node, lin)
-
-
-if __name__ == "__main__":
-    import itertools
-    import math
-
-    from shapely.geometry import Polygon
-
-    from pycellin.io.trackmate import read_trackmate_xml
-
-    xml = "sample_data/FakeTracks.xml"
-
-    model = read_trackmate_xml(xml, lone_spots="all", tracks="all")
-    lineage = model.data.cell_lineages[0]
-    # print(lineage.nodes[2004]["cell_contour"])
-    node = 2035
-    print(lineage.nodes[node]["area"])
-
-    # Shapely
-    roi = Polygon(lineage.nodes[node]["cell_contour"])
-    print(roi.area)
-
-    # Shoelace formula
-    vertices = lineage.nodes[node]["cell_contour"]
-    border = vertices + [vertices[0]]
-    area = sum(
-        [p1[0] * p2[1] - p1[1] * p2[0] for (p1, p2) in itertools.pairwise(border)]
-    )
-    print(abs(area) / 2)
-
-    # Perimeter shapely vs by hand
-    print(roi.length)
-    print(sum([math.dist(p1, p2) for (p1, p2) in itertools.pairwise(border)]))
-
-    # print(lineage.nodes[node]["location"])
-    # print(roi.centroid)

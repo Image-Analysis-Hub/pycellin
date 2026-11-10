@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 9546f8f, plus the uncommitted TrackMate warning about cycle properties. Update from there with: git log 9546f8f..dev -->
+<!-- Planned v0.6.0. Covers commits up to 35af630, plus the uncommitted removal of the morphology demo. Update from there with: git log 35af630..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -251,6 +251,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Docs:** use the `pc` alias consistently in the README and notebooks, update and re-run the notebooks, remove the unfinished "Creating a model from scratch" and "Working with TrackMate data" notebooks (the latter covered by "Getting started") and the State column of the README notebook table, explain when a calculator should be local or global, and replace `angle` with `turning_angle` in the examples of "Managing properties"
 - **Docs:** expand the README: what a cycle lineage is, what pycellin can do, how to upgrade from 0.5.1, what to do with cell fusions, and credits for GEFF and the _C. elegans_ and FakeTracks sample data
 - **Properties:** make the `is_complete_cycle` calculator local, since it only reads its own lineage. Its values and update cost are unchanged
+- **Properties:** remove the `__main__` demo of `morphology.py`, a one-off check of the area and perimeter computations that failed with `KeyError`
 - **Packaging:** find packages automatically in `pyproject.toml`
 - **Packaging:** declare the license as an SPDX expression (`BSD-3-Clause`) instead of the deprecated classifier. Building pycellin now needs setuptools >= 77
 - **Packaging:** between releases, the version on `dev` ends with `.dev0` (e.g. `0.6.0.dev0`), so models made with development code say so in their `pycellin_version` metadata
