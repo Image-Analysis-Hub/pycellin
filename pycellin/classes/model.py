@@ -4629,8 +4629,7 @@ class Model:
 
     def add_location_tag(
         self,
-        mask_path_metadata_field: str | None = None,
-        mask_path: str | None = None,
+        mask_path: str,
         tag_names: dict[int, str] | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
@@ -4653,10 +4652,7 @@ class Model:
 
         Parameters
         ----------
-        mask_path_metadata_field: str, optional
-            Name of the model metadata field that contains the path to the mask
-            image (str).
-        mask_path : str, optional
+        mask_path : str
             Path to the mask image (tif stack) that defines the location tags.
             The mask must be a tif stack where each pixel value represents a
             location tag. The first frame/slice of the mask image must correspond to
@@ -4678,16 +4674,7 @@ class Model:
         Raises
         ------
         ValueError
-            If neither `mask_path_metadata_field` nor `mask_path` are provided.
-        ValueError
-            If the specified mask metadata field is None and no mask path is provided.
-        ValueError
-            If the specified mask metadata field is a string (path to mask) but does not
-            match the provided mask path.
-        ValueError
             If `tag_names` is empty.
-        TypeError
-            If the specified mask metadata field is not a string (path to mask).
         TypeError
             If `tag_names` has a key that is not an int or a value that is not a str.
 
@@ -4696,36 +4683,6 @@ class Model:
         UserWarning
             If some keys of `tag_names` are not values of the mask.
         """
-        # Resolve mask_path from metadata or argument.
-        if mask_path_metadata_field is None:
-            if mask_path is None:
-                raise ValueError(
-                    "Either 'mask_path_metadata_field' or 'mask_path' must be provided."
-                )
-        else:
-            mask_md_value = self.model_metadata[mask_path_metadata_field]
-            if mask_md_value is None:
-                if mask_path is None:
-                    raise ValueError(
-                        f"No mask found: metadata field '{mask_path_metadata_field}' "
-                        "is None and no mask path is provided."
-                    )
-                self.model_metadata[mask_path_metadata_field] = mask_path
-            elif isinstance(mask_md_value, str):
-                if mask_path is None:
-                    mask_path = mask_md_value
-                elif mask_path != mask_md_value:
-                    raise ValueError(
-                        f"Metadata field '{mask_path_metadata_field}' value "
-                        f"'{mask_md_value}' does not match provided mask_path"
-                        f"'{mask_path}'."
-                    )
-            else:
-                raise TypeError(
-                    f"Metadata field '{mask_path_metadata_field}' must be a string "
-                    f"but got type {type(mask_md_value).__name__}."
-                )
-
         mask_image = tifffile.imread(mask_path).astype(np.uint32)
 
         size_x = self.get_pixel_width() or 1.0

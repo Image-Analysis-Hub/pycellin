@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 8e0e6f7, plus the uncommitted writers that return None. Update from there with: git log 8e0e6f7..dev -->
+<!-- Planned v0.6.0. Covers commits up to b93fea5, plus the uncommitted removal of mask_path_metadata_field. Update from there with: git log b93fea5..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -126,7 +126,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** topology lineage properties `num_cells`, `num_cycles`, `num_divisions`, `num_gaps` and `num_leaves`
 - **Properties:** topology lineage properties `lineage_cell_depth`, `lineage_cycle_depth` and `lineage_duration`
 - **Properties:** topology cycle properties `mother_cycle`, `daughter_cycles`, `sister_cycles` and `cousin_cycles`, the IDs of the mother, daughter, sister and cousin cell cycles of each cell cycle. `mother_cycle` is None for root cycles, and `add_cousin_cycles()` takes a `degree`, like `get_cousins()`
-- **Properties:** `location_tag`, a cell property read from a mask image. `mask_path_metadata_field` reads the mask path from the model metadata, and a `tag_names` dict maps pixel values to region names
+- **Properties:** `location_tag`, a cell property read from a mask image. A `tag_names` dict maps pixel values to region names
 - **Properties:** `normalized_age`, the relative age of a cell divided by the duration of its cell cycle, from 0 at the first cell of the cycle to 1 at the last one. With `ignore_incomplete_cycles=True`, the cells of cycles that start at the root or end with a leaf get NaN
 - **Properties:** `uses_external_data()` class method on calculators
 - **Packaging:** `pc.__version__` gives the installed version of pycellin
