@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to f298bf6, plus the uncommitted copies of the calculator and property given to add_custom_property(). Update from there with: git log f298bf6..dev -->
+<!-- Planned v0.6.0. Covers commits up to b00e13e, plus the uncommitted end of the single-cell lineage ID rule (lineage ID = -cell ID). Update from there with: git log b00e13e..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -77,6 +77,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** `add_cell()`, `remove_cell()`, `add_link()`, `remove_link()` and `split_lineage_from_cell()` take the lineage IDs, and the arguments after them, by keyword only, e.g. `model.remove_cell(5, lineage_id=0)`. Cell and lineage IDs are both integers, and these methods took them in different orders (`add_cell(lid, cid)` but `remove_cell(cid, lid)`), so a call written by analogy silently acted on another cell. `add_link()` now takes the two cell IDs first: `add_link(source_cell_id, target_cell_id, source_lineage_id=...)`. Calls written the old way fail with `TypeError`
 - **Model:** `get_cell_lineage()`, `get_cycle_lineage()`, `get_cell_lineages()` and `get_cycle_lineages()` raise `TypeError` for a lineage ID that isn't an integer, e.g. a lineage or a float, and for a lineage given instead of a list of IDs. They used to return None or an empty list, or even other lineages. NumPy integers work, and an unknown ID still gives None
 - **Model:** `add_lineage()`, `split_lineage_from_cell()` and `CellLineage()` raise `TypeError` for a lineage ID that isn't an integer, e.g. a float, a string or a boolean. `CellLineage()` used to fail on an `assert`, which let booleans through, and these methods accepted any ID when given a lineage or a new ID, although a float or a string made TrackMate exports unreadable
+- **Model:** pycellin no longer gives a single-cell lineage minus the ID of its cell as lineage ID: like any lineage it creates, it gets the next free ID. This changes the lineage ID of a cell split off a lineage by `update()`, e.g. after `remove_link()`, and of the single-cell lineages read from a GEFF file without lineage IDs. `update()` also no longer gives the split cell a new ID when minus its ID was already a lineage ID
 - **Lineages:** rename `CellLineage.get_sister_cells()` to `get_sisters()`, which also works on cycle lineages, where it returns the sister cell cycles
 - **Plotting:** rename `node_color_scale` to `node_colormap` in `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()`
 - **TrackMate:** `read_trackmate_xml()` takes `lone_spots` and `tracks` instead of `keep_all_spots` and `keep_all_tracks`, which name what it loads in TrackMate's terms: `lone_spots` is `"none"` (default), `"visible"` or `"all"` for the spots outside tracks, and `tracks` is `"visible"` (default) or `"all"`. Visible spots and tracks passed the spot and track filters of TrackMate (`VISIBILITY` of 1, listed in `FilteredTracks`). Replace `keep_all_spots=True` with `lone_spots="all"`, and `keep_all_tracks=True` with `tracks="all"`. `lone_spots="visible"` is new: it adds the spots outside tracks that TrackMate shows, without those its spot filters hid
@@ -95,7 +96,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 ### Added
 
 - **Model:** `merge()` to merge two models, and `split()` to split a model into several models from groups of lineage IDs. Properties reading an image, e.g. cell polygons from a label image, should be added to each model before merging: added to a merged model, they read the same image for all its lineages, with a warning
-  - lineage ID collisions are resolved, and single-cell lineages keep the lineage ID = -cell ID convention
+  - lineage ID collisions are resolved: the lineages whose ID is taken get the next free IDs
   - critical metadata (reference time property, time step and unit, pixel size, space unit) must match; other differing metadata values are stored as lineage properties
   - property declarations are checked for compatibility (property type, lineage type, unit, dtype)
   - calculators that rely on external data (e.g. a label image) are not kept
@@ -155,7 +156,6 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 
 - **Model:** core properties (`cell_id`, `lineage_id`, `timepoint` and the reference time property) are protected whenever they are declared
 - **Model:** timepoint handling is centralized in the updater: the `timepoint` calculator is always present and up to date
-- **Model:** enforce the single-cell lineage convention (lineage ID = -cell ID)
 - **Model:** the warning about cell fusions when loading a file says how to list and correct them, with `get_fusions()` and `remove_link()`, instead of pointing to a documentation that doesn't exist yet
 - **Properties:** data types are compared after normalizing their spelling (e.g. `float` and `float64`)
 - **TrackMate:** one-node lineages are identified by their size instead of by their lineage ID sign
@@ -201,7 +201,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** `cell_displacement`, `cell_speed`, `turning_angle` (`angle` in 0.5.1) and `straightness` could be added to a model without cell coordinates, e.g. read from a CTC file without label images, and `update()` then failed with `KeyError: 'cell_x'`: the model couldn't be updated or exported until they were removed. They now raise `MissingPropertyError` when added, as does `location_tag`. A cell without coordinates, e.g. added with `add_cell()`, gave the same `KeyError` at update: the `MissingPropertyError` raised now names the cell, its lineage and the property
 - **TrackMate:** `turning_angle` (`angle` in 0.5.1) in degrees was exported as a TrackMate angle, which TrackMate reads as radians
 - **TrackMate:** `division_rate` was exported as a time, so TrackMate showed it in the time unit, and the loader read it back with that unit, e.g. "minute" instead of "1/minute". It is now exported as a rate. The loader, which failed with `ValueError: Invalid dimension: RATE` on features with that dimension, reads them in 1 over the time unit
-- **TrackMate:** with `keep_all_spots=True` (now `lone_spots="all"`), spots without a track got lineage IDs already used by tracks, so some lineages were silently lost. Their lineage ID is now -cell ID
+- **TrackMate:** with `keep_all_spots=True` (now `lone_spots="all"`), spots without a track got lineage IDs already used by tracks, so some lineages were silently lost. They now get the next IDs after those of the tracks
 - **TrackMate:** the exporter wrote missing values (None) as the string 'None', which TrackMate can't read. They are now written as NaN, which the loader reads back as None for integer properties instead of failing
 - **TrackMate:** without `propagate_cycle_props=True`, the exporter declared the cycle properties as spot features although no spot had their values. In the reloaded model, these declarations remained after `add_cycle_lineages()` (`add_cycle_data()` in 0.5.1), so pycellin treated the cycle properties as cell lineage properties: `propagate_cycle_properties()` skipped them, or raised when they were listed. Cycle properties are now only declared when propagated
 - **TrackMate:** the loader failed on files without `POSITION_T`, which TrackMate doesn't require. It is now computed from `FRAME` and the frame interval of the image, with a warning

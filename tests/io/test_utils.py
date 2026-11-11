@@ -14,7 +14,6 @@ from pycellin.io.utils import (
     _get_int_ids,
     _get_props_from_data,
     _graph_has_node_prop,
-    _has_lin_id,
     _remove_orphaned_metadata,
     _split_graph_into_lineages,
     _update_lineage_prop_key,
@@ -858,18 +857,18 @@ class TestSplitGraphIntoLineages:
             )
 
     def test_auto_generated_ids(self, expected_two_lins):
-        """Test auto-generated IDs for single-node lineages (negative IDs)."""
+        """Test auto-generated IDs: the next ones, single-node lineages included."""
         g = nx.DiGraph()
-        g.add_edges_from([(1, 2), (3, 4)])  # positive IDs
-        g.add_nodes_from([10, 20])  # negative IDs
+        g.add_edges_from([(1, 2), (3, 4)])  # IDs 0 and 1
+        g.add_nodes_from([10, 20])  # IDs 2 and 3
         obtained = _split_graph_into_lineages(g, lineage_id_key=None)
 
         lin10_exp = CellLineage()
-        lin10_exp.add_node(10, lineage_id=-10)
-        lin10_exp.graph["lineage_id"] = -10
+        lin10_exp.add_node(10, lineage_id=2)
+        lin10_exp.graph["lineage_id"] = 2
         lin20_exp = CellLineage()
-        lin20_exp.add_node(20, lineage_id=-20)
-        lin20_exp.graph["lineage_id"] = -20
+        lin20_exp.add_node(20, lineage_id=3)
+        lin20_exp.graph["lineage_id"] = 3
         expected_two_lins.extend([lin10_exp, lin20_exp])
 
         assert len(obtained) == 4
@@ -936,38 +935,17 @@ class TestSplitGraphIntoLineages:
         lin_ids = {min(lin.nodes): lin.graph["lineage_id"] for lin in obtained}
         assert lin_ids == {1: 0, 3: 1, 5: 2}
 
-    def test_single_cell_without_id_gets_minus_cell_id(self, two_lin_graph):
-        """Test that a single-cell lineage without ID gets minus its cell ID."""
+    def test_single_cell_without_id_gets_next_id(self, two_lin_graph):
+        """Test that a single-cell lineage without ID gets the next ID."""
         two_lin_graph.add_node(5)
         obtained = _split_graph_into_lineages(
             two_lin_graph, lineage_id_key="lineage_id"
         )
 
         lin_ids = {min(lin.nodes): lin.graph["lineage_id"] for lin in obtained}
-        assert lin_ids == {1: 0, 3: 1, 5: -5}
+        assert lin_ids == {1: 0, 3: 1, 5: 2}
         lin5 = next(lin for lin in obtained if 5 in lin)
-        assert lin5.nodes[5]["lineage_id"] == -5
-
-    def test_single_cell_whose_minus_cell_id_is_used(self, two_lin_graph):
-        """Test that cell 0 alone gets a negative ID when lineage ID 0 is used."""
-        two_lin_graph.add_node(0)
-        obtained = _split_graph_into_lineages(
-            two_lin_graph, lineage_id_key="lineage_id"
-        )
-
-        lin_ids = {min(lin.nodes): lin.graph["lineage_id"] for lin in obtained}
-        assert lin_ids == {1: 0, 3: 1, 0: -1}
-
-    def test_single_cell_fallback_id_skips_single_cell_ids(self):
-        """Test that the replacement of a used -cell_id skips other single-cell IDs."""
-        g = nx.DiGraph()
-        g.add_edge(5, 6)
-        g.nodes[5]["lineage_id"] = g.nodes[6]["lineage_id"] = 0
-        g.add_nodes_from([0, 1])
-        obtained = _split_graph_into_lineages(g, lineage_id_key="lineage_id")
-
-        lin_ids = {min(lin.nodes): lin.graph["lineage_id"] for lin in obtained}
-        assert lin_ids == {5: 0, 0: -2, 1: -1}
+        assert lin5.nodes[5]["lineage_id"] == 2
 
     def test_numpy_int_ids_count_as_used(self, two_lin_graph):
         """Test that IDs stored as NumPy integers count as used IDs."""
@@ -982,16 +960,6 @@ class TestSplitGraphIntoLineages:
 
         lin_ids = {min(lin.nodes): lin.graph["lineage_id"] for lin in obtained}
         assert lin_ids == {1: 0, 3: 1, 5: 2}
-
-    def test_lineage_without_id_skips_single_cell_id(self):
-        """Test that a multi-cell lineage without ID skips the ID of cell 0 alone."""
-        g = nx.DiGraph()
-        g.add_edge(1, 2)
-        g.add_node(0)
-        obtained = _split_graph_into_lineages(g, lineage_id_key="lineage_id")
-
-        lin_ids = {min(lin.nodes): lin.graph["lineage_id"] for lin in obtained}
-        assert lin_ids == {1: 1, 0: 0}
 
     def test_duplicate_lineage_ids_raise(self, two_lin_graph):
         """Test ValueError when disconnected parts of the graph share a lineage ID."""
@@ -1079,38 +1047,6 @@ class TestSplitGraphIntoLineages:
             ValueError, match="inconsistent lineage ID values between nodes and lineage"
         ):
             _split_graph_into_lineages(g, lineage_id_key="lineage_id")
-
-
-class TestHasLinId:
-    """Test cases for _has_lin_id function."""
-
-    def test_lineage_has_id(self):
-        lin = CellLineage()
-        lin.add_node(1)
-        lin.graph["lineage_id"] = 3
-        assert _has_lin_id(lin, "lineage_id")
-
-    def test_one_node_has_id(self):
-        lin = CellLineage()
-        lin.add_edge(1, 2)
-        lin.nodes[2]["lineage_id"] = 3
-        assert _has_lin_id(lin, "lineage_id")
-
-    def test_no_id(self):
-        lin = CellLineage()
-        lin.add_edge(1, 2)
-        assert not _has_lin_id(lin, "lineage_id")
-
-    def test_none_ids(self):
-        lin = CellLineage()
-        lin.add_node(1, lineage_id=None)
-        lin.graph["lineage_id"] = None
-        assert not _has_lin_id(lin, "lineage_id")
-
-    def test_id_0(self):
-        lin = CellLineage()
-        lin.add_node(1, lineage_id=0)
-        assert _has_lin_id(lin, "lineage_id")
 
 
 class TestGetIntIds:
@@ -1266,7 +1202,7 @@ class TestUpdateLineagesIDsKey:
         lin2.graph["TRACK_ID"] = 20
 
         _update_lineages_ids_key([lin1, lin2], "TRACK_ID")
-        assert lin1.graph["lineage_id"] == -1
+        assert lin1.graph["lineage_id"] == 21
         assert lin2.graph["lineage_id"] == 20
 
     def test_all_lineages_no_key(self):
@@ -1281,7 +1217,7 @@ class TestUpdateLineagesIDsKey:
         _update_lineages_ids_key([lin1, lin2, lin3], "TRACK_ID")
         assert lin1.graph["lineage_id"] == 0
         assert lin2.graph["lineage_id"] == 1
-        assert lin3.graph["lineage_id"] == -6
+        assert lin3.graph["lineage_id"] == 2
         assert "TRACK_ID" not in lin1.graph
         assert "TRACK_ID" not in lin2.graph
         assert "TRACK_ID" not in lin3.graph
@@ -1303,10 +1239,10 @@ class TestUpdateLineagesIDsKey:
         lin4.add_node(5)
 
         _update_lineages_ids_key([lin1, lin2, lin3, lin4], "TRACK_ID")
-        assert lin1.graph["lineage_id"] == -1
-        assert lin2.graph["lineage_id"] == 11
+        assert lin1.graph["lineage_id"] == 11
+        assert lin2.graph["lineage_id"] == 12
         assert lin3.graph["lineage_id"] == 10
-        assert lin4.graph["lineage_id"] == -5
+        assert lin4.graph["lineage_id"] == 13
 
     def test_preserves_other_graph_attributes(self):
         """Test that other graph attributes are preserved."""

@@ -2318,8 +2318,8 @@ class TestStandardizePropertiesData:
         assert not {"x", "y", "z"} & set(lin.nodes[1])
 
     def test_assigns_fallback_lineage_id_for_single_node_lineage_without_key(self):
-        """When lin_id_key is absent from a single-node lineage graph, -node_id is
-        used."""
+        """When lin_id_key is absent from a single-node lineage graph, the next
+        available id is used, as for a multi-node lineage."""
         lin = CellLineage()
         lin.add_node(1, custom_lin_id=0, custom_cell_id=10)
 
@@ -2337,7 +2337,7 @@ class TestStandardizePropertiesData:
             },
         )
 
-        assert lin.graph["lineage_id"] == -1
+        assert lin.graph["lineage_id"] == 0
 
     def test_assigns_fallback_lineage_id_for_multi_node_lineage_without_key(self):
         """When lin_id_key is absent from a multi-node lineage graph, next available id

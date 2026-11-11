@@ -1311,17 +1311,13 @@ def test_parse_model_tag_all_lone_spots_and_tracks():
     _, _, data = tml._parse_model_tag(xml_path, lone_spots="all", tracks="all")
 
     # 107 spots: 96 in 7 tracks that keep their TrackMate ID, and 11 lone spots
-    # whose lineage ID is -cell_id.
+    # that get the next IDs.
     track_sizes = {
-        lin_id: len(lin) for lin_id, lin in data.cell_lineages.items() if lin_id >= 0
+        lin_id: len(lin) for lin_id, lin in data.cell_lineages.items() if len(lin) > 1
     }
     assert track_sizes == {0: 74, 1: 2, 2: 4, 3: 2, 4: 10, 5: 2, 6: 2}
-    lone_spots = {
-        lin_id: lin for lin_id, lin in data.cell_lineages.items() if lin_id < 0
-    }
-    assert len(lone_spots) == 11
-    for lin_id, lin in lone_spots.items():
-        assert list(lin.nodes) == [-lin_id]
+    lone_spots = {lin_id for lin_id, lin in data.cell_lineages.items() if len(lin) == 1}
+    assert lone_spots == set(range(7, 18))
     # The lineage ID of each lineage and of its cells matches its key in the data.
     for lin_id, lin in data.cell_lineages.items():
         assert lin.graph["lineage_id"] == lin_id

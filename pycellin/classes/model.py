@@ -1403,10 +1403,6 @@ class Model:
 
         The returned lineage ID cannot be 0 in case the user wants to reserve
         it for special purposes.
-
-        Positive lineage IDs should be used for lineages with more than one cell.
-        Negative lineage IDs should be used for lineages with a single cell,
-        and are equal to the negative of the cell ID.
         """
         return self.data._get_next_available_lineage_id(positive)
 
@@ -5895,9 +5891,7 @@ class Model:
         ``relabel_cells(unique_in_model=True)`` on the merged model.
 
         Regarding lineages:
-        Lineages of ``model`` whose lineage ID is already used get a new ID. Single-cell
-        lineages keep the convention lineage ID = -cell ID: their cell is renumbered
-        when needed.
+        Lineages of ``model`` whose lineage ID is already used get a new ID.
 
         Regarding model metadata:
         Critical fields must be identical in both models. The merged model
@@ -6049,23 +6043,12 @@ class Model:
 
         # Lineage IDs of the lineages to add. Missing IDs, and IDs already used in
         # model1 or planned for a previous lineage, are replaced by new ones.
-        # Single-cell lineages keep the convention lineage ID = -cell ID: if that ID is
-        # not available, their cell is renumbered, as when splitting lineages in
-        # _ModelUpdater._update(). Only model2, a copy, is modified here.
         used_lids = set(model1.get_cell_lineage_ids())
         lineages_to_add = []
         for lin in model2.get_cell_lineages():
             lid = lin.graph.get("lineage_id")
             if lid is None or lid in used_lids:
-                if len(lin) == 1:
-                    cid = next(iter(lin.nodes))
-                    lid = -cid
-                    if lid >= 0 or lid in used_lids:
-                        lid = min(min(used_lids, default=0) - 1, -1)
-                        nx.relabel_nodes(lin, {cid: -lid}, copy=False)
-                        lin.nodes[-lid]["cell_id"] = -lid
-                else:
-                    lid = max(max(used_lids, default=0) + 1, 1)
+                lid = max(max(used_lids, default=0) + 1, 1)
             used_lids.add(lid)
             lineages_to_add.append((lin, lid))
         new_lids = {lid for _, lid in lineages_to_add}

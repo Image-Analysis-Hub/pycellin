@@ -216,10 +216,6 @@ class Data:
 
         The returned lineage ID cannot be 0 in case the user wants to reserve
         it for special purposes.
-
-        Positive lineage IDs should be used for lineages with more than one cell.
-        Negative lineage IDs should be used for lineages with a single cell,
-        and are equal to the negative of the cell ID.
         """
         new_lin_id: int
         if len(self.cell_lineages) == 0:

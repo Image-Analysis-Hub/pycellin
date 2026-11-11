@@ -282,79 +282,33 @@ class _ModelUpdater:
             # whole, e.g. its number of cells, or identify it, e.g. its name.
             for split_lin in splitted_lins:
                 split_lin.graph.clear()
-                if len(split_lin) == 1:
-                    # ID of a one-node lineage is minus the ID of the node.
-                    original_cell_id = next(iter(split_lin.nodes()))
-                    new_lin_id = -original_cell_id
-                    if new_lin_id in data.cell_lineages:
-                        # ID is already taken, so we get a new one based on the
-                        # next available lineage ID. We want a negative lineage ID
-                        # since it is a one-cell lineage.
-                        new_cell_id = -data._get_next_available_lineage_id(
-                            positive=False
+                new_lin_id = data._get_next_available_lineage_id(positive=True)
+                # Track all cells moving to the new lineage.
+                for cell_id in split_lin.nodes():
+                    self._removed_cells.add(
+                        Cell(cell_id=cell_id, lineage_id=original_lin_id)
+                    )
+                    self._added_cells.add(Cell(cell_id=cell_id, lineage_id=new_lin_id))
+                # Track all edges moving to the new lineage.
+                for source, target in split_lin.edges():
+                    self._removed_links.add(
+                        Link(
+                            source_cell_id=source,
+                            target_cell_id=target,
+                            lineage_id=original_lin_id,
                         )
-                        cell_props = split_lin._remove_cell(original_cell_id)
-                        time_value = cell_props.pop(time_prop)
-                        assert len(split_lin) == 0
-                        split_lin._add_cell(
-                            new_cell_id,
-                            time_prop=time_prop,
-                            time_prop_value=time_value,
-                            **cell_props,
+                    )
+                    self._added_links.add(
+                        Link(
+                            source_cell_id=source,
+                            target_cell_id=target,
+                            lineage_id=new_lin_id,
                         )
-                        # Track the cell ID change.
-                        self._removed_cells.add(
-                            Cell(cell_id=original_cell_id, lineage_id=original_lin_id)
-                        )
-                        self._added_cells.add(
-                            Cell(cell_id=new_cell_id, lineage_id=-new_cell_id)
-                        )
-                        split_lin.graph["lineage_id"] = -new_cell_id
-                        data.cell_lineages[-new_cell_id] = split_lin
-                        self._added_lineages.add(-new_cell_id)
-                        self._discard_removals(split_lin)
-                    else:
-                        # Track that the cell moved to a new lineage.
-                        self._removed_cells.add(
-                            Cell(cell_id=original_cell_id, lineage_id=original_lin_id)
-                        )
-                        self._added_cells.add(
-                            Cell(cell_id=original_cell_id, lineage_id=new_lin_id)
-                        )
-                        split_lin.graph["lineage_id"] = new_lin_id
-                        data.cell_lineages[new_lin_id] = split_lin
-                        self._added_lineages.add(new_lin_id)
-                        self._discard_removals(split_lin)
-                else:
-                    new_lin_id = data._get_next_available_lineage_id(positive=True)
-                    # Track all cells moving to the new lineage.
-                    for cell_id in split_lin.nodes():
-                        self._removed_cells.add(
-                            Cell(cell_id=cell_id, lineage_id=original_lin_id)
-                        )
-                        self._added_cells.add(
-                            Cell(cell_id=cell_id, lineage_id=new_lin_id)
-                        )
-                    # Track all edges moving to the new lineage.
-                    for source, target in split_lin.edges():
-                        self._removed_links.add(
-                            Link(
-                                source_cell_id=source,
-                                target_cell_id=target,
-                                lineage_id=original_lin_id,
-                            )
-                        )
-                        self._added_links.add(
-                            Link(
-                                source_cell_id=source,
-                                target_cell_id=target,
-                                lineage_id=new_lin_id,
-                            )
-                        )
-                    split_lin.graph["lineage_id"] = new_lin_id
-                    data.cell_lineages[new_lin_id] = split_lin
-                    self._added_lineages.add(new_lin_id)
-                    self._discard_removals(split_lin)
+                    )
+                split_lin.graph["lineage_id"] = new_lin_id
+                data.cell_lineages[new_lin_id] = split_lin
+                self._added_lineages.add(new_lin_id)
+                self._discard_removals(split_lin)
 
         # The timepoint property is always kept present and up to date.
         timepoint_built = self._ensure_timepoint_calculator(data, time_prop, time_step)

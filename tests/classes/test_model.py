@@ -1584,10 +1584,10 @@ class TestUpdate:
         assert dict(new_lin.nodes(data="lineage_id")) == {4: new_lid, 5: new_lid}
 
     def test_single_cell_split_off_lineage_cell_gets_its_id(self, two_lineages_model):
-        # Removing link 4 -> 5 splits off cell 5 into lineage -5.
+        # Removing link 4 -> 5 splits off cell 5 into lineage 3, the next free ID.
         two_lineages_model.remove_link(source_cell_id=4, target_cell_id=5, lineage_id=1)
         two_lineages_model.update()
-        assert two_lineages_model.data.cell_lineages[-5].nodes[5]["lineage_id"] == -5
+        assert two_lineages_model.data.cell_lineages[3].nodes[5]["lineage_id"] == 3
 
     def test_split_off_lineage_without_original_lineage_props(self, two_lineages_model):
         two_lineages_model.data.cell_lineages[1].graph["lineage_name"] = "Track_1"
@@ -1711,6 +1711,27 @@ class TestPropagateCycleProperties:
         merged.update()
         for lin in merged.data.cell_lineages.values():
             assert all("mother_cycle" in cell for _, cell in lin.nodes(data=True))
+
+
+class TestMergeLineageIds:
+    """Test cases for the lineage IDs of the lineages a merge adds."""
+
+    def test_single_cell_lineages_whose_id_is_taken(self, two_lineages_model):
+        """Test that single-cell lineages whose ID is taken get the next free IDs
+        and keep their cell, like other lineages, whether minus the ID of their cell
+        is free or not."""
+        model = two_lineages_model
+        for lineage_id, cell_id in [(3, 9), (-20, 20)]:
+            model.add_lineage(lineage_id=lineage_id)
+            model.add_cell(lineage_id=lineage_id, cell_id=cell_id, time_value=0)
+        model.update()
+        merged = model.merge(copy.deepcopy(model))
+        added = {
+            lineage_id: sorted(lin.nodes)
+            for lineage_id, lin in merged.data.cell_lineages.items()
+            if lineage_id not in model.data.cell_lineages
+        }
+        assert added == {4: [1, 2, 3, 4, 5], 5: [10, 11], 6: [9], 7: [20]}
 
 
 class TestMergeCalculators:
@@ -2029,14 +2050,14 @@ class TestAddLink:
         assert two_lineages_model.data.cell_lineages[1].edges[4, 5]["link_value"] == 1.0
 
     def test_cells_moved_from_other_lineage_get_its_id(self, two_lineages_model):
-        # Cell 12 is split off into lineage -12, then moves to lineage 1 with the link.
+        # Cell 12 is split off into lineage 3, then moves to lineage 1 with the link.
         two_lineages_model.add_cell(lineage_id=2, cell_id=12, time_value=3)
         two_lineages_model.update()
         two_lineages_model.add_link(
             source_cell_id=3,
             source_lineage_id=1,
             target_cell_id=12,
-            target_lineage_id=-12,
+            target_lineage_id=3,
         )
         two_lineages_model.update()
         assert two_lineages_model.data.cell_lineages[1].nodes[12]["lineage_id"] == 1

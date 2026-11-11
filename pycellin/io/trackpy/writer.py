@@ -75,12 +75,12 @@ def _renumber_negative_lineage_ids(model: Model) -> None:
     model : Model
         The pycellin model to modify.
     """
-    one_node_lin_ids = [
+    negative_lin_ids = [
         lin.graph["lineage_id"]
         for lin in model.get_cell_lineages()
         if lin.graph["lineage_id"] < 0
     ]
-    for lin_id in one_node_lin_ids:
+    for lin_id in negative_lin_ids:
         lin = model.get_cell_lineage(lin_id)
         assert lin is not None
         new_lin_id = model.get_next_available_lineage_id()
