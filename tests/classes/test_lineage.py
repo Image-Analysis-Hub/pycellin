@@ -1731,6 +1731,20 @@ class TestCellLineageGetBranchProfileFigure:
                 line_style="nope",
             )
 
+    def test_missing_prop_raises(self, cell_lin):
+        """Test that a property no cell has, e.g. misspelled, is reported as such,
+        and that a property missing from a plotted cell names that cell."""
+        with pytest.raises(MissingPropertyError, match="No cell of lineage 1 has"):
+            cell_lin.get_branch_profile_figure(target_cells=6, y_prop="timepiont")
+        with pytest.raises(MissingPropertyError, match="No cell of lineage 1 has"):
+            cell_lin.get_branch_profile_figure(
+                target_cells=6, y_prop="timepoint", x_prop="timepiont"
+            )
+        nx.set_node_attributes(cell_lin, 1.0, "area")
+        del cell_lin.nodes[5]["area"]
+        with pytest.raises(MissingPropertyError, match="for node 5 in lineage 1"):
+            cell_lin.get_branch_profile_figure(target_cells=6, y_prop="area")
+
 
 class TestCellLineagePlotBranchProfile:
     """Test cases for CellLineage.plot_branch_profile method."""

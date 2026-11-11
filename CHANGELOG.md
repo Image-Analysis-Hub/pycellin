@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to b00e13e, plus the uncommitted end of the single-cell lineage ID rule (lineage ID = -cell ID). Update from there with: git log b00e13e..dev -->
+<!-- Planned v0.6.0. Covers commits up to b10b5cf, plus the uncommitted errors of get_branch_profile_figure() for missing properties (new in 0.6.0, so no entry). Update from there with: git log b10b5cf..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 

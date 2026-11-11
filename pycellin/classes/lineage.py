@@ -2605,8 +2605,7 @@ class CellLineage(Lineage):
             If `node_marker_style`, `division_marker_style` or `line_style` is
             not a dict, a list of dicts, or None.
         KeyError
-            If a target or source cell ID is not in the lineage, or if `x_prop`
-            or `y_prop` is missing from a plotted node.
+            If a target or source cell ID is not in the lineage.
         ValueError
             If `target_cells` is an empty list; if `source_cells` is a list
             while `target_cells` is not, or the two lists differ in length; if a
@@ -2614,7 +2613,8 @@ class CellLineage(Lineage):
             `source_cells` and `generations` are given; or if a source cell is
             not upstream of its target.
         MissingPropertyError
-            If a name in `node_hover_props` is absent from a plotted node.
+            If `x_prop`, `y_prop` or a name in `node_hover_props` is missing from a
+            plotted cell.
         FusionError
             If a cell fusion keeps the cells of a branch from forming a path.
 
@@ -2679,6 +2679,18 @@ class CellLineage(Lineage):
         )
         line_styles = self._expand_branch_style(line_style, "line_style", n_targets)
 
+        # A property that no cell has, e.g. misspelled, is reported as such rather
+        # than as missing from the first plotted cell.
+        for prop_id in (x_prop_id, y_prop_id):
+            if not any(prop_id in cell for _, cell in self.nodes(data=True)):
+                lineage_id = self.graph.get("lineage_id")
+                where = "the lineage" if lineage_id is None else f"lineage {lineage_id}"
+                raise MissingPropertyError(
+                    prop=prop_id,
+                    lineage_id=lineage_id,
+                    message=f"No cell of {where} has the property '{prop_id}'.",
+                )
+
         fig = go.Figure()
         for index, (target_cid, target_source_cell) in enumerate(
             zip(target_cids, source_cids)
@@ -2688,6 +2700,14 @@ class CellLineage(Lineage):
             )
             nodes = list(lineage.nodes())
 
+            for prop_id in (x_prop_id, y_prop_id):
+                for node in nodes:
+                    if prop_id not in lineage.nodes[node]:
+                        raise MissingPropertyError(
+                            prop=prop_id,
+                            node_id=node,
+                            lineage_id=lineage.graph.get("lineage_id"),
+                        )
             x_nodes = [lineage.nodes[node][x_prop_id] for node in nodes]
             y_nodes = [lineage.nodes[node][y_prop_id] for node in nodes]
 
