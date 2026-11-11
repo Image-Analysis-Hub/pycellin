@@ -1359,6 +1359,25 @@ class TestAddCustomProperty:
             input_props_model.add_mother_cycle()
         assert input_props_model.get_property("mother_cycle").lineage_type == "both"
 
+    def test_calculator_shared_by_models(self, two_lineages_model):
+        """Test that a calculator given to several models is copied with its
+        property: the propagation in a model changes neither the property nor its
+        declaration in the other models, whose cells get the values too."""
+        prop = _create_test_property("cycle_value", "node", lineage_type="cycle")
+        calc = ConstantValue(prop, 2.0)
+        models = [two_lineages_model, copy.deepcopy(two_lineages_model)]
+        for model in models:
+            model.add_custom_property(calc)
+            model.propagate_cycle_properties()
+        for model in models:
+            declared = model.get_property("cycle_value")
+            assert declared.lineage_type == "both"
+            assert model._updater._calculators["cycle_value"].property is declared
+            for lin in model.data.cell_lineages.values():
+                assert all(v == 2.0 for _, v in lin.nodes(data="cycle_value"))
+        assert prop.lineage_type == "cycle"
+        assert calc.property is prop
+
 
 class InputCopy(NodeLocalPropCalculator):
     """User-defined property copying another node property of cell lineages."""

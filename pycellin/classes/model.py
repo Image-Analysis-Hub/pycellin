@@ -2,7 +2,7 @@
 
 import inspect
 import warnings
-from copy import deepcopy
+from copy import copy, deepcopy
 from decimal import Decimal
 from itertools import pairwise
 from math import gcd
@@ -2302,6 +2302,12 @@ class Model:
         declaration is replaced only if it is unused: not protected, without
         calculator and without values in cell lineages.
 
+        The model keeps its own copies of the calculator and of its property, so
+        they can be given to several models. Changes made to them after adding no
+        longer reach the model, and the changes the model makes to its declaration,
+        e.g. the lineage type set to "both" by `propagate_cycle_properties()`,
+        don't reach them. `get_property()` returns the declaration of the model.
+
         Parameters
         ----------
         calculator : PropertyCalculator
@@ -2332,6 +2338,12 @@ class Model:
             comes from a merge without a shared label image, since that data may not
             match all the lineages.
         """
+        # The objects given may be shared with other models, and the model changes
+        # its declarations, e.g. propagate_cycle_properties(). The copy of the
+        # calculator is shallow, since it may hold a label image, and its property is
+        # the declaration of the model, which the updater reads.
+        calculator = copy(calculator)
+        calculator.property = copy(calculator.property)
         prop = calculator.property
         if prop.lineage_type == "cycle" and not self.data.cycle_lineages:
             raise ValueError(
