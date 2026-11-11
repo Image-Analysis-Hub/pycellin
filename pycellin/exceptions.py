@@ -148,7 +148,7 @@ class ProtectedPropertyError(AttributeError):
 
 class MissingPropertyError(KeyError):
     """
-    Raised when a required property is missing from a node, an edge or the model.
+    Raised when a required property is missing from a node or from the model.
 
     Parameters
     ----------

@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to c789867. Update from there with: git log c789867..dev -->
+<!-- Planned v0.6.0. Covers commits up to e6528f8, plus the uncommitted docstring fix of MissingPropertyError (new in 0.6.0, so no entry). Update from there with: git log e6528f8..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -97,31 +97,31 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 ### Added
 
 - **Model:** `merge()` to merge two models, and `split()` to split a model into several models from groups of lineage IDs. Properties reading an image, e.g. cell polygons from a label image, should be added to each model before merging: added to a merged model, they read the same image for all its lineages, with a warning
-  - lineage ID collisions are resolved: the lineages whose ID is taken get the next free IDs
+  - lineage ID collisions are resolved: the lineages whose ID is taken get new IDs, above the highest one in use
   - critical metadata (reference time property, time step and unit, pixel size, space unit) must match; other differing metadata values are stored as lineage properties
-  - property declarations are checked for compatibility (property type, lineage type, unit, dtype)
+  - properties declared in both models must have the same property type, lineage type and unit, or `merge()` raises `ValueError`. A different data type only gives a warning, and the declaration of the model `merge()` is called on is kept
   - calculators that rely on external data (e.g. a label image) are not kept
-  - cycle lineages are handled when only one of the models has some
-- **Model:** `rescale_time()` and `rescale_space()` to convert time or space values into another unit (e.g. frames to minutes, pixels to µm). Rescale right after loading: the properties added before keep their unit, and a warning names those to add again to update it
-- **Model:** `remove_lineages()`
+  - if only one of the models has cycle lineages, the merged model gets cycle lineages for all its lineages
+- **Model:** `rescale_time()` and `rescale_space()` to convert time or space values into another unit (e.g. frames to minutes, pixels to µm). Rescale right after loading: the properties added before are recomputed at the next `update()` but keep their unit, and a warning names those to add again. The other properties read from the file, e.g. TrackMate's `RADIUS`, keep their values and units
+- **Model:** `remove_lineages()` to remove several lineages at once and return them, as `remove_lineage()` does for one
 - **Model:** `relabel_cells()` to give cells consecutive IDs, optionally unique across the whole model
 - **Model:** `remove_intercycle_links()` to remove the outgoing links of division cells
 - **Model:** `get_cell_lineages()` and `get_cycle_lineages()` take an optional `lineage_ids` argument, to get only the lineages with these IDs, and raise `TypeError` for IDs that aren't integers. With `ignore_missing=False`, an unknown ID gives None instead of being skipped
-- **Model:** `overwrite_lineage_id` argument to `add_lineage()`
+- **Model:** `overwrite_lineage_id` argument to `add_lineage()`: given a lineage that has an ID, a different `lineage_id` raises `ValueError`, unless `overwrite_lineage_id=True`, which gives the new ID to the lineage and its cells
 - **Model:** `lineage_props` argument to `to_cell_dataframe()`, `to_link_dataframe()` and `to_cycle_dataframe()` to include lineage properties in the DataFrame
 - **Model:** `to_cycle_pair_dataframe()` to export pairs of related cell cycles with the properties of both side by side, e.g. to correlate the area at birth of mothers and daughters. The relation is any cycle property listing related cell cycles: `mother_cycle`, `daughter_cycles`, `sister_cycles`, `cousin_cycles`, or a user-defined one. `unique_pairs=True` keeps a single row for pairs listed from both sides, such as sisters
-- **Metadata:** `label_image` and `label_image_path` standard metadata fields
+- **Metadata:** `label_image` and `label_image_path` standard metadata fields, for the label image of the model or the path to its TIFF stack: `add_cell_polygon()`, `add_cell_multipolygon()`, `add_cell_total_intensity()` and `add_cell_mean_intensity()` read them when given no label image
 - **Metadata:** `ModelMetadata.diff()` to list the metadata fields that differ between two models
-- **Properties:** `Property.get_incompatibilities()` to compare two property declarations
-- **Properties:** `pycellin.properties` now exposes the 17 core property factories (`create_cell_id_property()`, `create_time_property()`, ...), to declare properties when building a model from scratch or writing a loader
-- **Properties:** `time` core property with its calculator
-- **Properties:** `cycle_start_time` and `cycle_end_time` core properties, the times of the first and last cells of the cycle in the reference time unit. Like `cycle_duration`, they are computed by `add_cycle_lineages()`
-- **Properties:** `first_cell` and `last_cell` core properties, the cell IDs of the first and last cells of the cycle. `last_cell` has the same value as `cycle_id`, but says what it is. Like `cells`, they are computed by `add_cycle_lineages()`. Propagated to the cells, they pick the first or last cell of each cycle in `to_cell_dataframe()`: `df[df["cell_id"] == df["first_cell"]]`
-- **Properties:** morphology properties `cell_polygon`, `cell_multipolygon`, `cell_contour`, `cell_area`, `cell_perimeter`, `cell_circularity` and `cell_solidity`
+- **Properties:** `Property.get_incompatibilities()` to list the differences between two property declarations in property type, lineage type, unit and data type, where `float` and `float64` count as the same
+- **Properties:** `time` core property (`create_time_property()`), the time of each cell, e.g. in minutes: `read_ctc()` and `from_trackpy()` compute it from the frames and the time step as their reference time property. Its `Time` calculator, in `pycellin.properties.core`, computes it from another time property and a factor, with `add_custom_property()`
+- **Properties:** `cycle_start_time` and `cycle_end_time` core properties (`create_cycle_start_time_property()` and `create_cycle_end_time_property()`), the times of the first and last cells of the cycle in the reference time unit. Like `cycle_duration`, they are computed by `add_cycle_lineages()`
+- **Properties:** `first_cell` and `last_cell` core properties (`create_first_cell_property()` and `create_last_cell_property()`), the cell IDs of the first and last cells of the cycle. `last_cell` has the same value as `cycle_id`, but says what it is. Like `cells`, they are computed by `add_cycle_lineages()`. Propagated to the cells, they pick the first or last cell of each cycle in `to_cell_dataframe()`: `df[df["cell_id"] == df["first_cell"]]`
+- **Properties:** morphology properties `cell_polygon`, `cell_multipolygon`, `cell_area`, `cell_perimeter`, `cell_circularity` and `cell_solidity`, and `add_cell_contour()`
   - `cell_polygon` is computed from a label image or from cell contours (e.g. loaded from TrackMate or CTC data). From a label image, it keeps the largest piece of each label and fills its holes, with a warning listing the cells concerned
   - `cell_multipolygon` is computed from a label image and keeps every piece and hole of each label
+  - `add_cell_contour()` computes `cell_contour` (`ROI_coords` in 0.5.1), previously only read from files, e.g. TrackMate or CTC data, from the cell polygons, e.g. to export to TrackMate the shape of cells segmented in a label image
 - **Properties:** morphology properties `cycle_mean_area`, `birth_area` and `division_area`
-- **Properties:** intensity properties `cell_total_intensity` and `cell_mean_intensity`, measured in an intensity image over the pixels of each cell, taken from a label image or from the cell polygons. Add them once per channel to measure several channels
+- **Properties:** intensity properties `cell_total_intensity` and `cell_mean_intensity`, measured in an intensity image over the pixels of each cell, taken from a label image or from the cell polygons, minus an optional `background` value per pixel. To measure several channels, add them once per channel, each with its own image and `custom_identifier`
 - **Properties:** intensity properties `cycle_mean_intensity`, `birth_intensity` and `division_intensity`
 - **Properties:** the `add_*()` methods of properties computed from another property take its identifier as an argument (`polygon_prop`, `area_prop`, `displacement_prop`, `speed_prop`, `intensity_prop`), e.g. to compute `cell_area` from your own polygons. The unit of the new property is taken from that property
 - **Properties:** `INPUT_PROPS` class attribute on calculators, to list the properties they read, e.g. `{"area_prop": ("node", "cell")}`. `add_custom_property()` checks that these properties are declared with the expected property and lineage types, for custom calculators too
@@ -130,9 +130,9 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** topology cycle properties `mother_cycle`, `daughter_cycles`, `sister_cycles` and `cousin_cycles`, the IDs of the mother, daughter, sister and cousin cell cycles of each cell cycle. `mother_cycle` is None for root cycles, and `add_cousin_cycles()` takes a `degree`, like `get_cousins()`
 - **Properties:** `location_tag`, a cell property read from a mask image. A `tag_names` dict maps pixel values to region names
 - **Properties:** `normalized_age`, the relative age of a cell divided by the duration of its cell cycle, from 0 at the first cell of the cycle to 1 at the last one. With `ignore_incomplete_cycles=True`, the cells of cycles that start at the root or end with a leaf get NaN
-- **Properties:** `uses_external_data()` class method on calculators
+- **Properties:** `uses_external_data()` class method on calculators, true for those that read data the model doesn't store, such as a label, intensity or mask image. `merge()` doesn't keep these calculators
 - **Packaging:** `pc.__version__` gives the installed version of pycellin
-- **Exceptions:** `MissingPropertyError` (a `KeyError`), raised when a required property is missing from a node, an edge or the model
+- **Exceptions:** `MissingPropertyError` (a `KeyError`), raised when a property that pycellin needs is missing from the model or from a cell, e.g. when adding a property computed from one not declared yet, or plotting a property that some cells lack
 - **Lineages:** `Lineage.get_depth()`, `Lineage.get_roots()`, `CellLineage.get_gaps()` and `CellLineage.get_duration()`
 - **Lineages:** `get_cousins()` on cell and cycle lineages: first cousins (same grandmother, different mother) by default, more distant ones with `degree`, or all of them with `degree=None`. In cell lineages, only the cousin cells at the same timepoint are returned
 - **Plotting:** `pycellin.styling` module with pycellin colors and two Plotly templates, `pycellin_white` (the new default) and `pycellin_dark`
@@ -140,13 +140,11 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Plotting:** `CellLineage.plot_branch_profile()` and `CellLineage.get_branch_profile_figure()` to plot a cell property along one or several branches, with per-branch styling of markers and lines
 - **Plotting:** `CellLineage.get_branch_lineage()` and `CellLineage.get_highlighted_lineage()` to extract or highlight the branch leading to a cell
 - **Plotting:** branch highlights in `CellLineage.plot()` and `get_tree_figure()`, with `target_cells`, `source_cells`, `generations` and `highlight_prop` arguments
-- **Plotting:** support for single-cell lineages
 - **Plotting:** `y_prop` of `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()` also accepts a property identifier, used as axis label. With a `Property`, the hover text now shows its unit too
 - **Plotting:** `node_colormap` also accepts a dict for discrete color maps
-- **Plotting:** nodes can be styled individually through `node_marker_style`
 - **TrackMate:** `reference_time_prop` argument to `read_trackmate_xml()`, e.g. `"FRAME"` to count the time in frames
 - **TrackMate:** default tracker in the exported XML, so the TrackMate wizard can be navigated back
-- **TrackMate:** dimension mappings for the new properties
+- **TrackMate:** the exporter declares the new properties with their TrackMate dimension, e.g. `cell_area` as an area, `cell_mean_intensity` as an intensity and `cycle_start_time` as a time, and counts, IDs and ratios such as `num_cells` with the dimension NONE, without the warning given for unknown properties
 - **GEFF:** `tracklets` argument to `write_geff()`, to write the tracklets (the cell cycles) in a `tracklet_id` cell property declared as the GEFF tracklet property. Like `cycle_id`, a tracklet is identified by the ID of its last cell. The tracklets are computed at export from the cell lineages, so they don't need cycle lineages and are always up to date
 - **GEFF:** `propagate_cycle_props` argument to `write_geff()`, as in `write_trackmate_xml()`, to write the cycle properties on the cells of the file without changing the model
 - **CTC:** `frame_offset` argument to `write_ctc()`, the frame of timepoint 0, added to the timepoints of the cells to give their CTC frames. Timepoints start at 0 at the earliest cell, so data that starts at a later frame, e.g. a CTC file whose first frame is 5, was exported from frame 0, out of line with its images. Pass that first frame, or in general the frame of any cell minus its timepoint
@@ -158,8 +156,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Model:** core properties (`cell_id`, `lineage_id`, `timepoint` and the reference time property) are protected whenever they are declared
 - **Model:** timepoint handling is centralized in the updater: the `timepoint` calculator is always present and up to date
 - **Model:** the warning about cell fusions when loading a file says how to list and correct them, with `get_fusions()` and `remove_link()`, instead of pointing to a documentation that doesn't exist yet
-- **Properties:** data types are compared after normalizing their spelling (e.g. `float` and `float64`)
-- **TrackMate:** one-node lineages are identified by their size instead of by their lineage ID sign
+- **Plotting:** in `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()`, nodes with a list of sizes in `node_marker_style` are drawn opaque and without outline, instead of as Plotly's semi-transparent bubbles with a white outline
 - **TrackMate:** document that only numeric properties are exported
 - **TrackMate:** the loader declares `FRAME` with the unit "frame" instead of no unit
 - **GEFF:** stricter coordinate arguments in `read_geff()`: they must describe a complete 2D or 3D system (x and y, plus z in 3D), and inferred coordinates are each assigned at most once. A coordinate argument or `reference_time_prop` (`time_prop` in 0.5.1) naming a property that isn't on every node is now reported with a warning instead of an INFO message, before the property is inferred from the GEFF metadata
@@ -200,14 +197,17 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning
 - **Properties:** `cell_displacement`, `cell_speed`, `turning_angle` (`angle` in 0.5.1) and `straightness`, and the cycle properties computed from them, failed with `KeyError` on 2D models without `cell_z`, e.g. loaded from a trackpy DataFrame, CTC label images or a GEFF file. They now use `cell_x` and `cell_y`, plus `cell_z` when it is declared
 - **Properties:** `cell_displacement`, `cell_speed`, `turning_angle` (`angle` in 0.5.1) and `straightness` could be added to a model without cell coordinates, e.g. read from a CTC file without label images, and `update()` then failed with `KeyError: 'cell_x'`: the model couldn't be updated or exported until they were removed. They now raise `MissingPropertyError` when added, as does `location_tag`. A cell without coordinates, e.g. added with `add_cell()`, gave the same `KeyError` at update: the `MissingPropertyError` raised now names the cell, its lineage and the property
+- **Plotting:** `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()` modified the `node_marker_style` dict given to them, adding the node colors of `node_colormap_prop` to it: the same dict reused for another lineage gave it the colors and color bar of the previous lineage
 - **TrackMate:** `turning_angle` (`angle` in 0.5.1) in degrees was exported as a TrackMate angle, which TrackMate reads as radians
 - **TrackMate:** `division_rate` was exported as a time, so TrackMate showed it in the time unit, and the loader read it back with that unit, e.g. "minute" instead of "1/minute". It is now exported as a rate. The loader, which failed with `ValueError: Invalid dimension: RATE` on features with that dimension, reads them in 1 over the time unit
 - **TrackMate:** the exporter declared the properties that TrackMate and pycellin don't know, e.g. custom ones, with the dimension NONE and a warning, whatever their unit. Those in pixels are now declared as lengths, or positions when named `x`, `y` or `z`, and those without unit or in frames as NONE without warning. Other units still give NONE with the warning
+- **TrackMate:** the exporter declared integer properties as non-integer features when their data type wasn't spelled `int`, e.g. `int64` in models read from GEFF files, so pycellin read `FRAME` and `VISIBILITY` back as floats
 - **TrackMate:** with `keep_all_spots=True` (now `lone_spots="all"`), spots without a track got lineage IDs already used by tracks, so some lineages were silently lost. They now get the next IDs after those of the tracks
 - **TrackMate:** the exporter wrote missing values (None) as the string 'None', which TrackMate can't read. They are now written as NaN, which the loader reads back as None for integer properties instead of failing
 - **TrackMate:** without `propagate_cycle_props=True`, the exporter declared the cycle properties as spot features although no spot had their values. In the reloaded model, these declarations remained after `add_cycle_lineages()` (`add_cycle_data()` in 0.5.1), so pycellin treated the cycle properties as cell lineage properties: `propagate_cycle_properties()` skipped them, or raised when they were listed. Cycle properties are now only declared when propagated
 - **TrackMate:** the loader failed on files without `POSITION_T`, which TrackMate doesn't require. It is now computed from `FRAME` and the frame interval of the image, with a warning
 - **TrackMate:** the exporter failed with `KeyError` on a model loaded from TrackMate to which a lineage had been added, since that lineage had no `FilteredTrack` flag. A lineage without the flag is now exported as a visible track
+- **TrackMate:** the exporter took every lineage with a negative ID for a one-cell lineage and wrote no track for it, so such a lineage with several cells lost its track and links, e.g. a cell cut off by `remove_link()`, which got minus its ID as lineage ID, then linked to a new cell. A lineage is now written as a track whenever it has several cells, whatever its ID
 - **TrackMate:** a model loaded from a TrackMate file with cells without contour (`ROI_N_POINTS` of 0, as the exporter writes them) couldn't be exported to TrackMate again: their contour, loaded as None, made the exporter fail with `TypeError`
 - **TrackMate:** the loader failed with "Invalid data type: unknown" on files with an attribute that their FeatureDeclarations don't declare, as soon as two spots, edges or tracks had it: trackpy models exported by pycellin, or files written by other tools such as ultrack. On a single element, the attribute was declared with the `unknown` data type and kept as text. Such attributes are now loaded with the data type of their values (integer, float or text) and no unit, with one warning naming them
 - **TrackMate:** the exporter wrote the attributes of cells, links and lineages that have no property declaration, without declaring them, and TrackMate reads every spot attribute as a number, so a text one kept it from opening the file. They are now left out, with a warning naming them
