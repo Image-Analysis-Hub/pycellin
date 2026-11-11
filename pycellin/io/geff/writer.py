@@ -601,9 +601,11 @@ def write_geff(
     tracklets: bool = False,
     propagate_cycle_props: bool = False,
     zarr_format: Literal[2, 3] = 2,
-) -> Model:
+) -> None:
     """
     Export a pycellin model to GEFF format.
+
+    The model is not modified: the export works on a copy.
 
     Parameters
     ----------
@@ -646,13 +648,6 @@ def write_geff(
         not exported, and a warning names them.
     zarr_format : Literal[2, 3], optional
         The Zarr format version to use for the GEFF file. Default is 2.
-
-    Returns
-    -------
-    Model
-        The model that was exported, which is a copy of the input model with
-        any necessary modifications for GEFF compatibility. The original input model
-        is not modified.
 
     Raises
     ------
@@ -742,8 +737,6 @@ def write_geff(
 
     except Exception as e:
         raise RuntimeError(f"Failed to export GEFF file to '{path}': {e}.") from e
-
-    return model_copy
 
 
 if __name__ == "__main__":

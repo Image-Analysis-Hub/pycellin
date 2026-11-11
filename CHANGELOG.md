@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 35af630, plus the uncommitted removal of the morphology demo. Update from there with: git log 35af630..dev -->
+<!-- Planned v0.6.0. Covers commits up to 8e0e6f7, plus the uncommitted writers that return None. Update from there with: git log 8e0e6f7..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -85,6 +85,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **CTC:** with label images (`labels_path`), cell positions and contours are now in the space unit: their pixel coordinates are multiplied by the pixel size. They were in pixels while the model had the space unit given to the loader, so properties computed from them, such as `cell_displacement`, got that unit for values in pixels
 - **trackpy:** the loader now uses a new `time` property (frame × time step) as the reference time property, instead of `frame`, and renames the trackpy coordinates `x`, `y`, `z` to `cell_x`, `cell_y`, `cell_z`
 - **Export:** `write_ctc()`, `write_geff()`, `write_trackmate_xml()` and `to_trackpy()` raise `UpdateRequiredError` when the model requires an update: call `model.update()` first. Most of them exported the changes not yet processed as they were, e.g. a lineage left in two parts by `remove_link()`, so a GEFF file written that way couldn't be read back correctly
+- **Export:** `write_geff()` and `write_trackmate_xml()` return None, like `write_ctc()` and `write_pickle()`. They returned their working copy of the model, half converted for the file (e.g. in TrackMate's names, without `cell_id`): pycellin couldn't always use it, and Jupyter displayed it and kept it in memory. To see what was written, read the file back
 - **GEFF:** `write_geff()` no longer has a `variable_length_props` argument, which the "Getting started" notebook called mandatory: it never had any effect, since geff detects variable-length properties from their values. Just remove it from your calls
 - **Pickles:** models pickled with pycellin 0.5.1 can't be read, since modules moved (`pycellin.graph` no longer exists) and names changed (e.g. `cell_ID`, `cycle_length`): read their original files again
 - **Exceptions:** pycellin exceptions now subclass the matching built-in exception: `LineageStructureError` (so `FusionError` and `TimeFlowError`) is a `ValueError`, `UpdateRequiredError` a `RuntimeError`, `ProtectedPropertyError` an `AttributeError`

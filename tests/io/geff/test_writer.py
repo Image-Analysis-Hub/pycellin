@@ -1,5 +1,6 @@
 """Unit test for GEFF file exporter."""
 
+import copy
 import logging
 
 import geff
@@ -945,66 +946,58 @@ class TestWriteGeff:
     def test_basic_export(self, simple_model, tmp_path):
         """Test basic GEFF export functionality."""
         geff_out = str(tmp_path / "test.geff")
-        exported_model = write_geff(simple_model, geff_out)
+        result = write_geff(simple_model, geff_out)
 
         # Check that the GEFF file was created.
         assert (tmp_path / "test.geff").exists()
 
-        # Check that a model is returned.
-        assert isinstance(exported_model, Model)
+        # Check that nothing is returned, as with the other writers.
+        assert result is None
 
         # Check that we can read it back.
         graph, metadata = geff.read(geff_out)
         assert graph is not None
         assert metadata is not None
 
-    def test_export_returns_copy(self, simple_model, tmp_path):
-        """Test that write_geff returns a copy and doesn't modify the original data.
-        It's not an exhaustive check since we are only checking the number of nodes
-        and edges.
-        """
+    def test_export_leaves_model_unchanged(self, simple_model, tmp_path):
+        """Test that write_geff doesn't modify the given model, although the export
+        changes its own copy: here it leaves out a property without values and a
+        None value, and adds the tracklets."""
         geff_out = str(tmp_path / "test.geff")
-        exported_model = write_geff(simple_model, geff_out)
+        simple_model.props_metadata._add_prop(
+            create_absolute_age_property(unit="timepoint")
+        )
+        simple_model.data.cell_lineages[0].nodes[2]["cell_x"] = None
+        before = copy.deepcopy(simple_model)
 
-        # Check that the original model's data is unchanged. It's not an exhaustive
-        # check since we are only checking the number of nodes and edges.
-        original_node_count = sum(
-            len(lin.nodes) for lin in simple_model.data.cell_lineages.values()
-        )
-        export_node_count = sum(
-            len(lin.nodes) for lin in exported_model.data.cell_lineages.values()
-        )
-        assert original_node_count == export_node_count
-        original_edge_count = sum(
-            len(lin.edges) for lin in simple_model.data.cell_lineages.values()
-        )
-        export_edge_count = sum(
-            len(lin.edges) for lin in exported_model.data.cell_lineages.values()
-        )
-        assert original_edge_count == export_edge_count
+        write_geff(simple_model, geff_out, tracklets=True)
 
-        assert exported_model is not simple_model
+        assert simple_model.get_properties() == before.get_properties()
+        for lineage_id, lin in simple_model.data.cell_lineages.items():
+            lin_before = before.data.cell_lineages[lineage_id]
+            assert dict(lin.nodes(data=True)) == dict(lin_before.nodes(data=True))
+            assert list(lin.edges(data=True)) == list(lin_before.edges(data=True))
+            assert lin.graph == lin_before.graph
 
     def test_export_cleans_metadata(self, simple_model, tmp_path):
-        """Test that write_geff cleans metadata by removing orphaned properties.
+        """Test that write_geff cleans metadata by leaving out orphaned properties.
 
         Also validates that multi-type properties (like lineage_id with NODE | LINEAGE)
-        are preserved when they have actual data in the lineages.
+        are written when they have actual data in the lineages.
         """
         geff_out = str(tmp_path / "test.geff")
         simple_model.props_metadata._add_prop(
             create_absolute_age_property(unit="timepoint")
         )
-        exported_model = write_geff(simple_model, geff_out)
+        write_geff(simple_model, geff_out)
 
-        # The absolute_age property is orphaned (no data in lineages), so it's removed.
-        # All other properties are preserved, including multi-type ones (lineage_id).
-        expected_props = {
-            k: v
-            for k, v in simple_model.get_properties().items()
-            if k != "absolute_age"
-        }
-        assert expected_props == exported_model.get_properties()
+        # The absolute_age property is orphaned (no data in lineages), so it's left
+        # out. The other cell and link properties are written, including multi-type
+        # ones (lineage_id).
+        _, metadata = geff.read(geff_out)
+        node_props = {"timepoint", "cell_x", "lineage_id"}
+        assert set(metadata.node_props_metadata) == node_props
+        assert set(metadata.edge_props_metadata) == {"link_x"}
 
     def test_empty_model_raises_error(self, tmp_path):
         """Test that exporting an empty model raises ValueError."""
@@ -1087,13 +1080,12 @@ class TestWriteGeff:
                 lin.nodes[node]["daughter_ids"] = list(lin.successors(node))
 
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
-            exported_model = write_geff(simple_model, geff_out)
+            write_geff(simple_model, geff_out)
 
         graph, metadata = geff.read(geff_out)
         assert "daughter_ids" not in metadata.node_props_metadata
         assert all("daughter_ids" not in attrs for _, attrs in graph.nodes(data=True))
         assert "'daughter_ids'" in caplog.text
-        assert "daughter_ids" not in exported_model.get_properties()
         # The original model is not modified.
         assert "daughter_ids" in simple_model.get_properties()
 
@@ -1116,16 +1108,13 @@ class TestWriteGeff:
         simple_model.add_cycle_lineages()
 
         with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
-            exported_model = write_geff(
-                simple_model, geff_out, propagate_cycle_props=True
-            )
+            write_geff(simple_model, geff_out, propagate_cycle_props=True)
 
         graph, metadata = geff.read(geff_out)
         assert "cycle_id" in metadata.node_props_metadata
         cycle_ids = {node: graph.nodes[node]["cycle_id"] for node in graph.nodes}
         assert cycle_ids == {1: 2, 2: 2, 3: 4, 4: 4}
         assert "propagate_cycle_props=True" not in caplog.text
-        assert exported_model.get_property("cycle_id").lineage_type == "both"
         # The original model is not modified.
         assert simple_model.get_property("cycle_id").lineage_type == "cycle"
         for lin in simple_model.data.cell_lineages.values():

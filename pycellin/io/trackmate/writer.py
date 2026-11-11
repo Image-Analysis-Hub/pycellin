@@ -1480,9 +1480,11 @@ def write_trackmate_xml(
     image_shape: tuple[int, int, int, int, int] | None = None,
     image_shape_field: str | None = None,
     propagate_cycle_props: bool = False,
-) -> Model:
+) -> None:
     """
     Write an XML file readable by TrackMate from a pycellin model.
+
+    The model is not modified: the export works on a copy.
 
     Parameters
     ----------
@@ -1517,14 +1519,6 @@ def write_trackmate_xml(
         and have them accessible in the tracks. Default is False: cycle properties
         are not exported, since TrackMate has no cycle lineages, and a warning names
         them.
-
-    Returns
-    -------
-    model_copy : Model
-        The model as it was exported, including all the modifications done by the
-        exporter (removal of incompatible properties, propagation of cycle
-        properties...).
-        This is a copy of the original model, so the original model is not modified.
 
     Raises
     ------
@@ -1616,7 +1610,6 @@ def write_trackmate_xml(
                     xf.write("\n")
                 else:
                     xf.write("\n  ")
-    return model_copy
 
 
 if __name__ == "__main__":
