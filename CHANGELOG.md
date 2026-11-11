@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 2708d10, plus the uncommitted TrackMate dimensions of division_rate and of the area and intensity properties. Update from there with: git log 2708d10..dev -->
+<!-- Planned v0.6.0. Covers commits up to 6eb4103, plus the uncommitted errors for properties that read missing cell coordinates. Update from there with: git log 6eb4103..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -197,6 +197,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells
 - **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning
 - **Properties:** `cell_displacement`, `cell_speed`, `turning_angle` (`angle` in 0.5.1) and `straightness`, and the cycle properties computed from them, failed with `KeyError` on 2D models without `cell_z`, e.g. loaded from a trackpy DataFrame, CTC label images or a GEFF file. They now use `cell_x` and `cell_y`, plus `cell_z` when it is declared
+- **Properties:** `cell_displacement`, `cell_speed`, `turning_angle` (`angle` in 0.5.1) and `straightness` could be added to a model without cell coordinates, e.g. read from a CTC file without label images, and `update()` then failed with `KeyError: 'cell_x'`: the model couldn't be updated or exported until they were removed. They now raise `MissingPropertyError` when added, as does `location_tag`. A cell without coordinates, e.g. added with `add_cell()`, gave the same `KeyError` at update: the `MissingPropertyError` raised now names the cell, its lineage and the property
 - **TrackMate:** `turning_angle` (`angle` in 0.5.1) in degrees was exported as a TrackMate angle, which TrackMate reads as radians
 - **TrackMate:** `division_rate` was exported as a time, so TrackMate showed it in the time unit, and the loader read it back with that unit, e.g. "minute" instead of "1/minute". It is now exported as a rate. The loader, which failed with `ValueError: Invalid dimension: RATE` on features with that dimension, reads them in 1 over the time unit
 - **TrackMate:** with `keep_all_spots=True` (now `lone_spots="all"`), spots without a track got lineage IDs already used by tracks, so some lineages were silently lost. Their lineage ID is now -cell ID

@@ -8,8 +8,8 @@ from typing import Any
 import numpy as np
 
 from pycellin.classes.data import Data
-from pycellin.classes.lineage import CycleLineage
-from pycellin.exceptions import FusionError
+from pycellin.classes.lineage import CellLineage, CycleLineage
+from pycellin.exceptions import FusionError, MissingPropertyError
 
 
 def _get_cycle_node_property_values(
@@ -108,6 +108,53 @@ def _get_cycle_edge_property_values(
             raise FusionError(first_cell, lin_id)
 
     return values
+
+
+def _get_position(
+    lineage: CellLineage, cell_id: int, coord_props: tuple[str, ...], prop_id: str
+) -> list[float]:
+    """
+    Return the position of a cell.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        Lineage graph containing the cell.
+    cell_id : int
+        ID of the cell.
+    coord_props : tuple[str, ...]
+        Identifiers of the node properties holding the coordinates of the cells,
+        one per axis.
+    prop_id : str
+        Identifier of the property computed from the position, for the error
+        message.
+
+    Returns
+    -------
+    list[float]
+        The coordinates of the cell, in the order of `coord_props`.
+
+    Raises
+    ------
+    MissingPropertyError
+        If the cell has no value, or None, for one of the coordinates.
+    """
+    cell = lineage.nodes[cell_id]
+    position = [cell.get(coord) for coord in coord_props]
+    if None in position:
+        coord = coord_props[position.index(None)]
+        lineage_id = lineage.graph.get("lineage_id")
+        raise MissingPropertyError(
+            coord,
+            node_id=cell_id,
+            lineage_id=lineage_id,
+            message=(
+                f"Cell {cell_id} in lineage {lineage_id} has no value for '{coord}', "
+                f"which '{prop_id}' needs. Set the coordinates of this cell, or "
+                f"remove '{prop_id}' with remove_property()."
+            ),
+        )
+    return position
 
 
 def _nanmean(values: list[Any]) -> float:

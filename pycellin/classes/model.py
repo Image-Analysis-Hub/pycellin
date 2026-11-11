@@ -2652,6 +2652,11 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Angle of the cell trajectory between two consecutive displacements".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `cell_x` or `cell_y` has not been declared.
         """
         prop = motion.create_turning_angle_property(
             custom_identifier=custom_identifier,
@@ -2660,7 +2665,7 @@ class Model:
             unit=unit,
         )
         self.add_custom_property(
-            motion.TurningAngle(prop, unit, self._get_coord_props())
+            motion.TurningAngle(prop, unit, self._get_coord_props(prop.identifier))
         )
 
     def add_cycle_mean_displacement(
@@ -3257,6 +3262,11 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Displacement of the cell between two consecutive detections".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `cell_x` or `cell_y` has not been declared.
         """
         prop = motion.create_cell_displacement_property(
             custom_identifier=custom_identifier,
@@ -3264,7 +3274,9 @@ class Model:
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-        self.add_custom_property(motion.CellDisplacement(prop, self._get_coord_props()))
+        self.add_custom_property(
+            motion.CellDisplacement(prop, self._get_coord_props(prop.identifier))
+        )
 
     def add_cell_polygon(
         self,
@@ -4089,16 +4101,45 @@ class Model:
                 )
         return tifffile.imread(label_image_path).astype(np.uint32)
 
-    def _get_coord_props(self) -> tuple[str, ...]:
+    def _get_coord_props(self, prop_id: str) -> tuple[str, ...]:
         """
         Return the identifiers of the cell coordinates of the model.
+
+        Parameters
+        ----------
+        prop_id : str
+            Identifier of the property that reads the coordinates, for the error
+            message.
 
         Returns
         -------
         tuple[str, ...]
             ("cell_x", "cell_y", "cell_z") when `cell_z` is declared, as for 3D data,
             else ("cell_x", "cell_y").
+
+        Raises
+        ------
+        MissingPropertyError
+            If `cell_x` or `cell_y` has not been declared.
         """
+        missing = [
+            coord
+            for coord in ("cell_x", "cell_y")
+            if not self.props_metadata._has_prop(coord)
+        ]
+        if missing:
+            if len(missing) == 2:
+                detail = "which have not been declared"
+            else:
+                detail = f"but '{missing[0]}' has not been declared"
+            raise MissingPropertyError(
+                missing[0],
+                message=(
+                    f"'{prop_id}' requires the cell coordinates 'cell_x' and "
+                    f"'cell_y', {detail}. Models read with read_ctc() only have them "
+                    "when label images are given with `labels_path`."
+                ),
+            )
         if self.props_metadata._has_prop("cell_z"):
             return ("cell_x", "cell_y", "cell_z")
         return ("cell_x", "cell_y")
@@ -4188,6 +4229,8 @@ class Model:
         ------
         MissingPropertyError
             If `time_prop` has not been declared in the model.
+        MissingPropertyError
+            If `cell_x` or `cell_y` has not been declared.
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
@@ -4203,7 +4246,9 @@ class Model:
         )
         self.add_custom_property(
             motion.CellSpeed(
-                prop, time_prop=time_prop, coord_props=self._get_coord_props()
+                prop,
+                time_prop=time_prop,
+                coord_props=self._get_coord_props(prop.identifier),
             )
         )
 
@@ -4673,6 +4718,8 @@ class Model:
 
         Raises
         ------
+        MissingPropertyError
+            If `cell_x` or `cell_y` has not been declared.
         ValueError
             If `tag_names` is empty.
         TypeError
@@ -4696,6 +4743,8 @@ class Model:
             custom_description=custom_description,
             dtype="int" if tag_names is None else "str",
         )
+        # The mask is read at the cell coordinates.
+        self._get_coord_props(prop.identifier)
         self.add_custom_property(
             topo.LocationTag(
                 prop, mask_image=mask_image, pixel_size=size_x, tag_names=tag_names
@@ -5073,6 +5122,11 @@ class Model:
         custom_description : str, optional
             New description for the property. If None, the description will be
             "Straightness of the cell trajectory during the cell cycle".
+
+        Raises
+        ------
+        MissingPropertyError
+            If `cell_x` or `cell_y` has not been declared.
         """
         prop = motion.create_straightness_property(
             custom_identifier=custom_identifier,
@@ -5080,7 +5134,9 @@ class Model:
             custom_description=custom_description,
         )
         self.add_custom_property(
-            motion.Straightness(prop, include_incoming_edge, self._get_coord_props())
+            motion.Straightness(
+                prop, include_incoming_edge, self._get_coord_props(prop.identifier)
+            )
         )
 
     def _get_prop_method(self, prop_identifier: str) -> Callable:

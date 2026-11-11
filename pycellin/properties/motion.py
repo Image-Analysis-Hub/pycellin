@@ -21,36 +21,13 @@ from pycellin.classes.property_calculator import (
 from pycellin.exceptions import FusionError
 from pycellin.properties.utils import (
     _get_cycle_edge_property_values,
+    _get_position,
     _nanmean,
     _nansum,
 )
 
 # Cell coordinates of 3D data. 2D data has no "cell_z".
 _CELL_COORD_PROPS = ("cell_x", "cell_y", "cell_z")
-
-
-def _get_position(
-    lineage: CellLineage, cell_id: int, coord_props: tuple[str, ...]
-) -> list[float]:
-    """
-    Return the position of a cell.
-
-    Parameters
-    ----------
-    lineage : CellLineage
-        Lineage graph containing the cell.
-    cell_id : int
-        ID of the cell.
-    coord_props : tuple[str, ...]
-        Identifiers of the node properties holding the coordinates of the cells,
-        one per axis.
-
-    Returns
-    -------
-    list[float]
-        The coordinates of the cell, in the order of `coord_props`.
-    """
-    return [lineage.nodes[cell_id][prop] for prop in coord_props]
 
 
 def create_cell_displacement_property(
@@ -113,9 +90,15 @@ class CellDisplacement(EdgeLocalPropCalculator):
         -------
         float
             The cell displacement.
+
+        Raises
+        ------
+        MissingPropertyError
+            If a cell of the edge has no value for one of the coordinates.
         """
-        pos1 = _get_position(lineage, edge[0], self.coord_props)
-        pos2 = _get_position(lineage, edge[1], self.coord_props)
+        prop_id = self.property.identifier
+        pos1 = _get_position(lineage, edge[0], self.coord_props, prop_id)
+        pos2 = _get_position(lineage, edge[1], self.coord_props, prop_id)
         return math.dist(pos1, pos2)
 
 
@@ -353,11 +336,17 @@ class CellSpeed(EdgeLocalPropCalculator):
         -------
         float
             Cell speed between two consecutive detections.
+
+        Raises
+        ------
+        MissingPropertyError
+            If a cell of the edge has no value for one of the coordinates.
         """
         time1 = lineage.nodes[edge[0]][self.time_prop]
         time2 = lineage.nodes[edge[1]][self.time_prop]
-        pos1 = _get_position(lineage, edge[0], self.coord_props)
-        pos2 = _get_position(lineage, edge[1], self.coord_props)
+        prop_id = self.property.identifier
+        pos1 = _get_position(lineage, edge[0], self.coord_props, prop_id)
+        pos2 = _get_position(lineage, edge[1], self.coord_props, prop_id)
         return math.dist(pos1, pos2) / (time2 - time1)
 
 
@@ -511,14 +500,20 @@ class Straightness(NodeGlobalPropCalculator):
         float
             Straightness of the displacement.
             Returns NaN if the total distance traveled is null.
+
+        Raises
+        ------
+        MissingPropertyError
+            If a cell of the cell cycle has no value for one of the coordinates.
         """
         lin_id = lineage.graph["lineage_id"]
         cell_lin = data.cell_lineages[lin_id]
         cells = lineage.nodes[node_id]["cells"]
+        prop_id = self.property.identifier
         distances = [
             math.dist(
-                _get_position(cell_lin, n1, self.coord_props),
-                _get_position(cell_lin, n2, self.coord_props),
+                _get_position(cell_lin, n1, self.coord_props, prop_id),
+                _get_position(cell_lin, n2, self.coord_props, prop_id),
             )
             for (n1, n2) in pairwise(cells)
         ]
@@ -528,8 +523,8 @@ class Straightness(NodeGlobalPropCalculator):
             preds = list(cell_lin.predecessors(first_cell))
             if len(preds) == 1:
                 dist = math.dist(
-                    _get_position(cell_lin, preds[0], self.coord_props),
-                    _get_position(cell_lin, first_cell, self.coord_props),
+                    _get_position(cell_lin, preds[0], self.coord_props, prop_id),
+                    _get_position(cell_lin, first_cell, self.coord_props, prop_id),
                 )
                 distances.append(dist)
             elif len(preds) > 1:
@@ -538,8 +533,8 @@ class Straightness(NodeGlobalPropCalculator):
         if sum(distances) == 0:
             return math.nan
 
-        first_cell_loc = _get_position(cell_lin, cells[0], self.coord_props)
-        last_cell_loc = _get_position(cell_lin, cells[-1], self.coord_props)
+        first_cell_loc = _get_position(cell_lin, cells[0], self.coord_props, prop_id)
+        last_cell_loc = _get_position(cell_lin, cells[-1], self.coord_props, prop_id)
         return math.dist(first_cell_loc, last_cell_loc) / sum(distances)
 
 
@@ -615,6 +610,12 @@ class TurningAngle(NodeLocalPropCalculator):
             Angle between the two consecutive displacement vectors.
             Returns NaN if the angle is not defined (first or last node in lineage,
             or dividing cell).
+
+        Raises
+        ------
+        MissingPropertyError
+            If the cell, its predecessor or its successor has no value for one of
+            the coordinates.
         """
         # Find the incoming and outgoing edges of the node of interest.
         predecessors = list(lineage.predecessors(node_id))
@@ -629,9 +630,16 @@ class TurningAngle(NodeLocalPropCalculator):
             raise FusionError(node_id, lineage.graph["lineage_id"])
 
         # Compute the angle between the incoming and outgoing edges.
-        in_coords = np.array(_get_position(lineage, predecessors[0], self.coord_props))
-        nid_coords = np.array(_get_position(lineage, node_id, self.coord_props))
-        out_coords = np.array(_get_position(lineage, successors[0], self.coord_props))
+        prop_id = self.property.identifier
+        in_coords = np.array(
+            _get_position(lineage, predecessors[0], self.coord_props, prop_id)
+        )
+        nid_coords = np.array(
+            _get_position(lineage, node_id, self.coord_props, prop_id)
+        )
+        out_coords = np.array(
+            _get_position(lineage, successors[0], self.coord_props, prop_id)
+        )
         vector_in = nid_coords - in_coords
         vector_out = out_coords - nid_coords
         # np.cross() needs 3D vectors: 2D ones get a null z.

@@ -14,6 +14,7 @@ from pycellin.classes.property_calculator import (
     LineageLocalPropCalculator,
     NodeLocalPropCalculator,
 )
+from pycellin.properties.utils import _get_position
 
 logger = logging.getLogger(__name__)
 
@@ -689,11 +690,16 @@ class LocationTag(NodeLocalPropCalculator):
 
         Raises
         ------
+        MissingPropertyError
+            If the cell has no value for `cell_x` or `cell_y`.
         ValueError
             If the cell's position is outside the mask image.
         """
-        x = int(np.floor(lineage.nodes[node_id]["cell_x"] / self.pixel_size + 0.5))
-        y = int(np.floor(lineage.nodes[node_id]["cell_y"] / self.pixel_size + 0.5))
+        x_coord, y_coord = _get_position(
+            lineage, node_id, ("cell_x", "cell_y"), self.property.identifier
+        )
+        x = int(np.floor(x_coord / self.pixel_size + 0.5))
+        y = int(np.floor(y_coord / self.pixel_size + 0.5))
         t = lineage.nodes[node_id]["timepoint"]
         # Explicit check: negative indices would silently wrap around.
         for axis, index, size in zip("tyx", (t, y, x), self.mask.shape):

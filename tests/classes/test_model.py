@@ -2552,19 +2552,19 @@ class TestAddRelativeAge:
 class TestAddCellSpeed:
     """Test cases for Model.add_cell_speed() method."""
 
-    def test_unit_from_time_prop(self, input_props_model):
-        input_props_model.add_cell_speed()
-        assert input_props_model.get_property("cell_speed").unit == "pixel/frame"
+    def test_unit_from_time_prop(self, contour_model):
+        contour_model.add_cell_speed()
+        assert contour_model.get_property("cell_speed").unit == "pixel/frame"
 
-    def test_wrong_time_prop_type_raises(self, input_props_model):
+    def test_wrong_time_prop_type_raises(self, contour_model):
         with pytest.raises(ValueError, match="prop_type 'node'"):
-            input_props_model.add_cell_speed(time_prop="my_speed")
+            contour_model.add_cell_speed(time_prop="my_speed")
 
-    def test_property_object_time_prop_raises(self, input_props_model):
-        time_prop = input_props_model.get_property("time")
+    def test_property_object_time_prop_raises(self, contour_model):
+        time_prop = contour_model.get_property("time")
         with pytest.raises(TypeError, match="Pass its identifier instead: 'time'"):
-            input_props_model.add_cell_speed(time_prop=time_prop)
-        assert input_props_model.get_property("cell_speed") is None
+            contour_model.add_cell_speed(time_prop=time_prop)
+        assert contour_model.get_property("cell_speed") is None
 
     def test_2d_model(self, contour_model):
         contour_model.add_cell_speed()
@@ -2578,10 +2578,67 @@ class TestGetCoordProps:
     """Test cases for Model._get_coord_props() method."""
 
     def test_2d_model(self, contour_model):
-        assert contour_model._get_coord_props() == ("cell_x", "cell_y")
+        assert contour_model._get_coord_props("prop") == ("cell_x", "cell_y")
 
     def test_3d_model(self, pixel_space_model):
-        assert pixel_space_model._get_coord_props() == ("cell_x", "cell_y", "cell_z")
+        coord_props = pixel_space_model._get_coord_props("prop")
+        assert coord_props == ("cell_x", "cell_y", "cell_z")
+
+
+class TestMissingCoordinates:
+    """Test cases for the properties that read the cell coordinates, on models or
+    cells without them."""
+
+    PROPS = (
+        "cell_displacement",
+        "cell_speed",
+        "turning_angle",
+        "straightness",
+        "location_tag",
+    )
+
+    @staticmethod
+    def _add(model, prop, tmp_path):
+        """Add a property that reads the coordinates, with a mask for
+        location_tag."""
+        kwargs = {}
+        if prop == "location_tag":
+            mask_path = tmp_path / "mask.tif"
+            tifffile.imwrite(mask_path, np.ones((5, 2, 6), dtype=np.uint8))
+            kwargs["mask_path"] = str(mask_path)
+        model.add_pycellin_property(prop, **kwargs)
+
+    @pytest.mark.parametrize("prop", PROPS)
+    def test_model_without_coordinates_raises(self, input_props_model, tmp_path, prop):
+        """Test that these properties can't be added to a model without
+        coordinates, where update() then failed with a bare KeyError."""
+        message = "'cell_x' and 'cell_y', which have not been declared"
+        with pytest.raises(MissingPropertyError, match=message):
+            self._add(input_props_model, prop, tmp_path)
+        assert not input_props_model.has_property(prop)
+
+    @pytest.mark.parametrize("prop", PROPS)
+    def test_cell_without_coordinates_raises(self, contour_model, tmp_path, prop):
+        """Test that a cell without coordinates makes update() raise an error that
+        names the cell and the property, instead of a bare KeyError."""
+        self._add(contour_model, prop, tmp_path)
+        contour_model.update()
+        new_cell = contour_model.add_cell(lineage_id=1, time_value=3)
+        contour_model.add_link(3, new_cell, source_lineage_id=1)
+        with pytest.raises(MissingPropertyError, match=f"'{prop}'") as error:
+            contour_model.update()
+        assert error.value.prop == "cell_x"
+        assert (error.value.node_id, error.value.lineage_id) == (new_cell, 1)
+
+    def test_none_coordinate_raises(self, contour_model):
+        """Test that a coordinate set to None is missing too."""
+        contour_model.add_cell_displacement()
+        contour_model.update()
+        contour_model.data.cell_lineages[1].nodes[4]["cell_y"] = None
+        contour_model.prepare_full_data_update()
+        with pytest.raises(MissingPropertyError) as error:
+            contour_model.update()
+        assert (error.value.prop, error.value.node_id) == ("cell_y", 4)
 
 
 class TestAddCellDisplacement:
