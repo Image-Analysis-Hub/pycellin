@@ -262,6 +262,9 @@ def _unit_to_dimension(
                 dimension = "NONE"
 
     if dimension is None:
+        # TODO: It's going to be a nightmare to deal with all the possible cases.
+        # Is it even possible? Maybe I could ask the user for a file with
+        # a property-dimension mapping. For now, I just set the dimension to NONE.
         match unit:
             case "pixel":
                 if name.lower() in ["x", "y", "z"]:
@@ -270,12 +273,13 @@ def _unit_to_dimension(
                     dimension = "LENGTH"
             case None | "frame":
                 dimension = "NONE"
-        # TODO: It's going to be a nightmare to deal with all the possible cases.
-        # Is it even possible? Maybe I could ask the user for a file with
-        # a property-dimension mapping. For now, I just set the dimension to NONE.
-        msg = f"Cannot infer dimension for property '{name}'. Dimension is set to NONE."
-        logger.warning(msg)
-        dimension = "NONE"
+            case _:
+                msg = (
+                    f"Cannot infer dimension for property '{name}'. Dimension is "
+                    "set to NONE."
+                )
+                logger.warning(msg)
+                dimension = "NONE"
 
     assert dimension is not None
     return dimension

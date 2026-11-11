@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to b10b5cf, plus the uncommitted errors of get_branch_profile_figure() for missing properties (new in 0.6.0, so no entry). Update from there with: git log b10b5cf..dev -->
+<!-- Planned v0.6.0. Covers commits up to 491c398, plus the uncommitted dimensions of the TrackMate export for the properties it doesn't know. Update from there with: git log 491c398..dev -->
 
 Model merging and splitting, a lot of new properties, branch plots, and many fixes around time handling. **This release contains breaking changes**, listed first below.
 
@@ -201,6 +201,7 @@ Model merging and splitting, a lot of new properties, branch plots, and many fix
 - **Properties:** `cell_displacement`, `cell_speed`, `turning_angle` (`angle` in 0.5.1) and `straightness` could be added to a model without cell coordinates, e.g. read from a CTC file without label images, and `update()` then failed with `KeyError: 'cell_x'`: the model couldn't be updated or exported until they were removed. They now raise `MissingPropertyError` when added, as does `location_tag`. A cell without coordinates, e.g. added with `add_cell()`, gave the same `KeyError` at update: the `MissingPropertyError` raised now names the cell, its lineage and the property
 - **TrackMate:** `turning_angle` (`angle` in 0.5.1) in degrees was exported as a TrackMate angle, which TrackMate reads as radians
 - **TrackMate:** `division_rate` was exported as a time, so TrackMate showed it in the time unit, and the loader read it back with that unit, e.g. "minute" instead of "1/minute". It is now exported as a rate. The loader, which failed with `ValueError: Invalid dimension: RATE` on features with that dimension, reads them in 1 over the time unit
+- **TrackMate:** the exporter declared the properties that TrackMate and pycellin don't know, e.g. custom ones, with the dimension NONE and a warning, whatever their unit. Those in pixels are now declared as lengths, or positions when named `x`, `y` or `z`, and those without unit or in frames as NONE without warning. Other units still give NONE with the warning
 - **TrackMate:** with `keep_all_spots=True` (now `lone_spots="all"`), spots without a track got lineage IDs already used by tracks, so some lineages were silently lost. They now get the next IDs after those of the tracks
 - **TrackMate:** the exporter wrote missing values (None) as the string 'None', which TrackMate can't read. They are now written as NaN, which the loader reads back as None for integer properties instead of failing
 - **TrackMate:** without `propagate_cycle_props=True`, the exporter declared the cycle properties as spot features although no spot had their values. In the reloaded model, these declarations remained after `add_cycle_lineages()` (`add_cycle_data()` in 0.5.1), so pycellin treated the cycle properties as cell lineage properties: `propagate_cycle_properties()` skipped them, or raised when they were listed. Cycle properties are now only declared when propagated

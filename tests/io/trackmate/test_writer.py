@@ -277,6 +277,33 @@ class TestUnitToDimension:
         )
         assert _unit_to_dimension(prop) == dimension
 
+    @pytest.mark.parametrize(
+        ("identifier", "unit", "dimension", "warns"),
+        [
+            ("my_length", "pixel", "LENGTH", False),
+            ("x", "pixel", "POSITION", False),
+            ("my_count", None, "NONE", False),
+            ("my_frame", "frame", "NONE", False),
+            ("my_time", "min", "NONE", True),
+        ],
+    )
+    def test_dimension_from_unit(self, caplog, identifier, unit, dimension, warns):
+        """Test the dimension given by the unit of a property that TrackMate and
+        pycellin don't know, and the warning when the unit gives none."""
+        prop = Property(
+            identifier=identifier,
+            name=identifier,
+            description=identifier,
+            provenance="custom",
+            prop_type="node",
+            lineage_type="cell",
+            dtype="float",
+            unit=unit,
+        )
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"):
+            assert _unit_to_dimension(prop) == dimension
+        assert ("Cannot infer dimension" in caplog.text) is warns
+
 
 class TestTransformName:
     """Test cases for _transform_name function."""
