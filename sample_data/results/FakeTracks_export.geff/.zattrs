@@ -12,9 +12,9 @@
                 "unit": "second"
             },
             {
-                "max": 109.03703703703704,
-                "min": 8.866666666666667,
-                "name": "cell_x",
+                "max": 0.0,
+                "min": 0.0,
+                "name": "cell_z",
                 "offset": null,
                 "scale": null,
                 "scaled_unit": null,
@@ -32,9 +32,9 @@
                 "unit": "micrometer"
             },
             {
-                "max": 0.0,
-                "min": 0.0,
-                "name": "cell_z",
+                "max": 109.03703703703704,
+                "min": 8.866666666666667,
+                "name": "cell_x",
                 "offset": null,
                 "scale": null,
                 "scaled_unit": null,
@@ -212,7 +212,7 @@
                 "dtype": "int64",
                 "identifier": "FRAME",
                 "name": "Frame",
-                "unit": null,
+                "unit": "frame",
                 "varlength": false
             },
             "MAX_INTENSITY_CH1": {
