@@ -17,6 +17,7 @@ from pycellin.io.trackmate.writer import (
     _relabel_nodes,
     _remove_non_numeric_props,
     _transform_name,
+    _unit_to_dimension,
     _value_to_str,
     _write_FeatureDeclarations,
     write_trackmate_xml,
@@ -244,6 +245,37 @@ def list_prop():
 
 
 # Test Classes ################################################################
+
+
+class TestUnitToDimension:
+    """Test cases for _unit_to_dimension function."""
+
+    @pytest.mark.parametrize(
+        ("identifier", "dimension"),
+        [
+            ("cell_mean_intensity", "INTENSITY"),
+            ("cell_total_intensity", "INTENSITY"),
+            ("cycle_mean_area", "AREA"),
+            ("birth_area", "AREA"),
+            ("division_area", "AREA"),
+            ("cycle_mean_intensity", "INTENSITY"),
+            ("birth_intensity", "INTENSITY"),
+            ("division_intensity", "INTENSITY"),
+            ("division_rate", "RATE"),
+        ],
+    )
+    def test_pycellin_property_dimension(self, identifier, dimension):
+        """Test the dimensions of the area, intensity and rate properties."""
+        prop = Property(
+            identifier=identifier,
+            name=identifier,
+            description=identifier,
+            provenance="pycellin",
+            prop_type="node",
+            lineage_type="cell",
+            dtype="float",
+        )
+        assert _unit_to_dimension(prop) == dimension
 
 
 class TestTransformName:

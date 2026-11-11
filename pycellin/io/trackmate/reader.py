@@ -140,6 +140,8 @@ def _dimension_to_unit(trackmate_prop, units) -> str | None:
             return units["spatialunits"] + "^2"
         case "TIME":
             return units["timeunits"]
+        case "RATE":
+            return "1/" + units["timeunits"]
         case "ANGLE":
             return "rad"
         case "ANGLE_RATE":

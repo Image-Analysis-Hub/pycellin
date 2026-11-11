@@ -287,6 +287,11 @@ class TestDimensionToUnit:
         trackmate_feature = {"feature": "VISIBILITY", "dimension": "NONE"}
         assert tml._dimension_to_unit(trackmate_feature, units) is None
 
+    def test_rate_is_per_time_unit(self, units: dict[str, str]):
+        """Test that RATE features, such as division_rate, are per time unit."""
+        trackmate_feature = {"feature": "division_rate", "dimension": "RATE"}
+        assert tml._dimension_to_unit(trackmate_feature, units) == "1/s"
+
 
 # _convert_and_add_prop ####################################################
 
