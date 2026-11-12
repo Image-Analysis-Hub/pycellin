@@ -55,6 +55,10 @@ test = [
     "pytest>=8.3",
     "pytest-cov>=6.0",
 ]
+docs = [
+    "myst-parser>=5.2",
+    "sphinx>=9.2",
+]
 
 [tool.setuptools.packages.find]
 include = ["pycellin*"]
