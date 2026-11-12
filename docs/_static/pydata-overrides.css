@@ -15,6 +15,9 @@ html[data-theme="light"] {
   --pst-color-secondary-bg: #f7e3ec;
   /* Links shown as code (API references) and links in some boxes. */
   --pst-color-link-higher-contrast: #7125a7;
+  /* sphinx-design: background of dropdowns with :color: primary or secondary. */
+  --sd-color-primary-bg: var(--pst-color-primary-bg);
+  --sd-color-secondary-bg: var(--pst-color-secondary-bg);
 }
 
 html[data-theme="dark"] {
@@ -25,4 +28,8 @@ html[data-theme="dark"] {
   --pst-color-secondary-highlight: #d56898;
   --pst-color-secondary-bg: #441328;
   --pst-color-link-higher-contrast: #c493e7;
+  /* sphinx-design: background of dropdowns with :color: primary or secondary. */
+  --sd-color-primary-bg: var(--pst-color-primary-bg);
+  --sd-color-secondary-bg: var(--pst-color-secondary-bg);
+
 }

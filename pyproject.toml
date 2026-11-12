@@ -59,6 +59,7 @@ docs = [
     "myst-parser>=5.2",
     "pydata-sphinx-theme>=0.24",
     "sphinx>=9.2",
+    "sphinx-design>=0.8",
 ]
 
 [tool.setuptools.packages.find]
