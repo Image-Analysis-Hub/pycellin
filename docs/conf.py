@@ -24,14 +24,19 @@ exclude_patterns = ["_build"]
 
 # -- HTML output ---------------------------------------------------------------
 # Theme-specific settings stay in this block: switching themes means rewriting it.
-# Shibuya options: https://shibuya.lepture.com/
+# PyData options: https://pydata-sphinx-theme.readthedocs.io/en/stable/
 
-html_theme = "shibuya"
+html_theme = "pydata_sphinx_theme"
 html_theme_options = {
-    "accent_color": "purple",
-    "github_url": "https://github.com/Image-Analysis-Hub/pycellin",
+    # Font Awesome icons ship with the theme: no download when a page loads.
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/Image-Analysis-Hub/pycellin",
+            "icon": "fa-brands fa-github",
+        },
+    ],
 }
 html_logo = "../pycellin_logo.png"
 html_static_path = ["_static"]
-html_css_files = ["shibuya-overrides.css"]
-
+html_css_files = ["pydata-overrides.css"]

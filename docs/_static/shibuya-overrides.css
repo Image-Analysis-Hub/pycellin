@@ -1,6 +1,0 @@
-/* Shibuya-specific adjustments. To delete if the docs switch themes. */
-
-/* Header logo: Shibuya's default is 28px, in a 56px header. */
-.sy-head-brand img {
-    height: 44px;
-}
