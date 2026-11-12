@@ -57,6 +57,7 @@ test = [
 ]
 docs = [
     "myst-parser>=5.2",
+    "numpydoc>=1.11",
     "pydata-sphinx-theme>=0.24",
     "sphinx>=9.2",
     "sphinx-design>=0.8",

@@ -37,6 +37,7 @@ Upgrading from 0.5.1? Read [the upgrade notes](#upgrading-from-0-5-1).
 :hidden:
 
 user_guide/index
+api/index
 ```
 
 
