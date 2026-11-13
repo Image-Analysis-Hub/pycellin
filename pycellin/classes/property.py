@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import contextlib
 from typing import Any, get_args
 
 from pycellin.custom_types import (
@@ -69,9 +70,11 @@ class Property:
         self.description = description
         self.provenance = provenance
 
-        # Convert string/list to PropertyType Flag if needed.
+        # Convert string/list to PropertyType Flag if needed. An unknown string is
+        # left as it is, to be refused below with the list of the valid values.
         if isinstance(prop_type, (str, list)):
-            prop_type = _property_type_from_string(prop_type)
+            with contextlib.suppress(KeyError):
+                prop_type = _property_type_from_string(prop_type)
 
         # Validate PropertyType.
         if not isinstance(prop_type, PropertyType) or prop_type == PropertyType(0):
@@ -80,7 +83,7 @@ class Property:
                 "flag set. Valid types: PropertyType.NODE, PropertyType.EDGE, "
                 "PropertyType.LINEAGE, or combinations like "
                 "PropertyType.NODE | PropertyType.EDGE, and strings/lists: "
-                "'node', 'edge', 'lineage', ['node', 'lineage']."
+                f"'node', 'edge', 'lineage', ['node', 'lineage']. Got {prop_type!r}."
             )
         self.prop_type = prop_type
 

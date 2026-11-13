@@ -97,6 +97,20 @@ class TestPropertyConstructor:
                 dtype="int",
             )
 
+    @pytest.mark.parametrize("prop_type", ["nodes", ["node", "edges"]])
+    def test_unknown_property_type_string_raises_error(self, prop_type):
+        """Test that an unknown property type string raises ValueError, not KeyError."""
+        with pytest.raises(ValueError, match="Valid types: .* Got "):
+            Property(
+                identifier="test",
+                name="test",
+                description="test",
+                provenance="test",
+                prop_type=prop_type,
+                lineage_type="cell",
+                dtype="int",
+            )
+
 
 class TestPropertyEq:
     """Test cases for Property.__eq()__ method."""
