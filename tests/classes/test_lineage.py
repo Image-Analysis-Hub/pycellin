@@ -182,12 +182,12 @@ def cell_lin_balanced():
 
 @pytest.fixture
 def empty_cycle_lin():
-    return CycleLineage(time_prop="timepoint", time_step=1)
+    return CycleLineage(time_prop="timepoint")
 
 
 @pytest.fixture
 def one_node_cycle_lin():
-    lineage = CycleLineage(time_prop="timepoint", time_step=1)
+    lineage = CycleLineage(time_prop="timepoint")
     lineage.add_node(1, generation=0)
     return lineage
 
@@ -195,7 +195,7 @@ def one_node_cycle_lin():
 @pytest.fixture
 def cycle_lin():
     # Nothing special, just a lineage.
-    lineage = CycleLineage(time_prop="timepoint", time_step=1)
+    lineage = CycleLineage(time_prop="timepoint")
     lineage.add_edges_from(
         [
             (1, 2),
@@ -221,9 +221,7 @@ def cycle_lin_triple_div(cycle_lin):
 def cycle_lin_balanced(cell_lin_balanced):
     # Cell cycles of cell_lin_balanced, identified by their last cell:
     # 1 to 7, then 16 to 23 for the cell cycles [8, 16] to [15, 23].
-    return CycleLineage(
-        time_prop="timepoint", time_step=1, cell_lineage=cell_lin_balanced
-    )
+    return CycleLineage(time_prop="timepoint", cell_lineage=cell_lin_balanced)
 
 
 # Test classes ###############################################################
@@ -2549,9 +2547,7 @@ class TestCycleLineageInit:
 
     def test_normal_lin(self, cell_lin):
         """Test CycleLineage creation on normal lineage."""
-        cycle_lin = CycleLineage(
-            time_prop="timepoint", time_step=1, cell_lineage=cell_lin
-        )
+        cycle_lin = CycleLineage(time_prop="timepoint", cell_lineage=cell_lin)
         assert sorted(cycle_lin.nodes()) == [2, 4, 6, 8, 9, 10, 14, 15, 16]
         assert cycle_lin.graph["lineage_id"] == 1
         assert cycle_lin.nodes[2]["cycle_id"] == 2
@@ -2581,17 +2577,13 @@ class TestCycleLineageInit:
 
     def test_empty_lin(self, empty_cell_lin):
         """Test CycleLineage creation on empty lineage."""
-        cycle_lin = CycleLineage(
-            time_prop="timepoint", time_step=1, cell_lineage=empty_cell_lin
-        )
+        cycle_lin = CycleLineage(time_prop="timepoint", cell_lineage=empty_cell_lin)
         assert len(cycle_lin) == 0
         assert cycle_lin.graph["lineage_id"] == 1
 
     def test_single_node(self, one_node_cell_lin):
         """Test CycleLineage creation on single node lineage."""
-        cycle_lin = CycleLineage(
-            time_prop="timepoint", time_step=1, cell_lineage=one_node_cell_lin
-        )
+        cycle_lin = CycleLineage(time_prop="timepoint", cell_lineage=one_node_cell_lin)
         assert len(cycle_lin) == 1
         assert cycle_lin.graph["lineage_id"] == 1
         assert cycle_lin.nodes[1]["cycle_id"] == 1
@@ -2605,9 +2597,7 @@ class TestCycleLineageInit:
 
     def test_gap(self, cell_lin_gap):
         """Test CycleLineage creation on lineage with gaps."""
-        cycle_lin = CycleLineage(
-            time_prop="timepoint", time_step=1, cell_lineage=cell_lin_gap
-        )
+        cycle_lin = CycleLineage(time_prop="timepoint", cell_lineage=cell_lin_gap)
         assert sorted(cycle_lin.nodes()) == [2, 4, 6, 8, 9, 10, 14, 15, 16]
         assert cycle_lin.graph["lineage_id"] == 1
         assert cycle_lin.nodes[2]["cycle_id"] == 2
@@ -2637,9 +2627,7 @@ class TestCycleLineageInit:
 
     def test_div_root(self, cell_lin_div_root):
         """Test CycleLineage creation on lineage with division root."""
-        cycle_lin = CycleLineage(
-            time_prop="timepoint", time_step=1, cell_lineage=cell_lin_div_root
-        )
+        cycle_lin = CycleLineage(time_prop="timepoint", cell_lineage=cell_lin_div_root)
         assert sorted(cycle_lin.nodes()) == [1, 2, 4, 6, 8, 9, 10, 14, 15, 16, 17]
         assert cycle_lin.graph["lineage_id"] == 1
         assert cycle_lin.nodes[1]["cycle_id"] == 1
@@ -2664,7 +2652,6 @@ class TestCycleLineageInit:
         root."""
         cycle_lin = CycleLineage(
             time_prop="timepoint",
-            time_step=1,
             cell_lineage=cell_lin_successive_divs_and_root,
         )
         assert sorted(cycle_lin.nodes()) == [2, 3, 5, 6, 7, 8, 9, 10, 11]
@@ -2689,7 +2676,7 @@ class TestCycleLineageInit:
     def test_triple_div(self, cell_lin_triple_div):
         """Test CycleLineage creation on lineage with triple division."""
         cycle_lin = CycleLineage(
-            time_prop="timepoint", time_step=1, cell_lineage=cell_lin_triple_div
+            time_prop="timepoint", cell_lineage=cell_lin_triple_div
         )
         assert sorted(cycle_lin.nodes()) == [2, 4, 6, 8, 9, 10, 14, 15, 16, 18]
         assert cycle_lin.graph["lineage_id"] == 1
@@ -2715,7 +2702,6 @@ class TestCycleLineageInit:
         with pytest.raises(LineageStructureError):
             CycleLineage(
                 time_prop="timepoint",
-                time_step=1,
                 cell_lineage=cell_lin_unconnected_node,
             )
 
@@ -2724,7 +2710,6 @@ class TestCycleLineageInit:
         with pytest.raises(LineageStructureError):
             CycleLineage(
                 time_prop="timepoint",
-                time_step=1,
                 cell_lineage=cell_lin_unconnected_component,
             )
 
@@ -2799,9 +2784,7 @@ class TestCycleLineageGetCousins:
 
     def test_no_time_constraint(self, cell_lin):
         """Test get_cousins returns cousin cycles whatever their timepoints."""
-        cycle_lin = CycleLineage(
-            time_prop="timepoint", time_step=1, cell_lineage=cell_lin
-        )
+        cycle_lin = CycleLineage(time_prop="timepoint", cell_lineage=cell_lin)
         # The cells of cell cycles [5, 6] and [7, 8] end before the cell of [15]
         # starts, but they are still its cousins.
         assert cycle_lin.get_cousins(15) == [6, 8]
@@ -2817,9 +2800,7 @@ class TestCycleLineageGetLinksWithinCycle:
 
     def test_normal_lin(self, cell_lin):
         """Test get_links_within_cycle on normal lineage."""
-        cycle_lin = CycleLineage(
-            time_prop="timepoint", time_step=1, cell_lineage=cell_lin
-        )
+        cycle_lin = CycleLineage(time_prop="timepoint", cell_lineage=cell_lin)
         # From division.
         assert cycle_lin.get_links_within_cycle(2) == [(1, 2)]
         assert cycle_lin.get_links_within_cycle(4) == [(3, 4)]
@@ -2832,16 +2813,12 @@ class TestCycleLineageGetLinksWithinCycle:
 
     def test_single_node(self, one_node_cell_lin):
         """Test get_links_within_cycle on single node lineage."""
-        cycle_lin = CycleLineage(
-            time_prop="timepoint", time_step=1, cell_lineage=one_node_cell_lin
-        )
+        cycle_lin = CycleLineage(time_prop="timepoint", cell_lineage=one_node_cell_lin)
         assert cycle_lin.get_links_within_cycle(1) == []
 
     def test_gap(self, cell_lin_gap):
         """Test get_links_within_cycle on lineage with gaps."""
-        cycle_lin = CycleLineage(
-            time_prop="timepoint", time_step=1, cell_lineage=cell_lin_gap
-        )
+        cycle_lin = CycleLineage(time_prop="timepoint", cell_lineage=cell_lin_gap)
         # From division.
         assert cycle_lin.get_links_within_cycle(2) == [(1, 2)]
         assert cycle_lin.get_links_within_cycle(4) == [(3, 4)]
@@ -2854,9 +2831,7 @@ class TestCycleLineageGetLinksWithinCycle:
 
     def test_div_root(self, cell_lin_div_root):
         """Test get_links_within_cycle on lineage with division root."""
-        cycle_lin = CycleLineage(
-            time_prop="timepoint", time_step=1, cell_lineage=cell_lin_div_root
-        )
+        cycle_lin = CycleLineage(time_prop="timepoint", cell_lineage=cell_lin_div_root)
         assert cycle_lin.get_links_within_cycle(1) == []
         assert cycle_lin.get_links_within_cycle(2) == []
         assert cycle_lin.get_links_within_cycle(17) == []
@@ -2869,7 +2844,6 @@ class TestCycleLineageGetLinksWithinCycle:
         root."""
         cycle_lin = CycleLineage(
             time_prop="timepoint",
-            time_step=1,
             cell_lineage=cell_lin_successive_divs_and_root,
         )
         assert cycle_lin.get_links_within_cycle(2) == []
@@ -2883,7 +2857,7 @@ class TestCycleLineageGetLinksWithinCycle:
     def test_triple_div(self, cell_lin_triple_div):
         """Test get_links_within_cycle on lineage with triple division."""
         cycle_lin = CycleLineage(
-            time_prop="timepoint", time_step=1, cell_lineage=cell_lin_triple_div
+            time_prop="timepoint", cell_lineage=cell_lin_triple_div
         )
         assert cycle_lin.get_links_within_cycle(4) == [(3, 4)]
         assert cycle_lin.get_links_within_cycle(6) == [(5, 6)]

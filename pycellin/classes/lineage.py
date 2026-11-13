@@ -3017,16 +3017,12 @@ class CycleLineage(Lineage):
     time_prop : str
         The time property used to compute the durations, start and end times of the
         cell cycles.
-    time_step : float
-        Not used.
     cell_lineage : CellLineage | None, default=None
         The cell lineage to build the cycle lineage from. None for an empty cycle
         lineage.
     """
 
-    def __init__(
-        self, time_prop: str, time_step: float, cell_lineage: CellLineage | None = None
-    ) -> None:
+    def __init__(self, time_prop: str, cell_lineage: CellLineage | None = None) -> None:
         super().__init__()
 
         if cell_lineage is not None:

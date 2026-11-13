@@ -35,7 +35,7 @@ def data():
         lineage.edges[source, target]["my_motion"] = float(target)
     lineage.graph["lineage_id"] = 1
     data = Data({1: lineage})
-    data._add_cycle_lineages(time_prop="frame", time_step=1)
+    data._add_cycle_lineages(time_prop="frame")
     return data
 
 

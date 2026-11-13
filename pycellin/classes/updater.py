@@ -428,7 +428,7 @@ class _ModelUpdater:
                 # else:
                 #     data.cycle_lineages[lin_id] = new_cycle_lineages
                 data.cycle_lineages[lin_id] = data._compute_cycle_lineage(
-                    time_prop, time_step, lin_id
+                    time_prop, lin_id
                 )
         # Remove cycle lineages whose cell lineage has been removed.
         for lin_id in self._removed_lineages:

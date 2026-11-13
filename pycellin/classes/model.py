@@ -1724,7 +1724,7 @@ class Model:
                     )
                 else:
                     cycle_lineage = self.data._compute_cycle_lineage(
-                        self.reference_time_prop, timestep, lineage_id
+                        self.reference_time_prop, lineage_id
                     )
                     self.data.cycle_lineages[lineage_id] = cycle_lineage
 
@@ -5510,7 +5510,7 @@ class Model:
             )
         for prop_id in unused:
             self.props_metadata._remove_prop(prop_id)
-        self.data._add_cycle_lineages(time_prop, time_step)
+        self.data._add_cycle_lineages(time_prop)
         self.props_metadata._add_cycle_lineage_props(time_unit)
 
     def has_cycle_lineages(self) -> bool:
@@ -6093,7 +6093,7 @@ class Model:
                     (lin, lid) for lid, lin in model1.data.cell_lineages.items()
                 ]
             for lin, lid in lineages:
-                cycle_lin = CycleLineage(time_prop, time_step, lin)
+                cycle_lin = CycleLineage(time_prop, lin)
                 cycle_lin.graph["lineage_id"] = lid
                 cycle_lineages_to_add[lid] = cycle_lin
 

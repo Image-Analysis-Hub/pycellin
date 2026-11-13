@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the documentation work of feature/docs up to 8f07c52 and the uncommitted constructors batch of the docstring pass. Update from there with: git log 6b884a4..dev -->
+<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the documentation work of feature/docs up to c5e5b92 and the uncommitted fixes found by the docstring pass (Property, PropsMetadata, CycleLineage time_step). Update from there with: git log 6b884a4..dev -->
 
 Model merging and splitting, many new properties (morphology, intensity, topology), branch plots, consistent names that follow PEP 8, and many fixes, notably to time handling and to reading and writing TrackMate, GEFF, CTC and trackpy data. **This release contains breaking changes**, listed first below.
 
@@ -57,6 +57,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Exceptions:** the exceptions moved from `pycellin.classes.exceptions` to `pycellin.exceptions`, available as `pc.exceptions` (e.g. `pc.exceptions.UpdateRequiredError`)
 - **Lineages:** `get_root()` always returns one node: it raises `LineageStructureError` when the lineage doesn't have exactly one root, instead of returning a list. The new `get_roots()` always returns a list, like `get_leaves()`
 - **Lineages:** `CycleLineage.yield_links_within_cycle()` is removed: use `get_links_within_cycle()`
+- **Lineages:** `CycleLineage()` no longer takes a `time_step` argument, unused since `cycle_duration` is computed from the reference time property alone: `CycleLineage(time_prop, time_step, cell_lineage)` → `CycleLineage(time_prop, cell_lineage)`
 - **Properties:** `pycellin.graph.properties` moved to `pycellin.properties`, and its `tracking` module is now `timing`, except `is_complete_cycle`, now in `topology`. The `pycellin.graph` package no longer exists. `pycellin.properties` no longer exposes the calculators: import them from their module, e.g. `from pycellin.properties.morphology import RodLength`
 - **Properties:** rename the `branch_*` properties to `cycle_*`, along with their `add_*()` methods, factories and calculators:
   - `branch_total_displacement` → `cycle_total_displacement`
@@ -202,6 +203,8 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning
 - **Properties:** `cell_displacement`, `cell_speed`, `turning_angle` (`angle` in 0.5.1) and `straightness`, and the cycle properties computed from them, failed with `KeyError` on 2D models without `cell_z`, e.g. loaded from CTC label images or a GEFF file. They now use `cell_x` and `cell_y`, plus `cell_z` when it is declared
 - **Properties:** `cell_displacement`, `cell_speed`, `turning_angle` (`angle` in 0.5.1) and `straightness` could be added to a model without cell coordinates, e.g. read from a CTC file without label images, and `update()` then failed with `KeyError: 'cell_x'`: the model couldn't be updated or exported until they were removed. They now raise `MissingPropertyError` when added, as does `location_tag`. A cell without coordinates, e.g. added with `add_cell()`, gave the same `KeyError` at update: the `MissingPropertyError` raised now names the cell, its lineage and the property
+- **Properties:** `Property()` raised `KeyError` on an unknown property type, e.g. `prop_type="nodes"`. It now raises the `ValueError` it raises for other invalid property types, which lists the valid ones and now also gives the value received
+- **Properties:** `PropsMetadata()` drops the protected properties that aren't declared, with a warning, but missed every other one of them in a row, e.g. the second one in `protected_props=["a", "b"]`, which stayed protected. It also removed the ones it dropped from the list given as `protected_props`
 - **Plotting:** `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()` modified the `node_marker_style` dict given to them, adding the node colors of `node_colormap_prop` to it: the same dict reused for another lineage gave it the colors and color bar of the previous lineage
 - **TrackMate:** `turning_angle` (`angle` in 0.5.1) in degrees was exported as a TrackMate angle, which TrackMate reads as radians
 - **TrackMate:** `division_rate` was exported as a time, so TrackMate showed it in the time unit, and the reader read it back with that unit, e.g. "minute" instead of "1/minute". It is now exported as a rate. The reader, which failed with `ValueError: Invalid dimension: RATE` on features with that dimension, reads them in 1 over the time unit
