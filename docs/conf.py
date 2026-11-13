@@ -64,6 +64,8 @@ numpydoc_xref_param_type = True
 numpydoc_xref_ignore = "all"
 numpydoc_xref_aliases = {
     # Other projects, by the short names pycellin's docstrings use.
+    "go.Figure": ":class:`plotly.graph_objects.Figure`",
+    "np.ndarray": "numpy.ndarray",
     "nx.DiGraph": "networkx.DiGraph",
     "pd.DataFrame": "pandas.DataFrame",
     "Path": "pathlib.Path",
