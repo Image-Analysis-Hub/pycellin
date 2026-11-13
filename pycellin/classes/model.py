@@ -4240,6 +4240,13 @@ class Model:
         custom_description : str | None, default=None
             New description for the property. If None, the description will take its
             default value (see :doc:`/api/predefined_properties`).
+
+        Raises
+        ------
+        ValueError
+            If pixels are not isotropic in x and y.
+        MissingPropertyError
+            If ``cell_contour`` has not been declared in the model.
         """
         prop = morpho.create_rod_length_property(
             custom_identifier=custom_identifier,
@@ -4247,13 +4254,9 @@ class Model:
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-        pixel_size = self.get_pixel_size()
-        size_x = pixel_size["width"] if pixel_size else 1.0
-        size_y = pixel_size["height"] if pixel_size else 1.0
-        assert size_x == size_y, "Pixels must be isotropic in x and y."
         calc = morpho.RodLength(
             prop,
-            size_x,
+            self._get_xy_pixel_size(),
             skeleton_method=skeleton_method,
             tolerance=tolerance,
             width_method=width_method,
@@ -4357,6 +4360,13 @@ class Model:
         custom_description : str | None, default=None
             New description for the property. If None, the description will take its
             default value (see :doc:`/api/predefined_properties`).
+
+        Raises
+        ------
+        ValueError
+            If pixels are not isotropic in x and y.
+        MissingPropertyError
+            If ``cell_contour`` has not been declared in the model.
         """
         prop = morpho.create_rod_width_property(
             custom_identifier=custom_identifier,
@@ -4364,13 +4374,9 @@ class Model:
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-        pixel_size = self.get_pixel_size()
-        size_x = pixel_size["width"] if pixel_size else 1.0
-        size_y = pixel_size["height"] if pixel_size else 1.0
-        assert size_x == size_y, "Pixels must be isotropic in x and y."
         calc = morpho.RodWidth(
             prop,
-            size_x,
+            self._get_xy_pixel_size(),
             skeleton_method=skeleton_method,
             tolerance=tolerance,
             width_method=width_method,

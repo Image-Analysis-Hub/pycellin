@@ -1169,6 +1169,7 @@ def _get_width_and_length(
     width_ignore_tips: bool = False,
     debug: bool = False,
     debug_folder: str | None = None,
+    contour_prop: str = "cell_contour",
 ) -> tuple[float, float]:
     """
     Compute the width and length of the ROI associated with a node.
@@ -1197,6 +1198,9 @@ def _get_width_and_length(
         Requires matplotlib, which pycellin does not install.
     debug_folder : Optional[str], optional
         Folder in which to save the debug graphs, by default None.
+    contour_prop : str, optional
+        Identifier of the node property holding the cell contours, by default
+        "cell_contour".
 
     Returns
     -------
@@ -1213,7 +1217,7 @@ def _get_width_and_length(
     # First we need to reconstruct the image of the object we are working on.
     # This is done by drawing and filling a polygon defined by the points
     # in the ROI list.
-    roi = lineage.nodes[node_id]["cell_contour"]
+    roi = lineage.nodes[node_id][contour_prop]
     # The coordinates extracted from the graph are in microns, not in pixels.
     # roi = [(int(x * x_resolution), int(y * x_resolution)) for (x, y) in roi]
     roi = [(int(x * 1 / pixel_size), int(y * 1 / pixel_size)) for (x, y) in roi]
@@ -1515,6 +1519,10 @@ def create_rod_width_property(
 
 
 class RodWidth(NodeLocalPropCalculator):
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "contour_prop": ("node", "cell")
+    }
+
     def __init__(
         self,
         property,
@@ -1525,6 +1533,7 @@ class RodWidth(NodeLocalPropCalculator):
         width_ignore_tips: bool = False,
         debug: bool = False,
         debug_folder: str | None = None,
+        contour_prop: str = "cell_contour",
     ):
         super().__init__(property)
         self.pixel_size = pixel_size
@@ -1534,6 +1543,7 @@ class RodWidth(NodeLocalPropCalculator):
         self.width_ignore_tips = width_ignore_tips
         self.debug = debug
         self.debug_folder = debug_folder
+        self.contour_prop = contour_prop
 
     def compute(  # type: ignore[override]
         self, lineage: CellLineage, node_id: int
@@ -1548,6 +1558,7 @@ class RodWidth(NodeLocalPropCalculator):
             self.width_ignore_tips,
             self.debug,
             self.debug_folder,
+            self.contour_prop,
         )[0]
 
 
@@ -1572,6 +1583,10 @@ def create_rod_length_property(
 
 
 class RodLength(NodeLocalPropCalculator):
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "contour_prop": ("node", "cell")
+    }
+
     def __init__(
         self,
         property,
@@ -1582,6 +1597,7 @@ class RodLength(NodeLocalPropCalculator):
         width_ignore_tips: bool = False,
         debug: bool = False,
         debug_folder: str | None = None,
+        contour_prop: str = "cell_contour",
     ):
         super().__init__(property)
         self.pixel_size = pixel_size
@@ -1591,6 +1607,7 @@ class RodLength(NodeLocalPropCalculator):
         self.width_ignore_tips = width_ignore_tips
         self.debug = debug
         self.debug_folder = debug_folder
+        self.contour_prop = contour_prop
 
     def compute(  # type: ignore[override]
         self, lineage: CellLineage, node_id: int
@@ -1605,6 +1622,7 @@ class RodLength(NodeLocalPropCalculator):
             self.width_ignore_tips,
             self.debug,
             self.debug_folder,
+            self.contour_prop,
         )[1]
 
 

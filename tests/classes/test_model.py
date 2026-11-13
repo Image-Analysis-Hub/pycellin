@@ -2334,6 +2334,24 @@ class TestAddCellMultipolygon:
             input_props_model.add_cell_multipolygon()
 
 
+class TestAddRodProperties:
+    """Test cases for Model.add_rod_length() and Model.add_rod_width() methods."""
+
+    @pytest.mark.parametrize("method", ["add_rod_length", "add_rod_width"])
+    def test_anisotropic_pixels_raise(self, contour_model, method):
+        contour_model.model_metadata.pixel_width = 1.0
+        contour_model.model_metadata.pixel_height = 2.0
+        with pytest.raises(ValueError, match="isotropic"):
+            getattr(contour_model, method)()
+
+    @pytest.mark.parametrize("method", ["add_rod_length", "add_rod_width"])
+    def test_missing_contour_prop_raises(self, input_props_model, method):
+        with pytest.raises(
+            MissingPropertyError, match="requires the property 'cell_contour'"
+        ):
+            getattr(input_props_model, method)()
+
+
 @pytest.fixture()
 def intensity_model(input_props_model):
     """
