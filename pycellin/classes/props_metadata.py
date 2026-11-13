@@ -56,18 +56,17 @@ class PropsMetadata:
         propagated_props: list[str] | None = None,
     ) -> None:
         self.properties = properties if properties is not None else {}
-        self._protected_props = protected_props if protected_props is not None else []
-        self._propagated_props = (
-            propagated_props if propagated_props is not None else []
-        )
-        for prop in self._protected_props:
-            if prop not in self.properties:
+        self._protected_props: list[str] = []
+        for prop in protected_props or []:
+            if prop in self.properties:
+                self._protected_props.append(prop)
+            else:
                 msg = (
                     f"Protected property '{prop}' does not exist in the declared "
                     "properties. Removing it from the list of protected properties."
                 )
                 warnings.warn(msg)
-                self._protected_props.remove(prop)
+        self._propagated_props = list(propagated_props or [])
 
     def __deepcopy__(self, memo):
         """
