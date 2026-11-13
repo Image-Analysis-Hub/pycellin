@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the documentation work of feature/docs up to c5e5b92 and the uncommitted fixes found by the docstring pass (Property, PropsMetadata, CycleLineage time_step). Update from there with: git log 6b884a4..dev -->
+<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the documentation work of feature/docs up to 366d3c5 and the uncommitted removal of the time step checks of cycle lineages. Update from there with: git log 6b884a4..dev -->
 
 Model merging and splitting, many new properties (morphology, intensity, topology), branch plots, consistent names that follow PEP 8, and many fixes, notably to time handling and to reading and writing TrackMate, GEFF, CTC and trackpy data. **This release contains breaking changes**, listed first below.
 
@@ -161,6 +161,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 
 - **Model:** core properties (`cell_id`, `lineage_id`, `timepoint` and the reference time property) are now protected in every model. Models read from GEFF files or built from scratch didn't protect all of them, so `remove_property()` could remove them
 - **Model:** the warning about cell fusions when loading a file says how to list and correct them, with `get_fusions()` and `remove_link()`, instead of pointing to a documentation that doesn't exist yet
+- **Model:** `add_cycle_lineages()`, `add_lineage()` with `with_cycle_lineage=True` and `merge()` no longer require the time step of the model, which building cycle lineages doesn't use. Without it, they raised `ValueError`, or for `add_lineage()` warned and skipped the cycle lineage. The `ValueError` of `update()` without a time step no longer says cycle lineages need it
 - **Plotting:** in `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()`, nodes with a list of sizes in `node_marker_style` are drawn opaque and without outline, instead of as Plotly's semi-transparent bubbles with a white outline
 - **TrackMate:** the reader declares `FRAME` with the unit "frame" instead of no unit
 - **GEFF:** `write_geff()` writes the cell coordinates as space axes by default: `cell_x`, `cell_y`, and `cell_z` when it is declared, as long as every cell has a value for them, since GEFF axes can't have missing values (otherwise they are left out, with a warning). Pass `space_axes=[]` to write none. Without space axes, other GEFF tools couldn't place the cells, and `read_geff()` lost the space unit of the model

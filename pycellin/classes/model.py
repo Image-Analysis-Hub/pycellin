@@ -1584,11 +1584,9 @@ class Model:
 
         time_step = self.model_metadata.time_step
         if time_step is None:
-            # TODO: add "see documentation" to the error message or explain
-            # directly how to set it?
             raise ValueError(
-                "The time step of the model is currently not defined "
-                "but is required for cycle lineage computation."
+                "The time step of the model is not defined, but is required to update "
+                "the model. Set it with set_time_step()."
             )
         # The timepoint property is always declared and protected, unless it is the
         # reference time property (see _ModelUpdater._update()).
@@ -1669,10 +1667,7 @@ class Model:
         -----
         UserWarning
             If `with_cycle_lineage` is True but the cycle lineages have not been added
-            yet.
-            If `with_cycle_lineage` is True but the time step of the model is not
-            defined.
-            In both these cases, the cycle lineage is not computed.
+            yet. The cycle lineage is then not computed.
         """
         # Determine the lineage ID to use.
         if lineage is None:
@@ -1716,17 +1711,10 @@ class Model:
                     "have not been added yet."
                 )
             else:
-                timestep = self.get_time_step()
-                if timestep is None:
-                    warnings.warn(
-                        f"Cannot add cycle lineage {lineage_id} when the time step "
-                        "of the model is not defined."
-                    )
-                else:
-                    cycle_lineage = self.data._compute_cycle_lineage(
-                        self.reference_time_prop, lineage_id
-                    )
-                    self.data.cycle_lineages[lineage_id] = cycle_lineage
+                cycle_lineage = self.data._compute_cycle_lineage(
+                    self.reference_time_prop, lineage_id
+                )
+                self.data.cycle_lineages[lineage_id] = cycle_lineage
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
@@ -5465,7 +5453,6 @@ class Model:
         Raises
         ------
         ValueError
-            If the time step of the model is not defined.
             If a default property of cycle lineages is already declared as another
             kind of property, and this declaration is used.
         """
@@ -5479,14 +5466,6 @@ class Model:
         # TODO: I have nothing to check if the structure was modified since
         # _update_required becomes true when properties are added...
         time_prop = self.model_metadata.reference_time_prop
-        time_step = self.model_metadata.time_step
-        if time_step is None:
-            # TODO: add "see documentation" to the error message or explain
-            # directly how to set it?
-            raise ValueError(
-                "The time step of the model is currently not defined "
-                "but is required for cycle lineage computation."
-            )
         time_unit = self.model_metadata.time_unit
         unused, used = [], []
         for prop in self.props_metadata._create_cycle_lineage_props(time_unit):
@@ -5877,9 +5856,7 @@ class Model:
             is set in only one of them.
             If a property with the same identifier and not created by a merge operation
             already exists in the model.
-            If one of the models has cycle lineages but the time step of this model is
-            not defined, or if a cycle lineage cannot be built (e.g. a lineage with
-            several roots).
+            If a cycle lineage cannot be built (e.g. a lineage with several roots).
             If ``new_metadata`` contains a critical field, or a name while ``new_name``
             is also given.
             If ``model`` starts earlier than the time origin of this model, which would
@@ -6081,12 +6058,6 @@ class Model:
         cycle_lineages_to_add = {}
         if with_cycles:
             time_prop = model1.reference_time_prop
-            time_step = model1.model_metadata.time_step
-            if time_step is None:
-                raise ValueError(
-                    "Cannot build the cycle lineages of the merged model: the time "
-                    "step of this model is not defined."
-                )
             lineages = list(lineages_to_add)
             if not model1.data.cycle_lineages:
                 lineages += [
