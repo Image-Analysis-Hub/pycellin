@@ -45,7 +45,63 @@ _MERGE_PROVENANCE = "pycellin merge"
 
 
 class Model:
-    """ """
+    """
+    Cell lineages of a tracking dataset, with their properties and metadata.
+
+    A model holds the cell lineages, their cycle lineages once added with
+    `add_cycle_lineages`, the declarations of their properties, and metadata such as
+    the time step and the units. Its methods edit the lineages, add and compute
+    properties, and export the data as DataFrames. A model is usually created by a
+    reader, such as `read_trackmate_xml`.
+
+    Parameters
+    ----------
+    model_metadata : ModelMetadata | dict[str, Any] | None, default=None
+        Metadata of the model. The model keeps a shallow copy.
+    props_metadata : PropsMetadata | None, default=None
+        The declaration of the properties present in the model. The model keeps a
+        deep copy.
+    data : Data | None, default=None
+        The lineages data of the model. The model keeps a deep copy.
+    reference_time_prop : str | None, default=None
+        The name of the property to use as the reference for time measurements.
+        Needs to be provided if `model_metadata` is None or does not contain it.
+    variable_time_step : bool, default=False
+        If True and ``time_step`` is not provided in `model_metadata`, the time step
+        will be computed using the greatest common divisor (GCD) of time
+        differences, which is suitable for irregularly sampled timepoints.
+        If False, the minimum time difference is used instead.
+        This parameter is only used when the time step needs to be automatically
+        computed from the data.
+
+    Attributes
+    ----------
+    data : Data
+        The cell lineages of the model, and their cycle lineages once added.
+    model_metadata : ModelMetadata
+        The metadata of the model.
+    props_metadata : PropsMetadata
+        The declarations of the properties of the model.
+
+    Raises
+    ------
+    ValueError
+        If `reference_time_prop` is not provided and cannot be inferred from
+        `model_metadata`.
+    TypeError
+        If `model_metadata` is not None, a `ModelMetadata` or a dict.
+
+    Warns
+    -----
+    UserWarning
+        If ``time_step`` is not provided in `model_metadata` and cannot be inferred
+        from the data.
+
+    Notes
+    -----
+    The core properties ``cell_id``, ``lineage_id``, ``timepoint`` and the reference
+    time property are protected whenever they are declared.
+    """
 
     def __init__(
         self,
@@ -55,47 +111,6 @@ class Model:
         reference_time_prop: str | None = None,
         variable_time_step: bool = False,
     ) -> None:
-        """
-        Constructs all the necessary attributes for the Model object.
-
-        Parameters
-        ----------
-        model_metadata : ModelMetadata | dict[str, Any] | None, optional
-            Metadata of the model (default is None).
-        props_metadata : PropsMetadata, optional
-            The declaration of the properties present in the model (default is None).
-        data : Data, optional
-            The lineages data of the model (default is None).
-        reference_time_prop : str, optional
-            The name of the property to use as the reference for time measurements.
-            Needs to be provided if model_metadata is None or does not contain it.
-        variable_time_step : bool, optional
-            If True and time_step is not provided in model_metadata, the time step
-            will be computed using the greatest common divisor (GCD) of time
-            differences, which is suitable for irregularly sampled timepoints.
-            If False, the minimum time difference is used instead (default is False).
-            This parameter is only used when time_step needs to be automatically
-            computed from the data.
-
-        Raises
-        ------
-        ValueError
-            If `reference_time_prop` is not provided and cannot be inferred from
-            `model_metadata`.
-        TypeError
-            If `model_metadata` is not None, ModelMetadata, or dict.
-
-        Warns
-        -----
-        UserWarning
-            If `time_step` is not provided in `model_metadata` and cannot be inferred
-            from the data.
-
-        Notes
-        -----
-        The core properties "cell_id", "lineage_id", "timepoint" and the reference
-        time property are protected whenever they are declared.
-        """
         # Check that we have a reference_time_prop.
         if reference_time_prop is None:
             if model_metadata is None:

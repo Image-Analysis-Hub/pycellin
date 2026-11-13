@@ -15,7 +15,43 @@ _UNKNOWN = "unknown"
 
 
 class Property:
-    """ """
+    """
+    Declaration of a property: its identifier, description, type, unit and data type.
+
+    Each parameter is stored in the attribute of the same name, `prop_type` as a
+    `~pycellin.custom_types.PropertyType`.
+
+    Parameters
+    ----------
+    identifier : str
+        A unique identifier for the property.
+    name : str
+        A human-readable name for the property.
+    description : str
+        A description of the property.
+    provenance : str
+        The provenance of the property (TrackMate, CTC, pycellin, custom...).
+    prop_type : PropertyType | str | list[str]
+        The type of the property. Can be:
+
+        - PropertyType Flag: ``PropertyType.NODE``, ``PropertyType.EDGE``,
+          ``PropertyType.LINEAGE``, or combinations like
+          ``PropertyType.NODE | PropertyType.EDGE``.
+        - String: ``"node"``, ``"edge"``, or ``"lineage"``.
+        - List of strings: ``["node", "lineage"]`` for multi-type properties.
+    lineage_type : LineageType
+        The type of lineage the property is associated with: ``"cell"`` for cell
+        lineages, ``"cycle"`` for cycle lineages, or ``"both"``.
+    dtype : str
+        The data type of the property (int, float, string).
+    unit : str | None, default=None
+        The unit of the property (e.g. µm, min, cell).
+
+    Raises
+    ------
+    ValueError
+        If the property type or the lineage type is not a valid value.
+    """
 
     def __init__(
         self,
@@ -28,39 +64,6 @@ class Property:
         dtype: str,
         unit: str | None = None,
     ) -> None:
-        """
-        Constructs all the necessary attributes for the Property object.
-
-        Parameters
-        ----------
-        identifier : str
-            A unique identifier for the property.
-        name : str
-            A human-readable name for the property.
-        description : str
-            A description of the property.
-        provenance : str
-            The provenance of the property (TrackMate, CTC, pycellin, custom...).
-        prop_type : PropertyType or str or list[str]
-            The type of the property. Can be:
-            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE,
-              PropertyType.LINEAGE, or combinations like
-              PropertyType.NODE | PropertyType.EDGE.
-            - String: "node", "edge", or "lineage"
-            - List of strings: ["node", "lineage"] for multi-type properties
-        lineage_type : LineageType
-            The type of lineage the property is associated with: "cell" for cell
-            lineages, "cycle" for cycle lineages, or "both".
-        dtype : str
-            The data type of the property (int, float, string).
-        unit : str, optional
-            The unit of the property (e.g. µm, min, cell).
-
-        Raises
-        ------
-        ValueError
-            If the property type or the lineage type is not a valid value.
-        """
         self.identifier = identifier
         self.name = name
         self.description = description

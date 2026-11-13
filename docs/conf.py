@@ -58,7 +58,6 @@ extlinks = {
 
 # -- API reference -------------------------------------------------------------
 
-autoclass_content = "both"
 numpydoc_show_class_members = False
 toc_object_entries_show_parents = "hide"
 numpydoc_xref_param_type = True

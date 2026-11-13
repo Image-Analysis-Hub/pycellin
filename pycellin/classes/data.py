@@ -14,23 +14,20 @@ class Data:
     """
     Class to store and manipulate cell lineages and cell cycle lineages.
 
+    Parameters
+    ----------
+    cell_lineages : dict[int, CellLineage]
+        The cell lineages to store, by lineage ID.
+
     Attributes
     ----------
     cell_lineages : dict[int, CellLineage]
-        The cell lineages stored.
+        The cell lineages stored, by lineage ID.
     cycle_lineages : dict[int, CycleLineage] | None
-        The cycle lineages stored, if any.
+        The cycle lineages stored, by lineage ID, if any.
     """
 
     def __init__(self, cell_lineages: dict[int, CellLineage]) -> None:
-        """
-        Initialize a Data object.
-
-        Parameters
-        ----------
-        cell_lineages : dict[int, CellLineage]
-            The cell lineages to store.
-        """
         self.cell_lineages = cell_lineages
         self.cycle_lineages: dict[int, CycleLineage] | None = None
 

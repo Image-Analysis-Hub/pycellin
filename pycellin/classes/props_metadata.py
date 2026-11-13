@@ -22,20 +22,25 @@ from pycellin.utils import _check_literal_type
 
 class PropsMetadata:
     """
-    The PropsMetadata class is used to store the properties that are
-    associated with the nodes, edges, and lineages of cell lineage graphs.
+    Store the properties associated with the nodes, edges and lineages of lineages.
+
+    Parameters
+    ----------
+    properties : dict[str, Property] | None, default=None
+        A dictionary of properties where the keys are the property identifiers and
+        the values are the Property objects.
+    protected_props : list[str] | None, default=None
+        A list of property identifiers that are protected from being modified or
+        removed. Identifiers missing from `properties` are dropped, with a warning.
+    propagated_props : list[str] | None, default=None
+        The identifiers of the cycle properties propagated to the cell lineages with
+        `Model.propagate_cycle_properties()`, which `Model.update()` copies again.
 
     Attributes
     ----------
     properties : dict[str, Property]
         A dictionary of properties where the keys are the property identifiers and
         the values are the Property objects.
-    protected_props : list[str]
-        A list of property identifiers that are protected from being modified or
-        removed.
-    propagated_props : list[str]
-        The identifiers of the cycle properties propagated to the cell lineages with
-        `Model.propagate_cycle_properties()`, which `Model.update()` copies again.
 
     Notes
     -----

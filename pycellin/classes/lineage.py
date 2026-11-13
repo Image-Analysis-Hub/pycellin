@@ -54,28 +54,24 @@ def _get_highlight_color(group: int) -> str:
 class Lineage(nx.DiGraph, metaclass=ABCMeta):
     """
     Abstract class for a lineage graph.
+
+    Parameters
+    ----------
+    nx_digraph : nx.DiGraph | None, default=None
+        A NetworkX directed graph to initialize the lineage with.
+    lineage_id : int | None, default=None
+        The ID of the lineage, stored in ``graph["lineage_id"]``. NumPy integers are
+        stored as Python integers.
+
+    Raises
+    ------
+    TypeError
+        If `lineage_id` is not an integer.
     """
 
     def __init__(
         self, nx_digraph: nx.DiGraph | None = None, lineage_id: int | None = None
     ) -> None:
-        """
-        Initialize a lineage graph.
-
-        Parameters
-        ----------
-        nx_digraph : nx.DiGraph, optional
-            A NetworkX directed graph to initialize the lineage with,
-            by default None.
-        lineage_id : int, optional
-            The ID of the lineage, by default None. NumPy integers are stored as
-            Python integers.
-
-        Raises
-        ------
-        TypeError
-            If `lineage_id` is not an integer.
-        """
         super().__init__(incoming_graph_data=nx_digraph)
         if lineage_id is not None:
             _check_integer(lineage_id, "lineage_id")
@@ -1229,6 +1225,27 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
 
 class CellLineage(Lineage):
+    """
+    Cell lineage: a cell and all its descendants, as a directed rooted tree.
+
+    A node is a cell at a specific point in time and space, and an edge links it to
+    the same cell, or to its daughter cells after a division, at a later time point.
+    As a `networkx.DiGraph`, a cell lineage also has the methods of NetworkX graphs.
+
+    Parameters
+    ----------
+    nx_digraph : nx.DiGraph | None, default=None
+        A NetworkX directed graph to initialize the lineage with.
+    lineage_id : int | None, default=None
+        The ID of the lineage, stored in ``graph["lineage_id"]``. NumPy integers are
+        stored as Python integers.
+
+    Raises
+    ------
+    TypeError
+        If `lineage_id` is not an integer.
+    """
+
     def __str__(self) -> str:
         name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
         txt = (
@@ -2986,6 +3003,27 @@ class CellLineage(Lineage):
 
 
 class CycleLineage(Lineage):
+    """
+    Cycle lineage: a cell lineage at the cell cycle level, as a directed rooted tree.
+
+    A node is a whole cell cycle, from just after a division to the next division, and
+    an edge links a cell cycle to those of its daughter cells. A cell cycle is
+    identified by the ID of its last cell. Built from a cell lineage, a cycle lineage
+    is frozen (see `~networkx.classes.function.freeze`): its structure can't be
+    modified. Models build their cycle lineages with `Model.add_cycle_lineages`.
+
+    Parameters
+    ----------
+    time_prop : str
+        The time property used to compute the durations, start and end times of the
+        cell cycles.
+    time_step : float
+        Not used.
+    cell_lineage : CellLineage | None, default=None
+        The cell lineage to build the cycle lineage from. None for an empty cycle
+        lineage.
+    """
+
     def __init__(
         self, time_prop: str, time_step: float, cell_lineage: CellLineage | None = None
     ) -> None:
