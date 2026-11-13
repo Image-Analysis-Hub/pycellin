@@ -65,3 +65,15 @@
 ```
 
 See [](predefined_properties.md) for the full list.
+
+## Types
+
+```{eval-rst}
+.. currentmodule:: pycellin.custom_types
+
+.. autosummary::
+   :toctree: generated
+
+   PropertyType
+   Cell
+```

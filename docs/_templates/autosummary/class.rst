@@ -4,4 +4,4 @@
 
 .. autoclass:: {{ objname }}
    :members:
-   :inherited-members: DiGraph,Graph
+   :inherited-members: DiGraph,Graph,tuple

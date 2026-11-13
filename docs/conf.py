@@ -7,6 +7,7 @@ import inspect
 from pathlib import Path
 
 import networkx as nx
+from sphinx.ext import intersphinx
 from sphinx.util.inspect import stringify_signature
 
 import pycellin
@@ -36,6 +37,7 @@ intersphinx_mapping = {
     "networkx": ("https://networkx.org/documentation/stable/", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
     "pandas": ("https://pandas.pydata.org/docs/", None),
+    "plotly": ("https://plotly.com/python-api-reference/", None),
     "python": ("https://docs.python.org/3/", None),
 }
 
@@ -52,13 +54,18 @@ numpydoc_xref_aliases = {
     "nx.DiGraph": "networkx.DiGraph",
     "pd.DataFrame": "pandas.DataFrame",
     "Path": "pathlib.Path",
+    # Written in full in the docstrings: an alias to the same name stays plain text
+    # (numpydoc_xref_ignore = "all"), but a role links.
+    "plotly.graph_objects.Figure": ":class:`plotly.graph_objects.Figure`",
     # pycellin's classes and exceptions, by their short names.
+    "Cell": "pycellin.custom_types.Cell",
     "CellLineage": "pycellin.CellLineage",
     "CycleLineage": "pycellin.CycleLineage",
     "Data": "pycellin.Data",
     "Model": "pycellin.Model",
     "ModelMetadata": "pycellin.ModelMetadata",
     "Property": "pycellin.Property",
+    "PropertyType": "pycellin.custom_types.PropertyType",
     "PropsMetadata": "pycellin.PropsMetadata",
     "FusionError": "pycellin.exceptions.FusionError",
     "LineageStructureError": "pycellin.exceptions.LineageStructureError",
@@ -71,6 +78,14 @@ default_role = "py:obj"
 # Parameter names go in single backticks too (numpydoc's guide) and can't link: don't
 # report bare lowercase names that don't resolve.
 nitpick_ignore_regex = [("py:obj", r"[a-z_][a-z0-9_]*")]
+# Types in signatures with no page to link to.
+nitpick_ignore = [
+    # pycellin's private base classes.
+    ("py:class", "pycellin.classes.lineage.Lineage"),
+    ("py:class", "pycellin.classes.property_calculator.PropertyCalculator"),
+    # No working entry in plotly's inventory.
+    ("py:class", "plotly.graph_objs.layout._template.Template"),
+]
 
 
 def _lineage_signature(app, what, name, obj, options, signature, return_annotation):
@@ -119,6 +134,26 @@ def _write_predefined_properties(app):
         path.write_text(text, encoding="utf-8")
 
 
+# plotly classes in pycellin's type hints, by the public name plotly's docs list
+# (plotly's inventory still lists plotly.graph_objs names, but their pages are gone).
+_PLOTLY_PUBLIC_NAMES = {
+    "plotly.graph_objs._figure.Figure": "plotly.graph_objects.Figure",
+}
+
+
+def _plotly_public_name(app, env, node, contnode):
+    """Link plotly classes under their public name.
+
+    Type hints give plotly's private module (plotly.graph_objs._figure.Figure), which
+    plotly's docs don't list.
+    """
+    public = _PLOTLY_PUBLIC_NAMES.get(node.get("reftarget"))
+    if public is None:
+        return None
+    node["reftarget"] = public
+    return intersphinx.missing_reference(app, env, node, contnode)
+
+
 # -- HTML output ---------------------------------------------------------------
 # Theme-specific settings stay in this block: switching themes means rewriting it.
 # PyData options: https://pydata-sphinx-theme.readthedocs.io/en/stable/
@@ -145,3 +180,4 @@ html_css_files = ["pydata-overrides.css"]
 def setup(app):
     app.connect("autodoc-process-signature", _lineage_signature)
     app.connect("builder-inited", _write_predefined_properties)
+    app.connect("missing-reference", _plotly_public_name)
