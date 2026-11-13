@@ -210,6 +210,8 @@ html_theme_options = {
 html_logo = "_static/logo/pycellin_logo.svg"
 html_static_path = ["_static"]
 html_css_files = ["pydata-overrides.css"]
+# On Read the Docs, tell search engines which URL is the main copy of each page.
+html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "")
 
 
 # -- Event handlers ------------------------------------------------------------
