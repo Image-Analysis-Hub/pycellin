@@ -6860,7 +6860,7 @@ class Model:
             y_prop (default is None).
         line_style : dict, optional
             Plotly line properties for the mean line (e.g. "color", "width", "dash").
-            Merged over the defaults {"color": "#862CC6", "width": 3}. The
+            Merged over the defaults {"color": "#982FC4", "width": 3}. The
             "color" is also used as the base color for the std band. Colors must be
             given as 'rgb(r,g,b)' or '#rrggbb'.
         marker_style : dict, optional
@@ -7051,7 +7051,7 @@ class Model:
             y_prop (default is None).
         line_style : dict, optional
             Plotly line properties for the mean line (e.g. "color", "width", "dash").
-            Merged over the defaults {"color": "#862CC6", "width": 3}. The
+            Merged over the defaults {"color": "#982FC4", "width": 3}. The
             "color" is also used as the base color for the std band. Colors must be
             given as 'rgb(r,g,b)' or '#rrggbb'.
         marker_style : dict, optional

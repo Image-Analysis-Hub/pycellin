@@ -6,6 +6,7 @@ Settings reference: https://www.sphinx-doc.org/en/master/usage/configuration.htm
 import enum
 import inspect
 import logging
+import os
 from pathlib import Path
 
 import networkx as nx
@@ -206,7 +207,7 @@ html_theme_options = {
         },
     ],
 }
-html_logo = "../pycellin_logo.png"
+html_logo = "_static/logo/pycellin_logo.svg"
 html_static_path = ["_static"]
 html_css_files = ["pydata-overrides.css"]
 

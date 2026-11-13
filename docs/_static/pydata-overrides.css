@@ -2,34 +2,35 @@
    the docs switch themes. Reference:
    https://pydata-sphinx-theme.readthedocs.io/en/stable/user_guide/styling.html
 
-   Logo colors: purple #862CC6 (primary: links, current page in the navigation) and
-   pink #CA427E (secondary: links on hover). The other shades keep the WCAG contrast of
-   link text at 4.5:1 or more on the page background. */
+   Logo colors: purple #982FC4 (primary: links, current page in the navigation) and
+   pink #DD397D (secondary: links on hover). The other shades keep their hue and
+   saturation (HLS) and change their lightness, keeping the WCAG contrast of link text
+   at 4.5:1 or more on the page background. That takes a slightly darker pink in light
+   mode: the logo pink reaches 4.24:1 on white. */
 
 html[data-theme="light"] {
-  --pst-color-primary: #862cc6;
-  --pst-color-primary-highlight: #7125a7;
-  --pst-color-primary-bg: #efe2f9;
-  --pst-color-secondary: #ca427e;
-  --pst-color-secondary-highlight: #b3326b;
-  --pst-color-secondary-bg: #f7e3ec;
+  --pst-color-primary: #982fc4;
+  --pst-color-primary-highlight: #8027a5;
+  --pst-color-primary-bg: #f2e2f8;
+  --pst-color-secondary: #db2e76;
+  --pst-color-secondary-highlight: #c42265;
+  --pst-color-secondary-bg: #fae1eb;
   /* Links shown as code (API references) and links in some boxes. */
-  --pst-color-link-higher-contrast: #7125a7;
+  --pst-color-link-higher-contrast: #8027a5;
   /* sphinx-design: background of dropdowns with :color: primary or secondary. */
   --sd-color-primary-bg: var(--pst-color-primary-bg);
   --sd-color-secondary-bg: var(--pst-color-secondary-bg);
 }
 
 html[data-theme="dark"] {
-  --pst-color-primary: #bb82e3;
-  --pst-color-primary-highlight: #a960dc;
-  --pst-color-primary-bg: #301047;
-  --pst-color-secondary: #dd88ad;
-  --pst-color-secondary-highlight: #d56898;
-  --pst-color-secondary-bg: #441328;
-  --pst-color-link-higher-contrast: #c493e7;
+  --pst-color-primary: #c684e1;
+  --pst-color-primary-highlight: #b663da;
+  --pst-color-primary-bg: #361146;
+  --pst-color-secondary: #e97ca9;
+  --pst-color-secondary-highlight: #e35a92;
+  --pst-color-secondary-bg: #4a0d26;
+  --pst-color-link-higher-contrast: #cd94e5;
   /* sphinx-design: background of dropdowns with :color: primary or secondary. */
   --sd-color-primary-bg: var(--pst-color-primary-bg);
   --sd-color-secondary-bg: var(--pst-color-secondary-bg);
-
 }

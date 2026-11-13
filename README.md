@@ -7,7 +7,7 @@
 
 </br>
 <p align="center">
-    <img src="https://raw.githubusercontent.com/Image-Analysis-Hub/pycellin/main/pycellin_logo.png" height="150"/>
+    <img src="https://raw.githubusercontent.com/Image-Analysis-Hub/pycellin/main/docs/_static/logo/pycellin_logo.svg" height="150"/>
 </p>
 
 

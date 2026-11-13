@@ -5,9 +5,9 @@ import plotly.graph_objects as go
 import plotly.io as pio
 
 # Pycellin colors.
-PYCELLIN_PURPLE: Final = "#862CC6"
-PYCELLIN_PINK: Final = "#CA427E"
-PYCELLIN_ORANGE: Final = "#DD7320"
+PYCELLIN_PURPLE: Final = "#982FC4"
+PYCELLIN_PINK: Final = "#DD397D"
+PYCELLIN_ORANGE: Final = "#F46C00"
 
 # Default marker styles for lineage branch profile plots
 # (Lineage.get_branch_profile_figure / plot_branch_profile). Only the constant
