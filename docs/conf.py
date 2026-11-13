@@ -206,12 +206,32 @@ html_theme_options = {
             "icon": "fa-brands fa-github",
         },
     ],
+    # "Edit on GitHub" button, in the right sidebar. See _edit_button_off_on_api_pages.
+    "use_edit_page_button": True,
 }
+# Where that button points: docs/ on the dev branch.
+html_context = {
+    "github_user": "Image-Analysis-Hub",
+    "github_repo": "pycellin",
+    "github_version": "dev",
+    "doc_path": "docs",
+}
+# No "Show Source" link: the edit button replaces it.
+html_show_sourcelink = False
 html_logo = "_static/logo/pycellin_logo.svg"
 html_static_path = ["_static"]
 html_css_files = ["pydata-overrides.css"]
 # On Read the Docs, tell search engines which URL is the main copy of each page.
 html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "")
+
+
+def _edit_button_off_on_api_pages(app, pagename, templatename, context, doctree):
+    """Hide the "Edit on GitHub" button on the pages autosummary generates.
+
+    They have no file in the repository: their content comes from the docstrings.
+    """
+    if pagename.startswith("api/generated/"):
+        context["theme_use_edit_page_button"] = False
 
 
 # -- Event handlers ------------------------------------------------------------
@@ -222,4 +242,5 @@ def setup(app):
     app.connect("autodoc-process-signature", _enum_signature)
     app.connect("builder-inited", _write_predefined_properties)
     app.connect("missing-reference", _plotly_public_name)
+    app.connect("html-page-context", _edit_button_off_on_api_pages)
     logging.getLogger("sphinx.numpydoc.numpydoc").addFilter(_show_once)
