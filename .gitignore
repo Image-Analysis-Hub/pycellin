@@ -5,6 +5,11 @@ __pycache__/
 build/
 *.egg-info/
 
+# Documentation
+docs/_build/
+docs/api/generated/
+docs/_generated/
+
 # mypy
 .mypy_cache/
 

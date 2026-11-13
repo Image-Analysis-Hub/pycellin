@@ -14,23 +14,20 @@ class Data:
     """
     Class to store and manipulate cell lineages and cell cycle lineages.
 
+    Parameters
+    ----------
+    cell_lineages : dict[int, CellLineage]
+        The cell lineages to store, by lineage ID.
+
     Attributes
     ----------
     cell_lineages : dict[int, CellLineage]
-        The cell lineages stored.
+        The cell lineages stored, by lineage ID.
     cycle_lineages : dict[int, CycleLineage] | None
-        The cycle lineages stored, if any.
+        The cycle lineages stored, by lineage ID, if any.
     """
 
     def __init__(self, cell_lineages: dict[int, CellLineage]) -> None:
-        """
-        Initialize a Data object.
-
-        Parameters
-        ----------
-        cell_lineages : dict[int, CellLineage]
-            The cell lineages to store.
-        """
         self.cell_lineages = cell_lineages
         self.cycle_lineages: dict[int, CycleLineage] | None = None
 
@@ -83,7 +80,7 @@ class Data:
         return f"Data object with {self.number_of_lineages()} cell lineages{txt}."
 
     def _add_cycle_lineages(
-        self, time_prop: str, time_step: int | float, lids: list[int] | None = None
+        self, time_prop: str, lids: list[int] | None = None
     ) -> None:
         """
         Add the cell cycle lineages from the cell lineages.
@@ -93,8 +90,6 @@ class Data:
         time_prop : str
             The name of the time property to use for computation
             of cycle lineage properties.
-        time_step : int | float
-            The time step between two consecutive time points.
         lids : list[int], optional
             The IDs of the lineages for which to compute cycle lineages,
             by default None i.e. all lineages.
@@ -102,13 +97,10 @@ class Data:
         if lids is None:
             lids = list(self.cell_lineages.keys())
         self.cycle_lineages = {
-            lin_id: self._compute_cycle_lineage(time_prop, time_step, lin_id)
-            for lin_id in lids
+            lin_id: self._compute_cycle_lineage(time_prop, lin_id) for lin_id in lids
         }
 
-    def _compute_cycle_lineage(
-        self, time_prop: str, time_step: float, lid: int
-    ) -> CycleLineage:
+    def _compute_cycle_lineage(self, time_prop: str, lid: int) -> CycleLineage:
         """
         Compute and return the cycle lineage corresponding to a given cell lineage.
 
@@ -116,8 +108,6 @@ class Data:
         ----------
         time_prop : str
             The name of the time property to use for cycle lineage computation.
-        time_step : float
-            The time step between two consecutive time points.
         lid : int
             The ID of the cell lineage for which to compute the cycle lineage.
 
@@ -126,7 +116,7 @@ class Data:
         CycleLineage
             The cycle lineage corresponding to the cell lineage.
         """
-        return CycleLineage(time_prop, time_step, self.cell_lineages[lid])
+        return CycleLineage(time_prop, self.cell_lineages[lid])
 
     def _freeze_lineage_data(self):
         """

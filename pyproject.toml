@@ -44,6 +44,7 @@ notebooks = [
 ]
 
 [project.urls]
+Documentation = "https://pycellin.readthedocs.io/"
 Examples = "https://github.com/Image-Analysis-Hub/pycellin/tree/main/notebooks"
 Changelog = "https://github.com/Image-Analysis-Hub/pycellin/blob/main/CHANGELOG.md"
 Issues = "https://github.com/Image-Analysis-Hub/pycellin/issues"
@@ -54,6 +55,13 @@ test = [
     "matplotlib>=3.8.4",
     "pytest>=8.3",
     "pytest-cov>=6.0",
+]
+docs = [
+    "myst-parser>=5.2",
+    "numpydoc>=1.11",
+    "pydata-sphinx-theme>=0.24",
+    "sphinx>=9.2",
+    "sphinx-design>=0.8",
 ]
 
 [tool.setuptools.packages.find]
@@ -66,5 +74,13 @@ testpaths = ["tests"]
 line-length = 88
 
 [tool.ruff.lint]
-# Ruff's default rules, plus line length (E501) for code, docstrings and comments.
-extend-select = ["E501"]
+# Ruff's default rules, plus line length (E501) for code, docstrings and comments, and
+# the docstring rules (D), set below to numpydoc's conventions.
+extend-select = ["E501", "D"]
+
+[tool.ruff.lint.per-file-ignores]
+# Docstring rules for the package only: not for tests, notebooks or docs/conf.py.
+"!pycellin/**" = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"

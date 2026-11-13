@@ -56,7 +56,7 @@ def make_lineage(x: float, y: float, t: int) -> CellLineage:
 def cycle_lin():
     # Three rounds of divisions numbered like a binary heap: cell cycle n divides
     # into cell cycles 2n and 2n + 1, from 1 -> (2, 3) to 7 -> (14, 15).
-    lineage = CycleLineage(time_prop="timepoint", time_step=1)
+    lineage = CycleLineage(time_prop="timepoint")
     for mother in range(1, 8):
         lineage.add_edges_from([(mother, 2 * mother), (mother, 2 * mother + 1)])
     return lineage
@@ -114,9 +114,7 @@ class TestIsCompleteCycle:
             calculator.compute(cell_lin, node_id=99)
 
     def test_compute_cycle_lineage(self, branching_cell_lin):
-        cycle_lin = CycleLineage(
-            time_prop="frame", time_step=1, cell_lineage=branching_cell_lin
-        )
+        cycle_lin = CycleLineage(time_prop="frame", cell_lineage=branching_cell_lin)
         calculator = IsCompleteCycle(create_is_complete_cycle_property())
         # Complete cell cycles.
         assert calculator.compute(cycle_lin, node_id=4) is True  # division

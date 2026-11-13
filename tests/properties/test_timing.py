@@ -234,7 +234,7 @@ def test_interdivision_time_cycle_lin(cell_lin, prop_cycle_lin):
     """Test InterdivisionTime Calculator with CycleLineage."""
     calculator = InterdivisionTime(prop_cycle_lin, time_prop="frame")
     data = Data({1: cell_lin})
-    data._add_cycle_lineages(time_prop="frame", time_step=1)
+    data._add_cycle_lineages(time_prop="frame")
     cycle_lin = data.cycle_lineages[1]
     # Complete cell cycles.
     assert calculator.compute(data, cycle_lin, node_id=4) == 2  # division
@@ -298,7 +298,7 @@ def test_division_rate_cycle_lin(cell_lin, prop_cycle_lin):
     """Test DivisionRate Calculator with CycleLineage."""
     calculator = DivisionRate(prop_cycle_lin, time_prop="frame")
     data = Data({1: cell_lin})
-    data._add_cycle_lineages(time_prop="frame", time_step=1)
+    data._add_cycle_lineages(time_prop="frame")
     cycle_lin = data.cycle_lineages[1]
     # Complete cell cycles.
     assert calculator.compute(data, cycle_lin, node_id=4) == 1 / 2  # division

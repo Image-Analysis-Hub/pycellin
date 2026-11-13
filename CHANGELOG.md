@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 6b884a4. Update from there with: git log 6b884a4..dev -->
+<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the documentation work of feature/docs up to 366d3c5 and the uncommitted removal of the time step checks of cycle lineages. Update from there with: git log 6b884a4..dev -->
 
 Model merging and splitting, many new properties (morphology, intensity, topology), branch plots, consistent names that follow PEP 8, and many fixes, notably to time handling and to reading and writing TrackMate, GEFF, CTC and trackpy data. **This release contains breaking changes**, listed first below.
 
@@ -57,6 +57,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Exceptions:** the exceptions moved from `pycellin.classes.exceptions` to `pycellin.exceptions`, available as `pc.exceptions` (e.g. `pc.exceptions.UpdateRequiredError`)
 - **Lineages:** `get_root()` always returns one node: it raises `LineageStructureError` when the lineage doesn't have exactly one root, instead of returning a list. The new `get_roots()` always returns a list, like `get_leaves()`
 - **Lineages:** `CycleLineage.yield_links_within_cycle()` is removed: use `get_links_within_cycle()`
+- **Lineages:** `CycleLineage()` no longer takes a `time_step` argument, unused since `cycle_duration` is computed from the reference time property alone: `CycleLineage(time_prop, time_step, cell_lineage)` → `CycleLineage(time_prop, cell_lineage)`
 - **Properties:** `pycellin.graph.properties` moved to `pycellin.properties`, and its `tracking` module is now `timing`, except `is_complete_cycle`, now in `topology`. The `pycellin.graph` package no longer exists. `pycellin.properties` no longer exposes the calculators: import them from their module, e.g. `from pycellin.properties.morphology import RodLength`
 - **Properties:** rename the `branch_*` properties to `cycle_*`, along with their `add_*()` methods, factories and calculators:
   - `branch_total_displacement` → `cycle_total_displacement`
@@ -153,12 +154,14 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **CTC:** `frame_offset` argument to `write_ctc()`, the frame of timepoint 0, added to the timepoints of the cells to give their CTC frames. Timepoints start at 0 at the earliest cell, so data that starts at a later frame, e.g. a CTC file whose first frame is 5, is exported from frame 0 by default, out of line with its images. Pass that first frame, or in general the frame of any cell minus its timepoint
 - **trackpy:** `reference_time_prop` argument to `from_trackpy()`, to name the time property it builds from the frames
 - **Dependencies:** `notebooks` extra with what the example notebooks need: JupyterLab, ipykernel, and nbformat, without which Plotly can't show figures in notebooks. Install it with `pip install "pycellin[notebooks]"`
+- **Docs:** a documentation site, https://pycellin.readthedocs.io/, with the installation steps, the list of tutorial notebooks, a glossary, and an API reference generated from the docstrings, including a table of all predefined properties. The README and the PyPI page link to it
 - **Docs:** the README explains what a cycle lineage is, what Pycellin can do, how to upgrade from 0.5.1 and what to do with cell fusions, and credits GEFF and the _C. elegans_ and FakeTracks sample data
 
 ### Changed
 
 - **Model:** core properties (`cell_id`, `lineage_id`, `timepoint` and the reference time property) are now protected in every model. Models read from GEFF files or built from scratch didn't protect all of them, so `remove_property()` could remove them
 - **Model:** the warning about cell fusions when loading a file says how to list and correct them, with `get_fusions()` and `remove_link()`, instead of pointing to a documentation that doesn't exist yet
+- **Model:** `add_cycle_lineages()`, `add_lineage()` with `with_cycle_lineage=True` and `merge()` no longer require the time step of the model, which building cycle lineages doesn't use. Without it, they raised `ValueError`, or for `add_lineage()` warned and skipped the cycle lineage. The `ValueError` of `update()` without a time step no longer says cycle lineages need it
 - **Plotting:** in `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()`, nodes with a list of sizes in `node_marker_style` are drawn opaque and without outline, instead of as Plotly's semi-transparent bubbles with a white outline
 - **TrackMate:** the reader declares `FRAME` with the unit "frame" instead of no unit
 - **GEFF:** `write_geff()` writes the cell coordinates as space axes by default: `cell_x`, `cell_y`, and `cell_z` when it is declared, as long as every cell has a value for them, since GEFF axes can't have missing values (otherwise they are left out, with a warning). Pass `space_axes=[]` to write none. Without space axes, other GEFF tools couldn't place the cells, and `read_geff()` lost the space unit of the model
@@ -168,6 +171,8 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Dependencies:** raise the minimum versions of geff (1.1.4.1.1) and geff-spec (1.1.1). With earlier versions, GEFF files lost the unit, name and description of the properties
 - **Dependencies:** the test dependencies moved from the `test` extra to a `test` dependency group, installed from a clone of the repository with `pip install -e . --group test` (pip >= 25.1)
 - **Docs:** the "Creating a model from scratch" notebook, unfinished, and "Working with TrackMate data", covered by "Getting started", are removed. The other notebooks are updated and re-run, and "Custom properties" explains when a calculator should be local or global
+- **Docs:** the README keeps only the `pip install` line of the installation steps, and links to the documentation for the rest: creating a conda environment, and installing the example notebooks or the development tools
+- **Docs:** the docstrings of the exceptions, `Cell` and `PropertyType`, and the class docstrings of `Model`, `Data`, `Property`, `PropsMetadata`, `CellLineage` and `CycleLineage`, follow numpydoc's guide, with the types written as in the type hints and the default values given, e.g. `int | None, default=None`. Constructor parameters are documented in the class docstring, and `Model`, `Property`, `CellLineage` and `CycleLineage` get a description. The values of `PropertyType` and the fields of `Cell` are documented
 
 ### Fixed
 
@@ -192,12 +197,15 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Model:** TrackMate and GEFF data where separate cells merge, i.e. a cell fusion that gives its lineage several roots, couldn't be loaded: the readers failed with an `UpdateRequiredError` about root nodes, which didn't mention fusions. Like other fusions, they are now loaded with a warning, and `get_fusions()` and `remove_link()` can be used to correct them
 - **Model:** the `FusionError` of `get_cell_cycle()`, and so of `get_cell_cycles()` and `add_cycle_lineages()` (`add_cycle_data()` in 0.5.1), could name the wrong cell: the cell it started from instead of the one with several parents
 - **Model:** the `FusionError` of `add_link()` between two lineages named the source lineage, although the cell it was about is in the target lineage. It also said this cell had more than one parent, when it had one and the link was refused
+- **Model:** the `TimeFlowError` of `add_link()` said the target cell had a time value lower than its parent's, also when both cells had the same time
 - **Model:** `add_link()` between two lineages with cell IDs in common, e.g. with the default IDs of `add_cell()` or after the new `relabel_cells()`, could lose cells. The cells of the target lineage given a new ID, to avoid the IDs of the source lineage, could get the ID of another of the cells moved and merge with it: `add_link()` then failed with an unclear error after removing the cells from the target lineage, or silently kept one cell instead of two. New IDs now skip the IDs of the cells moved too
 - **Properties:** `turning_angle` (`angle` in 0.5.1), `absolute_age` and `relative_age` were recomputed for every lineage at each update, as their calculators were global instead of local
 - **Properties:** `turning_angle` (`angle` in 0.5.1) was declared as an edge property although its values are on cells
 - **Properties:** `cycle_mean_displacement` and `cycle_mean_speed` (`branch_*` in 0.5.1) raised a NumPy `RuntimeWarning` for cell cycles without links. They are now NaN without warning
 - **Properties:** `cell_displacement`, `cell_speed`, `turning_angle` (`angle` in 0.5.1) and `straightness`, and the cycle properties computed from them, failed with `KeyError` on 2D models without `cell_z`, e.g. loaded from CTC label images or a GEFF file. They now use `cell_x` and `cell_y`, plus `cell_z` when it is declared
 - **Properties:** `cell_displacement`, `cell_speed`, `turning_angle` (`angle` in 0.5.1) and `straightness` could be added to a model without cell coordinates, e.g. read from a CTC file without label images, and `update()` then failed with `KeyError: 'cell_x'`: the model couldn't be updated or exported until they were removed. They now raise `MissingPropertyError` when added, as does `location_tag`. A cell without coordinates, e.g. added with `add_cell()`, gave the same `KeyError` at update: the `MissingPropertyError` raised now names the cell, its lineage and the property
+- **Properties:** `Property()` raised `KeyError` on an unknown property type, e.g. `prop_type="nodes"`. It now raises the `ValueError` it raises for other invalid property types, which lists the valid ones and now also gives the value received
+- **Properties:** `PropsMetadata()` drops the protected properties that aren't declared, with a warning, but missed every other one of them in a row, e.g. the second one in `protected_props=["a", "b"]`, which stayed protected. It also removed the ones it dropped from the list given as `protected_props`
 - **Plotting:** `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()` modified the `node_marker_style` dict given to them, adding the node colors of `node_colormap_prop` to it: the same dict reused for another lineage gave it the colors and color bar of the previous lineage
 - **TrackMate:** `turning_angle` (`angle` in 0.5.1) in degrees was exported as a TrackMate angle, which TrackMate reads as radians
 - **TrackMate:** `division_rate` was exported as a time, so TrackMate showed it in the time unit, and the reader read it back with that unit, e.g. "minute" instead of "1/minute". It is now exported as a rate. The reader, which failed with `ValueError: Invalid dimension: RATE` on features with that dimension, reads them in 1 over the time unit
@@ -246,8 +254,8 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **trackpy:** the reader linked the cells by scanning all of them for each particle, so the linking time grew with the square of the number of rows: loading 40,000 rows took 14 s, now 3 s
 - **trackpy:** with pandas 3.1 or later, the writer raised `Pandas4Warning`s, since it used pandas' `inplace` argument, deprecated in pandas 3.1 and removed in pandas 4
 - **trackpy:** exporting a model without divisions, e.g. one loaded from trackpy, warned that the model was already up to date
-- **Packaging:** the PyPI page had broken links: Documentation and Examples led to a site that doesn't exist, the README links to the notebooks didn't open them, and the README logo didn't show. Examples now opens the notebooks on GitHub, Documentation is removed until there is a documentation site, and a Changelog link is added
-- **Docs:** the installation steps of the README, also shown on the PyPI page, created a conda environment without Python, so `pip install pycellin` used the pip of another environment, if any. The environment is now created with Python 3.14
+- **Packaging:** the PyPI page had broken links: Documentation and Examples led to a site that doesn't exist, the README links to the notebooks didn't open them, and the README logo didn't show. Examples now opens the notebooks on GitHub, Documentation opens the new documentation site, and a Changelog link is added
+- **Docs:** the installation steps of the README, also shown on the PyPI page, created a conda environment without Python, so `pip install pycellin` used the pip of another environment, if any. The installation steps, now in the documentation, create it with Python 3.14
 - **Docs:** the code example of the README, also shown on the PyPI page, raised `NameError`: it called a `plot()` function that doesn't exist instead of `lin.plot()`. The link to Ershov et al., 2022 was broken too
 - **Docs:** `Model.get_cell_lineage_ids()` had lost its docstring to the alias that pointed to it
 - **Docs:** some examples of `add_pycellin_property()` and `add_pycellin_properties()` didn't work:
@@ -258,6 +266,9 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 
 - **Tests:** new tests for the new properties, plotting, exceptions, utils, the CTC and trackpy readers, the trackpy writer, `read_geff()` end to end, the pickle functions, and the signatures of the reading and writing functions
 - **Docs:** use the `pc` alias consistently in the README and notebooks, remove the State column of the README notebook table, replace `angle` with `turning_angle` in the examples of "Managing properties", and say in the docstring of `write_trackmate_xml()` that only numeric properties are exported
+- **Docs:** build the documentation with Sphinx, from `docs/`: PyData theme, pages in Markdown (MyST), and an API reference generated by autosummary and numpydoc. Its tools are in a new `docs` dependency group
+- **Docs:** build the documentation on Read the Docs (`.readthedocs.yaml`), with a preview of each pull request. Builds report broken references and check the docstrings against numpydoc's guide
+- **Docs:** move the logo to `docs/_static/logo/`, as an SVG used by both the documentation and the README
 - **Properties:** make the `is_complete_cycle` calculator local, since it only reads its own lineage. Its values and update cost are unchanged
 - **Properties:** remove the `__main__` demo of `morphology.py`, a one-off check of the area and perimeter computations that failed with `KeyError`
 - **Packaging:** find packages automatically in `pyproject.toml`
@@ -267,7 +278,9 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **CI:** the deploy workflow stops before building if the release tag doesn't match the package version
 - **CI:** fix releases starting the deploy workflow twice, which made one of the two runs fail at the PyPI upload
 - **CI:** new Style workflow that checks, on pushes and pull requests to `main`, that the code is formatted with Ruff and that no line is longer than 88 characters
+- **CI:** new Link check workflow that checks the external links of the documentation, every month and on demand
 - **Code style:** wrap code, docstrings and comments at 88 characters. The line length is set in `pyproject.toml`, where Ruff also flags longer lines (E501). The code and notebooks are reformatted with Ruff, and the README shows Ruff's badge instead of Black's
+- **Code style:** Ruff also checks the docstrings of the package against numpydoc's conventions (pydocstyle rules)
 - **Code:** fix typos, type hints, docstrings and formatting
 
 ### New Contributors

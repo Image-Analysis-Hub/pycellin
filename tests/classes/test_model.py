@@ -414,6 +414,25 @@ class TestAddCycleLineages:
         model.add_cycle_lineages()
         assert model.get_property("generation").lineage_type == "both"
 
+    def test_without_time_step(self, lineage_props_model):
+        """Building cycle lineages doesn't use the time step."""
+        model = lineage_props_model
+        model.model_metadata.time_step = None
+        model.add_cycle_lineages()
+        assert model.has_cycle_lineages()
+
+    def test_add_lineage_with_cycle_lineage_without_time_step(
+        self, lineage_props_model
+    ):
+        """add_lineage() builds the cycle lineage even without a time step."""
+        model = lineage_props_model
+        model.add_cycle_lineages()
+        model.model_metadata.time_step = None
+        lin = CellLineage(lineage_id=7)
+        lin.add_node(70, cell_id=70, frame=0)
+        model.add_lineage(lin, with_cycle_lineage=True)
+        assert 7 in model.data.cycle_lineages
+
 
 class TestToCycleDataframe:
     """Test cases for Model.to_cycle_dataframe() method."""

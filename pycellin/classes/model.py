@@ -45,7 +45,63 @@ _MERGE_PROVENANCE = "pycellin merge"
 
 
 class Model:
-    """ """
+    """
+    Cell lineages of a tracking dataset, with their properties and metadata.
+
+    A model holds the cell lineages, their cycle lineages once added with
+    `add_cycle_lineages`, the declarations of their properties, and metadata such as
+    the time step and the units. Its methods edit the lineages, add and compute
+    properties, and export the data as DataFrames. A model is usually created by a
+    reader, such as `read_trackmate_xml`.
+
+    Parameters
+    ----------
+    model_metadata : ModelMetadata | dict[str, Any] | None, default=None
+        Metadata of the model. The model keeps a shallow copy.
+    props_metadata : PropsMetadata | None, default=None
+        The declaration of the properties present in the model. The model keeps a
+        deep copy.
+    data : Data | None, default=None
+        The lineages data of the model. The model keeps a deep copy.
+    reference_time_prop : str | None, default=None
+        The name of the property to use as the reference for time measurements.
+        Needs to be provided if `model_metadata` is None or does not contain it.
+    variable_time_step : bool, default=False
+        If True and ``time_step`` is not provided in `model_metadata`, the time step
+        will be computed using the greatest common divisor (GCD) of time
+        differences, which is suitable for irregularly sampled timepoints.
+        If False, the minimum time difference is used instead.
+        This parameter is only used when the time step needs to be automatically
+        computed from the data.
+
+    Attributes
+    ----------
+    data : Data
+        The cell lineages of the model, and their cycle lineages once added.
+    model_metadata : ModelMetadata
+        The metadata of the model.
+    props_metadata : PropsMetadata
+        The declarations of the properties of the model.
+
+    Raises
+    ------
+    ValueError
+        If `reference_time_prop` is not provided and cannot be inferred from
+        `model_metadata`.
+    TypeError
+        If `model_metadata` is not None, a `ModelMetadata` or a dict.
+
+    Warns
+    -----
+    UserWarning
+        If ``time_step`` is not provided in `model_metadata` and cannot be inferred
+        from the data.
+
+    Notes
+    -----
+    The core properties ``cell_id``, ``lineage_id``, ``timepoint`` and the reference
+    time property are protected whenever they are declared.
+    """
 
     def __init__(
         self,
@@ -55,47 +111,6 @@ class Model:
         reference_time_prop: str | None = None,
         variable_time_step: bool = False,
     ) -> None:
-        """
-        Constructs all the necessary attributes for the Model object.
-
-        Parameters
-        ----------
-        model_metadata : ModelMetadata | dict[str, Any] | None, optional
-            Metadata of the model (default is None).
-        props_metadata : PropsMetadata, optional
-            The declaration of the properties present in the model (default is None).
-        data : Data, optional
-            The lineages data of the model (default is None).
-        reference_time_prop : str, optional
-            The name of the property to use as the reference for time measurements.
-            Needs to be provided if model_metadata is None or does not contain it.
-        variable_time_step : bool, optional
-            If True and time_step is not provided in model_metadata, the time step
-            will be computed using the greatest common divisor (GCD) of time
-            differences, which is suitable for irregularly sampled timepoints.
-            If False, the minimum time difference is used instead (default is False).
-            This parameter is only used when time_step needs to be automatically
-            computed from the data.
-
-        Raises
-        ------
-        ValueError
-            If `reference_time_prop` is not provided and cannot be inferred from
-            `model_metadata`.
-        TypeError
-            If `model_metadata` is not None, ModelMetadata, or dict.
-
-        Warns
-        -----
-        UserWarning
-            If `time_step` is not provided in `model_metadata` and cannot be inferred
-            from the data.
-
-        Notes
-        -----
-        The core properties "cell_id", "lineage_id", "timepoint" and the reference
-        time property are protected whenever they are declared.
-        """
         # Check that we have a reference_time_prop.
         if reference_time_prop is None:
             if model_metadata is None:
@@ -1569,11 +1584,9 @@ class Model:
 
         time_step = self.model_metadata.time_step
         if time_step is None:
-            # TODO: add "see documentation" to the error message or explain
-            # directly how to set it?
             raise ValueError(
-                "The time step of the model is currently not defined "
-                "but is required for cycle lineage computation."
+                "The time step of the model is not defined, but is required to update "
+                "the model. Set it with set_time_step()."
             )
         # The timepoint property is always declared and protected, unless it is the
         # reference time property (see _ModelUpdater._update()).
@@ -1654,10 +1667,7 @@ class Model:
         -----
         UserWarning
             If `with_cycle_lineage` is True but the cycle lineages have not been added
-            yet.
-            If `with_cycle_lineage` is True but the time step of the model is not
-            defined.
-            In both these cases, the cycle lineage is not computed.
+            yet. The cycle lineage is then not computed.
         """
         # Determine the lineage ID to use.
         if lineage is None:
@@ -1701,17 +1711,10 @@ class Model:
                     "have not been added yet."
                 )
             else:
-                timestep = self.get_time_step()
-                if timestep is None:
-                    warnings.warn(
-                        f"Cannot add cycle lineage {lineage_id} when the time step "
-                        "of the model is not defined."
-                    )
-                else:
-                    cycle_lineage = self.data._compute_cycle_lineage(
-                        self.reference_time_prop, timestep, lineage_id
-                    )
-                    self.data.cycle_lineages[lineage_id] = cycle_lineage
+                cycle_lineage = self.data._compute_cycle_lineage(
+                    self.reference_time_prop, lineage_id
+                )
+                self.data.cycle_lineages[lineage_id] = cycle_lineage
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
@@ -5450,7 +5453,6 @@ class Model:
         Raises
         ------
         ValueError
-            If the time step of the model is not defined.
             If a default property of cycle lineages is already declared as another
             kind of property, and this declaration is used.
         """
@@ -5464,14 +5466,6 @@ class Model:
         # TODO: I have nothing to check if the structure was modified since
         # _update_required becomes true when properties are added...
         time_prop = self.model_metadata.reference_time_prop
-        time_step = self.model_metadata.time_step
-        if time_step is None:
-            # TODO: add "see documentation" to the error message or explain
-            # directly how to set it?
-            raise ValueError(
-                "The time step of the model is currently not defined "
-                "but is required for cycle lineage computation."
-            )
         time_unit = self.model_metadata.time_unit
         unused, used = [], []
         for prop in self.props_metadata._create_cycle_lineage_props(time_unit):
@@ -5495,7 +5489,7 @@ class Model:
             )
         for prop_id in unused:
             self.props_metadata._remove_prop(prop_id)
-        self.data._add_cycle_lineages(time_prop, time_step)
+        self.data._add_cycle_lineages(time_prop)
         self.props_metadata._add_cycle_lineage_props(time_unit)
 
     def has_cycle_lineages(self) -> bool:
@@ -5862,9 +5856,7 @@ class Model:
             is set in only one of them.
             If a property with the same identifier and not created by a merge operation
             already exists in the model.
-            If one of the models has cycle lineages but the time step of this model is
-            not defined, or if a cycle lineage cannot be built (e.g. a lineage with
-            several roots).
+            If a cycle lineage cannot be built (e.g. a lineage with several roots).
             If ``new_metadata`` contains a critical field, or a name while ``new_name``
             is also given.
             If ``model`` starts earlier than the time origin of this model, which would
@@ -6066,19 +6058,13 @@ class Model:
         cycle_lineages_to_add = {}
         if with_cycles:
             time_prop = model1.reference_time_prop
-            time_step = model1.model_metadata.time_step
-            if time_step is None:
-                raise ValueError(
-                    "Cannot build the cycle lineages of the merged model: the time "
-                    "step of this model is not defined."
-                )
             lineages = list(lineages_to_add)
             if not model1.data.cycle_lineages:
                 lineages += [
                     (lin, lid) for lid, lin in model1.data.cell_lineages.items()
                 ]
             for lin, lid in lineages:
-                cycle_lin = CycleLineage(time_prop, time_step, lin)
+                cycle_lin = CycleLineage(time_prop, lin)
                 cycle_lin.graph["lineage_id"] = lid
                 cycle_lineages_to_add[lid] = cycle_lin
 
@@ -6860,7 +6846,7 @@ class Model:
             y_prop (default is None).
         line_style : dict, optional
             Plotly line properties for the mean line (e.g. "color", "width", "dash").
-            Merged over the defaults {"color": "#862CC6", "width": 3}. The
+            Merged over the defaults {"color": "#982FC4", "width": 3}. The
             "color" is also used as the base color for the std band. Colors must be
             given as 'rgb(r,g,b)' or '#rrggbb'.
         marker_style : dict, optional
@@ -7051,7 +7037,7 @@ class Model:
             y_prop (default is None).
         line_style : dict, optional
             Plotly line properties for the mean line (e.g. "color", "width", "dash").
-            Merged over the defaults {"color": "#862CC6", "width": 3}. The
+            Merged over the defaults {"color": "#982FC4", "width": 3}. The
             "color" is also used as the base color for the std band. Colors must be
             given as 'rgb(r,g,b)' or '#rrggbb'.
         marker_style : dict, optional

@@ -22,20 +22,25 @@ from pycellin.utils import _check_literal_type
 
 class PropsMetadata:
     """
-    The PropsMetadata class is used to store the properties that are
-    associated with the nodes, edges, and lineages of cell lineage graphs.
+    Store the properties associated with the nodes, edges and lineages of lineages.
+
+    Parameters
+    ----------
+    properties : dict[str, Property] | None, default=None
+        A dictionary of properties where the keys are the property identifiers and
+        the values are the Property objects.
+    protected_props : list[str] | None, default=None
+        A list of property identifiers that are protected from being modified or
+        removed. Identifiers missing from `properties` are dropped, with a warning.
+    propagated_props : list[str] | None, default=None
+        The identifiers of the cycle properties propagated to the cell lineages with
+        `Model.propagate_cycle_properties()`, which `Model.update()` copies again.
 
     Attributes
     ----------
     properties : dict[str, Property]
         A dictionary of properties where the keys are the property identifiers and
         the values are the Property objects.
-    protected_props : list[str]
-        A list of property identifiers that are protected from being modified or
-        removed.
-    propagated_props : list[str]
-        The identifiers of the cycle properties propagated to the cell lineages with
-        `Model.propagate_cycle_properties()`, which `Model.update()` copies again.
 
     Notes
     -----
@@ -51,18 +56,17 @@ class PropsMetadata:
         propagated_props: list[str] | None = None,
     ) -> None:
         self.properties = properties if properties is not None else {}
-        self._protected_props = protected_props if protected_props is not None else []
-        self._propagated_props = (
-            propagated_props if propagated_props is not None else []
-        )
-        for prop in self._protected_props:
-            if prop not in self.properties:
+        self._protected_props: list[str] = []
+        for prop in protected_props or []:
+            if prop in self.properties:
+                self._protected_props.append(prop)
+            else:
                 msg = (
                     f"Protected property '{prop}' does not exist in the declared "
                     "properties. Removing it from the list of protected properties."
                 )
                 warnings.warn(msg)
-                self._protected_props.remove(prop)
+        self._propagated_props = list(propagated_props or [])
 
     def __deepcopy__(self, memo):
         """
