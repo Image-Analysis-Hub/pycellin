@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 6b884a4. Update from there with: git log 6b884a4..dev -->
+<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the documentation work of feature/docs up to c8cc277 and the uncommitted README changes. Update from there with: git log 6b884a4..dev -->
 
 Model merging and splitting, many new properties (morphology, intensity, topology), branch plots, consistent names that follow PEP 8, and many fixes, notably to time handling and to reading and writing TrackMate, GEFF, CTC and trackpy data. **This release contains breaking changes**, listed first below.
 
@@ -153,6 +153,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **CTC:** `frame_offset` argument to `write_ctc()`, the frame of timepoint 0, added to the timepoints of the cells to give their CTC frames. Timepoints start at 0 at the earliest cell, so data that starts at a later frame, e.g. a CTC file whose first frame is 5, is exported from frame 0 by default, out of line with its images. Pass that first frame, or in general the frame of any cell minus its timepoint
 - **trackpy:** `reference_time_prop` argument to `from_trackpy()`, to name the time property it builds from the frames
 - **Dependencies:** `notebooks` extra with what the example notebooks need: JupyterLab, ipykernel, and nbformat, without which Plotly can't show figures in notebooks. Install it with `pip install "pycellin[notebooks]"`
+- **Docs:** a documentation site, https://pycellin.readthedocs.io/, with the installation steps, a glossary, and an API reference generated from the docstrings, including a table of all predefined properties. The README and the PyPI page link to it
 - **Docs:** the README explains what a cycle lineage is, what Pycellin can do, how to upgrade from 0.5.1 and what to do with cell fusions, and credits GEFF and the _C. elegans_ and FakeTracks sample data
 
 ### Changed
@@ -168,6 +169,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Dependencies:** raise the minimum versions of geff (1.1.4.1.1) and geff-spec (1.1.1). With earlier versions, GEFF files lost the unit, name and description of the properties
 - **Dependencies:** the test dependencies moved from the `test` extra to a `test` dependency group, installed from a clone of the repository with `pip install -e . --group test` (pip >= 25.1)
 - **Docs:** the "Creating a model from scratch" notebook, unfinished, and "Working with TrackMate data", covered by "Getting started", are removed. The other notebooks are updated and re-run, and "Custom properties" explains when a calculator should be local or global
+- **Docs:** the README keeps only the `pip install` line of the installation steps, and links to the documentation for the rest: creating a conda environment, and installing the example notebooks or the development tools
 
 ### Fixed
 
@@ -246,8 +248,8 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **trackpy:** the reader linked the cells by scanning all of them for each particle, so the linking time grew with the square of the number of rows: loading 40,000 rows took 14 s, now 3 s
 - **trackpy:** with pandas 3.1 or later, the writer raised `Pandas4Warning`s, since it used pandas' `inplace` argument, deprecated in pandas 3.1 and removed in pandas 4
 - **trackpy:** exporting a model without divisions, e.g. one loaded from trackpy, warned that the model was already up to date
-- **Packaging:** the PyPI page had broken links: Documentation and Examples led to a site that doesn't exist, the README links to the notebooks didn't open them, and the README logo didn't show. Examples now opens the notebooks on GitHub, Documentation is removed until there is a documentation site, and a Changelog link is added
-- **Docs:** the installation steps of the README, also shown on the PyPI page, created a conda environment without Python, so `pip install pycellin` used the pip of another environment, if any. The environment is now created with Python 3.14
+- **Packaging:** the PyPI page had broken links: Documentation and Examples led to a site that doesn't exist, the README links to the notebooks didn't open them, and the README logo didn't show. Examples now opens the notebooks on GitHub, Documentation opens the new documentation site, and a Changelog link is added
+- **Docs:** the installation steps of the README, also shown on the PyPI page, created a conda environment without Python, so `pip install pycellin` used the pip of another environment, if any. The installation steps, now in the documentation, create it with Python 3.14
 - **Docs:** the code example of the README, also shown on the PyPI page, raised `NameError`: it called a `plot()` function that doesn't exist instead of `lin.plot()`. The link to Ershov et al., 2022 was broken too
 - **Docs:** `Model.get_cell_lineage_ids()` had lost its docstring to the alias that pointed to it
 - **Docs:** some examples of `add_pycellin_property()` and `add_pycellin_properties()` didn't work:
@@ -258,6 +260,9 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 
 - **Tests:** new tests for the new properties, plotting, exceptions, utils, the CTC and trackpy readers, the trackpy writer, `read_geff()` end to end, the pickle functions, and the signatures of the reading and writing functions
 - **Docs:** use the `pc` alias consistently in the README and notebooks, remove the State column of the README notebook table, replace `angle` with `turning_angle` in the examples of "Managing properties", and say in the docstring of `write_trackmate_xml()` that only numeric properties are exported
+- **Docs:** build the documentation with Sphinx, from `docs/`: PyData theme, pages in Markdown (MyST), and an API reference generated by autosummary and numpydoc. Its tools are in a new `docs` dependency group
+- **Docs:** build the documentation on Read the Docs (`.readthedocs.yaml`), with a preview of each pull request. Builds report broken references and check the docstrings against numpydoc's guide
+- **Docs:** move the logo to `docs/_static/logo/`, as an SVG used by both the documentation and the README
 - **Properties:** make the `is_complete_cycle` calculator local, since it only reads its own lineage. Its values and update cost are unchanged
 - **Properties:** remove the `__main__` demo of `morphology.py`, a one-off check of the area and perimeter computations that failed with `KeyError`
 - **Packaging:** find packages automatically in `pyproject.toml`
@@ -267,7 +272,9 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **CI:** the deploy workflow stops before building if the release tag doesn't match the package version
 - **CI:** fix releases starting the deploy workflow twice, which made one of the two runs fail at the PyPI upload
 - **CI:** new Style workflow that checks, on pushes and pull requests to `main`, that the code is formatted with Ruff and that no line is longer than 88 characters
+- **CI:** new Link check workflow that checks the external links of the documentation, every month and on demand
 - **Code style:** wrap code, docstrings and comments at 88 characters. The line length is set in `pyproject.toml`, where Ruff also flags longer lines (E501). The code and notebooks are reformatted with Ruff, and the README shows Ruff's badge instead of Black's
+- **Code style:** Ruff also checks the docstrings of the package against numpydoc's conventions (pydocstyle rules)
 - **Code:** fix typos, type hints, docstrings and formatting
 
 ### New Contributors

@@ -3,6 +3,7 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/pycellin.svg)](https://python.org)
 [![License](https://img.shields.io/pypi/l/pycellin.svg)](https://github.com/Image-Analysis-Hub/pycellin/blob/main/LICENSE)
 [![Actions Status](https://github.com/Image-Analysis-Hub/pycellin/workflows/Test/badge.svg)](https://github.com/Image-Analysis-Hub/pycellin/actions)
+[![Documentation Status](https://readthedocs.org/projects/pycellin/badge/?version=latest)](https://pycellin.readthedocs.io/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 </br>
@@ -39,35 +40,13 @@ Although Pycellin was designed with bacteria / cell lineages in mind, it can be 
 
 Pycellin supports Python 3.10 and above. It is tested with Python 3.10 and 3.14 on the latest versions of Ubuntu, Windows and macOS. Please [let me know](https://github.com/Image-Analysis-Hub/pycellin/issues) if you encounter any compatibility issue with a different combination.
 
-It is recommended to install Pycellin in a conda or mamba environment. 
+It is recommended to install Pycellin in a conda or mamba environment, from [PyPI](https://pypi.org/project/pycellin/):
 
-1. Check that conda/mamba is already installed by typing either `conda` or `mamba` in a terminal. If not, follow the installation instructions on [Miniforge](https://conda-forge.org/download/).
+```
+pip install pycellin
+```
 
-2. Create a Python environment dedicated to Pycellin:
-    ```
-    conda create -n my_env_pycellin python=3.14
-    ```
-
-3. Activate the environment:
-    ```
-    conda activate my_env_pycellin
-    ```
-
-4. Install Pycellin via [PyPI](https://pypi.org/):
-    ```
-    pip install pycellin
-    ```
-    or if you want to run the example notebooks, use instead:
-    ```
-    pip install "pycellin[notebooks]"
-    ```
-    This also installs JupyterLab, which you start with `jupyter lab`.
-    To run the tests from a clone of the repository, install the test dependencies with pip >= 25.1:
-    ```
-    pip install -e . --group test
-    ```
-
-5. You're good to go!
+The [documentation](https://pycellin.readthedocs.io/) details each step, and how to install the example notebooks or the development tools.
 
 > **Upgrading from 0.5.1?** Version 0.6.0 renames many functions, methods and arguments, without aliases: for example, `load_TrackMate_XML()` is now `read_trackmate_xml()`. Pickle files written with 0.5.1 can't be read anymore either. The [changelog](https://github.com/Image-Analysis-Hub/pycellin/blob/main/CHANGELOG.md) lists all the changes.
 
@@ -129,7 +108,7 @@ pc.write_geff(
 
 ## Usage
 
-Please note that the following notebooks serve as temporary documentation. A full user's documentation and API documentation will be added soon.
+The [documentation](https://pycellin.readthedocs.io/) holds the API reference. Until its user guide is complete, these notebooks show how to use Pycellin:
 
 | Notebook                                                                                                              | Description                                                         | Level    |
 |-----------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|----------|
