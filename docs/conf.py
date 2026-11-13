@@ -3,7 +3,9 @@
 Settings reference: https://www.sphinx-doc.org/en/master/usage/configuration.html
 """
 
+import enum
 import inspect
+import logging
 from pathlib import Path
 
 import networkx as nx
@@ -74,7 +76,15 @@ numpydoc_xref_aliases = {
     "TimeFlowError": "pycellin.exceptions.TimeFlowError",
     "UpdateRequiredError": "pycellin.exceptions.UpdateRequiredError",
 }
+# Check docstrings against numpydoc's guide. Left out: the checks asking for more
+# content (extended summary, Examples, See Also), and GL02 (closing quotes on their own
+# line), which the #: comments documenting attributes can't follow.
+numpydoc_validation_checks = {"all", "ES01", "EX01", "SA01", "GL02"}
+# Not checked: numpydoc reads the (*values) signature Python gives enum classes.
+numpydoc_validation_exclude = {r"^pycellin\.custom_types\.PropertyType$"}
 default_role = "py:obj"
+# Report every reference that doesn't resolve, like the -n option.
+nitpicky = True
 # Parameter names go in single backticks too (numpydoc's guide) and can't link: don't
 # report bare lowercase names that don't resolve.
 nitpick_ignore_regex = [("py:obj", r"[a-z_][a-z0-9_]*")]
@@ -103,6 +113,33 @@ def _lineage_signature(app, what, name, obj, options, signature, return_annotati
         )
         return text, None
     return None
+
+
+def _enum_signature(app, what, name, obj, options, signature, return_annotation):
+    """Hide the (*values) signature Python gives enum classes.
+
+    Users write PropertyType.NODE, never PropertyType(...).
+    """
+    if what == "class" and isinstance(obj, type) and issubclass(obj, enum.Enum):
+        return "", None
+    return None
+
+
+# numpydoc messages already shown, see _show_once.
+_shown = set()
+
+
+def _show_once(record):
+    """Drop a numpydoc message already shown.
+
+    autosummary reads the docstring of each object it lists, for the table row, then the
+    object's page reads it again: numpydoc checks it, and warns, twice.
+    """
+    message = record.getMessage()
+    if message in _shown:
+        return False
+    _shown.add(message)
+    return True
 
 
 def _write_predefined_properties(app):
@@ -179,5 +216,7 @@ html_css_files = ["pydata-overrides.css"]
 
 def setup(app):
     app.connect("autodoc-process-signature", _lineage_signature)
+    app.connect("autodoc-process-signature", _enum_signature)
     app.connect("builder-inited", _write_predefined_properties)
     app.connect("missing-reference", _plotly_public_name)
+    logging.getLogger("sphinx.numpydoc.numpydoc").addFilter(_show_once)

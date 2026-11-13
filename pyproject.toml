@@ -73,5 +73,13 @@ testpaths = ["tests"]
 line-length = 88
 
 [tool.ruff.lint]
-# Ruff's default rules, plus line length (E501) for code, docstrings and comments.
-extend-select = ["E501"]
+# Ruff's default rules, plus line length (E501) for code, docstrings and comments, and
+# the docstring rules (D), set below to numpydoc's conventions.
+extend-select = ["E501", "D"]
+
+[tool.ruff.lint.per-file-ignores]
+# Docstring rules for the package only: not for tests, notebooks or docs/conf.py.
+"!pycellin/**" = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
