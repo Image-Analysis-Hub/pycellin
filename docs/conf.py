@@ -30,6 +30,7 @@ extensions = [
     "numpydoc",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinx.ext.extlinks",
     "sphinx.ext.intersphinx",
     "sphinx_design",
 ]
@@ -42,6 +43,16 @@ intersphinx_mapping = {
     "pandas": ("https://pandas.pydata.org/docs/", None),
     "plotly": ("https://plotly.com/python-api-reference/", None),
     "python": ("https://docs.python.org/3/", None),
+}
+# Links to the files of the repository, in the version these docs are built from: the
+# commit Read the Docs checked out, or dev for local builds. For example
+# {repo}`Getting started <notebooks/Getting%20started.ipynb>`.
+_git_ref = os.environ.get("READTHEDOCS_GIT_COMMIT_HASH", "dev")
+extlinks = {
+    "repo": (
+        f"https://github.com/Image-Analysis-Hub/pycellin/blob/{_git_ref}/%s",
+        "%s",
+    ),
 }
 
 

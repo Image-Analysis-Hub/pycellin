@@ -6,5 +6,6 @@ This guide explains how to install and use Pycellin.
 :maxdepth: 1
 
 installation
+tutorials
 glossary
 ```

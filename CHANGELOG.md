@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the documentation work of feature/docs up to c8cc277 and the uncommitted README changes. Update from there with: git log 6b884a4..dev -->
+<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the documentation work of feature/docs up to 5e27344 and the uncommitted tutorials page. Update from there with: git log 6b884a4..dev -->
 
 Model merging and splitting, many new properties (morphology, intensity, topology), branch plots, consistent names that follow PEP 8, and many fixes, notably to time handling and to reading and writing TrackMate, GEFF, CTC and trackpy data. **This release contains breaking changes**, listed first below.
 
@@ -153,7 +153,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **CTC:** `frame_offset` argument to `write_ctc()`, the frame of timepoint 0, added to the timepoints of the cells to give their CTC frames. Timepoints start at 0 at the earliest cell, so data that starts at a later frame, e.g. a CTC file whose first frame is 5, is exported from frame 0 by default, out of line with its images. Pass that first frame, or in general the frame of any cell minus its timepoint
 - **trackpy:** `reference_time_prop` argument to `from_trackpy()`, to name the time property it builds from the frames
 - **Dependencies:** `notebooks` extra with what the example notebooks need: JupyterLab, ipykernel, and nbformat, without which Plotly can't show figures in notebooks. Install it with `pip install "pycellin[notebooks]"`
-- **Docs:** a documentation site, https://pycellin.readthedocs.io/, with the installation steps, a glossary, and an API reference generated from the docstrings, including a table of all predefined properties. The README and the PyPI page link to it
+- **Docs:** a documentation site, https://pycellin.readthedocs.io/, with the installation steps, the list of tutorial notebooks, a glossary, and an API reference generated from the docstrings, including a table of all predefined properties. The README and the PyPI page link to it
 - **Docs:** the README explains what a cycle lineage is, what Pycellin can do, how to upgrade from 0.5.1 and what to do with cell fusions, and credits GEFF and the _C. elegans_ and FakeTracks sample data
 
 ### Changed
