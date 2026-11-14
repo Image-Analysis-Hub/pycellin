@@ -2364,6 +2364,8 @@ class Model:
         Raises
         ------
         ValueError
+            If the calculator computes values of another kind of object than the
+            property type, e.g. a node calculator for an edge property.
             If the property is a cycle lineage property and cycle lineages
             have not been computed yet.
             If a property read by the calculator does not have the property type
@@ -2391,6 +2393,16 @@ class Model:
         calculator = copy(calculator)
         calculator.property = copy(calculator.property)
         prop = calculator.property
+        # A node calculator stores its values on nodes, whatever the property type.
+        calc_type = calculator.get_property_type()
+        if calc_type is not None and (
+            _property_type_from_string(calc_type) not in prop.prop_type
+        ):
+            raise ValueError(
+                f"Cannot add '{prop.identifier}': {type(calculator).__name__} computes "
+                f"{calc_type} values, but the property type of '{prop.identifier}' is "
+                f"'{prop.prop_type}'."
+            )
         if prop.lineage_type == "cycle" and not self.data.cycle_lineages:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
@@ -5533,6 +5545,9 @@ class Model:
             kind of property, and this declaration is used.
         FusionError
             If a lineage has a fusion, i.e. a cell with more than one parent.
+        LineageStructureError
+            If a lineage has several roots, e.g. when `remove_link()` split it and
+            the model wasn't updated since.
         """
         # if self._updater._update_required:
         #     txt = (

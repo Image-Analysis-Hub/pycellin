@@ -7,17 +7,21 @@ import pytest
 from pycellin.classes import Property, PropsMetadata
 
 
-@pytest.fixture()
-def declared_prop():
+def _create_prop(identifier):
     return Property(
-        identifier="declared",
-        name="declared",
-        description="A declared property",
+        identifier=identifier,
+        name=identifier,
+        description=f"A {identifier} property",
         provenance="test",
         prop_type="node",
         lineage_type="cell",
         dtype="int",
     )
+
+
+@pytest.fixture()
+def declared_prop():
+    return _create_prop("declared")
 
 
 class TestPropsMetadataConstructor:
@@ -47,3 +51,36 @@ class TestPropsMetadataConstructor:
         assert protected == ["missing", "declared"]
         assert props_md._protected_props is not protected
         assert props_md._propagated_props is not propagated
+
+
+class TestChangePropIdentifier:
+    """Test cases for PropsMetadata._change_prop_identifier()."""
+
+    def test_identifier_already_declared_raises(self, declared_prop):
+        """Test that another declaration isn't replaced."""
+        other_prop = _create_prop("other")
+        props_md = PropsMetadata(
+            properties={"declared": declared_prop, "other": other_prop}
+        )
+        with pytest.raises(ValueError, match="already declared"):
+            props_md._change_prop_identifier("declared", "other")
+        assert props_md.properties["declared"] is declared_prop
+        assert props_md.properties["other"] is other_prop
+
+    def test_non_string_identifier_changes_nothing(self, declared_prop):
+        """Test that the declaration stays under its identifier."""
+        props_md = PropsMetadata(properties={"declared": declared_prop})
+        with pytest.raises(TypeError):
+            props_md._change_prop_identifier("declared", 3)
+        assert list(props_md.properties) == ["declared"]
+
+
+class TestProtectProp:
+    """Test cases for PropsMetadata._protect_prop()."""
+
+    def test_undeclared_prop_is_not_protected(self, declared_prop):
+        """Test that a property that isn't declared isn't protected."""
+        props_md = PropsMetadata(properties={"declared": declared_prop})
+        with pytest.warns(UserWarning, match="cannot be protected"):
+            props_md._protect_prop("missing")
+        assert "missing" not in props_md._protected_props

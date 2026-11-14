@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+"""The `Property` class: the declaration of a property."""
+
 import contextlib
 from typing import Any, get_args
 
@@ -96,6 +98,21 @@ class Property:
         self.unit = unit
 
     def __eq__(self, other: object) -> bool:
+        """
+        Return whether two properties have the same declaration.
+
+        Parameters
+        ----------
+        other : object
+            The object to compare with.
+
+        Returns
+        -------
+        bool
+            True if `other` is a `Property` with the same identifier, name,
+            description, provenance, property type, lineage type, data type and unit,
+            False otherwise. `NotImplemented` if `other` is not a `Property`.
+        """
         if not isinstance(other, Property):
             return NotImplemented
         return (
@@ -115,9 +132,9 @@ class Property:
 
         Two properties are compatible when they have the same property type, lineage
         type, unit and data type. Data types are compared after normalizing their
-        spelling (e.g. "float" and "float64", "str" and "string"). An "unknown" unit or
-        data type is compatible with any value. Name, description and provenance are
-        not compared.
+        spelling (e.g. ``"float"`` and ``"float64"``, ``"str"`` and ``"string"``). An
+        ``"unknown"`` unit or data type is compatible with any value. Name,
+        description and provenance are not compared.
 
         Parameters
         ----------
@@ -144,12 +161,12 @@ class Property:
 
     def __repr__(self) -> str:
         """
-        Compute a string representation of the Property object.
+        Compute a string representation of the `Property` object.
 
         Returns
         -------
         str
-            A string representation of the Property object.
+            A string representation of the `Property` object.
         """
         return (
             f"Property(identifier={self.identifier!r}, name={self.name!r}, "
@@ -160,12 +177,12 @@ class Property:
 
     def __str__(self) -> str:
         """
-        Compute a human-readable string representation of the Property object.
+        Compute a human-readable string representation of the `Property` object.
 
         Returns
         -------
         str
-            A human-readable string representation of the Property object.
+            A human-readable string representation of the `Property` object.
         """
         string = (
             f"Property '{self.identifier}'\n"
@@ -260,19 +277,21 @@ class Property:
         ----------
         other : Property
             The other property to compare with.
-        ignore_prop_type : bool, optional
+        ignore_prop_type : bool, default=False
             Whether to ignore the property type when comparing the properties.
 
         Returns
         -------
         bool
-            True if the properties are equal, False otherwise.
+            True if the properties are equal, False otherwise, also when `other` is
+            not a `Property`.
         """
         if not isinstance(other, Property):
-            return NotImplemented
+            return False
         if ignore_prop_type:
             return (
                 self.identifier == other.identifier
+                and self.name == other.name
                 and self.description == other.description
                 and self.provenance == other.provenance
                 and self.lineage_type == other.lineage_type

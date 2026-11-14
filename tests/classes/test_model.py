@@ -1344,6 +1344,13 @@ class TestAddCustomProperty:
             input_props_model.add_custom_property(calc)
         assert input_props_model.get_property("cycle_mean_area") is None
 
+    def test_calculator_for_another_prop_type_raises(self, two_lineages_model):
+        """Test that a node calculator can't compute an edge property."""
+        prop = _create_test_property("edge_value", "edge")
+        with pytest.raises(ValueError, match="ConstantValue computes node values"):
+            two_lineages_model.add_custom_property(ConstantValue(prop, 2.0))
+        assert two_lineages_model.get_property("edge_value") is None
+
     def test_readding_replaces_declaration(self, two_times_model):
         two_times_model.add_absolute_age()
         with pytest.warns(UserWarning, match="Overwriting the old Property"):
