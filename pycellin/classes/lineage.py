@@ -1021,7 +1021,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         return prop, prop
 
     def _build_edge_hover_text(
-        self, G: Graph, index_to_nx_id: dict, edge_hover_props: list[str] | None
+        self, G: Graph, id_prop: str, edge_hover_props: list[str] | None
     ) -> list[str]:
         """
         Build hover text for edges.
@@ -1030,11 +1030,11 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ----------
         G : Graph
             The igraph graph of the lineage.
-        index_to_nx_id : dict
-            Mapping from igraph vertex index to NetworkX node ID.
+        id_prop : str
+            The property of the nodes to use as identifier.
         edge_hover_props : list[str] | None
-            The edge properties to display on hover, after the IDs of the source and
-            target nodes. If None, only these IDs are displayed.
+            The edge properties to display on hover, after the `id_prop` values of the
+            source and target nodes. If None, only these values are displayed.
 
         Returns
         -------
@@ -1045,13 +1045,14 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         Raises
         ------
         KeyError
-            If a property of `edge_hover_props` is not an edge property of the graph.
+            If `id_prop` is not a node property of the graph, or if a property of
+            `edge_hover_props` is not an edge property of the graph.
         """
         edge_hover_text = []
         for edge in G.es:
-            source_id = index_to_nx_id[edge.source]
-            target_id = index_to_nx_id[edge.target]
-            text = f"Source cell_id: {source_id}<br>Target cell_id: {target_id}<br>"
+            source_id = G.vs[edge.source][id_prop]
+            target_id = G.vs[edge.target][id_prop]
+            text = f"Source {id_prop}: {source_id}<br>Target {id_prop}: {target_id}<br>"
             if edge_hover_props:
                 for prop in edge_hover_props:
                     if prop not in edge.attributes():
@@ -1061,7 +1062,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                         )
                     hover_text = f"{prop}: {edge[prop]}<br>"
                     text += hover_text
-                edge_hover_text += [text, text, text]
+            edge_hover_text += [text, text, text]
         return edge_hover_text
 
     @abstractmethod
@@ -1126,8 +1127,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
         edge_hover_props : list[str] | None, default=None
-            The edge properties to display on hover. If None, defaults to
-            displaying the source and target nodes.
+            The edge properties to display on hover, after the `id_prop` values of
+            the source and target nodes. If None, only these values are displayed.
         plot_bgcolor : str | None, default=None
             The background color of the plot. If None, defaults to current
             Plotly template.
@@ -1264,7 +1265,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                 mode="lines",
                 line=edge_line_style,
                 # hovertemplate="%{text}",
-                text=self._build_edge_hover_text(G, index_to_nx_id, edge_hover_props),
+                text=self._build_edge_hover_text(G, id_prop, edge_hover_props),
                 name="Edges",
             )
         )
@@ -1373,8 +1374,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
         edge_hover_props : list[str] | None, default=None
-            The edge properties to display on hover. If None, defaults to
-            displaying the source and target nodes.
+            The edge properties to display on hover, after the `id_prop` values of
+            the source and target nodes. If None, only these values are displayed.
         plot_bgcolor : str | None, default=None
             The background color of the plot. If None, defaults to current
             Plotly template.
@@ -1490,12 +1491,14 @@ class CellLineage(Lineage):
         Returns
         -------
         str
-            The ID of the lineage, its name if it has one, and its numbers of cells
-            and links.
+            The ID and the name of the lineage, when it has them, and its numbers of
+            cells and links.
         """
+        lineage_id = self.graph.get("lineage_id")
+        id_txt = f" of ID {lineage_id}" if lineage_id is not None else ""
         name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
         txt = (
-            f"CellLineage of ID {self.graph['lineage_id']}{name_txt}"
+            f"CellLineage{id_txt}{name_txt}"
             f" with {len(self)} cells and {len(self.edges())} links."
         )
         return txt
@@ -2573,8 +2576,8 @@ class CellLineage(Lineage):
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
         edge_hover_props : list[str] | None, default=None
-            The edge properties to display on hover. If None, defaults to
-            displaying the source and target nodes.
+            The edge properties to display on hover, after the `id_prop` values of
+            the source and target nodes. If None, only these values are displayed.
         plot_bgcolor : str | None, default=None
             The background color of the plot. If None, defaults to current
             Plotly template.
@@ -2776,8 +2779,8 @@ class CellLineage(Lineage):
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
         edge_hover_props : list[str] | None, default=None
-            The edge properties to display on hover. If None, defaults to
-            displaying the source and target nodes.
+            The edge properties to display on hover, after the `id_prop` values of
+            the source and target nodes. If None, only these values are displayed.
         plot_bgcolor : str | None, default=None
             The background color of the plot. If None, defaults to current
             Plotly template.
@@ -3568,12 +3571,14 @@ class CycleLineage(Lineage):
         Returns
         -------
         str
-            The ID of the lineage, its name if it has one, and its numbers of cell
-            cycles and links.
+            The ID and the name of the lineage, when it has them, and its numbers of
+            cell cycles and links.
         """
+        lineage_id = self.graph.get("lineage_id")
+        id_txt = f" of ID {lineage_id}" if lineage_id is not None else ""
         name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
         txt = (
-            f"CycleLineage of ID {self.graph['lineage_id']}{name_txt}"
+            f"CycleLineage{id_txt}{name_txt}"
             f" with {len(self)} cell cycles and {len(self.edges())} links."
         )
         return txt
@@ -3706,8 +3711,8 @@ class CycleLineage(Lineage):
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
         edge_hover_props : list[str] | None, default=None
-            The edge properties to display on hover. If None, defaults to
-            displaying the source and target nodes.
+            The edge properties to display on hover, after the `id_prop` values of
+            the source and target nodes. If None, only these values are displayed.
         plot_bgcolor : str | None, default=None
             The background color of the plot. If None, defaults to current
             Plotly template.
@@ -3835,8 +3840,8 @@ class CycleLineage(Lineage):
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
         edge_hover_props : list[str] | None, default=None
-            The edge properties to display on hover. If None, defaults to
-            displaying the source and target nodes.
+            The edge properties to display on hover, after the `id_prop` values of
+            the source and target nodes. If None, only these values are displayed.
         plot_bgcolor : str | None, default=None
             The background color of the plot. If None, defaults to current
             Plotly template.

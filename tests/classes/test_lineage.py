@@ -864,6 +864,22 @@ class TestLineageGetFusions:
         assert cell_lin_unconnected_component.get_fusions() == [20]
 
 
+class TestLineageGetTreeFigure:
+    """Test cases for the tree figures of CellLineage and CycleLineage."""
+
+    def test_default_edge_hover_text(self, cell_lin, cycle_lin_balanced):
+        """Test that each edge shows the IDs of its source and target on hover."""
+        cases = [(cell_lin, "cell_id"), (cycle_lin_balanced, "cycle_id")]
+        for lineage, id_prop in cases:
+            edges = lineage.get_tree_figure().data[0]
+            # One text per point of the edge trace: source, target and gap.
+            assert len(edges.text) == len(edges.x) == 3 * len(lineage.edges)
+            assert set(edges.text) == {
+                f"Source {id_prop}: {source}<br>Target {id_prop}: {target}<br>"
+                for source, target in lineage.edges
+            }
+
+
 # CellLineage-specific basic operations
 
 
