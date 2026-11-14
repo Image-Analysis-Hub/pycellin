@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the work of feature/docs up to e0c80db and the uncommitted fixes of the edge hover text and str() of the lineages. Update from there with: git log 6b884a4..dev -->
+<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the work of feature/docs up to 3dfff43 and the uncommitted division rule of is_division(). Update from there with: git log 6b884a4..dev -->
 
 Model merging and splitting, many new properties (morphology, intensity, topology), branch plots, consistent names that follow PEP 8, and many fixes, notably to time handling and to reading and writing TrackMate, GEFF, CTC and trackpy data. **This release contains breaking changes**, listed first below.
 
@@ -209,6 +209,8 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Properties:** `Property()` raised `KeyError` on an unknown property type, e.g. `prop_type="nodes"`. It now raises the `ValueError` it raises for other invalid property types, which lists the valid ones and now also gives the value received
 - **Properties:** `PropsMetadata()` drops the protected properties that aren't declared, with a warning, but missed every other one of them in a row, e.g. the second one in `protected_props=["a", "b"]`, which stayed protected. It also removed the ones it dropped from the list given as `protected_props`
 - **Lineages:** `str()` and `print()` failed with `KeyError` on lineages without a lineage ID, e.g. `CellLineage()` or a `CycleLineage` built without a cell lineage. They now describe such a lineage without its ID
+- **Lineages:** `is_division()`, and so the `is_division` property, returned False for a fusion cell that divides, whereas `get_divisions()` and `Model.get_divisions()` counted it, as does the new `num_divisions` property, and the description of the property says "has more than one daughter cell". A cell with several children is now a division cell whatever its number of parents
+- **Lineages:** in a lineage where a fusion cell divides, `get_cell_cycle()` failed with `AssertionError` on the cells of the cell cycles that end at this fusion cell, and so did `get_sisters()` (`get_sister_cells()` in 0.5.1) on these cells, and `add_cycle_lineages()` (`add_cycle_data()` in 0.5.1) and `CycleLineage()`. These cell cycles now end at the fusion cell, and `get_sisters()`, `add_cycle_lineages()` and `CycleLineage()` raise `FusionError`, as for other fusions. The cells born from such a division also get their cell cycle and sisters, instead of a `FusionError`
 - **Plotting:** `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()` modified the `node_marker_style` dict given to them, adding the node colors of `node_colormap_prop` to it: the same dict reused for another lineage gave it the colors and color bar of the previous lineage
 - **Plotting:** `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()` showed no hover text on the links unless `edge_hover_props` was given, instead of the IDs of their source and target, and these IDs were labeled `cell_ID` even on cycle lineages, where they are cell cycle IDs. Links now show the `id_prop` values of their source and target, `cell_id` or `cycle_id` by default, followed by the properties of `edge_hover_props`. So an `id_prop` that isn't a node property now raises `KeyError`, also when `node_hover_props` is given
 - **TrackMate:** `turning_angle` (`angle` in 0.5.1) in degrees was exported as a TrackMate angle, which TrackMate reads as radians
@@ -263,7 +265,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Docs:** the code example of the README, also shown on the PyPI page, raised `NameError`: it called a `plot()` function that doesn't exist instead of `lin.plot()`. The link to Ershov et al., 2022 was broken too
 - **Docs:** `Model.get_cell_lineage_ids()` had lost its docstring to the alias that pointed to it
 - **Docs:** the docstring of `Model.get_edge_properties()` described its `single_type` argument with node properties, and `add_rod_length()` and `add_rod_width()` had no docstring
-- **Docs:** in the lineages, the docstrings of `plot()` and `get_tree_figure()` described `node_hover_props` and `edge_hover_props` as hover templates instead of lists of properties, and that of `get_descendants()` gave an order to the descendants, which come in no particular order
+- **Docs:** in the lineages, the docstrings of `plot()` and `get_tree_figure()` described `node_hover_props` and `edge_hover_props` as hover templates instead of lists of properties, that of `get_descendants()` gave an order to the descendants, which come in no particular order, and that of `get_leaves()` said a leaf has at most one parent, although fusion cells without children are leaves too
 - **Docs:** some examples of `add_pycellin_property()` and `add_pycellin_properties()` didn't work:
   - their docstrings used an `in_time_unit` argument, which `add_absolute_age()` and `add_relative_age()` don't have, so the examples raised `TypeError`
   - the docstring of `add_pycellin_properties()` and "Managing properties" added a `cell_cycle_completeness` property, which doesn't exist (`cycle_completeness` in 0.5.1, now `is_complete_cycle`)

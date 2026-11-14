@@ -2554,6 +2554,16 @@ class TestCellLineageIsDivision:
         assert not cell_lin_unconnected_component_div.is_division(21)
         assert not cell_lin_unconnected_component_div.is_division(22)
 
+    def test_fusion(self, cell_lin_fusion):
+        """Test is_division on a fusion cell, whose parents don't count."""
+        # Fusion cell with one child.
+        assert not cell_lin_fusion.is_division(3)
+        # Fusion cell that divides.
+        cell_lin_fusion.add_node(5, timepoint=4, cell_id=5)
+        cell_lin_fusion.add_edge(3, 5)
+        assert cell_lin_fusion.is_division(3)
+        assert cell_lin_fusion.get_divisions() == [3]
+
 
 # CycleLineage operations
 

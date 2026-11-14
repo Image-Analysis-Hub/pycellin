@@ -231,7 +231,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         Return the leaves of the lineage.
 
-        A leaf is a node with no outgoing edges and one or less incoming edge.
+        A leaf is a node with no outgoing edges, whatever its number of incoming edges.
 
         Parameters
         ----------
@@ -2423,8 +2423,8 @@ class CellLineage(Lineage):
         """
         Check if a given cell is dividing.
 
-        A division cell is defined as a cell with more than one outgoing edge
-        and at most one incoming edge.
+        A division cell is a cell with more than one outgoing edge, whatever its
+        number of incoming edges: a fusion cell that divides is also a division cell.
 
         Parameters
         ----------
@@ -2441,7 +2441,7 @@ class CellLineage(Lineage):
         nx.NetworkXError
             If the cell is not in the lineage.
         """
-        return self.in_degree(cell_id) <= 1 and self.out_degree(cell_id) > 1
+        return self.out_degree(cell_id) > 1
 
     def _remove_intercycle_links(self) -> list[tuple[int, int, dict]]:
         """
