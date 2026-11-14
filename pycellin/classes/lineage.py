@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+"""The `CellLineage` and `CycleLineage` classes: lineage trees as NetworkX graphs."""
+
 from __future__ import annotations
 
 import warnings
@@ -28,23 +30,36 @@ from pycellin.styling import (
 )
 from pycellin.utils import _check_integer
 
+#: Color of the nodes whose value is not in a discrete color map.
 _DEFAULT_UNMAPPED_COLOR = "dimgrey"
-
-# Style argument for get_branch_profile_figure / plot_branch_profile
-# (node_marker_style, division_marker_style, line_style): one dict applied to
-# every branch, or a list with one entry (dict or None) per target cell.
-_BranchStyle = dict[str, Any] | list[dict[str, Any] | None] | None
 
 # TODO: all the visualization functionalities will be refined and moved to a dedicated
 # subpackage.
 
+#: Color of the cells outside the highlighted branches.
 _UNSELECTED_HIGHLIGHT_COLOR = "lightgray"
+#: Colors of the highlight groups: Pycellin purple, then Plotly's Safe palette.
 _HIGHLIGHT_COLORS = [
     PYCELLIN_PURPLE
 ] + px.colors.qualitative.Safe  # 12 Total IDs: 1 purple + 11 from Safe palette
 
 
 def _get_highlight_color(group: int) -> str:
+    """
+    Return the color of a highlight group.
+
+    Parameters
+    ----------
+    group : int
+        The highlight group: 0 for the cells outside the highlighted branches, then 1,
+        2, and so on for the groups of highlighted branches.
+
+    Returns
+    -------
+    str
+        ``"lightgray"`` for group 0 or lower, else a color of the highlight palette,
+        which starts over after 12 groups.
+    """
     if group <= 0:
         return _UNSELECTED_HIGHLIGHT_COLOR
 
@@ -86,16 +101,18 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         Parameters
         ----------
         prop_name : str
-            The name of the property to remove.
-        prop_type : PropertyType, optional
+            The identifier of the property to remove.
+        prop_type : PropertyType | None, default=None
             The type of the property to remove. If None, the property is removed
-            from all locations (nodes, edges, and graphs). If a PropertyType Flag is
-            provided, the property is removed only from the specified type(s).
+            from all locations (nodes, edges, and graphs). If a
+            `~pycellin.custom_types.PropertyType` flag is provided, the property is
+            removed only from the specified type(s).
 
         Raises
         ------
         TypeError
-            If prop_type is provided but is not a valid PropertyType Flag.
+            If `prop_type` is provided but is not a valid
+            `~pycellin.custom_types.PropertyType` flag.
 
         Examples
         --------
@@ -144,9 +161,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        ignore_lone_nodes : bool, optional
+        ignore_lone_nodes : bool, default=False
             True to ignore nodes with no incoming and outgoing edges, False otherwise.
-            False by default.
 
         Returns
         -------
@@ -157,7 +173,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ------
         LineageStructureError
             If the lineage doesn't have exactly one root, e.g. if it is empty.
-            It is a `FusionError` when the lineage has several roots and cell fusions.
+            It is a `~pycellin.exceptions.FusionError` when the lineage has several
+            roots and cell fusions.
         """
         roots = self.get_roots(ignore_lone_nodes=ignore_lone_nodes)
         if len(roots) == 1:
@@ -192,9 +209,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        ignore_lone_nodes : bool, optional
+        ignore_lone_nodes : bool, default=False
             True to ignore nodes with no incoming and outgoing edges, False otherwise.
-            False by default.
 
         Returns
         -------
@@ -219,9 +235,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Parameters
         ----------
-        ignore_lone_nodes : bool, optional
+        ignore_lone_nodes : bool, default=False
             True to ignore nodes with no incoming and outgoing edges, False otherwise.
-            False by default.
 
         Returns
         -------
@@ -242,9 +257,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         Return all the ancestors of a given node.
 
-        Chronological order means from the root node to the target node.
-        In terms of graph theory, it is the shortest path from the root node
-        to the target node.
+        The ancestors are in no particular order.
 
         Parameters
         ----------
@@ -255,6 +268,11 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         -------
         list[int]
             A list of all the ancestor nodes.
+
+        Raises
+        ------
+        nx.NetworkXError
+            If the node is not in the lineage.
         """
         ancestors = list(nx.ancestors(self, node_id))
         return ancestors
@@ -271,7 +289,12 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         Returns
         -------
         list[int]
-            A list of all the descendant nodes, from target node to leaf nodes.
+            A list of all the descendant nodes, in no particular order.
+
+        Raises
+        ------
+        nx.NetworkXError
+            If the node is not in the lineage.
         """
         descendants = nx.descendants(self, node_id)
         return list(descendants)
@@ -320,10 +343,9 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ----------
         node_id : int
             ID of the node (cell or cell cycle) for which to find the cousins.
-        degree : int | None, optional
+        degree : int | None, default=1
             Degree of the cousins: 1 for first cousins, 2 for second cousins, and
             so on. If None, the cousins of all degrees are returned, closest first.
-            1 by default.
 
         Returns
         -------
@@ -346,13 +368,12 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
     def _get_relatives(self, node_id: int, degree: int | None) -> list[int]:
         """
-        Return the relatives of a node that share an ancestor degree + 1
-        generations up, but no closer one.
+        Return the relatives of a node sharing an ancestor `degree` + 1 generations up.
 
-        Degree 0 gives the sisters of the node, degree 1 its first cousins, and so
-        on. Generations are counted in cell cycles, through the `_get_cycle()`,
-        `_get_parent_cycle()`, `_get_daughter_cycles()` and `_get_matching_nodes()`
-        methods.
+        The relatives share no closer ancestor with the node. Degree 0 gives the
+        sisters of the node, degree 1 its first cousins, and so on. Generations are
+        counted in cell cycles, through the ``_get_cycle()``, ``_get_parent_cycle()``,
+        ``_get_daughter_cycles()`` and ``_get_matching_nodes()`` methods.
 
         Parameters
         ----------
@@ -505,16 +526,16 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         The depth is defined as the number of nodes in the longest path from the root
         to any leaf.
 
+        Returns
+        -------
+        int
+            The depth of the lineage.
+
         Notes
         -----
         If the lineage is in a transient state where it has more than one root,
         `get_depth()` will still return the length of the longest path from any root
         to any leaf.
-
-        Returns
-        -------
-        int
-            The depth of the lineage.
         """
         # TODO: decide how to deal with gaps...
         return len(nx.dag_longest_path(self))
@@ -546,6 +567,11 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         -------
         bool
             True if the node is a root node, False otherwise.
+
+        Raises
+        ------
+        nx.NetworkXError
+            If the node is not in the lineage.
         """
         return self.in_degree(node_id) == 0
 
@@ -564,17 +590,50 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         -------
         bool
             True if the node is a leaf node, False otherwise.
+
+        Raises
+        ------
+        nx.NetworkXError
+            If the node is not in the lineage.
         """
         return self.out_degree(node_id) == 0
 
     def _get_nodes_position(self, positions: dict) -> tuple[list, list]:
-        """Extract x and y coordinates from positions dict."""
+        """
+        Extract the x and y coordinates of the nodes from their positions.
+
+        Parameters
+        ----------
+        positions : dict
+            The positions of the nodes, as ``(x, y)`` tuples by igraph vertex index.
+
+        Returns
+        -------
+        tuple[list, list]
+            The x coordinates and the y coordinates of the nodes.
+        """
         x_nodes = [x for (x, _) in positions.values()]
         y_nodes = [y for (_, y) in positions.values()]
         return x_nodes, y_nodes
 
     def _get_edges_position(self, G: Graph, positions: dict) -> tuple[list, list]:
-        """Extract x and y coordinates for edges from igraph object and positions."""
+        """
+        Extract the x and y coordinates of the edges from the node positions.
+
+        Parameters
+        ----------
+        G : Graph
+            The igraph graph of the lineage.
+        positions : dict
+            The positions of the nodes, as ``(x, y)`` tuples by igraph vertex index.
+
+        Returns
+        -------
+        tuple[list, list]
+            The x coordinates and the y coordinates of the edges: for each edge, those
+            of its source and target nodes, then None to separate it from the next
+            edge.
+        """
         edges = [edge.tuple for edge in G.es]
         x_edges = []
         y_edges = []
@@ -601,8 +660,20 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         """
         leaf_descendants: dict[int, int] = {}
 
-        def get_min_leaf_id(node_id):
-            """Get minimum leaf ID in subtree rooted at node_id."""
+        def get_min_leaf_id(node_id: int) -> int:
+            """
+            Get the minimum leaf ID in the subtree rooted at a node.
+
+            Parameters
+            ----------
+            node_id : int
+                ID of the root node of the subtree.
+
+            Returns
+            -------
+            int
+                The minimum ID of the leaves of the subtree.
+            """
             if node_id in leaf_descendants:
                 return leaf_descendants[node_id]
 
@@ -626,8 +697,18 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_order: list[int] = []
         nx_id_to_igraph_id = {}
 
-        def dfs(node_id):
-            """DFS traversal with children visited in sorted order."""
+        def dfs(node_id: int) -> None:
+            """
+            Run a DFS traversal from a node, with children visited in sorted order.
+
+            Each node gets the next igraph vertex index when it is first visited.
+            Children are sorted by the minimum leaf ID of their subtree.
+
+            Parameters
+            ----------
+            node_id : int
+                ID of the node to start the traversal from.
+            """
             if node_id in nx_id_to_igraph_id:
                 return
 
@@ -707,7 +788,35 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_text: str,
         node_text_font: dict[str, Any] | None,
     ) -> list[dict]:
-        """Build annotation objects for text displayed inside nodes."""
+        """
+        Build annotation objects for text displayed inside nodes.
+
+        Parameters
+        ----------
+        G : Graph
+            The igraph graph of the lineage.
+        positions : dict
+            The positions of the nodes, as ``(x, y)`` tuples by igraph vertex index.
+        nodes_count : int
+            The number of nodes of the graph.
+        node_text : str
+            The property of the nodes to display as text inside the nodes.
+        node_text_font : dict[str, Any] | None
+            The font style of the text inside the nodes. If None, defaults to current
+            Plotly template.
+
+        Returns
+        -------
+        list[dict]
+            One Plotly annotation per node.
+
+        Raises
+        ------
+        KeyError
+            If `node_text` is not a node property of the graph.
+        ValueError
+            If the graph doesn't have `nodes_count` values of `node_text`.
+        """
         node_labels = G.vs[node_text]
         if len(node_labels) != nodes_count:
             raise ValueError("The lists pos and text must have the same length.")
@@ -731,16 +840,47 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         node_colormap_prop: str,
         node_colormap: str | dict[Any, str] | None,
     ) -> dict:
-        """Apply color mapping to node marker style based on a node property.
+        """
+        Apply color mapping to node marker style based on a node property.
 
         Two modes, dispatched on the type of `node_colormap`:
+
         - continuous (str or None): interpolate a Plotly colorscale over the
           numeric property values, with a colorbar.
         - discrete (dict): map each property value to an explicit color via the
-          provided {value: color} dict, with a fallback for unmapped values.
+          provided ``{value: color}`` dict, with a fallback for unmapped values.
 
-        Returns a dict of marker settings (color, and colorscale/colorbar in
-        continuous mode).
+        Parameters
+        ----------
+        G : Graph
+            The igraph graph of the lineage.
+        node_colormap_prop : str
+            The property of the nodes to use for coloring the nodes.
+        node_colormap : str | dict[Any, str] | None
+            The Plotly colorscale of the continuous mode, None for the colorscale of
+            the current Plotly template, or the ``{value: color}`` dict of the
+            discrete mode.
+
+        Returns
+        -------
+        dict
+            Marker settings: the color of each node, plus the colorscale and colorbar
+            in continuous mode.
+
+        Raises
+        ------
+        KeyError
+            If `node_colormap_prop` is not a node property of the graph.
+        ValueError
+            If `node_colormap_prop` has no values, or has non-numeric values in
+            continuous mode.
+
+        Warns
+        -----
+        UserWarning
+            If the dict of the discrete mode doesn't cover all the values of
+            `node_colormap_prop`: the nodes with other values are drawn in
+            ``"dimgrey"``.
         """
         color_values = G.vs[node_colormap_prop]
 
@@ -793,7 +933,33 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         y_label: str,
         node_hover_props: list[str] | None,
     ) -> list[str]:
-        """Build hover text for nodes."""
+        """
+        Build hover text for nodes.
+
+        Parameters
+        ----------
+        G : Graph
+            The igraph graph of the lineage.
+        id_prop : str
+            The property of the nodes to use as identifier.
+        y_prop_id : str
+            The identifier of the node property plotted on the y-axis.
+        y_label : str
+            The label of the node property plotted on the y-axis.
+        node_hover_props : list[str] | None
+            The node properties to display on hover. If None, the values of `id_prop`
+            and of the property plotted on the y-axis are displayed.
+
+        Returns
+        -------
+        list[str]
+            The hover text of each node, by igraph vertex index.
+
+        Raises
+        ------
+        KeyError
+            If a property of `node_hover_props` is not a node property of the graph.
+        """
         if node_hover_props:
             node_hover_text = []
             for node in G.vs:
@@ -815,7 +981,20 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         return node_hover_text
 
     def _get_graph_name(self, G: Graph) -> str:
-        """Extract graph name from lineage ID if available."""
+        """
+        Extract graph name from lineage ID if available.
+
+        Parameters
+        ----------
+        G : Graph
+            The igraph graph of the lineage.
+
+        Returns
+        -------
+        str
+            ``"lineage_id: "`` followed by the lineage ID, or an empty string if the
+            graph has no lineage ID.
+        """
         if "lineage_id" in G.attributes():
             return f"lineage_id: {G['lineage_id']}"
         return ""
@@ -834,7 +1013,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         -------
         tuple[str, str]
             The identifier of the property, and its label: the name and unit of
-            a Property, or the identifier itself.
+            a `Property`, or the identifier itself.
         """
         if isinstance(prop, Property):
             label = f"{prop.name} ({prop.unit})" if prop.unit else prop.name
@@ -844,7 +1023,30 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
     def _build_edge_hover_text(
         self, G: Graph, index_to_nx_id: dict, edge_hover_props: list[str] | None
     ) -> list[str]:
-        """Build hover text for edges."""
+        """
+        Build hover text for edges.
+
+        Parameters
+        ----------
+        G : Graph
+            The igraph graph of the lineage.
+        index_to_nx_id : dict
+            Mapping from igraph vertex index to NetworkX node ID.
+        edge_hover_props : list[str] | None
+            The edge properties to display on hover, after the IDs of the source and
+            target nodes. If None, only these IDs are displayed.
+
+        Returns
+        -------
+        list[str]
+            The hover text of each edge, three times: for its source node, its target
+            node and the gap before the next edge.
+
+        Raises
+        ------
+        KeyError
+            If a property of `edge_hover_props` is not an edge property of the graph.
+        """
         edge_hover_text = []
         for edge in G.es:
             source_id = index_to_nx_id[edge.source]
@@ -888,64 +1090,82 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         This method generates a tree figure with Reingold-Tilford layout and returns
         it as a Plotly Figure object. The figure can then be updated or displayed using
-        `fig.show()`.
-        Heavily based on the code from https://plotly.com/python/tree-plots/
+        ``fig.show()``.
+        Heavily based on the code from https://plotly.com/python/tree-plots/.
 
         Parameters
         ----------
         id_prop : str
             The property of the nodes to use as identifier.
-        y_prop : str or Property
-            Node property to plot on the y-axis. A Property also supplies the
+        y_prop : str | Property
+            Node property to plot on the y-axis. A `Property` also supplies the
             axis label (its name and unit); a plain string is used as-is.
-        title : str, optional
+        title : str | None, default=None
             The title of the plot. If None, no title is displayed.
-        node_text : str, optional
+        node_text : str | None, default=None
             The property of the nodes to display as text inside the nodes
-            of the plot. If None, no text is displayed. None by default.
-        node_text_font : dict, optional
+            of the plot. If None, no text is displayed.
+        node_text_font : dict[str, Any] | None, default=None
             The font style of the text inside the nodes (size, color, etc).
             If None, defaults to current Plotly template.
-        node_marker_style : dict, optional
+        node_marker_style : dict[str, Any] | None, default=None
             The style of the markers representing the nodes in the plot
             (symbol, size, color, line, etc). If None, defaults to
             current Plotly template.
-        node_colormap_prop : str, optional
+        node_colormap_prop : str | None, default=None
             The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
-        node_colormap : str | dict[Any, str] | None, optional
-            The color map to use for coloring the nodes. If None,
-            defaults to current Plotly template.
-        node_hover_props : list[str], optional
+        node_colormap : str | dict[Any, str] | None, default=None
+            The color map to use for coloring the nodes: a Plotly colorscale for
+            numeric values, or a ``{value: color}`` dict. If None, defaults to
+            current Plotly template.
+        node_hover_props : list[str] | None, default=None
             The node properties to display on hover. If None, defaults to
-            displaying `cell_id` and the value of the y_prop.
-        edge_line_style : dict, optional
+            displaying the values of `id_prop` and `y_prop`.
+        edge_line_style : dict[str, Any] | None, default=None
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
-        edge_hover_props : list[str], optional
+        edge_hover_props : list[str] | None, default=None
             The edge properties to display on hover. If None, defaults to
             displaying the source and target nodes.
-        plot_bgcolor : str, optional
+        plot_bgcolor : str | None, default=None
             The background color of the plot. If None, defaults to current
             Plotly template.
-        show_horizontal_grid : bool, optional
-            True to display the horizontal grid, False otherwise. True by default.
-        show_legend : bool, optional
-            True to display the legend, False otherwise. True by default.
-        width : int, optional
+        show_horizontal_grid : bool, default=True
+            True to display the horizontal grid, False otherwise.
+        show_legend : bool, default=True
+            True to display the legend, False otherwise.
+        width : int | None, default=None
             The width of the plot. If None, defaults to current Plotly template.
-        height : int, optional
+        height : int | None, default=None
             The height of the plot. If None, defaults to current Plotly template.
-        template : str or go.layout.Template, optional
-            Plotly template to use for the figure (default is "pycellin_white"). A
-            "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on
-            templates.
+        template : str | go.layout.Template, default="pycellin_white"
+            Plotly template to use for the figure. A ``"pycellin_dark"`` template is
+            also available. See ``styling.py`` for Pycellin template details. See
+            Plotly documentation for more information on templates.
 
         Returns
         -------
-        plotly.graph_objects.Figure
+        go.Figure
             The generated Plotly figure object.
+
+        Raises
+        ------
+        KeyError
+            If `id_prop`, `y_prop`, `node_text` or `node_colormap_prop` is not a node
+            property of the lineage.
+            If a property of `node_hover_props` or `edge_hover_props` is not a node or
+            edge property of the lineage.
+        ValueError
+            If `node_colormap` is not a dict and `node_colormap_prop` has non-numeric
+            values.
+
+        Warns
+        -----
+        UserWarning
+            If `node_colormap` is a dict that doesn't cover all the values of
+            `node_colormap_prop`: the nodes with other values are drawn in
+            ``"dimgrey"``.
 
         Warnings
         --------
@@ -957,17 +1177,16 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         --------
         For styling the graph:
 
-        node_text_font = dict(
-            color="black",
-            size=10,
-        )
-
-        node_marker_style = dict(
-            symbol="circle",
-            size=20,
-            color="white",
-            line=dict(color="black", width=1),
-        )
+        >>> node_text_font = dict(
+        ...     color="black",
+        ...     size=10,
+        ... )
+        >>> node_marker_style = dict(
+        ...     symbol="circle",
+        ...     size=20,
+        ...     color="white",
+        ...     line=dict(color="black", width=1),
+        ... )
         """
         # https://plotly.com/python/hover-text-and-formatting/#customizing-hover-label-appearance
         # https://plotly.com/python/hover-text-and-formatting/#customizing-hover-text-with-a-hovertemplate
@@ -1125,52 +1344,70 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
         ----------
         id_prop : str
             The property of the nodes to use as identifier.
-        y_prop : str or Property
-            Node property to plot on the y-axis. A Property also supplies the
+        y_prop : str | Property
+            Node property to plot on the y-axis. A `Property` also supplies the
             axis label (its name and unit); a plain string is used as-is.
-        title : str, optional
+        title : str | None, default=None
             The title of the plot. If None, no title is displayed.
-        node_text : str, optional
+        node_text : str | None, default=None
             The property of the nodes to display as text inside the nodes
-            of the plot. If None, no text is displayed. None by default.
-        node_text_font : dict, optional
+            of the plot. If None, no text is displayed.
+        node_text_font : dict[str, Any] | None, default=None
             The font style of the text inside the nodes (size, color, etc).
             If None, defaults to current Plotly template.
-        node_marker_style : dict, optional
+        node_marker_style : dict[str, Any] | None, default=None
             The style of the markers representing the nodes in the plot
             (symbol, size, color, line, etc). If None, defaults to
             current Plotly template.
-        node_colormap_prop : str, optional
+        node_colormap_prop : str | None, default=None
             The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
-        node_colormap : str | dict[Any, str] | None, optional
-            The color map to use for coloring the nodes. If None,
-            defaults to current Plotly template.
-        node_hover_props : list[str], optional
-            The hover template for the nodes. If None, defaults to
-            displaying `cell_id` and the value of the y_prop.
-        edge_line_style : dict, optional
+        node_colormap : str | dict[Any, str] | None, default=None
+            The color map to use for coloring the nodes: a Plotly colorscale for
+            numeric values, or a ``{value: color}`` dict. If None, defaults to
+            current Plotly template.
+        node_hover_props : list[str] | None, default=None
+            The node properties to display on hover. If None, defaults to
+            displaying the values of `id_prop` and `y_prop`.
+        edge_line_style : dict[str, Any] | None, default=None
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
-        edge_hover_props : list[str], optional
-            The hover template for the edges. If None, defaults to
+        edge_hover_props : list[str] | None, default=None
+            The edge properties to display on hover. If None, defaults to
             displaying the source and target nodes.
-        plot_bgcolor : str, optional
+        plot_bgcolor : str | None, default=None
             The background color of the plot. If None, defaults to current
             Plotly template.
-        show_horizontal_grid : bool, optional
-            True to display the horizontal grid, False otherwise. True by default.
-        show_legend : bool, optional
-            True to display the legend, False otherwise. True by default.
-        width : int, optional
+        show_horizontal_grid : bool, default=True
+            True to display the horizontal grid, False otherwise.
+        show_legend : bool, default=True
+            True to display the legend, False otherwise.
+        width : int | None, default=None
             The width of the plot. If None, defaults to current Plotly template.
-        height : int, optional
+        height : int | None, default=None
             The height of the plot. If None, defaults to current Plotly template.
-        template : str or go.layout.Template, optional
-            Plotly template to use for the figure (default is "pycellin_white"). A
-            "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on
-            templates.
+        template : str | go.layout.Template, default="pycellin_white"
+            Plotly template to use for the figure. A ``"pycellin_dark"`` template is
+            also available. See ``styling.py`` for Pycellin template details. See
+            Plotly documentation for more information on templates.
+
+        Raises
+        ------
+        KeyError
+            If `id_prop`, `y_prop`, `node_text` or `node_colormap_prop` is not a node
+            property of the lineage.
+            If a property of `node_hover_props` or `edge_hover_props` is not a node or
+            edge property of the lineage.
+        ValueError
+            If `node_colormap` is not a dict and `node_colormap_prop` has non-numeric
+            values.
+
+        Warns
+        -----
+        UserWarning
+            If `node_colormap` is a dict that doesn't cover all the values of
+            `node_colormap_prop`: the nodes with other values are drawn in
+            ``"dimgrey"``.
 
         See Also
         --------
@@ -1247,6 +1484,15 @@ class CellLineage(Lineage):
     """
 
     def __str__(self) -> str:
+        """
+        Return a short description of the cell lineage.
+
+        Returns
+        -------
+        str
+            The ID of the lineage, its name if it has one, and its numbers of cells
+            and links.
+        """
         name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
         txt = (
             f"CellLineage of ID {self.graph['lineage_id']}{name_txt}"
@@ -1274,23 +1520,23 @@ class CellLineage(Lineage):
         time_prop: str = "timepoint",
         time_prop_value: float = 0,
         timepoint: int | None = None,
-        **cell_props,
+        **cell_props: Any,
     ) -> int:
         """
         Add a cell to the lineage graph.
 
         Parameters
         ----------
-        nid : int, optional
+        nid : int | None, default=None
             The node ID to assign to the new cell. If None, the next
             available node ID is used.
-        time_prop : str, optional
-            The name of the time property. Default is "timepoint".
-        time_prop_value : float, optional
-            The value of the time property. Default is 0.
-        timepoint : int, optional
+        time_prop : str, default="timepoint"
+            The identifier of the time property.
+        time_prop_value : float, default=0
+            The value of the time property.
+        timepoint : int | None, default=None
             The timepoint value to set for the cell. If None, it is not set.
-        **cell_props
+        **cell_props : Any
             Property values to set for the node.
 
         Returns
@@ -1300,8 +1546,6 @@ class CellLineage(Lineage):
 
         Raises
         ------
-        KeyError
-            If the lineage does not have a lineage ID.
         ValueError
             If the cell already exists in the lineage.
         """
@@ -1354,14 +1598,14 @@ class CellLineage(Lineage):
         target_nid: int,
         target_lineage: CellLineage | None = None,
         time_prop: str = "timepoint",
-        **link_props,
+        **link_props: Any,
     ) -> dict[int, int] | None:
         """
-        Create a link beween 2 cells.
+        Create a link between 2 cells.
 
         The 2 cells can be in the same lineage or in different lineages.
         However, the linking cannot be done if it leads to a fusion event,
-        i. e. a cell with more than one parent.
+        i.e. a cell with more than one parent.
 
         Parameters
         ----------
@@ -1369,18 +1613,18 @@ class CellLineage(Lineage):
             The node ID of the source cell.
         target_nid : int
             The node ID of the target cell.
-        target_lineage : CellLineage, optional
+        target_lineage : CellLineage | None, default=None
             The lineage of the target cell. If None, the target cell is
             assumed to be in the same lineage as the source cell.
-        time_prop : str, optional
-            The name of the time property. Default is "timepoint".
-        **link_props
+        time_prop : str, default="timepoint"
+            The identifier of the time property.
+        **link_props : Any
             Property values to set for the edge.
 
         Returns
         -------
-        dict[int, int] or None
-            A dictionary of renamed cells {old_id : new_id} from
+        dict[int, int] | None
+            A dictionary of renamed cells ``{old_id: new_id}`` from
             the target lineage when it had conflicting cell IDs with the
             source lineage. None otherwise.
 
@@ -1392,7 +1636,7 @@ class CellLineage(Lineage):
         FusionError
             If the target cell already has a parent cell.
         TimeFlowError
-            If the target cell happens before the source cell.
+            If the target cell is not later than the source cell.
         """
         source_lid, txt_src = CellLineage._get_lineage_id_and_err_msg(self)
 
@@ -1490,7 +1734,7 @@ class CellLineage(Lineage):
         two weakly connected components: one for all the cells upstream
         of the removed edge, and one for all the cells downstream.
         To divide a lineage into two separate lineages,
-        use the `_split_from_cell` or `_split_from_link` methods.
+        use the ``_split_from_cell()`` method.
 
         Parameters
         ----------
@@ -1538,12 +1782,11 @@ class CellLineage(Lineage):
         ----------
         nid : int
             The node ID of the cell from which to split the lineage.
-        split : {"upstream", "downstream"}, optional
+        split : Literal["upstream", "downstream"], default="upstream"
             Where to split the lineage relative to the given cell.
-            If upstream, the given cell becomes the root of the newly
-            created lineage. If downstream, the given cell stays in the initial
+            If ``"upstream"``, the given cell becomes the root of the newly
+            created lineage. If ``"downstream"``, the given cell stays in the initial
             lineage but its descendants all go in the newly created lineage.
-            "upstream" by default.
 
         Returns
         -------
@@ -1555,7 +1798,7 @@ class CellLineage(Lineage):
         ------
         ValueError
             If the cell does not exist in the lineage.
-            If the split parameter is not "upstream" or "downstream"
+            If `split` is not ``"upstream"`` or ``"downstream"``.
         """
         _, txt = CellLineage._get_lineage_id_and_err_msg(self)
         if nid not in self.nodes():
@@ -1574,7 +1817,7 @@ class CellLineage(Lineage):
         self.remove_nodes_from(nodes)
         return new_lineage  # type: ignore
 
-    def get_ancestors(self, node_id: int, sort=True) -> list[int]:
+    def get_ancestors(self, node_id: int, sort: bool = True) -> list[int]:
         """
         Return all the ancestors of a given cell.
 
@@ -1586,9 +1829,8 @@ class CellLineage(Lineage):
         ----------
         node_id : int
             ID of the cell for which to retrieve ancestor cells.
-        sort : bool, optional
+        sort : bool, default=True
             True to return the ancestors in chronological order, False otherwise.
-            True by default.
 
         Returns
         -------
@@ -1603,7 +1845,7 @@ class CellLineage(Lineage):
         Warns
         -----
         UserWarning
-            If the timepoint property is missing when ordering the cells.
+            If the ``timepoint`` property is missing when ordering the cells.
         """
         try:
             ancestors = super().get_ancestors(node_id)
@@ -1636,11 +1878,11 @@ class CellLineage(Lineage):
         target_cell : int
             ID of the target cell. This can be a leaf, or any cell at a
             specified timepoint.
-        source_cell : int, optional
+        source_cell : int | None, default=None
             ID of the cell where the branch should start. If given, return the
             path from `source_cell` to `target_cell`. Cannot be used together with
             `generations`.
-        generations : int, optional
+        generations : int | None, default=None
             Number of upstream division generations to include. If None,
             return the path from the root to `target_cell`. If 1, return the current
             generation from the closest upstream division or root to `target_cell`.
@@ -1654,13 +1896,18 @@ class CellLineage(Lineage):
         Raises
         ------
         KeyError
-            If the cell does not exist in the lineage.
+            If `target_cell` does not exist in the lineage.
         ValueError
-            If generations is not a positive integer or None, if generations
-            and source_cell are both given, or if source_cell is not upstream of
-            target_cell.
+            If `generations` is not a positive integer or None, if `generations`
+            and `source_cell` are both given, or if `source_cell` is not upstream of
+            `target_cell`.
         FusionError
             If a cell fusion keeps the selected cells from forming a path.
+
+        Warns
+        -----
+        UserWarning
+            If the ``timepoint`` property is missing when ordering the cells.
         """
         if generations is not None and source_cell is not None:
             raise ValueError("generations and source_cell cannot both be specified.")
@@ -1728,32 +1975,51 @@ class CellLineage(Lineage):
         Return a copy of the full lineage with single-cell branches marked.
 
         The returned lineage contains all cells from the original lineage, with
-        an extra node property set to 1 for cells in the selected branches and 0
-        for all other cells. The original lineage is not modified.
+        an extra node property set to 0 for the cells outside the selected branches.
+        The cells in the selected branches get the number of their group, from 1:
+        branches that touch or converge form one group, and groups are numbered in
+        the order of `target_cells`. The original lineage is not modified.
 
         Parameters
         ----------
-        target_cells : int or list[int]
+        target_cells : int | list[int]
             ID of the target cell, or IDs of several target cells. If several
             cells are passed, the highlighted nodes are the union of their
             single-cell branches.
-        source_cells : int or list[int], optional
+        source_cells : int | list[int] | None, default=None
             ID of the cell where each highlighted branch should start. If a
             single ID is passed, it is used for every target cell. If a list is
             passed, it must have the same length as `target_cells`, and starts
             are paired with targets by position. Cannot be used together with
             `generations`.
-        generations : int, optional
+        generations : int | None, default=None
             Number of upstream division generations to include. If None,
             highlight the path from the root to each target cell.
-        highlight_prop : str, optional
-            Name of the node property used to mark the selected branch.
-            "selected_branch" by default.
+        highlight_prop : str, default="selected_branch"
+            Identifier of the node property used to mark the selected branch.
 
         Returns
         -------
         CellLineage
             A copy of the full lineage with the selected branches marked.
+
+        Raises
+        ------
+        KeyError
+            If a target cell does not exist in the lineage.
+        ValueError
+            If `target_cells` is an empty list; if `source_cells` is a list while
+            `target_cells` is not, or the two lists differ in length; if `generations`
+            is not a positive integer or None; if both `source_cells` and
+            `generations` are given; or if a source cell is not upstream of its
+            target.
+        FusionError
+            If a cell fusion keeps the cells of a branch from forming a path.
+
+        Warns
+        -----
+        UserWarning
+            If the ``timepoint`` property is missing when ordering the cells.
         """
         is_single_target, target_cids, source_cids = (
             self._normalize_single_cell_lineage_inputs(target_cells, source_cells)
@@ -1818,21 +2084,20 @@ class CellLineage(Lineage):
         Return one marker color per cell, following the highlight groups.
 
         The colors are ordered the way `get_tree_figure` orders the cells, so the
-        returned list can be used directly as the "color" entry of its
+        returned list can be used directly as the ``"color"`` entry of its
         `node_marker_style`. Cells of highlight group 0 (unselected) get a neutral
         gray; each selected group gets its own color from the Pycellin highlight
         palette.
 
         Meant to be called on a lineage returned by `get_highlighted_lineage`,
         which is where the highlight property comes from. Callers who want their
-        own colors per group should instead pass a {group: color} dict as the
+        own colors per group should instead pass a ``{group: color}`` dict as the
         `node_colormap` of `get_tree_figure`.
 
         Parameters
         ----------
-        highlight_prop : str, optional
-            Name of the node property holding the highlight group of each cell.
-            "selected_branch" by default.
+        highlight_prop : str, default="selected_branch"
+            Identifier of the node property holding the highlight group of each cell.
 
         Returns
         -------
@@ -1870,7 +2135,7 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        cell_ids : list[int], optional
+        cell_ids : list[int] | None, default=None
             A list of cell IDs to check for divisions. If None, all cells
             in the lineage will be checked.
 
@@ -1878,6 +2143,11 @@ class CellLineage(Lineage):
         -------
         list[int]
             The list of dividing cells of the lineage.
+
+        Raises
+        ------
+        nx.NetworkXError
+            If a cell of `cell_ids` is not in the lineage.
         """
         if cell_ids is None:
             cell_ids = list(self.nodes())
@@ -1894,6 +2164,11 @@ class CellLineage(Lineage):
         -------
         list[tuple[int, int]]
             A list of tuples representing the gaps in the lineage.
+
+        Raises
+        ------
+        KeyError
+            If a linked cell has no ``timepoint`` value.
         """
         gaps = []
         for source, target in self.edges():
@@ -1910,19 +2185,18 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        time_prop : str, optional
-            The name of the time property in which the duration is measured.
-            Defaults to "timepoint".
-
-        Raises
-        ------
-        ValueError
-            If no `time_prop` property is found in the lineage nodes.
+        time_prop : str, default="timepoint"
+            The identifier of the time property in which the duration is measured.
 
         Returns
         -------
         float
             The total duration of the lineage in the units of the time property.
+
+        Raises
+        ------
+        ValueError
+            If no `time_prop` property is found in the lineage nodes.
         """
         times = nx.get_node_attributes(self, time_prop)
         # nx.get_node_attributes() only gets nodes with the prop.
@@ -1932,8 +2206,7 @@ class CellLineage(Lineage):
 
     def get_cell_cycle(self, cell_id: int) -> list[int]:
         """
-        Return all the cells in the cell cycle of the given cell, in chronological
-        order.
+        Return all the cells in the cell cycle of a cell, in chronological order.
 
         A cell cycle is a lineage segment that starts at the root or at a
         division cell, ends at a division cell or at a leaf, and doesn't
@@ -1952,6 +2225,8 @@ class CellLineage(Lineage):
 
         Raises
         ------
+        nx.NetworkXError
+            If the cell is not in the lineage.
         FusionError
             If the given cell or an earlier cell of its cell cycle has more than one
             predecessor.
@@ -2014,13 +2289,18 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        ignore_incomplete_cycles : bool, optional
-            True to ignore incomplete cell cycles, False otherwise. False by default.
+        ignore_incomplete_cycles : bool, default=False
+            True to ignore incomplete cell cycles, False otherwise.
 
         Returns
         -------
-        list(list(int))
+        list[list[int]]
             List of cell IDs for each cell cycle, in chronological order.
+
+        Raises
+        ------
+        FusionError
+            If a cell of the lineage has more than one predecessor.
         """
         if ignore_incomplete_cycles:
             end_nodes = self.get_divisions()  # Includes the root if it's a div.
@@ -2098,6 +2378,11 @@ class CellLineage(Lineage):
         list[int]
             IDs of the cell cycles born from the division ending the cell cycle,
             or an empty list if the cell cycle ends with a leaf.
+
+        Raises
+        ------
+        FusionError
+            If a daughter cell has more than one parent.
         """
         return [self._get_cycle(daughter) for daughter in self.successors(cycle_id)]
 
@@ -2116,6 +2401,13 @@ class CellLineage(Lineage):
         -------
         list[int]
             IDs of the cells of the cell cycle at the same timepoint as the cell.
+
+        Raises
+        ------
+        KeyError
+            If the cell or a cell of the cell cycle has no ``timepoint`` value.
+        FusionError
+            If a cell of the cell cycle has more than one parent.
         """
         timepoint = self.nodes[node_id]["timepoint"]
         return [
@@ -2140,6 +2432,11 @@ class CellLineage(Lineage):
         -------
         bool
             True if the cell is a division cell, False otherwise.
+
+        Raises
+        ------
+        nx.NetworkXError
+            If the cell is not in the lineage.
         """
         return self.in_degree(cell_id) <= 1 and self.out_degree(cell_id) > 1
 
@@ -2151,7 +2448,7 @@ class CellLineage(Lineage):
         -------
         list[tuple[int, int, dict]]
             A list of tuples representing the removed links. Each tuple contains
-            the source cell, target cell, and the link attributes.
+            the source cell, target cell, and the property values of the link.
         """
         edges = list(self.out_edges(self.get_divisions(), data=True))
         self.remove_edges_from(edges)
@@ -2217,88 +2514,116 @@ class CellLineage(Lineage):
 
         This method generates a tree figure with Reingold-Tilford layout and returns
         it as a Plotly Figure object. The figure can then be updated or displayed using
-        `fig.show()`.
-        Heavily based on the code from https://plotly.com/python/tree-plots/
+        ``fig.show()``.
+        Heavily based on the code from https://plotly.com/python/tree-plots/.
 
         Parameters
         ----------
-        id_prop : str, optional
-            The property of the nodes to use as the node ID. "cell_id" by default.
-        y_prop : str or Property, optional
-            Node property to plot on the y-axis, "timepoint" by default. A
-            Property also supplies the axis label (its name and unit); a plain
-            string is used as-is.
-        title : str, optional
+        id_prop : str, default="cell_id"
+            The property of the nodes to use as the node ID.
+        y_prop : str | Property | None, default=None
+            Node property to plot on the y-axis. If None, the ``timepoint`` property
+            is used. A `Property` also supplies the axis label (its name and unit); a
+            plain string is used as-is.
+        title : str | None, default=None
             The title of the plot. If None, no title is displayed.
-        target_cells : int or list[int], optional
+        target_cells : int | list[int] | None, default=None
             ID of the target cell, or IDs of several target cells, for plotting
             highlighted single-cell branches. If None, the whole lineage is
             plotted normally.
-        source_cells : int or list[int], optional
+        source_cells : int | list[int] | None, default=None
             ID of the cell where the highlighted branch should start. If a
             single ID is passed, it is used for every target cell. If a list is
             passed, it must have the same length as `target_cells`, and
             starts are paired with targets by position. Cannot be used together
             with `generations`.
-        generations : int, optional
+        generations : int | None, default=None
             Number of upstream division generations to include when
             `target_cells` is set. If None, use the path from the root
             to each target cell.
-        highlight_prop : str, optional
-            Name of the temporary node property used for highlighting.
-            "selected_branch" by default.
-        node_text : str, optional
+        highlight_prop : str, default="selected_branch"
+            Identifier of the temporary node property used for highlighting.
+        node_text : str | None, default=None
             The property of the nodes to display as text inside the nodes
-            of the plot. If None, no text is displayed. None by default.
-        node_text_font : dict, optional
+            of the plot. If None, no text is displayed.
+        node_text_font : dict[str, Any] | None, default=None
             The font style of the text inside the nodes (size, color, etc).
             If None, defaults to current Plotly template.
-        node_marker_style : dict, optional
+        node_marker_style : dict[str, Any] | None, default=None
             The style of the markers representing the nodes in the plot
             (symbol, size, color, line, etc). If None, defaults to
             current Plotly template.
-        node_colormap_prop : str, optional
+        node_colormap_prop : str | None, default=None
             The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied, unless `node_colormap` is
             given while highlighting branches (see `node_colormap`).
-        node_colormap : str | dict[Any, str], optional
-            The color map to use for coloring the nodes. If None,
-            defaults to current Plotly template. When `target_cells` is set and
+        node_colormap : str | dict[Any, str] | None, default=None
+            The color map to use for coloring the nodes: a Plotly colorscale for
+            numeric values, or a ``{value: color}`` dict. If None, defaults to
+            current Plotly template. When `target_cells` is set and
             `node_colormap_prop` is not, the color map is applied to the
-            highlight groups: pass a {group: color} dict where group 0 is the
+            highlight groups: pass a ``{group: color}`` dict where group 0 is the
             unselected cells and groups 1, 2, ... follow the order of
             `target_cells`. Groups left out of the dict fall back to a default
             color and trigger a warning.
-        node_hover_props : list[str], optional
-            The hover template for the nodes. If None, defaults to
-            displaying `cell_id` and the value of the y_prop.
-        edge_line_style : dict, optional
+        node_hover_props : list[str] | None, default=None
+            The node properties to display on hover. If None, defaults to
+            displaying the values of `id_prop` and `y_prop`.
+        edge_line_style : dict[str, Any] | None, default=None
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
-        edge_hover_props : list[str], optional
-            The hover template for the edges. If None, defaults to
+        edge_hover_props : list[str] | None, default=None
+            The edge properties to display on hover. If None, defaults to
             displaying the source and target nodes.
-        plot_bgcolor : str, optional
+        plot_bgcolor : str | None, default=None
             The background color of the plot. If None, defaults to current
             Plotly template.
-        show_horizontal_grid : bool, optional
-            True to display the horizontal grid, False otherwise. True by default.
-        show_legend : bool, optional
-            True to display the legend, False otherwise. True by default.
-        width : int, optional
+        show_horizontal_grid : bool, default=True
+            True to display the horizontal grid, False otherwise.
+        show_legend : bool, default=True
+            True to display the legend, False otherwise.
+        width : int | None, default=None
             The width of the plot. If None, defaults to current Plotly template.
-        height : int, optional
+        height : int | None, default=None
             The height of the plot. If None, defaults to current Plotly template.
-        template : str or go.layout.Template, optional
-            Plotly template to use for the figure (default is "pycellin_white"). A
-            "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on
-            templates.
+        template : str | go.layout.Template, default="pycellin_white"
+            Plotly template to use for the figure. A ``"pycellin_dark"`` template is
+            also available. See ``styling.py`` for Pycellin template details. See
+            Plotly documentation for more information on templates.
 
         Returns
         -------
-        plotly.graph_objects.Figure
+        go.Figure
             The generated Plotly figure object.
+
+        Raises
+        ------
+        KeyError
+            If a target cell does not exist in the lineage.
+            If `id_prop`, `y_prop`, `node_text` or `node_colormap_prop` is not a node
+            property of the lineage.
+            If a property of `node_hover_props` or `edge_hover_props` is not a node or
+            edge property of the lineage.
+        ValueError
+            If `target_cells` is an empty list; if `source_cells` is a list while
+            `target_cells` is not, or the two lists differ in length; if `generations`
+            is not a positive integer or None; if both `source_cells` and
+            `generations` are given; or if a source cell is not upstream of its
+            target.
+            If `node_colormap` is not a dict and `node_colormap_prop` has non-numeric
+            values.
+        FusionError
+            If a cell fusion keeps the cells of a highlighted branch from forming a
+            path.
+
+        Warns
+        -----
+        UserWarning
+            If `node_colormap` is a dict that doesn't cover all the values of
+            `node_colormap_prop`, or all the highlight groups: the nodes with other
+            values are drawn in ``"dimgrey"``.
+            If `target_cells` is given and the ``timepoint`` property is missing when
+            ordering the cells.
 
         Warnings
         --------
@@ -2397,103 +2722,131 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        id_prop : str, optional
-            The property of the nodes to use as the node ID. "cell_id" by default.
-        y_prop : str or Property, optional
-            Node property to plot on the y-axis, "timepoint" by default. A
-            Property also supplies the axis label (its name and unit); a plain
-            string is used as-is.
-        title : str, optional
+        id_prop : str, default="cell_id"
+            The property of the nodes to use as the node ID.
+        y_prop : str | Property | None, default=None
+            Node property to plot on the y-axis. If None, the ``timepoint`` property
+            is used. A `Property` also supplies the axis label (its name and unit); a
+            plain string is used as-is.
+        title : str | None, default=None
             The title of the plot. If None, no title is displayed.
-        target_cells : int or list[int], optional
+        target_cells : int | list[int] | None, default=None
             ID of the target cell, or IDs of several target cells, for plotting
             highlighted single-cell branches. If None, plot the whole lineage
             normally.
-        source_cells : int or list[int], optional
+        source_cells : int | list[int] | None, default=None
             ID of the cell where the highlighted branch should start. If a
             single ID is passed, it is used for every target cell. If a list is
             passed, it must have the same length as `target_cells`, and
             starts are paired with targets by position. Cannot be used together
             with `generations`.
-        generations : int, optional
+        generations : int | None, default=None
             Number of upstream division generations to include when
             `target_cells` is set. If None, use the path from the root
             to each target cell.
-        highlight_prop : str, optional
-            Name of the temporary node property used for highlighting.
-            "selected_branch" by default.
-        node_text : str, optional
+        highlight_prop : str, default="selected_branch"
+            Identifier of the temporary node property used for highlighting.
+        node_text : str | None, default=None
             The property of the nodes to display as text inside the nodes
-            of the plot. If None, no text is displayed. None by default.
-        node_text_font : dict, optional
+            of the plot. If None, no text is displayed.
+        node_text_font : dict[str, Any] | None, default=None
             The font style of the text inside the nodes (size, color, etc).
             If None, defaults to current Plotly template.
-        node_marker_style : dict, optional
+        node_marker_style : dict[str, Any] | None, default=None
             The style of the markers representing the nodes in the plot
             (symbol, size, color, line, etc). If None, defaults to
             current Plotly template.
-        node_colormap_prop : str, optional
+        node_colormap_prop : str | None, default=None
             The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied, unless `node_colormap` is
             given while highlighting branches (see `node_colormap`).
-        node_colormap : str | dict[Any, str], optional
-            The color map to use for coloring the nodes. If None,
-            defaults to current Plotly template. When `target_cells` is set and
+        node_colormap : str | dict[Any, str] | None, default=None
+            The color map to use for coloring the nodes: a Plotly colorscale for
+            numeric values, or a ``{value: color}`` dict. If None, defaults to
+            current Plotly template. When `target_cells` is set and
             `node_colormap_prop` is not, the color map is applied to the
-            highlight groups: pass a {group: color} dict where group 0 is the
+            highlight groups: pass a ``{group: color}`` dict where group 0 is the
             unselected cells and groups 1, 2, ... follow the order of
             `target_cells`. Groups left out of the dict fall back to a default
             color and trigger a warning.
-        node_hover_props : list[str], optional
-            The hover template for the nodes. If None, defaults to
-            displaying `cell_id` and the value of the y_prop.
-        edge_line_style : dict, optional
+        node_hover_props : list[str] | None, default=None
+            The node properties to display on hover. If None, defaults to
+            displaying the values of `id_prop` and `y_prop`.
+        edge_line_style : dict[str, Any] | None, default=None
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
-        edge_hover_props : list[str], optional
-            The hover template for the edges. If None, defaults to
+        edge_hover_props : list[str] | None, default=None
+            The edge properties to display on hover. If None, defaults to
             displaying the source and target nodes.
-        plot_bgcolor : str, optional
+        plot_bgcolor : str | None, default=None
             The background color of the plot. If None, defaults to current
             Plotly template.
-        show_horizontal_grid : bool, optional
-            True to display the horizontal grid, False otherwise. True by default.
-        show_legend : bool, optional
-            True to display the legend, False otherwise. True by default.
-        width : int, optional
+        show_horizontal_grid : bool, default=True
+            True to display the horizontal grid, False otherwise.
+        show_legend : bool, default=True
+            True to display the legend, False otherwise.
+        width : int | None, default=None
             The width of the plot. If None, defaults to current Plotly template.
-        height : int, optional
+        height : int | None, default=None
             The height of the plot. If None, defaults to current Plotly template.
-        template : str or go.layout.Template, optional
-            Plotly template to use for the figure (default is "pycellin_white"). A
-            "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on
-            templates.
+        template : str | go.layout.Template, default="pycellin_white"
+            Plotly template to use for the figure. A ``"pycellin_dark"`` template is
+            also available. See ``styling.py`` for Pycellin template details. See
+            Plotly documentation for more information on templates.
+
+        Raises
+        ------
+        KeyError
+            If a target cell does not exist in the lineage.
+            If `id_prop`, `y_prop`, `node_text` or `node_colormap_prop` is not a node
+            property of the lineage.
+            If a property of `node_hover_props` or `edge_hover_props` is not a node or
+            edge property of the lineage.
+        ValueError
+            If `target_cells` is an empty list; if `source_cells` is a list while
+            `target_cells` is not, or the two lists differ in length; if `generations`
+            is not a positive integer or None; if both `source_cells` and
+            `generations` are given; or if a source cell is not upstream of its
+            target.
+            If `node_colormap` is not a dict and `node_colormap_prop` has non-numeric
+            values.
+        FusionError
+            If a cell fusion keeps the cells of a highlighted branch from forming a
+            path.
+
+        Warns
+        -----
+        UserWarning
+            If `node_colormap` is a dict that doesn't cover all the values of
+            `node_colormap_prop`, or all the highlight groups: the nodes with other
+            values are drawn in ``"dimgrey"``.
+            If `target_cells` is given and the ``timepoint`` property is missing when
+            ordering the cells.
+
         Warnings
         --------
         In case of cell divisions, the hover text of the edges between the parent
         and child cells will be displayed only for one child cell.
         This cannot easily be corrected.
 
+        See Also
+        --------
+        get_tree_figure : Generate the figure without displaying it.
+
         Examples
         --------
         For styling the graph:
 
-        node_text_font = dict(
-            color="black",
-            size=10,
-        )
-
-        node_marker_style = dict(
-            symbol="circle",
-            size=20,
-            color="white",
-            line=dict(color="black", width=1),
-        )
-
-        See Also
-        --------
-        get_tree_figure : Generate the figure without displaying it.
+        >>> node_text_font = dict(
+        ...     color="black",
+        ...     size=10,
+        ... )
+        >>> node_marker_style = dict(
+        ...     symbol="circle",
+        ...     size=20,
+        ...     color="white",
+        ...     line=dict(color="black", width=1),
+        ... )
         """
         fig = self.get_tree_figure(
             id_prop=id_prop,
@@ -2529,9 +2882,9 @@ class CellLineage(Lineage):
         generations: int | None = None,
         title: str | None = None,
         mode: str = "lines+markers",
-        node_marker_style: _BranchStyle = None,
-        division_marker_style: _BranchStyle = None,
-        line_style: _BranchStyle = None,
+        node_marker_style: dict | list[dict | None] | None = None,
+        division_marker_style: dict | list[dict | None] | None = None,
+        line_style: dict | list[dict | None] | None = None,
         node_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_legend: bool | None = None,
@@ -2551,68 +2904,67 @@ class CellLineage(Lineage):
 
         Parameters
         ----------
-        target_cells : int or list[int]
+        target_cells : int | list[int]
             Target cell ID, or IDs of several target cells. Each target cell
             produces one branch and one trace.
-        y_prop : str or Property
-            Node property to plot on the y-axis. A Property also supplies the
+        y_prop : str | Property
+            Node property to plot on the y-axis. A `Property` also supplies the
             axis label (its name and unit); a plain string is used as-is.
-        x_prop : str or Property, optional
-            Node property to plot on the x-axis. "timepoint" by default.
-        source_cells : int or list[int], optional
+        x_prop : str | Property, default="timepoint"
+            Node property to plot on the x-axis.
+        source_cells : int | list[int] | None, default=None
             Cell ID where each branch should start. A single value (including
             the default None, meaning the root) is used for every target cell; a
             list is paired with `target_cells` by position and must have the
             same length. Cannot be combined with `generations`.
-        generations : int, optional
+        generations : int | None, default=None
             Number of upstream division generations to include in each branch.
             If None, the branch starts at the root, or at `source_cells` when it
             is given. Cannot be combined with `source_cells`.
-        title : str, optional
+        title : str | None, default=None
             The title of the plot. If None, no title is displayed.
-        mode : str, optional
-            Plotly scatter mode, e.g. "lines", "markers" or "lines+markers"
-            (the default).
-        node_marker_style : dict or list of dict, optional
+        mode : str, default="lines+markers"
+            Plotly scatter mode, e.g. ``"lines"``, ``"markers"`` or
+            ``"lines+markers"``.
+        node_marker_style : dict | list[dict | None] | None, default=None
             Marker style for ordinary (non-division) cells, merged over the
-            Pycellin defaults: the branch's trace color, size 10, a "circle"
-            symbol and no border. A nested "line" dict is merged key by key, so
-            a partial override such as {"line": {"width": 2}} keeps the default
+            Pycellin defaults: the branch's trace color, size 10, a ``"circle"``
+            symbol and no border. A nested ``"line"`` dict is merged key by key, so
+            a partial override such as ``{"line": {"width": 2}}`` keeps the default
             line color. Pass one dict to use the same style on every branch, or
             a list with one dict (or None) per target cell to style branches
             independently.
-        division_marker_style : dict or list of dict, optional
+        division_marker_style : dict | list[dict | None] | None, default=None
             The style of markers representing division cells. Values not provided
-            here fall back to the node marker style, then to the default division
-            style: a hollow white fill, a "circle-cross" symbol, a 2 px border in
-            the branch (node) color, and a size 2 px larger than the node marker
-            size. Accepts one dict or a per-target-cell list, as for
-            `node_marker_style`.
-        line_style : dict or list of dict, optional
+            here fall back to the default division style: a hollow white fill, a
+            ``"circle-cross"`` symbol, a 2 px border in the branch (node) color, and
+            a size 2 px larger than the node marker size. Other values fall back to
+            the node marker style. Accepts one dict or a per-target-cell list, as
+            for `node_marker_style`.
+        line_style : dict | list[dict | None] | None, default=None
             Plotly line style for the branch lines (color, width, dash, etc.).
-            Defaults to the branch's trace color. Accepts one dict or a
-            per-target-cell list, as for `node_marker_style`.
-        node_hover_props : list[str], optional
+            The line color defaults to the branch's trace color. Accepts one dict or
+            a per-target-cell list, as for `node_marker_style`.
+        node_hover_props : list[str] | None, default=None
             Extra node properties to append to the hover text, which always
             shows the cell ID and the plotted x and y values.
-        plot_bgcolor : str, optional
+        plot_bgcolor : str | None, default=None
             The background color of the plot area.
-        show_legend : bool, optional
+        show_legend : bool | None, default=None
             True to display the legend, False to hide it. If None, the legend is
             shown only when several target cells are plotted.
-        width : int, optional
+        width : int | None, default=None
             The width of the plot, in pixels.
-        height : int, optional
+        height : int | None, default=None
             The height of the plot, in pixels.
-        template : str or go.layout.Template, optional
-            Plotly template to use for the figure (default is "pycellin_white"). A
-            "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on
-            templates.
+        template : str | go.layout.Template, default="pycellin_white"
+            Plotly template to use for the figure. A ``"pycellin_dark"`` template is
+            also available. See ``styling.py`` for Pycellin template details. See
+            Plotly documentation for more information on templates.
 
         Returns
         -------
-        plotly.graph_objects.Figure
+        go.Figure
             The generated figure. Use Plotly's figure methods to customize or
             display it.
 
@@ -2622,18 +2974,24 @@ class CellLineage(Lineage):
             If `node_marker_style`, `division_marker_style` or `line_style` is
             not a dict, a list of dicts, or None.
         KeyError
-            If a target or source cell ID is not in the lineage.
+            If a target cell ID is not in the lineage.
         ValueError
             If `target_cells` is an empty list; if `source_cells` is a list
             while `target_cells` is not, or the two lists differ in length; if a
-            per-target-cell style list has the wrong length; if both
-            `source_cells` and `generations` are given; or if a source cell is
-            not upstream of its target.
+            per-target-cell style list has the wrong length; if `generations` is not
+            a positive integer or None; if both `source_cells` and `generations` are
+            given; or if a source cell is not upstream of its target, e.g. not in
+            the lineage.
         MissingPropertyError
-            If `x_prop`, `y_prop` or a name in `node_hover_props` is missing from a
-            plotted cell.
+            If `x_prop`, `y_prop` or a property of `node_hover_props` is missing
+            from a plotted cell.
         FusionError
             If a cell fusion keeps the cells of a branch from forming a path.
+
+        Warns
+        -----
+        UserWarning
+            If the ``timepoint`` property is missing when ordering the cells.
 
         See Also
         --------
@@ -2645,35 +3003,34 @@ class CellLineage(Lineage):
         Plot cell area over time for two branches, each starting at its own
         mother cell:
 
-        fig = lineage.get_branch_profile_figure(
-            target_cells=[100, 142],
-            y_prop="cell_area",
-            source_cells=[80, 130],
-        )
+        >>> fig = lineage.get_branch_profile_figure(
+        ...     target_cells=[100, 142],
+        ...     y_prop="cell_area",
+        ...     source_cells=[80, 130],
+        ... )
 
         Style ordinary cells and division cells independently:
 
-        fig = lineage.get_branch_profile_figure(
-            target_cells=100,
-            y_prop="cell_area",
-            node_marker_style=dict(color="orange", symbol="circle"),
-            division_marker_style=dict(
-                color="orange",
-                symbol="star",
-                line=dict(color="purple", width=3),
-            ),
-        )
+        >>> fig = lineage.get_branch_profile_figure(
+        ...     target_cells=100,
+        ...     y_prop="cell_area",
+        ...     node_marker_style=dict(color="orange", symbol="circle"),
+        ...     division_marker_style=dict(
+        ...         color="orange",
+        ...         symbol="star",
+        ...         line=dict(color="purple", width=3),
+        ...     ),
+        ... )
 
         Give each branch its own color with per-target-cell style lists:
 
-        fig = lineage.get_branch_profile_figure(
-            target_cells=[100, 142],
-            y_prop="cell_area",
-            node_marker_style=[{"color": "darkorange"}, {"color": "#982fc4"}],
-            line_style=[{"color": "orange"}, {"color": "#982fc4"}],
-        )
+        >>> fig = lineage.get_branch_profile_figure(
+        ...     target_cells=[100, 142],
+        ...     y_prop="cell_area",
+        ...     node_marker_style=[{"color": "darkorange"}, {"color": "#982fc4"}],
+        ...     line_style=[{"color": "orange"}, {"color": "#982fc4"}],
+        ... )
         """
-
         # Accept either property identifiers or Property objects, but use plain
         # identifiers for data access and readable labels for axes/hover text.
         x_prop_id, x_label = self._get_prop_id_and_label(x_prop)
@@ -2859,9 +3216,9 @@ class CellLineage(Lineage):
         generations: int | None = None,
         title: str | None = None,
         mode: str = "lines+markers",
-        node_marker_style: _BranchStyle = None,
-        division_marker_style: _BranchStyle = None,
-        line_style: _BranchStyle = None,
+        node_marker_style: dict | list[dict | None] | None = None,
+        division_marker_style: dict | list[dict | None] | None = None,
+        line_style: dict | list[dict | None] | None = None,
         node_hover_props: list[str] | None = None,
         plot_bgcolor: str | None = None,
         show_legend: bool | None = None,
@@ -2874,6 +3231,91 @@ class CellLineage(Lineage):
 
         This method generates the branch property figure and displays it.
 
+        Parameters
+        ----------
+        target_cells : int | list[int]
+            Target cell ID, or IDs of several target cells. Each target cell
+            produces one branch and one trace.
+        y_prop : str | Property
+            Node property to plot on the y-axis. A `Property` also supplies the
+            axis label (its name and unit); a plain string is used as-is.
+        x_prop : str | Property, default="timepoint"
+            Node property to plot on the x-axis.
+        source_cells : int | list[int] | None, default=None
+            Cell ID where each branch should start. A single value (including
+            the default None, meaning the root) is used for every target cell; a
+            list is paired with `target_cells` by position and must have the
+            same length. Cannot be combined with `generations`.
+        generations : int | None, default=None
+            Number of upstream division generations to include in each branch.
+            If None, the branch starts at the root, or at `source_cells` when it
+            is given. Cannot be combined with `source_cells`.
+        title : str | None, default=None
+            The title of the plot. If None, no title is displayed.
+        mode : str, default="lines+markers"
+            Plotly scatter mode, e.g. ``"lines"``, ``"markers"`` or
+            ``"lines+markers"``.
+        node_marker_style : dict | list[dict | None] | None, default=None
+            Marker style for ordinary (non-division) cells, merged over the
+            Pycellin defaults: the branch's trace color, size 10, a ``"circle"``
+            symbol and no border. A nested ``"line"`` dict is merged key by key, so
+            a partial override such as ``{"line": {"width": 2}}`` keeps the default
+            line color. Pass one dict to use the same style on every branch, or
+            a list with one dict (or None) per target cell to style branches
+            independently.
+        division_marker_style : dict | list[dict | None] | None, default=None
+            The style of markers representing division cells. Values not provided
+            here fall back to the default division style: a hollow white fill, a
+            ``"circle-cross"`` symbol, a 2 px border in the branch (node) color, and
+            a size 2 px larger than the node marker size. Other values fall back to
+            the node marker style. Accepts one dict or a per-target-cell list, as
+            for `node_marker_style`.
+        line_style : dict | list[dict | None] | None, default=None
+            Plotly line style for the branch lines (color, width, dash, etc.).
+            The line color defaults to the branch's trace color. Accepts one dict or
+            a per-target-cell list, as for `node_marker_style`.
+        node_hover_props : list[str] | None, default=None
+            Extra node properties to append to the hover text, which always
+            shows the cell ID and the plotted x and y values.
+        plot_bgcolor : str | None, default=None
+            The background color of the plot area.
+        show_legend : bool | None, default=None
+            True to display the legend, False to hide it. If None, the legend is
+            shown only when several target cells are plotted.
+        width : int | None, default=None
+            The width of the plot, in pixels.
+        height : int | None, default=None
+            The height of the plot, in pixels.
+        template : str | go.layout.Template, default="pycellin_white"
+            Plotly template to use for the figure. A ``"pycellin_dark"`` template is
+            also available. See ``styling.py`` for Pycellin template details. See
+            Plotly documentation for more information on templates.
+
+        Raises
+        ------
+        TypeError
+            If `node_marker_style`, `division_marker_style` or `line_style` is
+            not a dict, a list of dicts, or None.
+        KeyError
+            If a target cell ID is not in the lineage.
+        ValueError
+            If `target_cells` is an empty list; if `source_cells` is a list
+            while `target_cells` is not, or the two lists differ in length; if a
+            per-target-cell style list has the wrong length; if `generations` is not
+            a positive integer or None; if both `source_cells` and `generations` are
+            given; or if a source cell is not upstream of its target, e.g. not in
+            the lineage.
+        MissingPropertyError
+            If `x_prop`, `y_prop` or a property of `node_hover_props` is missing
+            from a plotted cell.
+        FusionError
+            If a cell fusion keeps the cells of a branch from forming a path.
+
+        Warns
+        -----
+        UserWarning
+            If the ``timepoint`` property is missing when ordering the cells.
+
         See Also
         --------
         get_branch_profile_figure : Generate the figure without displaying it.
@@ -2882,16 +3324,16 @@ class CellLineage(Lineage):
         --------
         Plot a branch with separate styles for node and division cells:
 
-        lineage.plot_branch_profile(
-            target_cells=100,
-            y_prop="cell_area",
-            node_marker_style=dict(color="orange", symbol="circle"),
-            division_marker_style=dict(
-                color="orange",
-                symbol="star",
-                line=dict(color="purple", width=3),
-            ),
-        )
+        >>> lineage.plot_branch_profile(
+        ...     target_cells=100,
+        ...     y_prop="cell_area",
+        ...     node_marker_style=dict(color="orange", symbol="circle"),
+        ...     division_marker_style=dict(
+        ...         color="orange",
+        ...         symbol="star",
+        ...         line=dict(color="purple", width=3),
+        ...     ),
+        ... )
         """
         fig = self.get_branch_profile_figure(
             target_cells=target_cells,
@@ -2918,6 +3360,30 @@ class CellLineage(Lineage):
         target_cells: int | list[int],
         source_cells: int | list[int] | None,
     ) -> tuple[bool, list[int], list[int | None]]:
+        """
+        Pair each target cell of single-cell branches with its source cell.
+
+        Parameters
+        ----------
+        target_cells : int | list[int]
+            ID of the target cell, or IDs of several target cells.
+        source_cells : int | list[int] | None
+            ID of the cell where each branch starts, used for every target cell, or
+            IDs paired with `target_cells` by position. None for the root.
+
+        Returns
+        -------
+        tuple[bool, list[int], list[int | None]]
+            Whether `target_cells` is a single ID, the IDs of the target cells, and
+            the ID of the source cell of each target cell.
+
+        Raises
+        ------
+        ValueError
+            If `target_cells` is an empty list.
+            If `source_cells` is a list while `target_cells` is not, or if the two
+            lists differ in length.
+        """
         # Normalize scalar input to a list so callers can use one code path for
         # both a single target cell and multiple target cells.
         is_single_target = isinstance(target_cells, int)
@@ -2945,12 +3411,38 @@ class CellLineage(Lineage):
 
     @staticmethod
     def _expand_branch_style(
-        style: _BranchStyle, arg_name: str, n_targets: int
+        style: dict | list[dict | None] | None, arg_name: str, n_targets: int
     ) -> list[dict[str, Any]]:
-        # Expand a branch-style argument to one plain dict per target cell.
-        # None or a single dict is broadcast to every trace; a list is paired
-        # with the target cells by position. Each returned dict is a fresh
-        # shallow copy the caller may mutate.
+        """
+        Expand a branch-style argument to one plain dict per target cell.
+
+        None or a single dict is broadcast to every trace; a list is paired
+        with the target cells by position. Each returned dict is a fresh
+        shallow copy the caller may mutate.
+
+        Parameters
+        ----------
+        style : dict | list[dict | None] | None
+            The style argument: None, a dict, or a list with one dict (or None) per
+            target cell.
+        arg_name : str
+            The name of the style argument, for error messages.
+        n_targets : int
+            The number of target cells.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One style dict per target cell, empty for None.
+
+        Raises
+        ------
+        TypeError
+            If `style` is not a dict, a list or None, or if an entry of the list is
+            not a dict or None.
+        ValueError
+            If `style` is a list whose length is not `n_targets`.
+        """
         if style is None or isinstance(style, dict):
             return [dict(style) if style else {} for _ in range(n_targets)]
         if not isinstance(style, list):
@@ -2977,7 +3469,7 @@ class CellLineage(Lineage):
     # TODO: I don't think this function is good design, even if it factorises code.
     # actually y_prop (prop name) and y_legend should be replaced by the Property y_prop
     # so we can access name and unit to display in the axis legend.
-    def _get_lineage_id_and_err_msg(lineage):
+    def _get_lineage_id_and_err_msg(lineage: CellLineage) -> tuple[int | None, str]:
         """
         Return the lineage ID and a text to display in error messages.
 
@@ -2988,10 +3480,9 @@ class CellLineage(Lineage):
 
         Returns
         -------
-        int | None
-            The lineage ID.
-        str
-            The text to display in error messages.
+        tuple[int | None, str]
+            The lineage ID, or None if the lineage has none, and the text to display
+            in error messages: ``" in lineage <ID>"``, or an empty string.
         """
         try:
             lid = lineage.graph["lineage_id"]
@@ -3020,6 +3511,15 @@ class CycleLineage(Lineage):
     cell_lineage : CellLineage | None, default=None
         The cell lineage to build the cycle lineage from. None for an empty cycle
         lineage.
+
+    Raises
+    ------
+    KeyError
+        If `cell_lineage` has no lineage ID, or if one of its cells has no
+        `time_prop` value.
+    LineageStructureError
+        If `cell_lineage` has several roots or cell fusions. It is a
+        `~pycellin.exceptions.FusionError` for cell fusions.
     """
 
     def __init__(self, time_prop: str, cell_lineage: CellLineage | None = None) -> None:
@@ -3062,6 +3562,15 @@ class CycleLineage(Lineage):
                 self.nodes[n]["generation"] = nx.shortest_path_length(self, root, n)
 
     def __str__(self) -> str:
+        """
+        Return a short description of the cycle lineage.
+
+        Returns
+        -------
+        str
+            The ID of the lineage, its name if it has one, and its numbers of cell
+            cycles and links.
+        """
         name_txt = f" named {self.graph['name']}" if "name" in self.graph else ""
         txt = (
             f"CycleLineage of ID {self.graph['lineage_id']}{name_txt}"
@@ -3071,7 +3580,7 @@ class CycleLineage(Lineage):
 
     # Methods to freeze / unfreeze?
 
-    def get_ancestors(self, node_id: int, sort=True) -> list[int]:
+    def get_ancestors(self, node_id: int, sort: bool = True) -> list[int]:
         """
         Return all the ancestor cell cycles of a given cell cycle.
 
@@ -3082,10 +3591,9 @@ class CycleLineage(Lineage):
         Parameters
         ----------
         node_id : int
-            ID of the cell cycle for which to retrieve ancestor cell cycle.
-        sort : bool, optional
+            ID of the cell cycle for which to retrieve ancestor cell cycles.
+        sort : bool, default=True
             True to return the ancestors in chronological order, False otherwise.
-            True by default.
 
         Returns
         -------
@@ -3100,7 +3608,7 @@ class CycleLineage(Lineage):
         Warns
         -----
         UserWarning
-            If there is no 'generation' property to order the cell cycles.
+            If there is no ``generation`` property to order the cell cycles.
         """
         try:
             ancestors = super().get_ancestors(node_id)
@@ -3126,8 +3634,13 @@ class CycleLineage(Lineage):
 
         Returns
         -------
-        list[tuple(int, int)]
+        list[tuple[int, int]]
             A list of links between the cells of a cell cycle.
+
+        Raises
+        ------
+        KeyError
+            If the cell cycle does not exist in the lineage.
         """
         return list(pairwise(self.nodes[cycle_id]["cells"]))
 
@@ -3156,65 +3669,83 @@ class CycleLineage(Lineage):
 
         This method generates a tree figure with Reingold-Tilford layout and returns
         it as a Plotly Figure object. The figure can then be updated or displayed using
-        `fig.show()`.
-        Heavily based on the code from https://plotly.com/python/tree-plots/
+        ``fig.show()``.
+        Heavily based on the code from https://plotly.com/python/tree-plots/.
 
         Parameters
         ----------
-        id_prop : str, optional
-            The property of the nodes to use as the node ID. "cycle_id" by default.
-        y_prop : str or Property, optional
-            Node property to plot on the y-axis, "generation" by default. A
-            Property also supplies the axis label (its name and unit); a plain
-            string is used as-is.
-        title : str, optional
+        id_prop : str, default="cycle_id"
+            The property of the nodes to use as the node ID.
+        y_prop : str | Property | None, default=None
+            Node property to plot on the y-axis. If None, the ``generation`` property
+            is used. A `Property` also supplies the axis label (its name and unit); a
+            plain string is used as-is.
+        title : str | None, default=None
             The title of the plot. If None, no title is displayed.
-        node_text : str, optional
+        node_text : str | None, default=None
             The property of the nodes to display as text inside the nodes
-            of the plot. If None, no text is displayed. None by default.
-        node_text_font : dict, optional
+            of the plot. If None, no text is displayed.
+        node_text_font : dict[str, Any] | None, default=None
             The font style of the text inside the nodes (size, color, etc).
             If None, defaults to current Plotly template.
-        node_marker_style : dict, optional
+        node_marker_style : dict[str, Any] | None, default=None
             The style of the markers representing the nodes in the plot
             (symbol, size, color, line, etc). If None, defaults to
             current Plotly template.
-        node_colormap_prop : str, optional
+        node_colormap_prop : str | None, default=None
             The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
-        node_colormap : str | dict[Any, str], optional
-            The color map to use for coloring the nodes. If None,
-            defaults to current Plotly template.
-        node_hover_props : list[str], optional
-            The hover template for the nodes. If None, defaults to
-            displaying `cell_id` and the value of the y_prop.
-        edge_line_style : dict, optional
+        node_colormap : str | dict[Any, str] | None, default=None
+            The color map to use for coloring the nodes: a Plotly colorscale for
+            numeric values, or a ``{value: color}`` dict. If None, defaults to
+            current Plotly template.
+        node_hover_props : list[str] | None, default=None
+            The node properties to display on hover. If None, defaults to
+            displaying the values of `id_prop` and `y_prop`.
+        edge_line_style : dict[str, Any] | None, default=None
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
-        edge_hover_props : list[str], optional
-            The hover template for the edges. If None, defaults to
+        edge_hover_props : list[str] | None, default=None
+            The edge properties to display on hover. If None, defaults to
             displaying the source and target nodes.
-        plot_bgcolor : str, optional
+        plot_bgcolor : str | None, default=None
             The background color of the plot. If None, defaults to current
             Plotly template.
-        show_horizontal_grid : bool, optional
-            True to display the horizontal grid, False otherwise. True by default.
-        show_legend : bool, optional
-            True to display the legend, False otherwise. True by default.
-        width : int, optional
+        show_horizontal_grid : bool, default=True
+            True to display the horizontal grid, False otherwise.
+        show_legend : bool, default=True
+            True to display the legend, False otherwise.
+        width : int | None, default=None
             The width of the plot. If None, defaults to current Plotly template.
-        height : int, optional
+        height : int | None, default=None
             The height of the plot. If None, defaults to current Plotly template.
-        template : str or go.layout.Template, optional
-            Plotly template to use for the figure (default is "pycellin_white"). A
-            "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on
-            templates.
+        template : str | go.layout.Template, default="pycellin_white"
+            Plotly template to use for the figure. A ``"pycellin_dark"`` template is
+            also available. See ``styling.py`` for Pycellin template details. See
+            Plotly documentation for more information on templates.
 
         Returns
         -------
-        plotly.graph_objects.Figure
+        go.Figure
             The generated Plotly figure object.
+
+        Raises
+        ------
+        KeyError
+            If `id_prop`, `y_prop`, `node_text` or `node_colormap_prop` is not a node
+            property of the lineage.
+            If a property of `node_hover_props` or `edge_hover_props` is not a node or
+            edge property of the lineage.
+        ValueError
+            If `node_colormap` is not a dict and `node_colormap_prop` has non-numeric
+            values.
+
+        Warns
+        -----
+        UserWarning
+            If `node_colormap` is a dict that doesn't cover all the values of
+            `node_colormap_prop`: the nodes with other values are drawn in
+            ``"dimgrey"``.
 
         Warnings
         --------
@@ -3272,55 +3803,73 @@ class CycleLineage(Lineage):
 
         Parameters
         ----------
-        id_prop : str, optional
-            The property of the nodes to use as the node ID. "cycle_id" by default.
-        y_prop : str or Property, optional
-            Node property to plot on the y-axis, "generation" by default. A
-            Property also supplies the axis label (its name and unit); a plain
-            string is used as-is.
-        title : str, optional
+        id_prop : str, default="cycle_id"
+            The property of the nodes to use as the node ID.
+        y_prop : str | Property | None, default=None
+            Node property to plot on the y-axis. If None, the ``generation`` property
+            is used. A `Property` also supplies the axis label (its name and unit); a
+            plain string is used as-is.
+        title : str | None, default=None
             The title of the plot. If None, no title is displayed.
-        node_text : str, optional
+        node_text : str | None, default=None
             The property of the nodes to display as text inside the nodes
-            of the plot. If None, no text is displayed. None by default.
-        node_text_font : dict, optional
+            of the plot. If None, no text is displayed.
+        node_text_font : dict[str, Any] | None, default=None
             The font style of the text inside the nodes (size, color, etc).
             If None, defaults to current Plotly template.
-        node_marker_style : dict, optional
+        node_marker_style : dict[str, Any] | None, default=None
             The style of the markers representing the nodes in the plot
             (symbol, size, color, line, etc). If None, defaults to
             current Plotly template.
-        node_colormap_prop : str, optional
+        node_colormap_prop : str | None, default=None
             The property of the nodes to use for coloring the nodes.
             If None, no color mapping is applied.
-        node_colormap : str | dict[Any, str], optional
-            The color map to use for coloring the nodes. If None,
-            defaults to current Plotly template.
-        node_hover_props : list[str], optional
-            The hover template for the nodes. If None, defaults to
-            displaying `cell_id` and the value of the y_prop.
-        edge_line_style : dict, optional
+        node_colormap : str | dict[Any, str] | None, default=None
+            The color map to use for coloring the nodes: a Plotly colorscale for
+            numeric values, or a ``{value: color}`` dict. If None, defaults to
+            current Plotly template.
+        node_hover_props : list[str] | None, default=None
+            The node properties to display on hover. If None, defaults to
+            displaying the values of `id_prop` and `y_prop`.
+        edge_line_style : dict[str, Any] | None, default=None
             The style of the lines representing the edges in the plot
             (color, width, etc). If None, defaults to current Plotly template.
-        edge_hover_props : list[str], optional
-            The hover template for the edges. If None, defaults to
+        edge_hover_props : list[str] | None, default=None
+            The edge properties to display on hover. If None, defaults to
             displaying the source and target nodes.
-        plot_bgcolor : str, optional
+        plot_bgcolor : str | None, default=None
             The background color of the plot. If None, defaults to current
             Plotly template.
-        show_horizontal_grid : bool, optional
-            True to display the horizontal grid, False otherwise. True by default.
-        show_legend : bool, optional
-            True to display the legend, False otherwise. True by default.
-        width : int, optional
+        show_horizontal_grid : bool, default=True
+            True to display the horizontal grid, False otherwise.
+        show_legend : bool, default=True
+            True to display the legend, False otherwise.
+        width : int | None, default=None
             The width of the plot. If None, defaults to current Plotly template.
-        height : int, optional
+        height : int | None, default=None
             The height of the plot. If None, defaults to current Plotly template.
-        template : str or go.layout.Template, optional
-            Plotly template to use for the figure (default is "pycellin_white"). A
-            "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on
-            templates.
+        template : str | go.layout.Template, default="pycellin_white"
+            Plotly template to use for the figure. A ``"pycellin_dark"`` template is
+            also available. See ``styling.py`` for Pycellin template details. See
+            Plotly documentation for more information on templates.
+
+        Raises
+        ------
+        KeyError
+            If `id_prop`, `y_prop`, `node_text` or `node_colormap_prop` is not a node
+            property of the lineage.
+            If a property of `node_hover_props` or `edge_hover_props` is not a node or
+            edge property of the lineage.
+        ValueError
+            If `node_colormap` is not a dict and `node_colormap_prop` has non-numeric
+            values.
+
+        Warns
+        -----
+        UserWarning
+            If `node_colormap` is a dict that doesn't cover all the values of
+            `node_colormap_prop`: the nodes with other values are drawn in
+            ``"dimgrey"``.
 
         Warnings
         --------
@@ -3328,25 +3877,24 @@ class CycleLineage(Lineage):
         and child cells will be displayed only for one child cell.
         This cannot easily be corrected.
 
+        See Also
+        --------
+        get_tree_figure : Generate the figure without displaying it.
+
         Examples
         --------
         For styling the graph:
 
-        node_text_font = dict(
-            color="black",
-            size=10,
-        )
-
-        node_marker_style = dict(
-            symbol="circle",
-            size=20,
-            color="white",
-            line=dict(color="black", width=1),
-        )
-
-        See Also
-        --------
-        get_tree_figure : Generate the figure without displaying it.
+        >>> node_text_font = dict(
+        ...     color="black",
+        ...     size=10,
+        ... )
+        >>> node_marker_style = dict(
+        ...     symbol="circle",
+        ...     size=20,
+        ...     color="white",
+        ...     line=dict(color="black", width=1),
+        ... )
         """
         fig = self.get_tree_figure(
             id_prop=id_prop,

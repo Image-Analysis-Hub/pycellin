@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the documentation work of feature/docs up to da832ff and the uncommitted fixes of the rod methods. Update from there with: git log 6b884a4..dev -->
+<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the documentation work of feature/docs up to 080a770 and the uncommitted docstring batch of lineage.py. Update from there with: git log 6b884a4..dev -->
 
 Model merging and splitting, many new properties (morphology, intensity, topology), branch plots, consistent names that follow PEP 8, and many fixes, notably to time handling and to reading and writing TrackMate, GEFF, CTC and trackpy data. **This release contains breaking changes**, listed first below.
 
@@ -172,7 +172,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Dependencies:** the test dependencies moved from the `test` extra to a `test` dependency group, installed from a clone of the repository with `pip install -e . --group test` (pip >= 25.1)
 - **Docs:** the "Creating a model from scratch" notebook, unfinished, and "Working with TrackMate data", covered by "Getting started", are removed. The other notebooks are updated and re-run, and "Custom properties" explains when a calculator should be local or global
 - **Docs:** the README keeps only the `pip install` line of the installation steps, and links to the documentation for the rest: creating a conda environment, and installing the example notebooks or the development tools
-- **Docs:** the docstrings of the exceptions, `Cell`, `PropertyType` and `Model`, and the class docstrings of `Data`, `Property`, `PropsMetadata`, `CellLineage` and `CycleLineage`, follow numpydoc's guide, with the types written as in the type hints and the default values given, e.g. `int | None, default=None`. Constructor parameters are documented in the class docstring, and `Model`, `Property`, `CellLineage` and `CycleLineage` get a description. The values of `PropertyType` and the fields of `Cell` are documented. The default description of a property added by an `add_*()` method links to the table of predefined properties
+- **Docs:** the docstrings of the exceptions, `Cell`, `PropertyType`, `Model`, `CellLineage` and `CycleLineage`, and the class docstrings of `Data`, `Property` and `PropsMetadata`, follow numpydoc's guide, with the types written as in the type hints and the default values given, e.g. `int | None, default=None`. Constructor parameters are documented in the class docstring, and `Model`, `Property`, `CellLineage` and `CycleLineage` get a description. The values of `PropertyType` and the fields of `Cell` are documented. The default description of a property added by an `add_*()` method links to the table of predefined properties
 
 ### Fixed
 
@@ -261,6 +261,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Docs:** the code example of the README, also shown on the PyPI page, raised `NameError`: it called a `plot()` function that doesn't exist instead of `lin.plot()`. The link to Ershov et al., 2022 was broken too
 - **Docs:** `Model.get_cell_lineage_ids()` had lost its docstring to the alias that pointed to it
 - **Docs:** the docstring of `Model.get_edge_properties()` described its `single_type` argument with node properties, and `add_rod_length()` and `add_rod_width()` had no docstring
+- **Docs:** in the lineages, the docstrings of `plot()` and `get_tree_figure()` described `node_hover_props` and `edge_hover_props` as hover templates instead of lists of properties, and that of `get_descendants()` gave an order to the descendants, which come in no particular order
 - **Docs:** some examples of `add_pycellin_property()` and `add_pycellin_properties()` didn't work:
   - their docstrings used an `in_time_unit` argument, which `add_absolute_age()` and `add_relative_age()` don't have, so the examples raised `TypeError`
   - the docstring of `add_pycellin_properties()` and "Managing properties" added a `cell_cycle_completeness` property, which doesn't exist (`cycle_completeness` in 0.5.1, now `is_complete_cycle`)

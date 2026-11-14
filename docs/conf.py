@@ -67,6 +67,7 @@ numpydoc_xref_aliases = {
     "go.Figure": ":class:`plotly.graph_objects.Figure`",
     "np.ndarray": "numpy.ndarray",
     "nx.DiGraph": "networkx.DiGraph",
+    "nx.NetworkXError": "networkx.NetworkXError",
     "pd.DataFrame": "pandas.DataFrame",
     "Path": "pathlib.Path",
     # Written in full in the docstrings: an alias to the same name stays plain text
