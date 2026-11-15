@@ -1,3 +1,5 @@
+"""Reader and writer for trackpy DataFrames."""
+
 from .reader import from_trackpy
 from .writer import to_trackpy
 

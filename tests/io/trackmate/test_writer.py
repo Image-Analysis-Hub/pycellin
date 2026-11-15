@@ -937,6 +937,32 @@ class TestWriteTrackmateXml:
         assert visibilities.count(0.0) == 1
         assert visibilities.count(1.0) == 106
 
+    def test_position_z_property_without_cell_z_raises(self, tmp_path, simple_model):
+        """Test that a POSITION_Z property isn't replaced by the zeros written as
+        POSITION_Z when the model has no cell_z."""
+        simple_model.props_metadata._add_prop(
+            Property(
+                identifier="POSITION_Z",
+                name="Z",
+                description="Z coordinate",
+                provenance="test",
+                prop_type="node",
+                lineage_type="cell",
+                dtype="float",
+                unit="pixel",
+            )
+        )
+        for lin in simple_model.data.cell_lineages.values():
+            for node in lin.nodes:
+                lin.nodes[node]["POSITION_Z"] = 5.0
+        with pytest.raises(ValueError, match="rename it to 'cell_z'"):
+            write_trackmate_xml(
+                simple_model,
+                tmp_path / "model.xml",
+                space_unit="pixel",
+                time_unit="frame",
+            )
+
 
 class TestWriteTrackmateXmlUnits:
     """Test cases for the units written by write_trackmate_xml function."""

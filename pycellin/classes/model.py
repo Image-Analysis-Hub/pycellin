@@ -42,7 +42,7 @@ from pycellin.utils import _check_integer, _color_to_rgba, _infer_dtype, _unit_u
 
 _L = TypeVar("_L", bound="Lineage")
 
-# Provenance of models built by Model.merge() and of the lineage properties it creates.
+#: Provenance of models built by Model.merge() and of the lineage properties it creates.
 _MERGE_PROVENANCE = "pycellin merge"
 
 

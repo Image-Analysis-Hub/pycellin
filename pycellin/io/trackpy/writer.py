@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
 
 """
-writer.py
+Writer for trackpy DataFrames.
 
-This module is part of the pycellin package.
-
-This module provides functions to export pycellin models to trackpy tracking files.
-It includes a function to export a pycellin model to a trackpy file and helper functions
-to build trackpy tracks from a lineage.
-
-References:
+References
+----------
 - trackpy: D. B. Allan, T. Caswell, N. C. Keim, C. M. van der Wel and R. W. Verweij,
-“soft-matter/trackpy: v0.6.4”. Zenodo, Jul. 10, 2024. doi: 10.5281/zenodo.12708864.
+  “soft-matter/trackpy: v0.6.4”. Zenodo, Jul. 10, 2024. doi: 10.5281/zenodo.12708864.
 - trackpy GitHub: https://github.com/soft-matter/trackpy
 """
 
@@ -28,7 +23,7 @@ def _safekeep_original_lineage_ids(model: Model) -> None:
     Add original lineage IDs to the nodes of the model.
 
     We want to safekeep them since we are going to renumber
-    the lineages later on.
+    the lineages later on. They are stored in the ``lineage_id_pycellin`` property.
 
     Parameters
     ----------
@@ -93,7 +88,7 @@ def _renumber_negative_lineage_ids(model: Model) -> None:
 
 def _rename_columns_if_exist(df: pd.DataFrame, columns_map: dict) -> pd.DataFrame:
     """
-    Helper function to rename columns if they exist in the DataFrame.
+    Rename columns if they exist in the DataFrame.
 
     Parameters
     ----------
@@ -105,7 +100,8 @@ def _rename_columns_if_exist(df: pd.DataFrame, columns_map: dict) -> pd.DataFram
     Returns
     -------
     pd.DataFrame
-        A copy of the DataFrame, with its existing columns renamed.
+        A copy of the DataFrame, with its existing columns renamed, or `df` itself
+        if no column is renamed.
     """
     for old_name, new_name in columns_map.items():
         if old_name in df.columns:
@@ -115,7 +111,7 @@ def _rename_columns_if_exist(df: pd.DataFrame, columns_map: dict) -> pd.DataFram
 
 def _drop_columns_if_exist(df: pd.DataFrame, columns: list) -> pd.DataFrame:
     """
-    Helper function to drop columns if they exist in the DataFrame.
+    Drop columns if they exist in the DataFrame.
 
     Parameters
     ----------
@@ -127,7 +123,8 @@ def _drop_columns_if_exist(df: pd.DataFrame, columns: list) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        A copy of the DataFrame, without the columns that existed among `columns`.
+        A copy of the DataFrame, without the columns that existed among `columns`,
+        or `df` itself if no column is dropped.
     """
     for column in columns:
         if column in df.columns:
@@ -144,7 +141,8 @@ def _format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
     df : pd.DataFrame
         The DataFrame to format.
     frame_prop : str
-        The property to use as the frame identifier.
+        The property to use as the frame identifier. A ``frame`` column that holds
+        another property is replaced.
 
     Returns
     -------
@@ -156,6 +154,10 @@ def _format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
     # If we already have the "particle" column, it means the data is coming from
     # trackpy, but it might not be up to date. Safer to remove it then recreate
     # it from "lineage_id".
+    # Likewise, a "frame" column that isn't frame_prop, e.g. because some cells have
+    # no frame, would end up next to the renamed frame_prop.
+    if frame_prop != "frame":
+        df = _drop_columns_if_exist(df, ["frame"])
 
     # Rename columns to match trackpy format.
     df = _rename_columns_if_exist(
@@ -199,12 +201,16 @@ def to_trackpy(model: Model) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        A DataFrame containing trackpy formatted data.
+        A DataFrame containing trackpy formatted data. Its ``particle`` column
+        identifies the cell cycles, and its ``lineage_id_pycellin`` column the
+        lineages of the model.
 
     Raises
     ------
     UpdateRequiredError
         If the model requires an update.
+    ValueError
+        If the model has no cells, or no ``cell_x`` or ``cell_y`` values.
     """
     _check_up_to_date(model)
     # Prepare the model for export.
@@ -215,6 +221,12 @@ def to_trackpy(model: Model) -> pd.DataFrame:
 
     # Creation of the trackpy DataFrame.
     df = model_copy.to_cell_dataframe()
+    missing = [prop for prop in ("cell_x", "cell_y") if prop not in df.columns]
+    if missing:
+        raise ValueError(
+            "trackpy needs the positions of the cells, but the model has no "
+            f"{' or '.join(repr(prop) for prop in missing)} values."
+        )
     frame_prop = _identify_frame_prop(model_copy)
     df = _format_dataframe(df, frame_prop)
 

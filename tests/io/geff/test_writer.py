@@ -31,6 +31,7 @@ from pycellin.io.geff.writer import (
 )
 from pycellin.properties.core import (
     create_cell_coord_property,
+    create_cell_id_property,
     create_frame_property,
     create_lineage_id_property,
     create_link_coord_property,
@@ -1176,6 +1177,36 @@ class TestWriteGeff:
             geff_out, data_validation=ValidationConfig(tracklet=True, lineage=True)
         )
         assert len(set(dict(graph.nodes(data="tracklet_id")).values())) == 2
+
+    def test_repeated_cell_ids_round_trip(self, caplog, simple_model, tmp_path):
+        """With cell IDs repeated across lineages, the cells get new IDs in the
+        file, and their IDs in the model are kept in pycellin_cell_id: the file is
+        read back with these new cell IDs."""
+        lin = CellLineage()
+        lin.add_node(1, timepoint=0, cell_x=20.0, lineage_id=2)
+        lin.add_node(2, timepoint=1, cell_x=22.0, lineage_id=2)
+        lin.add_edge(1, 2, link_x=2.0)
+        lin.graph["lineage_id"] = 2
+        simple_model.data.cell_lineages[2] = lin
+        simple_model.props_metadata._add_prop(create_cell_id_property())
+        for lineage in simple_model.data.cell_lineages.values():
+            for node in lineage.nodes:
+                lineage.nodes[node]["cell_id"] = node
+        geff_out = str(tmp_path / "test.geff")
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
+            write_geff(simple_model, geff_out)
+        assert "kept in the 'pycellin_cell_id' property" in caplog.text
+
+        reloaded = read_geff(geff_out)
+        cells = [
+            attrs
+            for lin in reloaded.data.cell_lineages.values()
+            for _, attrs in lin.nodes(data=True)
+        ]
+        assert not reloaded.has_property("geff_cell_id")
+        # Cells 1 and 2 of lineage 2 became cells 5 and 6.
+        previous_ids = {attrs["cell_id"]: attrs["pycellin_cell_id"] for attrs in cells}
+        assert previous_ids == {1: 1, 2: 2, 3: 3, 4: 4, 5: 1, 6: 2}
 
     def test_no_tracklet_by_default_with_propagated_cycle_id(
         self, simple_model, tmp_path

@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 
 """
-reader.py
+Reader for Cell Tracking Challenge (CTC) tracking files.
 
-This module is part of the pycellin package.
-
-This module provides functions to load and process Cell Tracking Challenge (CTC) files
-into pycellin models. It includes a function to load a CTC file into pycellin model
-and helper functions to create metadata, properties, and lineage graphs.
-
-References:
+References
+----------
 - CTC website: https://celltrackingchallenge.net/
 - CTC tracking annotations conventions:
-https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content%20conventions.pdf
+  https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content%20conventions.pdf
 """
 
 import logging
@@ -42,9 +37,9 @@ from pycellin.properties.morphology import (
 
 logger = logging.getLogger(__name__)
 
-# Units of the TIFF ResolutionUnit tag, except inches (2): a resolution in inches is
-# most likely a print default such as 72 dpi, not a pixel size. Millimeters and
-# micrometers are tifffile extensions of the TIFF standard.
+#: Units of the TIFF ResolutionUnit tag, except inches (2): a resolution in inches is
+#: most likely a print default such as 72 dpi, not a pixel size. Millimeters and
+#: micrometers are tifffile extensions of the TIFF standard.
 _RESOLUTION_UNITS = {3: "cm", 4: "mm", 5: "µm"}
 
 # TODO: what if the first frame is empty...?
@@ -89,7 +84,7 @@ def _integrate_label_images_metadata(
     The pixel size is read from the TIFF resolution tags, in the unit of the
     ResolutionUnit tag or, for ImageJ images, in the unit of the ImageJ metadata,
     which also gives the pixel depth. A resolution without unit gives no physical
-    pixel size: the space unit is then 'pixel', with pixels of size 1. So does a
+    pixel size: the space unit is then ``"pixel"``, with pixels of size 1. So does a
     resolution in inches, most likely a print default such as 72 dpi.
 
     Parameters
@@ -152,7 +147,7 @@ def _integrate_label_images_metadata(
 
 
 def _create_metadata(
-    file_path: str,
+    file_path: str | Path,
     labels_path: str | Path | None = None,
     space_unit: str | None = None,
     pixel_width: float | None = None,
@@ -166,33 +161,43 @@ def _create_metadata(
 
     Parameters
     ----------
-    file_path : str
+    file_path : str | Path
         The path to the file for which metadata is being created.
-    labels_path : str | Path, optional
+    labels_path : str | Path | None, default=None
         The path to the folder of label images, if any.
-    space_unit : str, optional
-        The spatial unit of the data. If not provided, it will be set to 'pixel'
-        by default.
-    pixel_width : float, optional
-        The pixel width in the spatial unit. If not provided, it will be set to 1.0
-        by default.
-    pixel_height : float, optional
-        The pixel height in the spatial unit. If not provided, it will be set to 1.0
-        by default.
-    pixel_depth : float, optional
-        The pixel depth in the spatial unit. If not provided, it will be set to 1.0
-        by default.
-    time_unit : str, optional
-        The temporal unit of the data. If not provided, it will be set to None
-        by default.
-    time_step : float, optional
-        The time step in the temporal unit. If not provided, it will be set to 1.0
-        by default.
+    space_unit : str | None, default=None
+        The spatial unit of the data. If None, it is read from the label images, if
+        any, or ``"pixel"`` is used.
+    pixel_width : float | None, default=None
+        The pixel width in the spatial unit. If None, it is read from the label
+        images, if any, or 1.0 is used.
+    pixel_height : float | None, default=None
+        The pixel height in the spatial unit. If None, it is read from the label
+        images, if any, or 1.0 is used.
+    pixel_depth : float | None, default=None
+        The pixel depth in the spatial unit. If None, it is read from the label
+        images, if any, or 1.0 is used.
+    time_unit : str | None, default=None
+        The temporal unit of the data.
+    time_step : float | None, default=None
+        The time step in the temporal unit. If None, 1 is used.
 
     Returns
     -------
     dict[str, Any]
         A dictionary containing the generated metadata.
+
+    Raises
+    ------
+    ValueError
+        If the label images are needed for a missing unit or pixel size, but
+        `labels_path` is not a folder or holds no .tif file.
+
+    Warns
+    -----
+    UserWarning
+        If the resolution of the label images, in inches, is ignored while the space
+        unit or the pixel width or height is not given.
     """
     metadata: dict[str, Any] = {}
     metadata["name"] = Path(file_path).stem
@@ -246,7 +251,7 @@ def _create_PropsMetadata(
     seg_data: bool, time_unit: str | None, space_unit: str
 ) -> PropsMetadata:
     """
-    Return a PropsMetadata object populated with pycellin basic properties.
+    Return a `PropsMetadata` object populated with pycellin basic properties.
 
     Parameters
     ----------
@@ -261,8 +266,9 @@ def _create_PropsMetadata(
     Returns
     -------
     PropsMetadata
-        An instance of PropsMetadata populated with cell and lineage
-        identification properties, and with the frame and time properties.
+        An instance of `PropsMetadata` populated with cell and lineage
+        identification properties, and with the frame and time properties, plus
+        the cell positions and contours if `seg_data` is True.
     """
     props_md = PropsMetadata()
     cell_id_prop = create_cell_id_property()
@@ -290,6 +296,7 @@ def _create_PropsMetadata(
 def _read_track_line(
     line: str,
     current_node_id: int,
+    line_number: int,
 ) -> tuple[list[tuple[int, dict[str, Any]]], int]:
     """
     Parse a single track line to generate a list of the nodes present in the track.
@@ -305,16 +312,38 @@ def _read_track_line(
     current_node_id : int
         The starting node ID to use for the first node in this track,
         which will be incremented for each subsequent node.
+    line_number : int
+        The number of the line in the CTC file, from 1, for the error messages.
 
     Returns
     -------
-    Tuple[List[Tuple[int, Dict[str, Any]]], int]
+    tuple[list[tuple[int, dict[str, Any]]], int]
         A tuple containing a list of nodes generated from the track line,
         where each node is represented as a tuple containing the node ID
         and a dictionary of attributes, and the next available node ID
         after generating all nodes for this track.
+
+    Raises
+    ------
+    ValueError
+        If the line doesn't hold four integers, or if the track ends before it
+        starts.
     """
-    track_id, start_frame, end_frame, parent_track = [int(el) for el in line.split()]
+    try:
+        track_id, start_frame, end_frame, parent_track = (
+            int(value) for value in line.split()
+        )
+    except ValueError:
+        raise ValueError(
+            f"Line {line_number} of the CTC file must hold 4 integers: the label of a "
+            "track, its first and last frames, and the label of its parent track (0 "
+            f"if none), but it is {line.strip()!r}."
+        ) from None
+    if end_frame < start_frame:
+        raise ValueError(
+            f"Track {track_id} ends at frame {end_frame}, before its first frame "
+            f"{start_frame} (line {line_number} of the CTC file)."
+        )
     nodes = []
     for frame in range(start_frame, end_frame + 1):
         node_attrs = {
@@ -343,7 +372,7 @@ def _add_nodes_and_edges(
     ----------
     graph : nx.DiGraph
         The directed graph to which the nodes and edges will be added.
-    nodes : List[Tuple[int, Dict[str, Any]]]
+    nodes : list[tuple[int, dict[str, Any]]]
         A list of tuples, where each tuple contains an integer representing
         the node identifier and a dictionary representing the node's attributes.
     """
@@ -366,9 +395,14 @@ def _merge_tracks(
     ----------
     graph : nx.DiGraph
         The directed graph to which the tracks belong.
-    nodes : List[Tuple[int, Dict[str, Any]]]
+    nodes : list[tuple[int, dict[str, Any]]]
         A list of tuples, where each tuple contains an integer representing
         the node identifier and a dictionary representing the node's attributes.
+
+    Raises
+    ------
+    ValueError
+        If the parent track is not in the graph.
     """
     parent_track = nodes[0][1]["PARENT"]
     if parent_track != 0:
@@ -378,6 +412,11 @@ def _merge_tracks(
             for node, data in graph.nodes(data=True)
             if data["TRACK"] == parent_track
         ]
+        if not parent_nodes:
+            raise ValueError(
+                f"Track {nodes[0][1]['TRACK']} has parent track {parent_track}, which "
+                "is not in the CTC file."
+            )
         parent_node = max(parent_nodes, key=lambda x: x[1])
         graph.add_edge(parent_node[0], nodes[0][0])
 
@@ -386,7 +425,7 @@ def _remove_track_attributes(graph: nx.DiGraph) -> None:
     """
     Remove the node attributes that were only needed for graph construction.
 
-    The 'TRACK' and 'PARENT' attributes are used to merge tracks and to match
+    The ``TRACK`` and ``PARENT`` attributes are used to merge tracks and to match
     segmentation labels to nodes. They are obsolete once the graph is complete.
 
     Parameters
@@ -415,20 +454,21 @@ def _extract_seg_data(
     ----------
     label_image_path : str
         The path to the label image file.
-    pixel_width : float, optional
-        The pixel width in the space unit. Default is 1.0.
-    pixel_height : float, optional
-        The pixel height in the space unit. Default is 1.0.
+    pixel_width : float, default=1.0
+        The pixel width in the space unit.
+    pixel_height : float, default=1.0
+        The pixel height in the space unit.
 
     Returns
     -------
-    Tuple[List[int], List[List[float]], List[List[Tuple[float, float]]]]
+    tuple[list[int], list[list[float]], list[list[tuple[float, float]]]]
         A tuple containing three lists:
+
         - labels: a list of unique labels in the image.
         - centroids: a list of centroids for each label, where each centroid
-            is represented as a (x, y) tuple of coordinates.
+          is represented as an [x, y] list of coordinates.
         - contours: a list of contours for each label, where each contour
-            is represented as a list of (x, y) coordinates relative to the centroid.
+          is represented as a list of (x, y) coordinates relative to the centroid.
 
     Raises
     ------
@@ -483,7 +523,7 @@ def _index_cells(graph: nx.DiGraph) -> dict[tuple[int, int], list[int]]:
     ----------
     graph : nx.DiGraph
         The directed graph representing the lineage data, whose nodes still have
-        their 'TRACK' attribute.
+        their ``TRACK`` attribute.
 
     Returns
     -------
@@ -505,28 +545,29 @@ def _integrate_seg_data(
     contours: list[list[tuple[float, float]]],
 ) -> None:
     """
-    Integrate segmentation data into the Pycellin model.
+    Integrate segmentation data into the graph.
 
-    This function updates the Pycellin model with segmentation data
+    This function updates the graph with segmentation data
     for a specific frame. It identifies the graph nodes to update thanks to the
     frame and labels and adds the following properties to each node:
-    - the centroids as cell positions (cell_x, cell_y),
-    - the centroid-relative contours of the cells (cell_contour).
+
+    - the centroids as cell positions (``cell_x``, ``cell_y``),
+    - the centroid-relative contours of the cells (``cell_contour``).
 
     Parameters
     ----------
-    graph: nx.DiGraph
+    graph : nx.DiGraph
         The directed graph representing the lineage data.
     cells : dict[tuple[int, int], list[int]]
-        The cells of the graph indexed by frame and track (see `_index_cells()`).
+        The cells of the graph indexed by frame and track (see ``_index_cells()``).
     frame : int
         The frame number for which the segmentation data is being integrated.
-    labels : List[int]
+    labels : list[int]
         A list of unique labels in the image.
-    centroids : List[List[float]]
+    centroids : list[list[float]]
         A list of centroids for each label, where each centroid
-        is represented as a (x, y) tuple of coordinates.
-    contours : List[List[Tuple[float, float]]]
+        is represented as an [x, y] list of coordinates.
+    contours : list[list[tuple[float, float]]]
         A list of contours for each label, where each contour
         is represented as a list of (x, y) coordinates relative to the centroid.
 
@@ -568,13 +609,13 @@ def read_ctc(
 
     The CTC tracking format does not support fusion events and does not allow
     gaps right after division events.
-    If only 'path' is given, only track topology is read. To load
-    cell positions and contours into the model, 'labels_path' must also be given.
+    If only `path` is given, only track topology is read. To load
+    cell positions and contours into the model, `labels_path` must also be given.
     The label images must be in the same format as the CTC format,
     i.e. a single 2D image per frame with a single label per cell. 3D label
     images are not supported yet.
-    The label images names must end in '<frame_number>.tif' (e.g. 000.tif,
-    02.tif, 0155.tif, etc.).
+    The label image names must end in ``<frame_number>.tif`` (e.g. ``000.tif``,
+    ``02.tif``, ``0155.tif``, etc.).
     For the space unit and pixel size, priority is given to the values given by the
     user. If not provided, pycellin will try to read them from the label images
     (TIFF resolution tags, with the unit of the ImageJ metadata for ImageJ images).
@@ -582,37 +623,36 @@ def read_ctc(
     If it fails or if no label images are given, default values will be used.
     Cell positions and contours are in the space unit: their pixel coordinates
     are multiplied by the pixel width and height.
-    Cell times are stored in two node properties: 'frame', read from the CTC file,
-    and 'time', equal to frame * time_step and expressed in time_unit. 'time' is
-    the reference time property of the model.
+    Cell times are stored in two node properties: ``frame``, read from the CTC file,
+    and ``time``, equal to ``frame * time_step`` and expressed in `time_unit`.
+    ``time`` is the reference time property of the model.
+    Blank lines of the CTC file are ignored.
 
     Parameters
     ----------
     path : str | Path
         The path to the CTC text file that contains the tracking data.
-    labels_path : str | Path, optional
+    labels_path : str | Path | None, default=None
         The path to the folder of label images, if any. If not provided, only the
         track topology will be read. If the space unit and pixel size are not
         directly provided by the user, they will be read from the label images.
         If it fails default values will be used.
-    space_unit : str, optional
-        The spatial unit of the data. If not provided or not infered from the label
-        images, it will be set to 'pixel' by default.
-    pixel_width : float, optional
-        The pixel width in the spatial unit. If not provided or not infered from the
-        label images, it will be set to 1.0 by default.
-    pixel_height : float, optional
-        The pixel height in the spatial unit. If not provided or not infered from the
-        label images, it will be set to 1.0 by default.
-    pixel_depth : float, optional
-        The pixel depth in the spatial unit. If not provided or not infered from the
-        label images, it will be set to 1.0 by default.
-    time_unit : str, optional
-        The temporal unit of the data. If not provided, it will be set to None
-        by default.
-    time_step : float, optional
-        The time step in the temporal unit. If not provided, it will be set to 1
-        by default.
+    space_unit : str | None, default=None
+        The spatial unit of the data. If None and not inferred from the label
+        images, ``"pixel"`` is used.
+    pixel_width : float | None, default=None
+        The pixel width in the spatial unit. If None and not inferred from the
+        label images, 1.0 is used.
+    pixel_height : float | None, default=None
+        The pixel height in the spatial unit. If None and not inferred from the
+        label images, 1.0 is used.
+    pixel_depth : float | None, default=None
+        The pixel depth in the spatial unit. If None and not inferred from the
+        label images, 1.0 is used.
+    time_unit : str | None, default=None
+        The temporal unit of the data.
+    time_step : float | None, default=None
+        The time step in the temporal unit. If None, 1 is used.
 
     Returns
     -------
@@ -622,9 +662,11 @@ def read_ctc(
     Raises
     ------
     ValueError
-        If 'labels_path' is not a folder of .tif label images, if a label image is
+        If `labels_path` is not a folder of .tif label images, if a label image is
         not 2D or its name doesn't end with a frame number, or if a label matches
         no cell or several cells of its frame.
+        If a line of the CTC file doesn't hold four integers, or describes a track
+        that ends before it starts or whose parent track the file doesn't have.
 
     Warns
     -----
@@ -646,8 +688,12 @@ def read_ctc(
         # being referenced by their children.
         # nodes_from_tracks keeps track of the nodes created for each track
         # so that they can be merged later.
-        for line in file:
-            nodes, current_node_id = _read_track_line(line, current_node_id)
+        for line_number, line in enumerate(file, start=1):
+            if not line.strip():
+                continue  # e.g. an empty last line
+            nodes, current_node_id = _read_track_line(
+                line, current_node_id, line_number
+            )
             nodes_from_tracks.append(nodes)
             _add_nodes_and_edges(graph, nodes)
 

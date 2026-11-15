@@ -12,6 +12,7 @@ from pycellin.io.trackpy.writer import to_trackpy
 from pycellin.properties.core import (
     create_cell_coord_property,
     create_cell_id_property,
+    create_frame_property,
     create_lineage_id_property,
     create_timepoint_property,
 )
@@ -160,6 +161,15 @@ class TestToTrackpy:
         df = to_trackpy(model_with_positions)
         keys = list(zip(df["particle"], df["frame"]))
         assert keys == sorted(keys)
+
+    def test_incomplete_frame_replaced_by_timepoints(self, model_with_positions):
+        """Test that a frame property missing on some cells is replaced by the
+        timepoints, instead of giving a second frame column."""
+        model_with_positions.props_metadata._add_prop(create_frame_property())
+        model_with_positions.data.cell_lineages[1].nodes[1]["frame"] = 5
+        df = to_trackpy(model_with_positions)
+        assert list(df.columns).count("frame") == 1
+        assert df["frame"].tolist() == [0, 1, 0, 1]
 
     def test_3d_positions_put_z_first(self, model_with_positions):
         """Test that the z position comes before y and x."""
