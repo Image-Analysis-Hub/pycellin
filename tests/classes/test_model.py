@@ -433,6 +433,23 @@ class TestAddCycleLineages:
         model.add_lineage(lin, with_cycle_lineage=True)
         assert 7 in model.data.cycle_lineages
 
+    @pytest.mark.parametrize("props_to_update", [None, ["cell_value"]])
+    def test_called_again_cycle_props_computed_at_next_update(
+        self, two_lineages_model, props_to_update
+    ):
+        """Called again, add_cycle_lineages() rebuilds the cycle lineages without the
+        values of the cycle properties: the next update, even partial, computes them
+        again."""
+        model = two_lineages_model
+        prop = _create_test_property("cycle_value", "node", lineage_type="cycle")
+        model.add_custom_property(ConstantValue(prop, 2.0))
+        model.update()
+        model.add_cycle_lineages()
+        assert model.is_update_required()
+        model.update(props_to_update=props_to_update)
+        for lin in model.data.cycle_lineages.values():
+            assert all(value == 2.0 for _, value in lin.nodes(data="cycle_value"))
+
 
 class TestToCycleDataframe:
     """Test cases for Model.to_cycle_dataframe() method."""

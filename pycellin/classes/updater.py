@@ -27,6 +27,10 @@ class _ModelUpdater:
     _full_data_update : bool
         True if all the cells, links and lineages are recorded as added, to update
         all the data (see `Model.prepare_full_data_update`).
+    _cycle_lineages_rebuilt : bool
+        True if the cycle lineages were rebuilt since the last update, e.g. by
+        `Model.add_cycle_lineages`, so that the update computes all the cycle lineage
+        properties again, as when it rebuilds them itself.
     _added_cells, _removed_cells : set[Cell]
         Record of the cells added and removed since the last update.
     _added_links, _removed_links : set[Link]
@@ -42,6 +46,7 @@ class _ModelUpdater:
     def __init__(self):
         self._update_required = False
         self._full_data_update = False
+        self._cycle_lineages_rebuilt = False
 
         # TODO: is a set a good idea? Maybe better to pool the nodes per lineage...
         # In this case I need to be able to modify the content of the collection
@@ -112,6 +117,7 @@ class _ModelUpdater:
         """Reset the state of the updater, except its calculators."""
         self._update_required = False
         self._full_data_update = False
+        self._cycle_lineages_rebuilt = False
         self._added_cells.clear()
         self._removed_cells.clear()
         self._added_links.clear()
@@ -441,7 +447,9 @@ class _ModelUpdater:
         # In case of modifications in the structure of some cell lineages,
         # we need to recompute the cycle lineages and their properties.
         # TODO: optimize so we don't have to recompute EVERYTHING for cycle lineages?
-        cycle_lineages_rebuilt = False
+        # Cycle lineages rebuilt since the last update, e.g. by add_cycle_lineages(),
+        # also lost their properties.
+        cycle_lineages_rebuilt = self._cycle_lineages_rebuilt
         for lin_id in lins_to_process:
             if data.cycle_lineages is not None:
                 cycle_lineages_rebuilt = True

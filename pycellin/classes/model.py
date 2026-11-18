@@ -2403,7 +2403,7 @@ class Model:
                 f"{calc_type} values, but the property type of '{prop.identifier}' is "
                 f"'{prop.prop_type}'."
             )
-        if prop.lineage_type == "cycle" and not self.data.cycle_lineages:
+        if prop.lineage_type == "cycle" and self.data.cycle_lineages is None:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
                 "Please compute them first with model.add_cycle_lineages()."
@@ -5295,7 +5295,7 @@ class Model:
         cycle_lin_props = list(futils.get_pycellin_cycle_lineage_properties().keys())
         if prop not in cell_lin_props + cycle_lin_props:
             raise KeyError(f"Property {prop} is not a predefined property of pycellin.")
-        elif prop in cycle_lin_props and not self.data.cycle_lineages:
+        elif prop in cycle_lin_props and self.data.cycle_lineages is None:
             raise ValueError(
                 f"Property {prop} is a property of cycle lineages, "
                 "but the cycle lineages have not been computed yet. "
@@ -5535,6 +5535,11 @@ class Model:
         and adds them to the model. It also adds the default properties
         associated with cycle lineages to the `PropsMetadata`.
 
+        The new cycle lineages only hold these default properties. If the model has
+        cycle properties computed by a calculator, e.g. when this method is called
+        again after adding some, the model then requires an update: `update()`
+        computes them on the new cycle lineages.
+
         These default properties may be declared already as other kinds of
         properties, e.g. as cell lineage properties in a loaded file where cycle
         properties were propagated to cell lineages. Such declarations are replaced
@@ -5587,6 +5592,14 @@ class Model:
             self.props_metadata._remove_prop(prop_id)
         self.data._add_cycle_lineages(time_prop)
         self.props_metadata._add_cycle_lineage_props(time_unit)
+        # The new cycle lineages only hold their default properties: the next update,
+        # even partial, computes the cycle properties that have a calculator.
+        if any(
+            calc.property.lineage_type in ("cycle", "both")
+            for calc in self._updater._calculators.values()
+        ):
+            self._updater._update_required = True
+            self._updater._cycle_lineages_rebuilt = True
 
     def has_cycle_lineages(self) -> bool:
         """
@@ -5846,7 +5859,7 @@ class Model:
         each node of the cell cycle in cell lineages, whereas they are stored only once
         per cell cycle on the cycle node in cycle lineages.
         """
-        if not self.data.cycle_lineages:
+        if self.data.cycle_lineages is None:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
                 "Please compute them first with model.add_cycle_lineages()."
@@ -6654,7 +6667,7 @@ class Model:
             lineages, is not declared in the model, or clashes with an existing
             column.
         """
-        if not self.data.cycle_lineages:
+        if self.data.cycle_lineages is None:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
                 "Please compute them first with model.add_cycle_lineages()."
