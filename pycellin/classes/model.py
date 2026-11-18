@@ -2729,6 +2729,8 @@ class Model:
         ------
         MissingPropertyError
             If ``cell_x`` or ``cell_y`` has not been declared.
+        ValueError
+            If `unit` is not ``"radian"`` or ``"degree"``.
         """
         prop = motion.create_turning_angle_property(
             custom_identifier=custom_identifier,
@@ -5210,7 +5212,8 @@ class Model:
         Parameters
         ----------
         include_incoming_edge : bool, default=False
-            Whether to include the distance between the first cell and its predecessor.
+            Whether to start the trajectory at the parent of the first cell, i.e. to
+            include the link from this parent to the first cell.
         custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
             ``"straightness"``.

@@ -18,6 +18,7 @@ from shapely.geometry import (
 )
 
 from pycellin.classes import CellLineage, Data, Property
+from pycellin.exceptions import MissingPropertyError
 from pycellin.properties.morphology import (
     BirthArea,
     CellArea,
@@ -717,7 +718,9 @@ class TestBirthArea:
     def test_compute_missing_cell_area(self, data, prop_cycle_lin):
         del data.cell_lineages[1].nodes[5]["cell_area"]
         calculator = BirthArea(prop_cycle_lin)
-        with pytest.raises(KeyError, match="'cell_area' does not exist"):
+        with pytest.raises(
+            MissingPropertyError, match="Cell 5 in lineage 1 has no value"
+        ):
             calculator.compute(data, data.cycle_lineages[1], node_id=6)
 
     def test_compute_custom_area_prop(self, data, prop_cycle_lin):
@@ -746,7 +749,9 @@ class TestDivisionArea:
     def test_compute_missing_cell_area(self, data, prop_cycle_lin):
         del data.cell_lineages[1].nodes[6]["cell_area"]
         calculator = DivisionArea(prop_cycle_lin)
-        with pytest.raises(KeyError, match="'cell_area' does not exist"):
+        with pytest.raises(
+            MissingPropertyError, match="Cell 6 in lineage 1 has no value"
+        ):
             calculator.compute(data, data.cycle_lineages[1], node_id=6)
 
     def test_compute_custom_area_prop(self, data, prop_cycle_lin):

@@ -9,6 +9,7 @@ import networkx as nx
 import pytest
 
 from pycellin.classes import CellLineage, Data
+from pycellin.exceptions import MissingPropertyError
 from pycellin.properties.utils import (
     _get_cycle_edge_property_values,
     _get_cycle_node_property_values,
@@ -50,10 +51,14 @@ class TestGetCycleNodePropertyValues:
         values = _get_cycle_node_property_values("cell_area", data, cycle_lin, 7)
         assert values == [7.0]
 
-    def test_missing_property(self, data):
+    def test_missing_value(self, data):
+        del data.cell_lineages[1].nodes[3]["cell_area"]
         cycle_lin = data.cycle_lineages[1]
-        with pytest.raises(KeyError, match="'cell_perimeter' does not exist"):
-            _get_cycle_node_property_values("cell_perimeter", data, cycle_lin, 4)
+        with pytest.raises(
+            MissingPropertyError,
+            match="Cell 3 in lineage 1 has no value for 'cell_area'",
+        ):
+            _get_cycle_node_property_values("cell_area", data, cycle_lin, 4)
 
 
 # _get_cycle_edge_property_values #############################################
@@ -88,11 +93,26 @@ class TestGetCycleEdgePropertyValues:
         )
         assert values == [2.0, 3.0, 4.0]
 
-    def test_missing_property(self, data):
+    def test_missing_value(self, data):
+        del data.cell_lineages[1].edges[2, 3]["cell_speed"]
         cycle_lin = data.cycle_lineages[1]
-        with pytest.raises(KeyError, match="'cell_displacement' does not exist"):
+        with pytest.raises(
+            MissingPropertyError,
+            match="Link 2 -> 3 in lineage 1 has no value for 'cell_speed'",
+        ):
             _get_cycle_edge_property_values(
-                "cell_displacement", data, cycle_lin, 4, include_incoming_edge=False
+                "cell_speed", data, cycle_lin, 4, include_incoming_edge=False
+            )
+
+    def test_missing_value_on_incoming_edge(self, data):
+        del data.cell_lineages[1].edges[4, 5]["cell_speed"]
+        cycle_lin = data.cycle_lineages[1]
+        with pytest.raises(
+            MissingPropertyError,
+            match="Link 4 -> 5 in lineage 1 has no value for 'cell_speed'",
+        ):
+            _get_cycle_edge_property_values(
+                "cell_speed", data, cycle_lin, 6, include_incoming_edge=True
             )
 
 
