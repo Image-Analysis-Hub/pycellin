@@ -71,9 +71,7 @@ class IsDivision(NodeLocalPropCalculator[CellLineage]):
         Property object to which the calculator is associated.
     """
 
-    def compute(
-        self, lineage: CellLineage, node_id: int
-    ) -> bool:
+    def compute(self, lineage: CellLineage, node_id: int) -> bool:
         """
         Compute whether a given node is a division event.
 
@@ -143,9 +141,7 @@ class IsLeaf(NodeLocalPropCalculator[CellLineage]):
         Property object to which the calculator is associated.
     """
 
-    def compute(
-        self, lineage: CellLineage, node_id: int
-    ) -> bool:
+    def compute(self, lineage: CellLineage, node_id: int) -> bool:
         """
         Compute whether a given node is a leaf cell.
 
@@ -215,9 +211,7 @@ class IsRoot(NodeLocalPropCalculator[CellLineage]):
         Property object to which the calculator is associated.
     """
 
-    def compute(
-        self, lineage: CellLineage, node_id: int
-    ) -> bool:
+    def compute(self, lineage: CellLineage, node_id: int) -> bool:
         """
         Compute whether a given node is a root cell.
 
@@ -295,9 +289,7 @@ class IsCompleteCycle(NodeLocalPropCalculator[CellLineage | CycleLineage]):
         Property object to which the calculator is associated.
     """
 
-    def compute(
-        self, lineage: CellLineage | CycleLineage, node_id: int
-    ) -> bool:
+    def compute(self, lineage: CellLineage | CycleLineage, node_id: int) -> bool:
         """
         Compute whether the cell cycle of a cell, or a cell cycle, is complete.
 
@@ -388,9 +380,7 @@ class NumCells(LineageLocalPropCalculator[CellLineage]):
         Property object to which the calculator is associated.
     """
 
-    def compute(
-        self, lineage: CellLineage
-    ) -> int:
+    def compute(self, lineage: CellLineage) -> int:
         """
         Compute the number of cells in the lineage.
 
@@ -459,9 +449,7 @@ class NumCycles(LineageLocalPropCalculator[CycleLineage]):
         Property object to which the calculator is associated.
     """
 
-    def compute(
-        self, lineage: CycleLineage
-    ) -> int:
+    def compute(self, lineage: CycleLineage) -> int:
         """
         Compute the number of cell cycles in the lineage.
 
@@ -528,9 +516,7 @@ class NumDivisions(LineageLocalPropCalculator[CellLineage]):
         Property object to which the calculator is associated.
     """
 
-    def compute(
-        self, lineage: CellLineage
-    ) -> int:
+    def compute(self, lineage: CellLineage) -> int:
         """
         Compute the number of cell divisions in the lineage.
 
@@ -599,9 +585,7 @@ class NumGaps(LineageLocalPropCalculator[CellLineage]):
         Property object to which the calculator is associated.
     """
 
-    def compute(
-        self, lineage: CellLineage
-    ) -> int:
+    def compute(self, lineage: CellLineage) -> int:
         """
         Compute the number of gaps in the lineage.
 
@@ -669,9 +653,7 @@ class NumLeaves(LineageLocalPropCalculator[CellLineage]):
         Property object to which the calculator is associated.
     """
 
-    def compute(
-        self, lineage: CellLineage
-    ) -> int:
+    def compute(self, lineage: CellLineage) -> int:
         """
         Compute the number of leaf cells in the lineage.
 
@@ -743,9 +725,7 @@ class LineageCellDepth(LineageLocalPropCalculator[CellLineage]):
         Property object to which the calculator is associated.
     """
 
-    def compute(
-        self, lineage: CellLineage
-    ) -> int:
+    def compute(self, lineage: CellLineage) -> int:
         """
         Compute the number of cells from the root to the most recent leaf.
 
@@ -818,9 +798,7 @@ class LineageCycleDepth(LineageLocalPropCalculator[CycleLineage]):
         Property object to which the calculator is associated.
     """
 
-    def compute(
-        self, lineage: CycleLineage
-    ) -> int:
+    def compute(self, lineage: CycleLineage) -> int:
         """
         Compute the maximum number of cell cycles along any path from root to leaf.
 
@@ -911,9 +889,7 @@ class LineageDuration(LineageLocalPropCalculator[CellLineage]):
         super().__init__(property)
         self.time_prop = time_prop
 
-    def compute(
-        self, lineage: CellLineage
-    ) -> float:
+    def compute(self, lineage: CellLineage) -> float:
         """
         Compute the total lifespan of the lineage.
 
@@ -1076,9 +1052,7 @@ class LocationTag(NodeLocalPropCalculator[CellLineage]):
                 "so cells on these values will get None."
             )
 
-    def compute(
-        self, lineage: CellLineage, node_id: int
-    ) -> int | str | None:
+    def compute(self, lineage: CellLineage, node_id: int) -> int | str | None:
         """
         Compute the location tag of a cell.
 
@@ -1177,9 +1151,7 @@ class MotherCycle(NodeLocalPropCalculator[CycleLineage]):
         Property object to which the calculator is associated.
     """
 
-    def compute(
-        self, lineage: CycleLineage, node_id: int
-    ) -> int | None:
+    def compute(self, lineage: CycleLineage, node_id: int) -> int | None:
         """
         Compute the mother cycle of a given cell cycle.
 
@@ -1250,9 +1222,7 @@ class DaughterCycles(NodeLocalPropCalculator[CycleLineage]):
         Property object to which the calculator is associated.
     """
 
-    def compute(
-        self, lineage: CycleLineage, node_id: int
-    ) -> list[int]:
+    def compute(self, lineage: CycleLineage, node_id: int) -> list[int]:
         """
         Compute the daughter cycles of a given cell cycle.
 
@@ -1323,9 +1293,7 @@ class SisterCycles(NodeLocalPropCalculator[CycleLineage]):
         Property object to which the calculator is associated.
     """
 
-    def compute(
-        self, lineage: CycleLineage, node_id: int
-    ) -> list[int]:
+    def compute(self, lineage: CycleLineage, node_id: int) -> list[int]:
         """
         Compute the sister cycles of a given cell cycle.
 
@@ -1415,9 +1383,7 @@ class CousinCycles(NodeLocalPropCalculator[CycleLineage]):
             raise ValueError(f"'degree' must be at least 1 or None, got {degree}.")
         self.degree = degree
 
-    def compute(
-        self, lineage: CycleLineage, node_id: int
-    ) -> list[int]:
+    def compute(self, lineage: CycleLineage, node_id: int) -> list[int]:
         """
         Compute the cousin cycles of a given cell cycle.
 
