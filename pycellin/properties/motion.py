@@ -71,7 +71,7 @@ def create_cell_displacement_property(
     )
 
 
-class CellDisplacement(EdgeLocalPropCalculator):
+class CellDisplacement(EdgeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the displacement of a cell between two consecutive detections.
 
@@ -94,9 +94,7 @@ class CellDisplacement(EdgeLocalPropCalculator):
         super().__init__(property)
         self.coord_props = coord_props
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, edge: tuple[int, int]
-    ) -> float:
+    def compute(self, lineage: CellLineage, edge: tuple[int, int]) -> float:
         """
         Compute the displacement of a cell between two consecutive detections.
 
@@ -167,7 +165,7 @@ def create_cycle_total_displacement_property(
     )
 
 
-class CycleTotalDisplacement(NodeGlobalPropCalculator):
+class CycleTotalDisplacement(NodeGlobalPropCalculator[CycleLineage]):
     """
     Calculator to compute the total displacement of a cell during a cell cycle.
 
@@ -201,9 +199,7 @@ class CycleTotalDisplacement(NodeGlobalPropCalculator):
         self.include_incoming_edge = include_incoming_edge
         self.displacement_prop = displacement_prop
 
-    def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, node_id: int
-    ) -> float:
+    def compute(self, data: Data, lineage: CycleLineage, node_id: int) -> float:
         """
         Compute the total displacement of a cell during the cell cycle.
 
@@ -279,7 +275,7 @@ def create_cycle_mean_displacement_property(
     )
 
 
-class CycleMeanDisplacement(NodeGlobalPropCalculator):
+class CycleMeanDisplacement(NodeGlobalPropCalculator[CycleLineage]):
     """
     Calculator to compute the mean displacement of a cell during a cell cycle.
 
@@ -313,9 +309,7 @@ class CycleMeanDisplacement(NodeGlobalPropCalculator):
         self.include_incoming_edge = include_incoming_edge
         self.displacement_prop = displacement_prop
 
-    def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, node_id: int
-    ) -> float:
+    def compute(self, data: Data, lineage: CycleLineage, node_id: int) -> float:
         """
         Compute the mean displacement of a cell during the cell cycle.
 
@@ -391,7 +385,7 @@ def create_cell_speed_property(
     )
 
 
-class CellSpeed(EdgeLocalPropCalculator):
+class CellSpeed(EdgeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the speed of a cell between two consecutive detections.
 
@@ -425,9 +419,7 @@ class CellSpeed(EdgeLocalPropCalculator):
         self.time_prop = time_prop
         self.coord_props = coord_props
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, edge: tuple[int, int]
-    ) -> float:
+    def compute(self, lineage: CellLineage, edge: tuple[int, int]) -> float:
         """
         Compute the speed of a cell between two consecutive detections.
 
@@ -501,7 +493,7 @@ def create_cycle_mean_speed_property(
     )
 
 
-class CycleMeanSpeed(NodeGlobalPropCalculator):
+class CycleMeanSpeed(NodeGlobalPropCalculator[CycleLineage]):
     """
     Calculator to compute the mean speed of a cell during a cell cycle.
 
@@ -533,9 +525,7 @@ class CycleMeanSpeed(NodeGlobalPropCalculator):
         self.include_incoming_edge = include_incoming_edge
         self.speed_prop = speed_prop
 
-    def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, node_id: int
-    ) -> float:
+    def compute(self, data: Data, lineage: CycleLineage, node_id: int) -> float:
         """
         Compute the mean speed of a cell during the cell cycle.
 
@@ -607,7 +597,7 @@ def create_straightness_property(
     )
 
 
-class Straightness(NodeGlobalPropCalculator):
+class Straightness(NodeGlobalPropCalculator[CycleLineage]):
     """
     Calculator to compute the straightness of the cell displacement within a cell cycle.
 
@@ -639,9 +629,7 @@ class Straightness(NodeGlobalPropCalculator):
         self.include_incoming_edge = include_incoming_edge
         self.coord_props = coord_props
 
-    def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, node_id: int
-    ) -> float:
+    def compute(self, data: Data, lineage: CycleLineage, node_id: int) -> float:
         """
         Compute the straightness of the cell displacement within a cell cycle.
 
@@ -747,7 +735,7 @@ def create_turning_angle_property(
     )
 
 
-class TurningAngle(NodeLocalPropCalculator):
+class TurningAngle(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the angle between two consecutive displacement vectors.
 
@@ -788,9 +776,7 @@ class TurningAngle(NodeLocalPropCalculator):
         self.unit = unit
         self.coord_props = coord_props
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> float:
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
         """
         Compute the angle between two consecutive displacement vectors at a cell.
 

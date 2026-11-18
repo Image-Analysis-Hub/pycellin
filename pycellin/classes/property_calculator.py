@@ -4,11 +4,15 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Generic, TypeVar, cast
 
 from pycellin.classes.data import Data
 from pycellin.classes.lineage import Lineage
 from pycellin.classes.property import Property
+
+#: Type of the lineages a calculator is computed on, e.g. `CellLineage`: the type
+#: parameter of the calculator classes.
+LineageT = TypeVar("LineageT", bound=Lineage)
 
 
 def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Lineage]:
@@ -45,7 +49,7 @@ def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Line
         raise ValueError("Invalid lineage type.")
 
 
-class PropertyCalculator(ABC):
+class PropertyCalculator(ABC, Generic[LineageT]):
     """
     Abstract class to compute and enrich data from a model with property values.
 
@@ -56,7 +60,9 @@ class PropertyCalculator(ABC):
     derive from one of the six public subclasses, such as `NodeLocalPropCalculator`,
     depending on the objects the property applies to (nodes, edges or lineages) and
     on the data it needs (local or global), which set ``_PROPERTY_TYPE`` and
-    ``_LOCAL_PROPERTY``.
+    ``_LOCAL_PROPERTY``. Their type parameter, `LineageT`, is the type of the
+    lineages the calculator is computed on, e.g.
+    ``NodeLocalPropCalculator[CellLineage]``.
 
     `INPUT_PROPS` lists the properties read by the calculator whose identifier is
     chosen by the user: it maps the name of the calculator attribute holding the
@@ -153,6 +159,26 @@ class PropertyCalculator(ABC):
             for attr, (prop_type, lineage_type) in self.INPUT_PROPS.items()
         }
 
+    def _get_lineages(self, data: Data) -> dict[int, LineageT]:
+        """
+        Return the lineages the property is computed on.
+
+        Parameters
+        ----------
+        data : Data
+            `Data` object containing the lineages.
+
+        Returns
+        -------
+        dict[int, LineageT]
+            The lineages of the lineage type of the property. Keys are the lineage
+            IDs.
+        """
+        lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
+        # The type parameter of the calculator is meant to match the lineage type of
+        # its property, which type checkers can't verify.
+        return cast("dict[int, LineageT]", lineages)
+
     @abstractmethod
     def compute(self, *args: Any, **kwargs: Any) -> Any:
         """
@@ -190,7 +216,7 @@ class PropertyCalculator(ABC):
         """
 
 
-class LocalPropCalculator(PropertyCalculator):
+class LocalPropCalculator(PropertyCalculator[LineageT]):
     """
     Abstract class to compute local property values and add them to lineages.
 
@@ -217,7 +243,7 @@ class LocalPropCalculator(PropertyCalculator):
     _LOCAL_PROPERTY = True
 
     @abstractmethod
-    def compute(self, lineage: Lineage, *args: Any, **kwargs: Any) -> Any:
+    def compute(self, lineage: LineageT, *args: Any, **kwargs: Any) -> Any:
         """
         Compute the value of a local property for a single object.
 
@@ -225,7 +251,7 @@ class LocalPropCalculator(PropertyCalculator):
 
         Parameters
         ----------
-        lineage : Lineage
+        lineage : LineageT
             Lineage object containing the object of interest.
         *args : Any
             The other arguments identifying the object, which depend on the subclass,
@@ -256,7 +282,7 @@ class LocalPropCalculator(PropertyCalculator):
         """
 
 
-class NodeLocalPropCalculator(LocalPropCalculator):
+class NodeLocalPropCalculator(LocalPropCalculator[LineageT]):
     """
     Abstract class to compute local node property values and add them to lineages.
 
@@ -290,6 +316,11 @@ class NodeLocalPropCalculator(LocalPropCalculator):
     or other arguments, to the calculator, override ``__init__()`` and call
     ``super().__init__(property)`` in it.
 
+    For type checkers, the class takes the type of the lineages it is computed on as
+    type parameter: a calculator for cell lineages can subclass
+    ``NodeLocalPropCalculator[CellLineage]``, and hint the `lineage` parameter of
+    `compute()` as `CellLineage`.
+
     See the "Custom properties" notebook, listed in :doc:`/user_guide/tutorials`, for
     examples.
     """
@@ -297,7 +328,7 @@ class NodeLocalPropCalculator(LocalPropCalculator):
     _PROPERTY_TYPE = "node"
 
     @abstractmethod
-    def compute(self, lineage: Lineage, node_id: int) -> Any:
+    def compute(self, lineage: LineageT, node_id: int) -> Any:
         """
         Compute the value of a local property for a single node.
 
@@ -305,7 +336,7 @@ class NodeLocalPropCalculator(LocalPropCalculator):
 
         Parameters
         ----------
-        lineage : Lineage
+        lineage : LineageT
             Lineage object containing the node of interest: a `CellLineage` or a
             `CycleLineage`, depending on the lineage type of the property.
         node_id : int
@@ -334,13 +365,13 @@ class NodeLocalPropCalculator(LocalPropCalculator):
             Not used: the edges and lineages to enrich, which the model gives to all
             the calculators.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
+        lineages = self._get_lineages(data)
         for nid, lin_id in nodes_to_enrich:
             lin = lineages[lin_id]
             lin.nodes[nid][self.property.identifier] = self.compute(lin, nid)
 
 
-class EdgeLocalPropCalculator(LocalPropCalculator):
+class EdgeLocalPropCalculator(LocalPropCalculator[LineageT]):
     """
     Abstract class to compute local edge property values and add them to lineages.
 
@@ -375,6 +406,11 @@ class EdgeLocalPropCalculator(LocalPropCalculator):
     or other arguments, to the calculator, override ``__init__()`` and call
     ``super().__init__(property)`` in it.
 
+    For type checkers, the class takes the type of the lineages it is computed on as
+    type parameter: a calculator for cell lineages can subclass
+    ``EdgeLocalPropCalculator[CellLineage]``, and hint the `lineage` parameter of
+    `compute()` as `CellLineage`.
+
     See the "Custom properties" notebook, listed in :doc:`/user_guide/tutorials`, for
     examples.
     """
@@ -382,7 +418,7 @@ class EdgeLocalPropCalculator(LocalPropCalculator):
     _PROPERTY_TYPE = "edge"
 
     @abstractmethod
-    def compute(self, lineage: Lineage, edge: tuple[int, int]) -> Any:
+    def compute(self, lineage: LineageT, edge: tuple[int, int]) -> Any:
         """
         Compute the value of a local property for a single edge.
 
@@ -390,7 +426,7 @@ class EdgeLocalPropCalculator(LocalPropCalculator):
 
         Parameters
         ----------
-        lineage : Lineage
+        lineage : LineageT
             Lineage object containing the edge of interest: a `CellLineage` or a
             `CycleLineage`, depending on the lineage type of the property.
         edge : tuple[int, int]
@@ -419,14 +455,14 @@ class EdgeLocalPropCalculator(LocalPropCalculator):
             Not used: the nodes and lineages to enrich, which the model gives to all
             the calculators.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
+        lineages = self._get_lineages(data)
         for source, target, lin_id in edges_to_enrich:
             link = (source, target)
             lin = lineages[lin_id]
             lin.edges[link][self.property.identifier] = self.compute(lin, link)
 
 
-class LineageLocalPropCalculator(LocalPropCalculator):
+class LineageLocalPropCalculator(LocalPropCalculator[LineageT]):
     """
     Abstract class to compute local lineage property values and add them to lineages.
 
@@ -459,6 +495,11 @@ class LineageLocalPropCalculator(LocalPropCalculator):
     or other arguments, to the calculator, override ``__init__()`` and call
     ``super().__init__(property)`` in it.
 
+    For type checkers, the class takes the type of the lineages it is computed on as
+    type parameter: a calculator for cell lineages can subclass
+    ``LineageLocalPropCalculator[CellLineage]``, and hint the `lineage` parameter of
+    `compute()` as `CellLineage`.
+
     See the "Custom properties" notebook, listed in :doc:`/user_guide/tutorials`, for
     examples.
     """
@@ -466,7 +507,7 @@ class LineageLocalPropCalculator(LocalPropCalculator):
     _PROPERTY_TYPE = "lineage"
 
     @abstractmethod
-    def compute(self, lineage: Lineage) -> Any:
+    def compute(self, lineage: LineageT) -> Any:
         """
         Compute the value of a local property for a single lineage.
 
@@ -474,7 +515,7 @@ class LineageLocalPropCalculator(LocalPropCalculator):
 
         Parameters
         ----------
-        lineage : Lineage
+        lineage : LineageT
             Lineage object of interest: a `CellLineage` or a `CycleLineage`,
             depending on the lineage type of the property.
 
@@ -500,13 +541,13 @@ class LineageLocalPropCalculator(LocalPropCalculator):
             Not used: the nodes and edges to enrich, which the model gives to all
             the calculators.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
+        lineages = self._get_lineages(data)
         for lin_id in lineage_ids_to_enrich:
             lin = lineages[lin_id]
             lin.graph[self.property.identifier] = self.compute(lin)
 
 
-class GlobalPropCalculator(PropertyCalculator):
+class GlobalPropCalculator(PropertyCalculator[LineageT]):
     """
     Abstract class to compute global property values and add them to lineages.
 
@@ -531,7 +572,7 @@ class GlobalPropCalculator(PropertyCalculator):
     _LOCAL_PROPERTY = False
 
     @abstractmethod
-    def compute(self, data: Data, lineage: Lineage, *args: Any, **kwargs: Any) -> Any:
+    def compute(self, data: Data, lineage: LineageT, *args: Any, **kwargs: Any) -> Any:
         """
         Compute the value of a global property for a single object.
 
@@ -541,7 +582,7 @@ class GlobalPropCalculator(PropertyCalculator):
         ----------
         data : Data
             `Data` object containing the lineages.
-        lineage : Lineage
+        lineage : LineageT
             Lineage object containing the object of interest.
         *args : Any
             The other arguments identifying the object, which depend on the subclass,
@@ -572,7 +613,7 @@ class GlobalPropCalculator(PropertyCalculator):
         """
 
 
-class NodeGlobalPropCalculator(GlobalPropCalculator):
+class NodeGlobalPropCalculator(GlobalPropCalculator[LineageT]):
     """
     Abstract class to compute global node property values and add them to lineages.
 
@@ -606,6 +647,11 @@ class NodeGlobalPropCalculator(GlobalPropCalculator):
     or other arguments, to the calculator, override ``__init__()`` and call
     ``super().__init__(property)`` in it.
 
+    For type checkers, the class takes the type of the lineages it is computed on as
+    type parameter: a calculator for cell lineages can subclass
+    ``NodeGlobalPropCalculator[CellLineage]``, and hint the `lineage` parameter of
+    `compute()` as `CellLineage`.
+
     See the "Custom properties" notebook, listed in :doc:`/user_guide/tutorials`, for
     examples.
     """
@@ -613,7 +659,7 @@ class NodeGlobalPropCalculator(GlobalPropCalculator):
     _PROPERTY_TYPE = "node"
 
     @abstractmethod
-    def compute(self, data: Data, lineage: Lineage, node_id: int) -> Any:
+    def compute(self, data: Data, lineage: LineageT, node_id: int) -> Any:
         """
         Compute the value of a global property for a single node.
 
@@ -623,7 +669,7 @@ class NodeGlobalPropCalculator(GlobalPropCalculator):
         ----------
         data : Data
             `Data` object containing the lineages.
-        lineage : Lineage
+        lineage : LineageT
             Lineage containing the node of interest: a `CellLineage` or a
             `CycleLineage`, depending on the lineage type of the property.
         node_id : int
@@ -649,13 +695,13 @@ class NodeGlobalPropCalculator(GlobalPropCalculator):
             Not used: the objects to enrich, which the model gives to all the
             calculators.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
+        lineages = self._get_lineages(data)
         for lin in lineages.values():
             for nid in lin.nodes:
                 lin.nodes[nid][self.property.identifier] = self.compute(data, lin, nid)
 
 
-class EdgeGlobalPropCalculator(GlobalPropCalculator):
+class EdgeGlobalPropCalculator(GlobalPropCalculator[LineageT]):
     """
     Abstract class to compute global edge property values and add them to lineages.
 
@@ -688,6 +734,11 @@ class EdgeGlobalPropCalculator(GlobalPropCalculator):
     or other arguments, to the calculator, override ``__init__()`` and call
     ``super().__init__(property)`` in it.
 
+    For type checkers, the class takes the type of the lineages it is computed on as
+    type parameter: a calculator for cell lineages can subclass
+    ``EdgeGlobalPropCalculator[CellLineage]``, and hint the `lineage` parameter of
+    `compute()` as `CellLineage`.
+
     See the "Custom properties" notebook, listed in :doc:`/user_guide/tutorials`, for
     examples.
     """
@@ -695,7 +746,7 @@ class EdgeGlobalPropCalculator(GlobalPropCalculator):
     _PROPERTY_TYPE = "edge"
 
     @abstractmethod
-    def compute(self, data: Data, lineage: Lineage, edge: tuple[int, int]) -> Any:
+    def compute(self, data: Data, lineage: LineageT, edge: tuple[int, int]) -> Any:
         """
         Compute the value of a global property for a single edge.
 
@@ -705,7 +756,7 @@ class EdgeGlobalPropCalculator(GlobalPropCalculator):
         ----------
         data : Data
             `Data` object containing the lineages.
-        lineage : Lineage
+        lineage : LineageT
             Lineage containing the edge of interest: a `CellLineage` or a
             `CycleLineage`, depending on the lineage type of the property.
         edge : tuple[int, int]
@@ -731,7 +782,7 @@ class EdgeGlobalPropCalculator(GlobalPropCalculator):
             Not used: the objects to enrich, which the model gives to all the
             calculators.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
+        lineages = self._get_lineages(data)
         for lin in lineages.values():
             for edge in lin.edges:
                 lin.edges[edge][self.property.identifier] = self.compute(
@@ -739,7 +790,7 @@ class EdgeGlobalPropCalculator(GlobalPropCalculator):
                 )
 
 
-class LineageGlobalPropCalculator(GlobalPropCalculator):
+class LineageGlobalPropCalculator(GlobalPropCalculator[LineageT]):
     """
     Abstract class to compute global lineage property values and add them to lineages.
 
@@ -771,6 +822,11 @@ class LineageGlobalPropCalculator(GlobalPropCalculator):
     or other arguments, to the calculator, override ``__init__()`` and call
     ``super().__init__(property)`` in it.
 
+    For type checkers, the class takes the type of the lineages it is computed on as
+    type parameter: a calculator for cell lineages can subclass
+    ``LineageGlobalPropCalculator[CellLineage]``, and hint the `lineage` parameter of
+    `compute()` as `CellLineage`.
+
     See the "Custom properties" notebook, listed in :doc:`/user_guide/tutorials`, for
     examples.
     """
@@ -778,7 +834,7 @@ class LineageGlobalPropCalculator(GlobalPropCalculator):
     _PROPERTY_TYPE = "lineage"
 
     @abstractmethod
-    def compute(self, data: Data, lineage: Lineage) -> Any:
+    def compute(self, data: Data, lineage: LineageT) -> Any:
         """
         Compute the value of a global property for a single lineage.
 
@@ -788,7 +844,7 @@ class LineageGlobalPropCalculator(GlobalPropCalculator):
         ----------
         data : Data
             `Data` object containing the lineages.
-        lineage : Lineage
+        lineage : LineageT
             Lineage of interest: a `CellLineage` or a `CycleLineage`, depending on
             the lineage type of the property.
 
@@ -810,6 +866,6 @@ class LineageGlobalPropCalculator(GlobalPropCalculator):
             Not used: the objects to enrich, which the model gives to all the
             calculators.
         """
-        lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
+        lineages = self._get_lineages(data)
         for lin in lineages.values():
             lin.graph[self.property.identifier] = self.compute(data, lin)

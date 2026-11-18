@@ -58,7 +58,7 @@ def create_is_division_property(
     )
 
 
-class IsDivision(NodeLocalPropCalculator):
+class IsDivision(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator for the ``is_division`` property.
 
@@ -71,7 +71,7 @@ class IsDivision(NodeLocalPropCalculator):
         Property object to which the calculator is associated.
     """
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CellLineage, node_id: int
     ) -> bool:
         """
@@ -90,7 +90,7 @@ class IsDivision(NodeLocalPropCalculator):
             True if the cell is a division event, i.e. has more than one daughter cell,
             False otherwise.
         """
-        return lineage.is_division(node_id)  # type: ignore
+        return lineage.is_division(node_id)
 
 
 def create_is_leaf_property(
@@ -131,7 +131,7 @@ def create_is_leaf_property(
     )
 
 
-class IsLeaf(NodeLocalPropCalculator):
+class IsLeaf(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator for the ``is_leaf`` property.
 
@@ -143,7 +143,7 @@ class IsLeaf(NodeLocalPropCalculator):
         Property object to which the calculator is associated.
     """
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CellLineage, node_id: int
     ) -> bool:
         """
@@ -162,7 +162,7 @@ class IsLeaf(NodeLocalPropCalculator):
             True if the cell is a leaf cell, i.e. has no daughter cells,
             False otherwise.
         """
-        return lineage.is_leaf(node_id)  # type: ignore
+        return lineage.is_leaf(node_id)
 
 
 def create_is_root_property(
@@ -203,7 +203,7 @@ def create_is_root_property(
     )
 
 
-class IsRoot(NodeLocalPropCalculator):
+class IsRoot(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator for the ``is_root`` property.
 
@@ -215,7 +215,7 @@ class IsRoot(NodeLocalPropCalculator):
         Property object to which the calculator is associated.
     """
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CellLineage, node_id: int
     ) -> bool:
         """
@@ -234,7 +234,7 @@ class IsRoot(NodeLocalPropCalculator):
             True if the cell is a root cell, i.e. has no parent cell,
             False otherwise.
         """
-        return lineage.is_root(node_id)  # type: ignore
+        return lineage.is_root(node_id)
 
 
 def create_is_complete_cycle_property(
@@ -278,7 +278,7 @@ def create_is_complete_cycle_property(
     )
 
 
-class IsCompleteCycle(NodeLocalPropCalculator):
+class IsCompleteCycle(NodeLocalPropCalculator[CellLineage | CycleLineage]):
     """
     Calculator to compute whether cell cycles are complete.
 
@@ -295,7 +295,7 @@ class IsCompleteCycle(NodeLocalPropCalculator):
         Property object to which the calculator is associated.
     """
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CellLineage | CycleLineage, node_id: int
     ) -> bool:
         """
@@ -376,7 +376,7 @@ def create_num_cells_property(
     )
 
 
-class NumCells(LineageLocalPropCalculator):
+class NumCells(LineageLocalPropCalculator[CellLineage]):
     """
     Calculator for the ``num_cells`` property.
 
@@ -388,7 +388,7 @@ class NumCells(LineageLocalPropCalculator):
         Property object to which the calculator is associated.
     """
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CellLineage
     ) -> int:
         """
@@ -447,7 +447,7 @@ def create_num_cycles_property(
     )
 
 
-class NumCycles(LineageLocalPropCalculator):
+class NumCycles(LineageLocalPropCalculator[CycleLineage]):
     """
     Calculator for the ``num_cycles`` property.
 
@@ -459,7 +459,7 @@ class NumCycles(LineageLocalPropCalculator):
         Property object to which the calculator is associated.
     """
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CycleLineage
     ) -> int:
         """
@@ -516,7 +516,7 @@ def create_num_divisions_property(
     )
 
 
-class NumDivisions(LineageLocalPropCalculator):
+class NumDivisions(LineageLocalPropCalculator[CellLineage]):
     """
     Calculator for the ``num_divisions`` property.
 
@@ -528,7 +528,7 @@ class NumDivisions(LineageLocalPropCalculator):
         Property object to which the calculator is associated.
     """
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CellLineage
     ) -> int:
         """
@@ -586,7 +586,7 @@ def create_num_gaps_property(
     )
 
 
-class NumGaps(LineageLocalPropCalculator):
+class NumGaps(LineageLocalPropCalculator[CellLineage]):
     """
     Calculator for the ``num_gaps`` property.
 
@@ -599,7 +599,7 @@ class NumGaps(LineageLocalPropCalculator):
         Property object to which the calculator is associated.
     """
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CellLineage
     ) -> int:
         """
@@ -657,7 +657,7 @@ def create_num_leaves_property(
     )
 
 
-class NumLeaves(LineageLocalPropCalculator):
+class NumLeaves(LineageLocalPropCalculator[CellLineage]):
     """
     Calculator for the ``num_leaves`` property.
 
@@ -669,7 +669,7 @@ class NumLeaves(LineageLocalPropCalculator):
         Property object to which the calculator is associated.
     """
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CellLineage
     ) -> int:
         """
@@ -730,7 +730,7 @@ def create_lineage_cell_depth_property(
     )
 
 
-class LineageCellDepth(LineageLocalPropCalculator):
+class LineageCellDepth(LineageLocalPropCalculator[CellLineage]):
     """
     Calculator for the ``lineage_cell_depth`` property.
 
@@ -743,7 +743,7 @@ class LineageCellDepth(LineageLocalPropCalculator):
         Property object to which the calculator is associated.
     """
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CellLineage
     ) -> int:
         """
@@ -805,7 +805,7 @@ def create_lineage_cycle_depth_property(
     )
 
 
-class LineageCycleDepth(LineageLocalPropCalculator):
+class LineageCycleDepth(LineageLocalPropCalculator[CycleLineage]):
     """
     Calculator for the ``lineage_cycle_depth`` property.
 
@@ -818,7 +818,7 @@ class LineageCycleDepth(LineageLocalPropCalculator):
         Property object to which the calculator is associated.
     """
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CycleLineage
     ) -> int:
         """
@@ -888,7 +888,7 @@ def create_lineage_duration_property(
     )
 
 
-class LineageDuration(LineageLocalPropCalculator):
+class LineageDuration(LineageLocalPropCalculator[CellLineage]):
     """
     Calculator for the ``lineage_duration`` property.
 
@@ -911,7 +911,7 @@ class LineageDuration(LineageLocalPropCalculator):
         super().__init__(property)
         self.time_prop = time_prop
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CellLineage
     ) -> float:
         """
@@ -977,7 +977,7 @@ def create_location_tag_property(
     )
 
 
-class LocationTag(NodeLocalPropCalculator):
+class LocationTag(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator for the ``location_tag`` property.
 
@@ -1076,7 +1076,7 @@ class LocationTag(NodeLocalPropCalculator):
                 "so cells on these values will get None."
             )
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CellLineage, node_id: int
     ) -> int | str | None:
         """
@@ -1165,7 +1165,7 @@ def create_mother_cycle_property(
     )
 
 
-class MotherCycle(NodeLocalPropCalculator):
+class MotherCycle(NodeLocalPropCalculator[CycleLineage]):
     """
     Calculator for the ``mother_cycle`` property.
 
@@ -1177,7 +1177,7 @@ class MotherCycle(NodeLocalPropCalculator):
         Property object to which the calculator is associated.
     """
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CycleLineage, node_id: int
     ) -> int | None:
         """
@@ -1237,7 +1237,7 @@ def create_daughter_cycles_property(
     )
 
 
-class DaughterCycles(NodeLocalPropCalculator):
+class DaughterCycles(NodeLocalPropCalculator[CycleLineage]):
     """
     Calculator for the ``daughter_cycles`` property.
 
@@ -1250,7 +1250,7 @@ class DaughterCycles(NodeLocalPropCalculator):
         Property object to which the calculator is associated.
     """
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CycleLineage, node_id: int
     ) -> list[int]:
         """
@@ -1310,7 +1310,7 @@ def create_sister_cycles_property(
     )
 
 
-class SisterCycles(NodeLocalPropCalculator):
+class SisterCycles(NodeLocalPropCalculator[CycleLineage]):
     """
     Calculator for the ``sister_cycles`` property.
 
@@ -1323,7 +1323,7 @@ class SisterCycles(NodeLocalPropCalculator):
         Property object to which the calculator is associated.
     """
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CycleLineage, node_id: int
     ) -> list[int]:
         """
@@ -1386,7 +1386,7 @@ def create_cousin_cycles_property(
     )
 
 
-class CousinCycles(NodeLocalPropCalculator):
+class CousinCycles(NodeLocalPropCalculator[CycleLineage]):
     """
     Calculator for the ``cousin_cycles`` property.
 
@@ -1415,7 +1415,7 @@ class CousinCycles(NodeLocalPropCalculator):
             raise ValueError(f"'degree' must be at least 1 or None, got {degree}.")
         self.degree = degree
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CycleLineage, node_id: int
     ) -> list[int]:
         """

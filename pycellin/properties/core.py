@@ -85,7 +85,7 @@ def create_time_property(
     )
 
 
-class Time(NodeLocalPropCalculator):
+class Time(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator for the time property.
 
@@ -138,9 +138,7 @@ class Time(NodeLocalPropCalculator):
         self.factor = factor
         self.force_recompute = force_recompute
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> float:
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
         """
         Compute the time of a given node.
 
@@ -205,7 +203,7 @@ def create_timepoint_property(provenance: str = "pycellin") -> Property:
     )
 
 
-class Timepoint(NodeLocalPropCalculator):
+class Timepoint(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator for the timepoint property.
 
@@ -278,9 +276,7 @@ class Timepoint(NodeLocalPropCalculator):
 
         self.min_time = min_time
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> int:
+    def compute(self, lineage: CellLineage, node_id: int) -> int:
         """
         Compute the timepoint of a given node.
 

@@ -224,7 +224,7 @@ def _shape_pixels(
     return frame[first_row : last_row + 1, first_col : last_col + 1][inside]
 
 
-class _CellIntensityCalculator(NodeLocalPropCalculator):
+class _CellIntensityCalculator(NodeLocalPropCalculator[CellLineage]):
     """
     Base class of the calculators computing cell intensities in an intensity image.
 
@@ -286,9 +286,7 @@ class _CellIntensityCalculator(NodeLocalPropCalculator):
             has no shape.
         """
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> float:
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
         """
         Compute the intensity of a cell.
 
@@ -518,7 +516,7 @@ def create_cycle_mean_intensity_property(
     )
 
 
-class CycleMeanIntensity(NodeGlobalPropCalculator):
+class CycleMeanIntensity(NodeGlobalPropCalculator[CycleLineage]):
     """
     Calculator to compute the mean intensity of a cell during a cell cycle.
 
@@ -543,9 +541,7 @@ class CycleMeanIntensity(NodeGlobalPropCalculator):
         super().__init__(property)
         self.intensity_prop = intensity_prop
 
-    def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, node_id: int
-    ) -> float:
+    def compute(self, data: Data, lineage: CycleLineage, node_id: int) -> float:
         """
         Compute the mean intensity of a cell during the cell cycle.
 
@@ -618,7 +614,7 @@ def create_birth_intensity_property(
     )
 
 
-class BirthIntensity(NodeGlobalPropCalculator):
+class BirthIntensity(NodeGlobalPropCalculator[CycleLineage]):
     """
     Calculator to compute the intensity of a cell at birth.
 
@@ -645,9 +641,7 @@ class BirthIntensity(NodeGlobalPropCalculator):
         super().__init__(property)
         self.intensity_prop = intensity_prop
 
-    def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, node_id: int
-    ) -> float:
+    def compute(self, data: Data, lineage: CycleLineage, node_id: int) -> float:
         """
         Compute the intensity of a cell at birth.
 
@@ -721,7 +715,7 @@ def create_division_intensity_property(
     )
 
 
-class DivisionIntensity(NodeGlobalPropCalculator):
+class DivisionIntensity(NodeGlobalPropCalculator[CycleLineage]):
     """
     Calculator to compute the intensity of a cell at division.
 
@@ -748,9 +742,7 @@ class DivisionIntensity(NodeGlobalPropCalculator):
         super().__init__(property)
         self.intensity_prop = intensity_prop
 
-    def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, node_id: int
-    ) -> float:
+    def compute(self, data: Data, lineage: CycleLineage, node_id: int) -> float:
         """
         Compute the intensity of a cell at division.
 

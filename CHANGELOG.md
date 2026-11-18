@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the work of feature/docs up to 33cbd8c and the uncommitted docstring batch of properties, with its fixes. Update from there with: git log 6b884a4..dev -->
+<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the work of feature/docs up to 33cbd8c and the uncommitted docstring batch of properties, with its fixes and the generic calculator classes. Update from there with: git log 6b884a4..dev -->
 
 Model merging and splitting, many new properties (morphology, intensity, topology), branch plots, consistent names that follow PEP 8, and many fixes, notably to time handling and to reading and writing TrackMate, GEFF, CTC and trackpy data. **This release contains breaking changes**, listed first below.
 
@@ -135,6 +135,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Properties:** `location_tag`, a cell property read from a mask image. A `tag_names` dict maps pixel values to region names
 - **Properties:** `normalized_age`, the relative age of a cell divided by the duration of its cell cycle, from 0 at the first cell of the cycle to 1 at the last one. With `ignore_incomplete_cycles=True`, the cells of cycles that start at the root or end with a leaf get NaN
 - **Properties:** `uses_external_data()` class method on calculators, true for those that read data the model doesn't store, such as a label, intensity or mask image. `merge()` doesn't keep these calculators
+- **Properties:** the calculator classes take the type of the lineages they are computed on as type parameter, for type checkers, e.g. `NodeLocalPropCalculator[CellLineage]` for a calculator whose `compute()` takes a `CellLineage`
 - **Packaging:** `pc.__version__` gives the installed version of Pycellin
 - **Exceptions:** `MissingPropertyError` (a `KeyError`), raised when a property that Pycellin needs is missing from the model or from a cell, e.g. when adding a property computed from one not declared yet, or plotting a property that some cells lack
 - **Lineages:** `Lineage.get_depth()`, `Lineage.get_roots()`, `CellLineage.get_gaps()` and `CellLineage.get_duration()`

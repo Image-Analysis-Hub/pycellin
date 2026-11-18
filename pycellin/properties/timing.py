@@ -93,7 +93,7 @@ def create_absolute_age_property(
     )
 
 
-class AbsoluteAge(NodeLocalPropCalculator):
+class AbsoluteAge(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the absolute age of cells.
 
@@ -118,9 +118,7 @@ class AbsoluteAge(NodeLocalPropCalculator):
         super().__init__(property)
         self.time_prop = time_prop
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> int | float:
+    def compute(self, lineage: CellLineage, node_id: int) -> int | float:
         """
         Compute the absolute age of a given cell.
 
@@ -199,7 +197,7 @@ def create_relative_age_property(
     )
 
 
-class RelativeAge(NodeLocalPropCalculator):
+class RelativeAge(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the relative age of cells.
 
@@ -225,9 +223,7 @@ class RelativeAge(NodeLocalPropCalculator):
         super().__init__(property)
         self.time_prop = time_prop
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> int | float:
+    def compute(self, lineage: CellLineage, node_id: int) -> int | float:
         """
         Compute the relative age of a given cell.
 
@@ -302,7 +298,7 @@ def create_normalized_age_property(
     )
 
 
-class NormalizedAge(NodeLocalPropCalculator):
+class NormalizedAge(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the normalized age of cells.
 
@@ -339,9 +335,7 @@ class NormalizedAge(NodeLocalPropCalculator):
         self.time_prop = time_prop
         self.ignore_incomplete_cycles = ignore_incomplete_cycles
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> float:
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
         """
         Compute the normalized age of a given cell.
 
@@ -523,7 +517,7 @@ def create_interdivision_time_property(
     )
 
 
-class InterdivisionTime(NodeGlobalPropCalculator):
+class InterdivisionTime(NodeGlobalPropCalculator[CellLineage | CycleLineage]):
     """
     Calculator to compute the interdivision time of cells.
 
@@ -548,7 +542,7 @@ class InterdivisionTime(NodeGlobalPropCalculator):
         super().__init__(property)
         self.time_prop = time_prop
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, data: Data, lineage: CellLineage | CycleLineage, node_id: int
     ) -> int | float:
         """
@@ -638,7 +632,7 @@ def create_division_rate_property(
     )
 
 
-class DivisionRate(NodeGlobalPropCalculator):
+class DivisionRate(NodeGlobalPropCalculator[CellLineage | CycleLineage]):
     """
     Calculator to compute the division rate of cells.
 
@@ -663,7 +657,7 @@ class DivisionRate(NodeGlobalPropCalculator):
         super().__init__(property)
         self.time_prop = time_prop
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, data: Data, lineage: CellLineage | CycleLineage, node_id: int
     ) -> int | float:
         """

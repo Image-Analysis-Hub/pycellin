@@ -107,6 +107,8 @@ nitpick_ignore = [
     # pycellin's private base classes.
     ("py:class", "pycellin.classes.lineage.Lineage"),
     ("py:class", "pycellin.classes.property_calculator.PropertyCalculator"),
+    # The type parameter of the calculator classes, explained in their Notes.
+    ("py:class", "pycellin.classes.property_calculator.LineageT"),
     # No working entry in plotly's inventory.
     ("py:class", "plotly.graph_objs.layout._template.Template"),
 ]

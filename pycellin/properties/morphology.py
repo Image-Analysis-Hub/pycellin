@@ -199,7 +199,7 @@ def _mask_to_polygons(mask: np.ndarray, fill_holes: bool = True) -> list[Polygon
     return sorted(polygons, key=lambda polygon: polygon.area, reverse=True)
 
 
-class _LabelImageShapeCalculator(NodeLocalPropCalculator):
+class _LabelImageShapeCalculator(NodeLocalPropCalculator[CellLineage]):
     """
     Base class of the calculators computing the shape of cells from a label image.
 
@@ -264,9 +264,7 @@ class _LabelImageShapeCalculator(NodeLocalPropCalculator):
             Shape of the cell, in (x, y) pixel coordinates of the mask.
         """
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> BaseGeometry:
+    def compute(self, lineage: CellLineage, node_id: int) -> BaseGeometry:
         """
         Compute the shape of a cell from its label in the label image.
 
@@ -574,7 +572,7 @@ def _largest_polygon(geometry: BaseGeometry) -> Polygon | None:
     return Polygon(max(polygons, key=lambda polygon: polygon.area).exterior)
 
 
-class CellPolygonFromContour(NodeLocalPropCalculator):
+class CellPolygonFromContour(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator for the cell polygon property, from the cell contour and position.
 
@@ -659,9 +657,7 @@ class CellPolygonFromContour(NodeLocalPropCalculator):
                 f"{' '.join(consequences)}"
             )
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> Polygon | None:
+    def compute(self, lineage: CellLineage, node_id: int) -> Polygon | None:
         """
         Compute the polygon of a cell from its contour and position.
 
@@ -752,7 +748,7 @@ def create_cell_area_property(
     )
 
 
-class CellArea(NodeLocalPropCalculator):
+class CellArea(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the area of a cell from its polygon.
 
@@ -778,9 +774,7 @@ class CellArea(NodeLocalPropCalculator):
         super().__init__(property)
         self.polygon_prop = polygon_prop
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> float:
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
         """
         Compute the area of a cell from its polygon.
 
@@ -856,7 +850,7 @@ def create_cycle_mean_area_property(
     )
 
 
-class CycleMeanArea(NodeGlobalPropCalculator):
+class CycleMeanArea(NodeGlobalPropCalculator[CycleLineage]):
     """
     Calculator to compute the mean area of a cell during a cell cycle.
 
@@ -879,9 +873,7 @@ class CycleMeanArea(NodeGlobalPropCalculator):
         super().__init__(property)
         self.area_prop = area_prop
 
-    def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, node_id: int
-    ) -> float:
+    def compute(self, data: Data, lineage: CycleLineage, node_id: int) -> float:
         """
         Compute the mean area of a cell during the cell cycle.
 
@@ -952,7 +944,7 @@ def create_birth_area_property(
     )
 
 
-class BirthArea(NodeGlobalPropCalculator):
+class BirthArea(NodeGlobalPropCalculator[CycleLineage]):
     """
     Calculator to compute the area of a cell at birth.
 
@@ -975,9 +967,7 @@ class BirthArea(NodeGlobalPropCalculator):
         super().__init__(property)
         self.area_prop = area_prop
 
-    def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, node_id: int
-    ) -> float:
+    def compute(self, data: Data, lineage: CycleLineage, node_id: int) -> float:
         """
         Compute the area of a cell at birth.
 
@@ -1050,7 +1040,7 @@ def create_division_area_property(
     )
 
 
-class DivisionArea(NodeGlobalPropCalculator):
+class DivisionArea(NodeGlobalPropCalculator[CycleLineage]):
     """
     Calculator to compute the area of a cell at division.
 
@@ -1073,9 +1063,7 @@ class DivisionArea(NodeGlobalPropCalculator):
         super().__init__(property)
         self.area_prop = area_prop
 
-    def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, node_id: int
-    ) -> float:
+    def compute(self, data: Data, lineage: CycleLineage, node_id: int) -> float:
         """
         Compute the area of a cell at division.
 
@@ -1152,7 +1140,7 @@ def create_cell_contour_property(
     )
 
 
-class CellContour(NodeLocalPropCalculator):
+class CellContour(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the contour of a cell from its polygon.
 
@@ -1186,7 +1174,7 @@ class CellContour(NodeLocalPropCalculator):
         self.force_recompute = force_recompute
         self.polygon_prop = polygon_prop
 
-    def compute(  # type: ignore[override]
+    def compute(
         self, lineage: CellLineage, node_id: int
     ) -> list[tuple[float, float]] | None:
         """
@@ -1290,7 +1278,7 @@ def create_cell_perimeter_property(
     )
 
 
-class CellPerimeter(NodeLocalPropCalculator):
+class CellPerimeter(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the perimeter of a cell from its polygon.
 
@@ -1316,9 +1304,7 @@ class CellPerimeter(NodeLocalPropCalculator):
         super().__init__(property)
         self.polygon_prop = polygon_prop
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> float:
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
         """
         Compute the perimeter of a cell from its polygon.
 
@@ -1394,7 +1380,7 @@ def create_cell_circularity_property(
     )
 
 
-class CellCircularity(NodeLocalPropCalculator):
+class CellCircularity(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the circularity of a cell from its polygon.
 
@@ -1424,9 +1410,7 @@ class CellCircularity(NodeLocalPropCalculator):
         super().__init__(property)
         self.polygon_prop = polygon_prop
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> float:
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
         """
         Compute the circularity of a cell from its polygon.
 
@@ -1504,7 +1488,7 @@ def create_cell_solidity_property(
     )
 
 
-class CellSolidity(NodeLocalPropCalculator):
+class CellSolidity(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the solidity of a cell from its polygon.
 
@@ -1532,9 +1516,7 @@ class CellSolidity(NodeLocalPropCalculator):
         super().__init__(property)
         self.polygon_prop = polygon_prop
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> float:
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
         """
         Compute the solidity of a cell from its polygon.
 
@@ -2137,7 +2119,7 @@ def create_rod_width_property(
     )
 
 
-class RodWidth(NodeLocalPropCalculator):
+class RodWidth(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the width of rod-shaped cells, such as bacteria.
 
@@ -2197,9 +2179,7 @@ class RodWidth(NodeLocalPropCalculator):
         self.debug_folder = debug_folder
         self.contour_prop = contour_prop
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> float:
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
         """
         Compute the width of a rod-shaped cell.
 
@@ -2279,7 +2259,7 @@ def create_rod_length_property(
     )
 
 
-class RodLength(NodeLocalPropCalculator):
+class RodLength(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the length of rod-shaped cells, such as bacteria.
 
@@ -2340,9 +2320,7 @@ class RodLength(NodeLocalPropCalculator):
         self.debug_folder = debug_folder
         self.contour_prop = contour_prop
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, node_id: int
-    ) -> float:
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
         """
         Compute the length of a rod-shaped cell.
 
