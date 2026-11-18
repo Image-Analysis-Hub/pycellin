@@ -3,8 +3,8 @@ name: Style
 on:
   push:
     branches: [ "main" ]
+  # Every pull request, whatever its target branch.
   pull_request:
-    branches: [ "main" ]
 
 permissions:
   contents: read

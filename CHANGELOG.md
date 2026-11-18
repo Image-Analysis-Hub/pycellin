@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the work of feature/docs up to 13ae6fc and the uncommitted corrections of the notebooks, of the description of cycle_num_cells and of the TrackMate coordinates warning. Update from there with: git log 6b884a4..dev -->
+<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the work of feature/docs up to 054fa4e and the uncommitted triggers of the Test and Style workflows. Update from there with: git log 6b884a4..dev -->
 
 Model merging and splitting, many new properties (morphology, intensity, topology), branch plots, consistent names that follow PEP 8, and many fixes, notably to time handling and to reading and writing TrackMate, GEFF, CTC and trackpy data. **This release contains breaking changes**, listed first below.
 
@@ -320,7 +320,8 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **CI:** bump `actions/setup-python` from 6 to 7
 - **CI:** the deploy workflow stops before building if the release tag doesn't match the package version
 - **CI:** fix releases starting the deploy workflow twice, which made one of the two runs fail at the PyPI upload
-- **CI:** new Style workflow that checks, on pushes and pull requests to `main`, that the code is formatted with Ruff and that no line is longer than 88 characters
+- **CI:** new Style workflow that checks, on pushes to `main` and on every pull request, that the code is formatted with Ruff and that no line is longer than 88 characters
+- **CI:** the Test workflow runs on every pull request, whatever its target branch, instead of only on those into `main`
 - **CI:** new Link check workflow that checks the external links of the documentation, every month and on demand
 - **Code style:** wrap code, docstrings and comments at 88 characters. The line length is set in `pyproject.toml`, where Ruff also flags longer lines (E501). The code and notebooks are reformatted with Ruff, and the README shows Ruff's badge instead of Black's
 - **Code style:** Ruff also checks the docstrings of the package against numpydoc's conventions (pydocstyle rules)
