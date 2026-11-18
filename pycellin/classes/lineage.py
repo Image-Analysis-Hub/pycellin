@@ -2212,8 +2212,8 @@ class CellLineage(Lineage):
         Return all the cells in the cell cycle of a cell, in chronological order.
 
         A cell cycle is a lineage segment that starts at the root or at a
-        division cell, ends at a division cell or at a leaf, and doesn't
-        include any other division.
+        daughter of a division cell, ends at a division cell or at a leaf, and
+        doesn't include any other division.
 
         Parameters
         ----------
@@ -2287,8 +2287,8 @@ class CellLineage(Lineage):
         Return all the cells of each cell cycle in a lineage.
 
         A cell cycle is a lineage segment that starts at the root or at a
-        division cell, ends at a division cell or at a leaf, and doesn't
-        include any other division.
+        daughter of a division cell, ends at a division cell or at a leaf, and
+        doesn't include any other division.
 
         Parameters
         ----------

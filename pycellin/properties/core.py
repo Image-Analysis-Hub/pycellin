@@ -341,7 +341,7 @@ def create_cell_id_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cell_id",
         name="Cell ID",
-        description="Unique identifier of the cell",
+        description="Identifier of the cell, unique within its lineage",
         provenance=provenance,
         prop_type="node",
         lineage_type="cell",
@@ -581,8 +581,8 @@ def create_cycle_id_property(provenance: str = "pycellin") -> Property:
         identifier="cycle_id",
         name="Cycle ID",
         description=(
-            "Unique identifier of the cell cycle, "
-            "i.e. cell_id of the last cell in the cell cycle"
+            "Identifier of the cell cycle, unique within its lineage: "
+            "cell_id of the last cell in the cell cycle"
         ),
         provenance=provenance,
         prop_type="node",
