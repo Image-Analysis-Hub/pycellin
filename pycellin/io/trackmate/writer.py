@@ -843,7 +843,11 @@ def _update_lineages(lin: CellLineage) -> None:
             pass  # not mandatory
 
 
-def _update_model_data(model: Model, frame_prop: str) -> None:
+def _update_model_data(
+    model: Model,
+    frame_prop: str,
+    id_mapping: dict[int, dict[int, int]] | None = None,
+) -> None:
     """
     Update the data in the model to match TrackMate requirements.
 
@@ -853,28 +857,37 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
         Model whose data to update.
     frame_prop : str
         Name of the property corresponding to the frame/timepoint.
+    id_mapping : dict[int, dict[int, int]] | None, default=None
+        Mapping of the old node IDs to the new ones for each lineage, as returned by
+        ``_relabel_nodes()``, if the nodes were relabeled.
 
     Notes
     -----
     A warning is logged if some cells are missing x and/or y coordinates, in which
-    case they are set to 0.0 by default.
+    case they are set to 0.0 by default. It names the cells by their ID in the
+    model, i.e. before relabeling.
     """
-    # Track cells with missing position properties: {lineage_id: set of node IDs}.
+    # Track cells with missing position properties: {lineage_id: set of cell IDs}.
     missing_positions = {}
+    mapping = id_mapping or {}
 
-    for lin in model.data.cell_lineages.values():
+    for lin_id, lin in model.data.cell_lineages.items():
         nodes_with_missing_pos = _update_nodes(lin, frame_prop)
         if nodes_with_missing_pos:
-            missing_positions[lin.graph["lineage_id"]] = nodes_with_missing_pos
+            old_ids = {new: old for old, new in mapping.get(lin_id, {}).items()}
+            missing_positions[lin.graph["lineage_id"]] = {
+                old_ids.get(node, node) for node in nodes_with_missing_pos
+            }
         _update_edges(lin)
         _update_lineages(lin)
 
     # Show a single summary warning at the end if any positions are missing.
     if missing_positions:
         msg_parts = []
-        for lineage_id, node_ids in missing_positions.items():
-            nodes_str = ", ".join(str(n) for n in sorted(node_ids))
-            msg_parts.append(f"  lineage {lineage_id}: cells {nodes_str}")
+        for lineage_id, cell_ids in missing_positions.items():
+            cells_str = ", ".join(str(c) for c in sorted(cell_ids))
+            cells = "cell" if len(cell_ids) == 1 else "cells"
+            msg_parts.append(f"  lineage {lineage_id}: {cells} {cells_str}")
         msg = (
             "Missing mandatory x and/or y coordinates, defaulting to 0.0 for:\n"
             + "\n".join(msg_parts)
@@ -1406,7 +1419,8 @@ def _prepare_model_for_export(
         property is written as, e.g. ``TRACK_ID`` for ``lineage_id``, or if there is
         a ``POSITION_Z`` property but no ``cell_z``.
     """
-    _relabel_nodes(model)  # TrackMate needs unique spot IDs across all lineages
+    # TrackMate needs unique spot IDs across all lineages.
+    id_mapping = _relabel_nodes(model)
     if propagate:
         model.propagate_cycle_properties()
     _warn_cycle_props_left_out(model)
@@ -1414,7 +1428,7 @@ def _prepare_model_for_export(
     frame_prop = _identify_frame_prop(model)
     _add_radius_prop(model)
     _update_props_metadata(model, frame_prop)
-    _update_model_data(model, frame_prop)
+    _update_model_data(model, frame_prop, id_mapping)
     _remove_non_numeric_props(model)
 
 

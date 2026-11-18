@@ -680,8 +680,8 @@ def create_cycle_num_cells_property(provenance: str = "pycellin") -> Property:
     """
     Create the declaration of the ``cycle_num_cells`` core property.
 
-    ``cycle_num_cells`` is the number of cells in the cell cycle, minding gaps. It is
-    a node property of cycle lineages.
+    ``cycle_num_cells`` is the number of cells in the cell cycle, not counting gaps
+    (missing detections). It is a node property of cycle lineages.
 
     Parameters
     ----------
@@ -696,7 +696,7 @@ def create_cycle_num_cells_property(provenance: str = "pycellin") -> Property:
     return Property(
         identifier="cycle_num_cells",
         name="Number of cells in the cycle",
-        description="Number of cells in the cell cycle, minding gaps",
+        description="Number of cells in the cell cycle, not counting gaps",
         provenance=provenance,
         prop_type="node",
         lineage_type="cycle",

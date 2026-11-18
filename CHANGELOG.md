@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the work of feature/docs up to 903ca1b. Update from there with: git log 6b884a4..dev -->
+<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the work of feature/docs up to 13ae6fc and the uncommitted corrections of the notebooks, of the description of cycle_num_cells and of the TrackMate coordinates warning. Update from there with: git log 6b884a4..dev -->
 
 Model merging and splitting, many new properties (morphology, intensity, topology), branch plots, consistent names that follow PEP 8, and many fixes, notably to time handling and to reading and writing TrackMate, GEFF, CTC and trackpy data. **This release contains breaking changes**, listed first below.
 
@@ -253,6 +253,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **TrackMate:** the writer wrote every spot as visible (`VISIBILITY` of 1), so after a round trip TrackMate showed the spots its spot filters had hidden, e.g. loaded with `keep_all_spots=True` and `keep_all_tracks=True`. Cells now keep their `VISIBILITY`, and cells without one are visible
 - **TrackMate:** the writer declared a string property called `name` as a feature, so the reader failed on the exported file with `could not convert string to float`. It is now only written as the display name of spots or tracks, and the reader ignores such a declaration
 - **TrackMate:** the writer failed with `NetworkXUnfeasible` on some models with cell IDs repeated across lineages: it renumbers the cells of such models, which failed when that swapped IDs, e.g. cell 0 becoming cell 1 and cell 1 becoming cell 0. This is common after the new `relabel_cells()`
+- **TrackMate:** when the writer renumbered the cells of a model, since some cell IDs repeat across lineages, its warning about cells without coordinates named them by their new IDs, which the model doesn't have. It now names them by their IDs in the model
 - **TrackMate:** exporting a model with cycle lineages without `propagate_cycle_props=True` warned that `cells` wasn't numeric and wouldn't be supported by TrackMate, as if the other cycle properties were exported, although none is. As for GEFF, a warning now names the cycle properties left out and says how to export them
 - **TrackMate:** `write_trackmate_xml()` (`export_TrackMate_XML()` in 0.5.1) silently replaced a property named like a feature that it writes from another property, e.g. a `TRACK_ID` cell property, since it writes `lineage_id` as `TRACK_ID`: the values of that property were lost. It now raises `ValueError`, which names the property to rename or remove and the property that the feature is written from. Likewise, a `POSITION_Z` property in a model without `cell_z` was replaced by zeros: it now raises `ValueError`, which suggests renaming it to `cell_z` if it holds the z coordinates
 - **TrackMate:** the reader failed with `KeyError: 'version'` on files whose `TrackMate` tag has no version, and with `UnboundLocalError` on files without an `AllTracks` tag, e.g. spots without tracking, which other tools may write. The version is then "unknown", as for files without a `TrackMate` tag, and files without `AllTracks` are read as files without tracks
