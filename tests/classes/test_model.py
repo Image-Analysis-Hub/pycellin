@@ -412,7 +412,8 @@ class TestAddCycleLineages:
         model.add_cycle_lineages()
         model.propagate_cycle_properties(["generation"])
         model.add_cycle_lineages()
-        assert model.get_property("generation").lineage_type == "both"
+        assert model.get_property("generation").lineage_type == "cycle"
+        assert "generation" in model.get_propagated_properties()
 
     def test_without_time_step(self, lineage_props_model):
         """Building cycle lineages doesn't use the time step."""
@@ -1395,17 +1396,18 @@ class TestAddCustomProperty:
         assert input_props_model.get_property("mother_cycle").lineage_type == "cycle"
         assert input_props_model.data.cycle_lineages[1].nodes[3]["mother_cycle"] == 2
 
-    def test_readding_propagated_prop_keeps_lineage_type(self, input_props_model):
+    def test_readding_propagated_prop_keeps_it_propagated(self, input_props_model):
         input_props_model.add_mother_cycle()
         input_props_model.propagate_cycle_properties(["mother_cycle"])
         with pytest.warns(UserWarning, match="Overwriting the old Property"):
             input_props_model.add_mother_cycle()
-        assert input_props_model.get_property("mother_cycle").lineage_type == "both"
+        assert input_props_model.get_property("mother_cycle").lineage_type == "cycle"
+        assert "mother_cycle" in input_props_model.get_propagated_properties()
 
     def test_calculator_shared_by_models(self, two_lineages_model):
         """Test that a calculator given to several models is copied with its
-        property: the propagation in a model changes neither the property nor its
-        declaration in the other models, whose cells get the values too."""
+        property: each model propagates its own declaration to its cells, and the
+        calculator given keeps its property."""
         prop = _create_test_property("cycle_value", "node", lineage_type="cycle")
         calc = ConstantValue(prop, 2.0)
         models = [two_lineages_model, copy.deepcopy(two_lineages_model)]
@@ -1414,7 +1416,7 @@ class TestAddCustomProperty:
             model.propagate_cycle_properties()
         for model in models:
             declared = model.get_property("cycle_value")
-            assert declared.lineage_type == "both"
+            assert model.get_propagated_properties()["cycle_value"] is declared
             assert model._updater._calculators["cycle_value"].property is declared
             for lin in model.data.cell_lineages.values():
                 assert all(v == 2.0 for _, v in lin.nodes(data="cycle_value"))
@@ -1695,23 +1697,38 @@ class TestPropagateCycleProperties:
         two_lineages_model.propagate_cycle_properties(["cycle_id"])
         assert two_lineages_model.props_metadata._get_propagated_props() == ["cycle_id"]
 
-    def test_lineage_type_prop_left_alone(self, two_lineages_model):
-        """Test that a property declared with the Lineage type, and not propagated,
-        keeps the values of its cells when all the cycle properties are propagated,
-        and at updates."""
+    def test_both_lineage_type_prop_left_alone(self, two_lineages_model):
+        """Test that a property of lineage type "both", e.g. lineage_id, keeps the
+        values of its cells when all the cycle properties are propagated, and at
+        updates."""
         model = two_lineages_model
-        prop = _create_test_property("both_prop", "node", lineage_type="both")
-        model.add_custom_property(ConstantValue(prop, 2.0))
-        model.update()
+        model.props_metadata._add_prop(
+            _create_test_property("both_prop", "node", lineage_type="both")
+        )
         for lin in model.data.cell_lineages.values():
             for _, cell in lin.nodes(data=True):
                 cell["both_prop"] = 5.0
+        for lin in model.data.cycle_lineages.values():
+            for _, cycle in lin.nodes(data=True):
+                cycle["both_prop"] = 2.0
         model.propagate_cycle_properties()
         model.remove_link(source_cell_id=1, target_cell_id=4, lineage_id=1)
         model.update()
-        assert "both_prop" not in model.props_metadata._get_propagated_props()
+        assert "both_prop" not in model.get_propagated_properties()
         for lin in model.data.cell_lineages.values():
             assert set(dict(lin.nodes(data="both_prop")).values()) == {5.0}
+
+    def test_propagated_prop_keeps_cycle_lineage_type(self, two_lineages_model):
+        """Test that a propagated property stays a cycle lineage property, which
+        get_cell_lineage_properties() also returns, e.g. for the GEFF writer."""
+        model = two_lineages_model
+        prop = _create_test_property("cycle_value", "node", lineage_type="cycle")
+        model.add_custom_property(ConstantValue(prop, 2.0))
+        model.propagate_cycle_properties(["cycle_value"])
+        assert model.get_property("cycle_value").lineage_type == "cycle"
+        assert list(model.get_propagated_properties()) == ["cycle_value"]
+        assert "cycle_value" in model.get_cell_lineage_properties()
+        assert "cycle_value" not in model.get_cell_lineage_properties(single_type=True)
 
     def test_removed_prop_dropped_from_record(self, two_lineages_model):
         model = two_lineages_model
@@ -1719,6 +1736,18 @@ class TestPropagateCycleProperties:
         model.propagate_cycle_properties(["mother_cycle"])
         model.remove_property("mother_cycle")
         assert model.props_metadata._get_propagated_props() == []
+
+    def test_removed_prop_values_removed_from_cells(self, two_lineages_model):
+        model = two_lineages_model
+        model.add_mother_cycle()
+        model.propagate_cycle_properties(["mother_cycle"])
+        model.remove_property("mother_cycle")
+        lineages = [
+            *model.data.cell_lineages.values(),
+            *model.data.cycle_lineages.values(),
+        ]
+        for lin in lineages:
+            assert all("mother_cycle" not in node for _, node in lin.nodes(data=True))
 
     def test_record_kept_by_copies(self, two_lineages_model):
         two_lineages_model.propagate_cycle_properties(["cycle_id"])
@@ -1751,6 +1780,20 @@ class TestPropagateCycleProperties:
         model2.propagate_cycle_properties(["mother_cycle"])
         merged = model1.merge(model2)
         assert merged.props_metadata._get_propagated_props() == ["mother_cycle"]
+        merged.update()
+        for lin in merged.data.cell_lineages.values():
+            assert all("mother_cycle" in cell for _, cell in lin.nodes(data=True))
+
+    def test_record_merged_prop_propagated_in_one_model(self, two_lineages_model):
+        """Test that a property of both models, propagated in one only, is propagated
+        in the merged model, to the cells of both models at the next update."""
+        model1 = two_lineages_model
+        model1.add_mother_cycle()
+        model1.update()
+        model2 = copy.deepcopy(model1)
+        model2.propagate_cycle_properties(["mother_cycle"])
+        merged = model1.merge(model2)
+        assert list(merged.get_propagated_properties()) == ["mother_cycle"]
         merged.update()
         for lin in merged.data.cell_lineages.values():
             assert all("mother_cycle" in cell for _, cell in lin.nodes(data=True))

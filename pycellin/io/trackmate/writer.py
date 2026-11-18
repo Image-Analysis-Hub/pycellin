@@ -381,7 +381,7 @@ def _write_FeatureDeclarations(
 
     Only the properties of cell lineages are declared, since TrackMate has no
     cycle lineages. Cycle properties are declared once propagated to the cell
-    lineages, which gives them the lineage type ``"both"``. A property called
+    lineages (see `Model.get_cell_lineage_properties`). A property called
     ``name`` on cells or lineages isn't declared either: it is written as the display
     name of spots or tracks, which TrackMate doesn't read as a feature.
 
@@ -397,6 +397,7 @@ def _write_FeatureDeclarations(
     ValueError
         If the feature type is unknown.
     """
+    cell_props = model.get_cell_lineage_properties()
     xf.write(f"\n{' ' * 4}")
     with xf.element("FeatureDeclarations"):
         features_type = ["SpotFeatures", "EdgeFeatures", "TrackFeatures"]
@@ -415,7 +416,7 @@ def _write_FeatureDeclarations(
                         raise ValueError(f"Unknown feature type: {f_type}")
                 first_feat_written = False
                 for prop in props.values():
-                    if prop.lineage_type == "cycle":
+                    if prop.identifier not in cell_props:
                         continue  # no values on spots, edges or tracks
                     if prop.identifier == "name" and f_type != "EdgeFeatures":
                         continue  # display name of spots and tracks, not a feature
@@ -501,14 +502,16 @@ def _get_exported_keys(model: Model) -> dict[str, set[str]]:
         "edge": set(),
         "lineage": {"name"},
     }
+    cell_props = model.get_cell_lineage_properties()
     for prop_type, props in (
         ("node", model.get_node_properties()),
         ("edge", model.get_edge_properties()),
         ("lineage", model.get_lineage_properties()),
     ):
-        # Cycle lineage properties are not declared, see _write_FeatureDeclarations().
+        # Only the properties of cell lineages are declared, see
+        # _write_FeatureDeclarations().
         exported_keys[prop_type].update(
-            prop_id for prop_id, prop in props.items() if prop.lineage_type != "cycle"
+            prop_id for prop_id in props if prop_id in cell_props
         )
 
     # Attributes written in another way, or not at all on purpose.
@@ -957,14 +960,11 @@ def _remove_non_numeric_props(model: Model) -> None:
         if name != "name" or model.get_property(name).prop_type == PropertyType.EDGE
     ]
     if to_remove:
-        # Cycle properties are not exported anyway, see _write_FeatureDeclarations(),
-        # and _warn_cycle_props_left_out() names those with values. Once propagated,
-        # they have the lineage type "both".
-        to_name = [
-            name
-            for name in to_remove
-            if model.get_property(name).lineage_type != "cycle"
-        ]
+        # Cycle properties not propagated to the cells are not exported anyway, see
+        # _write_FeatureDeclarations(), and _warn_cycle_props_left_out() names those
+        # with values.
+        cell_props = model.get_cell_lineage_properties()
+        to_name = [name for name in to_remove if name in cell_props]
         for name in to_remove:
             try:
                 model.remove_property(name)

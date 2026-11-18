@@ -44,7 +44,10 @@ class Property:
         - List of strings: ``["node", "lineage"]`` for multi-type properties.
     lineage_type : LineageType
         The type of lineage the property is associated with: ``"cell"`` for cell
-        lineages, ``"cycle"`` for cycle lineages, or ``"both"``.
+        lineages, ``"cycle"`` for cycle lineages, or ``"both"`` for a property
+        defined on both, such as ``lineage_id``. A calculator computes a property on
+        one of them only: to have the values of a cycle property on the cells too,
+        see `Model.propagate_cycle_properties`.
     dtype : str
         The data type of the property (int, float, string).
     unit : str | None, default=None

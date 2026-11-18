@@ -1082,7 +1082,8 @@ class Model:
         single_type : bool, default=False
             True to only return the properties of lineage type ``"cell"``. False to
             also return those of lineage type ``"both"``, which belong to cell and
-            cycle lineages alike.
+            cycle lineages alike, and the cycle properties propagated to the cell
+            lineages (see `get_propagated_properties()`).
 
         Returns
         -------
@@ -1092,6 +1093,7 @@ class Model:
         props = self.props_metadata._get_prop_dict_from_lin_type("cell")
         if not single_type:
             props.update(self.props_metadata._get_prop_dict_from_lin_type("both"))
+            props.update(self.get_propagated_properties())
         return props
 
     def get_cycle_lineage_properties(
@@ -1117,6 +1119,26 @@ class Model:
         if not single_type:
             props.update(self.props_metadata._get_prop_dict_from_lin_type("both"))
         return props
+
+    def get_propagated_properties(self) -> dict[str, Property]:
+        """
+        Return the cycle properties propagated to the cell lineages.
+
+        `propagate_cycle_properties()` copies the values of these cycle lineage
+        properties to the cells, and `update()` copies them again once it has
+        computed them. They keep the lineage type ``"cycle"``, and
+        `get_cell_lineage_properties()` also returns them.
+
+        Returns
+        -------
+        dict[str, Property]
+            Dictionary of the propagated properties, by identifier.
+        """
+        return {
+            prop_id: self.props_metadata.properties[prop_id]
+            for prop_id in self.props_metadata._get_propagated_props()
+            if prop_id in self.props_metadata.properties
+        }
 
     def get_node_properties(self, single_type: bool = False) -> dict[str, Property]:
         """
@@ -2344,17 +2366,17 @@ class Model:
 
         If the property is already declared with the same property type and lineage
         type, e.g. added before with other arguments, its declaration and calculator
-        are replaced, with a warning. A cycle property propagated to cell lineages
-        stays declared with the lineage type ``"both"``. If the property is declared
-        with another property type or lineage type, e.g. loaded from a file, the
-        declaration is replaced only if it is unused: not protected, without
-        calculator and without values in cell lineages.
+        are replaced, with a warning. A cycle property propagated to the cell lineages
+        stays propagated. If the property is declared with another property type or
+        lineage type, e.g. loaded from a file, the declaration is replaced only if it
+        is unused: not protected, without calculator and without values in cell
+        lineages.
 
         The model keeps its own copies of the calculator and of its property, so
         they can be given to several models. Changes made to them after adding no
         longer reach the model, and the changes the model makes to its declaration,
-        e.g. the lineage type set to ``"both"`` by `propagate_cycle_properties()`,
-        don't reach them. `get_property()` returns the declaration of the model.
+        e.g. a property type removed by `remove_property()`, don't reach them.
+        `get_property()` returns the declaration of the model.
 
         Parameters
         ----------
@@ -2366,6 +2388,8 @@ class Model:
         ValueError
             If the calculator computes values of another kind of object than the
             property type, e.g. a node calculator for an edge property.
+            If the lineage type of the property is ``"both"``, since a calculator
+            computes a property on cell lineages or on cycle lineages.
             If the property is a cycle lineage property and cycle lineages
             have not been computed yet.
             If a property read by the calculator does not have the property type
@@ -2403,6 +2427,13 @@ class Model:
                 f"{calc_type} values, but the property type of '{prop.identifier}' is "
                 f"'{prop.prop_type}'."
             )
+        if prop.lineage_type == "both":
+            raise ValueError(
+                f"Cannot add '{prop.identifier}' with the lineage type 'both': a "
+                "calculator computes a property on cell lineages or on cycle lineages. "
+                "For a cycle property also stored on the cells, add it with the "
+                "lineage type 'cycle', then call model.propagate_cycle_properties()."
+            )
         if prop.lineage_type == "cycle" and self.data.cycle_lineages is None:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
@@ -2427,11 +2458,8 @@ class Model:
                 stacklevel=2,
             )
         declared = self.get_property(prop.identifier)
-        if declared is not None:
-            if self._is_same_kind(declared, prop):
-                # A cycle property propagated to cell lineages stays declared on both.
-                prop.lineage_type = declared.lineage_type
-            elif self._is_unused_prop(prop.identifier):
+        if declared is not None and not self._is_same_kind(declared, prop):
+            if self._is_unused_prop(prop.identifier):
                 self.props_metadata._remove_prop(prop.identifier)
             else:
                 raise ValueError(
@@ -2452,10 +2480,7 @@ class Model:
         """
         Check whether a property is of the same kind as a declared one.
 
-        Both must have the same property type and lineage type. A property declared
-        with the lineage type ``"both"``, e.g. a cycle property propagated to cell
-        lineages, is also of the same kind as a cycle lineage property, since the
-        updater computes ``"both"`` properties on cycle lineages.
+        Both must have the same property type and lineage type.
 
         Parameters
         ----------
@@ -2469,11 +2494,10 @@ class Model:
         bool
             True if both properties are of the same kind, False otherwise.
         """
-        if declared.prop_type != prop.prop_type:
-            return False
-        if declared.lineage_type == "both":
-            return prop.lineage_type in ("cycle", "both")
-        return declared.lineage_type == prop.lineage_type
+        return (
+            declared.prop_type == prop.prop_type
+            and declared.lineage_type == prop.lineage_type
+        )
 
     def _is_unused_prop(self, prop_id: str) -> bool:
         """
@@ -2598,7 +2622,11 @@ class Model:
                     f"prop_type '{prop_type}', but '{input_id}' has prop_type "
                     f"'{input_prop.prop_type}'."
                 )
-            if input_prop.lineage_type not in (lineage_type, "both"):
+            # The values of a cycle property propagated to the cells are on the cells.
+            propagated = input_id in self.props_metadata._get_propagated_props()
+            if input_prop.lineage_type not in (lineage_type, "both") and not (
+                lineage_type == "cell" and propagated
+            ):
                 raise ValueError(
                     f"'{prop_id}' requires '{param}' to be a property with "
                     f"lineage_type '{lineage_type}', but '{input_id}' has lineage_type "
@@ -5414,6 +5442,8 @@ class Model:
 
         This updates the `PropsMetadata`, removes the property values
         for all lineages, and notifies the updater to unregister the calculator.
+        The values of a cycle property propagated to the cell lineages are removed
+        from the cells too.
 
         For multi-type properties, can either remove entirely or just remove
         specific types.
@@ -5476,6 +5506,16 @@ class Model:
         property = self.props_metadata.properties[prop]
         current_prop_type = property.prop_type
         lineage_type = property.lineage_type
+        if lineage_type not in ("cell", "cycle", "both"):
+            raise ValueError(
+                "Lineage type not recognized. Must be 'cell', 'cycle' or 'both'."
+            )
+        # The values of a cycle property propagated to the cells are on the cells too.
+        on_cells = (
+            lineage_type in ("cell", "both")
+            or prop in self.props_metadata._get_propagated_props()
+        )
+        on_cycles = lineage_type in ("cycle", "both")
 
         # Determine which types to remove.
         if prop_type_flag is None:
@@ -5495,23 +5535,12 @@ class Model:
         self.props_metadata._remove_prop(prop, prop_type_flag)
 
         # Update the data.
-        match lineage_type:
-            case "cell":
-                for lin in self.data.cell_lineages.values():
-                    lin._remove_prop(prop, types_to_remove)
-            case "cycle" if self.data.cycle_lineages:
-                for clin in self.data.cycle_lineages.values():
-                    clin._remove_prop(prop, types_to_remove)
-            case "both":
-                for lin in self.data.cell_lineages.values():
-                    lin._remove_prop(prop, types_to_remove)
-                if self.data.cycle_lineages:
-                    for clin in self.data.cycle_lineages.values():
-                        clin._remove_prop(prop, types_to_remove)
-            case _:
-                raise ValueError(
-                    "Lineage type not recognized. Must be 'cell', 'cycle' or 'both'."
-                )
+        if on_cells:
+            for lin in self.data.cell_lineages.values():
+                lin._remove_prop(prop, types_to_remove)
+        if on_cycles and self.data.cycle_lineages:
+            for clin in self.data.cycle_lineages.values():
+                clin._remove_prop(prop, types_to_remove)
 
         # Update the updater only if property was completely removed.
         if unregister_calculator:
@@ -5814,23 +5843,21 @@ class Model:
         - lineage property: the value of the cycle lineage is copied onto the
           cell lineage graph.
 
-        Values missing on the cycle lineage are skipped. The lineage type of the
-        properties that were propagated becomes ``"both"``, since the properties are
-        then present on both cycle and cell lineages.
+        Values missing on the cycle lineage are skipped. The properties that were
+        propagated keep the lineage type ``"cycle"``: `get_propagated_properties()`
+        lists them, and `get_cell_lineage_properties()` also returns them.
 
         `update()` keeps the propagated values up to date: once it has computed the
         cycle properties again, it copies the properties propagated with this method
         again to the cell lineages, including to the cells added since. A propagated
         property that the update doesn't compute, e.g. without calculator, keeps its
-        previous values on the cells. A property declared with the ``"both"`` type,
-        and not propagated, is left as it is.
+        previous values on the cells.
 
         Parameters
         ----------
         props : list[str] | None, default=None
-            List of the properties to propagate. If None, the cycle lineage
-            properties are propagated, i.e. those of lineage type ``"cycle"`` and
-            those already propagated.
+            List of the properties to propagate. If None, all the properties of
+            lineage type ``"cycle"`` are propagated.
         update : bool, default=True
             Whether to update the model before propagating the properties.
             For a correct propagation, the model must be updated
@@ -5844,6 +5871,8 @@ class Model:
             If the cycle lineages have not been computed yet.
             If a property in the list is not a cycle lineage property or not declared
             in the model.
+            If a property in the list has the lineage type ``"both"``, e.g.
+            ``lineage_id``, since it is already on the cell lineages.
         FusionError
             If the first cell of a cycle has more than one incoming link in the cell
             lineage, which indicates a fusion event.
@@ -5867,20 +5896,27 @@ class Model:
         if self._updater._update_required and update:
             self.update()
         if props is None:
-            # Not the properties declared with the Lineage type, such as lineage_id.
-            already_propagated = self.props_metadata._get_propagated_props()
-            props = [
+            # Not the properties of lineage type "both", such as lineage_id, which are
+            # already on the cell lineages.
+            props = list(self.get_cycle_lineage_properties(single_type=True))
+        else:
+            both_props = [
                 prop_id
-                for prop_id, prop in self.get_cycle_lineage_properties().items()
-                if prop.lineage_type == "cycle" or prop_id in already_propagated
+                for prop_id in props
+                if self.has_property(prop_id)
+                and self.props_metadata.properties[prop_id].lineage_type == "both"
             ]
+            if both_props:
+                names = ", ".join(repr(prop_id) for prop_id in both_props)
+                raise ValueError(
+                    f"Cannot propagate {names}: properties of lineage type 'both' are "
+                    "already on the cell lineages."
+                )
         propagated_props = self._copy_cycle_props_to_cells(props)
 
-        # Update the properties declaration: now the lineage type is "both" instead
-        # of just "cycle" since the properties are now present on cycle
-        # AND cell lineages. They are recorded for update() to copy them again.
+        # The propagated properties keep the lineage type "cycle". They are recorded
+        # for get_propagated_properties(), and for update() to copy them again.
         for prop in propagated_props:
-            self.props_metadata.properties[prop].lineage_type = "both"
             self.props_metadata._add_propagated_prop(prop)
 
     def _copy_cycle_props_to_cells(self, props: list[str] | None) -> set[str]:

@@ -109,6 +109,11 @@ class PropsMetadata:
         """
         # Objects pickled before propagated properties were recorded have no record.
         state.setdefault("_propagated_props", [])
+        # Propagated properties.
+        for prop_id in state["_propagated_props"]:
+            prop = state.get("properties", {}).get(prop_id)
+            if prop is not None and prop.lineage_type == "both":
+                prop.lineage_type = "cycle"
         self.__dict__.update(state)
 
     def __eq__(self, other: object) -> bool:
