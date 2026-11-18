@@ -1,3 +1,5 @@
+"""Graph-based framework to manipulate and analyze cell lineages from tracking data."""
+
 import importlib.metadata
 
 # Set before the other imports: submodules read it while the package is loading.

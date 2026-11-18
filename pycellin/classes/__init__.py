@@ -1,3 +1,5 @@
+"""The classes of Pycellin: model, data, lineages, properties and calculators."""
+
 from .data import Data
 from .lineage import CellLineage, CycleLineage
 from .model import Model

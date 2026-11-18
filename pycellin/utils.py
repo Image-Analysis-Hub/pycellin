@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+"""Helpers shared by Pycellin's modules: type checks, colors, data types and units."""
+
 import numbers
 import re
 from collections.abc import Iterable
@@ -8,7 +10,27 @@ from typing import Any, Literal, get_args, get_origin
 from plotly.colors import hex_to_rgb, unlabel_rgb
 
 
-def _check_literal_type(value, literal_type) -> bool:
+def _check_literal_type(value: Any, literal_type: Any) -> bool:
+    """
+    Check whether a value is one of the values of a `typing.Literal` type.
+
+    Parameters
+    ----------
+    value : Any
+        The value to check.
+    literal_type : Any
+        The ``Literal`` type, e.g. ``Literal["cell", "cycle", "both"]``.
+
+    Returns
+    -------
+    bool
+        True if `value` is one of the values of `literal_type`, False otherwise.
+
+    Raises
+    ------
+    TypeError
+        If `literal_type` is not a ``Literal`` type.
+    """
     if get_origin(literal_type) is Literal:
         return value in get_args(literal_type)
     raise TypeError(f"{literal_type} is not a Literal type")
@@ -39,7 +61,24 @@ def _check_integer(value: Any, name: str) -> None:
 
 def _color_to_rgba(color: str, alpha: float) -> str:
     """
-    Convert an 'rgb(r,g,b)' or '#rrggbb' color to an 'rgba(r,g,b,a)' string.
+    Convert an ``"rgb(r,g,b)"`` or ``"#rrggbb"`` color to an ``"rgba(r,g,b,a)"`` string.
+
+    Parameters
+    ----------
+    color : str
+        The color, as ``"rgb(r,g,b)"`` or ``"#rrggbb"``.
+    alpha : float
+        The opacity of the color, between 0 and 1.
+
+    Returns
+    -------
+    str
+        The color as ``"rgba(r,g,b,a)"``.
+
+    Raises
+    ------
+    ValueError
+        If `alpha` is not between 0 and 1, or if `color` is in another format.
     """
     if not 0.0 <= alpha <= 1.0:
         raise ValueError(f"Argument 'alpha' must be in [0, 1], got {alpha}.")
@@ -54,8 +93,8 @@ def _color_to_rgba(color: str, alpha: float) -> str:
     return f"rgba({r},{g},{b},{alpha})"
 
 
-# Spellings of the data types of properties, grouped by canonical pycellin data type.
-# Loaders and libraries spell them differently (e.g. GEFF uses numpy names).
+#: Spellings of the data types of properties, grouped by canonical pycellin data type:
+#: loaders and libraries spell them differently (e.g. GEFF uses numpy names).
 _DTYPE_SPELLINGS = {
     "int": (
         "int",
@@ -74,6 +113,7 @@ _DTYPE_SPELLINGS = {
     "string": ("string", "str"),
     "bool": ("bool", "bool_", "boolean"),
 }
+#: Canonical pycellin data type of each spelling of ``_DTYPE_SPELLINGS``.
 _DTYPE_ALIASES = {
     spelling: canonical
     for canonical, spellings in _DTYPE_SPELLINGS.items()
@@ -85,10 +125,11 @@ def _normalize_dtype(dtype: str | None) -> str | None:
     """
     Return the canonical spelling of a property data type.
 
-    Spellings of integers, floats, strings and booleans (e.g. "int64", "float32",
-    "str", "bool_") are mapped, case-insensitively, to "int", "float", "string" and
-    "bool". Other data types, such as containers or class names, are returned
-    unchanged since they cannot be normalized reliably.
+    Spellings of integers, floats, strings and booleans (e.g. ``"int64"``,
+    ``"float32"``, ``"str"``, ``"bool_"``) are mapped, case-insensitively, to
+    ``"int"``, ``"float"``, ``"string"`` and ``"bool"``. Other data types, such as
+    containers or class names, are returned unchanged since they cannot be normalized
+    reliably.
 
     Parameters
     ----------
@@ -165,11 +206,12 @@ def _infer_dtype(values: Iterable[Any]) -> str | None:
     """
     Infer the data type of values, in Python type hint syntax.
 
-    Booleans, integers (numpy integers included), real numbers and strings give "bool",
-    "int", "float" and "str" respectively. Integers mixed with real numbers give
-    "float". Values of other types give their class name, prefixed by their module
-    unless built in (e.g. "dict", "numpy.ndarray"). Values of several types give a
-    union of their data types (e.g. "int | str"). None values are ignored.
+    Booleans, integers (numpy integers included), real numbers and strings give
+    ``"bool"``, ``"int"``, ``"float"`` and ``"str"`` respectively. Integers mixed with
+    real numbers give ``"float"``. Values of other types give their class name,
+    prefixed by their module unless built in (e.g. ``"dict"``, ``"numpy.ndarray"``).
+    Values of several types give a union of their data types (e.g. ``"int | str"``).
+    None values are ignored.
 
     Parameters
     ----------
@@ -209,18 +251,18 @@ def _infer_dtype(values: Iterable[Any]) -> str | None:
 
 def _unit_uses(unit: str, base_unit: str) -> bool:
     """
-    Check if a unit is written with another unit, e.g. "micrometer/minute" with
-    "minute".
+    Check if a unit is written with another unit.
 
-    Units are compared word by word, a word being a run of letters: "min" is found in
-    "1/min" but not in "minute", and "m" in "m^2" but not in "mm".
+    For example, ``"micrometer/minute"`` is written with ``"minute"``. Units are
+    compared word by word, a word being a run of letters: ``"min"`` is found in
+    ``"1/min"`` but not in ``"minute"``, and ``"m"`` in ``"m^2"`` but not in ``"mm"``.
 
     Parameters
     ----------
     unit : str
-        The unit to search, e.g. "micrometer/minute".
+        The unit to search, e.g. ``"micrometer/minute"``.
     base_unit : str
-        The unit to look for, e.g. "minute".
+        The unit to look for, e.g. ``"minute"``.
 
     Returns
     -------

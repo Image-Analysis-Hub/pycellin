@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 """
+Writer for TrackMate XML files.
+
 Features in the XML file are not in the same order as a file that was exported
 directly from TrackMate.
 I've tested quickly and it doesn't seem to be a problem for TrackMate.
@@ -53,9 +55,10 @@ def _unit_to_dimension(
     str
         Dimension corresponding to the unit.
 
-    Warns
+    Notes
     -----
-    If the dimension cannot be determined, in which the default dimension NONE is used.
+    A warning is logged if the dimension cannot be determined, in which case the
+    default dimension ``NONE`` is used.
     """
     # TODO: finish this function and try to make it less nightmarish
     unit = prop.unit
@@ -302,6 +305,7 @@ def _transform_name(name: str) -> str:
     Notes
     -----
     The transformation consists in:
+
     - replacing underscores by spaces,
     - lowercasing the words, except for some exceptions,
     - capitalizing the first letter of the name,
@@ -377,9 +381,9 @@ def _write_FeatureDeclarations(
 
     Only the properties of cell lineages are declared, since TrackMate has no
     cycle lineages. Cycle properties are declared once propagated to the cell
-    lineages, which gives them the lineage type "both". A property called 'name' on
-    cells or lineages isn't declared either: it is written as the display name of spots
-    or tracks, which TrackMate doesn't read as a feature.
+    lineages (see `Model.get_cell_lineage_properties`). A property called
+    ``name`` on cells or lineages isn't declared either: it is written as the display
+    name of spots or tracks, which TrackMate doesn't read as a feature.
 
     Parameters
     ----------
@@ -393,6 +397,7 @@ def _write_FeatureDeclarations(
     ValueError
         If the feature type is unknown.
     """
+    cell_props = model.get_cell_lineage_properties()
     xf.write(f"\n{' ' * 4}")
     with xf.element("FeatureDeclarations"):
         features_type = ["SpotFeatures", "EdgeFeatures", "TrackFeatures"]
@@ -411,7 +416,7 @@ def _write_FeatureDeclarations(
                         raise ValueError(f"Unknown feature type: {f_type}")
                 first_feat_written = False
                 for prop in props.values():
-                    if prop.lineage_type == "cycle":
+                    if prop.identifier not in cell_props:
                         continue  # no values on spots, edges or tracks
                     if prop.identifier == "name" and f_type != "EdgeFeatures":
                         continue  # display name of spots and tracks, not a feature
@@ -432,7 +437,7 @@ def _value_to_str(
     """
     Convert a value to its associated string.
 
-    Indeed, ET.write() method only accepts to write strings.
+    Indeed, ``ET.write()`` method only accepts to write strings.
     However, TrackMate is only able to read Spot, Edge and Track
     features that can be parsed as numeric by Java. A missing value (None)
     is thus written as NaN, like TrackMate does.
@@ -484,26 +489,29 @@ def _get_exported_keys(model: Model) -> dict[str, set[str]]:
     Returns
     -------
     dict[str, set[str]]
-        The keys of the attributes to write, by property type ("node", "edge" and
-        "lineage").
+        The keys of the attributes to write, by property type (``"node"``,
+        ``"edge"`` and ``"lineage"``).
 
-    Warns
+    Notes
     -----
-    If some attributes have no property declaration, and so are not exported.
+    A warning is logged if some attributes have no property declaration, and so are
+    not exported.
     """
     exported_keys = {
         "node": {"ID", "name"},
         "edge": set(),
         "lineage": {"name"},
     }
+    cell_props = model.get_cell_lineage_properties()
     for prop_type, props in (
         ("node", model.get_node_properties()),
         ("edge", model.get_edge_properties()),
         ("lineage", model.get_lineage_properties()),
     ):
-        # Cycle lineage properties are not declared, see _write_FeatureDeclarations().
+        # Only the properties of cell lineages are declared, see
+        # _write_FeatureDeclarations().
         exported_keys[prop_type].update(
-            prop_id for prop_id, prop in props.items() if prop.lineage_type != "cycle"
+            prop_id for prop_id in props if prop_id in cell_props
         )
 
     # Attributes written in another way, or not at all on purpose.
@@ -552,7 +560,7 @@ def _create_Spot(
     node : int
         ID of the node in the lineage.
     keys : set[str]
-        Keys of the node attributes to write, see `_get_exported_keys()`. The cell
+        Keys of the node attributes to write, see ``_get_exported_keys()``. The cell
         contour is written in any case, as the ROI of the spot.
 
     Returns
@@ -592,7 +600,7 @@ def _write_AllSpots(
     data : dict[int, CellLineage]
         Cell lineages containing the data to write.
     keys : set[str]
-        Keys of the node attributes to write, see `_get_exported_keys()`.
+        Keys of the node attributes to write, see ``_get_exported_keys()``.
     """
     xf.write(f"\n{' ' * 4}")
     lineages = data.values()
@@ -633,9 +641,9 @@ def _write_AllTracks(
     data : dict[int, CellLineage]
         Cell lineages containing the data to write.
     track_keys : set[str]
-        Keys of the lineage attributes to write, see `_get_exported_keys()`.
+        Keys of the lineage attributes to write, see ``_get_exported_keys()``.
     edge_keys : set[str]
-        Keys of the edge attributes to write, see `_get_exported_keys()`.
+        Keys of the edge attributes to write, see ``_get_exported_keys()``.
     """
     xf.write(f"\n{' ' * 4}")
     with xf.element("AllTracks"):
@@ -667,7 +675,7 @@ def _write_AllTracks(
 
 def _write_track_id(xf: ET.xmlfile, lineage: CellLineage) -> None:
     """
-    Helper function to write a track ID to the XML file.
+    Write a track ID to the XML file.
 
     Parameters
     ----------
@@ -679,7 +687,7 @@ def _write_track_id(xf: ET.xmlfile, lineage: CellLineage) -> None:
     Raises
     ------
     KeyError
-        If a lineage with several cells does not have a TRACK_ID attribute.
+        If a lineage with several cells does not have a ``TRACK_ID`` attribute.
     """
     if len(lineage) < 2:
         # We don't want to write the track ID for one-node lineages.
@@ -741,7 +749,7 @@ def _update_nodes(lin: CellLineage, frame_prop: str) -> set[int]:
     Returns
     -------
     set[int]
-        Set of node IDs that are missing POSITION_X or POSITION_Y.
+        Set of node IDs that are missing ``POSITION_X`` or ``POSITION_Y``.
     """
     nodes_with_missing_pos = set()
 
@@ -793,7 +801,7 @@ def _update_edges(lin: CellLineage) -> None:
 
     Parameters
     ----------
-    lineage : CellLineage
+    lin : CellLineage
         Lineage whose edges to update.
     """
     for source_node, target_node, data in lin.edges(data=True):
@@ -815,7 +823,7 @@ def _update_lineages(lin: CellLineage) -> None:
 
     Parameters
     ----------
-    lineage : CellLineage
+    lin : CellLineage
         Lineage whose graph to update.
     """
     # Mandatory TrackMate property.
@@ -835,7 +843,11 @@ def _update_lineages(lin: CellLineage) -> None:
             pass  # not mandatory
 
 
-def _update_model_data(model: Model, frame_prop: str) -> None:
+def _update_model_data(
+    model: Model,
+    frame_prop: str,
+    id_mapping: dict[int, dict[int, int]] | None = None,
+) -> None:
     """
     Update the data in the model to match TrackMate requirements.
 
@@ -845,28 +857,37 @@ def _update_model_data(model: Model, frame_prop: str) -> None:
         Model whose data to update.
     frame_prop : str
         Name of the property corresponding to the frame/timepoint.
+    id_mapping : dict[int, dict[int, int]] | None, default=None
+        Mapping of the old node IDs to the new ones for each lineage, as returned by
+        ``_relabel_nodes()``, if the nodes were relabeled.
 
-    Warns
+    Notes
     -----
-    If some cells are missing x and/or y coordinates, in which case they are set
-    to 0.0 by default.
+    A warning is logged if some cells are missing x and/or y coordinates, in which
+    case they are set to 0.0 by default. It names the cells by their ID in the
+    model, i.e. before relabeling.
     """
-    # Track cells with missing position properties: {lineage_id: set of node IDs}.
+    # Track cells with missing position properties: {lineage_id: set of cell IDs}.
     missing_positions = {}
+    mapping = id_mapping or {}
 
-    for lin in model.data.cell_lineages.values():
+    for lin_id, lin in model.data.cell_lineages.items():
         nodes_with_missing_pos = _update_nodes(lin, frame_prop)
         if nodes_with_missing_pos:
-            missing_positions[lin.graph["lineage_id"]] = nodes_with_missing_pos
+            old_ids = {new: old for old, new in mapping.get(lin_id, {}).items()}
+            missing_positions[lin.graph["lineage_id"]] = {
+                old_ids.get(node, node) for node in nodes_with_missing_pos
+            }
         _update_edges(lin)
         _update_lineages(lin)
 
     # Show a single summary warning at the end if any positions are missing.
     if missing_positions:
         msg_parts = []
-        for lineage_id, node_ids in missing_positions.items():
-            nodes_str = ", ".join(str(n) for n in sorted(node_ids))
-            msg_parts.append(f"  lineage {lineage_id}: cells {nodes_str}")
+        for lineage_id, cell_ids in missing_positions.items():
+            cells_str = ", ".join(str(c) for c in sorted(cell_ids))
+            cells = "cell" if len(cell_ids) == 1 else "cells"
+            msg_parts.append(f"  lineage {lineage_id}: {cells} {cells_str}")
         msg = (
             "Missing mandatory x and/or y coordinates, defaulting to 0.0 for:\n"
             + "\n".join(msg_parts)
@@ -879,18 +900,19 @@ def _warn_cycle_props_left_out(model: Model) -> None:
     Warn about the cycle properties that the export leaves out, if any.
 
     Only the properties of cell lineages are exported, see
-    _write_FeatureDeclarations(), so cycle properties are left out unless they were
-    propagated to the cells first. As for GEFF, the properties named are the cell
-    and link properties with values on cycle lineages only.
+    ``_write_FeatureDeclarations()``, so cycle properties are left out unless they
+    were propagated to the cells first. As for GEFF, the properties named are the
+    cell and link properties with values on cycle lineages only.
 
     Parameters
     ----------
     model : Model
         Model to export, after the propagation of cycle properties, if any.
 
-    Warns
+    Notes
     -----
-    If some cell or link properties have values on cycle lineages only.
+    The warning is logged if some cell or link properties have values on cycle
+    lineages only.
     """
     if not model.data.cycle_lineages:
         return
@@ -918,24 +940,25 @@ def _remove_non_numeric_props(model: Model) -> None:
     """
     Completely remove non-numeric properties from the model.
 
+    The properties from TrackMate are kept, and so is ``name`` on cells or lineages,
+    the display name of spots or tracks.
+
     Parameters
     ----------
     model : Model
         Model to modify.
-
-    Warns
-    -----
-    If some properties are not numeric and will not be exported to TrackMate.
-    This is the case for properties with string, list, or other non-numeric
-    values that TrackMate cannot handle. Cycle properties that were not
-    propagated are removed without being named, since they are not exported
-    anyway.
 
     Notes
     -----
     This is necessary because TrackMate does not support non-numeric features.
     Boolean features are considered numeric and are converted to integers
     (1 for True, 0 for False).
+
+    A warning is logged if some properties are not numeric and will not be exported
+    to TrackMate. This is the case for properties with string, list, or other
+    non-numeric values that TrackMate cannot handle. Cycle properties that were not
+    propagated are removed without being named, since they are not exported
+    anyway.
     """
     to_remove = [
         name
@@ -950,14 +973,11 @@ def _remove_non_numeric_props(model: Model) -> None:
         if name != "name" or model.get_property(name).prop_type == PropertyType.EDGE
     ]
     if to_remove:
-        # Cycle properties are not exported anyway, see _write_FeatureDeclarations(),
-        # and _warn_cycle_props_left_out() names those with values. Once propagated,
-        # they have the lineage type "both".
-        to_name = [
-            name
-            for name in to_remove
-            if model.get_property(name).lineage_type != "cycle"
-        ]
+        # Cycle properties not propagated to the cells are not exported anyway, see
+        # _write_FeatureDeclarations(), and _warn_cycle_props_left_out() names those
+        # with values.
+        cell_props = model.get_cell_lineage_properties()
+        to_name = [name for name in to_remove if name in cell_props]
         for name in to_remove:
             try:
                 model.remove_property(name)
@@ -974,23 +994,65 @@ def _remove_non_numeric_props(model: Model) -> None:
             logger.warning(msg)
 
 
+def _rename_prop_to_feature(
+    props_md: PropsMetadata, prop_id: str, feature: str
+) -> None:
+    """
+    Rename a property to the TrackMate feature that it is written as.
+
+    Parameters
+    ----------
+    props_md : PropsMetadata
+        Properties metadata to modify.
+    prop_id : str
+        Identifier of the property to rename.
+    feature : str
+        Name of the TrackMate feature.
+
+    Raises
+    ------
+    KeyError
+        If the `prop_id` property is missing in the properties metadata.
+    ValueError
+        If another property already has the name of the feature.
+    """
+    if (
+        feature != prop_id
+        and prop_id in props_md.properties
+        and feature in props_md.properties
+    ):
+        raise ValueError(
+            f"The model has a '{feature}' property, but TrackMate's {feature} "
+            f"feature is written from '{prop_id}'. Rename or remove '{feature}' to "
+            "export the model to TrackMate."
+        )
+    props_md._change_prop_identifier(prop_id, feature)
+
+
 def _rename_props(props_md: PropsMetadata, frame_prop: str) -> None:
     """
     Rename some properties in the properties metadata to match TrackMate requirements.
 
+    Parameters
     ----------
     props_md : PropsMetadata
         Properties metadata to modify.
     frame_prop : str
         Name of the property corresponding to the frame/timepoint.
+
+    Raises
+    ------
+    ValueError
+        If the model already has a ``TRACK_ID`` property, or a ``FRAME`` property
+        other than `frame_prop`.
     """
     props_md._unprotect_prop("lineage_id")
-    props_md._change_prop_identifier("lineage_id", "TRACK_ID")
+    _rename_prop_to_feature(props_md, "lineage_id", "TRACK_ID")
     props_md._change_prop_description("TRACK_ID", "Track ID")
 
     if frame_prop != "FRAME":
         props_md._unprotect_prop(frame_prop)
-        props_md._change_prop_identifier(frame_prop, "FRAME")
+        _rename_prop_to_feature(props_md, frame_prop, "FRAME")
 
 
 def _remove_props(props_md: PropsMetadata) -> None:
@@ -1075,11 +1137,13 @@ def _add_mandatory_props(props_md: PropsMetadata) -> None:
 
 def _update_location_props(props_md: PropsMetadata) -> None:
     """
-    Update location properties in the properties metadata to match TrackMate
-    requirements.
+    Update location properties in the metadata to match TrackMate requirements.
 
-    This function renames the cell_x, cell_y, cell_z, link_x, link_y, link_z,
-    lineage_x, lineage_y, and lineage_z properties to their TrackMate matching features.
+    This function renames the ``cell_x``, ``cell_y``, ``cell_z``, ``link_x``,
+    ``link_y``, ``link_z``, ``lineage_x``, ``lineage_y``, and ``lineage_z``
+    properties to their TrackMate matching features. A missing ``cell_z`` property
+    gets a ``POSITION_Z`` declaration instead, since the spots are then written with
+    a ``POSITION_Z`` of 0.
 
     Parameters
     ----------
@@ -1089,11 +1153,18 @@ def _update_location_props(props_md: PropsMetadata) -> None:
     Raises
     ------
     KeyError
-        If a mandatory property is missing in the properties metadata.
+        If the ``cell_x`` or ``cell_y`` property is missing in the properties
+        metadata.
+    ValueError
+        If a property already has the name of the TrackMate feature that a location
+        property is written as, e.g. ``POSITION_X`` for ``cell_x``, or if there is
+        a ``POSITION_Z`` property but no ``cell_z``.
     """
     for axis in ["x", "y", "z"]:
         try:
-            props_md._change_prop_identifier(f"cell_{axis}", f"POSITION_{axis.upper()}")
+            _rename_prop_to_feature(
+                props_md, f"cell_{axis}", f"POSITION_{axis.upper()}"
+            )
         except KeyError:
             # This property is mandatory in TrackMate for x, y and z dimensions.
             if axis in ["x", "y"]:
@@ -1102,6 +1173,16 @@ def _update_location_props(props_md: PropsMetadata) -> None:
                     f"feature POSITION_{axis.upper()}."
                 )
             else:
+                # Without cell_z, the spots are written with a POSITION_Z of 0, which
+                # would replace the values of a POSITION_Z property.
+                if "POSITION_Z" in props_md.properties:
+                    raise ValueError(
+                        "The model has a 'POSITION_Z' property, but TrackMate's "
+                        "POSITION_Z feature is written from 'cell_z', or as 0 without "
+                        "it. If 'POSITION_Z' holds the z coordinates of the cells, "
+                        "rename it to 'cell_z'. Otherwise, rename or remove it to "
+                        "export the model to TrackMate."
+                    )
                 # We add the missing z dimension.
                 props_md._add_prop(
                     Property(
@@ -1116,14 +1197,14 @@ def _update_location_props(props_md: PropsMetadata) -> None:
                     )
                 )
         try:
-            props_md._change_prop_identifier(
-                f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION"
+            _rename_prop_to_feature(
+                props_md, f"link_{axis}", f"EDGE_{axis.upper()}_LOCATION"
             )
         except KeyError:
             pass  # not mandatory
         try:
-            props_md._change_prop_identifier(
-                f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION"
+            _rename_prop_to_feature(
+                props_md, f"lineage_{axis}", f"TRACK_{axis.upper()}_LOCATION"
             )
         except KeyError:
             pass  # not mandatory
@@ -1139,6 +1220,16 @@ def _update_props_metadata(model: Model, frame_prop: str) -> None:
         Model whose metadata to update.
     frame_prop : str
         Name of the property corresponding to the frame/timepoint.
+
+    Raises
+    ------
+    KeyError
+        If the ``cell_x`` or ``cell_y`` property is missing in the properties
+        metadata.
+    ValueError
+        If a property already has the name of the TrackMate feature that another
+        property is written as, e.g. ``TRACK_ID`` for ``lineage_id``, or if there is
+        a ``POSITION_Z`` property but no ``cell_z``.
     """
     _rename_props(model.props_metadata, frame_prop)
     _remove_props(model.props_metadata)
@@ -1163,6 +1254,12 @@ def _add_radius_prop(model: Model) -> None:
     ----------
     model : Model
         Model to modify.
+
+    Raises
+    ------
+    ValueError
+        If the model has a ``RADIUS`` property besides the radius property found
+        first, e.g. ``radius``.
     """
     # Check if there is already a radius property in the registered properties.
     props = model.get_properties()
@@ -1175,7 +1272,7 @@ def _add_radius_prop(model: Model) -> None:
     # If yes, rename it to RADIUS if necessary, in both metadata and data.
     if radius_prop_name is not None:
         if radius_prop_name != "RADIUS":
-            model.props_metadata._change_prop_identifier(radius_prop_name, "RADIUS")
+            _rename_prop_to_feature(model.props_metadata, radius_prop_name, "RADIUS")
             for lin in model.data.cell_lineages.values():
                 _update_node_prop_key(
                     lin,
@@ -1205,10 +1302,9 @@ def _add_radius_prop(model: Model) -> None:
                 lin.nodes[node]["RADIUS"] = 1.0
 
 
-def _relabel_nodes(model) -> dict[int, dict[int, int]]:
+def _relabel_nodes(model: Model) -> dict[int, dict[int, int]]:
     """
-    Relabel the nodes and return a mapping of old node IDs to new node IDs for each
-    lineage.
+    Relabel the nodes and return the mapping of old to new node IDs of each lineage.
 
     This is necessary because TrackMate requires unique spot IDs across all lineages.
     If the model has non-unique node IDs, we relabel them in place to ensure uniqueness.
@@ -1223,12 +1319,14 @@ def _relabel_nodes(model) -> dict[int, dict[int, int]]:
     dict[int, dict[int, int]]
         A mapping of old node IDs to new node IDs for each lineage.
         The outer dictionary keys are the lineage IDs, and the inner dictionaries
-        map old node IDs to new node IDs.
+        map old node IDs to new node IDs. It is empty if the node IDs are already
+        unique.
 
-    Warns
+    Notes
     -----
-    If duplicate node IDs are found, in which case all nodes will be relabeled
-    to ensure uniqueness.
+    A warning is logged if duplicate node IDs are found, in which case all nodes
+    will be relabeled to ensure uniqueness. The previous IDs are kept in the
+    ``pycellin_cell_id`` property.
     """
     # Count the occurrences of each node ID in the data.
     count_ids: Counter[int] = Counter()
@@ -1313,9 +1411,16 @@ def _prepare_model_for_export(
     Raises
     ------
     KeyError
-        If neither a frame-like property nor 'timepoint' is present on all nodes.
+        If neither a frame-like property nor ``timepoint`` is present on all nodes.
+        If the ``cell_x`` or ``cell_y`` property is missing.
+    ValueError
+        If `propagate` is True and the model has no cycle lineages.
+        If a property already has the name of the TrackMate feature that another
+        property is written as, e.g. ``TRACK_ID`` for ``lineage_id``, or if there is
+        a ``POSITION_Z`` property but no ``cell_z``.
     """
-    _relabel_nodes(model)  # TrackMate needs unique spot IDs across all lineages
+    # TrackMate needs unique spot IDs across all lineages.
+    id_mapping = _relabel_nodes(model)
     if propagate:
         model.propagate_cycle_properties()
     _warn_cycle_props_left_out(model)
@@ -1323,7 +1428,7 @@ def _prepare_model_for_export(
     frame_prop = _identify_frame_prop(model)
     _add_radius_prop(model)
     _update_props_metadata(model, frame_prop)
-    _update_model_data(model, frame_prop)
+    _update_model_data(model, frame_prop, id_mapping)
     _remove_non_numeric_props(model)
 
 
@@ -1338,23 +1443,26 @@ def _write_Settings(
     """
     Write the Settings XML tag into a TrackMate XML file.
 
+    The settings of a TrackMate file, kept in the model metadata when the model was
+    loaded from it, are written as they are: the image parameters are then ignored.
+
     Parameters
     ----------
     xf : ET.xmlfile
         Context manager for the XML file to write.
     model : Model
         Model containing the data to write.
-    image_path : str | Path | None, optional
-        Path to the image file associated with the model. Default is None.
+    image_path : str | Path | None, default=None
+        Path to the image file associated with the model.
         If provided, will be used instead of `image_path_field`.
-    image_path_field : str | None, optional
-        Name of the model metadata field that contains the image path. Default is None.
+    image_path_field : str | None, default=None
+        Name of the model metadata field that contains the image path.
         Not needed if `image_path` is provided.
-    image_shape : tuple[int, int, int, int, int] | None, optional
+    image_shape : tuple[int, int, int, int, int] | None, default=None
         Shape of the image associated with the model, in the format (T, C, Z, Y, X).
-        Default is None. If provided, will be used instead of `image_shape_field`.
-    image_shape_field : str | None, optional
-        Name of the model metadata field that contains the image shape. Default is None.
+        If provided, will be used instead of `image_shape_field`.
+    image_shape_field : str | None, default=None
+        Name of the model metadata field that contains the image shape.
         Not needed if `image_shape` is provided.
     """
     metadata = model.model_metadata.to_dict()
@@ -1461,7 +1569,7 @@ def _get_trackmate_unit(
     model_unit : str | None
         Unit of the model, used if `unit` is None.
     dimension : str
-        "space" or "time", for the warning.
+        ``"space"`` or ``"time"``, for the warning.
     default : str
         Unit used, with a warning, if neither `unit` nor `model_unit` is given.
 
@@ -1501,47 +1609,55 @@ def write_trackmate_xml(
     Parameters
     ----------
     model : Model
-        pycellin model containing the data to write.
+        The pycellin model containing the data to write.
     path : str | Path
         Path of the XML file to write.
-    space_unit : str, optional
-        Spatial unit of the TrackMate model, e.g. "µm". Defaults to the space unit
-        of the model, or "pixel", with a warning, if the model has none.
-    time_unit : str, optional
-        Temporal unit of the TrackMate model, e.g. "min". Defaults to the time unit
-        of the model, or "frame", with a warning, if the model has none.
-    image_path : str | Path | None, optional
-        Path to the image file associated with the model. Default is None.
+    space_unit : str | None, default=None
+        Spatial unit of the TrackMate model, e.g. ``"µm"``. If None, the space unit
+        of the model is used, or ``"pixel"``, with a warning, if the model has none.
+    time_unit : str | None, default=None
+        Temporal unit of the TrackMate model, e.g. ``"min"``. If None, the time unit
+        of the model is used, or ``"frame"``, with a warning, if the model has none.
+    image_path : str | Path | None, default=None
+        Path to the image file associated with the model.
         If provided, will be used instead of `image_path_field`.
-    image_path_field : str | None, optional
-        Name of the model metadata field that contains the image path. Default is None.
+    image_path_field : str | None, default=None
+        Name of the model metadata field that contains the image path.
         Not needed if `image_path` is provided.
-    image_shape : tuple[int, int, int, int, int] | None, optional
+    image_shape : tuple[int, int, int, int, int] | None, default=None
         Shape of the image associated with the model, in the format (T, C, Z, Y, X).
-        Default is None. If provided, will be used instead of `image_shape_field`.
+        If provided, will be used instead of `image_shape_field`.
         Not needed to open the XML in TrackMate, but useful for MATLAB scripting
         and the like.
-    image_shape_field : str | None, optional
-        Name of the model metadata field that contains the image shape. Default is None.
+    image_shape_field : str | None, default=None
+        Name of the model metadata field that contains the image shape.
         Not needed if `image_shape` is provided. Not needed to open the XML in
         TrackMate, but useful for MATLAB scripting and the like.
-    propagate_cycle_props : bool, optional
+    propagate_cycle_props : bool, default=False
         If True, cycle properties will be propagated to cell lineages before export.
         Useful if you want to export the cycle properties to TrackMate
-        and have them accessible in the tracks. Default is False: cycle properties
-        are not exported, since TrackMate has no cycle lineages, and a warning names
-        them.
+        and have them accessible in the tracks. If False, cycle properties are not
+        exported, since TrackMate has no cycle lineages, and a warning names them.
 
     Raises
     ------
     UpdateRequiredError
         If the model requires an update.
+    KeyError
+        If the model has no ``cell_x`` or ``cell_y`` property.
+    ValueError
+        If `propagate_cycle_props` is True and the model has no cycle lineages.
+        If the model has a property with the name of a TrackMate feature that
+        pycellin writes from another property, e.g. ``TRACK_ID``, written from
+        ``lineage_id``, or ``POSITION_Z``, written from ``cell_z`` (as 0 without
+        it).
+        If only some cells have a frame and their frames can't be deduced, see Notes.
 
     Warnings
     --------
     Quantitative analysis of cell cycle properties should not be done on cell
     lineages after propagation of cycle properties, UNLESS you account for the
-    number of cells in each cell cycle (`cycle_num_cells`). Otherwise you will
+    number of cells in each cell cycle (``cycle_num_cells``). Otherwise you will
     introduce a bias in your quantification.
     Indeed, after propagation, cycle properties (like interdivision time) become
     over-represented in long cell cycles since these properties are propagated on each
@@ -1553,17 +1669,29 @@ def write_trackmate_xml(
     TrackMate has a single spatial unit and a single temporal unit for all its
     features, while each pycellin property has its own unit. The values are written
     as they are, without conversion: check that the units of the properties match
-    `space_unit` and `time_unit`, e.g. with `model.get_properties_per_unit()`.
+    `space_unit` and `time_unit`, e.g. with `Model.get_properties_per_unit()`.
+
+    The image parameters are ignored when the model has the settings of a TrackMate
+    file, e.g. when it was loaded with `read_trackmate_xml`: these settings are
+    written as they are.
 
     TrackMate only supports numeric features. Non-numeric properties (strings,
     lists, polygons...) are not exported, except TrackMate's own properties and
-    'name' on cells or lineages, written as the display name of spots or tracks that
-    have no 'cell_name' or 'lineage_name'. Boolean properties are exported as integers
-    (1 for True, 0 for False).
+    ``name`` on cells or lineages, written as the display name of spots or tracks
+    that have no ``cell_name`` or ``lineage_name``. Boolean properties are exported
+    as integers (1 for True, 0 for False).
     Attributes of cells, links and lineages without a property declaration are not
     exported either, and a warning names them.
-    For example, a location tag added with `tag_names` holds strings and is not
-    exported: add it without `tag_names` to keep the integer tags.
+    For example, a location tag added by `Model.add_location_tag` with `tag_names`
+    holds strings and is not exported: add it without `tag_names` to keep the
+    integer tags.
+
+    The ``FRAME`` of the spots comes from the frame property of the model, a node
+    property called ``frame`` in any case, e.g. TrackMate's ``FRAME``. Cells without
+    frame, e.g. added with `Model.add_cell`, get their timepoint plus the difference
+    between frame and timepoint of the other cells, which must be the same for all of
+    them. Without frame property, the frames are the timepoints, which start at 0 at
+    the earliest cell.
     """
     _check_up_to_date(model)
     # We don't want to modify the original model.

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+
+"""Reader for TrackMate XML files."""
+
 import logging
 from copy import deepcopy
 from pathlib import Path
@@ -28,9 +31,12 @@ from pycellin.utils import _check_literal_type
 
 logger = logging.getLogger(__name__)
 
-# What the loader keeps of the spots outside tracks, and of the tracks. As in TrackMate,
-# visible spots have a VISIBILITY of 1, and visible tracks are listed in FilteredTracks.
+#: What the loader keeps of the spots outside tracks. As in TrackMate, visible spots
+#: have a VISIBILITY of 1. The signature of read_trackmate_xml() repeats these values,
+#: so that its documentation shows them: they need to be changed together.
 _LoneSpotsOption = Literal["none", "visible", "all"]
+#: What the loader keeps of the tracks. As in TrackMate, visible tracks are listed in
+#: FilteredTracks. The signature of read_trackmate_xml() repeats these values too.
 _TracksOption = Literal["visible", "all"]
 
 
@@ -38,10 +44,12 @@ def _get_units(
     element: ET._Element,
 ) -> dict[str, str]:
     """
-    Extracts units information from an XML element and returns it as a dictionary.
+    Extract units information from an XML element and return it as a dictionary.
 
     This function deep copies the attributes of the XML element into a dictionary,
-    then clears the element to free up memory.
+    then clears the element to free up memory. A missing spatial or time unit is set
+    to the default value of TrackMate, ``"pixel"`` or ``"frame"``, with a logged
+    warning.
 
     Parameters
     ----------
@@ -80,7 +88,7 @@ def _get_props_dict(
     ancestor: ET._Element,
 ) -> list[dict[str, str]]:
     """
-    Get all the properties of ancestor and return them as a list.
+    Get all the properties of `ancestor` and return them as a list.
 
     The ancestor is either a SpotFeatures, EdgeFeatures or a TrackFeatures tag.
 
@@ -107,12 +115,14 @@ def _get_props_dict(
     return props
 
 
-def _dimension_to_unit(trackmate_prop, units) -> str | None:
+def _dimension_to_unit(
+    trackmate_prop: dict[str, str], units: dict[str, str]
+) -> str | None:
     """
     Convert the dimension of a property to its unit.
 
-    FRAME has no dimension in TrackMate, but its unit is "frame", so that it can
-    be the reference time property of a model.
+    ``FRAME`` has no dimension in TrackMate, but its unit is ``"frame"``, so that it
+    can be the reference time property of a model.
 
     Parameters
     ----------
@@ -124,7 +134,12 @@ def _dimension_to_unit(trackmate_prop, units) -> str | None:
     Returns
     -------
     str | None
-        The unit of the property.
+        The unit of the property, or None if it has no unit.
+
+    Raises
+    ------
+    ValueError
+        If the dimension of the property is unknown.
     """
     if trackmate_prop["feature"] == "FRAME":
         return "frame"
@@ -164,17 +179,20 @@ def _convert_and_add_prop(
     trackmate_prop : dict[str, str]
         The property to add.
     prop_type : str
-        The type of the property to add (node, edge, or lineage).
+        The tag of the declaration of the property: ``"SpotFeatures"``,
+        ``"EdgeFeatures"`` or ``"TrackFeatures"``, for a node, edge or lineage
+        property.
     props_md : PropsMetadata
-        The PropsMetadata object to add the property to.
+        The `PropsMetadata` object to add the property to.
     units : dict[str, str]
         The temporal and spatial units of the TrackMate model
-        (`timeunits` and `spatialunits`).
+        (``timeunits`` and ``spatialunits``).
 
     Raises
     ------
     ValueError
         If the property type is invalid.
+        If the dimension of the property is unknown.
     """
     if trackmate_prop["isint"] == "true":
         prop_dtype = "int"
@@ -211,7 +229,7 @@ def _add_all_props(
     units: dict[str, str],
 ) -> None:
     """
-    Add all the TrackMate model properties to a PropsMetadata object.
+    Add all the TrackMate model properties to a `PropsMetadata` object.
 
     The model properties are divided in 3 categories: SpotFeatures, EdgeFeatures and
     TrackFeatures. Those properties are regrouped under the FeatureDeclarations tag.
@@ -225,10 +243,16 @@ def _add_all_props(
     ancestor : ET._Element
         The XML element that encompasses the information to be added.
     props_md : PropsMetadata
-        The PropsMetadata object to add the properties to.
+        The `PropsMetadata` object to add the properties to.
     units : dict[str, str]
         The temporal and spatial units of the TrackMate model
-        (`timeunits` and `spatialunits`).
+        (``timeunits`` and ``spatialunits``).
+
+    Raises
+    ------
+    ValueError
+        If features are declared under an unknown tag, or if a feature has an
+        unknown dimension.
     """
     event, element = next(iterator)
     while (event, element) != ("end", ancestor):
@@ -281,7 +305,7 @@ def _convert_attributes(
     The type to convert to is given by the properties metadata that stores all
     the properties info. The values of attributes that the file doesn't declare
     are left as strings: their data type is inferred once the whole file is read,
-    by `_declare_undeclared_attributes()`.
+    by ``_declare_undeclared_attributes()``.
 
     Parameters
     ----------
@@ -291,8 +315,9 @@ def _convert_attributes(
         The dictionary of properties that contains the information on how to convert
         the values of `attributes`.
     prop_type : str
-        The type of the property to convert (node, edge, or lineage).
-    undeclared : dict[str, set[str]] | None, optional
+        The type of the property to convert (``"node"``, ``"edge"`` or
+        ``"lineage"``).
+    undeclared : dict[str, set[str]] | None, default=None
         The keys of the attributes that the file doesn't declare, by property type,
         to which the undeclared keys of `attributes` are added. If None, they are
         not recorded.
@@ -300,7 +325,9 @@ def _convert_attributes(
     Raises
     ------
     ValueError
-        If a property has an invalid dtype (not "int", "float" nor "string").
+        If a property has an invalid dtype (not ``"int"``, ``"float"`` nor
+        ``"string"``).
+        If a value cannot be converted to the data type of its property.
     """
     # TODO: Rewrite this.
     for key, value in attributes.items():
@@ -345,7 +372,7 @@ def _infer_attribute_dtype(values: list[str]) -> str:
     Returns
     -------
     str
-        "int", "float" or "str".
+        ``"int"``, ``"float"`` or ``"str"``.
     """
     numbers = [value for value in values if value != "NaN"]
     try:
@@ -373,8 +400,8 @@ def _convert_attribute_value(value: str, dtype: str) -> int | float | str | None
     value : str
         The value to convert.
     dtype : str
-        The data type to convert to: "int", "float" or "str". NaN integers become
-        None.
+        The data type to convert to: ``"int"``, ``"float"`` or ``"str"``. NaN
+        integers become None.
 
     Returns
     -------
@@ -400,7 +427,7 @@ def _declare_undeclared_attributes(
     Convert and declare the attributes that the file doesn't declare.
 
     The data type of such an attribute is inferred from its values, see
-    `_infer_attribute_dtype()`, and it is declared without unit. An attribute of
+    ``_infer_attribute_dtype()``, and it is declared without unit. An attribute of
     several kinds of elements, e.g. of spots and tracks, gets a single declaration
     with several property types. Only the spots, edges and tracks that are kept
     are considered.
@@ -416,9 +443,9 @@ def _declare_undeclared_attributes(
     props_md : PropsMetadata
         The properties metadata to add the declarations to.
 
-    Warns
+    Notes
     -----
-    If some attributes are not declared in the file.
+    A warning is logged if some attributes are not declared in the file.
     """
     kept_tracks = {track_id for _, track_id in graph.nodes(data="TRACK_ID")}
     attrs_dicts = {
@@ -478,7 +505,7 @@ def _convert_ROI_coordinates(
     Raises
     ------
     KeyError
-        If the "ROI_N_POINTS" attribute is not found in the attributes dict.
+        If the ``ROI_N_POINTS`` attribute is not found in the attributes dict.
     """
     if "ROI_N_POINTS" not in attribs:
         raise KeyError(
@@ -523,7 +550,7 @@ def _add_all_nodes(
         node attributes.
     graph : nx.DiGraph
         Graph to add the nodes to.
-    undeclared : dict[str, set[str]] | None, optional
+    undeclared : dict[str, set[str]] | None, default=None
         The keys of the attributes that the file doesn't declare, by property type,
         to which the undeclared node attributes are added. If None, they are not
         recorded.
@@ -531,14 +558,12 @@ def _add_all_nodes(
     Returns
     -------
     bool
-        True if the model has segmentation data, False otherwise
+        True if the model has segmentation data, False otherwise.
 
     Raises
     ------
     ValueError
         If a node attribute cannot be converted to the expected type.
-    KeyError
-        If a node attribute is not found in the properties metadata.
     """
     segmentation = False
     event, element = next(iterator)
@@ -550,25 +575,15 @@ def _add_all_nodes(
             # conversion based on these attributes type (attribute `isint`)
             # as defined in the properties metadata.
             attribs = deepcopy(element.attrib)
-            try:
-                _convert_attributes(attribs, props_md.properties, "node", undeclared)
-            except ValueError as err:
-                print(f"ERROR: {err} Please check the XML file.")
-                raise
+            _convert_attributes(attribs, props_md.properties, "node", undeclared)
 
             # The ROI coordinates are not stored in a tag attribute but in
             # the tag text. So we need to extract then format them.
             # In case of a single-point detection, the `ROI_N_POINTS` attribute
             # is not present.
-            if segmentation:
-                try:
-                    _convert_ROI_coordinates(element, attribs)
-                except KeyError as err:
-                    print(err)
-            else:
-                if "ROI_N_POINTS" in attribs:
-                    segmentation = True
-                    _convert_ROI_coordinates(element, attribs)
+            if "ROI_N_POINTS" in attribs:
+                segmentation = True
+                _convert_ROI_coordinates(element, attribs)
 
             # Now that all the node attributes have been updated, we can add
             # them to the graph.
@@ -599,7 +614,7 @@ def _add_edge(
     This function extracts source and target node identifiers from the
     given XML element, along with any additional attributes defined
     within. It then adds an edge between these nodes in the specified
-    graph. If the nodes have a 'TRACK_ID' attribute, it ensures consistency
+    graph. If the nodes have a ``TRACK_ID`` attribute, it ensures consistency
     with the current track ID.
 
     Parameters
@@ -613,24 +628,19 @@ def _add_edge(
         The graph to which the edge and its attributes will be added.
     current_track_id : int
         Track ID of the track holding the edge.
-    undeclared : dict[str, set[str]] | None, optional
+    undeclared : dict[str, set[str]] | None, default=None
         The keys of the attributes that the file doesn't declare, by property type,
         to which the undeclared edge attributes are added. If None, they are not
         recorded.
 
     Raises
     ------
-    AssertionError
-        If the 'TRACK_ID' attribute of either the source or target node
-        does not match the current track ID, indicating an inconsistency
-        in track assignment.
+    ValueError
+        If an edge attribute cannot be converted to the expected type, or if a spot
+        of the edge is already in another track.
     """
     attribs = deepcopy(element.attrib)
-    try:
-        _convert_attributes(attribs, props_md.properties, "edge", undeclared)
-    except ValueError as err:
-        print(f"ERROR: {err} Please check the XML file.")
-        raise
+    _convert_attributes(attribs, props_md.properties, "edge", undeclared)
     try:
         entry_node_id = int(attribs["SPOT_SOURCE_ID"])
         exit_node_id = int(attribs["SPOT_TARGET_ID"])
@@ -646,17 +656,13 @@ def _add_edge(
         # Adding the current track ID to the nodes of the newly created
         # edge. This will be useful later to filter nodes by track and
         # add the saved tracks attributes (as returned by this method).
-        err_msg = f"Incoherent track ID for nodes {entry_node_id} and {exit_node_id}."
-        entry_node = graph.nodes[entry_node_id]
-        if "TRACK_ID" not in entry_node:
-            entry_node["TRACK_ID"] = current_track_id
-        else:
-            assert entry_node["TRACK_ID"] == current_track_id, err_msg
-        exit_node = graph.nodes[exit_node_id]
-        if "TRACK_ID" not in exit_node:
-            exit_node["TRACK_ID"] = current_track_id
-        else:
-            assert exit_node["TRACK_ID"] == current_track_id, err_msg
+        for node_id in (entry_node_id, exit_node_id):
+            track_id = graph.nodes[node_id].setdefault("TRACK_ID", current_track_id)
+            if track_id != current_track_id:
+                raise ValueError(
+                    f"Spot {node_id} is in tracks {track_id} and {current_track_id}, "
+                    "but a spot can only be in one track. Please check the XML file."
+                )
     finally:
         element.clear()
 
@@ -686,9 +692,9 @@ def _build_tracks(
     props_md : PropsMetadata
         An object holding the properties metadata information used
         to convert the edge and tracks attributes.
-    graph: nx.DiGraph
+    graph : nx.DiGraph
         The graph to which the edges and their attributes will be added.
-    undeclared : dict[str, set[str]] | None, optional
+    undeclared : dict[str, set[str]] | None, default=None
         The keys of the attributes that the file doesn't declare, by property type,
         to which the undeclared edge and track attributes are added. If None, they
         are not recorded.
@@ -698,6 +704,15 @@ def _build_tracks(
     list[dict[str, Any]]
         A list of dictionaries, each representing the attributes for a
         track.
+
+    Raises
+    ------
+    KeyError
+        If a Track element has no ``TRACK_ID`` attribute.
+    ValueError
+        If an edge or track attribute cannot be converted to the expected type, if
+        an Edge element is outside any Track element, or if a spot is in several
+        tracks.
     """
     tracks_attributes = []
     current_track_id = None
@@ -706,11 +721,7 @@ def _build_tracks(
         # Saving the current track information.
         if element.tag == "Track" and event == "start":
             attribs = deepcopy(element.attrib)
-            try:
-                _convert_attributes(attribs, props_md.properties, "lineage", undeclared)
-            except ValueError as err:
-                print(f"ERROR: {err} Please check the XML file.")
-                raise
+            _convert_attributes(attribs, props_md.properties, "lineage", undeclared)
             tracks_attributes.append(attribs)
             try:
                 current_track_id = attribs["TRACK_ID"]
@@ -723,7 +734,11 @@ def _build_tracks(
 
         # Edge creation.
         if element.tag == "Edge" and event == "start":
-            assert current_track_id is not None, "No current track ID."
+            if current_track_id is None:
+                raise ValueError(
+                    "An Edge element is outside any Track element. Please check the "
+                    "XML file."
+                )
             _add_edge(element, props_md, graph, current_track_id, undeclared)
 
         event, element = next(iterator)
@@ -748,28 +763,16 @@ def _get_filtered_tracks_id(
     Returns
     -------
     list[int]
-        List of tracks ID to identify the tracks to keep.
+        List of track IDs to identify the tracks to keep.
 
-    Raises
-    ------
-    KeyError
-        If the "TRACK_ID" attribute is not found
-        in the attributes of the current element.
+    Notes
+    -----
+    A warning is logged for each element without a ``TRACK_ID`` attribute, which is
+    ignored.
     """
     filtered_tracks_id = []
     event, element = next(iterator)
-    attribs = deepcopy(element.attrib)
-    try:
-        filtered_tracks_id.append(int(attribs["TRACK_ID"]))
-    except KeyError as err:
-        msg = (
-            f"No key {err} in the attributes of current element "
-            f"'{element.tag}'. Ignoring this track."
-        )
-        logger.warning(msg)
-
     while (event, element) != ("end", ancestor):
-        event, element = next(iterator)
         if element.tag == "TrackID" and event == "start":
             attribs = deepcopy(element.attrib)
             try:
@@ -780,6 +783,7 @@ def _get_filtered_tracks_id(
                     f"'{element.tag}'. Ignoring this track."
                 )
                 logger.warning(msg)
+        event, element = next(iterator)
 
     return filtered_tracks_id
 
@@ -798,9 +802,18 @@ def _update_props_metadata(
         The properties metadata to update.
     units : dict[str, str]
         The temporal and spatial units of the TrackMate model
-        (`timeunits` and `spatialunits`).
+        (``timeunits`` and ``spatialunits``).
     segmentation : bool
         True if the model has segmentation data, False otherwise.
+
+    Raises
+    ------
+    KeyError
+        If the ``POSITION_X``, ``POSITION_Y``, ``POSITION_Z`` or ``TRACK_ID``
+        property is missing in the properties metadata.
+    ValueError
+        If a feature already has the identifier that pycellin gives to another
+        feature, e.g. ``cell_x`` for ``POSITION_X``.
     """
     # Node properties.
     prop_cell_id = create_cell_id_property("TrackMate")
@@ -835,6 +848,8 @@ def _update_props_metadata(
     props_md.properties["lineage_id"].prop_type = (
         PropertyType.NODE | PropertyType.LINEAGE
     )
+    # Cell and cycle lineages share their lineage ID, as with the other readers.
+    props_md.properties["lineage_id"].lineage_type = "both"
     prop_filtered_track = Property(
         identifier="FilteredTrack",
         name="FilteredTrack",
@@ -931,18 +946,19 @@ def _filter_spots_and_tracks(
     """
     Remove from the graph the spots outside tracks and the tracks not to load.
 
-    The spots of a track are kept or removed with it, whatever their VISIBILITY.
+    The spots of a track are kept or removed with it, whatever their ``VISIBILITY``.
 
     Parameters
     ----------
     graph : nx.DiGraph
         Graph holding all the spots and links of the file. The spots in a track
-        have a 'TRACK_ID' attribute.
-    lone_spots : {"none", "visible", "all"}
-        Spots outside tracks to keep: none, only the visible ones (VISIBILITY of 1,
-        or no VISIBILITY), or all.
-    tracks : {"visible", "all"}
-        Tracks to keep: only the visible ones (listed in FilteredTracks), or all.
+        have a ``TRACK_ID`` attribute.
+    lone_spots : _LoneSpotsOption
+        Spots outside tracks to keep: none (``"none"``), only the visible ones
+        (``"visible"``: ``VISIBILITY`` of 1, or no ``VISIBILITY``), or all (``"all"``).
+    tracks : _TracksOption
+        Tracks to keep: only the visible ones (``"visible"``: listed in
+        FilteredTracks), or all (``"all"``).
     visible_tracks : set[int] | None
         IDs of the tracks listed in FilteredTracks, or None when the file has no
         FilteredTracks tag: all tracks are then visible.
@@ -972,7 +988,7 @@ def _parse_model_tag(
     Read an XML file and convert the model data into several graphs.
 
     Each TrackMate track and its associated data described in the XML file
-    are modeled as networkX directed graphs. Spots are modeled as graph
+    are modeled as NetworkX directed graphs. Spots are modeled as graph
     nodes, and edges as graph edges. Spot, edge and track properties are
     stored in node, edge and graph attributes, respectively.
 
@@ -980,22 +996,41 @@ def _parse_model_tag(
     ----------
     xml_path : str | Path
         Path of the XML file to process.
-    lone_spots : {"none", "visible", "all"}
-        Spots outside tracks to keep: none, only the visible ones, or all.
-    tracks : {"visible", "all"}
-        Tracks to keep: only the visible ones, or all.
+    lone_spots : _LoneSpotsOption
+        Spots outside tracks to keep: none (``"none"``), only the visible ones
+        (``"visible"``), or all (``"all"``).
+    tracks : _TracksOption
+        Tracks to keep: only the visible ones (``"visible"``), or all (``"all"``).
 
     Returns
     -------
     tuple[dict[str, str], PropsMetadata, Data]
         A tuple containing the space and time units, the properties metadata
         and the data of the model.
+
+    Raises
+    ------
+    ValueError
+        If an attribute of a spot, edge or track cannot be converted to the data
+        type of its feature, or if a feature has an unknown dimension.
+        If an Edge element is outside any Track element, or if a spot is in several
+        tracks.
+        If several disconnected parts of the graph have the same track ID.
+        If a feature already has the identifier that pycellin gives to another
+        feature, e.g. ``cell_x`` for ``POSITION_X``.
+    KeyError
+        If a Track element has no ``TRACK_ID`` attribute.
+        If the file has no ``POSITION_X``, ``POSITION_Y``, ``POSITION_Z`` or
+        ``TRACK_ID`` feature.
     """
     props_md = PropsMetadata()
     # Keys of the attributes that the file doesn't declare, by property type.
     undeclared: dict[str, set[str]] = {}
     # IDs of the tracks listed in FilteredTracks. None if the file has no such tag.
     visible_tracks: set[int] | None = None
+    # A file without AllSpots or AllTracks element has no spots or no tracks.
+    segmentation = False
+    tracks_attributes: list[dict[str, Any]] = []
 
     # Creation of a graph that will hold all the tracks described
     # in the XML file. This means that if there's more than one track,
@@ -1005,40 +1040,44 @@ def _parse_model_tag(
     # So as not to load the entire XML file into memory at once, we're
     # using an iterator to browse over the tags one by one.
     # The events 'start' and 'end' correspond respectively to the opening
-    # and the closing of the considered tag.
-    it = ET.iterparse(xml_path, events=["start", "end"])
-    _, root = next(it)  # Saving the root of the tree for later cleaning.
+    # and the closing of the considered tag. The iterator stops before the end of
+    # the file, so the file is opened here, to be closed in any case.
+    with open(xml_path, "rb") as file:
+        it = ET.iterparse(file, events=["start", "end"])
+        _, root = next(it)  # Saving the root of the tree for later cleaning.
 
-    for event, element in it:
-        # Get the temporal and spatial units of the model. They will be
-        # injected into each Property.
-        if element.tag == "Model" and event == "start":
-            units = _get_units(element)
-            root.clear()  # Cleaning the tree to free up some memory.
-            # All the browsed subelements of `root` are deleted.
+        for event, element in it:
+            # Get the temporal and spatial units of the model. They will be
+            # injected into each Property.
+            if element.tag == "Model" and event == "start":
+                units = _get_units(element)
+                root.clear()  # Cleaning the tree to free up some memory.
+                # All the browsed subelements of `root` are deleted.
 
-        # Get the spot, edge and track properties and add them to the
-        # properties metadata.
-        if element.tag == "FeatureDeclarations" and event == "start":
-            _add_all_props(it, element, props_md, units)
-            root.clear()
+            # Get the spot, edge and track properties and add them to the
+            # properties metadata.
+            if element.tag == "FeatureDeclarations" and event == "start":
+                _add_all_props(it, element, props_md, units)
+                root.clear()
 
-        # Adding the spots as nodes.
-        if element.tag == "AllSpots" and event == "start":
-            segmentation = _add_all_nodes(it, element, props_md, graph, undeclared)
-            root.clear()
+            # Adding the spots as nodes.
+            if element.tag == "AllSpots" and event == "start":
+                segmentation = _add_all_nodes(it, element, props_md, graph, undeclared)
+                root.clear()
 
-        # Adding the tracks as edges.
-        if element.tag == "AllTracks" and event == "start":
-            tracks_attributes = _build_tracks(it, element, props_md, graph, undeclared)
-            root.clear()
+            # Adding the tracks as edges.
+            if element.tag == "AllTracks" and event == "start":
+                tracks_attributes = _build_tracks(
+                    it, element, props_md, graph, undeclared
+                )
+                root.clear()
 
-        # Getting the tracks visible in TrackMate.
-        if element.tag == "FilteredTracks" and event == "start":
-            visible_tracks = set(_get_filtered_tracks_id(it, element))
+            # Getting the tracks visible in TrackMate.
+            if element.tag == "FilteredTracks" and event == "start":
+                visible_tracks = set(_get_filtered_tracks_id(it, element))
 
-        if element.tag == "Model" and event == "end":
-            break  # We are not interested in the following data.
+            if element.tag == "Model" and event == "end":
+                break  # We are not interested in the following data.
 
     # The spots and tracks are filtered once all of them are read, since files written
     # by other tools can have the spots after the tracks.
@@ -1078,7 +1117,10 @@ def _parse_model_tag(
             visible_tracks is None or lin.graph["lineage_id"] in visible_tracks
         )
 
-    return units, props_md, Data({lin.graph["lineage_id"]: lin for lin in lineages})
+    # Without spots to load, the graph gives a single empty lineage, left out as in
+    # read_ctc().
+    data = Data({lin.graph["lineage_id"]: lin for lin in lineages if len(lin) > 0})
+    return units, props_md, data
 
 
 def _get_specific_tags(
@@ -1086,13 +1128,13 @@ def _get_specific_tags(
     tag_names: list[str],
 ) -> dict[str, ET._Element]:
     """
-    Extract specific tags from an XML file and returns them in a dictionary.
+    Extract specific tags from an XML file and return them in a dictionary.
 
     This function parses an XML file, searching for specific tag names
     provided by the user. Once a tag is found, it is deep copied and
-    stored in a dictionary with the tag name as the key. The search
-    stops when all specified tags have been found or the end of the
-    file is reached.
+    stored in a dictionary with the tag name as the key. The whole file is
+    searched for each tag name, and the last element found with this name is
+    kept.
 
     Parameters
     ----------
@@ -1106,13 +1148,13 @@ def _get_specific_tags(
     dict[str, ET._Element]
         A dictionary where each key is a tag name from `tag_names` that
         was found in the XML file, and the corresponding value is the
-        deep copied `ET._Element` object for that tag.
+        deep copied ``ET._Element`` object for that tag.
     """
     dict_tags = {}
     for tag in tag_names:
-        it = ET.iterparse(xml_path, tag=tag)
-        for _, element in it:
-            dict_tags[element.tag] = deepcopy(element)
+        with open(xml_path, "rb") as file:
+            for _, element in ET.iterparse(file, tag=tag):
+                dict_tags[element.tag] = deepcopy(element)
     return dict_tags
 
 
@@ -1130,13 +1172,13 @@ def _get_trackmate_version(
     Returns
     -------
     str
-        The version of TrackMate used to generate the XML file. If the
-        version cannot be found, "unknown" is returned.
+        The version of TrackMate used to generate the XML file. If the file has no
+        TrackMate element, or if this element has no version, ``"unknown"`` is
+        returned.
     """
-    it = ET.iterparse(xml_path, tag="TrackMate")
-    for _, element in it:
-        version = str(element.attrib["version"])
-        return version
+    with open(xml_path, "rb") as file:
+        for _, element in ET.iterparse(file, tag="TrackMate"):
+            return str(element.attrib.get("version", "unknown"))
     return "unknown"
 
 
@@ -1157,9 +1199,10 @@ def _get_time_step(settings: ET._Element) -> float:
     Raises
     ------
     ValueError
-        If the 'timeinterval' attribute is missing or cannot be converted to float.
+        If the ``timeinterval`` attribute cannot be converted to float.
     KeyError
-        If the 'ImageData' element is not found in the settings.
+        If the ``timeinterval`` attribute is missing, or if the ImageData element
+        is not found in the settings.
     """
     for element in settings.iterchildren("ImageData"):
         try:
@@ -1188,16 +1231,17 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
     Returns
     -------
     dict[str, float]
-        The pixel width and heigth in the TrackMate model.
+        The pixel width, height and depth in the TrackMate model, with the
+        ``pixel_width``, ``pixel_height`` and ``pixel_depth`` keys.
 
     Raises
     ------
     ValueError
-        If the 'pixelwidth', 'pixelheight' or 'voxeldepth' attribute
+        If the ``pixelwidth``, ``pixelheight`` or ``voxeldepth`` attribute
         cannot be converted to float.
     KeyError
-        If the 'pixelwidth', 'pixelheight' or 'voxeldepth' attribute is missing,
-        or if the 'ImageData' element is not found in the settings.
+        If the ``pixelwidth``, ``pixelheight`` or ``voxeldepth`` attribute is
+        missing, or if the ImageData element is not found in the settings.
     """
     for element in settings.iterchildren("ImageData"):
         pixel_size = {}
@@ -1227,25 +1271,28 @@ def _add_missing_position_t(
     time_unit: str,
 ) -> None:
     """
-    Compute POSITION_T from FRAME when no spot of the file has it.
+    Compute ``POSITION_T`` from ``FRAME`` when no spot of the file has it.
 
-    TrackMate requires FRAME but not POSITION_T, which it defines as FRAME times
-    the frame interval of the image. Files not written by TrackMate can lack it.
+    TrackMate requires ``FRAME`` but not ``POSITION_T``, which it defines as
+    ``FRAME`` times the frame interval of the image. Files not written by TrackMate
+    can lack it.
 
     Parameters
     ----------
     data : Data
-        The data of the model, whose cells get POSITION_T.
+        The data of the model, whose cells get ``POSITION_T``.
     props_md : PropsMetadata
-        The properties metadata, where POSITION_T is declared if it is not already.
+        The properties metadata, where ``POSITION_T`` is declared if it is not
+        already.
     frame_interval : float
         The time interval between two frames of the image, in `time_unit`.
     time_unit : str
         The temporal unit of the TrackMate model.
 
-    Warns
+    Notes
     -----
-    If POSITION_T is computed, since its values don't come from the file.
+    A warning is logged if ``POSITION_T`` is computed, since its values don't come
+    from the file.
     """
     cells = [
         cell for lin in data.cell_lineages.values() for _, cell in lin.nodes(data=True)
@@ -1274,50 +1321,56 @@ def read_trackmate_xml(
     path: str | Path,
     *,
     reference_time_prop: str = "POSITION_T",
-    lone_spots: _LoneSpotsOption = "none",
-    tracks: _TracksOption = "visible",
+    lone_spots: Literal["none", "visible", "all"] = "none",
+    tracks: Literal["visible", "all"] = "visible",
 ) -> Model:
     """
     Read a TrackMate XML file and convert the tracks data to directed acyclic graphs.
 
     Each TrackMate track and its associated data described in the XML file
-    are modeled as networkX directed graphs. Spots are modeled as graph
+    are modeled as NetworkX directed graphs. Spots are modeled as graph
     nodes, and edges as graph edges. Spot, edge and track properties are
     stored in node, edge and graph attributes, respectively.
     The rest of the information contained in the XML file is stored either
-    as a metadata dict (TrackMate version, log, settings...) or in the Model
+    as a metadata dict (TrackMate version, log, settings...) or in the `Model`
     properties metadata.
 
     Parameters
     ----------
     path : str | Path
         Path of the XML file to process.
-    reference_time_prop : str, optional
+    reference_time_prop : str, default="POSITION_T"
         Name of the property that contains the time information of the model.
-        "POSITION_T" by default as it is what TrackMate uses. TrackMate doesn't
-        require it, so if no spot has it, it is computed from "FRAME" and the frame
-        interval of the image, with a warning. "FRAME" counts the time in frames,
-        with a time step of 1. Any other property must match the time unit and
-        timestep of the TrackMate model (i.e. the properties of the image on which
-        TrackMate was applied).
-    lone_spots : {"none", "visible", "all"}, optional
-        Spots outside tracks to load, each as a single-cell lineage: "none" (default),
-        "visible" for only the spots that TrackMate shows, i.e. that passed its spot
-        filters (VISIBILITY of 1, or no VISIBILITY), or "all".
-    tracks : {"visible", "all"}, optional
-        Tracks to load, with all their spots: "visible" (default) for only the tracks
+        ``POSITION_T`` is the one TrackMate uses. TrackMate doesn't require it, so
+        if no spot has it, it is computed from ``FRAME`` and the frame interval of
+        the image, with a warning. ``FRAME`` counts the time in frames, with a time
+        step of 1. Any other property must match the time unit and time step of
+        the TrackMate model (i.e. the properties of the image on which TrackMate
+        was applied).
+    lone_spots : Literal["none", "visible", "all"], default="none"
+        Spots outside tracks to load, each as a single-cell lineage: ``"none"``,
+        ``"visible"`` for only the spots that TrackMate shows, i.e. that passed its
+        spot filters (``VISIBILITY`` of 1, or no ``VISIBILITY``), or ``"all"``.
+    tracks : Literal["visible", "all"], default="visible"
+        Tracks to load, with all their spots: ``"visible"`` for only the tracks
         that TrackMate shows, i.e. that passed its track filters (listed in
-        FilteredTracks, or all of them without this tag), or "all".
+        FilteredTracks, or all of them without this tag), or ``"all"``.
 
     Returns
     -------
     Model
-        A pycellin Model that contains all the data from the TrackMate XML file.
+        A pycellin `Model` that contains all the data from the TrackMate XML file.
 
     Raises
     ------
     ValueError
         If `lone_spots` or `tracks` is not one of its options.
+        If a value of the file cannot be converted to its data type, if a feature
+        has an unknown dimension, or if a spot is in several tracks.
+    KeyError
+        If a track has no ``TRACK_ID``, if the file has no Settings element, or if
+        its ImageData element is missing or lacks the pixel size or, unless
+        `reference_time_prop` is ``"FRAME"``, the frame interval.
     """
     if not _check_literal_type(lone_spots, _LoneSpotsOption):
         raise ValueError(

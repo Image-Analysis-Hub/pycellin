@@ -1,3 +1,5 @@
+"""Reader and writer for pickle files of Pycellin models."""
+
 from .reader import read_pickle
 from .writer import write_pickle
 

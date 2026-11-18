@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
 
 """
-reader.py
+Reader for trackpy DataFrames.
 
-This module is part of the pycellin package.
-
-This module provides functions to load and process trackpy data into pycellin models.
-It includes a function to load a trackpy DataFrame into a pycellin model and helper
-functions to build the lineage graphs and to create metadata and properties.
-
-References:
+References
+----------
 - trackpy: D. B. Allan, T. Caswell, N. C. Keim, C. M. van der Wel and R. W. Verweij,
-“soft-matter/trackpy: v0.6.4”. Zenodo, Jul. 10, 2024. doi: 10.5281/zenodo.12708864.
+  “soft-matter/trackpy: v0.6.4”. Zenodo, Jul. 10, 2024. doi: 10.5281/zenodo.12708864.
 - trackpy GitHub: https://github.com/soft-matter/trackpy
 """
 
@@ -95,10 +90,10 @@ def _add_nodes(graph: nx.DiGraph, df: pd.DataFrame) -> None:
     Add nodes to the graph from the DataFrame.
 
     One node is created per row of the DataFrame. Its attributes are the row values,
-    with their data type, 'frame' and 'particle' cast to int and the trackpy
-    coordinates 'x', 'y' and 'z' renamed to 'cell_x', 'cell_y' and 'cell_z'. A
-    'cell_id' equal to the position of the row in the DataFrame is added, and also
-    used as node ID.
+    with their data type, ``frame`` and ``particle`` cast to int and the trackpy
+    coordinates ``x``, ``y`` and ``z`` renamed to ``cell_x``, ``cell_y`` and
+    ``cell_z``. A ``cell_id`` equal to the position of the row in the DataFrame is
+    added, and also used as node ID.
 
     Parameters
     ----------
@@ -106,6 +101,11 @@ def _add_nodes(graph: nx.DiGraph, df: pd.DataFrame) -> None:
         The graph to which nodes will be added.
     df : pd.DataFrame
         The DataFrame containing trackpy data.
+
+    Raises
+    ------
+    KeyError
+        If `df` is not empty and has no ``frame`` or ``particle`` column.
     """
     # Unlike iterrows(), to_dict() keeps the integers of a row whose values are all
     # numbers, instead of turning them into floats.
@@ -147,10 +147,10 @@ def _get_column_dtype(column: pd.Series) -> str:
     """
     Return the data type of a DataFrame column, in Python type hint syntax.
 
-    Boolean, integer and float columns give "bool", "int" and "float". For other
-    columns, the data type is inferred from the values, missing values ignored,
-    e.g. "str". A column without any value gives its pandas data type, e.g.
-    "object".
+    Boolean, integer and float columns give ``"bool"``, ``"int"`` and ``"float"``.
+    For other columns, the data type is inferred from the values, missing values
+    ignored, e.g. ``"str"``. A column without any value gives its pandas data type,
+    e.g. ``"object"``.
 
     Parameters
     ----------
@@ -184,24 +184,18 @@ def _create_metadata(
 
     Parameters
     ----------
-    space_unit : str, optional
-        The spatial unit of the data. If not provided, it will be set to 'pixel'
-        by default.
-    pixel_width : float, optional
-        The pixel width in the spatial unit. If not provided, it will be set to 1.0
-        by default.
-    pixel_height : float, optional
-        The pixel height in the spatial unit. If not provided, it will be set to 1.0
-        by default.
-    pixel_depth : float, optional
-        The pixel depth in the spatial unit. If not provided, it will be set to 1.0
-        by default.
-    time_unit : str, optional
-        The temporal unit of the data. If not provided, it will be set to 'frame'
-        by default.
-    time_step : float, optional
-        The time step in the temporal unit. If not provided, it will be set to 1.0
-        by default.
+    space_unit : str | None, default=None
+        The spatial unit of the data. If None, ``"pixel"`` is used.
+    pixel_width : float | None, default=None
+        The pixel width in the spatial unit. If None, 1.0 is used.
+    pixel_height : float | None, default=None
+        The pixel height in the spatial unit. If None, 1.0 is used.
+    pixel_depth : float | None, default=None
+        The pixel depth in the spatial unit. If None, 1.0 is used.
+    time_unit : str | None, default=None
+        The temporal unit of the data. If None, ``"frame"`` is used.
+    time_step : float | None, default=None
+        The time step in the temporal unit. If None, 1.0 is used.
 
     Returns
     -------
@@ -226,13 +220,13 @@ def _create_PropsMetadata(
     dtypes: dict[str, str], metadata: dict[str, Any], time_prop: str
 ) -> PropsMetadata:
     """
-    Return a PropsMetadata object populated with the needed properties.
+    Return a `PropsMetadata` object populated with the needed properties.
 
     Every column of the trackpy DataFrame is declared. The coordinate columns
-    ('x', 'y', 'z') are declared as 'cell_x', 'cell_y' and 'cell_z', and the
-    other columns under their own name, with their data type. The columns written
-    by trackpy get a name and a description, and the sizes and static errors the
-    unit of the coordinates.
+    (``x``, ``y``, ``z``) are declared as ``cell_x``, ``cell_y`` and ``cell_z``, and
+    the other columns under their own name, with their data type. The columns
+    written by trackpy get a name and a description, and the sizes and static
+    errors the unit of the coordinates.
 
     Parameters
     ----------
@@ -240,7 +234,7 @@ def _create_PropsMetadata(
         Data types of the columns of the trackpy DataFrame, by column name.
     metadata : dict[str, Any]
         Metadata dictionary containing information about the data, as created
-        by `_create_metadata()`. Its 'space_unit' and 'time_unit' are used as
+        by ``_create_metadata()``. Its ``space_unit`` and ``time_unit`` are used as
         property units.
     time_prop : str
         Identifier of the time property computed by the loader.
@@ -248,7 +242,8 @@ def _create_PropsMetadata(
     Returns
     -------
     PropsMetadata
-        An instance of PropsMetadata populated with pycellin and trackpy properties.
+        An instance of `PropsMetadata` populated with pycellin and trackpy
+        properties.
     """
     props_md = PropsMetadata()
 
@@ -307,47 +302,43 @@ def from_trackpy(
     """
     Load a trackpy DataFrame into a pycellin model.
 
-    The DataFrame must contain the 'frame' and 'particle' columns produced by
+    The DataFrame must contain the ``frame`` and ``particle`` columns produced by
     trackpy linking. Each row becomes a cell, and the cells of a same particle
     are linked by ascending frame. Each connected component becomes a lineage.
     The DataFrame is not modified.
 
-    Cell times are stored in two node properties: 'frame', read from the DataFrame,
-    and a time property computed by the loader (named by `reference_time_prop`),
-    equal to frame * time_step and expressed in time_unit. The computed time
-    property is the reference time property of the model.
+    Cell times are stored in two node properties: ``frame``, read from the
+    DataFrame, and a time property computed by the loader (named by
+    `reference_time_prop`), equal to ``frame * time_step`` and expressed in
+    `time_unit`. The computed time property is the reference time property of the
+    model.
 
     The other columns of the DataFrame become cell properties too, declared with
-    the data type of the column. The columns written by trackpy ('mass', 'size',
-    'ecc', 'signal', 'raw_mass', 'ep'...) get a description, and the sizes and
-    static errors the unit of the coordinates.
+    the data type of the column. The columns written by trackpy (``mass``,
+    ``size``, ``ecc``, ``signal``, ``raw_mass``, ``ep``...) get a description, and
+    the sizes and static errors the unit of the coordinates.
 
     Parameters
     ----------
     df : pd.DataFrame
         The DataFrame containing trackpy data.
-    space_unit : str, optional
-        The spatial unit of the data. If not provided, it will be set to 'pixel'
-        by default.
-    pixel_width : float, optional
-        The pixel width in the spatial unit. If not provided, it will be set to 1.0
-        by default.
-    pixel_height : float, optional
-        The pixel height in the spatial unit. If not provided, it will be set to 1.0
-        by default.
-    pixel_depth : float, optional
-        The pixel depth in the spatial unit. If not provided, it will be set to 1.0
-        by default.
-    time_unit : str, optional
-        The temporal unit of the data. If not provided, it will be set to 'frame'
-        by default.
-    time_step : float, optional
-        The time between two consecutive frames, in the temporal unit. If not
-        provided, it will be set to 1.0 by default.
-    reference_time_prop : str, optional
-        Identifier of the time property built from the 'frame' column
-        (frame * time_step), which becomes the reference time property of the model.
-        Defaults to "time". It must not be the name of a column of `df`.
+    space_unit : str | None, default=None
+        The spatial unit of the data. If None, ``"pixel"`` is used.
+    pixel_width : float | None, default=None
+        The pixel width in the spatial unit. If None, 1.0 is used.
+    pixel_height : float | None, default=None
+        The pixel height in the spatial unit. If None, 1.0 is used.
+    pixel_depth : float | None, default=None
+        The pixel depth in the spatial unit. If None, 1.0 is used.
+    time_unit : str | None, default=None
+        The temporal unit of the data. If None, ``"frame"`` is used.
+    time_step : float | None, default=None
+        The time between two consecutive frames, in the temporal unit. If None, 1.0
+        is used.
+    reference_time_prop : str, default="time"
+        Identifier of the time property built from the ``frame`` column
+        (``frame * time_step``), which becomes the reference time property of the
+        model. It must not be the name of a column of `df`.
 
     Returns
     -------
@@ -358,10 +349,12 @@ def from_trackpy(
     ------
     ValueError
         If `df` has both a trackpy coordinate column and its pycellin counterpart
-        (e.g. 'x' and 'cell_x'), if it has a 'cell_id', 'lineage_id' or
-        'timepoint' column, which pycellin creates, or if `reference_time_prop` is
-        already a column of `df` or is a property written by pycellin ('cell_id',
-        'lineage_id', 'timepoint' or a renamed coordinate).
+        (e.g. ``x`` and ``cell_x``), if it has a ``cell_id``, ``lineage_id`` or
+        ``timepoint`` column, which pycellin creates, or if `reference_time_prop` is
+        already a column of `df` or is a property written by pycellin (``cell_id``,
+        ``lineage_id``, ``timepoint`` or a renamed coordinate).
+    KeyError
+        If `df` is not empty and has no ``frame`` or ``particle`` column.
     """
     coord_props = {f"cell_{axis}" for axis in ("x", "y", "z") if axis in df.columns}
     conflicting_columns = sorted(coord_props & set(df.columns))

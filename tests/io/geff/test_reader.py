@@ -75,15 +75,6 @@ def geff_axes():
 
 
 @pytest.fixture
-def duplicate_time_axes():
-    """A list of geff axes with two matching time entries for the same prop."""
-    return [
-        geff_spec.Axis(name="frame", type="time", unit="second"),
-        geff_spec.Axis(name="frame", type="time", unit="millisecond"),
-    ]
-
-
-@pytest.fixture
 def geff_md_axes(geff_axes, geff_node_props_md):
     """GeffMetadata with axes and node properties metadata."""
     return geff.GeffMetadata(
@@ -519,7 +510,7 @@ class TestIdentifyLinIdProp:
             )
         assert len(caplog.records) == 2
         assert caplog.records[0].levelname == "INFO"
-        assert "infered from GEFF metadata" in caplog.records[0].message
+        assert "inferred from GEFF metadata" in caplog.records[0].message
         assert caplog.records[1].levelname == "INFO"
         assert "inferred from GEFF track_node_props" in caplog.records[1].message
 
@@ -534,7 +525,7 @@ class TestIdentifyLinIdProp:
             result = _identify_lin_id_prop("missing_key", None, graph_lin_id)
         assert len(caplog.records) == 2
         assert caplog.records[0].levelname == "INFO"
-        assert "infered from GEFF metadata" in caplog.records[0].message
+        assert "inferred from GEFF metadata" in caplog.records[0].message
         assert caplog.records[1].levelname == "INFO"
         assert "inferred from existing graph property" in caplog.records[1].message
 
@@ -547,7 +538,7 @@ class TestIdentifyLinIdProp:
             result = _identify_lin_id_prop("missing_key", None, graph_no_lin_id)
         assert len(caplog.records) == 2
         assert caplog.records[0].levelname == "INFO"
-        assert "infered from GEFF metadata" in caplog.records[0].message
+        assert "inferred from GEFF metadata" in caplog.records[0].message
         assert caplog.records[1].levelname == "WARNING"
         assert "No lineage identifier found" in caplog.records[1].message
 
@@ -1594,12 +1585,6 @@ class TestGetPropUnit:
         result = _get_prop_unit("frame", "space", None, geff_axes)
         assert result is None
 
-    def test_assertion_error_on_duplicate_axes(self, duplicate_time_axes):
-        """When multiple axes match the prop name and axis type, raise
-        AssertionError."""
-        with pytest.raises(AssertionError):
-            _get_prop_unit("frame", "time", None, duplicate_time_axes)
-
 
 class TestExtractAxesMetadata:
     """Test cases for _extract_axes_metadata function."""
@@ -1863,7 +1848,7 @@ class TestGetCellIdProblem:
         g = nx.DiGraph()
         g.add_node(0, id=0)
         g.add_node(1, id=1.5)
-        assert "not all positive integers" in _get_cell_id_problem(g, "id")
+        assert "not all non-negative integers" in _get_cell_id_problem(g, "id")
 
     def test_duplicates(self):
         """When two nodes have the same value, explain it."""
@@ -1940,7 +1925,7 @@ class TestEnsureValidCellID:
             result = _ensure_valid_cell_id(g, "id", {})
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
-        assert "not all positive integers" in caplog.records[0].message
+        assert "not all non-negative integers" in caplog.records[0].message
 
         assert result == "cell_id"
         assert g.nodes[0]["cell_id"] == 0
@@ -1955,7 +1940,7 @@ class TestEnsureValidCellID:
             result = _ensure_valid_cell_id(g, "id", {})
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
-        assert "not all positive integers" in caplog.records[0].message
+        assert "not all non-negative integers" in caplog.records[0].message
 
         assert result == "cell_id"
         assert g.nodes[0]["cell_id"] == 0
@@ -1970,7 +1955,7 @@ class TestEnsureValidCellID:
             result = _ensure_valid_cell_id(g, "id", {})
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
-        assert "not all positive integers" in caplog.records[0].message
+        assert "not all non-negative integers" in caplog.records[0].message
 
         assert result == "cell_id"
         assert g.nodes[0]["cell_id"] == 0
@@ -1985,7 +1970,7 @@ class TestEnsureValidCellID:
             result = _ensure_valid_cell_id(g, "id", {})
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
-        assert "not all positive integers" in caplog.records[0].message
+        assert "not all non-negative integers" in caplog.records[0].message
 
         assert result == "cell_id"
         assert g.nodes[0]["cell_id"] == 0
@@ -2733,6 +2718,37 @@ class TestReadGeff:
         assert model.get_cell_lineage_ids() == [0]
         lin = model.data.cell_lineages[0]
         assert dict(lin.nodes(data="geff_lineage_id")) == {0: 7.0, 1: 7.0}
+
+    def test_scale_and_offset_of_space_axes_applied(self, tmp_path):
+        """The coordinates are multiplied by the scale of their axis, then the offset
+        is added, and get the scaled unit. The scale of an axis in pixels is the pixel
+        size."""
+        g = nx.DiGraph()
+        g.add_node(0, t=0, x=4.0, y=8.0)
+        g.add_node(1, t=1, x=6.0, y=12.0)
+        g.add_edge(0, 1)
+        path = tmp_path / "scaled_axes.geff"
+        geff.write(
+            g,
+            path,
+            axis_names=["t", "y", "x"],
+            axis_types=["time", "space", "space"],
+            axis_units=[None, "pixel", "pixel"],
+            axis_scales=[None, 0.25, 0.5],
+            scaled_units=[None, "micrometer", "micrometer"],
+            axis_offset=[None, None, 10.0],
+        )
+
+        model = read_geff(path)
+
+        lin = model.data.cell_lineages[0]
+        assert dict(lin.nodes(data="cell_x")) == {0: 12.0, 1: 13.0}
+        assert dict(lin.nodes(data="cell_y")) == {0: 2.0, 1: 3.0}
+        assert model.get_pixel_width() == 0.5
+        assert model.get_pixel_height() == 0.25
+        assert model.get_space_unit() == "micrometer"
+        props = model.props_metadata.properties
+        assert props["cell_x"].unit == props["cell_y"].unit == "micrometer"
 
     def test_reference_time_prop_given(self, tmp_path):
         """The property given as reference_time_prop is the reference time property

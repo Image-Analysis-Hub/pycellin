@@ -1,12 +1,6 @@
 #!/usr/bin/env python3
 
-"""
-writer.py
-
-This module is part of the pycellin package.
-
-This module provides a function to write a pycellin model to a pickle file.
-"""
+"""Writer for pickle files of Pycellin models."""
 
 import pickle
 from pathlib import Path
@@ -29,8 +23,8 @@ def write_pickle(
         The model to write.
     path : str | Path
         Path of the pickle file to write.
-    protocol : int, optional
-        Pickle protocol to use (default is pickle.HIGHEST_PROTOCOL).
+    protocol : int, default=pickle.HIGHEST_PROTOCOL
+        Pickle protocol to use.
     """
     with open(path, "wb") as file:
         pickle.dump(model, file, protocol=protocol)

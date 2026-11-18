@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 
 """
-writer.py
+Writer for Cell Tracking Challenge (CTC) tracking files.
 
-This module is part of the pycellin package.
-
-This module provides functions to export pycellin models to Cell Tracking Challenge
-(CTC) tracking files. It includes a function to export a pycellin model to a CTC file
-and helper functions to build CTC tracks from a lineage.
-
-References:
+References
+----------
 - CTC website: https://celltrackingchallenge.net/
 - CTC tracking annotations conventions:
-https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content%20conventions.pdf
+  https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content%20conventions.pdf
 """
 
 from pathlib import Path
@@ -38,14 +33,14 @@ def _sort_nodes_by_timepoint(
     Parameters
     ----------
     lineage : CellLineage
-        The lineage object to which the nodes belongs.
+        The lineage object to which the nodes belong.
     nodes : list[int]
-        A list of nodes ID to order by ascending timepoint.
+        A list of node IDs to order by ascending timepoint.
 
     Returns
     -------
     list[int]
-        A list of nodes ID, ordered by ascending timepoint.
+        A list of node IDs, ordered by ascending timepoint.
     """
     sorted_list = [(node, lineage.nodes[node]["timepoint"]) for node in nodes]
     sorted_list.sort(key=lambda x: x[1])
@@ -62,9 +57,9 @@ def _find_gaps(
     Parameters
     ----------
     lineage : CellLineage
-        The lineage object to which the nodes belongs.
+        The lineage object to which the nodes belong.
     sorted_nodes : list[int]
-        A list of nodes ID, ordered by ascending timepoint.
+        A list of node IDs, ordered by ascending timepoint.
 
     Returns
     -------
@@ -95,13 +90,14 @@ def _add_track(
     Parameters
     ----------
     lineage : CellLineage
-        The lineage object to which the nodes belongs.
+        The lineage object to which the nodes belong.
     sorted_nodes : list[int]
-        A list of nodes ID, ordered by ascending timepoint.
+        A list of node IDs, ordered by ascending timepoint.
     ctc_tracks : dict[int, dict[str, int]]
         A dictionary containing the CTC tracks of the lineage.
     node_to_parent_track : dict[int, int]
-        A dictionary mapping the nodes to their parent CTC track.
+        A dictionary mapping the last node of each CTC track to the label of that
+        track, the parent track of the tracks that start with its children.
     current_track_label : int
         The current track label.
 
@@ -137,7 +133,8 @@ def _build_CTC_tracks(
     ctc_tracks : dict[int, dict[str, int]]
         A dictionary containing the CTC tracks of the lineage.
     node_to_parent_track : dict[int, int]
-        A dictionary mapping the nodes to their parent CTC track.
+        A dictionary mapping the last node of each CTC track to the label of that
+        track, the parent track of the tracks that start with its children.
     current_track_label : int
         The current track label.
 
@@ -166,7 +163,7 @@ def _build_CTC_tracks(
             raise FusionError(
                 err.node_id,
                 lineage.graph["lineage_id"],
-                f"CTC do not support fusion events. {err.message}",
+                f"The CTC format does not support fusion events. {err.message}",
             ) from err
         for cc in cell_cycles:
             sorted_nodes = _sort_nodes_by_timepoint(lineage, cc)
@@ -216,16 +213,11 @@ def _add_parent_track(
     track_info : dict[str, int]
         A dictionary containing the CTC track information.
     node_to_parent_track : dict[int, int]
-        A dictionary mapping the nodes to their parent CTC track.
+        A dictionary mapping the last node of each CTC track to the label of that
+        track, the parent track of the tracks that start with its children.
     """
+    # A cell has one parent at most: _build_CTC_tracks() raises on fusions first.
     parent_nodes = list(lineage.predecessors(track_info["B_node"]))
-    assert_msg = (
-        f"Node {track_info['B_node']} has more than 1 parent node "
-        f"({len(parent_nodes)} nodes) in lineage of ID "
-        f"{lineage.graph['lineage_id']}. Incorrect lineage topology: "
-        f"pycellin and CTC do not support fusion events."
-    )
-    assert len(parent_nodes) <= 1, assert_msg
     if parent_nodes:
         track_info["P"] = node_to_parent_track[parent_nodes[0]]
     else:
@@ -239,7 +231,7 @@ def write_ctc(
     frame_offset: int = 0,
 ) -> None:
     """
-    Export lineage data from a Model to CTC tracking file format.
+    Export lineage data from a `Model` to CTC tracking file format.
 
     The CTC tracking format does not support fusion events and does not allow
     gaps right after division events.
@@ -257,9 +249,9 @@ def write_ctc(
         The model from which we want to export the CTC file.
     path : str | Path
         The path to the CTC file to write.
-    frame_offset : int, optional
+    frame_offset : int, default=0
         The frame of timepoint 0, added to the timepoints of the cells to give
-        their CTC frames. 0 by default, which writes the timepoints as frames.
+        their CTC frames. With 0, the timepoints are written as frames.
 
     Raises
     ------
@@ -269,6 +261,8 @@ def write_ctc(
         If the model requires an update.
     ValueError
         If `frame_offset` gives cells a negative frame.
+    FusionError
+        If a lineage has a fusion event, which CTC does not support.
     """
     _check_integer(frame_offset, "frame_offset")
     _check_up_to_date(model)

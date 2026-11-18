@@ -97,6 +97,20 @@ class TestPropertyConstructor:
                 dtype="int",
             )
 
+    @pytest.mark.parametrize("prop_type", ["nodes", ["node", "edges"]])
+    def test_unknown_property_type_string_raises_error(self, prop_type):
+        """Test that an unknown property type string raises ValueError, not KeyError."""
+        with pytest.raises(ValueError, match="Valid types: .* Got "):
+            Property(
+                identifier="test",
+                name="test",
+                description="test",
+                provenance="test",
+                prop_type=prop_type,
+                lineage_type="cell",
+                dtype="int",
+            )
+
 
 class TestPropertyEq:
     """Test cases for Property.__eq()__ method."""
@@ -133,14 +147,17 @@ class TestPropertyIsEqual:
         assert prop1.is_equal(prop1_bis)
         assert not prop1.is_equal(prop2)
         assert not prop1.is_equal(prop3)
-        assert prop1.is_equal("not a property") == NotImplemented
+        assert prop1.is_equal("not a property") is False
 
     def test_ignore_prop_type(self, prop1, prop3, prop4):
         """Test with argument ignore_prop_type."""
         assert prop1.is_equal(prop4, ignore_prop_type=True)
         assert not prop1.is_equal(prop4, ignore_prop_type=False)
         assert not prop1.is_equal(prop3, ignore_prop_type=True)
-        assert prop1.is_equal("not a property", ignore_prop_type=True) == NotImplemented
+        assert prop1.is_equal("not a property", ignore_prop_type=True) is False
+        # Names are still compared.
+        prop4._change_name("other name")
+        assert not prop1.is_equal(prop4, ignore_prop_type=True)
 
 
 class TestPropertyChangeDescription:

@@ -1,3 +1,5 @@
+"""Reader and writer for TrackMate XML files."""
+
 from .reader import read_trackmate_xml
 from .writer import write_trackmate_xml
 

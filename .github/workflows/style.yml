@@ -3,8 +3,8 @@ name: Style
 on:
   push:
     branches: [ "main" ]
+  # Every pull request, whatever its target branch.
   pull_request:
-    branches: [ "main" ]
 
 permissions:
   contents: read
@@ -26,10 +26,36 @@ jobs:
     # Same version as the Ruff bundled with the VS Code extension: update both
     # together, since Ruff's formatting can change between versions.
     - name: Install Ruff
-      run: python -m pip install ruff==0.17.4
+      run: python -m pip install ruff==0.17.5
 
     - name: Check formatting
       run: ruff format --check
 
     - name: Check line length
       run: ruff check --select E501 --output-format github
+
+    # The D rules only apply to the package, with numpydoc's conventions: see
+    # pyproject.toml.
+    - name: Check docstring style
+      run: ruff check --select D --output-format github
+
+  pydoclint:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.14"
+
+    # Pinned, since a new version can report new findings.
+    - name: Install pydoclint
+      run: python -m pip install pydoclint==0.12.0
+
+    # With the options of [tool.pydoclint] in pyproject.toml.
+    - name: Check docstrings against signatures
+      run: pydoclint pycellin

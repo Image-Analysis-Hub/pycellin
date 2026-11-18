@@ -35,7 +35,7 @@ def data():
         lineage.edges[source, target]["my_motion"] = float(target)
     lineage.graph["lineage_id"] = 1
     data = Data({1: lineage})
-    data._add_cycle_lineages(time_prop="frame", time_step=1)
+    data._add_cycle_lineages(time_prop="frame")
     return data
 
 
@@ -220,6 +220,19 @@ class TestStraightness:
         calculator = Straightness(prop_cycle_lin, coord_props=("cell_x", "cell_y"))
         result = calculator.compute(data, data.cycle_lineages[1], node_id=3)
         assert result == pytest.approx(0.6)
+
+    def test_compute_include_incoming_edge(self, data, prop_cycle_lin):
+        # Cycle 4 = [4] is linked from cell 3, at (2, 0): with this link, its
+        # trajectory goes straight from (2, 0) to (3, 0).
+        lineage = data.cell_lineages[1]
+        positions = {1: (0, 0), 2: (1, 0), 3: (2, 0), 4: (3, 0), 5: (2, 1)}
+        for cell, position in positions.items():
+            lineage.nodes[cell].update(zip(("cell_x", "cell_y"), position))
+        calculator = Straightness(
+            prop_cycle_lin, include_incoming_edge=True, coord_props=("cell_x", "cell_y")
+        )
+        result = calculator.compute(data, data.cycle_lineages[1], node_id=4)
+        assert result == pytest.approx(1.0)
 
 
 # TurningAngle ################################################################

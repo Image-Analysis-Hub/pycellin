@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+"""The `Property` class: the declaration of a property."""
+
+import contextlib
 from typing import Any, get_args
 
 from pycellin.custom_types import (
@@ -10,12 +13,48 @@ from pycellin.custom_types import (
 )
 from pycellin.utils import _check_literal_type, _normalize_dtype
 
-# Unit and data type of properties whose declaration is unknown (e.g. TrackMate stubs).
-_UNKNOWN = "unknown"
-
 
 class Property:
-    """ """
+    """
+    Declaration of a property: its identifier, description, type, unit and data type.
+
+    Each parameter is stored in the attribute of the same name, `prop_type` as a
+    `~pycellin.custom_types.PropertyType`.
+
+    Parameters
+    ----------
+    identifier : str
+        A unique identifier for the property.
+    name : str
+        A human-readable name for the property.
+    description : str
+        A description of the property.
+    provenance : str
+        The provenance of the property (TrackMate, CTC, pycellin, custom...).
+    prop_type : PropertyType | str | list[str]
+        The type of the property. Can be:
+
+        - PropertyType Flag: ``PropertyType.NODE``, ``PropertyType.EDGE``,
+          ``PropertyType.LINEAGE``, or combinations like
+          ``PropertyType.NODE | PropertyType.EDGE``.
+        - String: ``"node"``, ``"edge"``, or ``"lineage"``.
+        - List of strings: ``["node", "lineage"]`` for multi-type properties.
+    lineage_type : LineageType
+        The type of lineage the property is associated with: ``"cell"`` for cell
+        lineages, ``"cycle"`` for cycle lineages, or ``"both"`` for a property
+        defined on both, such as ``lineage_id``. A calculator computes a property on
+        one of them only: to have the values of a cycle property on the cells too,
+        see `Model.propagate_cycle_properties`.
+    dtype : str
+        The data type of the property (int, float, string).
+    unit : str | None, default=None
+        The unit of the property (e.g. µm, min, cell).
+
+    Raises
+    ------
+    ValueError
+        If the property type or the lineage type is not a valid value.
+    """
 
     def __init__(
         self,
@@ -28,47 +67,16 @@ class Property:
         dtype: str,
         unit: str | None = None,
     ) -> None:
-        """
-        Constructs all the necessary attributes for the Property object.
-
-        Parameters
-        ----------
-        identifier : str
-            A unique identifier for the property.
-        name : str
-            A human-readable name for the property.
-        description : str
-            A description of the property.
-        provenance : str
-            The provenance of the property (TrackMate, CTC, pycellin, custom...).
-        prop_type : PropertyType or str or list[str]
-            The type of the property. Can be:
-            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE,
-              PropertyType.LINEAGE, or combinations like
-              PropertyType.NODE | PropertyType.EDGE.
-            - String: "node", "edge", or "lineage"
-            - List of strings: ["node", "lineage"] for multi-type properties
-        lineage_type : LineageType
-            The type of lineage the property is associated with: "cell" for cell
-            lineages, "cycle" for cycle lineages, or "both".
-        dtype : str
-            The data type of the property (int, float, string).
-        unit : str, optional
-            The unit of the property (e.g. µm, min, cell).
-
-        Raises
-        ------
-        ValueError
-            If the property type or the lineage type is not a valid value.
-        """
         self.identifier = identifier
         self.name = name
         self.description = description
         self.provenance = provenance
 
-        # Convert string/list to PropertyType Flag if needed.
+        # Convert string/list to PropertyType Flag if needed. An unknown string is
+        # left as it is, to be refused below with the list of the valid values.
         if isinstance(prop_type, (str, list)):
-            prop_type = _property_type_from_string(prop_type)
+            with contextlib.suppress(KeyError):
+                prop_type = _property_type_from_string(prop_type)
 
         # Validate PropertyType.
         if not isinstance(prop_type, PropertyType) or prop_type == PropertyType(0):
@@ -77,7 +85,7 @@ class Property:
                 "flag set. Valid types: PropertyType.NODE, PropertyType.EDGE, "
                 "PropertyType.LINEAGE, or combinations like "
                 "PropertyType.NODE | PropertyType.EDGE, and strings/lists: "
-                "'node', 'edge', 'lineage', ['node', 'lineage']."
+                f"'node', 'edge', 'lineage', ['node', 'lineage']. Got {prop_type!r}."
             )
         self.prop_type = prop_type
 
@@ -90,6 +98,21 @@ class Property:
         self.unit = unit
 
     def __eq__(self, other: object) -> bool:
+        """
+        Return whether two properties have the same declaration.
+
+        Parameters
+        ----------
+        other : object
+            The object to compare with.
+
+        Returns
+        -------
+        bool
+            True if `other` is a `Property` with the same identifier, name,
+            description, provenance, property type, lineage type, data type and unit,
+            False otherwise. `NotImplemented` if `other` is not a `Property`.
+        """
         if not isinstance(other, Property):
             return NotImplemented
         return (
@@ -109,9 +132,8 @@ class Property:
 
         Two properties are compatible when they have the same property type, lineage
         type, unit and data type. Data types are compared after normalizing their
-        spelling (e.g. "float" and "float64", "str" and "string"). An "unknown" unit or
-        data type is compatible with any value. Name, description and provenance are
-        not compared.
+        spelling (e.g. ``"float"`` and ``"float64"``, ``"str"`` and ``"string"``).
+        Name, description and provenance are not compared.
 
         Parameters
         ----------
@@ -126,24 +148,21 @@ class Property:
         """
         incompatibilities = {
             field: (getattr(self, field), getattr(other, field))
-            for field in ("prop_type", "lineage_type")
+            for field in ("prop_type", "lineage_type", "unit")
             if getattr(self, field) != getattr(other, field)
         }
-        if _UNKNOWN not in (self.unit, other.unit) and self.unit != other.unit:
-            incompatibilities["unit"] = (self.unit, other.unit)
-        dtypes = (_normalize_dtype(self.dtype), _normalize_dtype(other.dtype))
-        if _UNKNOWN not in (self.dtype, other.dtype) and dtypes[0] != dtypes[1]:
+        if _normalize_dtype(self.dtype) != _normalize_dtype(other.dtype):
             incompatibilities["dtype"] = (self.dtype, other.dtype)
         return incompatibilities
 
     def __repr__(self) -> str:
         """
-        Compute a string representation of the Property object.
+        Compute a string representation of the `Property` object.
 
         Returns
         -------
         str
-            A string representation of the Property object.
+            A string representation of the `Property` object.
         """
         return (
             f"Property(identifier={self.identifier!r}, name={self.name!r}, "
@@ -154,12 +173,12 @@ class Property:
 
     def __str__(self) -> str:
         """
-        Compute a human-readable string representation of the Property object.
+        Compute a human-readable string representation of the `Property` object.
 
         Returns
         -------
         str
-            A human-readable string representation of the Property object.
+            A human-readable string representation of the `Property` object.
         """
         string = (
             f"Property '{self.identifier}'\n"
@@ -254,19 +273,21 @@ class Property:
         ----------
         other : Property
             The other property to compare with.
-        ignore_prop_type : bool, optional
+        ignore_prop_type : bool, default=False
             Whether to ignore the property type when comparing the properties.
 
         Returns
         -------
         bool
-            True if the properties are equal, False otherwise.
+            True if the properties are equal, False otherwise, also when `other` is
+            not a `Property`.
         """
         if not isinstance(other, Property):
-            return NotImplemented
+            return False
         if ignore_prop_type:
             return (
                 self.identifier == other.identifier
+                and self.name == other.name
                 and self.description == other.description
                 and self.provenance == other.provenance
                 and self.lineage_type == other.lineage_type

@@ -1,0 +1,30 @@
+name: Link check
+
+# Check the docs' external links every month, and on demand from the Actions tab.
+on:
+  schedule:
+    - cron: "0 6 1 * *"  # 1st of each month at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linkcheck:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.14"
+
+    - name: Install pycellin and the docs tools
+      run: python -m pip install . --group docs
+
+    - name: Check external links
+      run: python -m sphinx -M linkcheck docs docs/_build

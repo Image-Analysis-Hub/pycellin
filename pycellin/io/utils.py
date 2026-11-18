@@ -1,3 +1,13 @@
+"""
+Helpers for the readers and writers of the different formats.
+
+Most of them are shared by several formats, the others are used by one format only.
+They check the models read or written (cell fusions, pending updates), split a graph
+into lineages, rename properties and relabel cells, list or remove properties, find
+the frames to write, and word the warning about the cycle properties left out of an
+export.
+"""
+
 import logging
 import numbers
 from collections import Counter
@@ -15,16 +25,12 @@ logger = logging.getLogger(__name__)
 
 def _check_fusions(model: Model) -> None:
     """
-    Check if the model contains fusions and issue a warning if so.
+    Check if the model contains fusions and log a warning if so.
 
     Parameters
     ----------
     model : Model
         The pycellin model to check for fusions.
-
-    Returns
-    -------
-    None
     """
     all_fusions = model.get_fusions()
     if all_fusions:
@@ -71,11 +77,11 @@ def _add_lineage_props(
     lineage_id_key: str = "lineage_id",
 ) -> None:
     """
-    Update each CellLineage in the list with corresponding lineage properties.
+    Update each `CellLineage` in the list with corresponding lineage properties.
 
-    This function iterates over a list of CellLineage objects,
+    This function iterates over a list of `CellLineage` objects,
     attempting to match each lineage with its corresponding lineage
-    properties based on the 'lineage_id_key' property present in the
+    properties based on the `lineage_id_key` property present in the
     lineage nodes. It then updates the lineage graph with these
     attributes.
 
@@ -85,24 +91,22 @@ def _add_lineage_props(
         A list of the lineages to update.
     lin_props : list[dict[str, Any]]
         A list of dictionaries, where each dictionary contains properties
-        for a specific lineage, identified by a the given 'lineage_id_key' key.
-    lineage_id_key : str, optional
+        for a specific lineage, identified by the given `lineage_id_key` key.
+    lineage_id_key : str, default="lineage_id"
         The key used to identify the lineage in the attributes.
-        Defaults to "lineage_id".
 
     Raises
     ------
     ValueError
         If a lineage is found to contain nodes with multiple distinct
-        'lineage_id_key' values, indicating an inconsistency in lineage ID
+        `lineage_id_key` values, indicating an inconsistency in lineage ID
         assignment.
 
-    Warns
+    Notes
     -----
-    UserWarning
-        If no lineage properties match a lineage ID, the lineage is skipped
-        and a warning is issued. This commonly occurs for single-node tracks
-        in TrackMate XML files, which don't have Track elements.
+    If no lineage properties match a lineage ID, the lineage is skipped and an info
+    message is logged. This commonly occurs for single-node tracks in TrackMate XML
+    files, which don't have Track elements.
     """
     missing_lineage_ids = []
 
@@ -155,63 +159,104 @@ def _add_lineage_props(
 
 def _identify_frame_prop(model: Model) -> str:
     """
-    Identify a frame-like property in the model.
+    Identify the property giving the frames of the cells, and complete it if needed.
 
-    This function checks if there is a frame-like property in the model's metadata.
-    If not, it falls back to the 'timepoint' property.
+    The frame property is a node property called ``frame``, in any case, such as
+    TrackMate's ``FRAME`` or trackpy's ``frame``. When only some cells have a frame,
+    e.g. after `Model.add_cell` or `Model.merge`, the others get their timepoint plus
+    the difference between frame and timepoint of the cells that have both. Frames and
+    timepoints only differ by their origin, the first frame of the movie and the
+    earliest cell, so this difference is the same for all cells. Without a frame
+    property, or when no cell has a frame, the frames are the timepoints.
+
+    The frames are completed in place: give a copy of the model to export.
 
     Parameters
     ----------
     model : Model
         The pycellin model to check for a frame-like property.
 
+    Returns
+    -------
+    str
+        The identifier of the frame-like property, or ``"timepoint"``.
+
     Raises
     ------
+    ValueError
+        If only some cells have a frame, and the difference between frame and
+        timepoint is not the same for all the cells that have both, so the missing
+        frames can't be deduced.
     KeyError
-        If neither a frame-like property nor 'timepoint' is present on all nodes.
+        If cells have neither a frame nor a ``timepoint`` value.
+
+    Notes
+    -----
+    The number of cells whose frame is computed is logged.
     """
-    # First, collect all frame-like properties from the metadata.
-    candidates = []
-    for prop in model.props_metadata._get_prop_dict_from_prop_type(
-        PropertyType.NODE
-    ).values():
-        if prop.identifier.lower() == "frame":
-            candidates.append(prop.identifier)
+    candidates = [
+        prop.identifier
+        for prop in model.props_metadata._get_prop_dict_from_prop_type(
+            PropertyType.NODE
+        ).values()
+        if prop.identifier.lower() == "frame"
+    ]
+    cells = [
+        cell
+        for lin in model.data.cell_lineages.values()
+        for _, cell in lin.nodes(data=True)
+    ]
 
-    # Check each candidate to see if it exists on all nodes in all lineages.
-    frame_prop = None
+    # A frame-like property present on all cells is used as it is.
     for candidate in candidates:
-        has_prop = True
-        for lin in model.data.cell_lineages.values():
-            has_prop = _graph_has_node_prop(lin, candidate) and has_prop
+        if all(cell.get(candidate) is not None for cell in cells):
+            return candidate
 
-        if has_prop:
-            frame_prop = candidate
-            break
-        else:
+    # One present on some cells only is completed from the timepoints.
+    for candidate in candidates:
+        offsets = {
+            cell[candidate] - cell["timepoint"]
+            for cell in cells
+            if cell.get(candidate) is not None and cell.get("timepoint") is not None
+        }
+        if not offsets:
             logger.info(
-                f"Property '{candidate}' found in metadata but not present on all "
-                "nodes. Trying next candidate or falling back to 'timepoint'."
+                f"No cell has both a '{candidate}' and a 'timepoint' value. Trying the "
+                "next frame-like property or falling back to 'timepoint'."
             )
-
-    # If no valid frame property found, fallback to "timepoint".
-    if frame_prop is None:
-        frame_prop = "timepoint"
-        has_prop = True
-        for lin in model.data.cell_lineages.values():
-            has_prop = _graph_has_node_prop(lin, frame_prop) and has_prop
-
-        if has_prop:
-            logger.info(
-                f"No valid frame-like property found. Falling back to '{frame_prop}'."
+            continue
+        missing = [cell for cell in cells if cell.get(candidate) is None]
+        num_txt = f"{len(missing)} cell{'s' if len(missing) > 1 else ''}"
+        if len(offsets) > 1:
+            examples = ", ".join(str(offset) for offset in sorted(offsets)[:3])
+            raise ValueError(
+                f"Cannot compute the frames of {num_txt} without '{candidate}' value, "
+                "e.g. added with add_cell(), from their timepoints: "
+                f"'{candidate}' minus 'timepoint' isn't the same for all the other "
+                f"cells (e.g. {examples}). Give these cells a '{candidate}' value, "
+                "e.g. with the prop_values argument of add_cell()."
             )
-        else:
+        if any(cell.get("timepoint") is None for cell in missing):
             raise KeyError(
-                "No valid frame-like property found. Tried candidates: "
-                f"{candidates} and fallback 'timepoint'. "
+                f"Some cells have neither a '{candidate}' nor a 'timepoint' value."
             )
+        offset = offsets.pop()
+        for cell in missing:
+            cell[candidate] = cell["timepoint"] + offset
+        logger.info(
+            f"Frames of {num_txt} without '{candidate}' value, e.g. added with "
+            f"add_cell(): their timepoints plus {offset}, as for the other cells."
+        )
+        return candidate
 
-    return frame_prop
+    # Without frames, the timepoints are the frames.
+    if not all(cell.get("timepoint") is not None for cell in cells):
+        raise KeyError(
+            "No valid frame-like property found. Tried candidates: "
+            f"{candidates} and fallback 'timepoint'."
+        )
+    logger.info("No valid frame-like property found. Falling back to 'timepoint'.")
+    return "timepoint"
 
 
 def _get_props_from_data(
@@ -267,7 +312,7 @@ def _relabel_nodes_in_place(graph: nx.Graph, mapping: dict[int, int]) -> None:
     """
     Relabel the nodes of a graph in place, whatever their old and new IDs.
 
-    NetworkX refuses to do it when old and new IDs form a loop, e.g. {0: 1, 1: 0}.
+    NetworkX refuses to do it when old and new IDs form a loop, e.g. ``{0: 1, 1: 0}``.
     Only then do the nodes go through temporary IDs. Doing it every time would make
     relabeling slower, and would change the order of the nodes when old and new IDs
     overlap without a loop, hence the autogenerated lineage IDs of a GEFF file.
@@ -277,7 +322,7 @@ def _relabel_nodes_in_place(graph: nx.Graph, mapping: dict[int, int]) -> None:
     graph : nx.Graph
         The graph to relabel.
     mapping : dict[int, int]
-        The new ID of each node, as {old_id: new_id}.
+        The new ID of each node, as ``{old_id: new_id}``.
     """
     try:
         nx.relabel_nodes(graph, mapping, copy=False)
@@ -331,12 +376,12 @@ def _remove_orphaned_metadata(model: Model) -> None:
     model : Model
         The pycellin model to update.
 
-    Warns
+    Notes
     -----
-    If some of the cell and link properties removed have values on the cycle
-    lineages, since an export leaves these values out. Properties without any value
-    only get an info message, as nothing is lost, and lineage properties no message,
-    as they are not exported anyway.
+    A warning is logged if some of the cell and link properties removed have values
+    on the cycle lineages, since an export leaves these values out. Properties
+    without any value only get an info message, as nothing is lost, and lineage
+    properties no message, as they are not exported anyway.
     """
     node_props_md = model.props_metadata._get_prop_dict_from_prop_type(
         PropertyType.NODE
@@ -403,14 +448,13 @@ def _split_graph_into_lineages(
     lin_props: list[dict[str, Any]] | None = None,
 ) -> list[CellLineage]:
     """
-    Split a graph into subgraphs representing lineages, and ensure consistent lineage ID
-    assignment.
+    Split a graph into lineages, and ensure consistent lineage ID assignment.
 
     This function takes a directed graph and splits it into subgraphs,
     where each subgraph corresponds to a connected component. It also ensures
     that each lineage and its nodes have a consistent lineage ID,
-    either by using an existing 'lineage_id_key' property or by creating one
-    if it is not provided. If 'lin_props' is provided, it also adds the
+    either by using an existing `lineage_id_key` property or by creating one
+    if it is not provided. If `lin_props` is provided, it also adds the
     corresponding properties to each lineage.
 
     Lineages without an ID get the next IDs that no other lineage uses, in the
@@ -418,28 +462,29 @@ def _split_graph_into_lineages(
 
     Parameters
     ----------
-    lineage : nx.DiGraph
+    graph : nx.DiGraph
         The graph to split.
-    lineage_id_key : str | None, optional
+    lineage_id_key : str | None, default=None
         The key used to identify the lineage in the properties. If None,
-        a "lineage_id" key will be created and set to the next available lineage ID.
-    lin_props : list[dict[str, Any]] | None, optional
+        a ``lineage_id`` key will be created and set to the next available lineage ID.
+    lin_props : list[dict[str, Any]] | None, default=None
         A list of dictionaries, where each dictionary contains properties
-        for a specific lineage, identified by a 'lineage_id_key' key.
+        for a specific lineage, identified by a `lineage_id_key` key.
         If None, no properties will be added to the lineages.
 
     Returns
     -------
     list[CellLineage]
-        A list of subgraphs, each representing a lineage.
+        A list of subgraphs, each representing a lineage. A graph without nodes
+        gives a single empty lineage.
 
     Raises
     ------
     ValueError
         If a lineage is found to contain nodes with multiple distinct
-        'lineage_id_key' values, indicating an inconsistency in lineage ID
-        assignment, if several lineages have the same ID, or if no lineage
-        properties match a lineage ID when 'lin_props' is provided.
+        `lineage_id_key` values, or values that differ from the one of the lineage,
+        indicating an inconsistency in lineage ID assignment.
+        If several lineages have the same ID.
     """
     # One subgraph is created per lineage, so each subgraph is
     # a connected component of `graph`.
@@ -608,22 +653,20 @@ def _update_node_prop_key(
         The old key of the property.
     new_key : str
         The new key of the property.
-    enforce_old_key_existence : bool, optional
+    enforce_old_key_existence : bool, default=False
         If True, raises an error when the old key does not exist in a node.
         If False, the function will skip nodes that do not have the old key.
-        Defaults to False.
-    set_default_if_missing : bool, optional
+    set_default_if_missing : bool, default=False
         If True, set the new key to `default_value` when the old key does not exist.
         If False, the new key will not be set when the old key does not exist.
-        Defaults to False.
-    default_value : Any | None, optional
+    default_value : Any | None, default=None
         The default value to set if the old key does not exist
-        and set_default_if_missing is True. Defaults to None.
+        and `set_default_if_missing` is True.
 
     Raises
     ------
     ValueError
-        If enforce_old_key_existence is True and the old key does not exist
+        If `enforce_old_key_existence` is True and the old key does not exist
         in a node.
     """
     for node in lineage.nodes:
@@ -688,7 +731,7 @@ def _update_lineages_ids_key(
     """
     Update the lineage ID key of lineage graphs to match pycellin convention.
 
-    If the lineage_id_key is not present in the lineage graph, a "lineage_id" key
+    If `lineage_id_key` is not present in the lineage graph, a ``lineage_id`` key
     is created and set to the next available lineage ID.
 
     Parameters

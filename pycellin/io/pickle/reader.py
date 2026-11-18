@@ -1,12 +1,6 @@
 #!/usr/bin/env python3
 
-"""
-reader.py
-
-This module is part of the pycellin package.
-
-This module provides a function to read a pycellin model from a pickle file.
-"""
+"""Reader for pickle files of Pycellin models."""
 
 import pickle
 from pathlib import Path

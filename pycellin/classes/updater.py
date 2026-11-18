@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+"""The ``_ModelUpdater`` class, which updates the property values of a model."""
+
 import networkx as nx
 
 from pycellin.classes import Data
@@ -10,9 +12,41 @@ from pycellin.properties.core import Timepoint, create_timepoint_property
 
 
 class _ModelUpdater:
+    """
+    Record the changes made to a model and update its property values.
+
+    The model records in its updater the cells, links and lineages added, removed or
+    modified since the last update, and registers there the calculators of its
+    properties. At the next update, the updater computes the property values that
+    may have changed, and rebuilds the cycle lineages of the lineages that changed.
+
+    Attributes
+    ----------
+    _update_required : bool
+        True if the model must be updated.
+    _full_data_update : bool
+        True if all the cells, links and lineages are recorded as added, to update
+        all the data (see `Model.prepare_full_data_update`).
+    _cycle_lineages_rebuilt : bool
+        True if the cycle lineages were rebuilt since the last update, e.g. by
+        `Model.add_cycle_lineages`, so that the update computes all the cycle lineage
+        properties again, as when it rebuilds them itself.
+    _added_cells, _removed_cells : set[Cell]
+        Record of the cells added and removed since the last update.
+    _added_links, _removed_links : set[Link]
+        Record of the links added and removed since the last update.
+    _added_lineages, _removed_lineages, _modified_lineages : set[int]
+        Record of the IDs of the lineages added, removed and modified since the last
+        update.
+    _calculators : dict[str, PropertyCalculator]
+        Calculators of the properties, by property identifier, in the order they
+        run.
+    """
+
     def __init__(self):
         self._update_required = False
         self._full_data_update = False
+        self._cycle_lineages_rebuilt = False
 
         # TODO: is a set a good idea? Maybe better to pool the nodes per lineage...
         # In this case I need to be able to modify the content of the collection
@@ -39,11 +73,11 @@ class _ModelUpdater:
         self, data: Data, time_prop: str, time_step: int | float
     ) -> bool:
         """
-        Build the timepoint calculator when it is missing or outdated.
+        Build the ``timepoint`` calculator when it is missing or outdated.
 
-        The timepoint property is relied upon throughout pycellin, so it must always be
-        present and up to date. No calculator is needed when timepoint is the
-        reference time property itself, nor when there is no data.
+        The ``timepoint`` property is relied upon throughout pycellin, so it must
+        always be present and up to date. No calculator is needed when ``timepoint``
+        is the reference time property itself, nor when there is no data.
 
         Parameters
         ----------
@@ -80,11 +114,10 @@ class _ModelUpdater:
         return True
 
     def _reinit(self) -> None:
-        """
-        Reset the state of the updater.
-        """
+        """Reset the state of the updater, except its calculators."""
         self._update_required = False
         self._full_data_update = False
+        self._cycle_lineages_rebuilt = False
         self._added_cells.clear()
         self._removed_cells.clear()
         self._added_links.clear()
@@ -115,9 +148,7 @@ class _ModelUpdater:
         }
 
     def _print_state(self) -> None:
-        """
-        Print the state of the updater.
-        """
+        """Print the state of the updater."""
         print("Update required:", self._update_required)
         print("Full data update:", self._full_data_update)
         print("Added cells:", self._added_cells)
@@ -136,7 +167,7 @@ class _ModelUpdater:
         Register a calculator for a property.
 
         Calculators run in registration order, except that a calculator runs after
-        the calculators of the properties it reads (see `_order_calculators()`).
+        the calculators of the properties it reads (see ``_order_calculators()``).
 
         Parameters
         ----------
@@ -148,10 +179,9 @@ class _ModelUpdater:
 
     def _order_calculators(self) -> None:
         """
-        Order the calculators so that each one runs after the calculators of the
-        properties it reads.
+        Order the calculators so that each runs after those of the properties it reads.
 
-        The properties a calculator reads are the ones of its `INPUT_PROPS`. This
+        The properties a calculator reads are the ones of its ``INPUT_PROPS``. This
         matters when a property gets its calculator after a property computed from it,
         e.g. a property loaded from a file, then added again with its add method: the
         property computed from it would otherwise be computed first, from the old
@@ -159,8 +189,8 @@ class _ModelUpdater:
         property, together with the calculators of its own inputs. The reader is not
         moved after it instead, since the calculators registered in between may read
         the reader without declaring it. Otherwise, the registration order is kept, and
-        the timepoint calculator stays first. With circular dependencies, a calculator
-        necessarily runs before one it reads.
+        the ``timepoint`` calculator stays first. With circular dependencies, a
+        calculator necessarily runs before one it reads.
         """
         ordered: dict[str, PropertyCalculator] = {}
         visited: set[str] = set()
@@ -219,7 +249,7 @@ class _ModelUpdater:
             The name of the time property to use for the update.
         time_step : int | float
             The time step to use for the update.
-        props_to_update : list of str, optional
+        props_to_update : list[str] | None, default=None
             List of properties to update. If None, all properties are updated.
             Properties without calculator are skipped. All the cycle lineage
             properties are computed on rebuilt cycle lineages, listed or not.
@@ -233,11 +263,11 @@ class _ModelUpdater:
 
         Warnings
         --------
-        A property is computed after the properties it reads (`INPUT_PROPS`), but cell
-        lineage properties are computed before cycle lineage properties. So if a cell
-        lineage property depends on a cycle lineage property, it will not be computed
-        correctly. In that case, the solution is to add the cycle properties first,
-        then update, then add the cell properties and update again.
+        A property is computed after the properties it reads (``INPUT_PROPS``), but
+        cell lineage properties are computed before cycle lineage properties. So if a
+        cell lineage property depends on a cycle lineage property, it will not be
+        computed correctly. In that case, the solution is to add the cycle properties
+        first, then update, then add the cell properties and update again.
         """
         # TODO: refactor, this method is too long and does too many things.
 
@@ -417,7 +447,9 @@ class _ModelUpdater:
         # In case of modifications in the structure of some cell lineages,
         # we need to recompute the cycle lineages and their properties.
         # TODO: optimize so we don't have to recompute EVERYTHING for cycle lineages?
-        cycle_lineages_rebuilt = False
+        # Cycle lineages rebuilt since the last update, e.g. by add_cycle_lineages(),
+        # also lost their properties.
+        cycle_lineages_rebuilt = self._cycle_lineages_rebuilt
         for lin_id in lins_to_process:
             if data.cycle_lineages is not None:
                 cycle_lineages_rebuilt = True
@@ -428,7 +460,7 @@ class _ModelUpdater:
                 # else:
                 #     data.cycle_lineages[lin_id] = new_cycle_lineages
                 data.cycle_lineages[lin_id] = data._compute_cycle_lineage(
-                    time_prop, time_step, lin_id
+                    time_prop, lin_id
                 )
         # Remove cycle lineages whose cell lineage has been removed.
         for lin_id in self._removed_lineages:

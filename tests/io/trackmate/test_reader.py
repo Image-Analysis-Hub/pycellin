@@ -1245,7 +1245,7 @@ def test_get_filtered_tracks_id():
 
     obtained_id = tml._get_filtered_tracks_id(it, element)
     expected_id = [0, 1]
-    assert obtained_id.sort() == expected_id.sort()
+    assert sorted(obtained_id) == expected_id
 
 
 def test_get_filtered_tracks_id_no_id():

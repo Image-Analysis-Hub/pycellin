@@ -95,7 +95,7 @@ def data():
         lineage.nodes[n]["cell_total_intensity"] = 10.0 * n
     lineage.graph["lineage_id"] = 1
     data = Data({1: lineage})
-    data._add_cycle_lineages(time_prop="frame", time_step=1)
+    data._add_cycle_lineages(time_prop="frame")
     return data
 
 

@@ -937,6 +937,57 @@ class TestWriteTrackmateXml:
         assert visibilities.count(0.0) == 1
         assert visibilities.count(1.0) == 106
 
+    def test_position_z_property_without_cell_z_raises(self, tmp_path, simple_model):
+        """Test that a POSITION_Z property isn't replaced by the zeros written as
+        POSITION_Z when the model has no cell_z."""
+        simple_model.props_metadata._add_prop(
+            Property(
+                identifier="POSITION_Z",
+                name="Z",
+                description="Z coordinate",
+                provenance="test",
+                prop_type="node",
+                lineage_type="cell",
+                dtype="float",
+                unit="pixel",
+            )
+        )
+        for lin in simple_model.data.cell_lineages.values():
+            for node in lin.nodes:
+                lin.nodes[node]["POSITION_Z"] = 5.0
+        with pytest.raises(ValueError, match="rename it to 'cell_z'"):
+            write_trackmate_xml(
+                simple_model,
+                tmp_path / "model.xml",
+                space_unit="pixel",
+                time_unit="frame",
+            )
+
+    def test_cells_without_coordinates_named_by_their_id_in_the_model(
+        self, tmp_path, model_non_unique_ids, caplog
+    ):
+        """Test that the warning about cells without coordinates names them by their
+        ID in the model, although the export relabels them since IDs repeat."""
+        del model_non_unique_ids.data.cell_lineages[0].nodes[2]["cell_y"]
+        for cell_id in (3, 6):
+            del model_non_unique_ids.data.cell_lineages[1].nodes[cell_id]["cell_x"]
+
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"):
+            write_trackmate_xml(
+                model_non_unique_ids,
+                tmp_path / "model.xml",
+                space_unit="pixel",
+                time_unit="frame",
+            )
+
+        messages = [r.message for r in caplog.records if "coordinates" in r.message]
+        expected = (
+            "Missing mandatory x and/or y coordinates, defaulting to 0.0 for:\n"
+            "  lineage 0: cell 2\n"
+            "  lineage 1: cells 3, 6"
+        )
+        assert messages == [expected]
+
 
 class TestWriteTrackmateXmlUnits:
     """Test cases for the units written by write_trackmate_xml function."""

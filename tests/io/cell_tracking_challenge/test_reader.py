@@ -348,3 +348,27 @@ class TestReadCtc:
         tifffile.imwrite(labels_path / "mask001.tif", img)
         with pytest.raises(ValueError, match="Label 9 not found"):
             read_ctc(ctc_path, labels_path=labels_path)
+
+    def test_blank_lines_ignored(self, tmp_path):
+        ctc_path = tmp_path / "res_track.txt"
+        ctc_path.write_text("1 0 2 0\n\n2 3 4 1\n3 3 5 1\n\n")
+        model = read_ctc(ctc_path)
+
+        # Track 1 (3 cells) divides into tracks 2 (2 cells) and 3 (3 cells).
+        assert len(model.data.cell_lineages) == 1
+        assert len(_get_cells(model)) == 8
+
+    @pytest.mark.parametrize(
+        ("text", "match"),
+        [
+            ("1 0 2\n", "Line 1 of the CTC file must hold 4 integers"),
+            ("1 0 2 0\n2 3 x 1\n", "Line 2 of the CTC file must hold 4 integers"),
+            ("1 2 0 0\n", "Track 1 ends at frame 0, before its first frame 2"),
+            ("1 0 2 0\n2 3 4 7\n", "Track 2 has parent track 7"),
+        ],
+    )
+    def test_invalid_track_raises(self, tmp_path, text, match):
+        ctc_path = tmp_path / "res_track.txt"
+        ctc_path.write_text(text)
+        with pytest.raises(ValueError, match=match):
+            read_ctc(ctc_path)

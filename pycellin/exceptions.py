@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+"""Exceptions raised by Pycellin."""
+
 # TODO: add a Warning when a property is not present across all cells,
 # links, or lineages?
 
@@ -11,9 +13,14 @@
 class LineageStructureError(ValueError):
     """
     Raised when an incorrect lineage structure is detected.
+
+    Parameters
+    ----------
+    message : str
+        The error message.
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         self.message = message
         super().__init__(self.message)
 
@@ -22,17 +29,16 @@ class FusionError(LineageStructureError):
     """
     Raised when a fusion event is detected in the lineage structure.
 
-    A fusion event happens when a node has more than one parent,
-    i. e. an in_degree greater than 1.
+    A fusion event happens when a node has more than one parent, i.e. an in-degree
+    greater than 1.
 
     Parameters
     ----------
     node_id : int
         The ID of the node where the fusion event was detected.
-    lineage_id : int, optional
+    lineage_id : int | None, default=None
         The ID of the lineage where the fusion event was detected.
-        None by default.
-    message : str, optional
+    message : str | None, default=None
         Custom error message. If not provided, a default message is displayed.
     """
 
@@ -65,16 +71,14 @@ class TimeFlowError(LineageStructureError):
     Parameters
     ----------
     source_node_id : int
-        The ID of the source node.
+        The ID of the source node of the link: the parent.
     target_node_id : int
-        The ID of the target node.
-    source_lineage_id : int, optional
+        The ID of the target node of the link: the child.
+    source_lineage_id : int | None, default=None
         The ID of the lineage of the source node.
-        None by default.
-    target_lineage_id : int, optional
+    target_lineage_id : int | None, default=None
         The ID of the lineage of the target node.
-        None by default.
-    message : str, optional
+    message : str | None, default=None
         Custom error message. If not provided, a default message is displayed.
     """
 
@@ -99,7 +103,7 @@ class TimeFlowError(LineageStructureError):
             )
             message = (
                 f"Node {target_node_id}{txt_target_lin} "
-                f"has a time value lower than its parent node, "
+                f"has a time value lower than or equal to that of its parent node, "
                 f"node {source_node_id}{txt_source_lin}."
             )
         super().__init__(message)
@@ -111,7 +115,7 @@ class UpdateRequiredError(RuntimeError):
 
     Parameters
     ----------
-    message : str, optional
+    message : str | None, default=None
         Custom error message. If not provided, a default message is displayed.
     """
 
@@ -132,7 +136,7 @@ class ProtectedPropertyError(AttributeError):
     ----------
     prop : str
         The identifier of the property that is protected.
-    message : str, optional
+    message : str | None, default=None
         Custom error message. If not provided, a default message is displayed.
     """
 
@@ -154,12 +158,12 @@ class MissingPropertyError(KeyError):
     ----------
     prop : str
         The identifier of the missing property.
-    node_id : int, optional
+    node_id : int | None, default=None
         The ID of the node where the property is missing. None when the property
         is missing from the model rather than from a specific node.
-    lineage_id : int, optional
+    lineage_id : int | None, default=None
         The ID of the lineage where the property is missing.
-    message : str, optional
+    message : str | None, default=None
         Custom error message. If not provided, a default message is displayed.
     """
 
@@ -181,5 +185,13 @@ class MissingPropertyError(KeyError):
         super().__init__(message)
 
     def __str__(self) -> str:
+        """
+        Return the error message, without the quotes that `KeyError` adds.
+
+        Returns
+        -------
+        str
+            The error message.
+        """
         # KeyError.__str__() returns the repr of the message, i.e. in quotes.
         return self.message
