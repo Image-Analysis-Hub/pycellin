@@ -15,5 +15,6 @@ build:
 
 sphinx:
   configuration: docs/conf.py
-  # Turn on once the docstring pass has brought the build to 0 warnings.
-  fail_on_warning: false
+  # Fail on any warning (sphinx-build -W --keep-going), e.g. a broken reference or a
+  # docstring that numpydoc's validation rejects.
+  fail_on_warning: true
