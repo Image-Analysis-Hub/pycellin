@@ -14,6 +14,9 @@ from pycellin.exceptions import UpdateRequiredError
 
 logger = logging.getLogger(__name__)
 
+#: Model metadata fields of the pixel size along x, y and z, in that order.
+_PIXEL_SIZE_FIELDS = ("pixel_width", "pixel_height", "pixel_depth")
+
 
 def _check_fusions(model: Model) -> None:
     """

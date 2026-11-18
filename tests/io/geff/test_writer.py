@@ -1041,6 +1041,42 @@ class TestWriteGeff:
         assert all(attrs["cell_y"] == 5.0 for attrs in cells)
         assert all(attrs["cell_z"] == 1.0 for attrs in cells)
 
+    def test_coordinates_written_in_pixels(self, model_with_xyz, tmp_path):
+        """Test that the space axes are written in pixels, with the pixel size as
+        scale, when the pixel size is known, and come back in the space unit with
+        their pixel size."""
+        geff_out = str(tmp_path / "test.geff")
+        model_with_xyz.model_metadata.pixel_width = 0.5
+        model_with_xyz.model_metadata.pixel_height = 0.25
+        write_geff(model_with_xyz, geff_out)
+
+        graph, metadata = geff.read(geff_out)
+        assert sorted(graph.nodes[n]["cell_x"] for n in graph) == [20, 24, 40, 44]
+        assert all(graph.nodes[n]["cell_y"] == 20.0 for n in graph)
+        assert all(graph.nodes[n]["cell_z"] == 1.0 for n in graph)
+        axes = {ax.name: ax for ax in metadata.axes}
+        for name, scale in [("cell_x", 0.5), ("cell_y", 0.25)]:
+            assert (axes[name].unit, axes[name].scale) == ("pixel", scale)
+            assert axes[name].scaled_unit == "micrometer"
+            assert metadata.node_props_metadata[name].unit == "pixel"
+        # Without pixel depth, z is written as it is.
+        assert (axes["cell_z"].unit, axes["cell_z"].scale) == ("micrometer", None)
+
+        reloaded = read_geff(geff_out)
+        assert reloaded.get_pixel_width() == 0.5
+        assert reloaded.get_pixel_height() == 0.25
+        assert reloaded.get_pixel_depth() is None
+        assert reloaded.get_space_unit() == "micrometer"
+        props = reloaded.props_metadata.properties
+        assert all(props[f"cell_{c}"].unit == "micrometer" for c in "xyz")
+        cells = [
+            attrs
+            for lin in reloaded.data.cell_lineages.values()
+            for _, attrs in lin.nodes(data=True)
+        ]
+        assert sorted(attrs["cell_x"] for attrs in cells) == [10.0, 12.0, 20.0, 22.0]
+        assert all(attrs["cell_y"] == 5.0 for attrs in cells)
+
     def test_export_with_custom_time_axes(self, simple_model, tmp_path):
         """Test export with custom time axes."""
         geff_out = str(tmp_path / "test.geff")

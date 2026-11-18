@@ -21,7 +21,11 @@ import networkx as nx
 from pycellin.classes import CellLineage, Model, Property
 from pycellin.custom_types import PropertyType
 from pycellin.exceptions import ProtectedPropertyError
-from pycellin.io.utils import _check_up_to_date, _remove_orphaned_metadata
+from pycellin.io.utils import (
+    _PIXEL_SIZE_FIELDS,
+    _check_up_to_date,
+    _remove_orphaned_metadata,
+)
 from pycellin.utils import _normalize_dtype
 
 logger = logging.getLogger(__name__)
@@ -397,11 +401,55 @@ def _get_default_space_axes(model: Model) -> list[str]:
     return space_axes
 
 
+def _convert_coordinates_to_pixels(
+    model: Model, space_axes: list[str]
+) -> dict[str, tuple[float, str | None]]:
+    """
+    Convert the space axes of a model into pixels, where the pixel size is known.
+
+    GEFF gives the pixel size as the scale of a space axis whose values are in
+    pixels. The values of each space axis are divided by the pixel size of their
+    coordinate (`pixel_width` for x, `pixel_height` for y, `pixel_depth` for z), when
+    the model metadata gives it. The property then has the unit ``"pixel"`` and the
+    data type ``"float"``.
+
+    Parameters
+    ----------
+    model : Model
+        The model to export, modified in place.
+    space_axes : list[str]
+        The properties of the x, y and optionally z coordinates, in that order.
+
+    Returns
+    -------
+    dict[str, tuple[float, str | None]]
+        ``{property: (pixel size, unit before the conversion)}`` for each converted
+        property.
+    """
+    node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
+    scales = {}
+    for prop_id, size_field in zip(space_axes, _PIXEL_SIZE_FIELDS):
+        size = getattr(model.model_metadata, size_field)
+        # An unknown property is reported by _build_axes().
+        if size is None or prop_id not in node_props:
+            continue
+        for lin in model.data.cell_lineages.values():
+            for _, attrs in lin.nodes(data=True):
+                if prop_id in attrs:
+                    attrs[prop_id] = attrs[prop_id] / size
+        prop = node_props[prop_id]
+        scales[prop_id] = (size, prop.unit)
+        prop.unit = "pixel"
+        prop.dtype = "float"
+    return scales
+
+
 def _build_axes(
     node_props: dict[str, Property],
     time_axes: list[str],
     space_axes: list[str] | None,
     channel_axes: list[str] | None,
+    scales: dict[str, tuple[float, str | None]] | None = None,
 ) -> list[geff_spec.Axis]:
     """
     Build a list of ``geff_spec.Axis`` objects for GEFF metadata.
@@ -426,6 +474,10 @@ def _build_axes(
         These should be properties in the model that represent different channels
         or modalities (e.g., ``chan_1``, ``chan_2``). If None, no channel axes will
         be included in the GEFF metadata.
+    scales : dict[str, tuple[float, str | None]] | None, default=None
+        The scale and scaled unit of the space axes in pixels, by property, as
+        returned by ``_convert_coordinates_to_pixels()``. If None, no axis has a
+        scale.
 
     Returns
     -------
@@ -464,17 +516,21 @@ def _build_axes(
                 )
             )
     if space_axes is not None:
+        scales = scales or {}
         for prop_name in reversed(space_axes):
             if prop_name not in node_props:
                 raise ValueError(
                     f"Unknown node property '{prop_name}', cannot be mapped to "
                     "space axis."
                 )
+            scale, scaled_unit = scales.get(prop_name, (None, None))
             axes.append(
                 geff_spec.Axis(
                     name=prop_name,
                     type="space",
                     unit=node_props[prop_name].unit,
+                    scale=scale,
+                    scaled_unit=scaled_unit,
                 )
             )
     return axes
@@ -561,6 +617,7 @@ def _build_geff_metadata(
     space_axes: list[str] | None = None,
     channel_axes: list[str] | None = None,
     tracklets: bool = False,
+    scales: dict[str, tuple[float, str | None]] | None = None,
 ) -> geff.GeffMetadata:
     """
     Build GEFF metadata from a pycellin model.
@@ -592,6 +649,10 @@ def _build_geff_metadata(
     tracklets : bool, default=False
         Whether to declare the ``tracklet_id`` cell property as the GEFF tracklet
         property. The cells must already have it, see ``_add_tracklet_ids()``.
+    scales : dict[str, tuple[float, str | None]] | None, default=None
+        The scale and scaled unit of the space axes in pixels, by property, as
+        returned by ``_convert_coordinates_to_pixels()``. If None, no axis has a
+        scale.
 
     Returns
     -------
@@ -617,6 +678,7 @@ def _build_geff_metadata(
         time_axes=time_axes,
         space_axes=space_axes,
         channel_axes=channel_axes,
+        scales=scales,
     )
     display_hints = _build_display_hints(
         time_axis=time_axes[0],
@@ -679,6 +741,7 @@ def write_geff(
         value for them (GEFF axes can't have missing values). An empty list exports
         no space axes. The space axes are written in OME-Zarr order (z, y, x), and
         the display hints are set to x (horizontal), y (vertical) and z (depth).
+        Their values are written in pixels when the pixel size is known, see Notes.
     channel_axes : list[str] | None, default=None
         List of property names that Geff will consider as channel axes.
         These should be properties in the model that represent different channels
@@ -743,6 +806,15 @@ def write_geff(
     them unique within a lineage. Repeated IDs are changed in the file, with a
     warning, and the IDs of the cells in the model are then kept in the
     ``pycellin_cell_id`` property.
+
+    GEFF gives the pixel size as the scale of a space axis whose values are in
+    pixels. So the space axes are written in pixels, as their values divided by the
+    pixel size from the model metadata (`pixel_width` for x, `pixel_height` for y,
+    `pixel_depth` for z), with this pixel size as scale and the unit of the
+    coordinates as scaled unit. `read_geff` converts them back. A space axis whose
+    pixel size is None is written as it is. The other properties, such as areas or
+    speeds, keep their units. Converting the coordinates into pixels and back can
+    change the last digit of some values.
     """
     _check_up_to_date(model)
     if not model.data.cell_lineages:
@@ -780,6 +852,10 @@ def write_geff(
     if tracklets:
         # Tracklet IDs are cell IDs, now unique across lineages.
         _add_tracklet_ids(model_copy)
+    if space_axes is None:
+        space_axes = _get_default_space_axes(model_copy)
+    # GEFF gives the pixel size as the scale of a space axis in pixels.
+    scales = _convert_coordinates_to_pixels(model_copy, space_axes)
     geff_graph = nx.compose_all(lineages)
 
     metadata = _build_geff_metadata(
@@ -788,6 +864,7 @@ def write_geff(
         space_axes=space_axes,
         channel_axes=channel_axes,
         tracklets=tracklets,
+        scales=scales,
     )
 
     try:

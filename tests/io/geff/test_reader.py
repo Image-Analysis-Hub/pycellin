@@ -2719,6 +2719,37 @@ class TestReadGeff:
         lin = model.data.cell_lineages[0]
         assert dict(lin.nodes(data="geff_lineage_id")) == {0: 7.0, 1: 7.0}
 
+    def test_scale_and_offset_of_space_axes_applied(self, tmp_path):
+        """The coordinates are multiplied by the scale of their axis, then the offset
+        is added, and get the scaled unit. The scale of an axis in pixels is the pixel
+        size."""
+        g = nx.DiGraph()
+        g.add_node(0, t=0, x=4.0, y=8.0)
+        g.add_node(1, t=1, x=6.0, y=12.0)
+        g.add_edge(0, 1)
+        path = tmp_path / "scaled_axes.geff"
+        geff.write(
+            g,
+            path,
+            axis_names=["t", "y", "x"],
+            axis_types=["time", "space", "space"],
+            axis_units=[None, "pixel", "pixel"],
+            axis_scales=[None, 0.25, 0.5],
+            scaled_units=[None, "micrometer", "micrometer"],
+            axis_offset=[None, None, 10.0],
+        )
+
+        model = read_geff(path)
+
+        lin = model.data.cell_lineages[0]
+        assert dict(lin.nodes(data="cell_x")) == {0: 12.0, 1: 13.0}
+        assert dict(lin.nodes(data="cell_y")) == {0: 2.0, 1: 3.0}
+        assert model.get_pixel_width() == 0.5
+        assert model.get_pixel_height() == 0.25
+        assert model.get_space_unit() == "micrometer"
+        props = model.props_metadata.properties
+        assert props["cell_x"].unit == props["cell_y"].unit == "micrometer"
+
     def test_reference_time_prop_given(self, tmp_path):
         """The property given as reference_time_prop is the reference time property
         of the model, instead of the time axis of the file."""

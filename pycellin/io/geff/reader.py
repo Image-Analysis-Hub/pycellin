@@ -22,6 +22,7 @@ from pycellin import __version__
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.custom_types import PropertyType, _property_type_to_strings
 from pycellin.io.utils import (
+    _PIXEL_SIZE_FIELDS,
     _check_fusions,
     _get_int_ids,
     _graph_has_node_prop,
@@ -849,6 +850,75 @@ def _get_prop_unit(
     return unit
 
 
+def _apply_space_scales(
+    geff_graph: nx.Graph,
+    geff_md: geff.GeffMetadata,
+    cell_x_key: str | None,
+    cell_y_key: str | None,
+    cell_z_key: str | None,
+) -> dict[str, float]:
+    """
+    Apply the scale and offset of the coordinate axes to their values.
+
+    A GEFF axis can give a scale and an offset, to apply in that order to its values,
+    e.g. to convert pixels into micrometers. pycellin stores the coordinates after
+    both: the values of each coordinate axis with a scale or an offset are converted
+    in place, and its axis is replaced by one without scale and offset. After a
+    scale, the values are in the scaled unit, which becomes the unit of the axis and
+    of the node property, None if the axis doesn't give one.
+
+    Parameters
+    ----------
+    geff_graph : nx.Graph
+        The graph read from the GEFF file, modified in place.
+    geff_md : geff.GeffMetadata
+        The metadata of the GEFF file, modified in place.
+    cell_x_key : str | None
+        The x-coordinate property of the GEFF file, if any.
+    cell_y_key : str | None
+        The y-coordinate property of the GEFF file, if any.
+    cell_z_key : str | None
+        The z-coordinate property of the GEFF file, if any.
+
+    Returns
+    -------
+    dict[str, float]
+        The pixel sizes given by the scales of the axes in pixels: ``pixel_width``,
+        ``pixel_height`` and ``pixel_depth`` for the x, y and z axes.
+    """
+    pixel_sizes = {}
+    axes = geff_md.axes or []
+    props_md = geff_md.node_props_metadata
+    keys = (cell_x_key, cell_y_key, cell_z_key)
+    for key, size_field in zip(keys, _PIXEL_SIZE_FIELDS):
+        # GEFF axis names are unique, so one axis matches at most.
+        index = next(
+            (i for i, ax in enumerate(axes) if ax.name == key and ax.type == "space"),
+            None,
+        )
+        if key is None or index is None:
+            continue
+        axis = axes[index]
+        if axis.scale is None and axis.offset is None:
+            continue
+        scale = 1.0 if axis.scale is None else axis.scale
+        offset = 0.0 if axis.offset is None else axis.offset
+        for _, attrs in geff_graph.nodes(data=True):
+            if attrs.get(key) is not None:
+                attrs[key] = attrs[key] * scale + offset
+        unit = axis.unit
+        if axis.scale is not None:
+            if _get_prop_unit(key, "space", props_md, axes) == "pixel":
+                pixel_sizes[size_field] = axis.scale
+            unit = axis.scaled_unit
+            if key in props_md:
+                props_md[key].unit = unit
+        if key in props_md:
+            props_md[key].dtype = "float64"
+        axes[index] = geff_spec.Axis(name=axis.name, type=axis.type, unit=unit)
+    return pixel_sizes
+
+
 def _extract_axes_metadata(
     geff_md: geff.GeffMetadata,
     time_key: str,
@@ -1497,6 +1567,14 @@ def read_geff(
     complete 2D set (x and y) or a complete 3D set (x, y, and z); partial
     specifications and duplicate property names are invalid.
 
+    A GEFF space axis can give a scale and an offset, e.g. to convert pixels into
+    micrometers, as in the files written by `write_geff` when the pixel size is
+    known. The coordinates of the model are stored after both: their values are
+    multiplied by the scale, then the offset is added, and the scaled unit of the
+    axis becomes their unit. When the values of the axis are in pixels, its scale
+    is the pixel size of the model (`pixel_width` for x, `pixel_height` for y,
+    `pixel_depth` for z).
+
     pycellin creates its own ``cell_id`` and ``lineage_id`` properties. A
     ``cell_id`` or ``lineage_id`` property of the GEFF file that is not used as
     identifier is kept under the name ``geff_cell_id`` or ``geff_lineage_id``, with
@@ -1517,11 +1595,16 @@ def read_geff(
     cell_x_prop, cell_y_prop, cell_z_prop = _identify_space_props(
         cell_x_prop, cell_y_prop, cell_z_prop, geff_md, geff_graph
     )
+    # Coordinates are stored in their scaled unit, e.g. pixels into micrometers.
+    pixel_sizes = _apply_space_scales(
+        geff_graph, geff_md, cell_x_prop, cell_y_prop, cell_z_prop
+    )
 
     # Extract and dispatch metadata.
     generic_md = _build_generic_metadata(
         path, geff_md, reference_time_prop, cell_x_prop, cell_y_prop, cell_z_prop
     )
+    generic_md.update(pixel_sizes)
     rename_map: dict[PropertyType, dict[str, str]] = {
         PropertyType.NODE: {},
         PropertyType.EDGE: {},
