@@ -3,7 +3,7 @@
 """The base classes of the calculators, which compute the values of properties."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any, ClassVar, Generic, TypeVar, cast
 
 from pycellin.classes.data import Data
@@ -15,7 +15,7 @@ from pycellin.classes.property import Property
 LineageT = TypeVar("LineageT", bound=Lineage)
 
 
-def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Lineage]:
+def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> Mapping[int, Lineage]:
     """
     Get the lineages from the data object based on the lineage type.
 
@@ -29,8 +29,8 @@ def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Line
 
     Returns
     -------
-    dict[int, Lineage]
-        Dictionary of lineages extracted from the data object.
+    Mapping[int, Lineage]
+        Lineages extracted from the data object.
         Keys are the lineage IDs. For ``"both"``, the cell lineages, each replaced by
         its cycle lineage when it has one, since they share their lineage ID.
 
@@ -38,12 +38,19 @@ def _get_lin_data_from_lin_type(data: Data, lineage_type: str) -> dict[int, Line
     ------
     ValueError
         If `lineage_type` is not ``"cell"``, ``"cycle"`` or ``"both"``.
+        If `lineage_type` is ``"cycle"`` or ``"both"``, and `data` has no cycle
+        lineages.
     """
     if lineage_type == "cell":
         return data.cell_lineages
-    elif lineage_type == "cycle":
-        return data.cycle_lineages
-    elif lineage_type == "both":
+    elif lineage_type in ("cycle", "both"):
+        if data.cycle_lineages is None:
+            raise ValueError(
+                "Cycle lineages have not been computed yet. "
+                "Please compute them first with model.add_cycle_lineages()."
+            )
+        if lineage_type == "cycle":
+            return data.cycle_lineages
         return {**data.cell_lineages, **data.cycle_lineages}
     else:
         raise ValueError("Invalid lineage type.")
@@ -159,7 +166,7 @@ class PropertyCalculator(ABC, Generic[LineageT]):
             for attr, (prop_type, lineage_type) in self.INPUT_PROPS.items()
         }
 
-    def _get_lineages(self, data: Data) -> dict[int, LineageT]:
+    def _get_lineages(self, data: Data) -> Mapping[int, LineageT]:
         """
         Return the lineages the property is computed on.
 
@@ -170,14 +177,20 @@ class PropertyCalculator(ABC, Generic[LineageT]):
 
         Returns
         -------
-        dict[int, LineageT]
+        Mapping[int, LineageT]
             The lineages of the lineage type of the property. Keys are the lineage
             IDs.
+
+        Raises
+        ------
+        ValueError
+            If the lineage type of the property is ``"cycle"`` or ``"both"``, and
+            `data` has no cycle lineages.
         """
         lineages = _get_lin_data_from_lin_type(data, self.property.lineage_type)
         # The type parameter of the calculator is meant to match the lineage type of
         # its property, which type checkers can't verify.
-        return cast("dict[int, LineageT]", lineages)
+        return cast("Mapping[int, LineageT]", lineages)
 
     @abstractmethod
     def compute(self, *args: Any, **kwargs: Any) -> Any:
@@ -364,6 +377,12 @@ class NodeLocalPropCalculator(LocalPropCalculator[LineageT]):
         **kwargs : Any
             Not used: the edges and lineages to enrich, which the model gives to all
             the calculators.
+
+        Raises
+        ------
+        ValueError
+            If the lineage type of the property is ``"cycle"`` or ``"both"``, and
+            `data` has no cycle lineages.
         """
         lineages = self._get_lineages(data)
         for nid, lin_id in nodes_to_enrich:
@@ -454,6 +473,12 @@ class EdgeLocalPropCalculator(LocalPropCalculator[LineageT]):
         **kwargs : Any
             Not used: the nodes and lineages to enrich, which the model gives to all
             the calculators.
+
+        Raises
+        ------
+        ValueError
+            If the lineage type of the property is ``"cycle"`` or ``"both"``, and
+            `data` has no cycle lineages.
         """
         lineages = self._get_lineages(data)
         for source, target, lin_id in edges_to_enrich:
@@ -540,6 +565,12 @@ class LineageLocalPropCalculator(LocalPropCalculator[LineageT]):
         **kwargs : Any
             Not used: the nodes and edges to enrich, which the model gives to all
             the calculators.
+
+        Raises
+        ------
+        ValueError
+            If the lineage type of the property is ``"cycle"`` or ``"both"``, and
+            `data` has no cycle lineages.
         """
         lineages = self._get_lineages(data)
         for lin_id in lineage_ids_to_enrich:
@@ -694,6 +725,12 @@ class NodeGlobalPropCalculator(GlobalPropCalculator[LineageT]):
         **kwargs : Any
             Not used: the objects to enrich, which the model gives to all the
             calculators.
+
+        Raises
+        ------
+        ValueError
+            If the lineage type of the property is ``"cycle"`` or ``"both"``, and
+            `data` has no cycle lineages.
         """
         lineages = self._get_lineages(data)
         for lin in lineages.values():
@@ -781,6 +818,12 @@ class EdgeGlobalPropCalculator(GlobalPropCalculator[LineageT]):
         **kwargs : Any
             Not used: the objects to enrich, which the model gives to all the
             calculators.
+
+        Raises
+        ------
+        ValueError
+            If the lineage type of the property is ``"cycle"`` or ``"both"``, and
+            `data` has no cycle lineages.
         """
         lineages = self._get_lineages(data)
         for lin in lineages.values():
@@ -865,6 +908,12 @@ class LineageGlobalPropCalculator(GlobalPropCalculator[LineageT]):
         **kwargs : Any
             Not used: the objects to enrich, which the model gives to all the
             calculators.
+
+        Raises
+        ------
+        ValueError
+            If the lineage type of the property is ``"cycle"`` or ``"both"``, and
+            `data` has no cycle lineages.
         """
         lineages = self._get_lineages(data)
         for lin in lineages.values():
