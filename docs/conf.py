@@ -37,6 +37,10 @@ extensions = [
 myst_enable_extensions = ["colon_fence"]
 exclude_patterns = ["_build", "_generated"]
 templates_path = ["_templates"]
+# Keep straight quotes: Sphinx curls the quotes of the text outside code, such as
+# default="timepoint" in parameter types, which then can't be copied into Python.
+# Dashes and ellipses are still converted.
+smartquotes_action = "De"
 intersphinx_mapping = {
     "networkx": ("https://networkx.org/documentation/stable/", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
