@@ -3542,13 +3542,15 @@ class CycleLineage(Lineage):
             # Freezing the structure since it's mapped on the cell lineage one.
             nx.freeze(self)
 
-            # Adding node and graph props.
-            self.graph["lineage_id"] = cell_lineage.graph["lineage_id"]
+            # Adding node and graph props. Like cells, cell cycles store the lineage ID.
+            lineage_id = cell_lineage.graph["lineage_id"]
+            self.graph["lineage_id"] = lineage_id
             for n in divs + leaves:
                 cells_in_cycle = cell_lineage.get_cell_cycle(n)
                 first = cells_in_cycle[0]
                 last = cells_in_cycle[-1]
                 self.nodes[n]["cycle_id"] = n
+                self.nodes[n]["lineage_id"] = lineage_id
                 self.nodes[n]["cells"] = cells_in_cycle
                 self.nodes[n]["first_cell"] = first
                 self.nodes[n]["last_cell"] = last

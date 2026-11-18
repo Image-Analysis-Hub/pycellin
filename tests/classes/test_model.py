@@ -1819,6 +1819,14 @@ class TestMergeLineageIds:
         }
         assert added == {4: [1, 2, 3, 4, 5], 5: [10, 11], 6: [9], 7: [20]}
 
+    def test_cell_cycles_store_new_ids(self, two_lineages_model):
+        """Test that the cell cycles of the lineages a merge adds store the new ID of
+        their lineage, like their cells."""
+        merged = two_lineages_model.merge(copy.deepcopy(two_lineages_model))
+        assert sorted(merged.data.cycle_lineages) == [1, 2, 3, 4]
+        for lineage_id, lin in merged.data.cycle_lineages.items():
+            assert set(dict(lin.nodes(data="lineage_id")).values()) == {lineage_id}
+
 
 class TestMergeCalculators:
     """Test cases for the calculators a merge adds to a model."""

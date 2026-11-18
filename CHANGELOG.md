@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the work of feature/docs up to 173da4b and the uncommitted propagation change (lineage type kept, get_propagated_properties()). Update from there with: git log 6b884a4..dev -->
+<!-- Planned v0.6.0. Covers commits up to 6b884a4, plus the work of feature/docs up to d5de831 and the uncommitted lineage_id declaration in all readers and on cell cycles. Update from there with: git log 6b884a4..dev -->
 
 Model merging and splitting, many new properties (morphology, intensity, topology), branch plots, consistent names that follow PEP 8, and many fixes, notably to time handling and to reading and writing TrackMate, GEFF, CTC and trackpy data. **This release contains breaking changes**, listed first below.
 
@@ -167,6 +167,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Model:** `add_cycle_lineages()`, `add_lineage()` with `with_cycle_lineage=True` and `merge()` no longer require the time step of the model, which building cycle lineages doesn't use. Without it, they raised `ValueError`, or for `add_lineage()` warned and skipped the cycle lineage. The `ValueError` of `update()` without a time step no longer says cycle lineages need it
 - **Properties:** the `enrich()` method of a calculator, called directly for a property of lineage type `"cycle"` or `"both"` on data without cycle lineages, raises `ValueError` saying to add them first, instead of a `TypeError` or `AttributeError`
 - **Properties:** `propagate_cycle_properties()` no longer changes the lineage type of the properties it propagates to `"both"` (`"Lineage"` in 0.5.1): they stay cycle lineage properties, listed by the new `get_propagated_properties()` and returned by `get_cell_lineage_properties()` too, so the writers still export them. `"both"` is left for the properties defined on cell and cycle lineages alike, such as `lineage_id`
+- **Properties:** all readers declare `lineage_id` on cell and cycle lineages (`"both"`), and cell cycles store it, as cells do. The TrackMate reader, and the GEFF reader for files that contain it, declared it on cell lineages only, so `merge()` refused to merge their models with models read from CTC or trackpy files. With the other readers, a cycle calculator reading `lineage_id` failed at the update, since cell cycles didn't store it
 - **Plotting:** in `CellLineage` and `CycleLineage` `plot()` and `get_tree_figure()`, nodes with a list of sizes in `node_marker_style` are drawn opaque and without outline, instead of as Plotly's semi-transparent bubbles with a white outline
 - **TrackMate:** the reader declares `FRAME` with the unit "frame" instead of no unit
 - **GEFF:** `write_geff()` writes the cell coordinates as space axes by default: `cell_x`, `cell_y`, and `cell_z` when it is declared, as long as every cell has a value for them, since GEFF axes can't have missing values (otherwise they are left out, with a warning). Pass `space_axes=[]` to write none. Without space axes, other GEFF tools couldn't place the cells, and `read_geff()` lost the space unit of the model

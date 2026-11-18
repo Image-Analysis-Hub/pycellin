@@ -848,6 +848,8 @@ def _update_props_metadata(
     props_md.properties["lineage_id"].prop_type = (
         PropertyType.NODE | PropertyType.LINEAGE
     )
+    # Cell and cycle lineages share their lineage ID, as with the other readers.
+    props_md.properties["lineage_id"].lineage_type = "both"
     prop_filtered_track = Property(
         identifier="FilteredTrack",
         name="FilteredTrack",

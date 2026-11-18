@@ -6211,8 +6211,12 @@ class Model:
                     (lin, lid) for lid, lin in model1.data.cell_lineages.items()
                 ]
             for lin, lid in lineages:
+                # The lineage still has its ID in its model: its cycle lineage and
+                # cell cycles get the ID it will have in the merged model.
                 cycle_lin = CycleLineage(time_prop, lin)
                 cycle_lin.graph["lineage_id"] = lid
+                for _, cycle in cycle_lin.nodes(data=True):
+                    cycle["lineage_id"] = lid
                 cycle_lineages_to_add[lid] = cycle_lin
 
         # Model metadata of the merged model. Fields shared by both models are kept,

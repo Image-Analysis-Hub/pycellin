@@ -1364,6 +1364,8 @@ def _standardize_props_metadata(
             props_md["lineage_id"] = props_md.pop(lin_id_key)
         props_md["lineage_id"].identifier = "lineage_id"
         props_md["lineage_id"].prop_type = PropertyType.NODE | PropertyType.LINEAGE
+        # Cell and cycle lineages share their lineage ID.
+        props_md["lineage_id"].lineage_type = "both"
     else:
         props_md["lineage_id"] = create_lineage_id_property(provenance="geff")
 
