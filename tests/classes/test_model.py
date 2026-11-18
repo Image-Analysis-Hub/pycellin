@@ -2350,9 +2350,9 @@ class TestAddCellPolygon:
         with pytest.raises(ValueError, match="'cell_x' is in 'pixel'"):
             contour_model.add_cell_polygon(source="contour")
 
-    def test_contour_source_unknown_unit_not_checked(self, contour_model):
+    def test_contour_source_missing_unit_not_checked(self, contour_model):
         contour_model.get_property("cell_contour").unit = None
-        contour_model.get_property("cell_y").unit = "unknown"
+        contour_model.get_property("cell_y").unit = None
         contour_model.add_cell_polygon(source="contour")
         assert contour_model.get_property("cell_polygon").unit == "um"
 

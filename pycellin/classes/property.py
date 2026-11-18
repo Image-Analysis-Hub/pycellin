@@ -13,9 +13,6 @@ from pycellin.custom_types import (
 )
 from pycellin.utils import _check_literal_type, _normalize_dtype
 
-# Unit and data type of properties whose declaration is unknown (e.g. TrackMate stubs).
-_UNKNOWN = "unknown"
-
 
 class Property:
     """
@@ -135,9 +132,8 @@ class Property:
 
         Two properties are compatible when they have the same property type, lineage
         type, unit and data type. Data types are compared after normalizing their
-        spelling (e.g. ``"float"`` and ``"float64"``, ``"str"`` and ``"string"``). An
-        ``"unknown"`` unit or data type is compatible with any value. Name,
-        description and provenance are not compared.
+        spelling (e.g. ``"float"`` and ``"float64"``, ``"str"`` and ``"string"``).
+        Name, description and provenance are not compared.
 
         Parameters
         ----------
@@ -152,13 +148,10 @@ class Property:
         """
         incompatibilities = {
             field: (getattr(self, field), getattr(other, field))
-            for field in ("prop_type", "lineage_type")
+            for field in ("prop_type", "lineage_type", "unit")
             if getattr(self, field) != getattr(other, field)
         }
-        if _UNKNOWN not in (self.unit, other.unit) and self.unit != other.unit:
-            incompatibilities["unit"] = (self.unit, other.unit)
-        dtypes = (_normalize_dtype(self.dtype), _normalize_dtype(other.dtype))
-        if _UNKNOWN not in (self.dtype, other.dtype) and dtypes[0] != dtypes[1]:
+        if _normalize_dtype(self.dtype) != _normalize_dtype(other.dtype):
             incompatibilities["dtype"] = (self.dtype, other.dtype)
         return incompatibilities
 

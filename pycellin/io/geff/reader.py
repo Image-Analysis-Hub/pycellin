@@ -22,7 +22,6 @@ from pycellin import __version__
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.custom_types import PropertyType, _property_type_to_strings
 from pycellin.io.utils import (
-    _PIXEL_SIZE_FIELDS,
     _check_fusions,
     _get_int_ids,
     _graph_has_node_prop,
@@ -890,7 +889,8 @@ def _apply_space_scales(
     axes = geff_md.axes or []
     props_md = geff_md.node_props_metadata
     keys = (cell_x_key, cell_y_key, cell_z_key)
-    for key, size_field in zip(keys, _PIXEL_SIZE_FIELDS):
+    size_fields = ("pixel_width", "pixel_height", "pixel_depth")
+    for key, size_field in zip(keys, size_fields):
         # GEFF axis names are unique, so one axis matches at most.
         index = next(
             (i for i, ax in enumerate(axes) if ax.name == key and ax.type == "space"),

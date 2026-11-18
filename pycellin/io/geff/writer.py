@@ -21,11 +21,7 @@ import networkx as nx
 from pycellin.classes import CellLineage, Model, Property
 from pycellin.custom_types import PropertyType
 from pycellin.exceptions import ProtectedPropertyError
-from pycellin.io.utils import (
-    _PIXEL_SIZE_FIELDS,
-    _check_up_to_date,
-    _remove_orphaned_metadata,
-)
+from pycellin.io.utils import _check_up_to_date, _remove_orphaned_metadata
 from pycellin.utils import _normalize_dtype
 
 logger = logging.getLogger(__name__)
@@ -428,7 +424,8 @@ def _convert_coordinates_to_pixels(
     """
     node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
     scales = {}
-    for prop_id, size_field in zip(space_axes, _PIXEL_SIZE_FIELDS):
+    size_fields = ("pixel_width", "pixel_height", "pixel_depth")
+    for prop_id, size_field in zip(space_axes, size_fields):
         size = getattr(model.model_metadata, size_field)
         # An unknown property is reported by _build_axes().
         if size is None or prop_id not in node_props:

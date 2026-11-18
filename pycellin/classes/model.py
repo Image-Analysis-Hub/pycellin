@@ -3494,7 +3494,7 @@ class Model:
         Return the unit shared by cell contours and cell positions.
 
         A contour is relative to the cell position, so both must have the same unit.
-        Undeclared properties and unknown units are not checked.
+        Undeclared properties and properties without unit are not checked.
 
         Parameters
         ----------
@@ -3504,7 +3504,7 @@ class Model:
         Returns
         -------
         str | None
-            The shared unit, or the unit of the contours if no unit is known.
+            The shared unit, or None if none of these properties has a unit.
 
         Raises
         ------
@@ -3515,9 +3515,7 @@ class Model:
             identifier: self._get_prop_unit(identifier)
             for identifier in (contour_prop, "cell_x", "cell_y")
         }
-        known_units = {
-            prop: unit for prop, unit in units.items() if unit not in (None, "unknown")
-        }
+        known_units = {prop: unit for prop, unit in units.items() if unit is not None}
         if len(set(known_units.values())) > 1:
             mismatch = ", ".join(
                 f"'{prop}' is in '{unit}'" for prop, unit in known_units.items()
@@ -3526,7 +3524,7 @@ class Model:
                 "The contours and the cell positions must have the same unit, since "
                 f"contours are relative to the cell position, but {mismatch}."
             )
-        return next(iter(known_units.values()), units[contour_prop])
+        return next(iter(known_units.values()), None)
 
     def add_cell_multipolygon(
         self,

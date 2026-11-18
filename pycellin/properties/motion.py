@@ -24,9 +24,6 @@ from pycellin.properties.utils import (
     _nansum,
 )
 
-#: Cell coordinate properties of 3D data: 2D data has no ``cell_z``.
-_CELL_COORD_PROPS = ("cell_x", "cell_y", "cell_z")
-
 
 def create_cell_displacement_property(
     custom_identifier: str | None = None,
@@ -82,14 +79,15 @@ class CellDisplacement(EdgeLocalPropCalculator[CellLineage]):
     ----------
     property : Property
         Property object to which the calculator is associated.
-    coord_props : tuple[str, ...], default=_CELL_COORD_PROPS
+    coord_props : tuple[str, ...], default=("cell_x", "cell_y", "cell_z")
         Identifiers of the cell lineage node properties holding the coordinates
-        of the cells, one per axis. Default is ``("cell_x", "cell_y", "cell_z")``,
-        for 3D data.
+        of the cells, one per axis. The default is for 3D data.
     """
 
     def __init__(
-        self, property: Property, coord_props: tuple[str, ...] = _CELL_COORD_PROPS
+        self,
+        property: Property,
+        coord_props: tuple[str, ...] = ("cell_x", "cell_y", "cell_z"),
     ):
         super().__init__(property)
         self.coord_props = coord_props
@@ -400,10 +398,9 @@ class CellSpeed(EdgeLocalPropCalculator[CellLineage]):
     time_prop : str
         Identifier of the cell lineage node property holding the time
         of the cells (e.g. ``frame``, ``POSITION_T``).
-    coord_props : tuple[str, ...], default=_CELL_COORD_PROPS
+    coord_props : tuple[str, ...], default=("cell_x", "cell_y", "cell_z")
         Identifiers of the cell lineage node properties holding the coordinates
-        of the cells, one per axis. Default is ``("cell_x", "cell_y", "cell_z")``,
-        for 3D data.
+        of the cells, one per axis. The default is for 3D data.
     """
 
     #: Input property: `time_prop`, a node property of cell lineages.
@@ -413,7 +410,7 @@ class CellSpeed(EdgeLocalPropCalculator[CellLineage]):
         self,
         property: Property,
         time_prop: str,
-        coord_props: tuple[str, ...] = _CELL_COORD_PROPS,
+        coord_props: tuple[str, ...] = ("cell_x", "cell_y", "cell_z"),
     ):
         super().__init__(property)
         self.time_prop = time_prop
@@ -613,17 +610,16 @@ class Straightness(NodeGlobalPropCalculator[CycleLineage]):
     include_incoming_edge : bool, default=False
         Whether to start the trajectory at the parent of the first cell, i.e. to
         include the link from this parent to the first cell.
-    coord_props : tuple[str, ...], default=_CELL_COORD_PROPS
+    coord_props : tuple[str, ...], default=("cell_x", "cell_y", "cell_z")
         Identifiers of the cell lineage node properties holding the coordinates
-        of the cells, one per axis. Default is ``("cell_x", "cell_y", "cell_z")``,
-        for 3D data.
+        of the cells, one per axis. The default is for 3D data.
     """
 
     def __init__(
         self,
         property: Property,
         include_incoming_edge: bool = False,
-        coord_props: tuple[str, ...] = _CELL_COORD_PROPS,
+        coord_props: tuple[str, ...] = ("cell_x", "cell_y", "cell_z"),
     ):
         super().__init__(property)
         self.include_incoming_edge = include_incoming_edge
@@ -751,10 +747,9 @@ class TurningAngle(NodeLocalPropCalculator[CellLineage]):
         Property object to which the calculator is associated.
     unit : Literal["radian", "degree"], default="radian"
         Unit in which the angle is computed.
-    coord_props : tuple[str, ...], default=_CELL_COORD_PROPS
+    coord_props : tuple[str, ...], default=("cell_x", "cell_y", "cell_z")
         Identifiers of the cell lineage node properties holding the coordinates
-        of the cells, one per axis. Default is ``("cell_x", "cell_y", "cell_z")``,
-        for 3D data.
+        of the cells, one per axis. The default is for 3D data.
 
     Raises
     ------
@@ -766,7 +761,7 @@ class TurningAngle(NodeLocalPropCalculator[CellLineage]):
         self,
         property: Property,
         unit: Literal["radian", "degree"] = "radian",
-        coord_props: tuple[str, ...] = _CELL_COORD_PROPS,
+        coord_props: tuple[str, ...] = ("cell_x", "cell_y", "cell_z"),
     ):
         super().__init__(property)
         if unit not in ("radian", "degree"):

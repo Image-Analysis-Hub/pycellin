@@ -1,4 +1,12 @@
-"""Helpers shared by the readers and writers of the different formats."""
+"""
+Helpers for the readers and writers of the different formats.
+
+Most of them are shared by several formats, the others are used by one format only.
+They check the models read or written (cell fusions, pending updates), split a graph
+into lineages, rename properties and relabel cells, list or remove properties, find
+the frames to write, and word the warning about the cycle properties left out of an
+export.
+"""
 
 import logging
 import numbers
@@ -13,9 +21,6 @@ from pycellin.custom_types import PropertyType, _property_type_from_string
 from pycellin.exceptions import UpdateRequiredError
 
 logger = logging.getLogger(__name__)
-
-#: Model metadata fields of the pixel size along x, y and z, in that order.
-_PIXEL_SIZE_FIELDS = ("pixel_width", "pixel_height", "pixel_depth")
 
 
 def _check_fusions(model: Model) -> None:
