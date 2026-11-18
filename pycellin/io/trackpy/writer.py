@@ -211,6 +211,16 @@ def to_trackpy(model: Model) -> pd.DataFrame:
         If the model requires an update.
     ValueError
         If the model has no cells, or no ``cell_x`` or ``cell_y`` values.
+        If only some cells have a frame and their frames can't be deduced, see Notes.
+
+    Notes
+    -----
+    The ``frame`` column comes from the frame property of the model, a node property
+    called ``frame`` in any case, e.g. trackpy's ``frame`` or TrackMate's ``FRAME``.
+    Cells without frame, e.g. added with `Model.add_cell`, get their timepoint plus the
+    difference between frame and timepoint of the other cells, which must be the same
+    for all of them. Without frame property, the frames are the timepoints, which
+    start at 0 at the earliest cell.
     """
     _check_up_to_date(model)
     # Prepare the model for export.
@@ -219,7 +229,8 @@ def to_trackpy(model: Model) -> pd.DataFrame:
     _remove_division_events(model_copy)  # Trackpy does not support division events.
     _renumber_negative_lineage_ids(model_copy)
 
-    # Creation of the trackpy DataFrame.
+    # Creation of the trackpy DataFrame, once the missing frames are completed.
+    frame_prop = _identify_frame_prop(model_copy)
     df = model_copy.to_cell_dataframe()
     missing = [prop for prop in ("cell_x", "cell_y") if prop not in df.columns]
     if missing:
@@ -227,7 +238,6 @@ def to_trackpy(model: Model) -> pd.DataFrame:
             "trackpy needs the positions of the cells, but the model has no "
             f"{' or '.join(repr(prop) for prop in missing)} values."
         )
-    frame_prop = _identify_frame_prop(model_copy)
     df = _format_dataframe(df, frame_prop)
 
     return df

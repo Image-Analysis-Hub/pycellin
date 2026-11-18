@@ -151,11 +151,17 @@ def _add_lineage_props(
 
 def _identify_frame_prop(model: Model) -> str:
     """
-    Identify a frame-like property in the model.
+    Identify the property giving the frames of the cells, and complete it if needed.
 
-    This function checks if there is a frame-like property in the model's metadata,
-    i.e. a node property called ``frame``, in any case, present on all nodes.
-    If not, it falls back to the ``timepoint`` property.
+    The frame property is a node property called ``frame``, in any case, such as
+    TrackMate's ``FRAME`` or trackpy's ``frame``. When only some cells have a frame,
+    e.g. after `Model.add_cell` or `Model.merge`, the others get their timepoint plus
+    the difference between frame and timepoint of the cells that have both. Frames and
+    timepoints only differ by their origin, the first frame of the movie and the
+    earliest cell, so this difference is the same for all cells. Without a frame
+    property, or when no cell has a frame, the frames are the timepoints.
+
+    The frames are completed in place: give a copy of the model to export.
 
     Parameters
     ----------
@@ -169,51 +175,80 @@ def _identify_frame_prop(model: Model) -> str:
 
     Raises
     ------
+    ValueError
+        If only some cells have a frame, and the difference between frame and
+        timepoint is not the same for all the cells that have both, so the missing
+        frames can't be deduced.
     KeyError
-        If neither a frame-like property nor ``timepoint`` is present on all nodes.
+        If cells have neither a frame nor a ``timepoint`` value.
+
+    Notes
+    -----
+    The number of cells whose frame is computed is logged.
     """
-    # First, collect all frame-like properties from the metadata.
-    candidates = []
-    for prop in model.props_metadata._get_prop_dict_from_prop_type(
-        PropertyType.NODE
-    ).values():
-        if prop.identifier.lower() == "frame":
-            candidates.append(prop.identifier)
+    candidates = [
+        prop.identifier
+        for prop in model.props_metadata._get_prop_dict_from_prop_type(
+            PropertyType.NODE
+        ).values()
+        if prop.identifier.lower() == "frame"
+    ]
+    cells = [
+        cell
+        for lin in model.data.cell_lineages.values()
+        for _, cell in lin.nodes(data=True)
+    ]
 
-    # Check each candidate to see if it exists on all nodes in all lineages.
-    frame_prop = None
+    # A frame-like property present on all cells is used as it is.
     for candidate in candidates:
-        has_prop = True
-        for lin in model.data.cell_lineages.values():
-            has_prop = _graph_has_node_prop(lin, candidate) and has_prop
+        if all(cell.get(candidate) is not None for cell in cells):
+            return candidate
 
-        if has_prop:
-            frame_prop = candidate
-            break
-        else:
+    # One present on some cells only is completed from the timepoints.
+    for candidate in candidates:
+        offsets = {
+            cell[candidate] - cell["timepoint"]
+            for cell in cells
+            if cell.get(candidate) is not None and cell.get("timepoint") is not None
+        }
+        if not offsets:
             logger.info(
-                f"Property '{candidate}' found in metadata but not present on all "
-                "nodes. Trying next candidate or falling back to 'timepoint'."
+                f"No cell has both a '{candidate}' and a 'timepoint' value. Trying the "
+                "next frame-like property or falling back to 'timepoint'."
             )
-
-    # If no valid frame property found, fallback to "timepoint".
-    if frame_prop is None:
-        frame_prop = "timepoint"
-        has_prop = True
-        for lin in model.data.cell_lineages.values():
-            has_prop = _graph_has_node_prop(lin, frame_prop) and has_prop
-
-        if has_prop:
-            logger.info(
-                f"No valid frame-like property found. Falling back to '{frame_prop}'."
+            continue
+        missing = [cell for cell in cells if cell.get(candidate) is None]
+        num_txt = f"{len(missing)} cell{'s' if len(missing) > 1 else ''}"
+        if len(offsets) > 1:
+            examples = ", ".join(str(offset) for offset in sorted(offsets)[:3])
+            raise ValueError(
+                f"Cannot compute the frames of {num_txt} without '{candidate}' value, "
+                "e.g. added with add_cell(), from their timepoints: "
+                f"'{candidate}' minus 'timepoint' isn't the same for all the other "
+                f"cells (e.g. {examples}). Give these cells a '{candidate}' value, "
+                "e.g. with the prop_values argument of add_cell()."
             )
-        else:
+        if any(cell.get("timepoint") is None for cell in missing):
             raise KeyError(
-                "No valid frame-like property found. Tried candidates: "
-                f"{candidates} and fallback 'timepoint'. "
+                f"Some cells have neither a '{candidate}' nor a 'timepoint' value."
             )
+        offset = offsets.pop()
+        for cell in missing:
+            cell[candidate] = cell["timepoint"] + offset
+        logger.info(
+            f"Frames of {num_txt} without '{candidate}' value, e.g. added with "
+            f"add_cell(): their timepoints plus {offset}, as for the other cells."
+        )
+        return candidate
 
-    return frame_prop
+    # Without frames, the timepoints are the frames.
+    if not all(cell.get("timepoint") is not None for cell in cells):
+        raise KeyError(
+            "No valid frame-like property found. Tried candidates: "
+            f"{candidates} and fallback 'timepoint'."
+        )
+    logger.info("No valid frame-like property found. Falling back to 'timepoint'.")
+    return "timepoint"
 
 
 def _get_props_from_data(

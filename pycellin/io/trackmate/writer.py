@@ -1637,6 +1637,7 @@ def write_trackmate_xml(
         pycellin writes from another property, e.g. ``TRACK_ID``, written from
         ``lineage_id``, or ``POSITION_Z``, written from ``cell_z`` (as 0 without
         it).
+        If only some cells have a frame and their frames can't be deduced, see Notes.
 
     Warnings
     --------
@@ -1670,6 +1671,13 @@ def write_trackmate_xml(
     For example, a location tag added by `Model.add_location_tag` with `tag_names`
     holds strings and is not exported: add it without `tag_names` to keep the
     integer tags.
+
+    The ``FRAME`` of the spots comes from the frame property of the model, a node
+    property called ``frame`` in any case, e.g. TrackMate's ``FRAME``. Cells without
+    frame, e.g. added with `Model.add_cell`, get their timepoint plus the difference
+    between frame and timepoint of the other cells, which must be the same for all of
+    them. Without frame property, the frames are the timepoints, which start at 0 at
+    the earliest cell.
     """
     _check_up_to_date(model)
     # We don't want to modify the original model.

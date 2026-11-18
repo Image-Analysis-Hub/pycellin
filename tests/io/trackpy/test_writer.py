@@ -162,14 +162,15 @@ class TestToTrackpy:
         keys = list(zip(df["particle"], df["frame"]))
         assert keys == sorted(keys)
 
-    def test_incomplete_frame_replaced_by_timepoints(self, model_with_positions):
-        """Test that a frame property missing on some cells is replaced by the
-        timepoints, instead of giving a second frame column."""
+    def test_incomplete_frame_completed_from_timepoints(self, model_with_positions):
+        """Test that the cells without frame get their timepoint plus the difference
+        between frame and timepoint of the other cells, e.g. when the movie starts
+        before the first cell, in a single frame column."""
         model_with_positions.props_metadata._add_prop(create_frame_property())
         model_with_positions.data.cell_lineages[1].nodes[1]["frame"] = 5
         df = to_trackpy(model_with_positions)
         assert list(df.columns).count("frame") == 1
-        assert df["frame"].tolist() == [0, 1, 0, 1]
+        assert df["frame"].tolist() == [5, 6, 5, 6]
 
     def test_3d_positions_put_z_first(self, model_with_positions):
         """Test that the z position comes before y and x."""
