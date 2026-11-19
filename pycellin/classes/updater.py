@@ -75,7 +75,7 @@ class _ModelUpdater:
         """
         Build the ``timepoint`` calculator when it is missing or outdated.
 
-        The ``timepoint`` property is relied upon throughout pycellin, so it must
+        The ``timepoint`` property is relied upon throughout Pycellin, so it must
         always be present and up to date. No calculator is needed when ``timepoint``
         is the reference time property itself, nor when there is no data.
 

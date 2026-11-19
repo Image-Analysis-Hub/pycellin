@@ -51,7 +51,7 @@ def create_is_division_property(
         name=custom_name or "Is division",
         description=custom_description
         or "Whether the cell is a division event, i.e. has more than one daughter cell",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="bool",
@@ -122,7 +122,7 @@ def create_is_leaf_property(
         name=custom_name or "Is leaf",
         description=custom_description
         or "Whether the cell is a leaf cell, i.e. has no daughter cells",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="bool",
@@ -192,7 +192,7 @@ def create_is_root_property(
         name=custom_name or "Is root",
         description=custom_description
         or "Whether the cell is a root cell, i.e. has no parent cell",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="bool",
@@ -265,7 +265,7 @@ def create_is_complete_cycle_property(
         description=custom_description
         or "Whether the full cell cycle is captured, i.e. starts from a division "
         "and ends with a division",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="bool",
@@ -361,7 +361,7 @@ def create_num_cells_property(
         identifier=custom_identifier or "num_cells",
         name=custom_name or "Number of cells",
         description=custom_description or "Number of cells in the lineage",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
         lineage_type="cell",
         dtype="int",
@@ -430,7 +430,7 @@ def create_num_cycles_property(
         identifier=custom_identifier or "num_cycles",
         name=custom_name or "Number of cell cycles",
         description=custom_description or "Number of cell cycles in the lineage",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
         lineage_type="cycle",
         dtype="int",
@@ -497,7 +497,7 @@ def create_num_divisions_property(
         identifier=custom_identifier or "num_divisions",
         name=custom_name or "Number of divisions",
         description=custom_description or "Number of cell divisions in the lineage",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
         lineage_type="cell",
         dtype="int",
@@ -565,7 +565,7 @@ def create_num_gaps_property(
         name=custom_name or "Number of gaps",
         description=custom_description
         or "Number of gaps (missing detections) in the lineage",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
         lineage_type="cell",
         dtype="int",
@@ -634,7 +634,7 @@ def create_num_leaves_property(
         name=custom_name or "Number of leaves",
         description=custom_description
         or "Number of leaf cells (cells without daughter cells) in the lineage",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
         lineage_type="cell",
         dtype="int",
@@ -705,7 +705,7 @@ def create_lineage_cell_depth_property(
         description=custom_description
         or "Maximum number of cells along any path from the founding cell (root) to "
         "a terminal cell (leaf)",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
         lineage_type="cell",
         dtype="int",
@@ -778,7 +778,7 @@ def create_lineage_cycle_depth_property(
         description=custom_description
         or "Maximum number of cell cycles along any path from the founding cell (root) "
         "to a terminal cell (leaf), i.e. the highest generation + 1",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
         lineage_type="cycle",
         dtype="int",
@@ -858,7 +858,7 @@ def create_lineage_duration_property(
         description=custom_description
         or "Total lifespan of the lineage, from the founding cell (root) to the most "
         "recent descendant (leaf)",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
         lineage_type="cell",
         dtype=dtype,
@@ -946,7 +946,7 @@ def create_location_tag_property(
         name=custom_name or "Location tag",
         description=custom_description
         or "A tag indicating the location of a cell in the image",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype=dtype,
@@ -1132,7 +1132,7 @@ def create_mother_cycle_property(
         description=custom_description
         or "ID of the cell cycle whose division gave birth to the cell cycle, "
         "or None for the root cell cycle",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="int",
@@ -1202,7 +1202,7 @@ def create_daughter_cycles_property(
         name=custom_name or "Daughter cycles",
         description=custom_description
         or "IDs of the cell cycles born from the division ending the cell cycle",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="list[int]",
@@ -1273,7 +1273,7 @@ def create_sister_cycles_property(
         name=custom_name or "Sister cycles",
         description=custom_description
         or "IDs of the other cell cycles born from the same division as the cell cycle",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="list[int]",
@@ -1347,7 +1347,7 @@ def create_cousin_cycles_property(
         description=custom_description
         or "IDs of the cousin cell cycles: cell cycles of the same generation that "
         "share an ancestor with the cell cycle, but not its mother",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="list[int]",

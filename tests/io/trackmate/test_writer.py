@@ -270,7 +270,7 @@ class TestUnitToDimension:
             identifier=identifier,
             name=identifier,
             description=identifier,
-            provenance="pycellin",
+            provenance="Pycellin",
             prop_type="node",
             lineage_type="cell",
             dtype="float",
@@ -289,7 +289,7 @@ class TestUnitToDimension:
     )
     def test_dimension_from_unit(self, caplog, identifier, unit, dimension, warns):
         """Test the dimension given by the unit of a property that TrackMate and
-        pycellin don't know, and the warning when the unit gives none."""
+        Pycellin don't know, and the warning when the unit gives none."""
         prop = Property(
             identifier=identifier,
             name=identifier,
@@ -309,7 +309,7 @@ class TestTransformName:
     """Test cases for _transform_name function."""
 
     def test_pycellin_id_is_uppercase(self):
-        """Test that 'id' in a pycellin identifier is displayed as 'ID'."""
+        """Test that 'id' in a Pycellin identifier is displayed as 'ID'."""
         assert _transform_name("cycle_id") == "Cycle ID"
         assert _transform_name("pycellin_cell_id") == "Pycellin cell ID"
 
@@ -714,7 +714,7 @@ class TestWriteTrackmateXml:
     def test_lineage_without_FilteredTrack_exported_as_visible(
         self, tmp_path, simple_model
     ):
-        """Test that a lineage without the FilteredTrack flag, e.g. added in pycellin,
+        """Test that a lineage without the FilteredTrack flag, e.g. added in Pycellin,
         is exported as a visible track."""
         # As loaded from TrackMate, with a hidden track.
         simple_model.props_metadata._add_prop(
@@ -1028,7 +1028,7 @@ class TestWriteTrackmateXmlUnits:
         assert any("no time unit" in m and "`time_unit`" in m for m in messages)
 
     def test_units_by_position_raise(self, tmp_path, simple_model):
-        """Test that options passed by position, like the units dict of pycellin
+        """Test that options passed by position, like the units dict of Pycellin
         0.5.1, raise instead of landing in another argument."""
         xml_path = tmp_path / "model.xml"
         with pytest.raises(TypeError):

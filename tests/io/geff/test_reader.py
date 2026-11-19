@@ -160,7 +160,7 @@ def prop_geff_cell_id():
         identifier="cell_id",
         name="cell_id",
         description="cell_id",
-        provenance="geff",
+        provenance="GEFF",
         prop_type="node",
         lineage_type="cell",
         dtype="int64",
@@ -1702,7 +1702,7 @@ class TestExtractGenericMetadata:
     def test_provenance_is_geff(self, geff_md_axes):
         """The 'provenance' key is always 'geff'."""
         result = _extract_generic_metadata("/some/tracks.geff", geff_md_axes)
-        assert result["provenance"] == "geff"
+        assert result["provenance"] == "GEFF"
 
     def test_date_is_non_empty_string(self, geff_md_axes):
         """The 'date' key is a non-empty string."""
@@ -1711,7 +1711,7 @@ class TestExtractGenericMetadata:
         assert len(result["date"]) > 0
 
     def test_pycellin_version_matches_installed_package(self, geff_md_axes):
-        """The 'pycellin_version' key matches the installed pycellin version."""
+        """The 'pycellin_version' key matches the installed Pycellin version."""
         expected = importlib.metadata.version("pycellin")
         result = _extract_generic_metadata("/some/tracks.geff", geff_md_axes)
         assert result["pycellin_version"] == expected
@@ -2091,7 +2091,7 @@ class TestStandardizePropertiesData:
     def test_applies_collision_renames_and_standard_keys(
         self, lineages_with_nonstandard_keys, standardize_rename_map
     ):
-        """Rename-map keys and pycellin standard keys are applied on nodes, edges,
+        """Rename-map keys and Pycellin standard keys are applied on nodes, edges,
         and lineage graph attributes."""
         _standardize_properties_data(
             lineages_with_nonstandard_keys,
@@ -2252,7 +2252,7 @@ class TestStandardizePropertiesData:
         assert lin.nodes[1]["cell_z"] == 3.0
 
     def test_coordinates_renamed_all_at_once(self):
-        """A coordinate whose current name is the pycellin name of another one keeps
+        """A coordinate whose current name is the Pycellin name of another one keeps
         its values, e.g. when the axes are permuted."""
         lin = CellLineage()
         lin.add_node(1, lineage_id=0, cell_id=11, cell_x=1.0, cell_y=2.0, cell_z=3.0)
@@ -2431,7 +2431,7 @@ class TestStandardizePropsMetadata:
         )
         assert "lineage_id" in props_md
         assert props_md["lineage_id"].identifier == "lineage_id"
-        assert props_md["lineage_id"].provenance == "geff"
+        assert props_md["lineage_id"].provenance == "GEFF"
 
     def test_cell_id_standard_key_preserved(self, pycellin_standard_md, rename_map):
         """When cell_id_key is already 'cell_id', key and metadata are preserved."""
@@ -2485,7 +2485,7 @@ class TestStandardizePropsMetadata:
         )
         assert "cell_id" in props_md
         assert props_md["cell_id"].identifier == "cell_id"
-        assert props_md["cell_id"].provenance == "geff"
+        assert props_md["cell_id"].provenance == "GEFF"
 
     def test_coord_none_skips_all_coord_keys(self, rename_map):
         """When all coord props are None, no standard coordinate key is added to
@@ -2525,7 +2525,7 @@ class TestStandardizePropsMetadata:
         assert pycellin_standard_md["cell_x"].provenance == "test"
 
     def test_coord_nonstandard_renamed(self, pycellin_non_standard_md, rename_map):
-        """When a coord prop key differs from the pycellin convention, it is renamed
+        """When a coord prop key differs from the Pycellin convention, it is renamed
         and its identifier is updated but metadata is preserved."""
         _standardize_props_metadata(
             pycellin_non_standard_md,
@@ -2560,7 +2560,7 @@ class TestStandardizePropsMetadata:
         assert "cell_x" in props_md
         assert props_md["cell_x"].identifier == "cell_x"
         assert props_md["cell_x"].unit == "um"
-        assert props_md["cell_x"].provenance == "geff"
+        assert props_md["cell_x"].provenance == "GEFF"
 
     def test_lin_id_not_none_but_not_in_props_md_creates_default(self, rename_map):
         """When lin_id_key is provided but not in props_md, a default should be created
@@ -2579,7 +2579,7 @@ class TestStandardizePropsMetadata:
         assert "custom_lineage_id" not in props_md
         assert "lineage_id" in props_md
         assert props_md["lineage_id"].identifier == "lineage_id"
-        assert props_md["lineage_id"].provenance == "geff"
+        assert props_md["lineage_id"].provenance == "GEFF"
 
     def test_cell_id_not_none_but_not_in_props_md_creates_default(self, rename_map):
         """When cell_id_key is provided but not in props_md, a default should be created
@@ -2598,13 +2598,13 @@ class TestStandardizePropsMetadata:
         assert "custom_cell_id" not in props_md
         assert "cell_id" in props_md
         assert props_md["cell_id"].identifier == "cell_id"
-        assert props_md["cell_id"].provenance == "geff"
+        assert props_md["cell_id"].provenance == "GEFF"
 
     def test_coord_with_rename_map_transformation(
         self, prop_position_x_node, rename_map
     ):
         """When a coordinate key is transformed by rename_map, the transformed key
-        is looked up in props_md, renamed to pycellin convention, and identifier
+        is looked up in props_md, renamed to Pycellin convention, and identifier
         updated."""
         props_md = {"old_pos_x": prop_position_x_node}
         rename_map[PropertyType.NODE]["old_pos_x"] = "position_x"
@@ -2676,7 +2676,7 @@ class TestReadGeff:
         props = model.props_metadata.properties
         assert props["geff_cell_id"].identifier == "geff_cell_id"
         assert props["geff_lineage_id"].identifier == "geff_lineage_id"
-        assert props["cell_id"].provenance == "geff"
+        assert props["cell_id"].provenance == "GEFF"
 
     @pytest.mark.parametrize("values", [(1.0, 2.0), (1.5, 2.5), ("a", "b")])
     def test_non_integer_lineage_ids_are_autogenerated(self, tmp_path, values):

@@ -249,7 +249,7 @@ def _unit_to_dimension(
                 # but it's a dimension not recognized by TM and it crashes.
                 dimension = "NONE"
 
-    if dimension is None and provenance == "pycellin":
+    if dimension is None and provenance == "Pycellin":
         try:
             dimension = pycellin_props[name]
         except KeyError:
@@ -257,9 +257,9 @@ def _unit_to_dimension(
                 dimension = trackmate_props[name]
             except KeyError:
                 msg = (
-                    f"'{name}' is a property listed as coming from pycellin"
-                    f" but it is not a known property of either pycellin or TrackMate. "
-                    f" Dimension is set to NONE."
+                    f"'{name}' is a property listed as coming from Pycellin"
+                    f" but it is not a known property of either Pycellin or TrackMate. "
+                    f"Dimension is set to NONE."
                 )
                 logger.warning(msg)
                 dimension = "NONE"
@@ -336,7 +336,7 @@ def _convert_prop_to_feat(
     prop: Property,
 ) -> dict[str, str]:
     """
-    Convert a pycellin property to a TrackMate feature.
+    Convert a Pycellin property to a TrackMate feature.
 
     Parameters
     ----------
@@ -722,7 +722,7 @@ def _write_FilteredTracks(
     with xf.element("FilteredTracks"):
         if has_FilteredTracks:
             for lineage in data.values():
-                # A lineage without the flag, e.g. added or split off in pycellin,
+                # A lineage without the flag, e.g. added or split off in Pycellin,
                 # is visible.
                 if lineage.graph.get("FilteredTrack", True):
                     _write_track_id(xf, lineage)
@@ -765,7 +765,7 @@ def _update_nodes(lin: CellLineage, frame_prop: str) -> set[int]:
         except KeyError:
             pass  # lineage_id should be present, but better be safe than sorry
         try:
-            data.pop("timepoint")  # internal pycellin property
+            data.pop("timepoint")  # internal Pycellin property
         except KeyError:
             # If frame_prop is timepoint, it has already been popped
             # and we can ignore the KeyError.
@@ -1090,7 +1090,7 @@ def _add_mandatory_props(props_md: PropsMetadata) -> None:
     Add mandatory properties to the properties metadata.
 
     This is necessary because TrackMate requires some features to be present
-    in the model, even if they are not used in pycellin.
+    in the model, even if they are not used in Pycellin.
 
     Parameters
     ----------
@@ -1379,7 +1379,7 @@ def _relabel_nodes(model: Model) -> dict[int, dict[int, int]]:
         identifier="pycellin_cell_id",
         name="Pycellin cell ID",
         description="Original cell ID before relabeling for TrackMate export",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="int",
@@ -1396,7 +1396,7 @@ def _prepare_model_for_export(
     propagate: bool,
 ) -> None:
     """
-    Prepare a pycellin model for export to TrackMate format.
+    Prepare a Pycellin model for export to TrackMate format.
 
     This function updates the model to match TrackMate requirements
     and removes non-numeric properties that TrackMate cannot handle.
@@ -1602,14 +1602,14 @@ def write_trackmate_xml(
     propagate_cycle_props: bool = False,
 ) -> None:
     """
-    Write an XML file readable by TrackMate from a pycellin model.
+    Write an XML file readable by TrackMate from a Pycellin model.
 
     The model is not modified: the export works on a copy.
 
     Parameters
     ----------
     model : Model
-        The pycellin model containing the data to write.
+        The Pycellin model containing the data to write.
     path : str | Path
         Path of the XML file to write.
     space_unit : str | None, default=None
@@ -1648,7 +1648,7 @@ def write_trackmate_xml(
     ValueError
         If `propagate_cycle_props` is True and the model has no cycle lineages.
         If the model has a property with the name of a TrackMate feature that
-        pycellin writes from another property, e.g. ``TRACK_ID``, written from
+        Pycellin writes from another property, e.g. ``TRACK_ID``, written from
         ``lineage_id``, or ``POSITION_Z``, written from ``cell_z`` (as 0 without
         it).
         If only some cells have a frame and their frames can't be deduced, see Notes.
@@ -1667,7 +1667,7 @@ def write_trackmate_xml(
     Notes
     -----
     TrackMate has a single spatial unit and a single temporal unit for all its
-    features, while each pycellin property has its own unit. The values are written
+    features, while each Pycellin property has its own unit. The values are written
     as they are, without conversion: check that the units of the properties match
     `space_unit` and `time_unit`, e.g. with `Model.get_properties_per_unit()`.
 

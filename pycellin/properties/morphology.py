@@ -57,7 +57,7 @@ def create_cell_polygon_property(
         as a shapely.Polygon".
     provenance : str | None, default=None
         Origin of the property, e.g. the name of the format it was loaded from. If None,
-        ``"pycellin"`` is used.
+        ``"Pycellin"`` is used.
     unit : str | None, default=None
         Unit of the coordinates, e.g. ``"µm"``.
 
@@ -70,7 +70,7 @@ def create_cell_polygon_property(
         identifier=custom_identifier or "cell_polygon",
         name=custom_name or "Cell polygon",
         description=custom_description or "Cell shape as a shapely.Polygon",
-        provenance=provenance or "pycellin",
+        provenance=provenance or "Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="shapely.Polygon",
@@ -105,7 +105,7 @@ def create_cell_multipolygon_property(
         computed from a label image".
     provenance : str | None, default=None
         Origin of the property, e.g. the name of the format it was loaded from. If None,
-        ``"pycellin"`` is used.
+        ``"Pycellin"`` is used.
     unit : str | None, default=None
         Unit of the coordinates, e.g. ``"µm"``.
 
@@ -120,7 +120,7 @@ def create_cell_multipolygon_property(
         description=custom_description
         or "Cell shape as a shapely.MultiPolygon, with all the pieces and holes "
         "of the cell label, computed from a label image",
-        provenance=provenance or "pycellin",
+        provenance=provenance or "Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="shapely.MultiPolygon",
@@ -727,7 +727,7 @@ def create_cell_area_property(
         cell".
     provenance : str | None, default=None
         Origin of the property, e.g. the name of the format it was loaded from. If None,
-        ``"pycellin"`` is used.
+        ``"Pycellin"`` is used.
     unit : str | None, default=None
         Unit of the areas, e.g. ``"µm^2"``.
 
@@ -740,7 +740,7 @@ def create_cell_area_property(
         identifier=custom_identifier or "cell_area",
         name=custom_name or "Cell area",
         description=custom_description or "Area of the cell",
-        provenance=provenance or "pycellin",
+        provenance=provenance or "Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="float",
@@ -842,7 +842,7 @@ def create_cycle_mean_area_property(
         identifier=custom_identifier or "cycle_mean_area",
         name=custom_name or "Cycle mean area",
         description=custom_description or "Mean area of the cell during the cell cycle",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="float",
@@ -936,7 +936,7 @@ def create_birth_area_property(
         name=custom_name or "Birth area",
         description=custom_description
         or "Area of the cell at the start of the cell cycle, right after division",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="float",
@@ -1032,7 +1032,7 @@ def create_division_area_property(
         name=custom_name or "Division area",
         description=custom_description
         or "Area of the cell at the end of the cell cycle, right before division",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="float",
@@ -1118,7 +1118,7 @@ def create_cell_contour_property(
         coordinates of the cell's contour, relative to its centroid".
     provenance : str | None, default=None
         Origin of the property, e.g. the name of the format it was loaded from. If None,
-        ``"pycellin"`` is used.
+        ``"Pycellin"`` is used.
     unit : str | None, default=None
         Unit of the coordinates, e.g. ``"µm"``.
 
@@ -1132,7 +1132,7 @@ def create_cell_contour_property(
         name=custom_name or "Cell contour",
         description=custom_description
         or "List of coordinates of the cell's contour, relative to its centroid",
-        provenance=provenance or "pycellin",
+        provenance=provenance or "Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="float",
@@ -1257,7 +1257,7 @@ def create_cell_perimeter_property(
         the cell".
     provenance : str | None, default=None
         Origin of the property, e.g. the name of the format it was loaded from. If None,
-        ``"pycellin"`` is used.
+        ``"Pycellin"`` is used.
     unit : str | None, default=None
         Unit of the perimeters, e.g. ``"µm"``.
 
@@ -1270,7 +1270,7 @@ def create_cell_perimeter_property(
         identifier=custom_identifier or "cell_perimeter",
         name=custom_name or "Cell perimeter",
         description=custom_description or "Perimeter of the cell",
-        provenance=provenance or "pycellin",
+        provenance=provenance or "Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="float",
@@ -1373,7 +1373,7 @@ def create_cell_circularity_property(
         description=custom_description
         or "Circularity of the cell, 4 pi times its area divided by its squared "
         "perimeter: 1 for a disk, closer to 0 for an elongated or irregular cell",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="float",
@@ -1481,7 +1481,7 @@ def create_cell_solidity_property(
         description=custom_description
         or "Solidity of the cell, its area divided by the area of its convex hull: "
         "1 for a convex cell, closer to 0 for a more concave cell",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="float",
@@ -1767,7 +1767,7 @@ def _get_width_and_length(
         True to ignore the skeleton tips while computing width.
     debug : bool, default=False
         True to activate debug behavior.
-        Requires matplotlib, which pycellin does not install.
+        Requires matplotlib, which Pycellin does not install.
     debug_folder : str | None, default=None
         Folder in which to save the debug graphs.
     contour_prop : str, default="cell_contour"
@@ -2111,7 +2111,7 @@ def create_rod_width_property(
         name=custom_name or "Rod width",
         description=custom_description
         or "Width of the cell, for rod-shaped cells only",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="float",
@@ -2145,7 +2145,7 @@ class RodWidth(NodeLocalPropCalculator[CellLineage]):
         True to ignore the tips of the skeleton when computing the width.
     debug : bool, default=False
         True to plot and save the steps of the computation. Requires matplotlib,
-        which pycellin does not install.
+        which Pycellin does not install.
     debug_folder : str | None, default=None
         Folder in which to save the debug plots.
     contour_prop : str, default="cell_contour"
@@ -2251,7 +2251,7 @@ def create_rod_length_property(
         name=custom_name or "Rod length",
         description=custom_description
         or "Length of the cell, for rod-shaped cells only",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="float",
@@ -2286,7 +2286,7 @@ class RodLength(NodeLocalPropCalculator[CellLineage]):
         Not used for the length (see `RodWidth`).
     debug : bool, default=False
         True to plot and save the steps of the computation. Requires matplotlib,
-        which pycellin does not install.
+        which Pycellin does not install.
     debug_folder : str | None, default=None
         Folder in which to save the debug plots.
     contour_prop : str, default="cell_contour"
@@ -2356,7 +2356,7 @@ class RodLength(NodeLocalPropCalculator[CellLineage]):
         )[1]
 
 
-# TODO: this is a property that should not be in pycellin, too many ways to define
+# TODO: this is a property that should not be in Pycellin, too many ways to define
 # the area increment. Since it is user dependent, I should put it in a notebook
 # as an example of custom property.
 

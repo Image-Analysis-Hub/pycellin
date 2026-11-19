@@ -23,7 +23,7 @@ jobs:
       with:
         python-version: "3.14"
 
-    - name: Install pycellin and the docs tools
+    - name: Install Pycellin and the docs tools
       run: python -m pip install . --group docs
 
     - name: Check external links

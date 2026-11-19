@@ -157,7 +157,7 @@ def _create_metadata(
     time_step: float | None = None,
 ) -> dict[str, Any]:
     """
-    Create a dictionary of basic pycellin metadata for a given file.
+    Create a dictionary of basic Pycellin metadata for a given file.
 
     Parameters
     ----------
@@ -251,7 +251,7 @@ def _create_PropsMetadata(
     seg_data: bool, time_unit: str | None, space_unit: str
 ) -> PropsMetadata:
     """
-    Return a `PropsMetadata` object populated with pycellin basic properties.
+    Return a `PropsMetadata` object populated with Pycellin basic properties.
 
     Parameters
     ----------
@@ -605,7 +605,7 @@ def read_ctc(
     time_step: float | None = None,
 ) -> Model:
     """
-    Create a pycellin model out of a Cell Tracking Challenge (CTC) text file.
+    Create a Pycellin model out of a Cell Tracking Challenge (CTC) text file.
 
     The CTC tracking format does not support fusion events and does not allow
     gaps right after division events.
@@ -617,7 +617,7 @@ def read_ctc(
     The label image names must end in ``<frame_number>.tif`` (e.g. ``000.tif``,
     ``02.tif``, ``0155.tif``, etc.).
     For the space unit and pixel size, priority is given to the values given by the
-    user. If not provided, pycellin will try to read them from the label images
+    user. If not provided, Pycellin will try to read them from the label images
     (TIFF resolution tags, with the unit of the ImageJ metadata for ImageJ images).
     A resolution in inches, most likely a print default such as 72 dpi, is ignored.
     If it fails or if no label images are given, default values will be used.
@@ -657,7 +657,7 @@ def read_ctc(
     Returns
     -------
     Model
-        The created pycellin model.
+        The created Pycellin model.
 
     Raises
     ------

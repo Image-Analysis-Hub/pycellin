@@ -27,7 +27,7 @@ class TestSignatures:
     """Test cases for the signatures of the reading and writing functions."""
 
     def test_every_function_listed(self):
-        """Test that every reading and writing function of pycellin is listed."""
+        """Test that every reading and writing function of Pycellin is listed."""
         prefixes = ("read_", "write_", "from_", "to_")
         names = {name for name in pc.__all__ if name.startswith(prefixes)}
         assert names == set(POSITIONAL_ARGS)

@@ -518,7 +518,7 @@ class TestAddTrackletIds:
                 identifier="tracklet_id",
                 name="Tracklet ID",
                 description="Tracklet ID from another tool",
-                provenance="geff",
+                provenance="GEFF",
                 prop_type="node",
                 lineage_type="cell",
                 dtype="int",
@@ -532,7 +532,7 @@ class TestAddTrackletIds:
             _add_tracklet_ids(simple_model)
 
         assert lin.nodes[1]["tracklet_id"] == 2
-        assert simple_model.get_property("tracklet_id").provenance == "pycellin"
+        assert simple_model.get_property("tracklet_id").provenance == "Pycellin"
         assert len(caplog.records) == 1
         assert "values of 1 cell of the model" in caplog.records[0].message
 

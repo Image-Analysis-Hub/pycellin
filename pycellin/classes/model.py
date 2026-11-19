@@ -43,7 +43,7 @@ from pycellin.utils import _check_integer, _color_to_rgba, _infer_dtype, _unit_u
 _L = TypeVar("_L", bound="Lineage")
 
 #: Provenance of models built by Model.merge() and of the lineage properties it creates.
-_MERGE_PROVENANCE = "pycellin merge"
+_MERGE_PROVENANCE = "Pycellin merge"
 
 
 class Model:
@@ -5301,7 +5301,7 @@ class Model:
 
     def add_pycellin_property(self, prop: str, **kwargs: Any) -> None:
         """
-        Add a single predefined pycellin property to the model.
+        Add a single predefined Pycellin property to the model.
 
         Parameters
         ----------
@@ -5315,7 +5315,7 @@ class Model:
         Raises
         ------
         KeyError
-            If the property is not a predefined property of pycellin.
+            If the property is not a predefined property of Pycellin.
         ValueError
             If the property is a property of cycle lineages and the cycle lineages
             have not been computed yet.
@@ -5323,7 +5323,7 @@ class Model:
         cell_lin_props = list(futils.get_pycellin_cell_lineage_properties().keys())
         cycle_lin_props = list(futils.get_pycellin_cycle_lineage_properties().keys())
         if prop not in cell_lin_props + cycle_lin_props:
-            raise KeyError(f"Property {prop} is not a predefined property of pycellin.")
+            raise KeyError(f"Property {prop} is not a predefined property of Pycellin.")
         elif prop in cycle_lin_props and self.data.cycle_lineages is None:
             raise ValueError(
                 f"Property {prop} is a property of cycle lineages, "
@@ -5336,7 +5336,7 @@ class Model:
         self, props_info: list[str | dict[str, dict[str, Any]]]
     ) -> None:
         """
-        Add the specified predefined pycellin properties to the model.
+        Add the specified predefined Pycellin properties to the model.
 
         Parameters
         ----------
@@ -5353,7 +5353,7 @@ class Model:
             nor a dictionary, or if the keyword arguments of a property are not given
             as a dictionary. No property is added then.
         KeyError
-            If a property is not a predefined property of pycellin.
+            If a property is not a predefined property of Pycellin.
         ValueError
             If a property is a property of cycle lineages and the cycle lineages
             have not been computed yet.
@@ -6035,15 +6035,14 @@ class Model:
         keeps the other fields shared by both models, except ``creation_timestamp`` and
         ``pycellin_version`` which are set at merge time, and ``name`` which follows
         `new_name`. Standard fields whose values differ are set to None, except
-        ``provenance`` which is set to ``"pycellin merge"``, and custom fields whose
+        ``provenance`` which is set to ``"Pycellin merge"``, and custom fields whose
         values differ are removed. `new_metadata` is applied last.
         When the value of a field for the merged model differs from its value in one of
         the models, the values of each model are stored on its lineages, in a lineage
-        property with the ``"pycellin merge"`` provenance. Lineages already storing a
-        field
-        from a previous merge keep their values. Label images (``label_image``) are
-        never stored on lineages. The data type of these lineage properties is inferred
-        from the stored values, in Python type hint syntax (e.g. ``"float"``,
+        property with the ``"Pycellin merge"`` provenance. Lineages already storing a
+        field from a previous merge keep their values. Label images (``label_image``)
+        are never stored on lineages. The data type of these lineage properties is
+        inferred from the stored values, in Python type hint syntax (e.g. ``"float"``,
         ``"int | str"``).
 
         Regarding cycle lineages:
@@ -6537,7 +6536,7 @@ class Model:
         # lineage makes pandas warn when a column is all None in a lineage.
         df = pd.DataFrame(records)
 
-        # Reoder the columns to have pycellin mandatory properties first.
+        # Reorder the columns to have Pycellin mandatory properties first.
         time_prop = self.model_metadata.reference_time_prop
         mandatory_columns = ["lineage_id", time_prop, "cell_id"]
         missing_columns = [col for col in mandatory_columns if col not in df.columns]
@@ -6615,7 +6614,7 @@ class Model:
             # Lineages without links, e.g. single-cell lineages.
             df = pd.DataFrame(columns=mandatory_columns, dtype=int)
 
-        # Reoder the columns to have pycellin mandatory properties first.
+        # Reorder the columns to have Pycellin mandatory properties first.
         columns = mandatory_columns + [
             col for col in df.columns if col not in mandatory_columns
         ]
@@ -6661,7 +6660,7 @@ class Model:
         # lineage makes pandas warn when a property is None in a lineage.
         df = pd.DataFrame(records)
 
-        # Reoder the columns to have pycellin mandatory properties first.
+        # Reorder the columns to have Pycellin mandatory properties first.
         if "lineage_id" not in df.columns:
             raise ValueError(
                 "Mandatory lineage property not found in the model: 'lineage_id'."
@@ -6729,7 +6728,7 @@ class Model:
         # mother_cycle in a lineage of a single cell cycle.
         df = pd.DataFrame(records)
 
-        # Reoder the columns to have pycellin mandatory properties first.
+        # Reorder the columns to have Pycellin mandatory properties first.
         columns = df.columns.tolist()
         columns.remove("lineage_id")
         columns.remove("generation")

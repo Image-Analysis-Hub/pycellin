@@ -180,7 +180,7 @@ def _create_metadata(
     time_step: float | None = None,
 ) -> dict[str, Any]:
     """
-    Create a dictionary of basic pycellin metadata for trackpy data.
+    Create a dictionary of basic Pycellin metadata for trackpy data.
 
     Parameters
     ----------
@@ -242,7 +242,7 @@ def _create_PropsMetadata(
     Returns
     -------
     PropsMetadata
-        An instance of `PropsMetadata` populated with pycellin and trackpy
+        An instance of `PropsMetadata` populated with Pycellin and trackpy
         properties.
     """
     props_md = PropsMetadata()
@@ -300,7 +300,7 @@ def from_trackpy(
     reference_time_prop: str = "time",
 ) -> Model:
     """
-    Load a trackpy DataFrame into a pycellin model.
+    Load a trackpy DataFrame into a Pycellin model.
 
     The DataFrame must contain the ``frame`` and ``particle`` columns produced by
     trackpy linking. Each row becomes a cell, and the cells of a same particle
@@ -343,15 +343,15 @@ def from_trackpy(
     Returns
     -------
     Model
-        A pycellin model populated with the trackpy data.
+        A Pycellin model populated with the trackpy data.
 
     Raises
     ------
     ValueError
-        If `df` has both a trackpy coordinate column and its pycellin counterpart
+        If `df` has both a trackpy coordinate column and its Pycellin counterpart
         (e.g. ``x`` and ``cell_x``), if it has a ``cell_id``, ``lineage_id`` or
-        ``timepoint`` column, which pycellin creates, or if `reference_time_prop` is
-        already a column of `df` or is a property written by pycellin (``cell_id``,
+        ``timepoint`` column, which Pycellin creates, or if `reference_time_prop` is
+        already a column of `df` or is a property written by Pycellin (``cell_id``,
         ``lineage_id``, ``timepoint`` or a renamed coordinate).
     KeyError
         If `df` is not empty and has no ``frame`` or ``particle`` column.
@@ -367,7 +367,7 @@ def from_trackpy(
     conflicting_columns = sorted(pycellin_props & set(df.columns))
     if conflicting_columns:
         raise ValueError(
-            f"The DataFrame has the column(s) {conflicting_columns}, but pycellin "
+            f"The DataFrame has the column(s) {conflicting_columns}, but Pycellin "
             "creates its own properties with these names. Rename or drop them "
             "before loading."
         )
@@ -375,7 +375,7 @@ def from_trackpy(
     if reference_time_prop in df.columns or reference_time_prop in reserved_props:
         raise ValueError(
             f"Cannot build the time property '{reference_time_prop}': a column or "
-            f"a pycellin property with this name already exists. Use the "
+            f"a Pycellin property with this name already exists. Use the "
             f"'reference_time_prop' argument to choose another name."
         )
 
@@ -399,7 +399,7 @@ def from_trackpy(
     del graph  # Redundant with the subgraphs.
     data = {lin.graph["lineage_id"]: lin for lin in lineages if len(lin) > 0}
 
-    # Create a pycellin model.
+    # Create a Pycellin model.
     props_md = _create_PropsMetadata(dtypes, md, reference_time_prop)
     model = Model(md, props_md, Data(data), reference_time_prop)
 

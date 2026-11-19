@@ -85,7 +85,7 @@ def create_absolute_age_property(
         name=custom_name or "Absolute age",
         description=custom_description
         or "Age of the cell since the start of the lineage",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype=dtype,
@@ -189,7 +189,7 @@ def create_relative_age_property(
         name=custom_name or "Relative age",
         description=custom_description
         or "Age of the cell since the start of the current cell cycle",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype=dtype,
@@ -291,7 +291,7 @@ def create_normalized_age_property(
         description=custom_description
         or "Relative age of the cell divided by the duration of its cell cycle: "
         "0 for the first cell of the cycle, 1 for the last one",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="float",
@@ -511,7 +511,7 @@ def create_interdivision_time_property(
         name=custom_name or "Interdivision time",
         description=custom_description
         or "Time elapsed between two successive divisions",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype=dtype,
@@ -628,7 +628,7 @@ def create_inverse_interdivision_time_property(
         name=custom_name or "Inverse interdivision time",
         description=custom_description
         or "Inverse of the time elapsed between two successive divisions",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="float",

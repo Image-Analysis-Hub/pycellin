@@ -609,7 +609,7 @@ def _extract_props_metadata(
                 identifier=key,
                 name=prop.name or key,
                 description=prop.description or prop.name or key,
-                provenance="geff",
+                provenance="GEFF",
                 prop_type=prop_type,
                 lineage_type="cell",
                 dtype=prop.dtype,
@@ -641,7 +641,7 @@ def _extract_props_metadata(
                     identifier=new_key,
                     name=prop.name or key,
                     description=prop.description or prop.name or key,
-                    provenance="geff",
+                    provenance="GEFF",
                     prop_type=prop_type,
                     lineage_type="cell",
                     dtype=prop.dtype,
@@ -705,7 +705,7 @@ def _extract_lin_props_metadata(
                 identifier=key,
                 name=prop.get("name") or key,
                 description=prop.get("description") or prop.get("name") or key,
-                provenance="geff",
+                provenance="GEFF",
                 prop_type=PropertyType.LINEAGE,
                 lineage_type="cell",
                 dtype=prop.get("dtype"),
@@ -725,7 +725,7 @@ def _extract_lin_props_metadata(
                     identifier=new_key,
                     name=prop.get("name") or key,
                     description=prop.get("description") or prop.get("name") or key,
-                    provenance="geff",
+                    provenance="GEFF",
                     prop_type=PropertyType.LINEAGE,
                     lineage_type="cell",
                     dtype=prop.get("dtype"),
@@ -860,7 +860,7 @@ def _apply_space_scales(
     Apply the scale and offset of the coordinate axes to their values.
 
     A GEFF axis can give a scale and an offset, to apply in that order to its values,
-    e.g. to convert pixels into micrometers. pycellin stores the coordinates after
+    e.g. to convert pixels into micrometers. Pycellin stores the coordinates after
     both: the values of each coordinate axis with a scale or an offset are converted
     in place, and its axis is replaced by one without scale and offset. After a
     scale, the values are in the scaled unit, which becomes the unit of the axis and
@@ -1032,7 +1032,7 @@ def _extract_generic_metadata(
     metadata: dict[str, Any] = {}
     metadata["name"] = Path(geff_file).stem
     metadata["file_path"] = geff_file
-    metadata["provenance"] = "geff"
+    metadata["provenance"] = "GEFF"
     metadata["date"] = str(datetime.now())
     metadata["pycellin_version"] = __version__
     metadata["geff_version"] = geff_md.geff_version
@@ -1051,7 +1051,7 @@ def _build_generic_metadata(
     cell_z_key: str | None,
 ) -> dict[str, Any]:
     """
-    Build and return a dictionary containing pycellin generic metadata.
+    Build and return a dictionary containing Pycellin generic metadata.
 
     Parameters
     ----------
@@ -1071,7 +1071,7 @@ def _build_generic_metadata(
     Returns
     -------
     dict[str, Any]
-        Dictionary containing generic pycellin metadata.
+        Dictionary containing generic Pycellin metadata.
     """
     metadata = _extract_generic_metadata(geff_file, geff_md)
     units_metadata = _extract_axes_metadata(
@@ -1087,9 +1087,9 @@ def _rename_reserved_prop(
     geff_graph: nx.DiGraph, props_md: dict[str, Property], key: str
 ) -> None:
     """
-    Rename a GEFF node property that has the name of a property created by pycellin.
+    Rename a GEFF node property that has the name of a property created by Pycellin.
 
-    pycellin creates its own ``cell_id`` and ``lineage_id`` properties. When the GEFF
+    Pycellin creates its own ``cell_id`` and ``lineage_id`` properties. When the GEFF
     graph has a node property with the same name that is not used as identifier,
     its values and its declaration are kept under ``geff_<key>``, and a warning is
     logged. Nothing happens if no node has the property.
@@ -1101,7 +1101,7 @@ def _rename_reserved_prop(
     props_md : dict[str, Property]
         The properties metadata read from the GEFF file, updated in place.
     key : str
-        Name of the property created by pycellin, ``"cell_id"`` or ``"lineage_id"``.
+        Name of the property created by Pycellin, ``"cell_id"`` or ``"lineage_id"``.
 
     Raises
     ------
@@ -1116,7 +1116,7 @@ def _rename_reserved_prop(
     ):
         raise ValueError(
             f"Cannot rename property '{key}' of the GEFF file to '{new_key}', "
-            f"since '{new_key}' already exists. pycellin creates its own '{key}' "
+            f"since '{new_key}' already exists. Pycellin creates its own '{key}' "
             "property: rename one of these properties before loading the file."
         )
 
@@ -1129,7 +1129,7 @@ def _rename_reserved_prop(
         props_md[new_key] = prop
     logger.warning(
         f"Property '{key}' of the GEFF file has been renamed to '{new_key}', since "
-        f"pycellin creates its own '{key}' property."
+        f"Pycellin creates its own '{key}' property."
     )
 
 
@@ -1208,7 +1208,7 @@ def _ensure_valid_cell_id(
     updated to match the provided IDs to avoid later inconsistencies.
 
     When the cell identifier is not the ``cell_id`` property of the graph, that
-    property is renamed to ``geff_cell_id``, so that pycellin can create its own.
+    property is renamed to ``geff_cell_id``, so that Pycellin can create its own.
 
     Parameters
     ----------
@@ -1283,10 +1283,10 @@ def _get_coordinate_renames(
     rename_map: dict[PropertyType, dict[str, str]],
 ) -> dict[str, str]:
     """
-    Map the current name of each coordinate property to its pycellin name.
+    Map the current name of each coordinate property to its Pycellin name.
 
     The current name of a coordinate is its name after the collision renames
-    recorded in `rename_map`. Coordinates already named like in pycellin are left
+    recorded in `rename_map`. Coordinates already named like in Pycellin are left
     out.
 
     Parameters
@@ -1328,10 +1328,10 @@ def _standardize_properties_data(
     rename_map: dict[PropertyType, dict[str, str]],
 ) -> None:
     """
-    Standardize properties data in lineages to match pycellin conventions.
+    Standardize properties data in lineages to match Pycellin conventions.
 
     This function updates the property keys in lineage node data to use
-    standardized pycellin naming conventions (e.g., ``cell_id``, ``cell_x``).
+    standardized Pycellin naming conventions (e.g., ``cell_id``, ``cell_x``).
     It also applies any key renames recorded in `rename_map` during metadata
     extraction so that the graph data stays consistent with the metadata.
 
@@ -1369,13 +1369,13 @@ def _standardize_properties_data(
         for old_key, new_key in rename_map[PropertyType.LINEAGE].items():
             _update_lineage_prop_key(lin, old_key=old_key, new_key=new_key)
 
-        # Standard pycellin property renames.
+        # Standard Pycellin property renames.
         if lin_id_key != "lineage_id":
             _update_node_prop_key(lin, old_key=lin_id_key, new_key="lineage_id")
         if cell_id_key != "cell_id":
             _update_node_prop_key(lin, old_key=cell_id_key, new_key="cell_id")
         # The coordinates are renamed all at once: the current name of one can be
-        # the pycellin name of another (e.g. 'cell_y' used as x), so renaming them
+        # the Pycellin name of another (e.g. 'cell_y' used as x), so renaming them
         # one after the other would overwrite values.
         for node in lin.nodes:
             attrs = lin.nodes[node]
@@ -1401,10 +1401,10 @@ def _standardize_props_metadata(
     rename_map: dict[PropertyType, dict[str, str]],
 ) -> None:
     """
-    Normalize properties metadata to match pycellin conventions.
+    Normalize properties metadata to match Pycellin conventions.
 
-    This function ensures that standard pycellin properties exist in the metadata
-    and renames them if needed to follow pycellin conventions.
+    This function ensures that standard Pycellin properties exist in the metadata
+    and renames them if needed to follow Pycellin conventions.
 
     Parameters
     ----------
@@ -1428,7 +1428,7 @@ def _standardize_props_metadata(
         properties that needed to be renamed during metadata extraction are also
         renamed in the metadata dictionary.
     """
-    # Ensure standard pycellin properties exist and are properly named.
+    # Ensure standard Pycellin properties exist and are properly named.
     if lin_id_key in props_md:
         if lin_id_key != "lineage_id":
             props_md["lineage_id"] = props_md.pop(lin_id_key)
@@ -1437,14 +1437,14 @@ def _standardize_props_metadata(
         # Cell and cycle lineages share their lineage ID.
         props_md["lineage_id"].lineage_type = "both"
     else:
-        props_md["lineage_id"] = create_lineage_id_property(provenance="geff")
+        props_md["lineage_id"] = create_lineage_id_property(provenance="GEFF")
 
     if cell_id_key in props_md:
         if cell_id_key != "cell_id":
             props_md["cell_id"] = props_md.pop(cell_id_key)
         props_md["cell_id"].identifier = "cell_id"
     else:
-        props_md["cell_id"] = create_cell_id_property(provenance="geff")
+        props_md["cell_id"] = create_cell_id_property(provenance="GEFF")
 
     # Create or standardize coordinate property keys.
     coordinate_keys = list(zip(_COORDINATES, (cell_x_key, cell_y_key, cell_z_key)))
@@ -1455,7 +1455,7 @@ def _standardize_props_metadata(
             if geff_key in props_md and geff_key != current_key:
                 props_md.pop(geff_key)
     # All at once, as in _standardize_properties_data(): the current name of a
-    # coordinate can be the pycellin name of another.
+    # coordinate can be the Pycellin name of another.
     renames = _get_coordinate_renames(cell_x_key, cell_y_key, cell_z_key, rename_map)
     moved = {
         new_key: props_md.pop(old_key)
@@ -1471,7 +1471,7 @@ def _standardize_props_metadata(
             props_md[pycellin_key].identifier = pycellin_key
         else:
             props_md[pycellin_key] = create_cell_coord_property(
-                unit=space_unit, axis=axis, provenance="geff"
+                unit=space_unit, axis=axis, provenance="GEFF"
             )
 
 
@@ -1487,7 +1487,7 @@ def read_geff(
     structure_validation: bool = True,
 ) -> Model:
     """
-    Load a GEFF file and return a pycellin model containing the data and metadata.
+    Load a GEFF file and return a Pycellin model containing the data and metadata.
 
     Parameters
     ----------
@@ -1533,12 +1533,12 @@ def read_geff(
     Returns
     -------
     Model
-        A pycellin model containing the data and metadata from the GEFF file.
+        A Pycellin model containing the data and metadata from the GEFF file.
 
     Raises
     ------
     ValueError
-        If the GEFF graph is undirected, as pycellin does not support undirected
+        If the GEFF graph is undirected, as Pycellin does not support undirected
         graphs, if the coordinate arguments don't include both x and y or contain
         duplicate property names, if the names of several space axes stand for
         the same coordinate, or if a ``cell_id`` or ``lineage_id`` property of the
@@ -1575,7 +1575,7 @@ def read_geff(
     is the pixel size of the model (`pixel_width` for x, `pixel_height` for y,
     `pixel_depth` for z).
 
-    pycellin creates its own ``cell_id`` and ``lineage_id`` properties. A
+    Pycellin creates its own ``cell_id`` and ``lineage_id`` properties. A
     ``cell_id`` or ``lineage_id`` property of the GEFF file that is not used as
     identifier is kept under the name ``geff_cell_id`` or ``geff_lineage_id``, with
     a warning.
@@ -1584,7 +1584,7 @@ def read_geff(
     geff_graph, geff_md = geff.read(path, structure_validation=structure_validation)
     if not geff_md.directed:
         raise ValueError(
-            "The GEFF graph is undirected: pycellin does not support undirected graphs."
+            "The GEFF graph is undirected: Pycellin does not support undirected graphs."
         )
 
     # Identify specific properties.
@@ -1612,7 +1612,7 @@ def read_geff(
     }
     props_md = _build_props_metadata(geff_md, rename_map)
 
-    # Split the graph into lineages. pycellin creates its own 'cell_id' and
+    # Split the graph into lineages. Pycellin creates its own 'cell_id' and
     # 'lineage_id' properties, so GEFF properties with these names that are not
     # used as identifiers are renamed first.
     cell_id_prop = _ensure_valid_cell_id(geff_graph, cell_id_prop, props_md)
@@ -1622,7 +1622,7 @@ def read_geff(
     if lineage_id_prop is None:
         lineage_id_prop = "lineage_id"
 
-    # Rename properties to match pycellin conventions.
+    # Rename properties to match Pycellin conventions.
     _standardize_properties_data(
         lineages=lineages,
         lin_id_key=lineage_id_prop,
@@ -1649,7 +1649,7 @@ def read_geff(
         props_metadata=PropsMetadata(properties=props_md),
         data=Data({lin.graph["lineage_id"]: lin for lin in lineages}),
     )
-    _check_fusions(model)  # pycellin DOES NOT support fusion events
+    _check_fusions(model)  # Pycellin DOES NOT support fusion events
 
     return model
 

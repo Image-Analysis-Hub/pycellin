@@ -30,7 +30,10 @@ class Property:
     description : str
         A description of the property.
     provenance : str
-        The provenance of the property (TrackMate, CTC, pycellin, custom...).
+        Where the property comes from: ``"Pycellin"`` for the properties that
+        Pycellin declares, the format or tool the data was read from for imported
+        ones (``"TrackMate"``, ``"CTC"``, ``"GEFF"`` or ``"trackpy"``), or any text
+        for custom properties, e.g. ``"custom"``.
     prop_type : PropertyType | str | list[str]
         The type of the property. Can be:
 

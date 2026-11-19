@@ -28,7 +28,7 @@ def _safekeep_original_lineage_ids(model: Model) -> None:
     Parameters
     ----------
     model : Model
-        The pycellin model to modify.
+        The Pycellin model to modify.
     """
     for lin_id, lin in model.data.cell_lineages.items():
         for node in lin.nodes():
@@ -45,7 +45,7 @@ def _remove_division_events(model: Model) -> None:
     Parameters
     ----------
     model : Model
-        The pycellin model to modify.
+        The Pycellin model to modify.
     """
     removed_link = False
     for lin in model.get_cell_lineages():
@@ -68,7 +68,7 @@ def _renumber_negative_lineage_ids(model: Model) -> None:
     Parameters
     ----------
     model : Model
-        The pycellin model to modify.
+        The Pycellin model to modify.
     """
     negative_lin_ids = [
         lin.graph["lineage_id"]
@@ -187,7 +187,7 @@ def _format_dataframe(df: pd.DataFrame, frame_prop: str) -> pd.DataFrame:
 
 def to_trackpy(model: Model) -> pd.DataFrame:
     """
-    Export a pycellin model to a trackpy DataFrame.
+    Export a Pycellin model to a trackpy DataFrame.
 
     Trackpy does not support division events. They will be removed for
     the export so each cell cycle will be represented by a single
@@ -196,7 +196,7 @@ def to_trackpy(model: Model) -> pd.DataFrame:
     Parameters
     ----------
     model : Model
-        The pycellin model to export.
+        The Pycellin model to export.
 
     Returns
     -------

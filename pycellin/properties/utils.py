@@ -349,7 +349,7 @@ def _get_pycellin_props_by_lin_type(
     lin_type_filter: list[str],
 ) -> dict[str, str]:
     """
-    Return the pycellin properties that can be computed on a given lineage type.
+    Return the Pycellin properties that can be computed on a given lineage type.
 
     Parameters
     ----------
@@ -384,7 +384,7 @@ def get_pycellin_cell_lineage_properties(
     single_type: bool = False,
 ) -> dict[str, str]:
     """
-    Return the pycellin properties that can be computed on cell lineages.
+    Return the Pycellin properties that can be computed on cell lineages.
 
     Automatically discovers properties by parsing ``create_*_property`` functions
     using AST.
@@ -393,7 +393,7 @@ def get_pycellin_cell_lineage_properties(
     ----------
     include_core_properties : bool, default=True
         Whether to include core properties, i.e. properties automatically computed by
-        pycellin.
+        Pycellin.
     single_type : bool, default=False
         True to only return the properties of lineage type ``"cell"``. False to also
         return those of lineage type ``"both"``, which belong to cell and cycle
@@ -415,7 +415,7 @@ def get_pycellin_cycle_lineage_properties(
     single_type: bool = False,
 ) -> dict[str, str]:
     """
-    Return the pycellin properties that can be computed on cycle lineages.
+    Return the Pycellin properties that can be computed on cycle lineages.
 
     Automatically discovers properties by parsing ``create_*_property`` functions
     using AST.
@@ -424,7 +424,7 @@ def get_pycellin_cycle_lineage_properties(
     ----------
     include_core_properties : bool, default=True
         Whether to include core properties, i.e. properties automatically computed by
-        pycellin.
+        Pycellin.
     single_type : bool, default=False
         True to only return the properties of lineage type ``"cycle"``. False to also
         return those of lineage type ``"both"``, which belong to cell and cycle

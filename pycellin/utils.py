@@ -93,7 +93,7 @@ def _color_to_rgba(color: str, alpha: float) -> str:
     return f"rgba({r},{g},{b},{alpha})"
 
 
-#: Spellings of the data types of properties, grouped by canonical pycellin data type:
+#: Spellings of the data types of properties, grouped by canonical Pycellin data type:
 #: loaders and libraries spell them differently (e.g. GEFF uses numpy names).
 _DTYPE_SPELLINGS = {
     "int": (
@@ -113,7 +113,7 @@ _DTYPE_SPELLINGS = {
     "string": ("string", "str"),
     "bool": ("bool", "bool_", "boolean"),
 }
-#: Canonical pycellin data type of each spelling of ``_DTYPE_SPELLINGS``.
+#: Canonical Pycellin data type of each spelling of ``_DTYPE_SPELLINGS``.
 _DTYPE_ALIASES = {
     spelling: canonical
     for canonical, spellings in _DTYPE_SPELLINGS.items()

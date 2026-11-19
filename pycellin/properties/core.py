@@ -12,7 +12,7 @@ from pycellin.classes.property_calculator import NodeLocalPropCalculator
 from pycellin.exceptions import UpdateRequiredError
 
 
-def create_frame_property(provenance: str = "pycellin") -> Property:
+def create_frame_property(provenance: str = "Pycellin") -> Property:
     """
     Create the declaration of the ``frame`` core property.
 
@@ -21,7 +21,7 @@ def create_frame_property(provenance: str = "pycellin") -> Property:
 
     Parameters
     ----------
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -43,7 +43,7 @@ def create_frame_property(provenance: str = "pycellin") -> Property:
 
 def create_time_property(
     unit: str | None,
-    provenance: str = "pycellin",
+    provenance: str = "Pycellin",
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
@@ -58,7 +58,7 @@ def create_time_property(
     ----------
     unit : str | None
         Unit of the time values, e.g. ``"min"``.
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
     custom_identifier : str | None, default=None
         New identifier for the property. If None, the identifier will be ``"time"``.
@@ -173,17 +173,17 @@ class Time(NodeLocalPropCalculator[CellLineage]):
         return lineage.nodes[node_id][self.time_prop] * self.factor
 
 
-def create_timepoint_property(provenance: str = "pycellin") -> Property:
+def create_timepoint_property(provenance: str = "Pycellin") -> Property:
     """
     Create the declaration of the ``timepoint`` core property.
 
     ``timepoint`` is the index of the detection along the time axis, computed by
-    pycellin from the reference time property of the model and its time step.
+    Pycellin from the reference time property of the model and its time step.
     It is a node property of cell lineages.
 
     Parameters
     ----------
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -320,7 +320,7 @@ class Timepoint(NodeLocalPropCalculator[CellLineage]):
         return rounded_timepoint
 
 
-def create_cell_id_property(provenance: str = "pycellin") -> Property:
+def create_cell_id_property(provenance: str = "Pycellin") -> Property:
     """
     Create the declaration of the ``cell_id`` core property.
 
@@ -330,7 +330,7 @@ def create_cell_id_property(provenance: str = "pycellin") -> Property:
 
     Parameters
     ----------
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -349,7 +349,7 @@ def create_cell_id_property(provenance: str = "pycellin") -> Property:
     )
 
 
-def create_lineage_id_property(provenance: str = "pycellin") -> Property:
+def create_lineage_id_property(provenance: str = "Pycellin") -> Property:
     """
     Create the declaration of the ``lineage_id`` core property.
 
@@ -358,7 +358,7 @@ def create_lineage_id_property(provenance: str = "pycellin") -> Property:
 
     Parameters
     ----------
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -378,7 +378,7 @@ def create_lineage_id_property(provenance: str = "pycellin") -> Property:
 
 
 def create_cell_coord_property(
-    unit: str | None, axis: str, provenance: str = "pycellin"
+    unit: str | None, axis: str, provenance: str = "Pycellin"
 ) -> Property:
     """
     Create the declaration of a ``cell_<axis>`` core property.
@@ -393,7 +393,7 @@ def create_cell_coord_property(
     axis : str
         Axis of the coordinate, e.g. ``"x"``, ``"y"`` or ``"z"``. It defines the
         identifier and the name of the property.
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -426,7 +426,7 @@ def _create_generic_cell_coord_property() -> Property:
         identifier="cell_{axis}",
         name="Cell {axis}",
         description="{axis} coordinate of the cell",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="float",
@@ -435,7 +435,7 @@ def _create_generic_cell_coord_property() -> Property:
 
 
 def create_link_coord_property(
-    unit: str, axis: str, provenance: str = "pycellin"
+    unit: str, axis: str, provenance: str = "Pycellin"
 ) -> Property:
     """
     Create the declaration of a ``link_<axis>`` core property.
@@ -451,7 +451,7 @@ def create_link_coord_property(
     axis : str
         Axis of the coordinate, e.g. ``"x"``, ``"y"`` or ``"z"``. It defines the
         identifier and the name of the property.
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -489,7 +489,7 @@ def _create_generic_link_coord_property() -> Property:
         description=(
             "{axis} coordinate of the link, i.e. mean coordinate of its two cells"
         ),
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="edge",
         lineage_type="cell",
         dtype="float",
@@ -498,7 +498,7 @@ def _create_generic_link_coord_property() -> Property:
 
 
 def create_lineage_coord_property(
-    unit: str, axis: str, provenance: str = "pycellin"
+    unit: str, axis: str, provenance: str = "Pycellin"
 ) -> Property:
     """
     Create the declaration of a ``lineage_<axis>`` core property.
@@ -513,7 +513,7 @@ def create_lineage_coord_property(
     axis : str
         Axis of the coordinate, e.g. ``"x"``, ``"y"`` or ``"z"``. It defines the
         identifier and the name of the property.
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -551,7 +551,7 @@ def _create_generic_lineage_coord_property() -> Property:
         description=(
             "{axis} coordinate of the lineage, i.e. mean coordinate of its cells"
         ),
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
         lineage_type="cell",
         dtype="float",
@@ -559,7 +559,7 @@ def _create_generic_lineage_coord_property() -> Property:
     )
 
 
-def create_cycle_id_property(provenance: str = "pycellin") -> Property:
+def create_cycle_id_property(provenance: str = "Pycellin") -> Property:
     """
     Create the declaration of the ``cycle_id`` core property.
 
@@ -569,7 +569,7 @@ def create_cycle_id_property(provenance: str = "pycellin") -> Property:
 
     Parameters
     ----------
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -591,7 +591,7 @@ def create_cycle_id_property(provenance: str = "pycellin") -> Property:
     )
 
 
-def create_cells_property(provenance: str = "pycellin") -> Property:
+def create_cells_property(provenance: str = "Pycellin") -> Property:
     """
     Create the declaration of the ``cells`` core property.
 
@@ -600,7 +600,7 @@ def create_cells_property(provenance: str = "pycellin") -> Property:
 
     Parameters
     ----------
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -619,7 +619,7 @@ def create_cells_property(provenance: str = "pycellin") -> Property:
     )
 
 
-def create_first_cell_property(provenance: str = "pycellin") -> Property:
+def create_first_cell_property(provenance: str = "Pycellin") -> Property:
     """
     Create the declaration of the ``first_cell`` core property.
 
@@ -628,7 +628,7 @@ def create_first_cell_property(provenance: str = "pycellin") -> Property:
 
     Parameters
     ----------
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -647,7 +647,7 @@ def create_first_cell_property(provenance: str = "pycellin") -> Property:
     )
 
 
-def create_last_cell_property(provenance: str = "pycellin") -> Property:
+def create_last_cell_property(provenance: str = "Pycellin") -> Property:
     """
     Create the declaration of the ``last_cell`` core property.
 
@@ -657,7 +657,7 @@ def create_last_cell_property(provenance: str = "pycellin") -> Property:
 
     Parameters
     ----------
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -676,7 +676,7 @@ def create_last_cell_property(provenance: str = "pycellin") -> Property:
     )
 
 
-def create_cycle_num_cells_property(provenance: str = "pycellin") -> Property:
+def create_cycle_num_cells_property(provenance: str = "Pycellin") -> Property:
     """
     Create the declaration of the ``cycle_num_cells`` core property.
 
@@ -685,7 +685,7 @@ def create_cycle_num_cells_property(provenance: str = "pycellin") -> Property:
 
     Parameters
     ----------
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -705,7 +705,7 @@ def create_cycle_num_cells_property(provenance: str = "pycellin") -> Property:
 
 
 def create_cycle_duration_property(
-    time_unit: str | None, provenance: str = "pycellin"
+    time_unit: str | None, provenance: str = "Pycellin"
 ) -> Property:
     """
     Create the declaration of the ``cycle_duration`` core property.
@@ -717,7 +717,7 @@ def create_cycle_duration_property(
     ----------
     time_unit : str | None
         Unit of the duration, e.g. ``"min"``.
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -738,7 +738,7 @@ def create_cycle_duration_property(
 
 
 def create_cycle_start_time_property(
-    time_unit: str | None, provenance: str = "pycellin"
+    time_unit: str | None, provenance: str = "Pycellin"
 ) -> Property:
     """
     Create the declaration of the ``cycle_start_time`` core property.
@@ -750,7 +750,7 @@ def create_cycle_start_time_property(
     ----------
     time_unit : str | None
         Unit of the time, e.g. ``"min"``.
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -771,7 +771,7 @@ def create_cycle_start_time_property(
 
 
 def create_cycle_end_time_property(
-    time_unit: str | None, provenance: str = "pycellin"
+    time_unit: str | None, provenance: str = "Pycellin"
 ) -> Property:
     """
     Create the declaration of the ``cycle_end_time`` core property.
@@ -783,7 +783,7 @@ def create_cycle_end_time_property(
     ----------
     time_unit : str | None
         Unit of the time, e.g. ``"min"``.
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns
@@ -803,7 +803,7 @@ def create_cycle_end_time_property(
     )
 
 
-def create_generation_property(provenance: str = "pycellin") -> Property:
+def create_generation_property(provenance: str = "Pycellin") -> Property:
     """
     Create the declaration of the ``generation`` core property.
 
@@ -813,7 +813,7 @@ def create_generation_property(provenance: str = "pycellin") -> Property:
 
     Parameters
     ----------
-    provenance : str, default="pycellin"
+    provenance : str, default="Pycellin"
         Origin of the property, e.g. the name of the format it was loaded from.
 
     Returns

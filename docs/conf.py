@@ -1,4 +1,4 @@
-"""Sphinx configuration for the pycellin documentation.
+"""Sphinx configuration for the Pycellin documentation.
 
 Settings reference: https://www.sphinx-doc.org/en/master/usage/configuration.html
 """
@@ -67,7 +67,7 @@ toc_object_entries_show_parents = "hide"
 numpydoc_xref_param_type = True
 numpydoc_xref_ignore = "all"
 numpydoc_xref_aliases = {
-    # Other projects, by the short names pycellin's docstrings use.
+    # Other projects, by the short names Pycellin's docstrings use.
     "go.Figure": ":class:`plotly.graph_objects.Figure`",
     "np.ndarray": "numpy.ndarray",
     "nx.DiGraph": "networkx.DiGraph",
@@ -77,7 +77,7 @@ numpydoc_xref_aliases = {
     # Written in full in the docstrings: an alias to the same name stays plain text
     # (numpydoc_xref_ignore = "all"), but a role links.
     "plotly.graph_objects.Figure": ":class:`plotly.graph_objects.Figure`",
-    # pycellin's classes and exceptions, by their short names.
+    # Pycellin's classes and exceptions, by their short names.
     "Cell": "pycellin.custom_types.Cell",
     "CellLineage": "pycellin.CellLineage",
     "CycleLineage": "pycellin.CycleLineage",
@@ -108,7 +108,7 @@ nitpicky = True
 nitpick_ignore_regex = [("py:obj", r"[a-z_][a-z0-9_]*")]
 # Types in signatures with no page to link to.
 nitpick_ignore = [
-    # pycellin's private base classes.
+    # Pycellin's private base classes.
     ("py:class", "pycellin.classes.lineage.Lineage"),
     ("py:class", "pycellin.classes.property_calculator.PropertyCalculator"),
     # The type parameter of the calculator classes, explained in their Notes.
@@ -191,7 +191,7 @@ def _write_predefined_properties(app):
         path.write_text(text, encoding="utf-8")
 
 
-# plotly classes in pycellin's type hints, by the public name plotly's docs list
+# plotly classes in Pycellin's type hints, by the public name plotly's docs list
 # (plotly's inventory still lists plotly.graph_objs names, but their pages are gone).
 _PLOTLY_PUBLIC_NAMES = {
     "plotly.graph_objs._figure.Figure": "plotly.graph_objects.Figure",

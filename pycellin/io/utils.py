@@ -30,7 +30,7 @@ def _check_fusions(model: Model) -> None:
     Parameters
     ----------
     model : Model
-        The pycellin model to check for fusions.
+        The Pycellin model to check for fusions.
     """
     all_fusions = model.get_fusions()
     if all_fusions:
@@ -174,7 +174,7 @@ def _identify_frame_prop(model: Model) -> str:
     Parameters
     ----------
     model : Model
-        The pycellin model to check for a frame-like property.
+        The Pycellin model to check for a frame-like property.
 
     Returns
     -------
@@ -374,7 +374,7 @@ def _remove_orphaned_metadata(model: Model) -> None:
     Parameters
     ----------
     model : Model
-        The pycellin model to update.
+        The Pycellin model to update.
 
     Notes
     -----
@@ -729,7 +729,7 @@ def _update_lineages_ids_key(
     lineage_id_key: str | None,
 ) -> None:
     """
-    Update the lineage ID key of lineage graphs to match pycellin convention.
+    Update the lineage ID key of lineage graphs to match Pycellin convention.
 
     If `lineage_id_key` is not present in the lineage graph, a ``lineage_id`` key
     is created and set to the next available lineage ID.

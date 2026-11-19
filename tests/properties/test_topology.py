@@ -32,7 +32,7 @@ def prop():
         identifier="location_tag",
         name="Location tag",
         description="test property",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="int",

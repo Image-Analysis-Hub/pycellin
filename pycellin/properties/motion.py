@@ -60,7 +60,7 @@ def create_cell_displacement_property(
         name=custom_name or "Cell displacement",
         description=custom_description
         or "Displacement of the cell between two consecutive detections",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="edge",
         lineage_type="cell",
         dtype="float",
@@ -155,7 +155,7 @@ def create_cycle_total_displacement_property(
         name=custom_name or "Cycle total displacement",
         description=custom_description
         or "Displacement of the cell during the cell cycle",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="float",
@@ -265,7 +265,7 @@ def create_cycle_mean_displacement_property(
         name=custom_name or "Cycle mean displacement",
         description=custom_description
         or "Mean displacement of the cell during the cell cycle",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="float",
@@ -375,7 +375,7 @@ def create_cell_speed_property(
         name=custom_name or "Cell speed",
         description=custom_description
         or "Speed of the cell between two consecutive detections",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="edge",
         lineage_type="cell",
         dtype="float",
@@ -482,7 +482,7 @@ def create_cycle_mean_speed_property(
         name=custom_name or "Cycle mean speed",
         description=custom_description
         or "Mean speed of the cell during the cell cycle",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="float",
@@ -587,7 +587,7 @@ def create_straightness_property(
         name=custom_name or "Straightness",
         description=custom_description
         or "Straightness of the cell trajectory during the cell cycle",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="float",
@@ -723,7 +723,7 @@ def create_turning_angle_property(
         name=custom_name or "Turning angle",
         description=custom_description
         or "Angle of the cell trajectory between two consecutive displacements",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="float",

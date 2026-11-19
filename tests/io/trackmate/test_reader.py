@@ -1591,7 +1591,7 @@ class TestAddMissingPositionT:
         assert lin.nodes[1]["POSITION_T"] == 0.0
         assert lin.nodes[2]["POSITION_T"] == 7.5
         prop = props_md.properties["POSITION_T"]
-        assert (prop.dtype, prop.unit, prop.provenance) == ("float", "min", "pycellin")
+        assert (prop.dtype, prop.unit, prop.provenance) == ("float", "min", "Pycellin")
 
     def test_warns_when_computed(self, caplog):
         """Test that a warning says POSITION_T is not from the file."""

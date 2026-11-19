@@ -40,25 +40,25 @@ class TestFromTrackpy:
     """Test cases for from_trackpy function."""
 
     def test_cell_id_column_raises(self, trackpy_df):
-        """A 'cell_id' column would be overwritten by pycellin: raise."""
+        """A 'cell_id' column would be overwritten by Pycellin: raise."""
         trackpy_df["cell_id"] = [5, 6]
         with pytest.raises(ValueError, match=r"column\(s\) \['cell_id'\]"):
             from_trackpy(trackpy_df)
 
     def test_lineage_id_column_raises(self, trackpy_df):
-        """A 'lineage_id' column would be overwritten by pycellin: raise."""
+        """A 'lineage_id' column would be overwritten by Pycellin: raise."""
         trackpy_df["lineage_id"] = [7, 7]
         with pytest.raises(ValueError, match=r"column\(s\) \['lineage_id'\]"):
             from_trackpy(trackpy_df)
 
     def test_timepoint_column_raises(self, trackpy_df):
-        """A 'timepoint' column would be overwritten by pycellin: raise."""
+        """A 'timepoint' column would be overwritten by Pycellin: raise."""
         trackpy_df["timepoint"] = [10, 11]
         with pytest.raises(ValueError, match=r"column\(s\) \['timepoint'\]"):
             from_trackpy(trackpy_df)
 
     def test_no_reserved_column(self, trackpy_df):
-        """Without reserved columns, pycellin creates its own properties."""
+        """Without reserved columns, Pycellin creates its own properties."""
         model = from_trackpy(trackpy_df)
         (lin,) = model.data.cell_lineages.values()
         assert [lin.nodes[n]["cell_id"] for n in sorted(lin.nodes)] == [0, 1]

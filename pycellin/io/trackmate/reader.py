@@ -172,7 +172,7 @@ def _convert_and_add_prop(
     units: dict[str, str],
 ) -> None:
     """
-    Convert a TrackMate property to a pycellin one to add it to the properties metadata.
+    Convert a TrackMate property to a Pycellin one to add it to the properties metadata.
 
     Parameters
     ----------
@@ -260,7 +260,7 @@ def _add_all_props(
         props = _get_props_dict(iterator, element)
         for prop in props:
             # 'name' is the display name of spots and tracks, not a feature, but files
-            # written by earlier versions of pycellin can declare it.
+            # written by earlier versions of Pycellin can declare it.
             if prop["feature"] != "name" or element.tag == "EdgeFeatures":
                 _convert_and_add_prop(prop, element.tag, props_md, units)
 
@@ -794,7 +794,7 @@ def _update_props_metadata(
     segmentation: bool,
 ) -> None:
     """
-    Update the properties metadata to match pycellin conventions.
+    Update the properties metadata to match Pycellin conventions.
 
     Parameters
     ----------
@@ -812,7 +812,7 @@ def _update_props_metadata(
         If the ``POSITION_X``, ``POSITION_Y``, ``POSITION_Z`` or ``TRACK_ID``
         property is missing in the properties metadata.
     ValueError
-        If a feature already has the identifier that pycellin gives to another
+        If a feature already has the identifier that Pycellin gives to another
         feature, e.g. ``cell_x`` for ``POSITION_X``.
     """
     # Node properties.
@@ -1016,7 +1016,7 @@ def _parse_model_tag(
         If an Edge element is outside any Track element, or if a spot is in several
         tracks.
         If several disconnected parts of the graph have the same track ID.
-        If a feature already has the identifier that pycellin gives to another
+        If a feature already has the identifier that Pycellin gives to another
         feature, e.g. ``cell_x`` for ``POSITION_X``.
     KeyError
         If a Track element has no ``TRACK_ID`` attribute.
@@ -1095,9 +1095,9 @@ def _parse_model_tag(
         lineage_id_key="TRACK_ID",
     )
 
-    # For pycellin compatibility, some TrackMate properties have to be renamed.
+    # For Pycellin compatibility, some TrackMate properties have to be renamed.
     # We only rename properties that are either essential to the functioning of
-    # pycellin or confusing (e.g. "name" is a spot and a track property).
+    # Pycellin or confusing (e.g. "name" is a spot and a track property).
     _update_props_metadata(props_md, units, segmentation)
     _update_lineages_ids_key(lineages, "TRACK_ID")
     for lin in lineages:
@@ -1359,7 +1359,7 @@ def read_trackmate_xml(
     Returns
     -------
     Model
-        A pycellin `Model` that contains all the data from the TrackMate XML file.
+        A Pycellin `Model` that contains all the data from the TrackMate XML file.
 
     Raises
     ------
@@ -1416,7 +1416,7 @@ def read_trackmate_xml(
         metadata[tag_name] = element_string
 
     model = Model(metadata, props_md, data)
-    _check_fusions(model)  # pycellin DOES NOT support fusion events
+    _check_fusions(model)  # Pycellin DOES NOT support fusion events
 
     return model
 

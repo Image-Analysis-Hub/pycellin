@@ -10,10 +10,10 @@ from pycellin.classes.model import Model
 
 def read_pickle(path: str | Path) -> Model:
     """
-    Read a pycellin model from a pickle file.
+    Read a Pycellin model from a pickle file.
 
     Only read pickle files from sources you trust: unpickling a file can run
-    arbitrary code. A model pickled with another version of pycellin may not be
+    arbitrary code. A model pickled with another version of Pycellin may not be
     readable.
 
     Parameters

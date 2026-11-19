@@ -12,7 +12,7 @@ def write_pickle(
     model: Model, path: str | Path, *, protocol: int = pickle.HIGHEST_PROTOCOL
 ) -> None:
     """
-    Write a pycellin model to a pickle file.
+    Write a Pycellin model to a pickle file.
 
     The whole model is saved, so that work on it can be resumed later, e.g. in
     another Python session, with `read_pickle()`.

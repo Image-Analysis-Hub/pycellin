@@ -38,9 +38,9 @@ def _are_values_equal(value1: Any, value2: Any) -> bool:
 @dataclass
 class ModelMetadata:
     """
-    Metadata for a pycellin `Model`.
+    Metadata for a Pycellin `Model`.
 
-    This class holds metadata information for a pycellin model, including
+    This class holds metadata information for a Pycellin model, including
     spatial and temporal context, as well as custom fields.
 
     Parameters
@@ -67,7 +67,7 @@ class ModelMetadata:
     space_unit : str | None, default=None
         Unit of spatial measurements (e.g., ``"µm"``, ``"nm"``, ``"pixel"``).
     pycellin_version : str, default=__version__
-        Version of pycellin used to create the model (automatically set).
+        Version of Pycellin used to create the model (automatically set).
     creation_timestamp : str, default=<factory>
         ISO format timestamp of when the model was created (automatically set).
     name : str | None, default=None

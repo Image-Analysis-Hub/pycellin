@@ -158,7 +158,7 @@ def _create_previous_id_property() -> Property:
         identifier="pycellin_cell_id",
         name="Pycellin cell ID",
         description="Original cell ID before relabeling for GEFF export",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="int",
@@ -172,7 +172,7 @@ def _to_geff_dtype(dtype: str) -> str:
     Parameters
     ----------
     dtype : str
-        Data type of a pycellin property.
+        Data type of a Pycellin property.
 
     Returns
     -------
@@ -266,7 +266,7 @@ def _create_tracklet_property() -> Property:
             "Identifier of the tracklet of the cell, i.e. of its cell cycle: "
             "ID of the last cell of the tracklet"
         ),
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="int",
@@ -571,7 +571,7 @@ def _build_props_metadata(
     properties: dict[str, Property],
 ) -> tuple[dict[str, geff_spec.PropMetadata], dict[str, geff_spec.PropMetadata]]:
     """
-    Build property metadata for GEFF from the properties of a pycellin model.
+    Build property metadata for GEFF from the properties of a Pycellin model.
 
     Parameters
     ----------
@@ -617,12 +617,12 @@ def _build_geff_metadata(
     scales: dict[str, tuple[float, str | None]] | None = None,
 ) -> geff.GeffMetadata:
     """
-    Build GEFF metadata from a pycellin model.
+    Build GEFF metadata from a Pycellin model.
 
     Parameters
     ----------
     model : Model
-        The pycellin model to extract metadata from.
+        The Pycellin model to extract metadata from.
     time_axes : str | list[str] | None, default=None
         Property name or list of property names that Geff will consider as time
         axes. These should be properties in the model that represent time (e.g.,
@@ -713,14 +713,14 @@ def write_geff(
     zarr_format: Literal[2, 3] = 2,
 ) -> None:
     """
-    Export a pycellin model to GEFF format.
+    Export a Pycellin model to GEFF format.
 
     The model is not modified: the export works on a copy.
 
     Parameters
     ----------
     model : Model
-        The pycellin model to export.
+        The Pycellin model to export.
     path : str | Path
         Path to the output GEFF file.
     time_axes : str | list[str] | None, default=None
@@ -799,7 +799,7 @@ def write_geff(
     values are written as missing values. Properties with a variable length, such as
     ``cell_contour``, need nothing special: geff detects them from their values.
 
-    GEFF needs cell IDs that are unique across lineages, while pycellin only needs
+    GEFF needs cell IDs that are unique across lineages, while Pycellin only needs
     them unique within a lineage. Repeated IDs are changed in the file, with a
     warning, and the IDs of the cells in the model are then kept in the
     ``pycellin_cell_id`` property.

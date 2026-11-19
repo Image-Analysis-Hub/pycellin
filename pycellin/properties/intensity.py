@@ -51,7 +51,7 @@ def create_cell_total_intensity_property(
         pixel values of the cell in an intensity image".
     provenance : str | None, default=None
         Origin of the property, e.g. the name of the format it was loaded from. If None,
-        ``"pycellin"`` is used.
+        ``"Pycellin"`` is used.
     unit : str | None, default=None
         Unit of the intensity values.
 
@@ -65,7 +65,7 @@ def create_cell_total_intensity_property(
         name=custom_name or "Cell total intensity",
         description=custom_description
         or "Sum of the pixel values of the cell in an intensity image",
-        provenance=provenance or "pycellin",
+        provenance=provenance or "Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="float",
@@ -98,7 +98,7 @@ def create_cell_mean_intensity_property(
         pixel values of the cell in an intensity image".
     provenance : str | None, default=None
         Origin of the property, e.g. the name of the format it was loaded from. If None,
-        ``"pycellin"`` is used.
+        ``"Pycellin"`` is used.
     unit : str | None, default=None
         Unit of the intensity values.
 
@@ -112,7 +112,7 @@ def create_cell_mean_intensity_property(
         name=custom_name or "Cell mean intensity",
         description=custom_description
         or "Mean of the pixel values of the cell in an intensity image",
-        provenance=provenance or "pycellin",
+        provenance=provenance or "Pycellin",
         prop_type="node",
         lineage_type="cell",
         dtype="float",
@@ -508,7 +508,7 @@ def create_cycle_mean_intensity_property(
         name=custom_name or "Cycle mean intensity",
         description=custom_description
         or "Mean intensity of the cell during the cell cycle",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="float",
@@ -606,7 +606,7 @@ def create_birth_intensity_property(
         name=custom_name or "Birth intensity",
         description=custom_description
         or "Intensity of the cell at the start of the cell cycle, right after division",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="float",
@@ -707,7 +707,7 @@ def create_division_intensity_property(
         name=custom_name or "Division intensity",
         description=custom_description
         or "Intensity of the cell at the end of the cell cycle, right before division",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
         lineage_type="cycle",
         dtype="float",
