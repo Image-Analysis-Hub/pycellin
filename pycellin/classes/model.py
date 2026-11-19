@@ -4564,8 +4564,13 @@ class Model:
         Add the interdivision time property to the model.
 
         Interdivision time is defined as the time elapsed between two successive
-        divisions. By default, interdivision time is given in the time unit of the
-        model, but a custom time property can be specified.
+        divisions, from the last cell of the previous cell cycle to the last cell of
+        the cell cycle. Only complete cell cycles, see ``is_complete_cycle``, have
+        both divisions: for a root cell cycle, the time starts at its first cell, and
+        for a cell cycle that doesn't end with a division, it stops at its last cell.
+        The core property ``cycle_duration`` gives the time from the first cell of
+        the cell cycle instead. By default, interdivision time is given in the time
+        unit of the model, but a custom time property can be specified.
 
         Parameters
         ----------

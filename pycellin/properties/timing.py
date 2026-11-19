@@ -481,8 +481,12 @@ def create_interdivision_time_property(
     """
     Create the declaration of the ``interdivision_time`` property.
 
-    ``interdivision_time`` is the time elapsed between two successive divisions. It is
-    a node property of cycle lineages.
+    ``interdivision_time`` is the time elapsed between two successive divisions,
+    from the last cell of the previous cell cycle to the last cell of the cell cycle.
+    It is a node property of cycle lineages. Only complete cell cycles, see
+    ``is_complete_cycle``, have both divisions: for a root cell cycle, the time
+    starts at its first cell, and for a cell cycle that doesn't end with a division,
+    it stops at its last cell.
 
     Parameters
     ----------
@@ -524,7 +528,10 @@ class InterdivisionTime(NodeGlobalPropCalculator[CellLineage | CycleLineage]):
     Calculator to compute the interdivision time of cells.
 
     Interdivision time is defined as the time elapsed between the 2 divisions
-    that define the cell cycle.
+    that define the cell cycle: from the last cell of the previous cell cycle to the
+    last cell of the cell cycle. Only complete cell cycles have both divisions: for a
+    root cell cycle, the time starts at its first cell, and for a cell cycle that
+    doesn't end with a division, it stops at its last cell.
     It is computed in the same unit as the time property given as input
     (e.g. ``frame``, ``time``, etc.).
 

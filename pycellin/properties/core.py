@@ -710,8 +710,11 @@ def create_cycle_duration_property(
     """
     Create the declaration of the ``cycle_duration`` core property.
 
-    ``cycle_duration`` is the duration of the cell cycle, regardless of gaps,
-    expressed in `time_unit`. It is a node property of cycle lineages.
+    ``cycle_duration`` is the time between the first and last cells of the cell
+    cycle, regardless of gaps, expressed in `time_unit`. It is a node property of
+    cycle lineages. It is the time over which the cell cycle was observed. For a cell
+    cycle that starts with a division, ``interdivision_time`` is longer, usually by
+    one time step: it starts at the last cell of the previous cell cycle.
 
     Parameters
     ----------
@@ -728,7 +731,10 @@ def create_cycle_duration_property(
     return Property(
         identifier="cycle_duration",
         name="Cycle duration",
-        description="Duration of the cell cycle, regardless of gaps",
+        description=(
+            "Time between the first and last cells of the cell cycle, regardless of "
+            "gaps"
+        ),
         provenance=provenance,
         prop_type="node",
         lineage_type="cycle",
