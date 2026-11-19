@@ -379,7 +379,8 @@ def _get_cell_lin_timepoints(
     """
     Get the time values of the divisions defining the cell cycle of a cell.
 
-    This function is used by the `InterdivisionTime` and `DivisionRate` calculators.
+    This function is used by the `InterdivisionTime` and `InverseInterdivisionTime`
+    calculators.
 
     Parameters
     ----------
@@ -425,7 +426,8 @@ def _get_cycle_lin_timepoints(
     """
     Get the time values of the divisions defining a cell cycle.
 
-    This function is used by the `InterdivisionTime` and `DivisionRate` calculators.
+    This function is used by the `InterdivisionTime` and `InverseInterdivisionTime`
+    calculators.
 
     Parameters
     ----------
@@ -590,40 +592,42 @@ class InterdivisionTime(NodeGlobalPropCalculator[CellLineage | CycleLineage]):
         return timepoint_curr_div - timepoint_prev_div
 
 
-def create_division_rate_property(
+def create_inverse_interdivision_time_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
     unit: str | None = None,
 ) -> Property:
     """
-    Create the declaration of the ``division_rate`` property.
+    Create the declaration of the ``inverse_interdivision_time`` property.
 
-    ``division_rate`` is the number of divisions per time unit. It is a node property
-    of cycle lineages.
+    ``inverse_interdivision_time`` is the inverse of the time elapsed between two
+    successive divisions. It is a node property of cycle lineages.
 
     Parameters
     ----------
     custom_identifier : str | None, default=None
         New identifier for the property. If None, the identifier will be
-        ``"division_rate"``.
+        ``"inverse_interdivision_time"``.
     custom_name : str | None, default=None
-        New name for the property. If None, the name will be "Division rate".
+        New name for the property. If None, the name will be "Inverse interdivision
+        time".
     custom_description : str | None, default=None
-        New description for the property. If None, the description will be "Number of
-        divisions per time unit".
+        New description for the property. If None, the description will be "Inverse of
+        the time elapsed between two successive divisions".
     unit : str | None, default=None
-        Unit of the division rates, e.g. ``"1/min"``.
+        Unit of the inverse interdivision times, e.g. ``"1/min"``.
 
     Returns
     -------
     Property
-        Declaration of the ``division_rate`` property.
+        Declaration of the ``inverse_interdivision_time`` property.
     """
     return Property(
-        identifier=custom_identifier or "division_rate",
-        name=custom_name or "Division rate",
-        description=custom_description or "Number of divisions per time unit",
+        identifier=custom_identifier or "inverse_interdivision_time",
+        name=custom_name or "Inverse interdivision time",
+        description=custom_description
+        or "Inverse of the time elapsed between two successive divisions",
         provenance="pycellin",
         prop_type="node",
         lineage_type="cycle",
@@ -632,12 +636,12 @@ def create_division_rate_property(
     )
 
 
-class DivisionRate(NodeGlobalPropCalculator[CellLineage | CycleLineage]):
+class InverseInterdivisionTime(NodeGlobalPropCalculator[CellLineage | CycleLineage]):
     """
-    Calculator to compute the division rate of cells.
+    Calculator to compute the inverse interdivision time of cells.
 
-    Division rate is defined as the number of divisions per time unit.
-    It is the inverse of the interdivision time.
+    Inverse interdivision time is defined as the inverse of the time elapsed between
+    the 2 divisions that define the cell cycle.
     It is computed in the inverse of the unit of the time property given as input
     (e.g. ``frame``, ``time``, etc.).
 
@@ -661,7 +665,7 @@ class DivisionRate(NodeGlobalPropCalculator[CellLineage | CycleLineage]):
         self, data: Data, lineage: CellLineage | CycleLineage, node_id: int
     ) -> int | float:
         """
-        Compute the division rate of a given cell or cell cycle.
+        Compute the inverse interdivision time of a given cell or cell cycle.
 
         Parameters
         ----------
@@ -675,7 +679,7 @@ class DivisionRate(NodeGlobalPropCalculator[CellLineage | CycleLineage]):
         Returns
         -------
         int | float
-            Division rate, or NaN if the interdivision time is 0.
+            Inverse interdivision time, or NaN if the interdivision time is 0.
 
         Raises
         ------

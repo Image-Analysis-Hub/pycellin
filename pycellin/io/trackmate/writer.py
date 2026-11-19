@@ -187,7 +187,7 @@ def _unit_to_dimension(
         "cycle_num_cells": "NONE",
         "cycle_start_time": "TIME",
         "interdivision_time": "TIME",
-        "division_rate": "RATE",
+        "inverse_interdivision_time": "RATE",
         "first_cell": "NONE",
         "last_cell": "NONE",
         "generation": "NONE",

@@ -904,13 +904,13 @@ class TestRescaleTime:
 
     def test_outdated_unit_warns_for_one_property(self, frame_time_model):
         frame_time_model.add_cycle_lineages()
-        frame_time_model.add_division_rate()
+        frame_time_model.add_inverse_interdivision_time()
         with pytest.warns(UserWarning) as record:
             frame_time_model.rescale_time(5, time_unit="min")
         assert [str(warning.message) for warning in record] == [
-            "Property 'division_rate' (1/frame) was added before the rescaling, so "
-            "its unit still uses 'frame' instead of 'min'. Add it again, with the "
-            "same method and arguments, to update its unit."
+            "Property 'inverse_interdivision_time' (1/frame) was added before the "
+            "rescaling, so its unit still uses 'frame' instead of 'min'. Add it again, "
+            "with the same method and arguments, to update its unit."
         ]
 
     @pytest.mark.parametrize("time_unit", [None, "frame"])

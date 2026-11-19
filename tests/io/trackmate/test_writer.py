@@ -261,7 +261,7 @@ class TestUnitToDimension:
             ("cycle_mean_intensity", "INTENSITY"),
             ("birth_intensity", "INTENSITY"),
             ("division_intensity", "INTENSITY"),
-            ("division_rate", "RATE"),
+            ("inverse_interdivision_time", "RATE"),
         ],
     )
     def test_pycellin_property_dimension(self, identifier, dimension):

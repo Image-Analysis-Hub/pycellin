@@ -4503,7 +4503,7 @@ class Model:
         )
         self.add_custom_property(topo.DaughterCycles(prop))
 
-    def add_division_rate(
+    def add_inverse_interdivision_time(
         self,
         time_prop: str | None = None,
         custom_identifier: str | None = None,
@@ -4511,12 +4511,12 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the division rate property to the model.
+        Add the inverse interdivision time property to the model.
 
-        Division rate is defined as the number of divisions per time unit.
-        It is the inverse of the interdivision time. By default, division rate
-        is given in the time unit of the model, but a custom time property can be
-        specified.
+        Inverse interdivision time is defined as the inverse of the time elapsed
+        between two successive divisions. By default, inverse interdivision time is
+        given in the inverse of the time unit of the model, but a custom time property
+        can be specified.
 
         Parameters
         ----------
@@ -4525,12 +4525,13 @@ class Model:
             cells. If None, the reference time property of the model is used.
         custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            ``"division_rate"``.
+            ``"inverse_interdivision_time"``.
         custom_name : str | None, default=None
-            New name for the property. If None, the name will be "Division rate".
+            New name for the property. If None, the name will be "Inverse interdivision
+            time".
         custom_description : str | None, default=None
             New description for the property. If None, the description will be
-            "Number of divisions per time unit".
+            "Inverse of the time elapsed between two successive divisions".
 
         Raises
         ------
@@ -4542,13 +4543,15 @@ class Model:
         time_prop = time_prop or self.reference_time_prop
         time_unit = self._get_prop_unit(time_prop)
 
-        prop = timing.create_division_rate_property(
+        prop = timing.create_inverse_interdivision_time_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=f"1/{time_unit}" if time_unit else None,
         )
-        self.add_custom_property(timing.DivisionRate(prop, time_prop=time_prop))
+        self.add_custom_property(
+            timing.InverseInterdivisionTime(prop, time_prop=time_prop)
+        )
 
     def add_interdivision_time(
         self,

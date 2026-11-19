@@ -288,8 +288,11 @@ class TestDimensionToUnit:
         assert tml._dimension_to_unit(trackmate_feature, units) is None
 
     def test_rate_is_per_time_unit(self, units: dict[str, str]):
-        """Test that RATE features, such as division_rate, are per time unit."""
-        trackmate_feature = {"feature": "division_rate", "dimension": "RATE"}
+        """Test that RATE features are per time unit."""
+        trackmate_feature = {
+            "feature": "inverse_interdivision_time",
+            "dimension": "RATE",
+        }
         assert tml._dimension_to_unit(trackmate_feature, units) == "1/s"
 
 

@@ -10,8 +10,8 @@ import pytest
 from pycellin.classes import CellLineage, Data, Property
 from pycellin.properties.timing import (
     AbsoluteAge,
-    DivisionRate,
     InterdivisionTime,
+    InverseInterdivisionTime,
     NormalizedAge,
     RelativeAge,
 )
@@ -250,12 +250,12 @@ def test_interdivision_time_cycle_lin(cell_lin, prop_cycle_lin):
         calculator.compute(data, cycle_lin, node_id=99)
 
 
-# DivisionRate ################################################################
+# InverseInterdivisionTime ####################################################
 
 
-def test_division_rate(cell_lin, prop_cell_lin):
-    """Test DivisionRate Calculator."""
-    calculator = DivisionRate(prop_cell_lin, time_prop="frame")
+def test_inverse_interdivision_time(cell_lin, prop_cell_lin):
+    """Test InverseInterdivisionTime Calculator."""
+    calculator = InverseInterdivisionTime(prop_cell_lin, time_prop="frame")
     # Root.
     assert calculator.compute(Data({}), cell_lin, node_id=1) == 1 / 1
     # Divisions.
@@ -272,12 +272,12 @@ def test_division_rate(cell_lin, prop_cell_lin):
         calculator.compute(Data({}), cell_lin, node_id=99)
 
 
-def test_division_rate_gap(cell_lin, prop_cell_lin):
-    """Test DivisionRate Calculator with a gap in the lineage."""
+def test_inverse_interdivision_time_gap(cell_lin, prop_cell_lin):
+    """Test InverseInterdivisionTime Calculator with a gap in the lineage."""
     # Create a lineage with a gap.
     cell_lin.remove_nodes_from([3, 12, 13])
     cell_lin.add_edges_from([(2, 4), (11, 14)])
-    calculator = DivisionRate(prop_cell_lin, time_prop="frame")
+    calculator = InverseInterdivisionTime(prop_cell_lin, time_prop="frame")
     # Root.
     assert calculator.compute(Data({}), cell_lin, node_id=1) == 1 / 1
     # Divisions.
@@ -294,9 +294,9 @@ def test_division_rate_gap(cell_lin, prop_cell_lin):
         calculator.compute(Data({}), cell_lin, node_id=99)
 
 
-def test_division_rate_cycle_lin(cell_lin, prop_cycle_lin):
-    """Test DivisionRate Calculator with CycleLineage."""
-    calculator = DivisionRate(prop_cycle_lin, time_prop="frame")
+def test_inverse_interdivision_time_cycle_lin(cell_lin, prop_cycle_lin):
+    """Test InverseInterdivisionTime Calculator with CycleLineage."""
+    calculator = InverseInterdivisionTime(prop_cycle_lin, time_prop="frame")
     data = Data({1: cell_lin})
     data._add_cycle_lineages(time_prop="frame")
     cycle_lin = data.cycle_lineages[1]
