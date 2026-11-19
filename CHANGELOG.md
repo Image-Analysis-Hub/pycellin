@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to 7d3006d, plus the uncommitted glossary, capital P of Pycellin in docstrings, messages, comments and tests, and provenance values spelled as display names. Update from there with: git log 7d3006d..dev -->
+<!-- Planned v0.6.0. Covers commits up to 9331fcb, plus the uncommitted Python version classifiers. Update from there with: git log 9331fcb..dev -->
 
 Model merging and splitting, many new properties (morphology, intensity, topology), branch plots, consistent names that follow PEP 8, and many fixes, notably to time handling and to reading and writing TrackMate, GEFF, CTC and trackpy data. **This release contains breaking changes**, listed first below.
 
@@ -321,6 +321,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Packaging:** find packages automatically in `pyproject.toml`
 - **Packaging:** declare the license as an SPDX expression (`BSD-3-Clause`) instead of the deprecated classifier. Building Pycellin now needs setuptools >= 77
 - **Packaging:** between releases, the version on `dev` ends with `.dev0` (e.g. `0.6.0.dev0`), so models made with development code say so in their `pycellin_version` metadata
+- **Packaging:** list the supported Python versions, 3.10 to 3.14, in the classifiers. PyPI shows them, and the README's Python Version badge reads them
 - **CI:** bump `actions/setup-python` from 6 to 7
 - **CI:** the deploy workflow stops before building if the release tag doesn't match the package version
 - **CI:** fix releases starting the deploy workflow twice, which made one of the two runs fail at the PyPI upload
