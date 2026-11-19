@@ -2739,8 +2739,8 @@ class Model:
         custom_name : str | None, default=None
             New name for the property. If None, the name will be "Absolute age".
         custom_description : str | None, default=None
-            New description for the property. If None, the description will be
-            "Age of the cell since the start of the lineage".
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2787,8 +2787,8 @@ class Model:
         custom_name : str | None, default=None
             New name for the property. If None, the name will be "Turning angle".
         custom_description : str | None, default=None
-            New description for the property. If None, the description will be
-            "Angle of the cell trajectory between two consecutive displacements".
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2832,8 +2832,8 @@ class Model:
             New name for the property. If None, the name will be
             "Cycle mean displacement".
         custom_description : str | None, default=None
-            New description for the property. If None, the description will be
-            "Mean displacement of the cell during the cell cycle".
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2882,8 +2882,8 @@ class Model:
             New name for the property. If None, the name will be
             "Cycle mean speed".
         custom_description : str | None, default=None
-            New description for the property. If None, the description will be
-            "Mean speed of the cell during the cell cycle".
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2932,8 +2932,8 @@ class Model:
             New name for the property. If None, the name will be
             "Cycle total displacement".
         custom_description : str | None, default=None
-            New description for the property. If None, the description will be
-            "Displacement of the cell during the cell cycle".
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -3383,8 +3383,8 @@ class Model:
         custom_name : str | None, default=None
             New name for the property. If None, the name will be "Cell displacement".
         custom_description : str | None, default=None
-            New description for the property. If None, the description will be
-            "Displacement of the cell between two consecutive detections".
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -4373,8 +4373,8 @@ class Model:
         custom_name : str | None, default=None
             New name for the property. If None, the name will be "Cell speed".
         custom_description : str | None, default=None
-            New description for the property. If None, the description will be
-            "Speed of the cell between two consecutive detections".
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -4573,8 +4573,8 @@ class Model:
             New name for the property. If None, the name will be "Inverse interdivision
             time".
         custom_description : str | None, default=None
-            New description for the property. If None, the description will be
-            "Inverse of the time elapsed between two successive divisions".
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -4626,8 +4626,8 @@ class Model:
         custom_name : str | None, default=None
             New name for the property. If None, the name will be "Interdivision time".
         custom_description : str | None, default=None
-            New description for the property. If None, the description will be
-            "Time elapsed between two successive divisions".
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -4670,9 +4670,8 @@ class Model:
         custom_name : str | None, default=None
             New name for the property. If None, the name will be "is division".
         custom_description : str | None, default=None
-            New description for the property. If None, the description will be
-            "Whether the cell is a division event, i.e. has more than one daughter
-            cell".
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
         """
         prop = topo.create_is_division_property(
             custom_identifier=custom_identifier,
@@ -4702,8 +4701,8 @@ class Model:
         custom_name : str | None, default=None
             New name for the property. If None, the name will be "is leaf".
         custom_description : str | None, default=None
-            New description for the property. If None, the description will be
-            "Whether the cell is a leaf cell, i.e. has no daughter cells".
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
         """
         prop = topo.create_is_leaf_property(
             custom_identifier=custom_identifier,
@@ -4733,8 +4732,8 @@ class Model:
         custom_name : str | None, default=None
             New name for the property. If None, the name will be "is root".
         custom_description : str | None, default=None
-            New description for the property. If None, the description will be
-            "Whether the cell is a root cell, i.e. has no parent cell".
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
         """
         prop = topo.create_is_root_property(
             custom_identifier=custom_identifier,
@@ -5211,8 +5210,8 @@ class Model:
         custom_name : str | None, default=None
             New name for the property. If None, the name will be "Relative age".
         custom_description : str | None, default=None
-            New description for the property. If None, the description will be
-            "Age of the cell since the start of the current cell cycle".
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -5297,8 +5296,8 @@ class Model:
         custom_name : str | None, default=None
             New name for the property. If None, the name will be "Straightness".
         custom_description : str | None, default=None
-            New description for the property. If None, the description will be
-            "Straightness of the cell trajectory during the cell cycle".
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
