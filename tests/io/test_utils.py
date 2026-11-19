@@ -964,6 +964,20 @@ class TestSplitGraphIntoLineages:
         lin_ids = {min(lin.nodes): lin.graph["lineage_id"] for lin in obtained}
         assert lin_ids == {1: 0, 3: 1, 5: 2}
 
+    @pytest.mark.parametrize("lineage_id_key", [None, "lineage_id"])
+    def test_ids_after_reserved_ids(self, lineage_id_key):
+        """Test that lineages without an ID get the IDs after the reserved ones, e.g.
+        those of the tracks of a file that are not loaded."""
+        g = nx.DiGraph()
+        g.add_edge(1, 2)
+        g.add_node(3)
+        obtained = _split_graph_into_lineages(
+            g, lineage_id_key=lineage_id_key, reserved_ids=[0, 4]
+        )
+
+        lin_ids = {min(lin.nodes): lin.graph["lineage_id"] for lin in obtained}
+        assert lin_ids == {1: 5, 3: 6}
+
     def test_duplicate_lineage_ids_raise(self, two_lin_graph):
         """Test ValueError when disconnected parts of the graph share a lineage ID."""
         two_lin_graph.nodes[3]["lineage_id"] = 0

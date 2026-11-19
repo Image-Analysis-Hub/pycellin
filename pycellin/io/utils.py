@@ -456,6 +456,7 @@ def _split_graph_into_lineages(
     graph: nx.DiGraph,
     lineage_id_key: str | None = None,
     lin_props: list[dict[str, Any]] | None = None,
+    reserved_ids: Iterable[Any] = (),
 ) -> list[CellLineage]:
     """
     Split a graph into lineages, and ensure consistent lineage ID assignment.
@@ -468,7 +469,8 @@ def _split_graph_into_lineages(
     corresponding properties to each lineage.
 
     Lineages without an ID get the next IDs that no other lineage uses, in the
-    order of the lineages: from 0, or after the largest ID given by the data.
+    order of the lineages: from 0, or after the largest ID given by the data or
+    in `reserved_ids`.
 
     Parameters
     ----------
@@ -481,6 +483,9 @@ def _split_graph_into_lineages(
         A list of dictionaries, where each dictionary contains properties
         for a specific lineage, identified by a `lineage_id_key` key.
         If None, no properties will be added to the lineages.
+    reserved_ids : Iterable[Any], default=()
+        IDs that the lineages without an ID must not get, besides those given by
+        the data, e.g. the IDs of the tracks of a file that are not loaded.
 
     Returns
     -------
@@ -514,13 +519,14 @@ def _split_graph_into_lineages(
     if lineage_id_key is None:
         # We need to create and add a lineage_id key to each lineage and
         # to each node of the lineage.
-        for lin_id, lin in enumerate(lineages):
+        first_lin_id = max(max(_get_int_ids(reserved_ids), default=-1) + 1, 0)
+        for lin_id, lin in enumerate(lineages, start=first_lin_id):
             lin.graph["lineage_id"] = lin_id
             for node in lin.nodes:
                 lin.nodes[node]["lineage_id"] = lin_id
     else:
-        # IDs given by the data, on the lineages or on their nodes.
-        used_lin_ids = set()
+        # IDs given by the data, on the lineages or on their nodes, and reserved IDs.
+        used_lin_ids = set(reserved_ids)
         for lin in lineages:
             if lin.graph.get(lineage_id_key) is not None:
                 used_lin_ids.add(lin.graph[lineage_id_key])
@@ -529,7 +535,7 @@ def _split_graph_into_lineages(
                 for _, lin_id in lin.nodes(data=lineage_id_key)
                 if lin_id is not None
             )
-        # Lineages without an ID get the next IDs after those given by the data.
+        # Lineages without an ID get the next IDs after the used or reserved ones.
         next_lin_id = max(max(_get_int_ids(used_lin_ids), default=-1) + 1, 0)
 
         # Do lineages and nodes have the lineage_id_key property?

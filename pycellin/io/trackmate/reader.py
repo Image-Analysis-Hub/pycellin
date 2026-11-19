@@ -882,7 +882,8 @@ def _update_location_related_props(
     Update properties related to location of lineage, nodes and edges in a lineage.
 
     Only the coordinates that `props_md` declares are renamed, so that 2D data gets
-    no z coordinate.
+    no z coordinate. A single-cell lineage, from a spot outside tracks, gets the
+    position of its cell as lineage location, if `props_md` declares one.
 
     Parameters
     ----------
@@ -926,8 +927,6 @@ def _update_location_related_props(
         #             coord_u = lineage.nodes[u][f"cell_{axis}"]
         #             coord_v = lineage.nodes[v][f"cell_{axis}"]
         #             data[f"link_{axis}"] = (coord_u + coord_v) / 2
-    else:
-        has_edge_location = False
 
     # Lineage
     if "TRACK_X_LOCATION" in lineage.graph:
@@ -936,11 +935,12 @@ def _update_location_related_props(
                 f"TRACK_{axis.upper()}_LOCATION", None
             )
     else:
-        if len(lineage) == 1 and has_edge_location:
-            # This is a one-node lineage from TrackMate.
-            # One-node graph don't have the TRACK_X_LOCATION, TRACK_Y_LOCATION
-            # and TRACK_Z_LOCATION properties in the graph, so we have to create it.
-            node = [n for n in lineage.nodes][0]
+        if len(lineage) == 1:
+            # This is a one-node lineage from TrackMate, i.e. a spot outside tracks.
+            # TrackMate writes no track for it, so it has no TRACK_X_LOCATION,
+            # TRACK_Y_LOCATION or TRACK_Z_LOCATION. Since TrackMate places a track
+            # at the mean position of its spots, it gets the position of its cell.
+            node = next(iter(lineage.nodes))
             for axis in axes["lineage"]:
                 lineage.graph[f"lineage_{axis}"] = lineage.nodes[node][f"cell_{axis}"]
         # else:
@@ -1182,11 +1182,20 @@ def _parse_model_tag(
     _declare_undeclared_attributes(undeclared, graph, tracks_attributes, props_md)
 
     # We want one lineage per track, so we need to split the graph
-    # into its connected components.
+    # into its connected components. Only the loaded tracks give their attributes.
+    # The spots outside tracks get the IDs after all the track IDs of the file, so
+    # that their IDs don't depend on the tracks loaded and are never those of a
+    # hidden track.
+    loaded_track_ids = {track_id for _, track_id in graph.nodes(data="TRACK_ID")}
     lineages = _split_graph_into_lineages(
         graph,
-        lin_props=tracks_attributes,
+        lin_props=[
+            attrs
+            for attrs in tracks_attributes
+            if attrs["TRACK_ID"] in loaded_track_ids
+        ],
         lineage_id_key="TRACK_ID",
+        reserved_ids=[attrs["TRACK_ID"] for attrs in tracks_attributes],
     )
 
     # For Pycellin compatibility, some TrackMate properties have to be renamed.
@@ -1491,6 +1500,12 @@ def read_trackmate_xml(
 
     Notes
     -----
+    Each track becomes a lineage with the ID of the track. The spots outside tracks
+    loaded with `lone_spots` become single-cell lineages with the next IDs after all
+    the track IDs of the file, so that their IDs don't depend on `tracks`. When the
+    file gives the location of tracks, these lineages get the position of their
+    spot, since TrackMate places a track at the mean position of its spots.
+
     TrackMate gives every spot a z coordinate, of 0 for a 2D image. Pycellin keeps
     it only for 3D data, i.e. when a spot has a nonzero ``POSITION_Z`` or when the
     image has several slices. Models of 2D data have no ``cell_z``, ``link_z`` or

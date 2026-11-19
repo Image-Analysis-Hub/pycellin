@@ -1326,6 +1326,8 @@ def test_update_location_related_props():
 
 
 def test_update_location_related_props_one_node():
+    """Test that a one-node lineage, from a spot outside tracks, gets the position of
+    its cell as location."""
     lineage = CellLineage()
     lineage.add_node(1, POSITION_X=1, POSITION_Y=2, POSITION_Z=3)
 
@@ -1334,6 +1336,9 @@ def test_update_location_related_props_one_node():
     assert lineage.nodes[1]["cell_x"] == 1
     assert lineage.nodes[1]["cell_y"] == 2
     assert lineage.nodes[1]["cell_z"] == 3
+    assert lineage.graph["lineage_x"] == 1
+    assert lineage.graph["lineage_y"] == 2
+    assert lineage.graph["lineage_z"] == 3
 
 
 def test_update_location_related_props_2d():
@@ -1368,6 +1373,12 @@ def test_parse_model_tag_all_lone_spots_and_tracks():
     assert track_sizes == {0: 74, 1: 2, 2: 4, 3: 2, 4: 10, 5: 2, 6: 2}
     lone_spots = {lin_id for lin_id, lin in data.cell_lineages.items() if len(lin) == 1}
     assert lone_spots == set(range(7, 18))
+    # Lone spots get the position of their spot as location.
+    for lin_id in lone_spots:
+        lin = data.cell_lineages[lin_id]
+        (cell,) = lin.nodes.values()
+        assert lin.graph["lineage_x"] == cell["cell_x"]
+        assert lin.graph["lineage_y"] == cell["cell_y"]
     # The lineage ID of each lineage and of its cells matches its key in the data.
     for lin_id, lin in data.cell_lineages.items():
         assert lin.graph["lineage_id"] == lin_id
@@ -1378,6 +1389,24 @@ def test_parse_model_tag_all_lone_spots_and_tracks():
         lid for lid, lin in data.cell_lineages.items() if lin.graph["FilteredTrack"]
     }
     assert visible == {0, 4}
+
+
+def test_parse_model_tag_lone_spots_whatever_the_tracks():
+    """Lone spots get the IDs after all the track IDs of the file, so that they load
+    the same whatever the tracks loaded, without the attributes of a hidden track."""
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    lone_spots = {}
+    for tracks in ["visible", "all"]:
+        _, _, data = tml._parse_model_tag(xml_path, lone_spots="all", tracks=tracks)
+        lone_spots[tracks] = {
+            lin_id: (dict(lin.graph), dict(lin.nodes(data=True)))
+            for lin_id, lin in data.cell_lineages.items()
+            if len(lin) == 1
+        }
+
+    # FakeTracks has tracks 0 to 6, of which only 0 and 4 are visible.
+    assert set(lone_spots["visible"]) == set(range(7, 18))
+    assert lone_spots["visible"] == lone_spots["all"]
 
 
 @pytest.mark.parametrize(
