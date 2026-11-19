@@ -101,8 +101,8 @@ class Model:
 
     Notes
     -----
-    The core properties ``cell_id``, ``lineage_id``, ``timepoint`` and the reference
-    time property are protected whenever they are declared.
+    The core properties ``cell_id``, ``lineage_id`` and ``timepoint``, and the
+    reference time property, are protected whenever they are declared.
     """
 
     def __init__(
@@ -203,14 +203,14 @@ class Model:
             )
             self.update(["timepoint"])
 
-        # Core properties are protected whenever they are declared.
-        core_props = (
+        # Protect the properties Pycellin relies on, whenever they are declared.
+        props_to_protect = (
             "cell_id",
             "lineage_id",
             "timepoint",
             self.reference_time_prop,
         )
-        for prop_id in core_props:
+        for prop_id in props_to_protect:
             if self.props_metadata._has_prop(prop_id):
                 self.props_metadata._protect_prop(prop_id)
 

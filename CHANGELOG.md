@@ -165,7 +165,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 
 ### Changed
 
-- **Model:** core properties (`cell_id`, `lineage_id`, `timepoint` and the reference time property) are now protected in every model. Models read from GEFF files or built from scratch didn't protect all of them, so `remove_property()` could remove them
+- **Model:** the core properties `cell_id`, `lineage_id` and `timepoint`, and the reference time property, are now protected in every model. Models read from GEFF files or built from scratch didn't protect all of them, so `remove_property()` could remove them
 - **Model:** the warning about cell fusions when loading a file says how to list and correct them, with `get_fusions()` and `remove_link()`, instead of pointing to a documentation that doesn't exist yet
 - **Model:** `add_cycle_lineages()`, `add_lineage()` with `with_cycle_lineage=True` and `merge()` no longer require the time step of the model, which building cycle lineages doesn't use. Without it, they raised `ValueError`, or for `add_lineage()` warned and skipped the cycle lineage. The `ValueError` of `update()` without a time step no longer says cycle lineages need it
 - **Properties:** the `enrich()` method of a calculator, called directly for a property of lineage type `"cycle"` or `"both"` on data without cycle lineages, raises `ValueError` saying to add them first, instead of a `TypeError` or `AttributeError`
