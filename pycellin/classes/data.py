@@ -10,6 +10,8 @@ from typing import Any, Literal
 import networkx as nx
 
 from pycellin.classes.lineage import CellLineage, CycleLineage
+from pycellin.exceptions import PycellinWarning
+from pycellin.utils import _find_stack_level
 
 
 class Data:
@@ -213,7 +215,7 @@ class Data:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the number of cell lineages and cycle lineages do not match.
         """
         if self.cycle_lineages and len(self.cell_lineages) != len(self.cycle_lineages):
@@ -222,7 +224,7 @@ class Data:
                 f"and cycle lineages ({len(self.cycle_lineages)}) do not match. "
                 "An update of the model is required. "
             )
-            warnings.warn(msg)
+            warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
         return len(self.cell_lineages)
 
     def _get_next_available_lineage_id(self, positive: bool) -> int:

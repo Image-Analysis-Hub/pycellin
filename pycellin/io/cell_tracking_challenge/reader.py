@@ -22,6 +22,7 @@ import tifffile
 from skimage.measure import regionprops
 
 from pycellin.classes import Data, Model, PropsMetadata
+from pycellin.exceptions import PycellinWarning
 from pycellin.io.utils import _split_graph_into_lineages
 from pycellin.properties.core import (
     create_cell_coord_property,
@@ -34,6 +35,7 @@ from pycellin.properties.morphology import (
     _mask_to_polygons,
     create_cell_contour_property,
 )
+from pycellin.utils import _find_stack_level
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +99,7 @@ def _integrate_label_images_metadata(
 
     Warns
     -----
-    UserWarning
+    PycellinWarning
         If the resolution of the label image, in inches, is ignored while the
         metadata lacks the space unit or the pixel width or height.
     """
@@ -128,7 +130,8 @@ def _integrate_label_images_metadata(
                 "in inches: it is most likely a print default such as 72 dpi, not a "
                 "pixel size. Give 'space_unit', 'pixel_width' and 'pixel_height' to "
                 "read_ctc() to calibrate the cell positions.",
-                stacklevel=4,
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
             )
 
     pixel_sizes = []
@@ -195,7 +198,7 @@ def _create_metadata(
 
     Warns
     -----
-    UserWarning
+    PycellinWarning
         If the resolution of the label images, in inches, is ignored while the space
         unit or the pixel width or height is not given.
     """
@@ -670,7 +673,7 @@ def read_ctc(
 
     Warns
     -----
-    UserWarning
+    PycellinWarning
         If the resolution of the label images is in inches, and therefore ignored,
         while the space unit or the pixel width or height is not given.
     """

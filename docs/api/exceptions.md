@@ -12,4 +12,5 @@
    MissingPropertyError
    ProtectedPropertyError
    UpdateRequiredError
+   PycellinWarning
 ```

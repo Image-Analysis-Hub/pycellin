@@ -195,3 +195,22 @@ class MissingPropertyError(KeyError):
         """
         # KeyError.__str__() returns the repr of the message, i.e. in quotes.
         return self.message
+
+
+class PycellinWarning(UserWarning):
+    """
+    Category of the warnings issued by Pycellin.
+
+    Pycellin warns when the code that calls it can avoid the problem, e.g. with
+    another argument or a change to the model. What the code can't avoid, e.g. in the
+    content of a file read, is logged instead with the `logging` module, under the
+    ``pycellin`` logger.
+
+    Examples
+    --------
+    Hide all the warnings of Pycellin:
+
+    >>> import warnings
+    >>> import pycellin as pc
+    >>> warnings.filterwarnings("ignore", category=pc.exceptions.PycellinWarning)
+    """

@@ -14,7 +14,9 @@ from pycellin.classes.property_calculator import (
     LineageLocalPropCalculator,
     NodeLocalPropCalculator,
 )
+from pycellin.exceptions import PycellinWarning
 from pycellin.properties.utils import _get_position
+from pycellin.utils import _find_stack_level
 
 logger = logging.getLogger(__name__)
 
@@ -988,7 +990,7 @@ class LocationTag(NodeLocalPropCalculator[CellLineage]):
 
     Warns
     -----
-    UserWarning
+    PycellinWarning
         If some keys of `tag_names` are not values of the mask.
     """
 
@@ -1033,7 +1035,7 @@ class LocationTag(NodeLocalPropCalculator[CellLineage]):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If some keys of `tag_names` are not values of the mask.
         """
         mask_values = set(np.unique(self.mask).tolist())
@@ -1043,7 +1045,8 @@ class LocationTag(NodeLocalPropCalculator[CellLineage]):
             warnings.warn(
                 f"Tag name values {missing} are not in the mask, "
                 "so no cell will get these tags.",
-                stacklevel=4,
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
             )
         unmapped = sorted(mask_values - mapped_values)
         if unmapped:

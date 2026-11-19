@@ -10,6 +10,7 @@ export.
 
 import logging
 import numbers
+import warnings
 from collections import Counter
 from collections.abc import Iterable
 from typing import Any
@@ -18,7 +19,8 @@ import networkx as nx
 
 from pycellin.classes import CellLineage, Model
 from pycellin.custom_types import PropertyType, _property_type_from_string
-from pycellin.exceptions import UpdateRequiredError
+from pycellin.exceptions import PycellinWarning, UpdateRequiredError
+from pycellin.utils import _find_stack_level
 
 logger = logging.getLogger(__name__)
 
@@ -376,12 +378,16 @@ def _remove_orphaned_metadata(model: Model) -> None:
     model : Model
         The Pycellin model to update.
 
+    Warns
+    -----
+    PycellinWarning
+        If some of the cell and link properties removed have values on the cycle
+        lineages, since an export leaves these values out.
+
     Notes
     -----
-    A warning is logged if some of the cell and link properties removed have values
-    on the cycle lineages, since an export leaves these values out. Properties
-    without any value only get an info message, as nothing is lost, and lineage
-    properties no message, as they are not exported anyway.
+    Properties without any value only get an info message, as nothing is lost, and
+    lineage properties no message, as they are not exported anyway.
     """
     node_props_md = model.props_metadata._get_prop_dict_from_prop_type(
         PropertyType.NODE
@@ -408,7 +414,11 @@ def _remove_orphaned_metadata(model: Model) -> None:
         | (cycle_edge_props & set(orphaned_edge_props))
     )
     if not_exported:
-        logger.warning(_get_cycle_props_message(not_exported), stacklevel=2)
+        warnings.warn(
+            _get_cycle_props_message(not_exported),
+            PycellinWarning,
+            stacklevel=_find_stack_level(),
+        )
     for location, orphaned_props, cycle_props in (
         ("cells", orphaned_node_props, cycle_node_props),
         ("links", orphaned_edge_props, cycle_edge_props),

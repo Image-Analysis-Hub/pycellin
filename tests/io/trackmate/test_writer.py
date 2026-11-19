@@ -11,7 +11,7 @@ import pytest
 from lxml import etree as ET
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
-from pycellin.exceptions import UpdateRequiredError
+from pycellin.exceptions import PycellinWarning, UpdateRequiredError
 from pycellin.io.trackmate.reader import read_trackmate_xml
 from pycellin.io.trackmate.writer import (
     _relabel_nodes,
@@ -609,9 +609,13 @@ class TestWriteTrackmateXml:
     ):
         """Test that cycle properties can be computed again on the reloaded model."""
         xml_path = tmp_path / "model.xml"
-        write_trackmate_xml(
-            model_with_cycle_lineages, xml_path, space_unit="pixel", time_unit="frame"
-        )
+        with pytest.warns(PycellinWarning, match="Cycle properties are not exported"):
+            write_trackmate_xml(
+                model_with_cycle_lineages,
+                xml_path,
+                space_unit="pixel",
+                time_unit="frame",
+            )
         model = read_trackmate_xml(xml_path)
 
         model.add_cycle_lineages()
@@ -658,7 +662,10 @@ class TestWriteTrackmateXml:
         """Test that a warning names the cycle properties left out and how to export
         them, and that the non-numeric ones are not named as unsupported."""
         xml_path = tmp_path / "model.xml"
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"):
+        with (
+            caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"),
+            pytest.warns(PycellinWarning) as warned,
+        ):
             write_trackmate_xml(
                 model_with_cycle_lineages,
                 xml_path,
@@ -666,15 +673,14 @@ class TestWriteTrackmateXml:
                 time_unit="frame",
             )
 
-        messages = [record.message for record in caplog.records]
         warning = (
             "Cycle properties are not exported: cells, cycle_duration, "
             "cycle_end_time, cycle_id, cycle_num_cells, cycle_start_time, first_cell, "
             "generation, last_cell, mother_cycle. Use propagate_cycle_props=True to "
             "write them on the cells."
         )
-        assert warning in messages
-        assert not any("not numeric" in message for message in messages)
+        assert warning in [str(w.message) for w in warned]
+        assert not any("not numeric" in record.message for record in caplog.records)
 
     def test_propagated_cycle_props_not_named_as_left_out(
         self, tmp_path, model_with_cycle_lineages, caplog
@@ -863,7 +869,7 @@ class TestWriteTrackmateXml:
         lin = read_trackmate_xml(xml_path).data.cell_lineages[0]
         assert dict(lin.nodes(data="cell_name")) == {1: "ID1", 2: "ID2"}
 
-    def test_undeclared_attributes_not_exported(self, tmp_path, simple_model, caplog):
+    def test_undeclared_attributes_not_exported(self, tmp_path, simple_model):
         """Test that attributes without a property declaration are not exported,
         with a warning naming them, so that TrackMate can read the file."""
         lin = simple_model.data.cell_lineages[0]
@@ -873,7 +879,7 @@ class TestWriteTrackmateXml:
         lin.graph["lineage_note"] = 2
         xml_path = tmp_path / "model.xml"
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"):
+        with pytest.warns(PycellinWarning) as warned:
             write_trackmate_xml(
                 simple_model, xml_path, space_unit="pixel", time_unit="frame"
             )
@@ -886,7 +892,9 @@ class TestWriteTrackmateXml:
         ):
             assert all(key not in element.attrib for element in tree.iter(tag))
         messages = [
-            r.message for r in caplog.records if "no property declaration" in r.message
+            str(w.message)
+            for w in warned
+            if "no property declaration" in str(w.message)
         ]
         assert len(messages) == 1
         assert "'note' (cells)" in messages[0]
@@ -1009,7 +1017,7 @@ class TestWriteTrackmateXml:
             )
 
     def test_cells_without_coordinates_named_by_their_id_in_the_model(
-        self, tmp_path, model_non_unique_ids, caplog
+        self, tmp_path, model_non_unique_ids
     ):
         """Test that the warning about cells without coordinates names them by their
         ID in the model, although the export relabels them since IDs repeat."""
@@ -1017,7 +1025,7 @@ class TestWriteTrackmateXml:
         for cell_id in (3, 6):
             del model_non_unique_ids.data.cell_lineages[1].nodes[cell_id]["cell_x"]
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"):
+        with pytest.warns(PycellinWarning) as warned:
             write_trackmate_xml(
                 model_non_unique_ids,
                 tmp_path / "model.xml",
@@ -1025,7 +1033,7 @@ class TestWriteTrackmateXml:
                 time_unit="frame",
             )
 
-        messages = [r.message for r in caplog.records if "coordinates" in r.message]
+        messages = [str(w.message) for w in warned if "coordinates" in str(w.message)]
         expected = (
             "Missing mandatory x and/or y coordinates, defaulting to 0.0 for:\n"
             "  lineage 0: cell 2\n"
@@ -1059,16 +1067,18 @@ class TestWriteTrackmateXmlUnits:
         assert self._read_units(xml_path) == ("pixel", "sec")
 
     def test_model_without_units_written_in_pixels_and_frames(
-        self, tmp_path, simple_model, caplog, monkeypatch
+        self, tmp_path, simple_model, monkeypatch
     ):
         """Test that a model without units is written in pixels and frames, with a
         warning for each unit, without asking for them."""
         monkeypatch.setattr("builtins.input", lambda *args: pytest.fail("input()"))
         xml_path = tmp_path / "model.xml"
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"):
+        with pytest.warns(PycellinWarning) as warned:
             write_trackmate_xml(simple_model, xml_path)
         assert self._read_units(xml_path) == ("pixel", "frame")
-        messages = [record.message for record in caplog.records]
+        # The warnings show the line of the caller, not a line of Pycellin.
+        assert all(Path(w.filename).samefile(__file__) for w in warned)
+        messages = [str(w.message) for w in warned]
         assert any("no space unit" in m and "`space_unit`" in m for m in messages)
         assert any("no time unit" in m and "`time_unit`" in m for m in messages)
 

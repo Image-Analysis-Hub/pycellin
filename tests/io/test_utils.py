@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
-from pycellin.exceptions import UpdateRequiredError
+from pycellin.exceptions import PycellinWarning, UpdateRequiredError
 from pycellin.io.utils import (
     _add_lineage_props,
     _check_up_to_date,
@@ -639,15 +639,18 @@ class TestRemoveOrphanedMetadata:
         cycle_lineage.nodes[0]["cycle_node_prop"] = 1.0
         model.data.cycle_lineages = {0: cycle_lineage}
 
-        with caplog.at_level(logging.INFO, logger="pycellin.io.utils"):
+        with (
+            caplog.at_level(logging.INFO, logger="pycellin.io.utils"),
+            pytest.warns(PycellinWarning) as warned,
+        ):
             _remove_orphaned_metadata(model)
 
         warning = (
             "Cycle properties are not exported: cycle_edge_prop, cycle_node_prop. "
             "Use propagate_cycle_props=True to write them on the cells."
         )
+        assert [str(w.message) for w in warned] == [warning]
         assert [(record.levelname, record.message) for record in caplog.records] == [
-            ("WARNING", warning),
             ("INFO", "Ignoring property without any value on cells: empty_node_prop."),
             ("INFO", "Ignoring property without any value on links: empty_edge_prop."),
         ]

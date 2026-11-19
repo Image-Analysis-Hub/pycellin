@@ -10,7 +10,7 @@ from geff.validate.data import ValidationConfig
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
 from pycellin.custom_types import PropertyType
-from pycellin.exceptions import UpdateRequiredError
+from pycellin.exceptions import PycellinWarning, UpdateRequiredError
 from pycellin.io.geff.reader import read_geff
 from pycellin.io.geff.writer import (
     _add_tracklet_ids,
@@ -555,25 +555,25 @@ class TestGetDefaultSpaceAxes:
         """Without cell_y, no space axis is exported."""
         assert _get_default_space_axes(simple_model) == []
 
-    def test_missing_z_value(self, model_with_xyz, caplog):
+    def test_missing_z_value(self, model_with_xyz):
         """A cell without cell_z drops the z axis, with a warning."""
         del model_with_xyz.data.cell_lineages[0].nodes[1]["cell_z"]
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
+        with pytest.warns(PycellinWarning) as warned:
             space_axes = _get_default_space_axes(model_with_xyz)
         assert space_axes == ["cell_x", "cell_y"]
-        assert len(caplog.records) == 1
-        assert "'cell_z' (1)" in caplog.records[0].message
-        assert "no z axis" in caplog.records[0].message
+        assert len(warned) == 1
+        assert "'cell_z' (1)" in str(warned[0].message)
+        assert "no z axis" in str(warned[0].message)
 
-    def test_missing_y_value(self, model_with_xyz, caplog):
+    def test_missing_y_value(self, model_with_xyz):
         """A cell without cell_y drops all the space axes, with a warning."""
         del model_with_xyz.data.cell_lineages[0].nodes[1]["cell_y"]
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.writer"):
+        with pytest.warns(PycellinWarning) as warned:
             space_axes = _get_default_space_axes(model_with_xyz)
         assert space_axes == []
-        assert len(caplog.records) == 1
-        assert "'cell_y' (1)" in caplog.records[0].message
-        assert "no space axes" in caplog.records[0].message
+        assert len(warned) == 1
+        assert "'cell_y' (1)" in str(warned[0].message)
+        assert "no space axes" in str(warned[0].message)
 
 
 class TestBuildAxes:
@@ -1126,17 +1126,16 @@ class TestWriteGeff:
         # The original model is not modified.
         assert "daughter_ids" in simple_model.get_properties()
 
-    def test_cycle_props_left_out_by_default(self, caplog, simple_model, tmp_path):
+    def test_cycle_props_left_out_by_default(self, simple_model, tmp_path):
         """Test that cycle properties are left out by default, with a warning."""
         geff_out = str(tmp_path / "test.geff")
         simple_model.add_cycle_lineages()
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
+        with pytest.warns(PycellinWarning, match="propagate_cycle_props=True"):
             write_geff(simple_model, geff_out)
 
         _, metadata = geff.read(geff_out)
         assert "cycle_id" not in metadata.node_props_metadata
-        assert "propagate_cycle_props=True" in caplog.text
 
     def test_propagate_cycle_props(self, caplog, simple_model, tmp_path):
         """Test that cycle properties are written on the cells of the file, without
@@ -1252,7 +1251,9 @@ class TestWriteGeff:
         simple_model.add_cycle_lineages()
         simple_model.propagate_cycle_properties(["cycle_id"])
         geff_out = str(tmp_path / "test.geff")
-        write_geff(simple_model, geff_out)
+        # Only cycle_id is propagated: the other cycle properties are left out.
+        with pytest.warns(PycellinWarning, match="Cycle properties are not exported"):
+            write_geff(simple_model, geff_out)
 
         _, metadata = geff.read(geff_out)
         assert "tracklet" not in metadata.track_node_props

@@ -3,6 +3,7 @@
 """Unit tests for Model class from model.py module."""
 
 import copy
+import logging
 import pickle
 import warnings
 from pathlib import Path
@@ -932,8 +933,7 @@ class TestRescaleTime:
         frame_time_model.add_absolute_age()
         with pytest.warns(UserWarning, match="added before the rescaling"):
             frame_time_model.rescale_time(5, time_unit="min")
-        with pytest.warns(UserWarning, match="Overwriting the old Property"):
-            frame_time_model.add_absolute_age()
+        frame_time_model.add_absolute_age()
         assert frame_time_model.get_property("absolute_age").unit == "min"
 
 
@@ -1369,10 +1369,15 @@ class TestAddCustomProperty:
             two_lineages_model.add_custom_property(ConstantValue(prop, 2.0))
         assert two_lineages_model.get_property("edge_value") is None
 
-    def test_readding_replaces_declaration(self, two_times_model):
+    def test_readding_replaces_declaration(self, two_times_model, caplog):
         two_times_model.add_absolute_age()
-        with pytest.warns(UserWarning, match="Overwriting the old Property"):
+        with (
+            caplog.at_level(logging.INFO, logger="pycellin.classes.props_metadata"),
+            warnings.catch_warnings(),
+        ):
+            warnings.simplefilter("error")
             two_times_model.add_absolute_age(time_prop="frame")
+        assert "Overwriting the old Property" in caplog.text
         prop = two_times_model.get_property("absolute_age")
         assert (prop.dtype, prop.unit) == ("int", "frame")
 
@@ -1399,8 +1404,7 @@ class TestAddCustomProperty:
     def test_readding_propagated_prop_keeps_it_propagated(self, input_props_model):
         input_props_model.add_mother_cycle()
         input_props_model.propagate_cycle_properties(["mother_cycle"])
-        with pytest.warns(UserWarning, match="Overwriting the old Property"):
-            input_props_model.add_mother_cycle()
+        input_props_model.add_mother_cycle()
         assert input_props_model.get_property("mother_cycle").lineage_type == "cycle"
         assert "mother_cycle" in input_props_model.get_propagated_properties()
 
@@ -1583,8 +1587,7 @@ class TestUpdate:
         input_props_model.add_custom_property(InputCopy(copy_prop, "my_area"))
         input_props_model.update()
         area_prop = _create_test_property("my_area", "node", unit="um^2")
-        with pytest.warns(UserWarning, match="Overwriting the old Property"):
-            input_props_model.add_custom_property(ConstantValue(area_prop, 10.0))
+        input_props_model.add_custom_property(ConstantValue(area_prop, 10.0))
         input_props_model.update()
         lin = input_props_model.data.cell_lineages[1]
         assert set(dict(lin.nodes(data="area_copy")).values()) == {10.0}
@@ -1596,8 +1599,7 @@ class TestUpdate:
         input_props_model.add_custom_property(DoubledAreaCopy(doubled_prop))
         input_props_model.update()
         area_prop = _create_test_property("my_area", "node", unit="um^2")
-        with pytest.warns(UserWarning, match="Overwriting the old Property"):
-            input_props_model.add_custom_property(ConstantValue(area_prop, 10.0))
+        input_props_model.add_custom_property(ConstantValue(area_prop, 10.0))
         input_props_model.update()
         lin = input_props_model.data.cell_lineages[1]
         assert set(dict(lin.nodes(data="doubled_area")).values()) == {20.0}
@@ -2418,6 +2420,14 @@ class TestAddRodProperties:
         contour_model.model_metadata.pixel_height = 2.0
         with pytest.raises(ValueError, match="isotropic"):
             getattr(contour_model, method)()
+
+    @pytest.mark.parametrize("method", ["add_rod_length", "add_rod_width"])
+    def test_unknown_width_method_raises(self, contour_model, method):
+        """An unknown width method is refused when adding the property, before the
+        update, which failed with UnboundLocalError."""
+        with pytest.raises(ValueError, match="Unknown width method 'average'"):
+            getattr(contour_model, method)(width_method="average")
+        assert not contour_model.has_property(method.removeprefix("add_"))
 
     @pytest.mark.parametrize("method", ["add_rod_length", "add_rod_width"])
     def test_missing_contour_prop_raises(self, input_props_model, method):

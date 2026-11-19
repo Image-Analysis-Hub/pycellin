@@ -11,6 +11,7 @@ References
 
 import copy
 import logging
+import warnings
 from pathlib import Path
 from typing import Literal
 
@@ -20,9 +21,9 @@ import networkx as nx
 
 from pycellin.classes import CellLineage, Model, Property
 from pycellin.custom_types import PropertyType
-from pycellin.exceptions import ProtectedPropertyError
+from pycellin.exceptions import ProtectedPropertyError, PycellinWarning
 from pycellin.io.utils import _check_up_to_date, _remove_orphaned_metadata
-from pycellin.utils import _normalize_dtype
+from pycellin.utils import _find_stack_level, _normalize_dtype
 
 logger = logging.getLogger(__name__)
 
@@ -361,10 +362,11 @@ def _get_default_space_axes(model: Model) -> list[str]:
     list[str]
         The coordinate properties, in x, y, z order.
 
-    Notes
+    Warns
     -----
-    A warning is logged if ``cell_x``, ``cell_y`` or ``cell_z`` is declared but some
-    cells have no value for it, so that it can't be exported as an axis.
+    PycellinWarning
+        If ``cell_x``, ``cell_y`` or ``cell_z`` is declared but some cells have no
+        value for it, so that it can't be exported as an axis.
     """
     node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
     if "cell_x" not in node_props or "cell_y" not in node_props:
@@ -389,10 +391,12 @@ def _get_default_space_axes(model: Model) -> list[str]:
     else:
         space_axes = ["cell_x", "cell_y"]
         consequence = "the GEFF file has no z axis"
-    logger.warning(
+    warnings.warn(
         f"Some cells have no value for {counts_str}, so {consequence}: GEFF axes "
         "can't have missing values. Give these cells coordinates, or choose other "
-        "properties with space_axes."
+        "properties with space_axes.",
+        PycellinWarning,
+        stacklevel=_find_stack_level(),
     )
     return space_axes
 
@@ -775,6 +779,13 @@ def write_geff(
     RuntimeError
         If geff fails to write the file.
 
+    Warns
+    -----
+    PycellinWarning
+        If cycle properties are left out, see `propagate_cycle_props`.
+        If some cells have no value for ``cell_x``, ``cell_y`` or ``cell_z``, so that
+        it can't be written as a space axis.
+
     Warnings
     --------
     Quantitative analysis of cell cycle properties should not be done on cell
@@ -812,6 +823,11 @@ def write_geff(
     pixel size is None is written as it is. The other properties, such as areas or
     speeds, keep their units. Converting the coordinates into pixels and back can
     change the last digit of some values.
+
+    The messages about what the GEFF format can't store, e.g. properties left out
+    for their data type, are logged with the `logging` module, while the problems
+    that the arguments or the model can avoid are issued as
+    `~pycellin.exceptions.PycellinWarning`.
     """
     _check_up_to_date(model)
     if not model.data.cell_lineages:

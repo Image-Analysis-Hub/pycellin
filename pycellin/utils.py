@@ -2,12 +2,47 @@
 
 """Helpers shared by Pycellin's modules: type checks, colors, data types and units."""
 
+import inspect
 import numbers
 import re
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any, Literal, get_args, get_origin
 
 from plotly.colors import hex_to_rgb, unlabel_rgb
+
+# Folder of the Pycellin package, to tell its frames from the user's.
+_PACKAGE_DIR = Path(__file__).parent
+
+
+def _find_stack_level() -> int:
+    """
+    Return the stack level that points a warning at the first frame outside Pycellin.
+
+    Given as the `stacklevel` of `warnings.warn`, it makes the warning show the line
+    of the user's code that led to it, whatever the depth of Pycellin's calls in
+    between.
+
+    Returns
+    -------
+    int
+        Number of frames from this function to the first one outside the Pycellin
+        package.
+    """
+    frame = inspect.currentframe()
+    level = 0
+    try:
+        # Comparing paths, not strings: Windows paths compare case-insensitively, and
+        # pseudo-files such as "<string>" never match, whatever the working directory.
+        while frame is not None and Path(frame.f_code.co_filename).is_relative_to(
+            _PACKAGE_DIR
+        ):
+            frame = frame.f_back
+            level += 1
+    finally:
+        # Frames hold references to their variables: break the cycle.
+        del frame
+    return level
 
 
 def _check_literal_type(value: Any, literal_type: Any) -> bool:

@@ -20,6 +20,7 @@ from pycellin.exceptions import (
     FusionError,
     LineageStructureError,
     MissingPropertyError,
+    PycellinWarning,
     TimeFlowError,
 )
 from pycellin.styling import (
@@ -28,7 +29,7 @@ from pycellin.styling import (
     BRANCH_PROFILE_NODE_MARKER,
     PYCELLIN_PURPLE,
 )
-from pycellin.utils import _check_integer
+from pycellin.utils import _check_integer, _find_stack_level
 
 #: Color of the nodes whose value is not in a discrete color map.
 _DEFAULT_UNMAPPED_COLOR = "dimgrey"
@@ -877,7 +878,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the dict of the discrete mode doesn't cover all the values of
             `node_colormap_prop`: the nodes with other values are drawn in
             ``"dimgrey"``.
@@ -900,7 +901,8 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
                     f"Color map for property '{node_colormap_prop}' does not cover "
                     f"value(s) {sorted(unmapped, key=str)}; using "
                     f"'{_DEFAULT_UNMAPPED_COLOR}' for those nodes.",
-                    stacklevel=2,
+                    PycellinWarning,
+                    stacklevel=_find_stack_level(),
                 )
             return {"color": colors}
 
@@ -1163,7 +1165,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If `node_colormap` is a dict that doesn't cover all the values of
             `node_colormap_prop`: the nodes with other values are drawn in
             ``"dimgrey"``.
@@ -1405,7 +1407,7 @@ class Lineage(nx.DiGraph, metaclass=ABCMeta):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If `node_colormap` is a dict that doesn't cover all the values of
             `node_colormap_prop`: the nodes with other values are drawn in
             ``"dimgrey"``.
@@ -1847,7 +1849,7 @@ class CellLineage(Lineage):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the ``timepoint`` property is missing when ordering the cells.
         """
         try:
@@ -1860,7 +1862,9 @@ class CellLineage(Lineage):
             except KeyError:
                 warnings.warn(
                     "No 'timepoint' property to order the cells. "
-                    "Returning ancestors in arbitrary order."
+                    "Returning ancestors in arbitrary order.",
+                    PycellinWarning,
+                    stacklevel=_find_stack_level(),
                 )
         return ancestors
 
@@ -1909,7 +1913,7 @@ class CellLineage(Lineage):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the ``timepoint`` property is missing when ordering the cells.
         """
         if generations is not None and source_cell is not None:
@@ -2021,7 +2025,7 @@ class CellLineage(Lineage):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the ``timepoint`` property is missing when ordering the cells.
         """
         is_single_target, target_cids, source_cids = (
@@ -2621,7 +2625,7 @@ class CellLineage(Lineage):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If `node_colormap` is a dict that doesn't cover all the values of
             `node_colormap_prop`, or all the highlight groups: the nodes with other
             values are drawn in ``"dimgrey"``.
@@ -2819,7 +2823,7 @@ class CellLineage(Lineage):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If `node_colormap` is a dict that doesn't cover all the values of
             `node_colormap_prop`, or all the highlight groups: the nodes with other
             values are drawn in ``"dimgrey"``.
@@ -2993,7 +2997,7 @@ class CellLineage(Lineage):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the ``timepoint`` property is missing when ordering the cells.
 
         See Also
@@ -3316,7 +3320,7 @@ class CellLineage(Lineage):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the ``timepoint`` property is missing when ordering the cells.
 
         See Also
@@ -3614,7 +3618,7 @@ class CycleLineage(Lineage):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If there is no ``generation`` property to order the cell cycles.
         """
         try:
@@ -3625,7 +3629,11 @@ class CycleLineage(Lineage):
             try:
                 ancestors.sort(key=lambda n: self.nodes[n]["generation"])
             except KeyError:
-                warnings.warn("No 'generation' property to order the cell cycles.")
+                warnings.warn(
+                    "No 'generation' property to order the cell cycles.",
+                    PycellinWarning,
+                    stacklevel=_find_stack_level(),
+                )
         return ancestors
 
     def get_links_within_cycle(self, cycle_id: int) -> list[tuple[int, int]]:
@@ -3749,7 +3757,7 @@ class CycleLineage(Lineage):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If `node_colormap` is a dict that doesn't cover all the values of
             `node_colormap_prop`: the nodes with other values are drawn in
             ``"dimgrey"``.
@@ -3873,7 +3881,7 @@ class CycleLineage(Lineage):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If `node_colormap` is a dict that doesn't cover all the values of
             `node_colormap_prop`: the nodes with other values are drawn in
             ``"dimgrey"``.

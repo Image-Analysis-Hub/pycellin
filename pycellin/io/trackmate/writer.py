@@ -13,6 +13,7 @@ import logging
 import math
 import numbers
 import re
+import warnings
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -25,7 +26,7 @@ from pycellin.classes.model import Model
 from pycellin.classes.property import Property
 from pycellin.classes.props_metadata import PropsMetadata
 from pycellin.custom_types import PropertyType
-from pycellin.exceptions import ProtectedPropertyError
+from pycellin.exceptions import ProtectedPropertyError, PycellinWarning
 from pycellin.io.utils import (
     _check_up_to_date,
     _get_cycle_props_message,
@@ -34,7 +35,7 @@ from pycellin.io.utils import (
     _relabel_nodes_in_place,
     _update_node_prop_key,
 )
-from pycellin.utils import _is_numeric_dtype, _normalize_dtype
+from pycellin.utils import _find_stack_level, _is_numeric_dtype, _normalize_dtype
 
 logger = logging.getLogger(__name__)
 
@@ -492,10 +493,10 @@ def _get_exported_keys(model: Model) -> dict[str, set[str]]:
         The keys of the attributes to write, by property type (``"node"``,
         ``"edge"`` and ``"lineage"``).
 
-    Notes
+    Warns
     -----
-    A warning is logged if some attributes have no property declaration, and so are
-    not exported.
+    PycellinWarning
+        If some attributes have no property declaration, and so are not exported.
     """
     exported_keys = {
         "node": {"ID", "name"},
@@ -538,9 +539,11 @@ def _get_exported_keys(model: Model) -> dict[str, set[str]]:
         for key in sorted(keys)
     )
     if ignored_str:
-        logger.warning(
+        warnings.warn(
             f"Not exporting attributes that have no property declaration: "
-            f"{ignored_str}."
+            f"{ignored_str}.",
+            PycellinWarning,
+            stacklevel=_find_stack_level(),
         )
     return exported_keys
 
@@ -922,12 +925,14 @@ def _update_model_data(
         Mapping of the old node IDs to the new ones for each lineage, as returned by
         ``_relabel_nodes()``, if the nodes were relabeled.
 
+    Warns
+    -----
+    PycellinWarning
+        If some cells are missing x and/or y coordinates, in which case they are set
+        to 0.0. It names the cells by their ID in the model, i.e. before relabeling.
+
     Notes
     -----
-    A warning is logged if some cells are missing x and/or y coordinates, in which
-    case they are set to 0.0 by default. It names the cells by their ID in the
-    model, i.e. before relabeling.
-
     Spots without ``POSITION_T`` or ``QUALITY`` get one, as TrackMate needs them,
     and a message at the info level says how many.
     """
@@ -978,7 +983,7 @@ def _update_model_data(
             "Missing mandatory x and/or y coordinates, defaulting to 0.0 for:\n"
             + "\n".join(msg_parts)
         )
-        logger.warning(msg)
+        warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
 
 
 def _warn_cycle_props_left_out(model: Model) -> None:
@@ -995,10 +1000,10 @@ def _warn_cycle_props_left_out(model: Model) -> None:
     model : Model
         Model to export, after the propagation of cycle properties, if any.
 
-    Notes
+    Warns
     -----
-    The warning is logged if some cell or link properties have values on cycle
-    lineages only.
+    PycellinWarning
+        If some cell or link properties have values on cycle lineages only.
     """
     if not model.data.cycle_lineages:
         return
@@ -1019,7 +1024,11 @@ def _warn_cycle_props_left_out(model: Model) -> None:
         | ((edge_props_md & cycle_edge_props) - cell_edge_props)
     )
     if left_out:
-        logger.warning(_get_cycle_props_message(left_out))
+        warnings.warn(
+            _get_cycle_props_message(left_out),
+            PycellinWarning,
+            stacklevel=_find_stack_level(),
+        )
 
 
 def _remove_non_numeric_props(model: Model) -> None:
@@ -1686,14 +1695,21 @@ def _get_trackmate_unit(
     -------
     str
         The unit to write.
+
+    Warns
+    -----
+    PycellinWarning
+        If neither `unit` nor `model_unit` is given, so that `default` is written.
     """
     if unit is not None:
         return unit
     if model_unit:
         return model_unit
-    logger.warning(
+    warnings.warn(
         f"The model has no {dimension} unit: writing '{default}' as the TrackMate "
-        f"{dimension} unit. Give `{dimension}_unit` to choose it."
+        f"{dimension} unit. Give `{dimension}_unit` to choose it.",
+        PycellinWarning,
+        stacklevel=_find_stack_level(),
     )
     return default
 
@@ -1762,6 +1778,16 @@ def write_trackmate_xml(
         it).
         If only some cells have a frame and their frames can't be deduced, see Notes.
 
+    Warns
+    -----
+    PycellinWarning
+        If the model has no space or time unit and none is given, see `space_unit`
+        and `time_unit`.
+        If cycle properties are left out, see `propagate_cycle_props`.
+        If some cells have no ``cell_x`` or ``cell_y`` value: they are written at 0.
+        If cells, links or lineages have attributes without a property declaration:
+        these attributes are not exported.
+
     Warnings
     --------
     Quantitative analysis of cell cycle properties should not be done on cell
@@ -1808,6 +1834,11 @@ def write_trackmate_xml(
     `read_ctc` or `from_trackpy`, get the time of their frame, ``FRAME`` times the
     time interval of the file, and a quality of -1, as TrackMate gives spots added by
     hand.
+
+    The messages about what TrackMate can't store, e.g. properties left out because
+    they are not numeric, are logged with the `logging` module, while the problems
+    that the arguments or the model can avoid are issued as
+    `~pycellin.exceptions.PycellinWarning`.
     """
     _check_up_to_date(model)
     # We don't want to modify the original model.

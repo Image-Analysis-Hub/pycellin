@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Planned v0.6.0. Covers commits up to d3141b7, plus the uncommitted POSITION_T and QUALITY in the TrackMate writer, and texts of cycle_duration and interdivision_time. Update from there with: git log d3141b7..dev -->
+<!-- Planned v0.6.0. Covers commits up to b86459b, plus the uncommitted warnings pass: PycellinWarning, warnings pointing at the caller, warnings and log messages sorted, rod messages and width method. Update from there with: git log b86459b..dev -->
 
 Model merging and splitting, many new properties (morphology, intensity, topology), branch plots, consistent names that follow PEP 8, and many fixes, notably to time handling and to reading and writing TrackMate, GEFF, CTC and trackpy data. **This release contains breaking changes**, listed first below.
 
@@ -143,6 +143,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Properties:** `uses_external_data()` class method on calculators, true for those that read data the model doesn't store, such as a label, intensity or mask image. `merge()` doesn't keep these calculators
 - **Properties:** the calculator classes take the type of the lineages they are computed on as type parameter, for type checkers, e.g. `NodeLocalPropCalculator[CellLineage]` for a calculator whose `compute()` takes a `CellLineage`
 - **Packaging:** `pc.__version__` gives the installed version of Pycellin
+- **Exceptions:** `PycellinWarning` (a `UserWarning`), the category of Pycellin's warnings, to filter them all at once, e.g. `warnings.filterwarnings("ignore", category=pc.exceptions.PycellinWarning)`
 - **Exceptions:** `MissingPropertyError` (a `KeyError`), raised when a property that Pycellin needs is missing from the model or from a cell, e.g. when adding a property computed from one not declared yet, or plotting a property that some cells lack
 - **Lineages:** `Lineage.get_depth()`, `Lineage.get_roots()`, `CellLineage.get_gaps()` and `CellLineage.get_duration()`
 - **Lineages:** `get_cousins()` on cell and cycle lineages: first cousins (same grandmother, different mother) by default, more distant ones with `degree`, or all of them with `degree=None`. In cell lineages, only the cousin cells at the same timepoint are returned
@@ -166,6 +167,11 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 
 ### Changed
 
+- **Warnings:** Pycellin issues a warning, of the new `PycellinWarning` category, when your code can avoid the problem, e.g. with another argument, and logs a message with the `logging` module when it can't, e.g. about the content of a file. Therefore:
+  - these log messages are now warnings: `read_geff()` given a `reference_time_prop`, `lineage_id_prop`, `cell_id_prop` or coordinate property that it can't use; `write_geff()` and `write_trackmate_xml()` leaving out cycle properties, or writing cells without coordinates; `write_trackmate_xml()` writing a default unit, or leaving out attributes without a property declaration
+  - these warnings are now info messages: `update()` on a model already up to date, and a property added again with the same property type, e.g. to update its unit after a rescaling. With another property type, it is still a warning
+  - `read_geff()` reports at the info level the files without cell or lineage identifiers, or without coordinates, which are common among the files of other tools
+  - without a logging configuration, only the log messages of the warning level and above are shown: `logging.basicConfig(level=logging.INFO)` shows the info messages too
 - **Model:** the core properties `cell_id`, `lineage_id` and `timepoint`, and the reference time property, are now protected in every model. Models read from GEFF files or built from scratch didn't protect all of them, so `remove_property()` could remove them
 - **Model:** the warning about cell fusions when loading a file says how to list and correct them, with `get_fusions()` and `remove_link()`, instead of pointing to a documentation that doesn't exist yet
 - **Model:** `add_cycle_lineages()`, `add_lineage()` with `with_cycle_lineage=True` and `merge()` no longer require the time step of the model, which building cycle lineages doesn't use. Without it, they raised `ValueError`, or for `add_lineage()` warned and skipped the cycle lineage. The `ValueError` of `update()` without a time step no longer says cycle lineages need it
@@ -186,6 +192,7 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 
 ### Fixed
 
+- **Warnings:** most warnings showed the line of Pycellin's code that issued them, e.g. with the path of the installation in notebook outputs. They now show the line of your code that led to them
 - **Model:** changing the time step with `set_time_step()` corrupted the `timepoint` values
 - **Model:** after `set_reference_time_prop()` (`set_reference_time_property()` in 0.5.1), `cycle_duration` kept the unit of the previous reference time property, although its values are computed from the new one
 - **Model:** `add_lineage()` failed with `with_cycle_lineage=True` (`with_CycleLineage` in 0.5.1) or with a lineage that had no lineage ID, and ignored its `lineage_id` argument (`lid` in 0.5.1) when given a lineage. Given a lineage that has another ID, `lineage_id` now raises `ValueError`, unless `overwrite_lineage_id=True`
@@ -226,6 +233,8 @@ Model merging and splitting, many new properties (morphology, intensity, topolog
 - **Properties:** `cell_displacement`, `cell_speed`, `turning_angle` (`angle` in 0.5.1) and `straightness` could be added to a model without cell coordinates, e.g. read from a CTC file without label images, and `update()` then failed with `KeyError: 'cell_x'`: the model couldn't be updated or exported until they were removed. They now raise `MissingPropertyError` when added, as does `location_tag`. A cell without coordinates, e.g. added with `add_cell()`, gave the same `KeyError` at update: the `MissingPropertyError` raised now names the cell, its lineage and the property
 - **Properties:** `rod_length` and `rod_width` could be added to a model without cell contours, e.g. read from a CTC file without label images, and `update()` then failed with `KeyError: 'cell_contour'` (`'ROI_coords'` in 0.5.1): the model couldn't be updated or exported until they were removed. They now raise `MissingPropertyError` when added. Their calculators, `RodLength` and `RodWidth`, take the identifier of the contour property as `contour_prop`
 - **Properties:** `add_rod_length()` and `add_rod_width()` checked that pixels are isotropic in x and y with an `assert`, which Python skips when run with `-O`: the rods were then measured with the pixel width on both axes. They also failed with `KeyError` when the pixel width or height wasn't defined but another pixel size was. They now read the pixel size as the other methods do, and raise `ValueError` when pixels aren't isotropic
+- **Properties:** `rod_length` and `rod_width` printed a message to the standard output for each round cell at every update, and called the skeletons without tips one-pixel skeletons. These cells, which get NaN, are now named in info messages of the `logging` module
+- **Properties:** with an unknown `width_method` (`method_width` in 0.5.1), `add_rod_length()` and `add_rod_width()` were accepted, then the update printed a message for each cell and failed with `UnboundLocalError`. They now raise `ValueError`
 - **Properties:** `Property()` raised `KeyError` on an unknown property type, e.g. `prop_type="nodes"`. It now raises the `ValueError` it raises for other invalid property types, which lists the valid ones and now also gives the value received
 - **Properties:** `PropsMetadata()` drops the protected properties that aren't declared, with a warning, but missed every other one of them in a row, e.g. the second one in `protected_props=["a", "b"]`, which stayed protected. It also removed the ones it dropped from the list given as `protected_props`
 - **Properties:** `Property.is_equal()` returned `NotImplemented`, which counts as true in a condition, when the other object wasn't a `Property`, and didn't compare the names with `ignore_prop_type=True`. It now returns False in the first case, and compares the names

@@ -3,11 +3,13 @@
 """The `PropsMetadata` class: the declarations of the properties of a model."""
 
 import copy
+import logging
 import warnings
 from typing import Any, get_args
 
 from pycellin.classes.property import Property
 from pycellin.custom_types import LineageType, PropertyType, _property_type_from_string
+from pycellin.exceptions import PycellinWarning
 from pycellin.properties.core import (
     create_cells_property,
     create_cycle_duration_property,
@@ -19,7 +21,9 @@ from pycellin.properties.core import (
     create_generation_property,
     create_last_cell_property,
 )
-from pycellin.utils import _check_literal_type
+from pycellin.utils import _check_literal_type, _find_stack_level
+
+logger = logging.getLogger(__name__)
 
 
 class PropsMetadata:
@@ -67,7 +71,7 @@ class PropsMetadata:
                     f"Protected property '{prop}' does not exist in the declared "
                     "properties. Removing it from the list of protected properties."
                 )
-                warnings.warn(msg)
+                warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
         self._propagated_props = list(propagated_props or [])
 
     def __deepcopy__(self, memo: dict[int, Any]) -> "PropsMetadata":
@@ -330,37 +334,42 @@ class PropsMetadata:
         overwrite : bool, default=False
             Whether to overwrite an existing property with the same identifier.
             If False, existing properties will not be overwritten but a
-            warning will be issued. If True, existing properties will be overwritten,
-            with a warning too.
+            warning will be issued. If True, existing properties will be overwritten.
 
         Warns
         -----
-        UserWarning
-            If a property with the same identifier already exists and `overwrite` is
-            True: the existing property is overwritten.
+        PycellinWarning
+            If a property with the same identifier but another property type already
+            exists and `overwrite` is True: the existing property is overwritten.
             If a property with the same identifier already exists and `overwrite` is
             False: the existing property is NOT overwritten.
+
+        Notes
+        -----
+        Overwriting a property of the same type, e.g. to update its unit after
+        rescaling, is reported at the info level of the `logging` module.
         """
         if property.identifier in self.properties:
             old_prop = self.properties[property.identifier]
-            if property.prop_type == old_prop.prop_type:
-                txt = "with the same type"
-            else:
-                txt = "with a different type"
+            same_type = property.prop_type == old_prop.prop_type
+            txt = "with the same type" if same_type else "with a different type"
 
             if overwrite:
                 msg = (
                     f"A Property '{property.identifier}' already exists {txt}. "
                     "Overwriting the old Property."
                 )
-                warnings.warn(msg, stacklevel=2)
+                if same_type:
+                    logger.info(msg)
+                else:
+                    warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
                 self.properties[property.identifier] = property
             else:
                 msg = (
                     f"A Property '{property.identifier}' already exists {txt}. "
                     "Not overwriting the old Property."
                 )
-                warnings.warn(msg, stacklevel=2)
+                warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
         else:
             self.properties[property.identifier] = property
 
@@ -379,14 +388,18 @@ class PropsMetadata:
         overwrite : bool, default=False
             Whether to overwrite existing properties with the same identifier.
             If False, existing properties will not be overwritten but a
-            warning will be issued. If True, existing properties will be overwritten,
-            with a warning too.
+            warning will be issued. If True, existing properties will be overwritten.
 
         Warns
         -----
-        UserWarning
-            If a property with the same identifier already exists, whether it is
-            overwritten or not.
+        PycellinWarning
+            If a property with the same identifier already exists and is not
+            overwritten, or is overwritten by a property of another type.
+
+        Notes
+        -----
+        Overwriting a property of the same type is reported at the info level of the
+        `logging` module.
         """
         for property in properties:
             self._add_prop(property, overwrite=overwrite)
@@ -467,7 +480,7 @@ class PropsMetadata:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the property is protected and cannot be removed.
         """
         if prop_id not in self.properties:
@@ -479,7 +492,7 @@ class PropsMetadata:
                 f"Property '{prop_id}' is protected and cannot be removed. "
                 "Unprotect the property before modifying it."
             )
-            warnings.warn(msg)
+            warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
             return
 
         # If no prop_type specified, remove entirely.
@@ -541,7 +554,7 @@ class PropsMetadata:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If a property is protected and cannot be removed.
         """
         for prop_id in prop_ids:
@@ -573,7 +586,7 @@ class PropsMetadata:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the property is protected and cannot be modified.
         """
         if prop_id not in self.properties:
@@ -592,7 +605,7 @@ class PropsMetadata:
                 f"Property '{prop_id}' is protected and cannot be modified. "
                 "Unprotect the property before modifying it."
             )
-            warnings.warn(msg)
+            warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
         else:
             self.properties[new_id] = self.properties.pop(prop_id)
             self.properties[new_id]._change_identifier(new_id)
@@ -620,7 +633,7 @@ class PropsMetadata:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the property is protected and cannot be modified.
         """
         if prop_id not in self.properties:
@@ -632,7 +645,7 @@ class PropsMetadata:
                 f"Property '{prop_id}' is protected and cannot be modified. "
                 "Unprotect the property before modifying it."
             )
-            warnings.warn(msg)
+            warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
         else:
             self.properties[prop_id]._change_name(new_name)
 
@@ -660,7 +673,7 @@ class PropsMetadata:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the property is protected and cannot be modified
             (i.e. it is in the list of protected properties).
         """
@@ -673,7 +686,7 @@ class PropsMetadata:
                 f"Property '{prop_id}' is protected and cannot be modified. "
                 "Unprotect the property before modifying it."
             )
-            warnings.warn(msg)
+            warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
         else:
             self.properties[prop_id]._change_description(new_description)
 
@@ -688,7 +701,7 @@ class PropsMetadata:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the property does not exist in the declared properties: it is not
             protected.
         """
@@ -697,7 +710,7 @@ class PropsMetadata:
                 f"Property '{prop_id}' does not exist in the declared properties "
                 "and cannot be protected."
             )
-            warnings.warn(msg)
+            warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
             return
 
         if prop_id not in self._protected_props:
@@ -714,7 +727,7 @@ class PropsMetadata:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the property does not exist in the declared properties.
         """
         if prop_id not in self.properties:
@@ -722,7 +735,7 @@ class PropsMetadata:
                 f"Property '{prop_id}' does not exist in the declared properties "
                 "and cannot be unprotected."
             )
-            warnings.warn(msg)
+            warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
 
         if prop_id in self._protected_props:
             self._protected_props.remove(prop_id)

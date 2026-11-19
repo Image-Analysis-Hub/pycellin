@@ -2,6 +2,7 @@
 
 import importlib.metadata
 import logging
+from pathlib import Path
 
 import geff
 import geff_spec
@@ -11,11 +12,7 @@ import pytest
 
 from pycellin.classes import CellLineage, Property
 from pycellin.custom_types import PropertyType
-from pycellin.properties.core import (
-    create_cell_coord_property,
-    create_cell_id_property,
-    create_lineage_id_property,
-)
+from pycellin.exceptions import PycellinWarning
 from pycellin.io.geff.reader import (
     _build_generic_metadata,
     _build_props_metadata,
@@ -37,6 +34,11 @@ from pycellin.io.geff.reader import (
     _standardize_properties_data,
     _standardize_props_metadata,
     read_geff,
+)
+from pycellin.properties.core import (
+    create_cell_coord_property,
+    create_cell_id_property,
+    create_lineage_id_property,
 )
 
 # Fixtures ####################################################################
@@ -501,18 +503,19 @@ class TestIdentifyLinIdProp:
         self, caplog, graph_lin_id
     ):
         """When lin_id_prop is not in graph but geff_track_node_props has 'lineage',
-        return the value from track_node_props and log."""
-        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"):
+        return the value from track_node_props, with a warning and a log."""
+        with (
+            caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"),
+            pytest.warns(PycellinWarning, match="inferred from GEFF metadata"),
+        ):
             result = _identify_lin_id_prop(
                 "missing_key",
                 {"lineage": "track_id"},
                 graph_lin_id,
             )
-        assert len(caplog.records) == 2
+        assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "INFO"
-        assert "inferred from GEFF metadata" in caplog.records[0].message
-        assert caplog.records[1].levelname == "INFO"
-        assert "inferred from GEFF track_node_props" in caplog.records[1].message
+        assert "inferred from GEFF track_node_props" in caplog.records[0].message
 
         assert result == "track_id"
 
@@ -520,27 +523,29 @@ class TestIdentifyLinIdProp:
         self, caplog, graph_lin_id
     ):
         """When lin_id_prop is not in graph and geff_track_node_props is None,
-        fall back to 'lineage_id' if present in graph and log."""
-        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"):
+        fall back to 'lineage_id' if present in graph, with a warning and a log."""
+        with (
+            caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"),
+            pytest.warns(PycellinWarning, match="inferred from GEFF metadata"),
+        ):
             result = _identify_lin_id_prop("missing_key", None, graph_lin_id)
-        assert len(caplog.records) == 2
+        assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "INFO"
-        assert "inferred from GEFF metadata" in caplog.records[0].message
-        assert caplog.records[1].levelname == "INFO"
-        assert "inferred from existing graph property" in caplog.records[1].message
+        assert "inferred from existing graph property" in caplog.records[0].message
 
         assert result == "lineage_id"
 
     def test_provided_key_not_in_graph_no_fallback(self, caplog, graph_no_lin_id):
         """When lin_id_prop is not in graph, geff_track_node_props is None,
-        and graph has no 'lineage_id', log and return None."""
-        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"):
+        and graph has no 'lineage_id', warn, log and return None."""
+        with (
+            caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"),
+            pytest.warns(PycellinWarning, match="inferred from GEFF metadata"),
+        ):
             result = _identify_lin_id_prop("missing_key", None, graph_no_lin_id)
-        assert len(caplog.records) == 2
+        assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "INFO"
-        assert "inferred from GEFF metadata" in caplog.records[0].message
-        assert caplog.records[1].levelname == "WARNING"
-        assert "No lineage identifier found" in caplog.records[1].message
+        assert "No lineage identifier found" in caplog.records[0].message
 
         assert result is None
 
@@ -598,28 +603,40 @@ class TestIdentifyLinIdProp:
         self, caplog, graph_no_lin_id
     ):
         """When lin_id_prop is None, geff_track_node_props is None,
-        and graph has no 'lineage_id', log and return None."""
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.reader"):
+        and graph has no 'lineage_id', log an info message and return None."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"):
             result = _identify_lin_id_prop(None, None, graph_no_lin_id)
         assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
+        assert caplog.records[0].levelname == "INFO"
         assert "No lineage identifier found" in caplog.records[0].message
 
         assert result is None
 
-    @pytest.mark.parametrize(
-        "lin_id_key, track_node_props",
-        [("lin", None), (None, {"lineage": "lin"})],
-    )
-    def test_non_integer_values(self, caplog, lin_id_key, track_node_props):
-        """When the values of the property are not integers, whether it is provided or
-        comes from geff_track_node_props, log and return None."""
+    def test_non_integer_values_of_provided_key(self, caplog):
+        """When the values of the provided property are not integers, warn and return
+        None."""
+        g = nx.DiGraph()
+        g.add_node(0, lin=1.0)
+        g.add_node(1, lin=2.0)
+        with (
+            caplog.at_level(logging.WARNING, logger="pycellin.io.geff.reader"),
+            pytest.warns(PycellinWarning, match="its values are not all integers"),
+        ):
+            result = _identify_lin_id_prop("lin", None, g)
+        assert len(caplog.records) == 0
+
+        assert result is None
+
+    def test_non_integer_values_from_track_node_props(self, caplog):
+        """When the values of the property from geff_track_node_props are not
+        integers, log a warning and return None."""
         g = nx.DiGraph()
         g.add_node(0, lin=1.0)
         g.add_node(1, lin=2.0)
         with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.reader"):
-            result = _identify_lin_id_prop(lin_id_key, track_node_props, g)
+            result = _identify_lin_id_prop(None, {"lineage": "lin"}, g)
         assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
         assert "its values are not all integers" in caplog.records[0].message
 
         assert result is None
@@ -638,15 +655,18 @@ class TestIdentifyTimeProp:
     ):
         """When time_key is not in the graph but display hints have a valid time prop,
         warn and return the hint key."""
-        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"):
+        with (
+            caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"),
+            pytest.warns(
+                PycellinWarning, match="'missing_key' given as reference_time_prop"
+            ),
+        ):
             result = _identify_time_prop(
                 "missing_key", geff_md_display_hints, graph_lin_id
             )
-        assert len(caplog.records) == 2
-        assert caplog.records[0].levelname == "WARNING"
-        assert "'missing_key' given as reference_time_prop" in caplog.records[0].message
-        assert caplog.records[1].levelname == "INFO"
-        assert "inferred from display hints" in caplog.records[1].message
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "INFO"
+        assert "inferred from display hints" in caplog.records[0].message
 
         assert result == "frame"
 
@@ -655,25 +675,27 @@ class TestIdentifyTimeProp:
     ):
         """When time_key is not in the graph, no display hints are available,
         and the axes have a matching time prop, warn and return the axis key."""
-        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"):
+        with (
+            caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"),
+            pytest.warns(PycellinWarning, match="is not on every node"),
+        ):
             result = _identify_time_prop("missing_key", geff_md_axes, graph_lin_id)
-        assert len(caplog.records) == 2
-        assert caplog.records[0].levelname == "WARNING"
-        assert "is not on every node" in caplog.records[0].message
-        assert caplog.records[1].levelname == "INFO"
-        assert "inferred from axes" in caplog.records[1].message
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "INFO"
+        assert "inferred from axes" in caplog.records[0].message
 
         assert result == "frame"
 
-    def test_provided_key_not_in_graph_no_geff_md_raises(self, caplog, graph_lin_id):
+    def test_provided_key_not_in_graph_no_geff_md_raises(self, graph_lin_id):
         """When time_key is not in the graph and geff_md is None,
         warn and raise ValueError."""
-        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"):
-            with pytest.raises(ValueError):
-                _identify_time_prop("missing_key", None, graph_lin_id)
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "'missing_key' given as reference_time_prop" in caplog.records[0].message
+        with (
+            pytest.raises(ValueError),
+            pytest.warns(
+                PycellinWarning, match="'missing_key' given as reference_time_prop"
+            ),
+        ):
+            _identify_time_prop("missing_key", None, graph_lin_id)
 
     def test_none_key_inferred_from_display_hints(
         self, caplog, graph_lin_id, geff_md_display_hints
@@ -808,17 +830,18 @@ class TestIdentifySpaceProps:
     ):
         """When x and y keys are absent from the graph, warn and infer them from
         display hints."""
-        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"):
+        with (
+            caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"),
+            pytest.warns(PycellinWarning) as warned,
+        ):
             result = _identify_space_props(
                 "missing_x", "missing_y", None, geff_md_display_hints, graph_with_coords
             )
-        assert len(caplog.records) == 4
-        assert caplog.records[0].levelname == "WARNING"
-        assert caplog.records[1].levelname == "WARNING"
-        assert "'missing_x' given as cell_x_prop" in caplog.records[0].message
-        assert "'missing_y' given as cell_y_prop" in caplog.records[1].message
-        assert "inferred from display hints" in caplog.records[2].message
-        assert "inferred from display hints" in caplog.records[3].message
+        assert "'missing_x' given as cell_x_prop" in str(warned[0].message)
+        assert "'missing_y' given as cell_y_prop" in str(warned[1].message)
+        assert len(caplog.records) == 2
+        assert "inferred from display hints" in caplog.records[0].message
+        assert "inferred from display hints" in caplog.records[1].message
 
         assert result == ("position_x", "position_y", None)
 
@@ -827,17 +850,18 @@ class TestIdentifySpaceProps:
     ):
         """When x and y keys are absent from the graph, warn and infer them from the
         axis names."""
-        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"):
+        with (
+            caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"),
+            pytest.warns(PycellinWarning) as warned,
+        ):
             result = _identify_space_props(
                 "missing_x", "missing_y", None, geff_md_axes, graph_with_coords
             )
-        assert len(caplog.records) == 4
-        assert caplog.records[0].levelname == "WARNING"
-        assert caplog.records[1].levelname == "WARNING"
-        assert "is not on every node" in caplog.records[0].message
-        assert "is not on every node" in caplog.records[1].message
-        assert "inferred from axis name" in caplog.records[2].message
-        assert "inferred from axis name" in caplog.records[3].message
+        assert len(warned) == 2
+        assert all("is not on every node" in str(w.message) for w in warned)
+        assert len(caplog.records) == 2
+        assert "inferred from axis name" in caplog.records[0].message
+        assert "inferred from axis name" in caplog.records[1].message
 
         assert result == ("position_x", "position_y", None)
 
@@ -1628,10 +1652,10 @@ class TestExtractAxesMetadata:
     def test_all_space_props_none_warns(self, caplog, geff_axes):
         """When all space props are None, log and omit space_unit."""
         geff_md = self._make_geff_md(axes=geff_axes)
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.reader"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"):
             result = _extract_axes_metadata(geff_md, "frame", None, None, None)
         assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
+        assert caplog.records[0].levelname == "INFO"
         assert "No coordinate properties found" in caplog.records[0].message
 
         assert result["time_unit"] == "second"
@@ -1861,13 +1885,9 @@ class TestGetCellIdProblem:
 class TestFallbackToNodeKeys:
     """Test cases for _fallback_to_node_keys function."""
 
-    def test_sets_cell_id_from_node_keys(self, caplog, graph_no_lin_id):
+    def test_sets_cell_id_from_node_keys(self, graph_no_lin_id):
         """When falling back, each node gets a cell_id equal to its node key."""
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.reader"):
-            _fallback_to_node_keys(graph_no_lin_id, "fallback reason", {})
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "fallback" in caplog.records[0].message
+        _fallback_to_node_keys(graph_no_lin_id, {})
 
         assert graph_no_lin_id.nodes[0]["cell_id"] == 0
         assert graph_no_lin_id.nodes[1]["cell_id"] == 1
@@ -1879,7 +1899,7 @@ class TestFallbackToNodeKeys:
         g = nx.DiGraph()
         g.add_node(0, cell_id=7)
         g.add_node(1, cell_id=7)
-        _fallback_to_node_keys(g, "fallback reason", {})
+        _fallback_to_node_keys(g, {})
         assert g.nodes[0] == {"geff_cell_id": 7, "cell_id": 0}
         assert g.nodes[1] == {"geff_cell_id": 7, "cell_id": 1}
 
@@ -1888,11 +1908,12 @@ class TestEnsureValidCellID:
     """Test cases for _ensure_valid_cell_id function."""
 
     def test_none_key_falls_back_to_node_keys(self, caplog, graph_no_lin_id):
-        """When cell_id_key is None, create cell_id from node keys and log."""
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.reader"):
+        """When cell_id_key is None, create cell_id from node keys and log an info
+        message."""
+        with caplog.at_level(logging.INFO, logger="pycellin.io.geff.reader"):
             result = _ensure_valid_cell_id(graph_no_lin_id, None, {})
         assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
+        assert caplog.records[0].levelname == "INFO"
         assert "No cell identifier property provided" in caplog.records[0].message
 
         assert result == "cell_id"
@@ -1901,91 +1922,73 @@ class TestEnsureValidCellID:
         assert graph_no_lin_id.nodes[0]["frame"] == 0
         assert graph_no_lin_id.nodes[1]["frame"] == 1
 
-    def test_missing_prop_falls_back(self, caplog):
-        """When cell_id_key is missing on some nodes, fall back and log."""
+    def test_missing_prop_falls_back(self):
+        """When cell_id_key is missing on some nodes, fall back with a warning."""
         g = nx.Graph()
         g.add_node(0, id=0)
         g.add_node(1)
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.reader"):
+        with pytest.warns(PycellinWarning, match="not present on all nodes"):
             result = _ensure_valid_cell_id(g, "id", {})
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "not present on all nodes" in caplog.records[0].message
 
         assert result == "cell_id"
         assert g.nodes[0]["cell_id"] == 0
         assert g.nodes[1]["cell_id"] == 1
 
-    def test_negative_value_fall_back(self, caplog):
-        """When cell_id_key has a negative value, fall back and log."""
+    def test_negative_value_fall_back(self):
+        """When cell_id_key has a negative value, fall back with a warning."""
         g = nx.Graph()
         g.add_node(0, id=0)
         g.add_node(1, id=-1)
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.reader"):
+        with pytest.warns(PycellinWarning, match="not all non-negative integers"):
             result = _ensure_valid_cell_id(g, "id", {})
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "not all non-negative integers" in caplog.records[0].message
 
         assert result == "cell_id"
         assert g.nodes[0]["cell_id"] == 0
         assert g.nodes[1]["cell_id"] == 1
 
-    def test_string_value_fall_back(self, caplog):
-        """When cell_id_key has a string value, fall back and log."""
+    def test_string_value_fall_back(self):
+        """When cell_id_key has a string value, fall back with a warning."""
         g = nx.Graph()
         g.add_node(0, id=0)
         g.add_node(1, id="1")
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.reader"):
+        with pytest.warns(PycellinWarning, match="not all non-negative integers"):
             result = _ensure_valid_cell_id(g, "id", {})
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "not all non-negative integers" in caplog.records[0].message
 
         assert result == "cell_id"
         assert g.nodes[0]["cell_id"] == 0
         assert g.nodes[1]["cell_id"] == 1
 
-    def test_bool_value_fall_back(self, caplog):
-        """When cell_id_key has a boolean value, fall back and log."""
+    def test_bool_value_fall_back(self):
+        """When cell_id_key has a boolean value, fall back with a warning."""
         g = nx.Graph()
         g.add_node(0, id=0)
         g.add_node(1, id=True)
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.reader"):
+        with pytest.warns(PycellinWarning, match="not all non-negative integers"):
             result = _ensure_valid_cell_id(g, "id", {})
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "not all non-negative integers" in caplog.records[0].message
 
         assert result == "cell_id"
         assert g.nodes[0]["cell_id"] == 0
         assert g.nodes[1]["cell_id"] == 1
 
-    def test_none_value_fall_back(self, caplog):
-        """When cell_id_key has a None value, fall back and log."""
+    def test_none_value_fall_back(self):
+        """When cell_id_key has a None value, fall back with a warning."""
         g = nx.Graph()
         g.add_node(0, id=0)
         g.add_node(1, id=None)
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.reader"):
+        with pytest.warns(PycellinWarning, match="not all non-negative integers"):
             result = _ensure_valid_cell_id(g, "id", {})
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "not all non-negative integers" in caplog.records[0].message
 
         assert result == "cell_id"
         assert g.nodes[0]["cell_id"] == 0
         assert g.nodes[1]["cell_id"] == 1
 
-    def test_duplicate_prop_values_fall_back(self, caplog):
-        """When cell_id_key has duplicate values, fall back and log."""
+    def test_duplicate_prop_values_fall_back(self):
+        """When cell_id_key has duplicate values, fall back with a warning."""
         g = nx.Graph()
         g.add_node(0, id=1)
         g.add_node(1, id=1)
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.geff.reader"):
+        with pytest.warns(PycellinWarning, match="Duplicate values found"):
             result = _ensure_valid_cell_id(g, "id", {})
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "Duplicate values found" in caplog.records[0].message
 
         assert result == "cell_id"
         assert g.nodes[0]["cell_id"] == 0
@@ -2692,7 +2695,12 @@ class TestReadGeff:
         path = tmp_path / "non_integer_ids.geff"
         geff.write(g, path, axis_names=["t"], axis_types=["time"])
 
-        model = read_geff(path, lineage_id_prop="track")
+        with pytest.warns(
+            PycellinWarning, match="its values are not all integers"
+        ) as warned:
+            model = read_geff(path, lineage_id_prop="track")
+        # The warning shows the line of the caller, not a line of Pycellin.
+        assert Path(warned[0].filename).samefile(__file__)
 
         lineage_ids = model.get_cell_lineage_ids()
         assert sorted(lineage_ids) == [0, 1]

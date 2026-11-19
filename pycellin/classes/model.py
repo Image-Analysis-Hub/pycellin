@@ -3,6 +3,7 @@
 """The `Model` class: the lineages of a dataset, their properties and metadata."""
 
 import inspect
+import logging
 import warnings
 from copy import copy, deepcopy
 from decimal import Decimal
@@ -31,6 +32,7 @@ from pycellin.exceptions import (
     FusionError,
     MissingPropertyError,
     ProtectedPropertyError,
+    PycellinWarning,
 )
 from pycellin.properties import intensity, motion, timing
 from pycellin.properties.core import (
@@ -38,7 +40,15 @@ from pycellin.properties.core import (
     create_timepoint_property,
 )
 from pycellin.styling import PYCELLIN_PURPLE
-from pycellin.utils import _check_integer, _color_to_rgba, _infer_dtype, _unit_uses
+from pycellin.utils import (
+    _check_integer,
+    _color_to_rgba,
+    _find_stack_level,
+    _infer_dtype,
+    _unit_uses,
+)
+
+logger = logging.getLogger(__name__)
 
 _L = TypeVar("_L", bound="Lineage")
 
@@ -95,7 +105,7 @@ class Model:
 
     Warns
     -----
-    UserWarning
+    PycellinWarning
         If ``time_step`` is not provided in `model_metadata` and cannot be inferred
         from the data.
 
@@ -160,7 +170,7 @@ class Model:
                     "automatically with model.set_time_step() once you have added data "
                     "to the model."
                 )
-                warnings.warn(msg, UserWarning, stacklevel=2)
+                warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
 
         # Create final model metadata with all required values.
         # TODO: add unit extracted from props_metadata, if any
@@ -618,7 +628,7 @@ class Model:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the reference time property has a calculator, since it will overwrite
             the rescaled values at the next update.
             If `time_unit` is given and properties with a calculator have a unit that
@@ -658,7 +668,8 @@ class Model:
             warnings.warn(
                 f"The reference time property '{time_prop}' has a calculator, which "
                 "will overwrite the rescaled values at the next update.",
-                stacklevel=2,
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
             )
         # The units of the properties computed from time are built from this unit.
         old_time_unit = self._get_prop_unit(time_prop)
@@ -720,7 +731,7 @@ class Model:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If a coordinate property has a calculator, since it will overwrite the
             rescaled values at the next update.
             If `space_unit` is given and properties with a calculator have a unit that
@@ -774,7 +785,8 @@ class Model:
                         f"The coordinate property '{prop.identifier}' has a "
                         "calculator, which will overwrite the rescaled values at the "
                         "next update.",
-                        stacklevel=2,
+                        PycellinWarning,
+                        stacklevel=_find_stack_level(),
                     )
                 self._multiply_prop_values(prop.identifier, prop.prop_type, axis_factor)
                 if space_unit is not None:
@@ -866,7 +878,7 @@ class Model:
                 "and arguments, to update their units."
             )
         # stacklevel=3 points to the call of rescale_time() or rescale_space().
-        warnings.warn(message, stacklevel=3)
+        warnings.warn(message, PycellinWarning, stacklevel=_find_stack_level())
 
     def _multiply_prop_values(
         self,
@@ -1545,10 +1557,7 @@ class Model:
 
         Warns
         -----
-        UserWarning
-            If the model is already up to date: no update is performed. If the user
-            wants to force an update, they can call `prepare_full_data_update()`
-            before calling this method.
+        PycellinWarning
             If a property in the `props_to_update` list has not been declared, or has
             no calculator (e.g. a property loaded from a file): that property is
             ignored during the update.
@@ -1557,6 +1566,10 @@ class Model:
 
         Notes
         -----
+        If the model is already up to date, no update is performed, and a message
+        says so at the info level of the `logging` module. To force an update, call
+        `prepare_full_data_update()` before this method.
+
         The ``timepoint`` property is always kept declared and up to date, whatever
         `props_to_update` contains. The only exception is when ``timepoint`` is the
         reference time property itself.
@@ -1596,7 +1609,7 @@ class Model:
         their lineage.
         """
         if not self._updater._update_required:
-            warnings.warn("Model is already up to date.")
+            logger.info("Model is already up to date.")
             return
 
         if props_to_update is not None:
@@ -1608,7 +1621,9 @@ class Model:
             if missing_props:
                 warnings.warn(
                     "The following properties have not been declared and will be "
-                    f"ignored: {', '.join(repr(prop) for prop in missing_props)}."
+                    f"ignored: {', '.join(repr(prop) for prop in missing_props)}.",
+                    PycellinWarning,
+                    stacklevel=_find_stack_level(),
                 )
             # E.g. a property loaded from a file, or a core property of cycle lineages.
             props_without_calc = [
@@ -1621,7 +1636,9 @@ class Model:
                     "The following properties have no calculator and will be ignored: "
                     f"{', '.join(repr(prop) for prop in props_without_calc)}. Their "
                     "values come from the data, or are computed with the cycle "
-                    "lineages."
+                    "lineages.",
+                    PycellinWarning,
+                    stacklevel=_find_stack_level(),
                 )
             props_to_update = [
                 prop
@@ -1629,7 +1646,11 @@ class Model:
                 if prop not in missing_props and prop not in props_without_calc
             ]
             if not props_to_update:
-                warnings.warn("No properties to update. The model will not be updated.")
+                warnings.warn(
+                    "No properties to update. The model will not be updated.",
+                    PycellinWarning,
+                    stacklevel=_find_stack_level(),
+                )
                 return
 
         # self.data._freeze_lineage_data()
@@ -1720,7 +1741,7 @@ class Model:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If `with_cycle_lineage` is True but the cycle lineages have not been added
             yet. The cycle lineage is then not computed.
         """
@@ -1763,7 +1784,9 @@ class Model:
             if self.data.cycle_lineages is None:
                 warnings.warn(
                     f"Cannot add cycle lineage {lineage_id} when the cycle lineages "
-                    "have not been added yet."
+                    "have not been added yet.",
+                    PycellinWarning,
+                    stacklevel=_find_stack_level(),
                 )
             else:
                 cycle_lineage = self.data._compute_cycle_lineage(
@@ -1952,7 +1975,7 @@ class Model:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If `time_value` is not a multiple of the time step of the model.
 
         Notes
@@ -1981,7 +2004,9 @@ class Model:
             warnings.warn(
                 f"The time value {time_value} is not consistent with the time step "
                 f"of the model ({time_step}). Use model.set_time_step() to set or "
-                f"compute a new time step compatible with all time values."
+                f"compute a new time step compatible with all time values.",
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
             )
 
         if unique_in_model is True:
@@ -2366,7 +2391,8 @@ class Model:
 
         If the property is already declared with the same property type and lineage
         type, e.g. added before with other arguments, its declaration and calculator
-        are replaced, with a warning. A cycle property propagated to the cell lineages
+        are replaced, and an info message says so. A cycle property propagated to the
+        cell lineages
         stays propagated. If the property is declared with another property type or
         lineage type, e.g. loaded from a file, the declaration is replaced only if it
         is unused: not protected, without calculator and without values in cell
@@ -2403,9 +2429,7 @@ class Model:
 
         Warns
         -----
-        UserWarning
-            If the property is already declared with the same property type and
-            lineage type, since its declaration is replaced.
+        PycellinWarning
             If the calculator uses external data (e.g. a label image) and the model
             comes from a merge without a shared label image, since that data may not
             match all the lineages.
@@ -2455,7 +2479,8 @@ class Model:
                 "merged model. If they come from different images, its values will be "
                 "wrong for some of them: add the property to each model before merging "
                 "instead.",
-                stacklevel=2,
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
             )
         declared = self.get_property(prop.identifier)
         if declared is not None and not self._is_same_kind(declared, prop):
@@ -4258,7 +4283,9 @@ class Model:
         measured on its skeleton. The cell contour (``cell_contour``) is filled and
         skeletonized, and the skeleton is pruned and simplified into a line: the
         length is the length of this line, extended at both tips to the edge of the
-        cell. It is only meaningful for rod-shaped cells.
+        cell. It is only meaningful for rod-shaped cells: cells whose skeleton is a
+        single pixel or has no tip, typically round cells, get NaN, and an info
+        message names them.
 
         Parameters
         ----------
@@ -4269,7 +4296,8 @@ class Model:
             Tolerance distance for the simplification of the skeleton line (0-1). The
             higher the tolerance, the more simplified the line.
         width_method : str, default="mean"
-            Not used for the length (see `add_rod_width()`).
+            Not used for the length (see `add_rod_width()`), but must be ``"min"``,
+            ``"max"``, ``"mean"`` or ``"median"``.
         width_ignore_tips : bool, default=False
             Not used for the length (see `add_rod_width()`).
         custom_identifier : str | None, default=None
@@ -4284,7 +4312,8 @@ class Model:
         Raises
         ------
         ValueError
-            If pixels are not isotropic in x and y.
+            If pixels are not isotropic in x and y, or if `width_method` is not
+            ``"min"``, ``"max"``, ``"mean"`` or ``"median"``.
         MissingPropertyError
             If ``cell_contour`` has not been declared in the model.
         """
@@ -4378,7 +4407,8 @@ class Model:
         measured along its skeleton. The cell contour (``cell_contour``) is filled
         and skeletonized, and the width is computed from the distances between the
         skeleton and the edge of the cell. It is only meaningful for rod-shaped
-        cells.
+        cells: cells whose skeleton is a single pixel or has no tip, typically round
+        cells, get NaN, and an info message names them.
 
         Parameters
         ----------
@@ -4404,7 +4434,8 @@ class Model:
         Raises
         ------
         ValueError
-            If pixels are not isotropic in x and y.
+            If pixels are not isotropic in x and y, or if `width_method` is not
+            ``"min"``, ``"max"``, ``"mean"`` or ``"median"``.
         MissingPropertyError
             If ``cell_contour`` has not been declared in the model.
         """
@@ -4869,7 +4900,7 @@ class Model:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If some keys of `tag_names` are not values of the mask.
         """
         mask_image = tifffile.imread(mask_path).astype(np.uint32)
@@ -6016,7 +6047,7 @@ class Model:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If a property declared in both models has a different data type.
             If calculators using external data (e.g. a label image) are not kept in the
             merged model.
@@ -6309,7 +6340,8 @@ class Model:
             warnings.warn(
                 "Properties declared with different data types in the two models: "
                 f"{dtype_mismatches}. The declarations of this model are kept.",
-                stacklevel=2,
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
             )
         external_calcs = sorted(external_calcs1 | external_calcs2)
         if external_calcs:
@@ -6317,7 +6349,8 @@ class Model:
                 "Calculators using external data (e.g. a label image) are not kept in "
                 f"the merged model: {external_calcs}. The property values are kept, "
                 "but are not computed again until the properties are added again.",
-                stacklevel=2,
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
             )
 
         # Calculators using external data.

@@ -27,7 +27,9 @@ from pycellin.classes.property_calculator import (
     NodeGlobalPropCalculator,
     NodeLocalPropCalculator,
 )
+from pycellin.exceptions import PycellinWarning
 from pycellin.properties.utils import _get_cycle_node_property_values, _nanmean
+from pycellin.utils import _find_stack_level
 
 logger = logging.getLogger(__name__)
 
@@ -418,7 +420,7 @@ class CellPolygonFromLabelImage(_LabelImageShapeCalculator):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the label of some cells is made of several pieces or has holes.
         """
         self._fragmented_cells = []
@@ -438,7 +440,9 @@ class CellPolygonFromLabelImage(_LabelImageShapeCalculator):
                 f"In the label image, {' and '.join(issues)}. "
                 f"'{self.property.identifier}' only keeps the largest piece of each "
                 "label and fills its holes. To keep all the pieces and holes, use the "
-                "cell multipolygon property instead: model.add_cell_multipolygon()."
+                "cell multipolygon property instead: model.add_cell_multipolygon().",
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
             )
 
     def _shape_from_mask(
@@ -1726,6 +1730,27 @@ def _from_path_to_line(path: list[tuple[int, int]], tol: float) -> LineString:
     return simplified_line
 
 
+def _check_width_method(width_method: str) -> None:
+    """
+    Check that `width_method` is a method of `_get_width_and_length` for the width.
+
+    Parameters
+    ----------
+    width_method : str
+        Method to compute the width along the skeleton.
+
+    Raises
+    ------
+    ValueError
+        If `width_method` is not ``"min"``, ``"max"``, ``"mean"`` or ``"median"``.
+    """
+    if width_method not in ("min", "max", "mean", "median"):
+        raise ValueError(
+            f"Unknown width method '{width_method}': use 'min', 'max', 'mean' or "
+            "'median'."
+        )
+
+
 def _get_width_and_length(
     node_id: int,
     lineage: CellLineage,
@@ -1777,13 +1802,21 @@ def _get_width_and_length(
     -------
     tuple[float, float]
         Width and length of the ROI, in the unit of `pixel_size`. Both are NaN if the
-        skeleton is a single pixel or a loop.
+        skeleton is a single pixel or has no tip, e.g. a loop.
 
     Raises
     ------
     KeyError
         If the cell has no value for `contour_prop`.
+    ValueError
+        If `width_method` is not ``"min"``, ``"max"``, ``"mean"`` or ``"median"``.
+
+    Notes
+    -----
+    An info message names the cell when its skeleton is a single pixel or has no
+    tip, which happens with round cells.
     """
+    _check_width_method(width_method)
     if debug:
         print("NODE", node_id)
         if skeleton_method == "zhang":
@@ -1876,48 +1909,27 @@ def _get_width_and_length(
 
     # Tips of the skeleton = pixels connected to only 1 pixel.
     tip_px = [px for px, list_px in adjacency_dict.items() if len(list_px) == 1]
+    lineage_id = lineage.graph.get("lineage_id")
     if len(adjacency_dict) == 1:
         # There is only one pixel in the skeleton. The object being processed
         # is probably roundish. The method for mesuring length is not
         # adapted to this kind of morphology.
-        try:
-            track_id = lineage.nodes[node_id]["TRACK_ID"]
-        except KeyError:
-            print(
-                f"WARNING: One pixel skeleton on node {node_id}! "
-                f"The object is probably roundish and the radius "
-                f"is a better metric in that case. Setting the length and "
-                f"width to NaN."
-            )
-        else:
-            print(
-                f"WARNING: One pixel skeleton on node {node_id} of track "
-                f"{track_id}! The object is probably roundish and the radius"
-                f" is a better metric in that case. Setting the length and "
-                f"width to NaN."
-            )
+        logger.info(
+            f"The skeleton of cell {node_id} in lineage {lineage_id} is a single "
+            "pixel, so its rod length and width are NaN: the cell is probably round, "
+            "and its radius is a better measure."
+        )
         length = np.nan
         width = np.nan
     elif len(adjacency_dict) == 0 or len(tip_px) == 0:
         # The skeleton is a loop!! The object being processed is
         # probably roundish. The method for mesuring length is not adapted to
         # this kind of morphology.
-        try:
-            track_id = lineage.nodes[node_id]["TRACK_ID"]
-        except KeyError:
-            print(
-                f"WARNING: One pixel skeleton on node {node_id}! "
-                f"The object is probably roundish and the radius "
-                f"is a better metric in that case. Setting the length and "
-                f"width to NaN."
-            )
-        else:
-            print(
-                f"WARNING: Circular skeleton on node {node_id} of track "
-                f"{track_id}! The object is probably roundish and the radius "
-                f"is a better metric in that case. Setting the length and "
-                f"width to NaN."
-            )
+        logger.info(
+            f"The skeleton of cell {node_id} in lineage {lineage_id} has no tip, e.g. "
+            "a loop, so its rod length and width are NaN: the cell is probably round, "
+            "and its radius is a better measure."
+        )
         length = np.nan
         width = np.nan
     else:
@@ -2019,9 +2031,7 @@ def _get_width_and_length(
                 width = np.nan
             else:
                 width = np.min(dist_on_skel) * 2 - 1
-        else:
-            print("Wrong width method. Should be one of: min, max, mean, median.")
-            # TODO: raise an error when method is not supported
+        # Any other width method was refused by _check_width_method() above.
 
         if debug:
             print(f"Width: {width:.2f} px i.e. {width * pixel_size:.2f} μm.")
@@ -2150,6 +2160,11 @@ class RodWidth(NodeLocalPropCalculator[CellLineage]):
         Folder in which to save the debug plots.
     contour_prop : str, default="cell_contour"
         Identifier of the node property holding the cell contours.
+
+    Raises
+    ------
+    ValueError
+        If `width_method` is not ``"min"``, ``"max"``, ``"mean"`` or ``"median"``.
     """
 
     #: Input property: `contour_prop`, a node property of cell lineages.
@@ -2169,6 +2184,7 @@ class RodWidth(NodeLocalPropCalculator[CellLineage]):
         debug_folder: str | None = None,
         contour_prop: str = "cell_contour",
     ):
+        _check_width_method(width_method)
         super().__init__(property)
         self.pixel_size = pixel_size
         self.skeleton_method = skeleton_method
@@ -2281,7 +2297,8 @@ class RodLength(NodeLocalPropCalculator[CellLineage]):
         Tolerance distance for the simplification of the skeleton line (0-1). The
         higher the tolerance, the more simplified the line.
     width_method : str, default="mean"
-        Not used for the length (see `RodWidth`).
+        Not used for the length (see `RodWidth`), but must be ``"min"``, ``"max"``,
+        ``"mean"`` or ``"median"``.
     width_ignore_tips : bool, default=False
         Not used for the length (see `RodWidth`).
     debug : bool, default=False
@@ -2291,6 +2308,11 @@ class RodLength(NodeLocalPropCalculator[CellLineage]):
         Folder in which to save the debug plots.
     contour_prop : str, default="cell_contour"
         Identifier of the node property holding the cell contours.
+
+    Raises
+    ------
+    ValueError
+        If `width_method` is not ``"min"``, ``"max"``, ``"mean"`` or ``"median"``.
     """
 
     #: Input property: `contour_prop`, a node property of cell lineages.
@@ -2310,6 +2332,7 @@ class RodLength(NodeLocalPropCalculator[CellLineage]):
         debug_folder: str | None = None,
         contour_prop: str = "cell_contour",
     ):
+        _check_width_method(width_method)
         super().__init__(property)
         self.pixel_size = pixel_size
         self.skeleton_method = skeleton_method
