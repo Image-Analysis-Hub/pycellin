@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pycellin"
-version = "0.6.0.dev0"
+version = "0.6.0"
 authors = [{ name = "Laura Xénard", email = "laura.xenard@protonmail.com" }]
 description = "Graph-based framework to manipulate and analyze cell lineages from cell tracking data"
 readme = "README.md"
@@ -12,8 +12,8 @@ license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 dependencies = [
-    "geff>=1.1.3.1.1",
-    "geff-spec>=1.1",
+    "geff>=1.1.4.1.1",
+    "geff-spec>=1.1.1",
     "igraph>=0.9",
     "lxml>=5",
     "networkx>=3",
@@ -29,6 +29,11 @@ dependencies = [
 classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
@@ -44,8 +49,9 @@ notebooks = [
 ]
 
 [project.urls]
-Documentation = "https://Image-Analysis-Hub.github.io/pycellin/"
-Examples = "https://Image-Analysis-Hub.github.io/pycellin/notebooks/"
+Documentation = "https://pycellin.readthedocs.io/"
+Examples = "https://github.com/Image-Analysis-Hub/pycellin/tree/main/notebooks"
+Changelog = "https://github.com/Image-Analysis-Hub/pycellin/blob/main/CHANGELOG.md"
 Issues = "https://github.com/Image-Analysis-Hub/pycellin/issues"
 Source = "https://github.com/Image-Analysis-Hub/pycellin/"
 
@@ -55,9 +61,45 @@ test = [
     "pytest>=8.3",
     "pytest-cov>=6.0",
 ]
+docs = [
+    "myst-parser>=5.2",
+    "numpydoc>=1.11",
+    "pydata-sphinx-theme>=0.24",
+    "sphinx>=9.2",
+    "sphinx-design>=0.8",
+]
 
 [tool.setuptools.packages.find]
 include = ["pycellin*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+# Ruff's default rules, plus line length (E501) for code, docstrings and comments, and
+# the docstring rules (D), set below to numpydoc's conventions.
+extend-select = ["E501", "D"]
+
+[tool.ruff.lint.per-file-ignores]
+# Docstring rules for the package only: not for tests, notebooks or docs/conf.py.
+"!pycellin/**" = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.pydoclint]
+# Check that the docstrings of the package match the signatures: parameters, with
+# their type hints and defaults, and return types. Run with: pydoclint pycellin
+style = "numpy"
+# The type of a parameter with a default ends with ", default=<value>", as written in
+# the signature.
+check-arg-defaults = true
+# Raises sections also list the exceptions raised by the functions called.
+skip-checking-raises = true
+# Class attributes are documented with #: comments, not in an Attributes section.
+check-class-attributes = false
+# Docstrings with a summary only are checked too: every docstring has full sections.
+skip-checking-short-docstrings = false

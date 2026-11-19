@@ -1,97 +1,119 @@
 #!/usr/bin/env python3
 
-import importlib.metadata
+"""Helpers shared by Pycellin's modules: type checks, colors, data types and units."""
+
+import inspect
 import numbers
 import re
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any, Literal, get_args, get_origin
 
-import networkx as nx
-import networkx.algorithms.isomorphism as iso
 from plotly.colors import hex_to_rgb, unlabel_rgb
 
+# Folder of the Pycellin package, to tell its frames from the user's.
+_PACKAGE_DIR = Path(__file__).parent
 
-def check_literal_type(value, literal_type) -> bool:
+
+def _find_stack_level() -> int:
+    """
+    Return the stack level that points a warning at the first frame outside Pycellin.
+
+    Given as the `stacklevel` of `warnings.warn`, it makes the warning show the line
+    of the user's code that led to it, whatever the depth of Pycellin's calls in
+    between.
+
+    Returns
+    -------
+    int
+        Number of frames from this function to the first one outside the Pycellin
+        package.
+    """
+    frame = inspect.currentframe()
+    level = 0
+    try:
+        # Comparing paths, not strings: Windows paths compare case-insensitively, and
+        # pseudo-files such as "<string>" never match, whatever the working directory.
+        while frame is not None and Path(frame.f_code.co_filename).is_relative_to(
+            _PACKAGE_DIR
+        ):
+            frame = frame.f_back
+            level += 1
+    finally:
+        # Frames hold references to their variables: break the cycle.
+        del frame
+    return level
+
+
+def _check_literal_type(value: Any, literal_type: Any) -> bool:
+    """
+    Check whether a value is one of the values of a `typing.Literal` type.
+
+    Parameters
+    ----------
+    value : Any
+        The value to check.
+    literal_type : Any
+        The ``Literal`` type, e.g. ``Literal["cell", "cycle", "both"]``.
+
+    Returns
+    -------
+    bool
+        True if `value` is one of the values of `literal_type`, False otherwise.
+
+    Raises
+    ------
+    TypeError
+        If `literal_type` is not a ``Literal`` type.
+    """
     if get_origin(literal_type) is Literal:
         return value in get_args(literal_type)
     raise TypeError(f"{literal_type} is not a Literal type")
 
 
-# TODO: this function should move into a tests/utils.py file
-def is_equal(obt: nx.DiGraph, exp: nx.DiGraph) -> bool:
-    """Check if two graphs are perfectly identical.
+def _check_integer(value: Any, name: str) -> None:
+    """
+    Check that a value is an integer.
 
-    It checks that the graphs are isomorphic, and that their graph,
-    nodes and edges attributes are all identical.
+    NumPy integers are accepted, since they are what the integers of a DataFrame are.
+    Booleans are rejected, although bool is a subclass of int.
 
     Parameters
     ----------
-    obt : nx.DiGraph
-        The obtained graph, built from XML_reader.py.
-    exp : nx.DiGraph
-        The expected graph, built from here.
+    value : Any
+        The value to check.
+    name : str
+        The name of the value, for the error message.
 
-    Returns
-    -------
-    bool : True if the graphs are identical, False otherwise.
+    Raises
+    ------
+    TypeError
+        If the value is not an integer.
     """
-    edges_attr = list(set([k for (n1, n2, d) in exp.edges.data() for k in d]))
-    edges_default = len(edges_attr) * [0]
-    em = iso.categorical_edge_match(edges_attr, edges_default)
-    nodes_attr = list(set([k for (n, d) in exp.nodes.data() for k in d]))
-    nodes_default = len(nodes_attr) * [0]
-    nm = iso.categorical_node_match(nodes_attr, nodes_default)
-
-    if not obt.nodes.data() and not exp.nodes.data():
-        same_nodes = True
-    elif len(obt.nodes.data()) != len(exp.nodes.data()):
-        same_nodes = False
-    else:
-        for data1, data2 in zip(sorted(obt.nodes.data()), sorted(exp.nodes.data())):
-            n1, attr1 = data1
-            n2, attr2 = data2
-            if sorted(attr1) == sorted(attr2) and n1 == n2:
-                same_nodes = True
-            else:
-                same_nodes = False
-
-    if not obt.edges.data() and not exp.edges.data():
-        same_edges = True
-    elif len(obt.edges.data()) != len(exp.edges.data()):
-        same_edges = False
-    else:
-        for data1, data2 in zip(sorted(obt.edges.data()), sorted(exp.edges.data())):
-            n11, n12, attr1 = data1
-            n21, n22, attr2 = data2
-            if sorted(attr1) == sorted(attr2) and sorted((n11, n12)) == sorted(
-                (n21, n22)
-            ):
-                same_edges = True
-            else:
-                same_edges = False
-
-    if (
-        nx.is_isomorphic(obt, exp, edge_match=em, node_match=nm)
-        and obt.graph == exp.graph
-        and same_nodes
-        and same_edges
-    ):
-        return True
-    else:
-        return False
-
-
-def get_pycellin_version() -> str:
-    """Get pycellin version from package metadata"""
-    try:
-        return importlib.metadata.version("pycellin")
-    except importlib.metadata.PackageNotFoundError:
-        return "development"
+    if isinstance(value, bool) or not isinstance(value, numbers.Integral):
+        raise TypeError(f"'{name}' must be an integer, not {type(value).__name__}.")
 
 
 def _color_to_rgba(color: str, alpha: float) -> str:
     """
-    Convert an 'rgb(r,g,b)' or '#rrggbb' color to an 'rgba(r,g,b,a)' string.
+    Convert an ``"rgb(r,g,b)"`` or ``"#rrggbb"`` color to an ``"rgba(r,g,b,a)"`` string.
+
+    Parameters
+    ----------
+    color : str
+        The color, as ``"rgb(r,g,b)"`` or ``"#rrggbb"``.
+    alpha : float
+        The opacity of the color, between 0 and 1.
+
+    Returns
+    -------
+    str
+        The color as ``"rgba(r,g,b,a)"``.
+
+    Raises
+    ------
+    ValueError
+        If `alpha` is not between 0 and 1, or if `color` is in another format.
     """
     if not 0.0 <= alpha <= 1.0:
         raise ValueError(f"Argument 'alpha' must be in [0, 1], got {alpha}.")
@@ -106,8 +128,8 @@ def _color_to_rgba(color: str, alpha: float) -> str:
     return f"rgba({r},{g},{b},{alpha})"
 
 
-# Spellings of the data types of properties, grouped by canonical pycellin data type.
-# Loaders and libraries spell them differently (e.g. GEFF uses numpy names).
+#: Spellings of the data types of properties, grouped by canonical Pycellin data type:
+#: loaders and libraries spell them differently (e.g. GEFF uses numpy names).
 _DTYPE_SPELLINGS = {
     "int": (
         "int",
@@ -126,6 +148,7 @@ _DTYPE_SPELLINGS = {
     "string": ("string", "str"),
     "bool": ("bool", "bool_", "boolean"),
 }
+#: Canonical Pycellin data type of each spelling of ``_DTYPE_SPELLINGS``.
 _DTYPE_ALIASES = {
     spelling: canonical
     for canonical, spellings in _DTYPE_SPELLINGS.items()
@@ -137,10 +160,11 @@ def _normalize_dtype(dtype: str | None) -> str | None:
     """
     Return the canonical spelling of a property data type.
 
-    Spellings of integers, floats, strings and booleans (e.g. "int64", "float32",
-    "str", "bool_") are mapped, case-insensitively, to "int", "float", "string" and
-    "bool". Other data types, such as containers or class names, are returned
-    unchanged since they cannot be normalized reliably.
+    Spellings of integers, floats, strings and booleans (e.g. ``"int64"``,
+    ``"float32"``, ``"str"``, ``"bool_"``) are mapped, case-insensitively, to
+    ``"int"``, ``"float"``, ``"string"`` and ``"bool"``. Other data types, such as
+    containers or class names, are returned unchanged since they cannot be normalized
+    reliably.
 
     Parameters
     ----------
@@ -217,11 +241,12 @@ def _infer_dtype(values: Iterable[Any]) -> str | None:
     """
     Infer the data type of values, in Python type hint syntax.
 
-    Booleans, integers (numpy integers included), real numbers and strings give "bool",
-    "int", "float" and "str" respectively. Integers mixed with real numbers give 
-    "float". Values of other types give their class name, prefixed by their module 
-    unless built in (e.g. "dict", "numpy.ndarray"). Values of several types give a 
-    union of their data types (e.g. "int | str"). None values are ignored.
+    Booleans, integers (numpy integers included), real numbers and strings give
+    ``"bool"``, ``"int"``, ``"float"`` and ``"str"`` respectively. Integers mixed with
+    real numbers give ``"float"``. Values of other types give their class name,
+    prefixed by their module unless built in (e.g. ``"dict"``, ``"numpy.ndarray"``).
+    Values of several types give a union of their data types (e.g. ``"int | str"``).
+    None values are ignored.
 
     Parameters
     ----------
@@ -257,3 +282,34 @@ def _infer_dtype(values: Iterable[Any]) -> str | None:
     if {"int", "float"} <= names:
         names.discard("int")
     return " | ".join(sorted(names))
+
+
+def _unit_uses(unit: str, base_unit: str) -> bool:
+    """
+    Check if a unit is written with another unit.
+
+    For example, ``"micrometer/minute"`` is written with ``"minute"``. Units are
+    compared word by word, a word being a run of letters: ``"min"`` is found in
+    ``"1/min"`` but not in ``"minute"``, and ``"m"`` in ``"m^2"`` but not in ``"mm"``.
+
+    Parameters
+    ----------
+    unit : str
+        The unit to search, e.g. ``"micrometer/minute"``.
+    base_unit : str
+        The unit to look for, e.g. ``"minute"``.
+
+    Returns
+    -------
+    bool
+        True if the words of `base_unit` appear in `unit`, in a row.
+    """
+
+    def words(text: str) -> list[str]:
+        return "".join(char if char.isalpha() else " " for char in text).split()
+
+    unit_words, base_words = words(unit), words(base_unit)
+    n = len(base_words)
+    return n > 0 and any(
+        unit_words[i : i + n] == base_words for i in range(len(unit_words) - n + 1)
+    )

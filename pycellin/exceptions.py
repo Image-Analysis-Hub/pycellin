@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+
+"""Exceptions raised by Pycellin."""
+
+# TODO: add a Warning when a property is not present across all cells,
+# links, or lineages?
+
+# TODO: create an exception when unknown cell, cell cycle, link, lineage...
+
+# TODO: maybe add a PropertyTypeValueError and a LineageTypeValueError
+
+
+class LineageStructureError(ValueError):
+    """
+    Raised when an incorrect lineage structure is detected.
+
+    Parameters
+    ----------
+    message : str
+        The error message.
+    """
+
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(self.message)
+
+
+class FusionError(LineageStructureError):
+    """
+    Raised when a fusion event is detected in the lineage structure.
+
+    A fusion event happens when a node has more than one parent, i.e. an in-degree
+    greater than 1.
+
+    Parameters
+    ----------
+    node_id : int
+        The ID of the node where the fusion event was detected.
+    lineage_id : int | None, default=None
+        The ID of the lineage where the fusion event was detected.
+    message : str | None, default=None
+        Custom error message. If not provided, a default message is displayed.
+    """
+
+    def __init__(
+        self,
+        node_id: int,
+        lineage_id: int | None = None,
+        message: str | None = None,
+    ):
+        self.node_id = node_id
+        self.lineage_id = lineage_id
+        if message is None:
+            if lineage_id is None:
+                message = f"Node {node_id} has more than one parent node."
+            else:
+                message = (
+                    f"Node {node_id} in lineage {lineage_id} has more than one "
+                    "parent node."
+                )
+        super().__init__(message)
+
+
+class TimeFlowError(LineageStructureError):
+    """
+    Raised when a time flow error is detected in the lineage structure.
+
+    In a lineage graph, time flows from the root of the graph to the leaves.
+    As a result, a node should always have a time value greater than its parent.
+
+    Parameters
+    ----------
+    source_node_id : int
+        The ID of the source node of the link: the parent.
+    target_node_id : int
+        The ID of the target node of the link: the child.
+    source_lineage_id : int | None, default=None
+        The ID of the lineage of the source node.
+    target_lineage_id : int | None, default=None
+        The ID of the lineage of the target node.
+    message : str | None, default=None
+        Custom error message. If not provided, a default message is displayed.
+    """
+
+    def __init__(
+        self,
+        source_node_id: int,
+        target_node_id: int,
+        source_lineage_id: int | None = None,
+        target_lineage_id: int | None = None,
+        message: str | None = None,
+    ):
+        self.source_node_id = source_node_id
+        self.source_lineage_id = source_lineage_id
+        self.target_node_id = target_node_id
+        self.target_lineage_id = target_lineage_id
+        if message is None:
+            txt_source_lin = (
+                "" if source_lineage_id is None else f" in lineage {source_lineage_id}"
+            )
+            txt_target_lin = (
+                "" if target_lineage_id is None else f" in lineage {target_lineage_id}"
+            )
+            message = (
+                f"Node {target_node_id}{txt_target_lin} "
+                f"has a time value lower than or equal to that of its parent node, "
+                f"node {source_node_id}{txt_source_lin}."
+            )
+        super().__init__(message)
+
+
+class UpdateRequiredError(RuntimeError):
+    """
+    Raised when an update is required before performing an operation.
+
+    Parameters
+    ----------
+    message : str | None, default=None
+        Custom error message. If not provided, a default message is displayed.
+    """
+
+    def __init__(
+        self,
+        message: str | None = None,
+    ):
+        if message is None:
+            message = "An update is required before performing this operation."
+        super().__init__(message)
+
+
+class ProtectedPropertyError(AttributeError):
+    """
+    Raised when trying to modify or delete a protected property.
+
+    Parameters
+    ----------
+    prop : str
+        The identifier of the property that is protected.
+    message : str | None, default=None
+        Custom error message. If not provided, a default message is displayed.
+    """
+
+    def __init__(self, prop: str, message: str | None = None):
+        self.prop = prop
+        if message is None:
+            message = (
+                f"The property '{prop}' is protected and cannot be modified "
+                "nor removed."
+            )
+        super().__init__(message)
+
+
+class MissingPropertyError(KeyError):
+    """
+    Raised when a required property is missing from a node or from the model.
+
+    Parameters
+    ----------
+    prop : str
+        The identifier of the missing property.
+    node_id : int | None, default=None
+        The ID of the node where the property is missing. None when the property
+        is missing from the model rather than from a specific node.
+    lineage_id : int | None, default=None
+        The ID of the lineage where the property is missing.
+    message : str | None, default=None
+        Custom error message. If not provided, a default message is displayed.
+    """
+
+    def __init__(
+        self,
+        prop: str,
+        node_id: int | None = None,
+        lineage_id: int | None = None,
+        message: str | None = None,
+    ):
+        self.prop = prop
+        self.node_id = node_id
+        self.lineage_id = lineage_id
+        if message is None:
+            node_txt = f" for node {node_id}" if node_id is not None else ""
+            lin_txt = f" in lineage {lineage_id}" if lineage_id is not None else ""
+            message = f"Required property '{prop}' is missing{node_txt}{lin_txt}."
+        self.message = message
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        """
+        Return the error message, without the quotes that `KeyError` adds.
+
+        Returns
+        -------
+        str
+            The error message.
+        """
+        # KeyError.__str__() returns the repr of the message, i.e. in quotes.
+        return self.message
+
+
+class PycellinWarning(UserWarning):
+    """
+    Category of the warnings issued by Pycellin.
+
+    Pycellin warns when the code that calls it can avoid the problem, e.g. with
+    another argument or a change to the model. What the code can't avoid, e.g. in the
+    content of a file read, is logged instead with the `logging` module, under the
+    ``pycellin`` logger.
+
+    Examples
+    --------
+    Hide all the warnings of Pycellin:
+
+    >>> import warnings
+    >>> import pycellin as pc
+    >>> warnings.filterwarnings("ignore", category=pc.exceptions.PycellinWarning)
+    """

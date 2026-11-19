@@ -1,107 +1,163 @@
 #!/usr/bin/env python3
 
+"""The `PropsMetadata` class: the declarations of the properties of a model."""
+
 import copy
+import logging
 import warnings
-from typing import get_args
+from typing import Any, get_args
 
 from pycellin.classes.property import Property
-from pycellin.custom_types import LineageType, PropertyType, property_type_from_string
+from pycellin.custom_types import LineageType, PropertyType, _property_type_from_string
+from pycellin.exceptions import PycellinWarning
 from pycellin.properties.core import (
     create_cells_property,
     create_cycle_duration_property,
     create_cycle_end_time_property,
     create_cycle_id_property,
-    create_cycle_length_property,
+    create_cycle_num_cells_property,
     create_cycle_start_time_property,
     create_first_cell_property,
+    create_generation_property,
     create_last_cell_property,
-    create_level_property,
 )
-from pycellin.utils import check_literal_type
+from pycellin.utils import _check_literal_type, _find_stack_level
+
+logger = logging.getLogger(__name__)
 
 
 class PropsMetadata:
     """
-    The PropsMetadata class is used to store the properties that are
-    associated with the nodes, edges, and lineages of cell lineage graphs.
+    Store the properties associated with the nodes, edges and lineages of lineages.
+
+    Parameters
+    ----------
+    properties : dict[str, Property] | None, default=None
+        A dictionary of properties where the keys are the property identifiers and
+        the values are the `Property` objects.
+    protected_props : list[str] | None, default=None
+        A list of property identifiers that are protected from being modified or
+        removed. Identifiers missing from `properties` are dropped, with a warning.
+    propagated_props : list[str] | None, default=None
+        The identifiers of the cycle properties propagated to the cell lineages with
+        `Model.propagate_cycle_properties()`, which `Model.update()` copies again.
 
     Attributes
     ----------
-    props : dict[str, Property]
+    properties : dict[str, Property]
         A dictionary of properties where the keys are the property identifiers and
-        the values are the Property objects.
-    protected_props : list[str]
-        A list of property identifiers that are protected from being modified or removed.
+        the values are the `Property` objects.
 
     Notes
     -----
-    Spatial and temporal units are not part of the PropsMetadata but of the
+    Spatial and temporal units are not part of the `PropsMetadata` but of the
     properties themselves to allow different units for a same dimension (e.g. time
     in seconds or minutes).
     """
 
     def __init__(
         self,
-        props: dict[str, Property] | None = None,
+        properties: dict[str, Property] | None = None,
         protected_props: list[str] | None = None,
+        propagated_props: list[str] | None = None,
     ) -> None:
-        self.props = props if props is not None else {}
-        self._protected_props = protected_props if protected_props is not None else []
-        for prop in self._protected_props:
-            if prop not in self.props:
+        self.properties = properties if properties is not None else {}
+        self._protected_props: list[str] = []
+        for prop in protected_props or []:
+            if prop in self.properties:
+                self._protected_props.append(prop)
+            else:
                 msg = (
                     f"Protected property '{prop}' does not exist in the declared "
                     "properties. Removing it from the list of protected properties."
                 )
-                warnings.warn(msg)
-                self._protected_props.remove(prop)
+                warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
+        self._propagated_props = list(propagated_props or [])
 
-    def __deepcopy__(self, memo):
+    def __deepcopy__(self, memo: dict[int, Any]) -> "PropsMetadata":
         """
-        Create a deep copy of the PropsMetadata object.
+        Create a deep copy of the `PropsMetadata` object.
 
         Parameters
         ----------
-        memo : dict
+        memo : dict[int, Any]
             A dictionary used by the copy module to track already copied objects
             to handle circular references.
 
         Returns
         -------
         PropsMetadata
-            A deep copy of the PropsMetadata object with all properties and
-            protected properties lists independently copied.
+            A deep copy of the `PropsMetadata` object with all properties and the
+            lists of protected and propagated properties independently copied.
         """
         props_copy = {
-            prop_id: copy.deepcopy(prop, memo) for prop_id, prop in self.props.items()
+            prop_id: copy.deepcopy(prop, memo)
+            for prop_id, prop in self.properties.items()
         }
         protected_props_copy = copy.deepcopy(self._protected_props, memo)
-        return PropsMetadata(props=props_copy, protected_props=protected_props_copy)
+        propagated_props_copy = copy.deepcopy(self._propagated_props, memo)
+        return PropsMetadata(
+            properties=props_copy,
+            protected_props=protected_props_copy,
+            propagated_props=propagated_props_copy,
+        )
 
-    def __eq__(self, other):
+    def __setstate__(self, state: dict) -> None:
+        """
+        Restore a pickled `PropsMetadata` object.
+
+        Parameters
+        ----------
+        state : dict
+            State dictionary from pickling.
+        """
+        # Objects pickled before propagated properties were recorded have no record.
+        state.setdefault("_propagated_props", [])
+        # Propagated properties.
+        for prop_id in state["_propagated_props"]:
+            prop = state.get("properties", {}).get(prop_id)
+            if prop is not None and prop.lineage_type == "both":
+                prop.lineage_type = "cycle"
+        self.__dict__.update(state)
+
+    def __eq__(self, other: object) -> bool:
+        """
+        Return whether two `PropsMetadata` objects declare the same properties.
+
+        Parameters
+        ----------
+        other : object
+            The object to compare with.
+
+        Returns
+        -------
+        bool
+            True if `other` is a `PropsMetadata` with the same property declarations,
+            False otherwise. The protected and propagated properties are not compared.
+        """
         if not isinstance(other, PropsMetadata):
             return False
-        return self.props == other.props
+        return self.properties == other.properties
 
     def __repr__(self) -> str:
         """
-        Compute a string representation of the PropsMetadata object.
+        Compute a string representation of the `PropsMetadata` object.
 
         Returns
         -------
         str
-            A string representation of the PropsMetadata object.
+            A string representation of the `PropsMetadata` object.
         """
-        return f"PropsMetadata(props={self.props!r})"
+        return f"PropsMetadata(properties={self.properties!r})"
 
     def __str__(self) -> str:
         """
-        Compute a human-readable str representation of the PropsMetadata object.
+        Compute a human-readable string representation of the `PropsMetadata` object.
 
         Returns
         -------
         str
-            A human-readable string representation of the PropsMetadata object.
+            A human-readable string representation of the `PropsMetadata` object.
         """
         node_props = ", ".join(
             self._get_prop_dict_from_prop_type(PropertyType.NODE).keys()
@@ -123,7 +179,7 @@ class PropsMetadata:
         prop_id: str,
     ) -> bool:
         """
-        Check if the PropsMetadata contains the specified property.
+        Check if the `PropsMetadata` contains the specified property.
 
         Parameters
         ----------
@@ -135,87 +191,102 @@ class PropsMetadata:
         bool
             True if the property has been declared, False otherwise.
         """
-        return prop_id in self.props
+        return prop_id in self.properties
 
     def _get_prop_dict_from_prop_type(
         self,
         prop_type: PropertyType | str | list[str],
         exact_match: bool = False,
-    ) -> dict:
+    ) -> dict[str, Property]:
         """
         Return the dictionary of properties corresponding to the specified type.
 
         By default, uses "has-flag" semantics: returns properties that have ANY of
-        the specified flags set. For example, searching for NODE will return
-        properties with NODE, NODE|LINEAGE, etc.
+        the specified flags set. For example, searching for ``NODE`` will return
+        properties with ``NODE``, ``NODE|LINEAGE``, etc.
 
         Parameters
         ----------
-        prop_type : PropertyType or str or list[str]
+        prop_type : PropertyType | str | list[str]
             The type of the property. Can be:
-            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE,
-            or combinations like PropertyType.NODE | PropertyType.EDGE.
-            - String: "node", "edge", or "lineage"
-            - List of strings: ["node", "lineage"] for multi-type properties
-        exact_match : bool, default False
-            If False (default), returns properties that have ANY of the specified flags.
+
+            - PropertyType Flag: ``PropertyType.NODE``, ``PropertyType.EDGE``,
+              ``PropertyType.LINEAGE``, or combinations like
+              ``PropertyType.NODE | PropertyType.EDGE``.
+            - String: ``"node"``, ``"edge"``, or ``"lineage"``.
+            - List of strings: ``["node", "lineage"]`` for multi-type properties.
+        exact_match : bool, default=False
+            If False, returns properties that have ANY of the specified flags.
             If True, returns only properties that exactly match the specified flags.
 
         Returns
         -------
-        dict
-            The dictionary of properties corresponding to the specified type.
+        dict[str, Property]
+            The dictionary of properties corresponding to the specified type, by
+            identifier.
 
         Raises
         ------
+        KeyError
+            If `prop_type` is, or contains, a string that is not a property type.
         ValueError
-            If the property type is invalid.
+            If `prop_type` is an empty list, or is not a valid property type.
         """
         # Convert string/list to PropertyType Flag if needed.
         if isinstance(prop_type, (str, list)):
-            prop_type = property_type_from_string(prop_type)
+            prop_type = _property_type_from_string(prop_type)
 
         # Validate PropertyType.
         if not isinstance(prop_type, PropertyType) or prop_type == PropertyType(0):
             raise ValueError(
-                "Property type must be a valid PropertyType Flag with at least one flag set. "
-                "Valid types: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE, "
-                "or strings/lists: 'node', 'edge', 'lineage', ['node', 'lineage']."
+                "Property type must be a valid PropertyType Flag with at least one "
+                "flag set. Valid types: PropertyType.NODE, PropertyType.EDGE, "
+                "PropertyType.LINEAGE, or strings/lists: 'node', 'edge', 'lineage', "
+                "['node', 'lineage']."
             )
 
         # Filter properties based on match type.
         if exact_match:
-            props = {k: v for k, v in self.props.items() if v.prop_type == prop_type}
+            props = {
+                k: v for k, v in self.properties.items() if v.prop_type == prop_type
+            }
         else:
-            props = {k: v for k, v in self.props.items() if v.prop_type & prop_type}
+            props = {
+                k: v for k, v in self.properties.items() if v.prop_type & prop_type
+            }
 
         return props
 
-    def _get_prop_dict_from_lin_type(self, lin_type: LineageType) -> dict:
+    def _get_prop_dict_from_lin_type(
+        self, lineage_type: LineageType
+    ) -> dict[str, Property]:
         """
         Return the dictionary of properties corresponding to the specified lineage type.
 
         Parameters
         ----------
-        lin_type : LineageType
-            The type of the lineage properties to return (CellLineage,
-            CycleLineage or Lineage).
+        lineage_type : LineageType
+            The lineage type of the properties to return: ``"cell"``, ``"cycle"`` or
+            ``"both"``. Only the properties of this exact lineage type are returned.
 
         Returns
         -------
-        dict
-            The dictionary of properties corresponding to the specified lineage type.
+        dict[str, Property]
+            The dictionary of properties corresponding to the specified lineage type,
+            by identifier.
 
         Raises
         ------
         ValueError
             If the lineage type is invalid.
         """
-        if not check_literal_type(lin_type, LineageType):
+        if not _check_literal_type(lineage_type, LineageType):
             raise ValueError(
                 f"Lineage type must be one of {', '.join(get_args(LineageType))}."
             )
-        props = {k: v for k, v in self.props.items() if lin_type == v.lin_type}
+        props = {
+            k: v for k, v in self.properties.items() if lineage_type == v.lineage_type
+        }
         return props
 
     def _get_protected_props(self) -> list[str]:
@@ -229,44 +300,78 @@ class PropsMetadata:
         """
         return self._protected_props
 
+    def _get_propagated_props(self) -> list[str]:
+        """
+        Return the cycle properties propagated to the cell lineages.
+
+        Returns
+        -------
+        list[str]
+            The identifiers of the propagated properties.
+        """
+        return self._propagated_props
+
+    def _add_propagated_prop(self, prop_id: str) -> None:
+        """
+        Record that a cycle property is propagated to the cell lineages.
+
+        Parameters
+        ----------
+        prop_id : str
+            The identifier of the propagated property.
+        """
+        if prop_id not in self._propagated_props:
+            self._propagated_props.append(prop_id)
+
     def _add_prop(self, property: Property, overwrite: bool = False) -> None:
         """
-        Add the specified property to the PropsMetadata.
+        Add the specified property to the `PropsMetadata`.
 
         Parameters
         ----------
         property : Property
             The property to add.
-        overwrite : bool, optional
+        overwrite : bool, default=False
             Whether to overwrite an existing property with the same identifier.
-            If False (default), existing properties will not be overwritten but a
+            If False, existing properties will not be overwritten but a
             warning will be issued. If True, existing properties will be overwritten.
 
         Warns
         -----
-        UserWarning
-            If a property with the same identifier already exists and overwrite=True.
-            The existing property will be overwritten.
-        UserWarning
-            If a property with the same identifier already exists and overwrite=False.
-            The existing property will NOT be overwritten.
+        PycellinWarning
+            If a property with the same identifier but another property type already
+            exists and `overwrite` is True: the existing property is overwritten.
+            If a property with the same identifier already exists and `overwrite` is
+            False: the existing property is NOT overwritten.
+
+        Notes
+        -----
+        Overwriting a property of the same type, e.g. to update its unit after
+        rescaling, is reported at the info level of the `logging` module.
         """
-        if property.identifier in self.props:
-            old_prop = self.props[property.identifier]
-            if property.prop_type == old_prop.prop_type:
-                txt = "with the same type"
-            else:
-                txt = "with a different type"
+        if property.identifier in self.properties:
+            old_prop = self.properties[property.identifier]
+            same_type = property.prop_type == old_prop.prop_type
+            txt = "with the same type" if same_type else "with a different type"
 
             if overwrite:
-                msg = f"A Property '{property.identifier}' already exists {txt}. Overwriting the old Property."
-                warnings.warn(msg, stacklevel=2)
-                self.props[property.identifier] = property
+                msg = (
+                    f"A Property '{property.identifier}' already exists {txt}. "
+                    "Overwriting the old Property."
+                )
+                if same_type:
+                    logger.info(msg)
+                else:
+                    warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
+                self.properties[property.identifier] = property
             else:
-                msg = f"A Property '{property.identifier}' already exists {txt}. Not overwriting the old Property."
-                warnings.warn(msg, stacklevel=2)
+                msg = (
+                    f"A Property '{property.identifier}' already exists {txt}. "
+                    "Not overwriting the old Property."
+                )
+                warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
         else:
-            self.props[property.identifier] = property
+            self.properties[property.identifier] = property
 
     def _add_props(
         self,
@@ -274,42 +379,74 @@ class PropsMetadata:
         overwrite: bool = False,
     ) -> None:
         """
-        Add the specified properties to the PropsMetadata.
+        Add the specified properties to the `PropsMetadata`.
 
         Parameters
         ----------
         properties : list[Property]
             The properties to add.
-        overwrite : bool, optional
+        overwrite : bool, default=False
             Whether to overwrite existing properties with the same identifier.
-            If False (default), existing properties will not be overwritten but a
+            If False, existing properties will not be overwritten but a
             warning will be issued. If True, existing properties will be overwritten.
+
+        Warns
+        -----
+        PycellinWarning
+            If a property with the same identifier already exists and is not
+            overwritten, or is overwritten by a property of another type.
+
+        Notes
+        -----
+        Overwriting a property of the same type is reported at the info level of the
+        `logging` module.
         """
         for property in properties:
             self._add_prop(property, overwrite=overwrite)
+
+    @staticmethod
+    def _create_cycle_lineage_props(time_unit: str | None) -> list[Property]:
+        """
+        Create the declarations of the basic properties of cell cycle lineages.
+
+        Parameters
+        ----------
+        time_unit : str | None
+            The unit of the time property (e.g. ``"frame"``, ``"minute"``,
+            ``"hour"``, etc.).
+
+        Returns
+        -------
+        list[Property]
+            The declarations of the basic properties of cell cycle lineages.
+        """
+        return [
+            create_cycle_id_property(),
+            create_cells_property(),
+            create_first_cell_property(),
+            create_last_cell_property(),
+            create_cycle_num_cells_property(),
+            create_cycle_duration_property(time_unit),
+            create_cycle_start_time_property(time_unit),
+            create_cycle_end_time_property(time_unit),
+            create_generation_property(),
+        ]
 
     def _add_cycle_lineage_props(self, time_unit: str | None) -> None:
         """
         Add the basic properties of cell cycle lineages.
 
+        Properties already declared are left as they are. The properties added are
+        protected.
+
         Parameters
         ----------
         time_unit : str | None
-            The unit of the time property (e.g. 'frame', 'minute', 'hour', etc.).
+            The unit of the time property (e.g. ``"frame"``, ``"minute"``,
+            ``"hour"``, etc.).
         """
-        props = [
-            create_cycle_id_property(),
-            create_cells_property(),
-            create_first_cell_property(),
-            create_last_cell_property(),
-            create_cycle_length_property(),
-            create_cycle_duration_property(time_unit),
-            create_cycle_start_time_property(time_unit),
-            create_cycle_end_time_property(time_unit),
-            create_level_property(),
-        ]
-        for prop in props:
-            if prop.identifier not in self.props:
+        for prop in self._create_cycle_lineage_props(time_unit):
+            if prop.identifier not in self.properties:
                 self._add_prop(prop)
                 self._protect_prop(prop.identifier)
 
@@ -319,7 +456,7 @@ class PropsMetadata:
         prop_type: PropertyType | None = None,
     ) -> None:
         """
-        Remove the specified property from the PropsMetadata.
+        Remove the specified property from the `PropsMetadata`.
 
         For multi-type properties, can either remove entirely or just remove
         specific types.
@@ -328,24 +465,25 @@ class PropsMetadata:
         ----------
         prop_id : str
             The identifier of the property to remove.
-        prop_type : PropertyType, optional
-            If specified, only remove the property for the specified type. For multi-type
-            properties (e.g., NODE|LINEAGE), this allows converting to single-type
-            by removing one flag. If None (default), the property is removed entirely.
-
-        Warns
-        -----
-        UserWarning
-            If the property is protected and cannot be removed.
+        prop_type : PropertyType | None, default=None
+            If specified, only remove the property for the specified type. For
+            multi-type properties (e.g., ``NODE|LINEAGE``), this allows converting to
+            single-type by removing one flag. If None, the property is removed
+            entirely.
 
         Raises
         ------
         KeyError
             If the property does not exist.
         ValueError
-            If prop_type is specified but the property doesn't have those flags.
+            If `prop_type` is specified but the property doesn't have those flags.
+
+        Warns
+        -----
+        PycellinWarning
+            If the property is protected and cannot be removed.
         """
-        if prop_id not in self.props:
+        if prop_id not in self.properties:
             raise KeyError(
                 f"Property '{prop_id}' does not exist in the declared properties."
             )
@@ -354,16 +492,17 @@ class PropsMetadata:
                 f"Property '{prop_id}' is protected and cannot be removed. "
                 "Unprotect the property before modifying it."
             )
-            warnings.warn(msg)
+            warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
             return
 
         # If no prop_type specified, remove entirely.
         if prop_type is None:
-            del self.props[prop_id]
+            del self.properties[prop_id]
+            self._forget_propagated_prop(prop_id)
             return
 
         # Determine new type for the property.
-        current_prop_type = self.props[prop_id].prop_type
+        current_prop_type = self.properties[prop_id].prop_type
         if not (current_prop_type & prop_type):
             raise ValueError(
                 f"Property '{prop_id}' does not have type(s) {prop_type}. "
@@ -373,9 +512,22 @@ class PropsMetadata:
 
         # Update or remove the property.
         if new_prop_type == PropertyType(0):
-            del self.props[prop_id]
+            del self.properties[prop_id]
+            self._forget_propagated_prop(prop_id)
         else:
-            self.props[prop_id].prop_type = new_prop_type
+            self.properties[prop_id].prop_type = new_prop_type
+
+    def _forget_propagated_prop(self, prop_id: str) -> None:
+        """
+        Drop a property from the record of the propagated properties, if it is in it.
+
+        Parameters
+        ----------
+        prop_id : str
+            The identifier of the property.
+        """
+        if prop_id in self._propagated_props:
+            self._propagated_props.remove(prop_id)
 
     def _remove_props(
         self,
@@ -383,15 +535,27 @@ class PropsMetadata:
         prop_type: PropertyType | None = None,
     ) -> None:
         """
-        Remove the specified properties from the PropsMetadata.
+        Remove the specified properties from the `PropsMetadata`.
 
         Parameters
         ----------
         prop_ids : list[str]
             The identifiers of the properties to remove.
-        prop_type : PropertyType, optional
+        prop_type : PropertyType | None, default=None
             If specified, only remove the properties for the specified type.
-            If None (default), properties are removed entirely.
+            If None, properties are removed entirely.
+
+        Raises
+        ------
+        KeyError
+            If a property does not exist.
+        ValueError
+            If `prop_type` is specified but a property doesn't have those flags.
+
+        Warns
+        -----
+        PycellinWarning
+            If a property is protected and cannot be removed.
         """
         for prop_id in prop_ids:
             self._remove_prop(prop_id, prop_type)
@@ -415,22 +579,39 @@ class PropsMetadata:
         ------
         KeyError
             If the property does not exist in the declared properties.
-        UserWarning
+        TypeError
+            If `new_id` is not a string.
+        ValueError
+            If another property is already declared with the identifier `new_id`.
+
+        Warns
+        -----
+        PycellinWarning
             If the property is protected and cannot be modified.
         """
-        if prop_id not in self.props:
+        if prop_id not in self.properties:
             raise KeyError(
                 f"Property '{prop_id}' does not exist in the declared properties."
+            )
+        if not isinstance(new_id, str):
+            raise TypeError("Property identifier must be a string.")
+        if new_id != prop_id and new_id in self.properties:
+            raise ValueError(
+                f"Cannot rename property '{prop_id}' to '{new_id}': a property "
+                f"'{new_id}' is already declared."
             )
         if prop_id in self._protected_props:
             msg = (
                 f"Property '{prop_id}' is protected and cannot be modified. "
                 "Unprotect the property before modifying it."
             )
-            warnings.warn(msg)
+            warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
         else:
-            self.props[new_id] = self.props.pop(prop_id)
-            self.props[new_id]._change_identifier(new_id)
+            self.properties[new_id] = self.properties.pop(prop_id)
+            self.properties[new_id]._change_identifier(new_id)
+            if prop_id in self._propagated_props:
+                self._forget_propagated_prop(prop_id)
+                self._add_propagated_prop(new_id)
 
     def _change_prop_name(self, prop_id: str, new_name: str) -> None:
         """
@@ -442,8 +623,20 @@ class PropsMetadata:
             The identifier of the property whose name is to be changed.
         new_name : str
             The new name for the property.
+
+        Raises
+        ------
+        KeyError
+            If the property does not exist in the declared properties.
+        TypeError
+            If `new_name` is not a string.
+
+        Warns
+        -----
+        PycellinWarning
+            If the property is protected and cannot be modified.
         """
-        if prop_id not in self.props:
+        if prop_id not in self.properties:
             raise KeyError(
                 f"Property '{prop_id}' does not exist in the declared properties."
             )
@@ -452,9 +645,9 @@ class PropsMetadata:
                 f"Property '{prop_id}' is protected and cannot be modified. "
                 "Unprotect the property before modifying it."
             )
-            warnings.warn(msg)
+            warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
         else:
-            self.props[prop_id]._change_name(new_name)
+            self.properties[prop_id]._change_name(new_name)
 
     def _change_prop_description(
         self,
@@ -475,11 +668,16 @@ class PropsMetadata:
         ------
         KeyError
             If the property does not exist in the declared properties.
-        UserWarning
+        TypeError
+            If `new_description` is not a string.
+
+        Warns
+        -----
+        PycellinWarning
             If the property is protected and cannot be modified
             (i.e. it is in the list of protected properties).
         """
-        if prop_id not in self.props:
+        if prop_id not in self.properties:
             raise KeyError(
                 f"Property '{prop_id}' does not exist in the declared properties."
             )
@@ -488,9 +686,9 @@ class PropsMetadata:
                 f"Property '{prop_id}' is protected and cannot be modified. "
                 "Unprotect the property before modifying it."
             )
-            warnings.warn(msg)
+            warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
         else:
-            self.props[prop_id]._change_description(new_description)
+            self.properties[prop_id]._change_description(new_description)
 
     def _protect_prop(self, prop_id: str) -> None:
         """
@@ -501,17 +699,19 @@ class PropsMetadata:
         prop_id : str
             The identifier of the property to protect.
 
-        Raises
-        ------
-        UserWarning
-            If the property does not exist in the declared properties.
+        Warns
+        -----
+        PycellinWarning
+            If the property does not exist in the declared properties: it is not
+            protected.
         """
-        if prop_id not in self.props:
+        if prop_id not in self.properties:
             msg = (
                 f"Property '{prop_id}' does not exist in the declared properties "
                 "and cannot be protected."
             )
-            warnings.warn(msg)
+            warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
+            return
 
         if prop_id not in self._protected_props:
             self._protected_props.append(prop_id)
@@ -525,22 +725,22 @@ class PropsMetadata:
         prop_id : str
             The identifier of the property to unprotect.
 
-        Raises
-        ------
-        UserWarning
+        Warns
+        -----
+        PycellinWarning
             If the property does not exist in the declared properties.
         """
-        if prop_id not in self.props:
+        if prop_id not in self.properties:
             msg = (
                 f"Property '{prop_id}' does not exist in the declared properties "
                 "and cannot be unprotected."
             )
-            warnings.warn(msg)
+            warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
 
         if prop_id in self._protected_props:
             self._protected_props.remove(prop_id)
 
-    def _get_units_per_props(self) -> dict[str | None, list[str]]:
+    def _get_props_per_unit(self) -> dict[str | None, list[str]]:
         """
         Return a dict of units and the properties associated with each unit.
 
@@ -551,30 +751,30 @@ class PropsMetadata:
         -------
         dict[str | None, list[str]]
             A dictionary where the keys are units (or None for unitless properties)
-            and the values are lists of property identifiers. For example:
-            {'unit1': ['property1', 'property2'], 'unit2': ['property3'], None: ['property4']}.
+            and the values are lists of property identifiers. For example,
+            ``{"µm": ["cell_x", "cell_y"], None: ["cell_id"]}``.
         """
         units: dict[str | None, list[str]] = {}
-        for prop in self.props.values():
+        for prop in self.properties.values():
             if prop.unit in units:
                 units[prop.unit].append(prop.identifier)
             else:
                 units[prop.unit] = [prop.identifier]
         return units
 
-    def copy(self, deep: bool = True):
+    def copy(self, deep: bool = True) -> "PropsMetadata":
         """
-        Create a copy of the PropsMetadata object.
+        Create a copy of the `PropsMetadata` object.
 
         Parameters
         ----------
-        deep : bool, optional
-            If True (default), creates a deep copy. If False, creates a shallow copy.
+        deep : bool, default=True
+            If True, creates a deep copy. If False, creates a shallow copy.
 
         Returns
         -------
         PropsMetadata
-            A copy of the PropsMetadata object.
+            A copy of the `PropsMetadata` object.
         """
         if deep:
             return copy.deepcopy(self)

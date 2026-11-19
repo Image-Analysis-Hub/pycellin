@@ -18,15 +18,16 @@ from shapely.geometry import (
 )
 
 from pycellin.classes import CellLineage, Data, Property
+from pycellin.exceptions import MissingPropertyError
 from pycellin.properties.morphology import (
     BirthArea,
     CellArea,
     CellCircularity,
     CellContour,
-    CellMultiPolygonFromLabelImg,
+    CellMultiPolygonFromLabelImage,
     CellPerimeter,
     CellPolygonFromContour,
-    CellPolygonFromLabelImg,
+    CellPolygonFromLabelImage,
     CellSolidity,
     CycleMeanArea,
     DivisionArea,
@@ -51,7 +52,7 @@ def data():
         lineage.nodes[n]["cell_area"] = float(n)
     lineage.graph["lineage_id"] = 1
     data = Data({1: lineage})
-    data._add_cycle_lineages(time_prop="frame", time_step=1)
+    data._add_cycle_lineages(time_prop="frame")
     return data
 
 
@@ -61,9 +62,9 @@ def prop_cycle_lin():
         identifier="test_property",
         name="test property",
         description="test property",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
         unit="um^2",
     )
@@ -88,15 +89,15 @@ def prop_cell_lin():
         identifier="test_property",
         name="test property",
         description="test property",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
 
 
 @pytest.fixture
-def label_img():
+def label_image():
     # Timepoint 0: label 3 is a 2x3 rectangle (rows 2-3, columns 5-7). Label 4 is
     # made of a 3x3 square (rows 6-8, columns 1-3) and of a single pixel. Label 5
     # is a 3x3 square with a hole at its center (rows 6-8, columns 6-8).
@@ -176,57 +177,57 @@ class TestMaskToPolygons:
         assert MultiPolygon(polygons).is_valid
 
 
-# CellPolygonFromLabelImg #####################################################
+# CellPolygonFromLabelImage #####################################################
 
 
-class TestCellPolygonFromLabelImg:
+class TestCellPolygonFromLabelImage:
     def test_existing_value_kept_with_custom_identifier(self, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=1, timepoint=0, test_property="existing")
-        label_img = np.zeros((1, 5, 5), dtype=np.uint32)
-        calculator = CellPolygonFromLabelImg(
-            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        label_image = np.zeros((1, 5, 5), dtype=np.uint32)
+        calculator = CellPolygonFromLabelImage(
+            prop_cell_lin, label_prop="label", label_image=label_image, pixel_size=1.0
         )
-        assert calculator.compute(lineage, nid=1) == "existing"
+        assert calculator.compute(lineage, node_id=1) == "existing"
 
-    def test_compute_position_and_pixel_size(self, label_img, prop_cell_lin):
+    def test_compute_position_and_pixel_size(self, label_image, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=3, timepoint=0)
-        calculator = CellPolygonFromLabelImg(
-            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=2.0
+        calculator = CellPolygonFromLabelImage(
+            prop_cell_lin, label_prop="label", label_image=label_image, pixel_size=2.0
         )
-        polygon = calculator.compute(lineage, nid=1)
+        polygon = calculator.compute(lineage, node_id=1)
         assert polygon.bounds == (9.0, 3.0, 15.0, 7.0)
         assert polygon.area == 22.0
 
-    def test_compute_keeps_largest_piece(self, label_img, prop_cell_lin):
+    def test_compute_keeps_largest_piece(self, label_image, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=4, timepoint=0)
         lineage.graph["lineage_id"] = 1
-        calculator = CellPolygonFromLabelImg(
-            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        calculator = CellPolygonFromLabelImage(
+            prop_cell_lin, label_prop="label", label_image=label_image, pixel_size=1.0
         )
-        polygon = calculator.compute(lineage, nid=1)
+        polygon = calculator.compute(lineage, node_id=1)
         assert polygon.area == 8.5
         assert polygon.bounds == (0.5, 5.5, 3.5, 8.5)
 
-    def test_compute_missing_label_raises(self, label_img, prop_cell_lin):
+    def test_compute_missing_label_raises(self, label_image, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=7, timepoint=0)
         lineage.graph["lineage_id"] = 1
-        calculator = CellPolygonFromLabelImg(
-            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        calculator = CellPolygonFromLabelImage(
+            prop_cell_lin, label_prop="label", label_image=label_image, pixel_size=1.0
         )
         with pytest.raises(ValueError, match="Label 7 of cell 1"):
-            calculator.compute(lineage, nid=1)
+            calculator.compute(lineage, node_id=1)
 
-    def test_enrich_warns_once_for_fragmented_labels(self, label_img, prop_cell_lin):
+    def test_enrich_warns_once_for_fragmented_labels(self, label_image, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=3, timepoint=0)
         lineage.add_node(2, label=4, timepoint=0)
         lineage.graph["lineage_id"] = 1
-        calculator = CellPolygonFromLabelImg(
-            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        calculator = CellPolygonFromLabelImage(
+            prop_cell_lin, label_prop="label", label_image=label_image, pixel_size=1.0
         )
         with pytest.warns(UserWarning, match="1 cell has a label") as record:
             calculator.enrich(Data({1: lineage}), [(1, 1), (2, 1)])
@@ -234,26 +235,26 @@ class TestCellPolygonFromLabelImg:
         assert "cell 2 of lineage 1" in str(record[0].message)
         assert "model.add_cell_multipolygon()" in str(record[0].message)
 
-    def test_enrich_warns_for_holes(self, label_img, prop_cell_lin):
+    def test_enrich_warns_for_holes(self, label_image, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=5, timepoint=0)
         lineage.graph["lineage_id"] = 1
-        calculator = CellPolygonFromLabelImg(
-            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        calculator = CellPolygonFromLabelImage(
+            prop_cell_lin, label_prop="label", label_image=label_image, pixel_size=1.0
         )
         with pytest.warns(UserWarning, match=r"1 cell has a label with holes \(cell 1"):
             calculator.enrich(Data({1: lineage}), [(1, 1)])
         assert lineage.nodes[1]["test_property"].area == 8.5
 
     def test_enrich_single_warning_for_pieces_and_holes(
-        self, label_img, prop_cell_lin
+        self, label_image, prop_cell_lin
     ):
         lineage = CellLineage()
         lineage.add_node(1, label=4, timepoint=0)
         lineage.add_node(2, label=5, timepoint=0)
         lineage.graph["lineage_id"] = 1
-        calculator = CellPolygonFromLabelImg(
-            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        calculator = CellPolygonFromLabelImage(
+            prop_cell_lin, label_prop="label", label_image=label_image, pixel_size=1.0
         )
         with pytest.warns(UserWarning) as record:
             calculator.enrich(Data({1: lineage}), [(1, 1), (2, 1)])
@@ -263,60 +264,60 @@ class TestCellPolygonFromLabelImg:
         assert "a label with holes (cell 2 of lineage 1)" in message
 
     def test_enrich_no_warning_without_fragmented_label(
-        self, label_img, prop_cell_lin
+        self, label_image, prop_cell_lin
     ):
         lineage = CellLineage()
         lineage.add_node(1, label=3, timepoint=0)
         lineage.graph["lineage_id"] = 1
-        calculator = CellPolygonFromLabelImg(
-            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        calculator = CellPolygonFromLabelImage(
+            prop_cell_lin, label_prop="label", label_image=label_image, pixel_size=1.0
         )
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             calculator.enrich(Data({1: lineage}), [(1, 1)])
 
     def test_get_input_props(self, prop_cell_lin):
-        calculator = CellPolygonFromLabelImg(
+        calculator = CellPolygonFromLabelImage(
             prop_cell_lin,
             label_prop="my_label",
-            label_img=np.zeros((1, 5, 5), dtype=np.uint32),
+            label_image=np.zeros((1, 5, 5), dtype=np.uint32),
             pixel_size=1.0,
         )
         assert calculator.get_input_props() == {
-            "label_prop": ("my_label", "node", "CellLineage")
+            "label_prop": ("my_label", "node", "cell")
         }
 
 
-# CellMultiPolygonFromLabelImg ################################################
+# CellMultiPolygonFromLabelImage ################################################
 
 
-class TestCellMultiPolygonFromLabelImg:
-    def test_compute_keeps_all_pieces(self, label_img, prop_cell_lin):
+class TestCellMultiPolygonFromLabelImage:
+    def test_compute_keeps_all_pieces(self, label_image, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=4, timepoint=0)
-        calculator = CellMultiPolygonFromLabelImg(
-            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        calculator = CellMultiPolygonFromLabelImage(
+            prop_cell_lin, label_prop="label", label_image=label_image, pixel_size=1.0
         )
-        multipolygon = calculator.compute(lineage, nid=1)
+        multipolygon = calculator.compute(lineage, node_id=1)
         assert [polygon.area for polygon in multipolygon.geoms] == [8.5, 0.5]
 
-    def test_compute_single_piece(self, label_img, prop_cell_lin):
+    def test_compute_single_piece(self, label_image, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=3, timepoint=0)
-        calculator = CellMultiPolygonFromLabelImg(
-            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=2.0
+        calculator = CellMultiPolygonFromLabelImage(
+            prop_cell_lin, label_prop="label", label_image=label_image, pixel_size=2.0
         )
-        multipolygon = calculator.compute(lineage, nid=1)
+        multipolygon = calculator.compute(lineage, node_id=1)
         assert isinstance(multipolygon, MultiPolygon)
         assert len(multipolygon.geoms) == 1
         assert multipolygon.bounds == (9.0, 3.0, 15.0, 7.0)
 
-    def test_enrich_no_warning_for_fragmented_labels(self, label_img, prop_cell_lin):
+    def test_enrich_no_warning_for_fragmented_labels(self, label_image, prop_cell_lin):
         lineage = CellLineage()
         lineage.add_node(1, label=4, timepoint=0)
         lineage.graph["lineage_id"] = 1
-        calculator = CellMultiPolygonFromLabelImg(
-            prop_cell_lin, label_prop="label", label_img=label_img, pixel_size=1.0
+        calculator = CellMultiPolygonFromLabelImage(
+            prop_cell_lin, label_prop="label", label_image=label_image, pixel_size=1.0
         )
         with warnings.catch_warnings():
             warnings.simplefilter("error")
@@ -370,21 +371,21 @@ class TestLargestPolygon:
 class TestCellPolygonFromContour:
     def test_compute_relative_to_position(self, contour_lineage, prop_cell_lin):
         calculator = CellPolygonFromContour(prop_cell_lin)
-        polygon = calculator.compute(contour_lineage, nid=1)
+        polygon = calculator.compute(contour_lineage, node_id=1)
         assert polygon.bounds == (9.0, 19.5, 11.0, 20.5)
 
     def test_compute_custom_contour_prop(self, contour_lineage, prop_cell_lin):
         contour_lineage.nodes[2]["my_contour"] = [(0, 0), (3, 0), (3, 1)]
         calculator = CellPolygonFromContour(prop_cell_lin, contour_prop="my_contour")
-        assert calculator.compute(contour_lineage, nid=2).area == 1.5
+        assert calculator.compute(contour_lineage, node_id=2).area == 1.5
 
     def test_compute_missing_contour(self, contour_lineage, prop_cell_lin):
         calculator = CellPolygonFromContour(prop_cell_lin)
-        assert calculator.compute(contour_lineage, nid=2) is None
+        assert calculator.compute(contour_lineage, node_id=2) is None
 
     def test_compute_none_contour(self, contour_lineage, prop_cell_lin):
         calculator = CellPolygonFromContour(prop_cell_lin)
-        assert calculator.compute(contour_lineage, nid=3) is None
+        assert calculator.compute(contour_lineage, node_id=3) is None
 
     def test_compute_crossing_contour_keeps_largest_piece(
         self, contour_lineage, prop_cell_lin
@@ -392,7 +393,7 @@ class TestCellPolygonFromContour:
         # A figure-eight whose two lobes have areas 1/3 and 4/3.
         contour_lineage.nodes[1]["cell_contour"] = [(0, 0), (2, 2), (2, 0), (0, 1)]
         calculator = CellPolygonFromContour(prop_cell_lin)
-        polygon = calculator.compute(contour_lineage, nid=1)
+        polygon = calculator.compute(contour_lineage, node_id=1)
         assert polygon.is_valid
         assert math.isclose(polygon.area, 4 / 3)
 
@@ -401,31 +402,31 @@ class TestCellPolygonFromContour:
         contour = [(0, 0), (2, 0), (2, 2), (1, 2), (1, 4), (1, 2), (0, 2)]
         contour_lineage.nodes[1]["cell_contour"] = contour
         calculator = CellPolygonFromContour(prop_cell_lin)
-        polygon = calculator.compute(contour_lineage, nid=1)
+        polygon = calculator.compute(contour_lineage, node_id=1)
         assert polygon.is_valid
         assert polygon.area == 4.0
 
     def test_compute_contour_too_short(self, contour_lineage, prop_cell_lin):
         contour_lineage.nodes[1]["cell_contour"] = [(0, 0), (1, 1)]
         calculator = CellPolygonFromContour(prop_cell_lin)
-        assert calculator.compute(contour_lineage, nid=1) is None
+        assert calculator.compute(contour_lineage, node_id=1) is None
 
     def test_compute_empty_contour(self, contour_lineage, prop_cell_lin):
         contour_lineage.nodes[1]["cell_contour"] = []
         calculator = CellPolygonFromContour(prop_cell_lin)
-        assert calculator.compute(contour_lineage, nid=1) is None
+        assert calculator.compute(contour_lineage, node_id=1) is None
 
     def test_existing_value_kept(self, contour_lineage, prop_cell_lin):
         contour_lineage.nodes[1]["test_property"] = "existing"
         calculator = CellPolygonFromContour(prop_cell_lin)
-        assert calculator.compute(contour_lineage, nid=1) == "existing"
+        assert calculator.compute(contour_lineage, node_id=1) == "existing"
 
     def test_existing_value_recomputed_with_force_recompute(
         self, contour_lineage, prop_cell_lin
     ):
         contour_lineage.nodes[1]["test_property"] = "existing"
         calculator = CellPolygonFromContour(prop_cell_lin, force_recompute=True)
-        assert calculator.compute(contour_lineage, nid=1).area == 2.0
+        assert calculator.compute(contour_lineage, node_id=1).area == 2.0
 
     def test_enrich_logs_once(self, contour_lineage, prop_cell_lin, caplog):
         contour_lineage.add_node(
@@ -456,7 +457,7 @@ class TestCellPolygonFromContour:
     def test_get_input_props(self, prop_cell_lin):
         calculator = CellPolygonFromContour(prop_cell_lin, contour_prop="my_contour")
         assert calculator.get_input_props() == {
-            "contour_prop": ("my_contour", "node", "CellLineage")
+            "contour_prop": ("my_contour", "node", "cell")
         }
 
 
@@ -466,11 +467,11 @@ class TestCellPolygonFromContour:
 class TestCellArea:
     def test_compute_default_polygon_prop(self, polygon_lineage, prop_cell_lin):
         calculator = CellArea(prop_cell_lin)
-        assert calculator.compute(polygon_lineage, nid=1) == 2.0
+        assert calculator.compute(polygon_lineage, node_id=1) == 2.0
 
     def test_compute_custom_polygon_prop(self, polygon_lineage, prop_cell_lin):
         calculator = CellArea(prop_cell_lin, polygon_prop="my_polygon")
-        assert calculator.compute(polygon_lineage, nid=2) == 3.0
+        assert calculator.compute(polygon_lineage, node_id=2) == 3.0
 
     def test_compute_multipolygon(self, polygon_lineage, prop_cell_lin):
         polygon_lineage.nodes[1]["my_multipolygon"] = MultiPolygon(
@@ -480,22 +481,22 @@ class TestCellArea:
             ]
         )
         calculator = CellArea(prop_cell_lin, polygon_prop="my_multipolygon")
-        assert calculator.compute(polygon_lineage, nid=1) == 3.0
+        assert calculator.compute(polygon_lineage, node_id=1) == 3.0
 
     def test_compute_missing_polygon(self, polygon_lineage, prop_cell_lin):
         calculator = CellArea(prop_cell_lin)
         with pytest.raises(KeyError, match="missing 'cell_polygon' property"):
-            calculator.compute(polygon_lineage, nid=2)
+            calculator.compute(polygon_lineage, node_id=2)
 
     def test_compute_none_polygon(self, polygon_lineage, prop_cell_lin):
         polygon_lineage.nodes[2]["cell_polygon"] = None
         calculator = CellArea(prop_cell_lin)
-        assert math.isnan(calculator.compute(polygon_lineage, nid=2))
+        assert math.isnan(calculator.compute(polygon_lineage, node_id=2))
 
     def test_get_input_props(self, prop_cell_lin):
         calculator = CellArea(prop_cell_lin, polygon_prop="my_polygon")
         assert calculator.get_input_props() == {
-            "polygon_prop": ("my_polygon", "node", "CellLineage")
+            "polygon_prop": ("my_polygon", "node", "cell")
         }
 
 
@@ -505,16 +506,16 @@ class TestCellArea:
 class TestCellPerimeter:
     def test_compute_default_polygon_prop(self, polygon_lineage, prop_cell_lin):
         calculator = CellPerimeter(prop_cell_lin)
-        assert calculator.compute(polygon_lineage, nid=1) == 6.0
+        assert calculator.compute(polygon_lineage, node_id=1) == 6.0
 
     def test_compute_custom_polygon_prop(self, polygon_lineage, prop_cell_lin):
         calculator = CellPerimeter(prop_cell_lin, polygon_prop="my_polygon")
-        assert calculator.compute(polygon_lineage, nid=2) == 8.0
+        assert calculator.compute(polygon_lineage, node_id=2) == 8.0
 
     def test_compute_none_polygon(self, polygon_lineage, prop_cell_lin):
         polygon_lineage.nodes[2]["cell_polygon"] = None
         calculator = CellPerimeter(prop_cell_lin)
-        assert math.isnan(calculator.compute(polygon_lineage, nid=2))
+        assert math.isnan(calculator.compute(polygon_lineage, node_id=2))
 
 
 # CellCircularity #############################################################
@@ -525,18 +526,18 @@ class TestCellCircularity:
         calculator = CellCircularity(prop_cell_lin)
         # Area 2, perimeter 6.
         expected = 4 * math.pi * 2 / 6**2
-        assert calculator.compute(polygon_lineage, nid=1) == pytest.approx(expected)
+        assert calculator.compute(polygon_lineage, node_id=1) == pytest.approx(expected)
 
     def test_compute_custom_polygon_prop(self, polygon_lineage, prop_cell_lin):
         calculator = CellCircularity(prop_cell_lin, polygon_prop="my_polygon")
         # Area 3, perimeter 8.
         expected = 4 * math.pi * 3 / 8**2
-        assert calculator.compute(polygon_lineage, nid=2) == pytest.approx(expected)
+        assert calculator.compute(polygon_lineage, node_id=2) == pytest.approx(expected)
 
     def test_compute_disk_close_to_one(self, polygon_lineage, prop_cell_lin):
         polygon_lineage.nodes[2]["cell_polygon"] = Point(0, 0).buffer(5)
         calculator = CellCircularity(prop_cell_lin)
-        assert 0.999 < calculator.compute(polygon_lineage, nid=2) < 1
+        assert 0.999 < calculator.compute(polygon_lineage, node_id=2) < 1
 
     def test_compute_multipolygon(self, polygon_lineage, prop_cell_lin):
         polygon_lineage.nodes[1]["my_multipolygon"] = MultiPolygon(
@@ -548,27 +549,27 @@ class TestCellCircularity:
         calculator = CellCircularity(prop_cell_lin, polygon_prop="my_multipolygon")
         # Area 2, perimeter 8.
         expected = 4 * math.pi * 2 / 8**2
-        assert calculator.compute(polygon_lineage, nid=1) == pytest.approx(expected)
+        assert calculator.compute(polygon_lineage, node_id=1) == pytest.approx(expected)
 
     def test_compute_missing_polygon(self, polygon_lineage, prop_cell_lin):
         calculator = CellCircularity(prop_cell_lin)
         with pytest.raises(KeyError, match="missing 'cell_polygon' property"):
-            calculator.compute(polygon_lineage, nid=2)
+            calculator.compute(polygon_lineage, node_id=2)
 
     def test_compute_none_polygon(self, polygon_lineage, prop_cell_lin):
         polygon_lineage.nodes[2]["cell_polygon"] = None
         calculator = CellCircularity(prop_cell_lin)
-        assert math.isnan(calculator.compute(polygon_lineage, nid=2))
+        assert math.isnan(calculator.compute(polygon_lineage, node_id=2))
 
     def test_compute_empty_polygon(self, polygon_lineage, prop_cell_lin):
         polygon_lineage.nodes[2]["cell_polygon"] = Polygon()
         calculator = CellCircularity(prop_cell_lin)
-        assert math.isnan(calculator.compute(polygon_lineage, nid=2))
+        assert math.isnan(calculator.compute(polygon_lineage, node_id=2))
 
     def test_get_input_props(self, prop_cell_lin):
         calculator = CellCircularity(prop_cell_lin, polygon_prop="my_polygon")
         assert calculator.get_input_props() == {
-            "polygon_prop": ("my_polygon", "node", "CellLineage")
+            "polygon_prop": ("my_polygon", "node", "cell")
         }
 
 
@@ -578,7 +579,7 @@ class TestCellCircularity:
 class TestCellSolidity:
     def test_compute_convex_polygon(self, polygon_lineage, prop_cell_lin):
         calculator = CellSolidity(prop_cell_lin)
-        assert calculator.compute(polygon_lineage, nid=1) == 1.0
+        assert calculator.compute(polygon_lineage, node_id=1) == 1.0
 
     def test_compute_concave_polygon(self, polygon_lineage, prop_cell_lin):
         # L shape of area 3, whose convex hull cuts a corner of a 2x2 square.
@@ -586,14 +587,14 @@ class TestCellSolidity:
             [(0, 0), (2, 0), (2, 1), (1, 1), (1, 2), (0, 2)]
         )
         calculator = CellSolidity(prop_cell_lin, polygon_prop="my_polygon")
-        assert calculator.compute(polygon_lineage, nid=2) == pytest.approx(3 / 3.5)
+        assert calculator.compute(polygon_lineage, node_id=2) == pytest.approx(3 / 3.5)
 
     def test_compute_polygon_with_hole(self, polygon_lineage, prop_cell_lin):
         polygon_lineage.nodes[2]["cell_polygon"] = Polygon(
             [(0, 0), (3, 0), (3, 3), (0, 3)], [[(1, 1), (2, 1), (2, 2), (1, 2)]]
         )
         calculator = CellSolidity(prop_cell_lin)
-        assert calculator.compute(polygon_lineage, nid=2) == pytest.approx(8 / 9)
+        assert calculator.compute(polygon_lineage, node_id=2) == pytest.approx(8 / 9)
 
     def test_compute_multipolygon(self, polygon_lineage, prop_cell_lin):
         # The convex hull of the two unit squares is a 3x1 rectangle.
@@ -604,27 +605,27 @@ class TestCellSolidity:
             ]
         )
         calculator = CellSolidity(prop_cell_lin, polygon_prop="my_multipolygon")
-        assert calculator.compute(polygon_lineage, nid=1) == pytest.approx(2 / 3)
+        assert calculator.compute(polygon_lineage, node_id=1) == pytest.approx(2 / 3)
 
     def test_compute_missing_polygon(self, polygon_lineage, prop_cell_lin):
         calculator = CellSolidity(prop_cell_lin)
         with pytest.raises(KeyError, match="missing 'cell_polygon' property"):
-            calculator.compute(polygon_lineage, nid=2)
+            calculator.compute(polygon_lineage, node_id=2)
 
     def test_compute_none_polygon(self, polygon_lineage, prop_cell_lin):
         polygon_lineage.nodes[2]["cell_polygon"] = None
         calculator = CellSolidity(prop_cell_lin)
-        assert math.isnan(calculator.compute(polygon_lineage, nid=2))
+        assert math.isnan(calculator.compute(polygon_lineage, node_id=2))
 
     def test_compute_empty_polygon(self, polygon_lineage, prop_cell_lin):
         polygon_lineage.nodes[2]["cell_polygon"] = Polygon()
         calculator = CellSolidity(prop_cell_lin)
-        assert math.isnan(calculator.compute(polygon_lineage, nid=2))
+        assert math.isnan(calculator.compute(polygon_lineage, node_id=2))
 
     def test_get_input_props(self, prop_cell_lin):
         calculator = CellSolidity(prop_cell_lin, polygon_prop="my_polygon")
         assert calculator.get_input_props() == {
-            "polygon_prop": ("my_polygon", "node", "CellLineage")
+            "polygon_prop": ("my_polygon", "node", "cell")
         }
 
 
@@ -634,7 +635,7 @@ class TestCellSolidity:
 class TestCellContour:
     def test_compute_custom_polygon_prop(self, polygon_lineage, prop_cell_lin):
         calculator = CellContour(prop_cell_lin, polygon_prop="my_polygon")
-        contour = calculator.compute(polygon_lineage, nid=2)
+        contour = calculator.compute(polygon_lineage, node_id=2)
         assert contour[:4] == [(-1.5, -0.5), (1.5, -0.5), (1.5, 0.5), (-1.5, 0.5)]
 
     def test_compute_multipolygon_raises(self, polygon_lineage, prop_cell_lin):
@@ -643,19 +644,19 @@ class TestCellContour:
         )
         calculator = CellContour(prop_cell_lin, polygon_prop="my_multipolygon")
         with pytest.raises(TypeError, match="a contour needs a Polygon"):
-            calculator.compute(polygon_lineage, nid=1)
+            calculator.compute(polygon_lineage, node_id=1)
 
     def test_compute_none_polygon(self, polygon_lineage, prop_cell_lin):
         polygon_lineage.nodes[2]["cell_polygon"] = None
         calculator = CellContour(prop_cell_lin)
-        assert calculator.compute(polygon_lineage, nid=2) is None
+        assert calculator.compute(polygon_lineage, node_id=2) is None
 
     def test_existing_value_kept_with_custom_identifier(
         self, polygon_lineage, prop_cell_lin
     ):
         polygon_lineage.nodes[2]["test_property"] = "existing"
         calculator = CellContour(prop_cell_lin, polygon_prop="my_polygon")
-        assert calculator.compute(polygon_lineage, nid=2) == "existing"
+        assert calculator.compute(polygon_lineage, node_id=2) == "existing"
 
 
 # CycleMeanArea ###############################################################
@@ -664,35 +665,35 @@ class TestCellContour:
 class TestCycleMeanArea:
     def test_compute(self, data, prop_cycle_lin):
         calculator = CycleMeanArea(prop_cycle_lin)
-        cycle_lin = data.cycle_data[1]
-        assert calculator.compute(data, cycle_lin, nid=4) == 2.5
-        assert calculator.compute(data, cycle_lin, nid=6) == 5.5
-        assert calculator.compute(data, cycle_lin, nid=7) == 7.0
+        cycle_lin = data.cycle_lineages[1]
+        assert calculator.compute(data, cycle_lin, node_id=4) == 2.5
+        assert calculator.compute(data, cycle_lin, node_id=6) == 5.5
+        assert calculator.compute(data, cycle_lin, node_id=7) == 7.0
 
     def test_compute_ignores_nan(self, data, prop_cycle_lin):
-        data.cell_data[1].nodes[3]["cell_area"] = math.nan
+        data.cell_lineages[1].nodes[3]["cell_area"] = math.nan
         calculator = CycleMeanArea(prop_cycle_lin)
-        result = calculator.compute(data, data.cycle_data[1], nid=4)
+        result = calculator.compute(data, data.cycle_lineages[1], node_id=4)
         assert result == pytest.approx(7 / 3)
 
     def test_compute_only_nan(self, data, prop_cycle_lin):
-        data.cell_data[1].nodes[7]["cell_area"] = math.nan
+        data.cell_lineages[1].nodes[7]["cell_area"] = math.nan
         calculator = CycleMeanArea(prop_cycle_lin)
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            result = calculator.compute(data, data.cycle_data[1], nid=7)
+            result = calculator.compute(data, data.cycle_lineages[1], node_id=7)
         assert math.isnan(result)
 
     def test_compute_custom_area_prop(self, data, prop_cycle_lin):
-        for n in data.cell_data[1].nodes:
-            data.cell_data[1].nodes[n]["my_area"] = 10.0 * n
+        for n in data.cell_lineages[1].nodes:
+            data.cell_lineages[1].nodes[n]["my_area"] = 10.0 * n
         calculator = CycleMeanArea(prop_cycle_lin, area_prop="my_area")
-        assert calculator.compute(data, data.cycle_data[1], nid=6) == 55.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 55.0
 
     def test_enrich(self, data, prop_cycle_lin):
         calculator = CycleMeanArea(prop_cycle_lin)
         calculator.enrich(data)
-        cycle_lin = data.cycle_data[1]
+        cycle_lin = data.cycle_lineages[1]
         assert cycle_lin.nodes[4]["test_property"] == 2.5
         assert cycle_lin.nodes[6]["test_property"] == 5.5
         assert cycle_lin.nodes[7]["test_property"] == 7.0
@@ -704,27 +705,29 @@ class TestCycleMeanArea:
 class TestBirthArea:
     def test_compute_complete_cycle(self, data, prop_cycle_lin):
         calculator = BirthArea(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], nid=6) == 5.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 5.0
 
     def test_compute_leaf_cycle(self, data, prop_cycle_lin):
         calculator = BirthArea(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], nid=7) == 7.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=7) == 7.0
 
     def test_compute_root_cycle(self, data, prop_cycle_lin):
         calculator = BirthArea(prop_cycle_lin)
-        assert math.isnan(calculator.compute(data, data.cycle_data[1], nid=4))
+        assert math.isnan(calculator.compute(data, data.cycle_lineages[1], node_id=4))
 
     def test_compute_missing_cell_area(self, data, prop_cycle_lin):
-        del data.cell_data[1].nodes[5]["cell_area"]
+        del data.cell_lineages[1].nodes[5]["cell_area"]
         calculator = BirthArea(prop_cycle_lin)
-        with pytest.raises(KeyError, match="'cell_area' does not exist"):
-            calculator.compute(data, data.cycle_data[1], nid=6)
+        with pytest.raises(
+            MissingPropertyError, match="Cell 5 in lineage 1 has no value"
+        ):
+            calculator.compute(data, data.cycle_lineages[1], node_id=6)
 
     def test_compute_custom_area_prop(self, data, prop_cycle_lin):
-        for n in data.cell_data[1].nodes:
-            data.cell_data[1].nodes[n]["my_area"] = 10.0 * n
+        for n in data.cell_lineages[1].nodes:
+            data.cell_lineages[1].nodes[n]["my_area"] = 10.0 * n
         calculator = BirthArea(prop_cycle_lin, area_prop="my_area")
-        assert calculator.compute(data, data.cycle_data[1], nid=6) == 50.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 50.0
 
 
 # DivisionArea ################################################################
@@ -733,24 +736,26 @@ class TestBirthArea:
 class TestDivisionArea:
     def test_compute_complete_cycle(self, data, prop_cycle_lin):
         calculator = DivisionArea(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], nid=6) == 6.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 6.0
 
     def test_compute_root_cycle(self, data, prop_cycle_lin):
         calculator = DivisionArea(prop_cycle_lin)
-        assert calculator.compute(data, data.cycle_data[1], nid=4) == 4.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=4) == 4.0
 
     def test_compute_leaf_cycle(self, data, prop_cycle_lin):
         calculator = DivisionArea(prop_cycle_lin)
-        assert math.isnan(calculator.compute(data, data.cycle_data[1], nid=7))
+        assert math.isnan(calculator.compute(data, data.cycle_lineages[1], node_id=7))
 
     def test_compute_missing_cell_area(self, data, prop_cycle_lin):
-        del data.cell_data[1].nodes[6]["cell_area"]
+        del data.cell_lineages[1].nodes[6]["cell_area"]
         calculator = DivisionArea(prop_cycle_lin)
-        with pytest.raises(KeyError, match="'cell_area' does not exist"):
-            calculator.compute(data, data.cycle_data[1], nid=6)
+        with pytest.raises(
+            MissingPropertyError, match="Cell 6 in lineage 1 has no value"
+        ):
+            calculator.compute(data, data.cycle_lineages[1], node_id=6)
 
     def test_compute_custom_area_prop(self, data, prop_cycle_lin):
-        for n in data.cell_data[1].nodes:
-            data.cell_data[1].nodes[n]["my_area"] = 10.0 * n
+        for n in data.cell_lineages[1].nodes:
+            data.cell_lineages[1].nodes[n]["my_area"] = 10.0 * n
         calculator = DivisionArea(prop_cycle_lin, area_prop="my_area")
-        assert calculator.compute(data, data.cycle_data[1], nid=6) == 60.0
+        assert calculator.compute(data, data.cycle_lineages[1], node_id=6) == 60.0

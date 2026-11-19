@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 
-"""
-A collection of diverse morphology properties that can be added to
-lineage graphs.
-"""
+"""A collection of morphology properties that can be added to lineage graphs."""
 
 import logging
 import warnings
 from abc import abstractmethod
 from itertools import combinations, product
 from operator import itemgetter
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import networkx as nx
 import numpy as np
@@ -30,7 +27,9 @@ from pycellin.classes.property_calculator import (
     NodeGlobalPropCalculator,
     NodeLocalPropCalculator,
 )
+from pycellin.exceptions import PycellinWarning
 from pycellin.properties.utils import _get_cycle_node_property_values, _nanmean
+from pycellin.utils import _find_stack_level
 
 logger = logging.getLogger(__name__)
 
@@ -39,16 +38,43 @@ def create_cell_polygon_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
-    custom_provenance: str | None = None,
+    provenance: str | None = None,
     unit: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``cell_polygon`` property.
+
+    ``cell_polygon`` is the shape of the cell as a ``shapely.Polygon``. It is a node
+    property of cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"cell_polygon"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Cell polygon".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Cell shape
+        as a shapely.Polygon".
+    provenance : str | None, default=None
+        Origin of the property, e.g. the name of the format it was loaded from. If None,
+        ``"Pycellin"`` is used.
+    unit : str | None, default=None
+        Unit of the coordinates, e.g. ``"µm"``.
+
+    Returns
+    -------
+    Property
+        Declaration of the ``cell_polygon`` property.
+    """
     return Property(
         identifier=custom_identifier or "cell_polygon",
         name=custom_name or "Cell polygon",
         description=custom_description or "Cell shape as a shapely.Polygon",
-        provenance=custom_provenance or "pycellin",
+        provenance=provenance or "Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="shapely.Polygon",
         unit=unit,
     )
@@ -58,18 +84,47 @@ def create_cell_multipolygon_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
-    custom_provenance: str | None = None,
+    provenance: str | None = None,
     unit: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``cell_multipolygon`` property.
+
+    ``cell_multipolygon`` is the shape of the cell label in a label image as a
+    ``shapely.MultiPolygon``, with all its pieces and holes. It is a node property of
+    cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"cell_multipolygon"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Cell multipolygon".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Cell shape
+        as a shapely.MultiPolygon, with all the pieces and holes of the cell label,
+        computed from a label image".
+    provenance : str | None, default=None
+        Origin of the property, e.g. the name of the format it was loaded from. If None,
+        ``"Pycellin"`` is used.
+    unit : str | None, default=None
+        Unit of the coordinates, e.g. ``"µm"``.
+
+    Returns
+    -------
+    Property
+        Declaration of the ``cell_multipolygon`` property.
+    """
     return Property(
         identifier=custom_identifier or "cell_multipolygon",
         name=custom_name or "Cell multipolygon",
         description=custom_description
         or "Cell shape as a shapely.MultiPolygon, with all the pieces and holes "
         "of the cell label, computed from a label image",
-        provenance=custom_provenance or "pycellin",
+        provenance=provenance or "Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="shapely.MultiPolygon",
         unit=unit,
     )
@@ -86,9 +141,9 @@ def _trace_region(region: np.ndarray, fully_connected: str) -> np.ndarray:
     ----------
     region : np.ndarray
         2D binary array holding a single region without holes.
-    fully_connected : {"high", "low"}
-        "high" if the region is 8-connected, "low" if it is 4-connected
-        (see skimage.measure.find_contours).
+    fully_connected : str
+        ``"high"`` if the region is 8-connected, ``"low"`` if it is 4-connected
+        (see ``skimage.measure.find_contours``).
 
     Returns
     -------
@@ -114,9 +169,9 @@ def _mask_to_polygons(mask: np.ndarray, fill_holes: bool = True) -> list[Polygon
     ----------
     mask : np.ndarray
         2D binary mask.
-    fill_holes : bool, optional
-        If True (default), holes are filled and each polygon is the outline of its
-        piece. If False, holes become interior rings of the polygons.
+    fill_holes : bool, default=True
+        If True, holes are filled and each polygon is the outline of its piece. If
+        False, holes become interior rings of the polygons.
 
     Returns
     -------
@@ -146,11 +201,11 @@ def _mask_to_polygons(mask: np.ndarray, fill_holes: bool = True) -> list[Polygon
     return sorted(polygons, key=lambda polygon: polygon.area, reverse=True)
 
 
-class _LabelImgShapeCalculator(NodeLocalPropCalculator):
+class _LabelImageShapeCalculator(NodeLocalPropCalculator[CellLineage]):
     """
     Base class of the calculators computing the shape of cells from a label image.
 
-    Subclasses implement `_shape_from_mask()`, which converts the mask of a cell
+    Subclasses implement ``_shape_from_mask()``, which converts the mask of a cell
     label into a shapely geometry.
 
     Parameters
@@ -158,40 +213,41 @@ class _LabelImgShapeCalculator(NodeLocalPropCalculator):
     property : Property
         Property object to which the calculator is associated.
     label_prop : str
-        Name of the property that stores cell labels.
-    label_img : np.ndarray
+        Identifier of the property that stores cell labels.
+    label_image : np.ndarray
         The label image.
     pixel_size : float
         The size of each pixel. Must be in the same unit as the property unit.
-    force_recompute : bool, optional
+    force_recompute : bool, default=False
         Whether to force recomputation of the property when it has already been
-        computed, by default False.
+        computed.
     """
 
-    # The label image belongs to the model the calculator was created for.
+    #: True: the label image belongs to the model the calculator was created for.
     _USES_EXTERNAL_DATA = True
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "label_prop": ("node", "CellLineage")
-    }
+    #: Input property: `label_prop`, a node property of cell lineages.
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"label_prop": ("node", "cell")}
 
     def __init__(
         self,
         property: Property,
         label_prop: str,
-        label_img: np.ndarray,
+        label_image: np.ndarray,
         pixel_size: float,
         force_recompute: bool = False,
     ):
         super().__init__(property)
         self.label_prop = label_prop
-        self.label_img = label_img
+        self.label_image = label_image
         self.pixel_size = pixel_size
         self.force_recompute = force_recompute
         # Bounding boxes of the labels of each timepoint, computed on first use.
         self._label_slices: dict[int, list[tuple[slice, slice] | None]] = {}
 
     @abstractmethod
-    def _shape_from_mask(self, mask: np.ndarray, lineage, nid: int) -> BaseGeometry:
+    def _shape_from_mask(
+        self, mask: np.ndarray, lineage: CellLineage, nid: int
+    ) -> BaseGeometry:
         """
         Convert the mask of a cell label into a shapely geometry.
 
@@ -210,14 +266,41 @@ class _LabelImgShapeCalculator(NodeLocalPropCalculator):
             Shape of the cell, in (x, y) pixel coordinates of the mask.
         """
 
-    def compute(self, lineage, nid: int) -> BaseGeometry:
-        if not self.force_recompute and self.prop.identifier in lineage.nodes[nid]:
-            return lineage.nodes[nid][self.prop.identifier]
+    def compute(self, lineage: CellLineage, node_id: int) -> BaseGeometry:
+        """
+        Compute the shape of a cell from its label in the label image.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage graph containing the cell of interest.
+        node_id : int
+            Node ID (``cell_id``) of the cell of interest.
+
+        Returns
+        -------
+        BaseGeometry
+            Shape of the cell, in the coordinates of the label image scaled by the pixel
+            size. If the cell already has a value for the property and `force_recompute`
+            is False, this value is returned instead.
+
+        Raises
+        ------
+        KeyError
+            If the cell has no value for `label_prop` or ``timepoint``.
+        ValueError
+            If the label of the cell is not in its timepoint of the label image.
+        """
+        if (
+            not self.force_recompute
+            and self.property.identifier in lineage.nodes[node_id]
+        ):
+            return lineage.nodes[node_id][self.property.identifier]
 
         _, (rows, cols), mask = _find_label(
-            self.label_img, self._label_slices, lineage, nid, self.label_prop
+            self.label_image, self._label_slices, lineage, node_id, self.label_prop
         )
-        shape = self._shape_from_mask(mask, lineage, nid)
+        shape = self._shape_from_mask(mask, lineage, node_id)
         # Move the shape from the bounding box to the frame, then scale it.
         size = self.pixel_size
         return affine_transform(
@@ -226,7 +309,7 @@ class _LabelImgShapeCalculator(NodeLocalPropCalculator):
 
 
 def _find_label(
-    label_img: np.ndarray,
+    label_image: np.ndarray,
     label_slices: dict[int, list[tuple[slice, ...] | None]],
     lineage: CellLineage,
     nid: int,
@@ -237,18 +320,18 @@ def _find_label(
 
     Parameters
     ----------
-    label_img : np.ndarray
+    label_image : np.ndarray
         The label image, with time as first axis.
     label_slices : dict[int, list[tuple[slice, ...] | None]]
         Bounding boxes of the labels of each timepoint, as returned by
-        scipy.ndimage.find_objects(). The bounding boxes of a timepoint are
+        ``scipy.ndimage.find_objects()``. The bounding boxes of a timepoint are
         computed and added on its first use.
     lineage : CellLineage
         Lineage graph containing the cell.
     nid : int
         Node ID of the cell.
     label_prop : str
-        Name of the property that stores cell labels.
+        Identifier of the property that stores cell labels.
 
     Returns
     -------
@@ -258,12 +341,14 @@ def _find_label(
 
     Raises
     ------
+    KeyError
+        If the cell has no value for `label_prop` or ``timepoint``.
     ValueError
         If the label of the cell is not in its timepoint of the label image.
     """
     label = int(lineage.nodes[nid][label_prop])
     t = lineage.nodes[nid]["timepoint"]
-    frame = label_img[t]
+    frame = label_image[t]
     if t not in label_slices:
         label_slices[t] = ndi.find_objects(frame)
     slices = label_slices[t]
@@ -277,47 +362,47 @@ def _find_label(
     return t, bbox, frame[bbox] == label
 
 
-class CellPolygonFromLabelImg(_LabelImgShapeCalculator):
+class CellPolygonFromLabelImage(_LabelImageShapeCalculator):
     """
-    A calculator for the cell polygon property, which computes the cell shape as a
-    shapely.Polygon from a label image.
+    Calculator for the cell polygon property, computed from a label image.
 
-    The polygon is the outline of the cell label: holes are filled and, when the
-    label is made of several pieces, only the largest one is kept. At the end of
-    each update, a single warning lists the cells whose label is made of several
-    pieces or has holes. Pixels that touch only by a corner belong to the same piece.
+    The polygon, a ``shapely.Polygon``, is the outline of the cell label: holes are
+    filled and, when the label is made of several pieces, only the largest one is
+    kept. At the end of each update, a single warning lists the cells whose label is
+    made of several pieces or has holes. Pixels that touch only by a corner belong to
+    the same piece.
 
     Parameters
     ----------
     property : Property
         Property object to which the calculator is associated.
     label_prop : str
-        Name of the property that stores cell labels.
-    label_img : np.ndarray
+        Identifier of the property that stores cell labels.
+    label_image : np.ndarray
         The label image.
     pixel_size : float
         The size of each pixel. Must be in the same unit as the property unit.
-    force_recompute : bool, optional
+    force_recompute : bool, default=False
         Whether to force recomputation of the property when it has already been
-        computed, by default False.
+        computed.
     """
 
     def __init__(
         self,
         property: Property,
         label_prop: str,
-        label_img: np.ndarray,
+        label_image: np.ndarray,
         pixel_size: float,
         force_recompute: bool = False,
     ):
-        super().__init__(property, label_prop, label_img, pixel_size, force_recompute)
+        super().__init__(property, label_prop, label_image, pixel_size, force_recompute)
         # (cell ID, lineage ID) of the cells whose label is in several pieces,
         # and of the cells whose label has holes.
         self._fragmented_cells: list[tuple[int, int]] = []
         self._cells_with_holes: list[tuple[int, int]] = []
 
     def enrich(
-        self, data: Data, nodes_to_enrich: list[tuple[int, int]], **kwargs
+        self, data: Data, nodes_to_enrich: list[tuple[int, int]], **kwargs: Any
     ) -> None:
         """
         Enrich the data with the cell polygons of a list of nodes.
@@ -326,13 +411,16 @@ class CellPolygonFromLabelImg(_LabelImgShapeCalculator):
         ----------
         data : Data
             Data object containing the lineages.
-        nodes_to_enrich : list of tuple[int, int]
+        nodes_to_enrich : list[tuple[int, int]]
             List of tuples containing the node ID and the lineage ID of the nodes
             to enrich with the property value.
+        **kwargs : Any
+            Arguments of the other kinds of calculators, such as ``edges_to_enrich``,
+            which the updater passes to all calculators. Not used.
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the label of some cells is made of several pieces or has holes.
         """
         self._fragmented_cells = []
@@ -350,12 +438,37 @@ class CellPolygonFromLabelImg(_LabelImgShapeCalculator):
         if issues:
             warnings.warn(
                 f"In the label image, {' and '.join(issues)}. "
-                f"'{self.prop.identifier}' only keeps the largest piece of each label "
-                "and fills its holes. To keep all the pieces and holes, use the cell "
-                "multipolygon property instead: model.add_cell_multipolygon()."
+                f"'{self.property.identifier}' only keeps the largest piece of each "
+                "label and fills its holes. To keep all the pieces and holes, use the "
+                "cell multipolygon property instead: model.add_cell_multipolygon().",
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
             )
 
-    def _shape_from_mask(self, mask: np.ndarray, lineage, nid: int) -> Polygon:
+    def _shape_from_mask(
+        self, mask: np.ndarray, lineage: CellLineage, nid: int
+    ) -> Polygon:
+        """
+        Convert the mask of a cell label into the outline of its largest piece.
+
+        The cells whose label is made of several pieces or has holes are recorded for
+        the warning of `enrich()`.
+
+        Parameters
+        ----------
+        mask : np.ndarray
+            Binary mask of the cell label, cropped to its bounding box.
+        lineage : CellLineage
+            Lineage graph containing the cell.
+        nid : int
+            Node ID of the cell.
+
+        Returns
+        -------
+        Polygon
+            Outline of the largest piece of the label, holes filled, in (x, y) pixel
+            coordinates of the mask.
+        """
         polygons = _mask_to_polygons(mask)
         if len(polygons) > 1:
             self._fragmented_cells.append((nid, lineage.graph["lineage_id"]))
@@ -370,7 +483,7 @@ def _describe_cells(cells: list[tuple[int, int]], what: str) -> str:
 
     Parameters
     ----------
-    cells : list of tuple[int, int]
+    cells : list[tuple[int, int]]
         (cell ID, lineage ID) of the cells.
     what : str
         What the cells have, e.g. "a label with holes".
@@ -388,31 +501,51 @@ def _describe_cells(cells: list[tuple[int, int]], what: str) -> str:
     return f"{cells_txt} {what} ({examples})"
 
 
-class CellMultiPolygonFromLabelImg(_LabelImgShapeCalculator):
+class CellMultiPolygonFromLabelImage(_LabelImageShapeCalculator):
     """
-    A calculator for the cell multipolygon property, which computes the cell shape
-    as a shapely.MultiPolygon from a label image.
+    Calculator for the cell multipolygon property, computed from a label image.
 
-    The multipolygon holds one polygon per piece of the cell label, sorted by
-    decreasing area, with the holes of each piece as interior rings. Pixels that
-    touch only by a corner belong to the same piece.
+    The multipolygon, a ``shapely.MultiPolygon``, holds one polygon per piece of the
+    cell label, sorted by decreasing area, with the holes of each piece as interior
+    rings. Pixels that touch only by a corner belong to the same piece.
 
     Parameters
     ----------
     property : Property
         Property object to which the calculator is associated.
     label_prop : str
-        Name of the property that stores cell labels.
-    label_img : np.ndarray
+        Identifier of the property that stores cell labels.
+    label_image : np.ndarray
         The label image.
     pixel_size : float
         The size of each pixel. Must be in the same unit as the property unit.
-    force_recompute : bool, optional
+    force_recompute : bool, default=False
         Whether to force recomputation of the property when it has already been
-        computed, by default False.
+        computed.
     """
 
-    def _shape_from_mask(self, mask: np.ndarray, lineage, nid: int) -> MultiPolygon:
+    def _shape_from_mask(
+        self, mask: np.ndarray, lineage: CellLineage, nid: int
+    ) -> MultiPolygon:
+        """
+        Convert the mask of a cell label into a multipolygon, with its pieces and holes.
+
+        Parameters
+        ----------
+        mask : np.ndarray
+            Binary mask of the cell label, cropped to its bounding box.
+        lineage : CellLineage
+            Lineage graph containing the cell.
+        nid : int
+            Node ID of the cell.
+
+        Returns
+        -------
+        MultiPolygon
+            One polygon per piece of the label, sorted by decreasing area, with the
+            holes of each piece as interior rings, in (x, y) pixel coordinates of the
+            mask.
+        """
         return MultiPolygon(_mask_to_polygons(mask, fill_holes=False))
 
 
@@ -423,8 +556,8 @@ def _largest_polygon(geometry: BaseGeometry) -> Polygon | None:
     Parameters
     ----------
     geometry : BaseGeometry
-        Geometry to search, such as the output of shapely.make_valid(): a Polygon,
-        a MultiPolygon or a GeometryCollection.
+        Geometry to search, such as the output of ``shapely.make_valid()``: a
+        ``Polygon``, a ``MultiPolygon`` or a ``GeometryCollection``.
 
     Returns
     -------
@@ -443,33 +576,33 @@ def _largest_polygon(geometry: BaseGeometry) -> Polygon | None:
     return Polygon(max(polygons, key=lambda polygon: polygon.area).exterior)
 
 
-class CellPolygonFromContour(NodeLocalPropCalculator):
+class CellPolygonFromContour(NodeLocalPropCalculator[CellLineage]):
     """
-    A calculator for the cell polygon property, which computes the cell shape as a
-    shapely.Polygon from the cell contour and position.
+    Calculator for the cell polygon property, from the cell contour and position.
 
-    The contour holds the (x, y) coordinates of the outline of the cell, relative
-    to the cell position (`cell_x`, `cell_y`), like the contours loaded from
-    TrackMate or Cell Tracking Challenge data. The polygon is None for cells without
-    a contour. An invalid contour, such as a contour that crosses itself, is
-    repaired with shapely.make_valid(): the polygon is its largest piece with holes
-    filled, or None if the contour has no area. At the end of each update, a single
-    log message lists the cells without a contour or with an invalid one.
+    The cell shape is a ``shapely.Polygon``. The contour holds the (x, y) coordinates
+    of the outline of the cell, relative to the cell position (``cell_x``,
+    ``cell_y``), like the contours loaded from TrackMate or Cell Tracking Challenge
+    data. The polygon is None for cells without a contour. An invalid contour, such as
+    a contour that crosses itself, is repaired with ``shapely.make_valid()``: the
+    polygon is its largest piece with holes filled, or None if the contour has no
+    area. At the end of each update, a single log message lists the cells without a
+    contour or with an invalid one.
 
     Parameters
     ----------
     property : Property
         Property object to which the calculator is associated.
-    contour_prop : str, optional
+    contour_prop : str, default="cell_contour"
         Identifier of the node property holding the cell contours.
-        Defaults to "cell_contour".
-    force_recompute : bool, optional
+    force_recompute : bool, default=False
         Whether to force recomputation of the property when it has already been
-        computed, by default False.
+        computed.
     """
 
+    #: Input property: `contour_prop`, a node property of cell lineages.
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "contour_prop": ("node", "CellLineage")
+        "contour_prop": ("node", "cell")
     }
 
     def __init__(
@@ -487,7 +620,7 @@ class CellPolygonFromContour(NodeLocalPropCalculator):
         self._cells_with_invalid_contour: list[tuple[int, int]] = []
 
     def enrich(
-        self, data: Data, nodes_to_enrich: list[tuple[int, int]], **kwargs
+        self, data: Data, nodes_to_enrich: list[tuple[int, int]], **kwargs: Any
     ) -> None:
         """
         Enrich the data with the cell polygons of a list of nodes.
@@ -496,9 +629,12 @@ class CellPolygonFromContour(NodeLocalPropCalculator):
         ----------
         data : Data
             Data object containing the lineages.
-        nodes_to_enrich : list of tuple[int, int]
+        nodes_to_enrich : list[tuple[int, int]]
             List of tuples containing the node ID and the lineage ID of the nodes
             to enrich with the property value.
+        **kwargs : Any
+            Arguments of the other kinds of calculators, such as ``edges_to_enrich``,
+            which the updater passes to all calculators. Not used.
         """
         self._cells_without_contour = []
         self._cells_with_invalid_contour = []
@@ -508,7 +644,7 @@ class CellPolygonFromContour(NodeLocalPropCalculator):
         if self._cells_without_contour:
             issues.append(_describe_cells(self._cells_without_contour, "no value"))
             consequences.append(
-                f"'{self.prop.identifier}' is None for cells without a value."
+                f"'{self.property.identifier}' is None for cells without a value."
             )
         if self._cells_with_invalid_contour:
             issues.append(
@@ -516,7 +652,7 @@ class CellPolygonFromContour(NodeLocalPropCalculator):
             )
             consequences.append(
                 "Invalid contours, such as contours crossing themselves, are repaired "
-                f"and '{self.prop.identifier}' keeps their largest piece (None if "
+                f"and '{self.property.identifier}' keeps their largest piece (None if "
                 "they have no area)."
             )
         if issues:
@@ -525,14 +661,39 @@ class CellPolygonFromContour(NodeLocalPropCalculator):
                 f"{' '.join(consequences)}"
             )
 
-    def compute(self, lineage, nid: int) -> Polygon | None:
-        if not self.force_recompute and self.prop.identifier in lineage.nodes[nid]:
-            return lineage.nodes[nid][self.prop.identifier]
+    def compute(self, lineage: CellLineage, node_id: int) -> Polygon | None:
+        """
+        Compute the polygon of a cell from its contour and position.
 
-        cell = lineage.nodes[nid]
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage graph containing the cell of interest.
+        node_id : int
+            Node ID (``cell_id``) of the cell of interest.
+
+        Returns
+        -------
+        Polygon | None
+            Polygon of the cell, or None if the cell has no contour or if its contour
+            has no area. If the cell already has a value for the property and
+            `force_recompute` is False, this value is returned instead.
+
+        Raises
+        ------
+        KeyError
+            If a cell with a contour has no value for ``cell_x`` or ``cell_y``.
+        """
+        if (
+            not self.force_recompute
+            and self.property.identifier in lineage.nodes[node_id]
+        ):
+            return lineage.nodes[node_id][self.property.identifier]
+
+        cell = lineage.nodes[node_id]
         contour = cell.get(self.contour_prop)
         if contour is None:
-            self._cells_without_contour.append((nid, lineage.graph["lineage_id"]))
+            self._cells_without_contour.append((node_id, lineage.graph["lineage_id"]))
             return None
         x, y = cell["cell_x"], cell["cell_y"]
         try:
@@ -541,7 +702,7 @@ class CellPolygonFromContour(NodeLocalPropCalculator):
             polygon = None
         if polygon is not None and polygon.is_valid and not polygon.is_empty:
             return polygon
-        self._cells_with_invalid_contour.append((nid, lineage.graph["lineage_id"]))
+        self._cells_with_invalid_contour.append((node_id, lineage.graph["lineage_id"]))
         return _largest_polygon(make_valid(polygon)) if polygon is not None else None
 
 
@@ -549,52 +710,101 @@ def create_cell_area_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
-    custom_provenance: str | None = None,
+    provenance: str | None = None,
     unit: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``cell_area`` property.
+
+    ``cell_area`` is the area of the cell, computed from its polygon. It is a node
+    property of cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"cell_area"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Cell area".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Area of the
+        cell".
+    provenance : str | None, default=None
+        Origin of the property, e.g. the name of the format it was loaded from. If None,
+        ``"Pycellin"`` is used.
+    unit : str | None, default=None
+        Unit of the areas, e.g. ``"µm^2"``.
+
+    Returns
+    -------
+    Property
+        Declaration of the ``cell_area`` property.
+    """
     return Property(
         identifier=custom_identifier or "cell_area",
         name=custom_name or "Cell area",
         description=custom_description or "Area of the cell",
-        provenance=custom_provenance or "pycellin",
+        provenance=provenance or "Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit=unit,
     )
 
 
-class CellArea(NodeLocalPropCalculator):
+class CellArea(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the area of a cell from its polygon.
 
-    The area of a shapely.MultiPolygon is the area of all its pieces, holes excluded.
-    The area is NaN for cells whose polygon is None, such as cells without a contour.
+    The area of a ``shapely.MultiPolygon`` is the area of all its pieces, holes
+    excluded. The area is NaN for cells whose polygon is None, such as cells without a
+    contour.
 
     Parameters
     ----------
     property : Property
         Property object to which the calculator is associated.
-    polygon_prop : str, optional
+    polygon_prop : str, default="cell_polygon"
         Identifier of the node property holding the cell shapes as
-        shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
+        ``shapely.Polygon`` or ``shapely.MultiPolygon``.
     """
 
+    #: Input property: `polygon_prop`, a node property of cell lineages.
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "polygon_prop": ("node", "CellLineage")
+        "polygon_prop": ("node", "cell")
     }
 
     def __init__(self, property: Property, polygon_prop: str = "cell_polygon"):
         super().__init__(property)
         self.polygon_prop = polygon_prop
 
-    def compute(self, lineage, nid: int) -> float:
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
+        """
+        Compute the area of a cell from its polygon.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage graph containing the cell of interest.
+        node_id : int
+            Node ID (``cell_id``) of the cell of interest.
+
+        Returns
+        -------
+        float
+            Area of the cell, or NaN if its polygon is None.
+
+        Raises
+        ------
+        KeyError
+            If the cell has no value for `polygon_prop`.
+        """
         try:
-            polygon = lineage.nodes[nid][self.polygon_prop]
+            polygon = lineage.nodes[node_id][self.polygon_prop]
         except KeyError:
             msg = (
-                f"Cannot compute '{self.prop.identifier}': missing "
-                f"'{self.polygon_prop}' property for cell {nid}, "
+                f"Cannot compute '{self.property.identifier}': missing "
+                f"'{self.polygon_prop}' property for cell {node_id}, "
                 f"lineage {lineage.graph['lineage_id']}. "
                 f"Please compute the '{self.polygon_prop}' property first."
             )
@@ -608,19 +818,43 @@ def create_cycle_mean_area_property(
     custom_description: str | None = None,
     unit: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``cycle_mean_area`` property.
+
+    ``cycle_mean_area`` is the mean area of the cell during the cell cycle. It is a
+    node property of cycle lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"cycle_mean_area"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Cycle mean area".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Mean area of
+        the cell during the cell cycle".
+    unit : str | None, default=None
+        Unit of the areas, e.g. ``"µm^2"``.
+
+    Returns
+    -------
+    Property
+        Declaration of the ``cycle_mean_area`` property.
+    """
     return Property(
         identifier=custom_identifier or "cycle_mean_area",
         name=custom_name or "Cycle mean area",
         description=custom_description or "Mean area of the cell during the cell cycle",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
         unit=unit,
     )
 
 
-class CycleMeanArea(NodeGlobalPropCalculator):
+class CycleMeanArea(NodeGlobalPropCalculator[CycleLineage]):
     """
     Calculator to compute the mean area of a cell during a cell cycle.
 
@@ -632,22 +866,18 @@ class CycleMeanArea(NodeGlobalPropCalculator):
     ----------
     property : Property
         Property object to which the calculator is associated.
-    area_prop : str, optional
+    area_prop : str, default="cell_area"
         Identifier of the cell lineage node property holding the cell areas.
-        Defaults to "cell_area".
     """
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "area_prop": ("node", "CellLineage")
-    }
+    #: Input property: `area_prop`, a node property of cell lineages.
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"area_prop": ("node", "cell")}
 
     def __init__(self, property: Property, area_prop: str = "cell_area"):
         super().__init__(property)
         self.area_prop = area_prop
 
-    def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, nid: int
-    ) -> float:
+    def compute(self, data: Data, lineage: CycleLineage, node_id: int) -> float:
         """
         Compute the mean area of a cell during the cell cycle.
 
@@ -657,16 +887,21 @@ class CycleMeanArea(NodeGlobalPropCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        nid : int
-            Node ID (cycle_id) of the cell cycle of interest.
+        node_id : int
+            Node ID (``cycle_id``) of the cell cycle of interest.
 
         Returns
         -------
         float
             Mean area of the cell during the cell cycle, or NaN if no cell
             of the cell cycle has an area value.
+
+        Raises
+        ------
+        MissingPropertyError
+            If a cell of the cell cycle has no value for `area_prop`.
         """
-        areas = _get_cycle_node_property_values(self.area_prop, data, lineage, nid)
+        areas = _get_cycle_node_property_values(self.area_prop, data, lineage, node_id)
         return _nanmean(areas)
 
 
@@ -676,20 +911,44 @@ def create_birth_area_property(
     custom_description: str | None = None,
     unit: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``birth_area`` property.
+
+    ``birth_area`` is the area of the cell at the start of the cell cycle, right after
+    division. It is a node property of cycle lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"birth_area"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Birth area".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Area of the
+        cell at the start of the cell cycle, right after division".
+    unit : str | None, default=None
+        Unit of the areas, e.g. ``"µm^2"``.
+
+    Returns
+    -------
+    Property
+        Declaration of the ``birth_area`` property.
+    """
     return Property(
         identifier=custom_identifier or "birth_area",
         name=custom_name or "Birth area",
         description=custom_description
         or "Area of the cell at the start of the cell cycle, right after division",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
         unit=unit,
     )
 
 
-class BirthArea(NodeGlobalPropCalculator):
+class BirthArea(NodeGlobalPropCalculator[CycleLineage]):
     """
     Calculator to compute the area of a cell at birth.
 
@@ -701,22 +960,18 @@ class BirthArea(NodeGlobalPropCalculator):
     ----------
     property : Property
         Property object to which the calculator is associated.
-    area_prop : str, optional
+    area_prop : str, default="cell_area"
         Identifier of the cell lineage node property holding the cell areas.
-        Defaults to "cell_area".
     """
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "area_prop": ("node", "CellLineage")
-    }
+    #: Input property: `area_prop`, a node property of cell lineages.
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"area_prop": ("node", "cell")}
 
     def __init__(self, property: Property, area_prop: str = "cell_area"):
         super().__init__(property)
         self.area_prop = area_prop
 
-    def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, nid: int
-    ) -> float:
+    def compute(self, data: Data, lineage: CycleLineage, node_id: int) -> float:
         """
         Compute the area of a cell at birth.
 
@@ -726,18 +981,24 @@ class BirthArea(NodeGlobalPropCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        nid : int
-            Node ID (cycle_id) of the cell cycle of interest.
+        node_id : int
+            Node ID (``cycle_id``) of the cell cycle of interest.
 
         Returns
         -------
         float
             Area of the first cell of the cell cycle, or NaN if the cell cycle
             starts at a root.
+
+        Raises
+        ------
+        MissingPropertyError
+            If a cell of the cell cycle has no value for `area_prop`.
         """
-        if lineage.is_root(nid):
+        if lineage.is_root(node_id):
             return np.nan
-        return _get_cycle_node_property_values(self.area_prop, data, lineage, nid)[0]
+        areas = _get_cycle_node_property_values(self.area_prop, data, lineage, node_id)
+        return areas[0]
 
 
 def create_division_area_property(
@@ -746,20 +1007,44 @@ def create_division_area_property(
     custom_description: str | None = None,
     unit: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``division_area`` property.
+
+    ``division_area`` is the area of the cell at the end of the cell cycle, right
+    before division. It is a node property of cycle lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"division_area"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Division area".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Area of the
+        cell at the end of the cell cycle, right before division".
+    unit : str | None, default=None
+        Unit of the areas, e.g. ``"µm^2"``.
+
+    Returns
+    -------
+    Property
+        Declaration of the ``division_area`` property.
+    """
     return Property(
         identifier=custom_identifier or "division_area",
         name=custom_name or "Division area",
         description=custom_description
         or "Area of the cell at the end of the cell cycle, right before division",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="float",
         unit=unit,
     )
 
 
-class DivisionArea(NodeGlobalPropCalculator):
+class DivisionArea(NodeGlobalPropCalculator[CycleLineage]):
     """
     Calculator to compute the area of a cell at division.
 
@@ -771,22 +1056,18 @@ class DivisionArea(NodeGlobalPropCalculator):
     ----------
     property : Property
         Property object to which the calculator is associated.
-    area_prop : str, optional
+    area_prop : str, default="cell_area"
         Identifier of the cell lineage node property holding the cell areas.
-        Defaults to "cell_area".
     """
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "area_prop": ("node", "CellLineage")
-    }
+    #: Input property: `area_prop`, a node property of cell lineages.
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"area_prop": ("node", "cell")}
 
     def __init__(self, property: Property, area_prop: str = "cell_area"):
         super().__init__(property)
         self.area_prop = area_prop
 
-    def compute(  # type: ignore[override]
-        self, data: Data, lineage: CycleLineage, nid: int
-    ) -> float:
+    def compute(self, data: Data, lineage: CycleLineage, node_id: int) -> float:
         """
         Compute the area of a cell at division.
 
@@ -796,60 +1077,95 @@ class DivisionArea(NodeGlobalPropCalculator):
             Data object containing the lineage.
         lineage : CycleLineage
             Lineage graph containing the node of interest.
-        nid : int
-            Node ID (cycle_id) of the cell cycle of interest.
+        node_id : int
+            Node ID (``cycle_id``) of the cell cycle of interest.
 
         Returns
         -------
         float
             Area of the last cell of the cell cycle, or NaN if the cell cycle
             ends at a leaf.
+
+        Raises
+        ------
+        MissingPropertyError
+            If a cell of the cell cycle has no value for `area_prop`.
         """
-        if lineage.is_leaf(nid):
+        if lineage.is_leaf(node_id):
             return np.nan
-        return _get_cycle_node_property_values(self.area_prop, data, lineage, nid)[-1]
+        areas = _get_cycle_node_property_values(self.area_prop, data, lineage, node_id)
+        return areas[-1]
 
 
 def create_cell_contour_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
-    custom_provenance: str | None = None,
+    provenance: str | None = None,
     unit: str | None = None,
-):
+) -> Property:
+    """
+    Create the declaration of the ``cell_contour`` property.
+
+    ``cell_contour`` is the list of the coordinates of the contour of the cell,
+    relative to its centroid. It is a node property of cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"cell_contour"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Cell contour".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "List of
+        coordinates of the cell's contour, relative to its centroid".
+    provenance : str | None, default=None
+        Origin of the property, e.g. the name of the format it was loaded from. If None,
+        ``"Pycellin"`` is used.
+    unit : str | None, default=None
+        Unit of the coordinates, e.g. ``"µm"``.
+
+    Returns
+    -------
+    Property
+        Declaration of the ``cell_contour`` property.
+    """
     return Property(
         identifier=custom_identifier or "cell_contour",
         name=custom_name or "Cell contour",
         description=custom_description
         or "List of coordinates of the cell's contour, relative to its centroid",
-        provenance=custom_provenance or "pycellin",
+        provenance=provenance or "Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit=unit,
     )
 
 
-class CellContour(NodeLocalPropCalculator):
+class CellContour(NodeLocalPropCalculator[CellLineage]):
     """
-    Calculator to compute the contour of a cell from its polygon, as coordinates
-    relative to the polygon centroid. The contour is None for cells whose polygon
-    is None.
+    Calculator to compute the contour of a cell from its polygon.
+
+    The contour is given as coordinates relative to the polygon centroid. It is None
+    for cells whose polygon is None.
 
     Parameters
     ----------
     property : Property
         Property object to which the calculator is associated.
-    force_recompute : bool, optional
+    force_recompute : bool, default=False
         Whether to force recomputation of the property when it has already been
-        computed, by default False.
-    polygon_prop : str, optional
+        computed.
+    polygon_prop : str, default="cell_polygon"
         Identifier of the node property holding the cell shapes as
-        shapely.Polygon. Defaults to "cell_polygon".
+        ``shapely.Polygon``.
     """
 
+    #: Input property: `polygon_prop`, a node property of cell lineages.
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "polygon_prop": ("node", "CellLineage")
+        "polygon_prop": ("node", "cell")
     }
 
     def __init__(
@@ -862,15 +1178,46 @@ class CellContour(NodeLocalPropCalculator):
         self.force_recompute = force_recompute
         self.polygon_prop = polygon_prop
 
-    def compute(self, lineage, nid: int) -> list[tuple[int, int]] | None:
-        if not self.force_recompute and self.prop.identifier in lineage.nodes[nid]:
-            return lineage.nodes[nid][self.prop.identifier]
+    def compute(
+        self, lineage: CellLineage, node_id: int
+    ) -> list[tuple[float, float]] | None:
+        """
+        Compute the contour of a cell from its polygon.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage graph containing the cell of interest.
+        node_id : int
+            Node ID (``cell_id``) of the cell of interest.
+
+        Returns
+        -------
+        list[tuple[float, float]] | None
+            (x, y) coordinates of the exterior ring of the polygon, relative to its
+            centroid, or None if the polygon is None. If the cell already has a value
+            for the property and `force_recompute` is False, this value is returned
+            instead.
+
+        Raises
+        ------
+        KeyError
+            If the cell has no value for `polygon_prop`.
+        TypeError
+            If the polygon of the cell is not a ``shapely.Polygon``, e.g. a
+            ``shapely.MultiPolygon``.
+        """
+        if (
+            not self.force_recompute
+            and self.property.identifier in lineage.nodes[node_id]
+        ):
+            return lineage.nodes[node_id][self.property.identifier]
         try:
-            poly = lineage.nodes[nid][self.polygon_prop]
+            poly = lineage.nodes[node_id][self.polygon_prop]
         except KeyError:
             msg = (
-                f"Cannot compute '{self.prop.identifier}': missing "
-                f"'{self.polygon_prop}' property for cell {nid}, "
+                f"Cannot compute '{self.property.identifier}': missing "
+                f"'{self.polygon_prop}' property for cell {node_id}, "
                 f"lineage {lineage.graph['lineage_id']}. "
                 f"Please compute the '{self.polygon_prop}' property first."
             )
@@ -879,12 +1226,13 @@ class CellContour(NodeLocalPropCalculator):
             return None
         if not isinstance(poly, Polygon):
             raise TypeError(
-                f"Cannot compute '{self.prop.identifier}' for cell {nid}, lineage "
-                f"{lineage.graph['lineage_id']}: '{self.polygon_prop}' holds a "
+                f"Cannot compute '{self.property.identifier}' for cell {node_id}, "
+                f"lineage {lineage.graph['lineage_id']}: '{self.polygon_prop}' holds a "
                 f"{type(poly).__name__}, but a contour needs a Polygon."
             )
         return [
-            (x - poly.centroid.x, y - poly.centroid.y) for (x, y) in poly.exterior.coords
+            (x - poly.centroid.x, y - poly.centroid.y)
+            for (x, y) in poly.exterior.coords
         ]
 
 
@@ -892,26 +1240,53 @@ def create_cell_perimeter_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
-    custom_provenance: str | None = None,
+    provenance: str | None = None,
     unit: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``cell_perimeter`` property.
+
+    ``cell_perimeter`` is the perimeter of the cell, computed from its polygon. It is
+    a node property of cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"cell_perimeter"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Cell perimeter".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Perimeter of
+        the cell".
+    provenance : str | None, default=None
+        Origin of the property, e.g. the name of the format it was loaded from. If None,
+        ``"Pycellin"`` is used.
+    unit : str | None, default=None
+        Unit of the perimeters, e.g. ``"µm"``.
+
+    Returns
+    -------
+    Property
+        Declaration of the ``cell_perimeter`` property.
+    """
     return Property(
         identifier=custom_identifier or "cell_perimeter",
         name=custom_name or "Cell perimeter",
         description=custom_description or "Perimeter of the cell",
-        provenance=custom_provenance or "pycellin",
+        provenance=provenance or "Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit=unit,
     )
 
 
-class CellPerimeter(NodeLocalPropCalculator):
+class CellPerimeter(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the perimeter of a cell from its polygon.
 
-    The perimeter of a shapely.MultiPolygon is the length of the boundaries of all
+    The perimeter of a ``shapely.MultiPolygon`` is the length of the boundaries of all
     its pieces, including the edges of their holes. The perimeter is NaN for cells
     whose polygon is None, such as cells without a contour.
 
@@ -919,26 +1294,47 @@ class CellPerimeter(NodeLocalPropCalculator):
     ----------
     property : Property
         Property object to which the calculator is associated.
-    polygon_prop : str, optional
+    polygon_prop : str, default="cell_polygon"
         Identifier of the node property holding the cell shapes as
-        shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
+        ``shapely.Polygon`` or ``shapely.MultiPolygon``.
     """
 
+    #: Input property: `polygon_prop`, a node property of cell lineages.
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "polygon_prop": ("node", "CellLineage")
+        "polygon_prop": ("node", "cell")
     }
 
     def __init__(self, property: Property, polygon_prop: str = "cell_polygon"):
         super().__init__(property)
         self.polygon_prop = polygon_prop
 
-    def compute(self, lineage, nid: int) -> float:
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
+        """
+        Compute the perimeter of a cell from its polygon.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage graph containing the cell of interest.
+        node_id : int
+            Node ID (``cell_id``) of the cell of interest.
+
+        Returns
+        -------
+        float
+            Perimeter of the cell, or NaN if its polygon is None.
+
+        Raises
+        ------
+        KeyError
+            If the cell has no value for `polygon_prop`.
+        """
         try:
-            polygon = lineage.nodes[nid][self.polygon_prop]
+            polygon = lineage.nodes[node_id][self.polygon_prop]
         except KeyError:
             msg = (
-                f"Cannot compute '{self.prop.identifier}': missing "
-                f"'{self.polygon_prop}' property for cell {nid}, "
+                f"Cannot compute '{self.property.identifier}': missing "
+                f"'{self.polygon_prop}' property for cell {node_id}, "
                 f"lineage {lineage.graph['lineage_id']}. "
                 f"Please compute the '{self.polygon_prop}' property first."
             )
@@ -951,27 +1347,51 @@ def create_cell_circularity_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``cell_circularity`` property.
+
+    ``cell_circularity`` is 4 pi times the area of the cell divided by its squared
+    perimeter: 1 for a disk, closer to 0 for an elongated or irregular cell. It is a
+    node property of cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"cell_circularity"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Cell circularity".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Circularity
+        of the cell, 4 pi times its area divided by its squared perimeter: 1 for a disk,
+        closer to 0 for an elongated or irregular cell".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``cell_circularity`` property.
+    """
     return Property(
         identifier=custom_identifier or "cell_circularity",
         name=custom_name or "Cell circularity",
         description=custom_description
         or "Circularity of the cell, 4 pi times its area divided by its squared "
         "perimeter: 1 for a disk, closer to 0 for an elongated or irregular cell",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
 
 
-class CellCircularity(NodeLocalPropCalculator):
+class CellCircularity(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the circularity of a cell from its polygon.
 
     The circularity is 4 pi times the area of the polygon divided by its squared
     perimeter. It is 1 for a disk and gets closer to 0 as the cell gets elongated
     or its outline irregular. Polygons always have a circularity below 1, even
-    regular polygons with many sides. The circularity of a shapely.MultiPolygon is
+    regular polygons with many sides. The circularity of a ``shapely.MultiPolygon`` is
     computed from the area and perimeter of all its pieces, as in `CellArea` and
     `CellPerimeter`, so pieces and holes lower it. The circularity is NaN for cells
     whose polygon is None, such as cells without a contour, or has no perimeter.
@@ -980,26 +1400,47 @@ class CellCircularity(NodeLocalPropCalculator):
     ----------
     property : Property
         Property object to which the calculator is associated.
-    polygon_prop : str, optional
+    polygon_prop : str, default="cell_polygon"
         Identifier of the node property holding the cell shapes as
-        shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
+        ``shapely.Polygon`` or ``shapely.MultiPolygon``.
     """
 
+    #: Input property: `polygon_prop`, a node property of cell lineages.
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "polygon_prop": ("node", "CellLineage")
+        "polygon_prop": ("node", "cell")
     }
 
     def __init__(self, property: Property, polygon_prop: str = "cell_polygon"):
         super().__init__(property)
         self.polygon_prop = polygon_prop
 
-    def compute(self, lineage, nid: int) -> float:
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
+        """
+        Compute the circularity of a cell from its polygon.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage graph containing the cell of interest.
+        node_id : int
+            Node ID (``cell_id``) of the cell of interest.
+
+        Returns
+        -------
+        float
+            Circularity of the cell, or NaN if its polygon is None or has no perimeter.
+
+        Raises
+        ------
+        KeyError
+            If the cell has no value for `polygon_prop`.
+        """
         try:
-            polygon = lineage.nodes[nid][self.polygon_prop]
+            polygon = lineage.nodes[node_id][self.polygon_prop]
         except KeyError:
             msg = (
-                f"Cannot compute '{self.prop.identifier}': missing "
-                f"'{self.polygon_prop}' property for cell {nid}, "
+                f"Cannot compute '{self.property.identifier}': missing "
+                f"'{self.polygon_prop}' property for cell {node_id}, "
                 f"lineage {lineage.graph['lineage_id']}. "
                 f"Please compute the '{self.polygon_prop}' property first."
             )
@@ -1014,26 +1455,50 @@ def create_cell_solidity_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``cell_solidity`` property.
+
+    ``cell_solidity`` is the area of the cell divided by the area of its convex hull:
+    1 for a convex cell, closer to 0 for a more concave cell. It is a node property of
+    cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"cell_solidity"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Cell solidity".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Solidity of
+        the cell, its area divided by the area of its convex hull: 1 for a convex cell,
+        closer to 0 for a more concave cell".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``cell_solidity`` property.
+    """
     return Property(
         identifier=custom_identifier or "cell_solidity",
         name=custom_name or "Cell solidity",
         description=custom_description
         or "Solidity of the cell, its area divided by the area of its convex hull: "
         "1 for a convex cell, closer to 0 for a more concave cell",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
     )
 
 
-class CellSolidity(NodeLocalPropCalculator):
+class CellSolidity(NodeLocalPropCalculator[CellLineage]):
     """
     Calculator to compute the solidity of a cell from its polygon.
 
     The solidity is the area of the polygon divided by the area of its convex hull.
     It is 1 for a convex cell and gets closer to 0 as the outline of the cell gets
-    more concave. For a shapely.MultiPolygon, the convex hull encloses all the
+    more concave. For a ``shapely.MultiPolygon``, the convex hull encloses all the
     pieces, and holes are excluded from the area. The solidity is NaN for cells
     whose polygon is None, such as cells without a contour, or has no area.
 
@@ -1041,26 +1506,48 @@ class CellSolidity(NodeLocalPropCalculator):
     ----------
     property : Property
         Property object to which the calculator is associated.
-    polygon_prop : str, optional
+    polygon_prop : str, default="cell_polygon"
         Identifier of the node property holding the cell shapes as
-        shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
+        ``shapely.Polygon`` or ``shapely.MultiPolygon``.
     """
 
+    #: Input property: `polygon_prop`, a node property of cell lineages.
     INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "polygon_prop": ("node", "CellLineage")
+        "polygon_prop": ("node", "cell")
     }
 
     def __init__(self, property: Property, polygon_prop: str = "cell_polygon"):
         super().__init__(property)
         self.polygon_prop = polygon_prop
 
-    def compute(self, lineage, nid: int) -> float:
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
+        """
+        Compute the solidity of a cell from its polygon.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage graph containing the cell of interest.
+        node_id : int
+            Node ID (``cell_id``) of the cell of interest.
+
+        Returns
+        -------
+        float
+            Solidity of the cell, or NaN if its polygon is None or its convex hull has
+            no area.
+
+        Raises
+        ------
+        KeyError
+            If the cell has no value for `polygon_prop`.
+        """
         try:
-            polygon = lineage.nodes[nid][self.polygon_prop]
+            polygon = lineage.nodes[node_id][self.polygon_prop]
         except KeyError:
             msg = (
-                f"Cannot compute '{self.prop.identifier}': missing "
-                f"'{self.polygon_prop}' property for cell {nid}, "
+                f"Cannot compute '{self.property.identifier}': missing "
+                f"'{self.polygon_prop}' property for cell {node_id}, "
                 f"lineage {lineage.graph['lineage_id']}. "
                 f"Please compute the '{self.polygon_prop}' property first."
             )
@@ -1080,7 +1567,27 @@ class CellSolidity(NodeLocalPropCalculator):
 # - move area_increment to a notebook as an example of custom property
 
 
-def from_roi_to_array(roi, width, height):
+def _from_roi_to_array(
+    roi: list[tuple[int, int]], width: int, height: int
+) -> np.ndarray:
+    """
+    Draw a filled polygon into a binary image.
+
+    Parameters
+    ----------
+    roi : list[tuple[int, int]]
+        (x, y) pixel coordinates of the vertices of the polygon.
+    width : int
+        Width of the image, in pixels.
+    height : int
+        Height of the image, in pixels.
+
+    Returns
+    -------
+    np.ndarray
+        Binary image of shape (height, width): 1 inside the polygon and on its
+        outline, 0 elsewhere.
+    """
     # Actual drawing of the object and conversion to a numpy array.
     img = Image.new("L", (width, height), "black")
     img_draw = ImageDraw.Draw(img)
@@ -1093,7 +1600,22 @@ def from_roi_to_array(roi, width, height):
     return img
 
 
-def adjacent_pixels(img, pixel):
+def _adjacent_pixels(img: np.ndarray, pixel: tuple[int, int]) -> list[tuple[int, int]]:
+    """
+    Return the non-zero pixels adjacent to a pixel, in 8-connectivity.
+
+    Parameters
+    ----------
+    img : np.ndarray
+        2D image, e.g. a skeleton.
+    pixel : tuple[int, int]
+        (row, column) coordinates of the pixel.
+
+    Returns
+    -------
+    list[tuple[int, int]]
+        (row, column) coordinates of the non-zero neighbors of the pixel.
+    """
     i, j = pixel
     adj_px = []
     for k, l in product(range(i - 1, i + 2), range(j - 1, j + 2)):
@@ -1111,7 +1633,23 @@ def adjacent_pixels(img, pixel):
     return adj_px
 
 
-def prune_skel(adjacency_dict):
+def _prune_skel(
+    adjacency_dict: dict[tuple[int, int], list[tuple[int, int]]],
+) -> dict[tuple[int, int], list[tuple[int, int]]]:
+    """
+    Keep only the main branch of a skeleton, its longest path between two tips.
+
+    Parameters
+    ----------
+    adjacency_dict : dict[tuple[int, int], list[tuple[int, int]]]
+        Adjacency of the skeleton pixels: the (row, column) coordinates of each pixel,
+        mapped to those of its adjacent pixels.
+
+    Returns
+    -------
+    dict[tuple[int, int], list[tuple[int, int]]]
+        Adjacency of the pixels of the main branch only.
+    """
     # We only want to keep the main skeleton which is the longest path
     # of the graph. To find it, we are looking for the longest shortest
     # path between 2 extremities of the graph. For this, we switch to
@@ -1127,7 +1665,28 @@ def prune_skel(adjacency_dict):
     return nx.to_dict_of_lists(skel_graph, nodelist=longest_path)
 
 
-def from_skel_to_path(adjacency_dict, first_px):
+def _from_skel_to_path(
+    adjacency_dict: dict[tuple[int, int], list[tuple[int, int]]],
+    first_px: tuple[int, int],
+) -> list[tuple[int, int]]:
+    """
+    Order the pixels of a skeleton without branches, from one tip to the other.
+
+    Parameters
+    ----------
+    adjacency_dict : dict[tuple[int, int], list[tuple[int, int]]]
+        Adjacency of the skeleton pixels: the (row, column) coordinates of each pixel,
+        mapped to those of its adjacent pixels. The lists of adjacent pixels are
+        modified in place.
+    first_px : tuple[int, int]
+        (row, column) coordinates of the tip to start from.
+
+    Returns
+    -------
+    list[tuple[int, int]]
+        (row, column) coordinates of the skeleton pixels, in order along the
+        skeleton.
+    """
     # Ordering the skeleton pixels by following along the skeleton,
     # from one tip to another.
     path = [first_px]
@@ -1146,7 +1705,23 @@ def from_skel_to_path(adjacency_dict, first_px):
     return path
 
 
-def from_path_to_line(path, tol):
+def _from_path_to_line(path: list[tuple[int, int]], tol: float) -> LineString:
+    """
+    Convert a path of pixels into a simplified line.
+
+    Parameters
+    ----------
+    path : list[tuple[int, int]]
+        (row, column) coordinates of the pixels of the path.
+    tol : float
+        Tolerance distance of the simplification, in pixels (see
+        ``shapely.LineString.simplify``).
+
+    Returns
+    -------
+    LineString
+        The simplified line, in (x, y) pixel coordinates.
+    """
     # Creation of a geometrical line out of the skeleton path.
     line = LineString([Point((x, y)) for (y, x) in path])
     # To get a better approximation of the object lenght, we simplify
@@ -1155,61 +1730,104 @@ def from_path_to_line(path, tol):
     return simplified_line
 
 
-def get_width_and_length(
-    nid: int,
+def _check_width_method(width_method: str) -> None:
+    """
+    Check that `width_method` is a method of `_get_width_and_length` for the width.
+
+    Parameters
+    ----------
+    width_method : str
+        Method to compute the width along the skeleton.
+
+    Raises
+    ------
+    ValueError
+        If `width_method` is not ``"min"``, ``"max"``, ``"mean"`` or ``"median"``.
+    """
+    if width_method not in ("min", "max", "mean", "median"):
+        raise ValueError(
+            f"Unknown width method '{width_method}': use 'min', 'max', 'mean' or "
+            "'median'."
+        )
+
+
+def _get_width_and_length(
+    node_id: int,
     lineage: CellLineage,
     pixel_size: float,
-    skel_algo: str = "zhang",
+    skeleton_method: str = "zhang",
     tolerance: float = 0.5,
-    method_width: str = "mean",
+    width_method: str = "mean",
     width_ignore_tips: bool = False,
     debug: bool = False,
     debug_folder: str | None = None,
+    contour_prop: str = "cell_contour",
 ) -> tuple[float, float]:
     """
     Compute the width and length of the ROI associated with a node.
 
+    The ROI is the contour of the cell (`contour_prop`), drawn as a filled polygon
+    and skeletonized. The length is measured along the pruned and simplified
+    skeleton, extended at both tips to the edge of the cell, and the width from the
+    distances between the skeleton and the edge of the cell.
+
     Parameters
     ----------
-    nid : int
-        Node ID (cell_id) of the cell of interest.
+    node_id : int
+        Node ID (``cell_id``) of the cell of interest.
     lineage : CellLineage
         Lineage graph containing the node of interest.
     pixel_size : float
-        Pixel size in micrometer.
-    skel_algo : str, optional
-        'zhang' or 'lee', by default 'zhang'.
-    tolerance : float, optional
+        Size of a pixel, in the unit of the cell contour coordinates.
+    skeleton_method : str, default="zhang"
+        Skeletonization method, ``"zhang"`` or ``"lee"`` (see
+        ``skimage.morphology.skeletonize``).
+    tolerance : float, default=0.5
         Tolerance distance for shape simplification (0-1).
         The higher the tolerance, the more simplified the line will be.
-        By default 0.5.
-    method_width : str, optional
-        Method to compute width along skeleton: min, max, mean or median.
-        By default mean.
-    width_ignore_tips : bool, optional
-        True to ignore the skeleton tips while computing width, by default False.
-    debug : bool, optional
-        True to activate debug behavior, by default False.
-        Requires matplotlib, which pycellin does not install.
-    debug_folder : Optional[str], optional
-        Folder in which to save the debug graphs, by default None.
+    width_method : str, default="mean"
+        Method to compute width along skeleton: ``"min"``, ``"max"``, ``"mean"`` or
+        ``"median"``.
+    width_ignore_tips : bool, default=False
+        True to ignore the skeleton tips while computing width.
+    debug : bool, default=False
+        True to activate debug behavior.
+        Requires matplotlib, which Pycellin does not install.
+    debug_folder : str | None, default=None
+        Folder in which to save the debug graphs.
+    contour_prop : str, default="cell_contour"
+        Identifier of the node property holding the cell contours.
 
     Returns
     -------
     tuple[float, float]
-        Width and length of the ROI.
+        Width and length of the ROI, in the unit of `pixel_size`. Both are NaN if the
+        skeleton is a single pixel or has no tip, e.g. a loop.
+
+    Raises
+    ------
+    KeyError
+        If the cell has no value for `contour_prop`.
+    ValueError
+        If `width_method` is not ``"min"``, ``"max"``, ``"mean"`` or ``"median"``.
+
+    Notes
+    -----
+    An info message names the cell when its skeleton is a single pixel or has no
+    tip, which happens with round cells.
     """
+    _check_width_method(width_method)
     if debug:
-        print("NODE", nid)
-        if skel_algo == "zhang":
-            not_skel_algo = "lee"
-        elif skel_algo == "lee":
-            not_skel_algo = "zhang"
+        print("NODE", node_id)
+        if skeleton_method == "zhang":
+            other_skeleton_method = "lee"
+        elif skeleton_method == "lee":
+            other_skeleton_method = "zhang"
 
     # First we need to reconstruct the image of the object we are working on.
     # This is done by drawing and filling a polygon defined by the points
     # in the ROI list.
-    roi = lineage.nodes[nid]["cell_contour"]
+    roi = lineage.nodes[node_id][contour_prop]
     # The coordinates extracted from the graph are in microns, not in pixels.
     # roi = [(int(x * x_resolution), int(y * x_resolution)) for (x, y) in roi]
     roi = [(int(x * 1 / pixel_size), int(y * 1 / pixel_size)) for (x, y) in roi]
@@ -1229,7 +1847,7 @@ def get_width_and_length(
     img_height = y_max - y_min + 1 + 4
     # Placing the object in the center of the image.
     roi = [(x - x_min + 2, y - y_min + 2) for (x, y) in roi]
-    img = from_roi_to_array(roi, img_width, img_height)
+    img = _from_roi_to_array(roi, img_width, img_height)
 
     if debug:
         import matplotlib.pyplot as plt
@@ -1238,26 +1856,26 @@ def get_width_and_length(
         ax[0, 0].imshow(img, cmap="gray")
         ax[0, 0].set_aspect("equal")
         ax[0, 0].axis("off")
-        ax[0, 0].set_title(f"ROI node {nid}", fontsize=6)
+        ax[0, 0].set_title(f"ROI node {node_id}", fontsize=6)
 
     # Now that we have a numpy array modelling our object, we can compute
     # its distance transform and its skeleton.
     distance = ndi.distance_transform_edt(img)
-    skel = skeletonize(img, method=skel_algo)
+    skel = skeletonize(img, method=skeleton_method)
     # Distance transform but only for the pixels of the skeleton.
     dist_on_skel = distance * skel
     if debug:
         ax[0, 1].imshow(dist_on_skel, cmap="magma")
         ax[0, 1].contour(img, [0.5], colors="w")
         ax[0, 1].axis("off")
-        ax[0, 1].set_title(f"Skeleton {skel_algo.capitalize()}", fontsize=6)
+        ax[0, 1].set_title(f"Skeleton {skeleton_method.capitalize()}", fontsize=6)
 
-        skel2 = skeletonize(img, method=not_skel_algo)
+        skel2 = skeletonize(img, method=other_skeleton_method)
         dist_on_skel2 = distance * skel2
         ax[1, 1].imshow(dist_on_skel2, cmap="magma")
         ax[1, 1].contour(img, [0.5], colors="w")
         ax[1, 1].axis("off")
-        ax[1, 1].set_title(f"Skeleton {not_skel_algo.capitalize()}", fontsize=6)
+        ax[1, 1].set_title(f"Skeleton {other_skeleton_method.capitalize()}", fontsize=6)
 
     # The next step is to create a simple path out of the skeleton, then to
     # simplify the associated curve to compute an approximation of the
@@ -1269,7 +1887,7 @@ def get_width_and_length(
     pixels_i, pixels_j = np.nonzero(skel)
     pruning = False
     for i, j in zip(pixels_i, pixels_j):
-        adj_px = adjacent_pixels(skel, (i, j))
+        adj_px = _adjacent_pixels(skel, (i, j))
         connectivity = len(adj_px)
         if connectivity > 2:
             # There is a side branching so we will need to prune it later
@@ -1284,55 +1902,34 @@ def get_width_and_length(
             print("PRUNING")
             print(adjacency_dict)
             # print(len(adjacency_dict))
-        adjacency_dict = prune_skel(adjacency_dict)
+        adjacency_dict = _prune_skel(adjacency_dict)
         if debug:
             print(adjacency_dict)
             # print(len(adjacency_dict))
 
     # Tips of the skeleton = pixels connected to only 1 pixel.
     tip_px = [px for px, list_px in adjacency_dict.items() if len(list_px) == 1]
+    lineage_id = lineage.graph.get("lineage_id")
     if len(adjacency_dict) == 1:
         # There is only one pixel in the skeleton. The object being processed
         # is probably roundish. The method for mesuring length is not
         # adapted to this kind of morphology.
-        try:
-            track_id = lineage.nodes[nid]["TRACK_ID"]
-        except KeyError:
-            print(
-                f"WARNING: One pixel skeleton on node {nid}! "
-                f"The object is probably roundish and the radius "
-                f"is a better metric in that case. Setting the length and "
-                f"width to NaN."
-            )
-        else:
-            print(
-                f"WARNING: One pixel skeleton on node {nid} of track "
-                f"{track_id}! The object is probably roundish and the radius"
-                f" is a better metric in that case. Setting the length and "
-                f"width to NaN."
-            )
+        logger.info(
+            f"The skeleton of cell {node_id} in lineage {lineage_id} is a single "
+            "pixel, so its rod length and width are NaN: the cell is probably round, "
+            "and its radius is a better measure."
+        )
         length = np.nan
         width = np.nan
     elif len(adjacency_dict) == 0 or len(tip_px) == 0:
         # The skeleton is a loop!! The object being processed is
         # probably roundish. The method for mesuring length is not adapted to
         # this kind of morphology.
-        try:
-            track_id = lineage.nodes[nid]["TRACK_ID"]
-        except KeyError:
-            print(
-                f"WARNING: One pixel skeleton on node {nid}! "
-                f"The object is probably roundish and the radius "
-                f"is a better metric in that case. Setting the length and "
-                f"width to NaN."
-            )
-        else:
-            print(
-                f"WARNING: Circular skeleton on node {nid} of track "
-                f"{track_id}! The object is probably roundish and the radius "
-                f"is a better metric in that case. Setting the length and "
-                f"width to NaN."
-            )
+        logger.info(
+            f"The skeleton of cell {node_id} in lineage {lineage_id} has no tip, e.g. "
+            "a loop, so its rod length and width are NaN: the cell is probably round, "
+            "and its radius is a better measure."
+        )
         length = np.nan
         width = np.nan
     else:
@@ -1340,7 +1937,7 @@ def get_width_and_length(
         # from one tip to another.
         # The skeleton has been pruned so there should be only 2 tips.
         assert len(tip_px) == 2
-        path = from_skel_to_path(adjacency_dict, tip_px[0])
+        path = _from_skel_to_path(adjacency_dict, tip_px[0])
         if debug:
             points = [Point((x, y)) for (y, x) in path]
             xs = [point.x for point in points]
@@ -1351,13 +1948,13 @@ def get_width_and_length(
             ax[0, 2].axis("off")
 
         # Simplification of the path.
-        line = from_path_to_line(path, tolerance)
+        line = _from_path_to_line(path, tolerance)
         if debug:
             ax[0, 2].scatter(*line.xy, color="purple", marker="x", s=10)
             ax[0, 2].plot(*line.xy, color="purple")
             ax[0, 2].contour(img, [0.5], colors="b")
             ax[0, 2].set_title(
-                f"Pruned skeleton {skel_algo.capitalize()}\n+ simplified line",
+                f"Pruned skeleton {skeleton_method.capitalize()}\n+ simplified line",
                 fontsize=6,
             )
 
@@ -1374,15 +1971,17 @@ def get_width_and_length(
             pixels_i2, pixels_j2 = np.nonzero(skel2)
             pruning2 = False
             for i, j in zip(pixels_i2, pixels_j2):
-                adj_px2 = adjacent_pixels(skel2, (i, j))
+                adj_px2 = _adjacent_pixels(skel2, (i, j))
                 connectivity2 = len(adj_px2)
                 if connectivity2 > 2:
                     pruning2 = True
                 adjacency_dict2[(i, j)] = adj_px2
             if pruning2:
-                adjacency_dict2 = prune_skel(adjacency_dict2)
-            tip_px2 = [px for px, list_px in adjacency_dict2.items() if len(list_px) == 1]
-            path2 = from_skel_to_path(adjacency_dict2, tip_px2[0])
+                adjacency_dict2 = _prune_skel(adjacency_dict2)
+            tip_px2 = [
+                px for px, list_px in adjacency_dict2.items() if len(list_px) == 1
+            ]
+            path2 = _from_skel_to_path(adjacency_dict2, tip_px2[0])
             points2 = [Point((x, y)) for (y, x) in path2]
             xs = [point.x for point in points2]
             ys = [point.y for point in points2]
@@ -1390,12 +1989,13 @@ def get_width_and_length(
             ax[1, 2].invert_yaxis()
             ax[1, 2].set_aspect("equal")
             ax[1, 2].axis("off")
-            line2 = from_path_to_line(path2, tolerance)
+            line2 = _from_path_to_line(path2, tolerance)
             ax[1, 2].scatter(*line2.xy, color="purple", marker="x", s=10)
             ax[1, 2].plot(*line2.xy, color="purple")
             ax[1, 2].contour(img, [0.5], colors="b")
             ax[1, 2].set_title(
-                f"Pruned skeleton {not_skel_algo.capitalize()}\n+ simplified line",
+                f"Pruned skeleton {other_skeleton_method.capitalize()}\n"
+                "+ simplified line",
                 fontsize=6,
             )
             length2 = line2.length
@@ -1412,36 +2012,36 @@ def get_width_and_length(
         # so we discard the rest.
         dist_on_skel = dist_on_skel[dist_on_skel > 0]
 
-        if method_width == "mean":
+        if width_method == "mean":
             # Width: averaging the distance transform along skeleton.
             width = (np.sum(dist_on_skel) / len(dist_on_skel)) * 2 - 1
-        elif method_width == "median":
+        elif width_method == "median":
             # Width: median distance transform along skeleton.
             width = np.median(dist_on_skel) * 2 - 1
-        elif method_width == "max":
+        elif width_method == "max":
             # Width: max distance transform along skeleton.
             # TODO: see how to deal with this case, maybe put it in the ignore_tips?
             if len(dist_on_skel) == 0:
                 width = np.nan
             else:
                 width = np.max(dist_on_skel) * 2 - 1
-        elif method_width == "min":
+        elif width_method == "min":
             # Width: min distance transform along skeleton.
             if len(dist_on_skel) == 0:
                 width = np.nan
             else:
                 width = np.min(dist_on_skel) * 2 - 1
-        else:
-            print("Wrong width method. Should be one of: min, max, mean, median.")
-            # TODO: raise an error when method is not supported
+        # Any other width method was refused by _check_width_method() above.
 
         if debug:
             print(f"Width: {width:.2f} px i.e. {width * pixel_size:.2f} μm.")
             print(f"Length: {length:.2f} px i.e. {length * pixel_size:.2f} μm.\n")
 
             txt = (
-                f"Length: {length * pixel_size:.2f} μm\n{' ' * 10}i.e. {length:.2f} px"
-                f"\nWidth: {width * pixel_size:.2f} μm\n{' ' * 10}i.e. {width:.2f} px"
+                f"Length: {length * pixel_size:.2f} μm\n"
+                f"{' ' * 10}i.e. {length:.2f} px\n"
+                f"Width: {width * pixel_size:.2f} μm\n"
+                f"{' ' * 10}i.e. {width:.2f} px"
             )
             ax[0, 2].annotate(
                 txt,
@@ -1456,8 +2056,10 @@ def get_width_and_length(
 
             width2 = (np.sum(dist_on_skel2) / len(pixels_i2)) * 2 - 1
             txt2 = (
-                f"Length: {length2 * pixel_size:.2f} μm\n{' ' * 10}i.e. {length2:.2f} px"
-                f"\nWidth: {width2 * pixel_size:.2f} μm\n{' ' * 10}i.e. {width2:.2f} px"
+                f"Length: {length2 * pixel_size:.2f} μm\n"
+                f"{' ' * 10}i.e. {length2:.2f} px\n"
+                f"Width: {width2 * pixel_size:.2f} μm\n"
+                f"{' ' * 10}i.e. {width2:.2f} px"
             )
             ax[1, 2].annotate(
                 txt2,
@@ -1472,8 +2074,8 @@ def get_width_and_length(
 
             ax[1, 0].remove()
             plt.show()
-            lin_id = lineage.nodes[nid]["lineage_id"]
-            file = f"{debug_folder}/Lineage{lin_id}_Node{nid}_{skel_algo}"
+            lin_id = lineage.nodes[node_id]["lineage_id"]
+            file = f"{debug_folder}/Lineage{lin_id}_Node{node_id}_{skeleton_method}"
             plt.savefig(file)
             plt.close()
 
@@ -1484,116 +2086,300 @@ def get_width_and_length(
 
 
 def create_rod_width_property(
-    custom_identifier: str | None,
+    custom_identifier: str | None = None,
+    *,
     unit: str,
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``rod_width`` property.
+
+    ``rod_width`` is the width of a rod-shaped cell, such as a bacterium. It is a node
+    property of cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"rod_width"``.
+    unit : str
+        Unit of the widths, e.g. ``"µm"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Rod width".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Width of the
+        cell, for rod-shaped cells only".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``rod_width`` property.
+    """
     return Property(
         identifier=custom_identifier or "rod_width",
         name=custom_name or "Rod width",
-        description=custom_description or "Width of the cell, for rod-shaped cells only",
-        provenance="pycellin",
+        description=custom_description
+        or "Width of the cell, for rod-shaped cells only",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit=unit,
     )
 
 
-class RodWidth(NodeLocalPropCalculator):
+class RodWidth(NodeLocalPropCalculator[CellLineage]):
+    """
+    Calculator to compute the width of rod-shaped cells, such as bacteria.
+
+    The cell contour (`contour_prop`) is filled and skeletonized, and the width is
+    computed from the distances between the skeleton and the edge of the cell. It is
+    only meaningful for rod-shaped cells.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    pixel_size : float
+        Size of a pixel, in the unit of the cell contour coordinates.
+    skeleton_method : str, default="zhang"
+        Skeletonization method, ``"zhang"`` or ``"lee"`` (see
+        ``skimage.morphology.skeletonize``).
+    tolerance : float, default=0.5
+        Not used for the width (see `RodLength`).
+    width_method : str, default="mean"
+        How to compute the width from the distances along the skeleton:
+        ``"min"``, ``"max"``, ``"mean"`` or ``"median"``.
+    width_ignore_tips : bool, default=False
+        True to ignore the tips of the skeleton when computing the width.
+    debug : bool, default=False
+        True to plot and save the steps of the computation. Requires matplotlib,
+        which Pycellin does not install.
+    debug_folder : str | None, default=None
+        Folder in which to save the debug plots.
+    contour_prop : str, default="cell_contour"
+        Identifier of the node property holding the cell contours.
+
+    Raises
+    ------
+    ValueError
+        If `width_method` is not ``"min"``, ``"max"``, ``"mean"`` or ``"median"``.
+    """
+
+    #: Input property: `contour_prop`, a node property of cell lineages.
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "contour_prop": ("node", "cell")
+    }
+
     def __init__(
         self,
-        property,
+        property: Property,
         pixel_size: float,
-        skel_algo: str = "zhang",
+        skeleton_method: str = "zhang",
         tolerance: float = 0.5,
-        method_width: str = "mean",
+        width_method: str = "mean",
         width_ignore_tips: bool = False,
         debug: bool = False,
         debug_folder: str | None = None,
+        contour_prop: str = "cell_contour",
     ):
+        _check_width_method(width_method)
         super().__init__(property)
         self.pixel_size = pixel_size
-        self.skel_algo = skel_algo
+        self.skeleton_method = skeleton_method
         self.tolerance = tolerance
-        self.method_width = method_width
+        self.width_method = width_method
         self.width_ignore_tips = width_ignore_tips
         self.debug = debug
         self.debug_folder = debug_folder
+        self.contour_prop = contour_prop
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, nid: int
-    ) -> float:
-        return get_width_and_length(
-            nid,
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
+        """
+        Compute the width of a rod-shaped cell.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage graph containing the cell of interest.
+        node_id : int
+            Node ID (``cell_id``) of the cell of interest.
+
+        Returns
+        -------
+        float
+            Width of the cell, in the unit of `pixel_size`, or NaN if the skeleton of
+            the cell is a single pixel or a loop.
+
+        Raises
+        ------
+        KeyError
+            If the cell has no value for the contour property (`contour_prop`).
+        """
+        return _get_width_and_length(
+            node_id,
             lineage,
             self.pixel_size,
-            self.skel_algo,
+            self.skeleton_method,
             self.tolerance,
-            self.method_width,
+            self.width_method,
             self.width_ignore_tips,
             self.debug,
             self.debug_folder,
+            self.contour_prop,
         )[0]
 
 
 def create_rod_length_property(
-    custom_identifier: str | None,
+    custom_identifier: str | None = None,
+    *,
     unit: str,
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``rod_length`` property.
+
+    ``rod_length`` is the length of a rod-shaped cell, such as a bacterium. It is a
+    node property of cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"rod_length"``.
+    unit : str
+        Unit of the lengths, e.g. ``"µm"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Rod length".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Length of
+        the cell, for rod-shaped cells only".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``rod_length`` property.
+    """
     return Property(
         identifier=custom_identifier or "rod_length",
         name=custom_name or "Rod length",
-        description=custom_description or "Length of the cell, for rod-shaped cells only",
-        provenance="pycellin",
+        description=custom_description
+        or "Length of the cell, for rod-shaped cells only",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="float",
         unit=unit,
     )
 
 
-class RodLength(NodeLocalPropCalculator):
+class RodLength(NodeLocalPropCalculator[CellLineage]):
+    """
+    Calculator to compute the length of rod-shaped cells, such as bacteria.
+
+    The cell contour (`contour_prop`) is filled and skeletonized, and the skeleton
+    is pruned and simplified into a line: the length is the length of this line,
+    extended at both tips to the edge of the cell. It is only meaningful for
+    rod-shaped cells.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    pixel_size : float
+        Size of a pixel, in the unit of the cell contour coordinates.
+    skeleton_method : str, default="zhang"
+        Skeletonization method, ``"zhang"`` or ``"lee"`` (see
+        ``skimage.morphology.skeletonize``).
+    tolerance : float, default=0.5
+        Tolerance distance for the simplification of the skeleton line (0-1). The
+        higher the tolerance, the more simplified the line.
+    width_method : str, default="mean"
+        Not used for the length (see `RodWidth`), but must be ``"min"``, ``"max"``,
+        ``"mean"`` or ``"median"``.
+    width_ignore_tips : bool, default=False
+        Not used for the length (see `RodWidth`).
+    debug : bool, default=False
+        True to plot and save the steps of the computation. Requires matplotlib,
+        which Pycellin does not install.
+    debug_folder : str | None, default=None
+        Folder in which to save the debug plots.
+    contour_prop : str, default="cell_contour"
+        Identifier of the node property holding the cell contours.
+
+    Raises
+    ------
+    ValueError
+        If `width_method` is not ``"min"``, ``"max"``, ``"mean"`` or ``"median"``.
+    """
+
+    #: Input property: `contour_prop`, a node property of cell lineages.
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "contour_prop": ("node", "cell")
+    }
+
     def __init__(
         self,
-        property,
+        property: Property,
         pixel_size: float,
-        skel_algo: str = "zhang",
+        skeleton_method: str = "zhang",
         tolerance: float = 0.5,
-        method_width: str = "mean",
+        width_method: str = "mean",
         width_ignore_tips: bool = False,
         debug: bool = False,
         debug_folder: str | None = None,
+        contour_prop: str = "cell_contour",
     ):
+        _check_width_method(width_method)
         super().__init__(property)
         self.pixel_size = pixel_size
-        self.skel_algo = skel_algo
+        self.skeleton_method = skeleton_method
         self.tolerance = tolerance
-        self.method_width = method_width
+        self.width_method = width_method
         self.width_ignore_tips = width_ignore_tips
         self.debug = debug
         self.debug_folder = debug_folder
+        self.contour_prop = contour_prop
 
-    def compute(  # type: ignore[override]
-        self, lineage: CellLineage, nid: int
-    ) -> float:
-        return get_width_and_length(
-            nid,
+    def compute(self, lineage: CellLineage, node_id: int) -> float:
+        """
+        Compute the length of a rod-shaped cell.
+
+        Parameters
+        ----------
+        lineage : CellLineage
+            Lineage graph containing the cell of interest.
+        node_id : int
+            Node ID (``cell_id``) of the cell of interest.
+
+        Returns
+        -------
+        float
+            Length of the cell, in the unit of `pixel_size`, or NaN if the skeleton of
+            the cell is a single pixel or a loop.
+
+        Raises
+        ------
+        KeyError
+            If the cell has no value for the contour property (`contour_prop`).
+        """
+        return _get_width_and_length(
+            node_id,
             lineage,
             self.pixel_size,
-            self.skel_algo,
+            self.skeleton_method,
             self.tolerance,
-            self.method_width,
+            self.width_method,
             self.width_ignore_tips,
             self.debug,
             self.debug_folder,
+            self.contour_prop,
         )[1]
 
 
-# TODO: this is a property that should not be in pycellin, too many ways to define
+# TODO: this is a property that should not be in Pycellin, too many ways to define
 # the area increment. Since it is user dependent, I should put it in a notebook
 # as an example of custom property.
 
@@ -1642,37 +2428,3 @@ class RodLength(NodeLocalPropCalculator):
 #     for lin in lineages:
 #         for node in lin.nodes:
 #             lin.nodes[node]["AREA_INCREMENT"] = get_area_increment(node, lin)
-
-
-if __name__ == "__main__":
-    import itertools
-    import math
-
-    from shapely.geometry import Polygon
-
-    from pycellin.io.trackmate import load_TrackMate_XML
-
-    xml = "sample_data/FakeTracks.xml"
-
-    model = load_TrackMate_XML(xml, keep_all_spots=True, keep_all_tracks=True)
-    lineage = model.data.cell_data[0]
-    # print(lineage.nodes[2004]["cell_contour"])
-    node = 2035
-    print(lineage.nodes[node]["area"])
-
-    # Shapely
-    roi = Polygon(lineage.nodes[node]["cell_contour"])
-    print(roi.area)
-
-    # Shoelace formula
-    vertices = lineage.nodes[node]["cell_contour"]
-    border = vertices + [vertices[0]]
-    area = sum([p1[0] * p2[1] - p1[1] * p2[0] for (p1, p2) in itertools.pairwise(border)])
-    print(abs(area) / 2)
-
-    # Perimeter shapely vs by hand
-    print(roi.length)
-    print(sum([math.dist(p1, p2) for (p1, p2) in itertools.pairwise(border)]))
-
-    # print(lineage.nodes[node]["location"])
-    # print(roi.centroid)

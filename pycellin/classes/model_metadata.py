@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 
+"""The `ModelMetadata` class: the metadata of a model."""
+
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import MISSING, dataclass, field
 from datetime import datetime
 from typing import Any
 
 import numpy as np
 
-from pycellin.utils import get_pycellin_version
+from pycellin import __version__
 
 
 def _are_values_equal(value1: Any, value2: Any) -> bool:
     """
     Check if two metadata values are equal.
 
-    Unlike ``==``, this function can compare numpy arrays, such as label images.
+    Unlike ``==``, this function can compare NumPy arrays, such as label images.
 
     Parameters
     ----------
@@ -36,52 +38,70 @@ def _are_values_equal(value1: Any, value2: Any) -> bool:
 @dataclass
 class ModelMetadata:
     """
-    Metadata for a pycellin Model.
+    Metadata for a Pycellin `Model`.
 
-    This class holds metadata information for a pycellin model, including
+    This class holds metadata information for a Pycellin model, including
     spatial and temporal context, as well as custom fields.
 
     Parameters
     ----------
-    reference_time_property : str
+    reference_time_prop : str
         Name of the property used as the reference for time measurements.
-        Common choices are "frame" for frame number or "time" for actual time.
+        Common choices are ``frame`` for frame number or ``time`` for actual time.
         By default, all time-related operations will use this property so it must
         be present across all cells.
-    time_step : int | float | None
-        Time interval between consecutive time points in time_unit.
-        If None, will be set depending on reference_time_property and props_metadata.
-    time_unit : str | None
-        Unit of time measurements (e.g., 's', 'min', 'h', 'frames').
-        If None, will be set depending on reference_time_property and props_metadata.
-    pixel_width : float | None
-        Physical size of a pixel in the x-dimension, in space_unit.
-    pixel_height : float | None
-        Physical size of a pixel in the y-dimension, in space_unit.
-    pixel_depth : float | None
-        Physical size of a pixel in the z-dimension, in space_unit.
-    space_unit : str | None
-        Unit of spatial measurements (e.g., 'μm', 'nm', 'pixels').
-    pycellin_version : str
-        Version of pycellin used to create the model (automatically set).
-    creation_timestamp : str
+    time_step : int | float | None, default=None
+        Time interval between consecutive time points in `time_unit`.
+        If None, `Model` computes it from the values of the reference time property,
+        when the model has lineages.
+    time_unit : str | None, default=None
+        Unit of time measurements (e.g., ``"s"``, ``"min"``, ``"h"``, ``"frame"``).
+        `Model.set_reference_time_prop` sets it to the unit of the new reference
+        time property.
+    pixel_width : float | None, default=None
+        Physical size of a pixel in the x-dimension, in `space_unit`.
+    pixel_height : float | None, default=None
+        Physical size of a pixel in the y-dimension, in `space_unit`.
+    pixel_depth : float | None, default=None
+        Physical size of a pixel in the z-dimension, in `space_unit`.
+    space_unit : str | None, default=None
+        Unit of spatial measurements (e.g., ``"µm"``, ``"nm"``, ``"pixel"``).
+    pycellin_version : str, default=__version__
+        Version of Pycellin used to create the model (automatically set).
+    creation_timestamp : str, default=<factory>
         ISO format timestamp of when the model was created (automatically set).
-    name : str | None, default None
+    name : str | None, default=None
         Human-readable name for the model.
-    provenance : str | None, default None
+    provenance : str | None, default=None
         Information about the origin or processing history of the data.
-    file_location : str | None, default None
+    file_path : str | None, default=None
         Path or location where the associated data files are stored.
+    label_image_path : str | None, default=None
+        Path to the label image of the data (tif stack), read by the properties
+        computed from a label image, e.g. `Model.add_cell_polygon`, when they are
+        not given one.
+    label_image : np.ndarray | None, default=None
+        The label image of the data, read by the properties computed from a label
+        image, e.g. `Model.add_cell_polygon`, when they are not given one. It is used
+        instead of `label_image_path` when both are set.
+
+    Raises
+    ------
+    TypeError
+        If `reference_time_prop` is not a string.
+    ValueError
+        If `reference_time_prop` is an empty string.
+        If `pixel_width`, `pixel_height` or `pixel_depth` is not positive.
 
     Examples
     --------
     Create basic metadata:
 
     >>> metadata = ModelMetadata(
-    ...     reference_time_property="time",
+    ...     reference_time_prop="time",
     ...     time_unit="seconds",
     ...     time_step=30.0,
-    ...     space_unit="μm",
+    ...     space_unit="µm",
     ...     pixel_width=0.1,
     ...     pixel_height=0.1,
     ...     name="Cell Growth Analysis"
@@ -100,7 +120,7 @@ class ModelMetadata:
     """
 
     # Mandatory field.
-    reference_time_property: str
+    reference_time_prop: str
 
     # Semi-required fields, used to define the model's spatial and temporal context.
     time_step: int | float | None = None
@@ -111,28 +131,34 @@ class ModelMetadata:
     space_unit: str | None = None
 
     # Standard optional fields, for traceability.
-    pycellin_version: str = field(default_factory=get_pycellin_version)
+    pycellin_version: str = __version__
     creation_timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     name: str | None = None
     provenance: str | None = None
-    file_location: str | None = None
-    label_img_path: str | None = None
-    label_img: np.ndarray | None = None
+    file_path: str | None = None
+    label_image_path: str | None = None
+    label_image: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         """
-        Post-initialization processing for ModelMetadata.
+        Validate the metadata after initialization.
 
-        Handles any additional metadata validation.
+        Raises
+        ------
+        TypeError
+            If `reference_time_prop` is not a string.
+        ValueError
+            If `reference_time_prop` is an empty string.
+            If `pixel_width`, `pixel_height` or `pixel_depth` is not positive.
         """
-        # reference_time_property validation.
-        if not isinstance(self.reference_time_property, str):
+        # reference_time_prop validation.
+        if not isinstance(self.reference_time_prop, str):
             raise TypeError(
-                f"reference_time_property must be a string, got "
-                f"{type(self.reference_time_property).__name__}"
+                f"reference_time_prop must be a string, got "
+                f"{type(self.reference_time_prop).__name__}"
             )
-        if not self.reference_time_property:
-            raise ValueError("reference_time_property cannot be an empty string.")
+        if not self.reference_time_prop:
+            raise ValueError("reference_time_prop cannot be an empty string.")
 
         # Validate that pixel dimensions are positive, if provided.
         if self.pixel_width is not None and self.pixel_width <= 0:
@@ -144,7 +170,7 @@ class ModelMetadata:
 
     def __delattr__(self, name: str) -> None:
         """
-        Prevent deletion of dataclass fields, allow deletion of dynamically added fields.
+        Prevent deletion of dataclass fields, allow deletion of dynamically added ones.
 
         Parameters
         ----------
@@ -185,12 +211,12 @@ class ModelMetadata:
 
     def get_all_metadata(self) -> dict[str, Any]:
         """
-        Return a dictionary of all metadata (both predefined and dynamically added fields).
+        Return a dictionary of all metadata (predefined and dynamically added fields).
 
         Returns
         -------
         dict[str, Any]
-            Dictionary containing all metadatafields.
+            Dictionary containing all metadata fields.
         """
         return dict(self.__dict__)
 
@@ -203,15 +229,15 @@ class ModelMetadata:
         Return the metadata fields whose values differ from another metadata.
 
         Both standard and custom fields are compared. A field missing from one of
-        the metadata is considered to have a None value. Numpy arrays, such as label
+        the metadata is considered to have a None value. NumPy arrays, such as label
         images, are compared element-wise.
 
         Parameters
         ----------
         other : ModelMetadata
             The metadata to compare with.
-        exclude : Iterable[str] | None, optional
-            Fields to ignore in the comparison. Default is None.
+        exclude : Iterable[str] | None, default=None
+            Fields to ignore in the comparison.
 
         Returns
         -------
@@ -230,10 +256,11 @@ class ModelMetadata:
 
     def to_dict(self) -> dict[str, Any]:
         """
-        Convert to dictionary for serialization (alias for get_all_metadata).
+        Convert to dictionary for serialization (alias for `get_all_metadata`).
 
         Returns all fields (both predefined and dynamically added) in a single
-        dictionary suitable for JSON serialization, database storage, etc.
+        dictionary, e.g. for serialization or database storage. The values are not
+        converted: a label image stays a NumPy array.
 
         Returns
         -------
@@ -245,7 +272,7 @@ class ModelMetadata:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ModelMetadata":
         """
-        Create ModelMetadata instance from dictionary.
+        Create a `ModelMetadata` instance from a dictionary.
 
         Handles both predefined fields and dynamically added fields properly.
         Unknown fields are added as dynamic attributes.
@@ -264,9 +291,12 @@ class ModelMetadata:
         Raises
         ------
         TypeError
-            If data is not a dictionary.
+            If `data` is not a dictionary, or if its ``reference_time_prop`` field is
+            not a string.
         ValueError
-            If required fields are missing from the dictionary.
+            If `data` has no ``reference_time_prop`` field, or if this field is an
+            empty string.
+            If a pixel size is not positive.
         """
         # Validate input type.
         if not isinstance(data, dict):
@@ -276,7 +306,7 @@ class ModelMetadata:
         required_fields = {
             name
             for name, field_obj in cls.__dataclass_fields__.items()
-            if field_obj.default is field_obj.default_factory is None  # no default value
+            if field_obj.default is MISSING and field_obj.default_factory is MISSING
         }
 
         # Check for missing required fields.

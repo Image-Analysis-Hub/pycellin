@@ -17,7 +17,7 @@ def prop1():
         description="desc1",
         provenance="prov1",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="type1",
         unit="unit1",
     )
@@ -31,7 +31,7 @@ def prop1_bis():
         description="desc1",
         provenance="prov1",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="type1",
         unit="unit1",
     )
@@ -45,7 +45,7 @@ def prop2():
         description="desc2",
         provenance="prov2",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="type2",
         unit="unit2",
     )
@@ -59,7 +59,7 @@ def prop3():
         description="desc1",
         provenance="prov1",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="type1",
     )
 
@@ -72,7 +72,7 @@ def prop4():
         description="desc1",
         provenance="prov1",
         prop_type="edge",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="type1",
         unit="unit1",
     )
@@ -93,7 +93,21 @@ class TestPropertyConstructor:
                 description="test",
                 provenance="test",
                 prop_type=empty_flag,
-                lin_type="CellLineage",
+                lineage_type="cell",
+                dtype="int",
+            )
+
+    @pytest.mark.parametrize("prop_type", ["nodes", ["node", "edges"]])
+    def test_unknown_property_type_string_raises_error(self, prop_type):
+        """Test that an unknown property type string raises ValueError, not KeyError."""
+        with pytest.raises(ValueError, match="Valid types: .* Got "):
+            Property(
+                identifier="test",
+                name="test",
+                description="test",
+                provenance="test",
+                prop_type=prop_type,
+                lineage_type="cell",
                 dtype="int",
             )
 
@@ -112,7 +126,7 @@ class TestPropertyEq:
         assert prop1 != "not a property"
 
     def test_invalid_Literal(self):
-        """Test Property equality in the case of an invalid Literal for lin_type."""
+        """Test Property equality in the case of an invalid Literal for lineage_type."""
         with pytest.raises(ValueError):
             Property(
                 identifier="name1",
@@ -120,7 +134,7 @@ class TestPropertyEq:
                 description="desc1",
                 provenance="prov1",
                 prop_type="node",
-                lin_type="not a valid Literal",
+                lineage_type="not a valid Literal",
                 dtype="type1",
             )
 
@@ -133,14 +147,17 @@ class TestPropertyIsEqual:
         assert prop1.is_equal(prop1_bis)
         assert not prop1.is_equal(prop2)
         assert not prop1.is_equal(prop3)
-        assert prop1.is_equal("not a property") == NotImplemented
+        assert prop1.is_equal("not a property") is False
 
     def test_ignore_prop_type(self, prop1, prop3, prop4):
         """Test with argument ignore_prop_type."""
         assert prop1.is_equal(prop4, ignore_prop_type=True)
         assert not prop1.is_equal(prop4, ignore_prop_type=False)
         assert not prop1.is_equal(prop3, ignore_prop_type=True)
-        assert prop1.is_equal("not a property", ignore_prop_type=True) == NotImplemented
+        assert prop1.is_equal("not a property", ignore_prop_type=True) is False
+        # Names are still compared.
+        prop4._change_name("other name")
+        assert not prop1.is_equal(prop4, ignore_prop_type=True)
 
 
 class TestPropertyChangeDescription:
@@ -212,7 +229,7 @@ class TestPropertyConstructorConversion:
             description="test",
             provenance="test",
             prop_type="node",
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         )
         assert prop.prop_type == PropertyType.NODE
@@ -225,7 +242,7 @@ class TestPropertyConstructorConversion:
             description="test",
             provenance="test",
             prop_type=["edge"],
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         )
         assert prop.prop_type == PropertyType.EDGE
@@ -238,7 +255,7 @@ class TestPropertyConstructorConversion:
             description="test",
             provenance="test",
             prop_type=["node", "edge"],
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         )
         assert prop.prop_type == (PropertyType.NODE | PropertyType.EDGE)
@@ -251,7 +268,7 @@ class TestPropertyConstructorConversion:
             description="test",
             provenance="test",
             prop_type=PropertyType.LINEAGE,
-            lin_type="CellLineage",
+            lineage_type="cell",
             dtype="int",
         )
         assert prop.prop_type == PropertyType.LINEAGE
@@ -267,7 +284,7 @@ class TestPropertyConstructorAttributes:
         assert prop1.description == "desc1"
         assert prop1.provenance == "prov1"
         assert prop1.prop_type == PropertyType.NODE
-        assert prop1.lin_type == "CellLineage"
+        assert prop1.lineage_type == "cell"
         assert prop1.dtype == "type1"
         assert prop1.unit == "unit1"
 
@@ -276,7 +293,7 @@ class TestPropertyConstructorAttributes:
         assert prop3.unit is None
 
     def test_invalid_lineage_type(self):
-        """Test that invalid lin_type raises ValueError."""
+        """Test that invalid lineage_type raises ValueError."""
         with pytest.raises(ValueError, match="Lineage type must be one of"):
             Property(
                 identifier="test",
@@ -284,23 +301,23 @@ class TestPropertyConstructorAttributes:
                 description="test",
                 provenance="test",
                 prop_type="node",
-                lin_type="InvalidType",
+                lineage_type="InvalidType",
                 dtype="int",
             )
 
     def test_different_lineage_types(self):
         """Test constructor with different valid lineage types."""
-        for lin_type in ["CellLineage", "CycleLineage", "Lineage"]:
+        for lineage_type in ["cell", "cycle", "both"]:
             prop = Property(
                 identifier="test",
                 name="test",
                 description="test",
                 provenance="test",
                 prop_type="node",
-                lin_type=lin_type,
+                lineage_type=lineage_type,
                 dtype="int",
             )
-            assert prop.lin_type == lin_type
+            assert prop.lineage_type == lineage_type
 
 
 class TestPropertyRepr:
@@ -322,7 +339,7 @@ class TestPropertyRepr:
         assert "description=" in repr_str
         assert "provenance=" in repr_str
         assert "prop_type=" in repr_str
-        assert "lin_type=" in repr_str
+        assert "lineage_type=" in repr_str
         assert "dtype=" in repr_str
         assert "unit=" in repr_str
 

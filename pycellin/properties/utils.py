@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+"""Helpers of the property calculators, and discovery of the predefined properties."""
+
 import ast
 import math
 from pathlib import Path
@@ -8,8 +10,8 @@ from typing import Any
 import numpy as np
 
 from pycellin.classes.data import Data
-from pycellin.classes.exceptions import FusionError
-from pycellin.classes.lineage import CycleLineage
+from pycellin.classes.lineage import CellLineage, CycleLineage
+from pycellin.exceptions import FusionError, MissingPropertyError
 
 
 def _get_cycle_node_property_values(
@@ -24,32 +26,40 @@ def _get_cycle_node_property_values(
     Parameters
     ----------
     prop_name : str
-        Name of the property to retrieve.
+        Identifier of the property to retrieve.
     data : Data
         Data object containing the lineage.
     lineage : CycleLineage
         Lineage graph containing the node of interest.
     nid : int
-        Node ID (cycle_id) of the cell cycle of interest.
+        Node ID (``cycle_id``) of the cell cycle of interest.
 
     Returns
     -------
-    list of Any
+    list[Any]
         List of values of the property for all cells within the cell cycle.
 
     Raises
     ------
-    KeyError
-        If the property does not exist in the cell lineage.
+    MissingPropertyError
+        If a cell of the cell cycle has no value for the property.
     """
     lin_id = lineage.graph["lineage_id"]
-    cell_lin = data.cell_data[lin_id]
-    try:
-        values = [cell_lin.nodes[cid][prop_name] for cid in lineage.nodes[nid]["cells"]]
-    except KeyError:
-        raise KeyError(
-            f"Property '{prop_name}' does not exist in the cell lineage '{lin_id}'."
-        )
+    cell_lin = data.cell_lineages[lin_id]
+    values = []
+    for cid in lineage.nodes[nid]["cells"]:
+        try:
+            values.append(cell_lin.nodes[cid][prop_name])
+        except KeyError:
+            raise MissingPropertyError(
+                prop_name,
+                node_id=cid,
+                lineage_id=lin_id,
+                message=(
+                    f"Cell {cid} in lineage {lin_id} has no value for '{prop_name}' "
+                    f"(cell cycle {nid})."
+                ),
+            ) from None
     return values
 
 
@@ -66,60 +76,113 @@ def _get_cycle_edge_property_values(
     Parameters
     ----------
     prop_name : str
-        Name of the property to retrieve.
+        Identifier of the property to retrieve.
     data : Data
         Data object containing the lineage.
     lineage : CycleLineage
         Lineage graph containing the node of interest.
     nid : int
-        Node ID (cycle_id) of the cell of interest.
+        Node ID (``cycle_id``) of the cell cycle of interest.
     include_incoming_edge : bool
         Whether to include the incoming edge of the first cell of the cell cycle.
 
     Returns
     -------
-    list of Any
+    list[Any]
         List of values of the property for all edges within the cell cycle.
 
     Raises
     ------
-    KeyError
-        If the property does not exist in the cell lineage.
+    MissingPropertyError
+        If an edge of the cell cycle has no value for the property.
+    FusionError
+        If `include_incoming_edge` is True and the first cell of the cell cycle has
+        more than one parent.
     """
     lin_id = lineage.graph["lineage_id"]
-    cell_lin = data.cell_data[lin_id]
-    try:
-        values = [
-            cell_lin.edges[edge][prop_name]
-            for edge in lineage.yield_links_within_cycle(nid)
-        ]
-    except KeyError:
-        raise KeyError(
-            f"Property '{prop_name}' does not exist in the cell lineage '{lin_id}'."
-        )
-
+    cell_lin = data.cell_lineages[lin_id]
+    edges = list(lineage.get_links_within_cycle(nid))
     if include_incoming_edge:
         first_cell = lineage.nodes[nid]["cells"][0]
         predecessors = list(cell_lin.predecessors(first_cell))
         if len(predecessors) == 1:
-            edge = (predecessors[0], first_cell)
-            values.append(cell_lin.edges[edge][prop_name])
+            edges.append((predecessors[0], first_cell))
         elif len(predecessors) > 1:
             raise FusionError(first_cell, lin_id)
 
+    values = []
+    for source, target in edges:
+        try:
+            values.append(cell_lin.edges[source, target][prop_name])
+        except KeyError:
+            raise MissingPropertyError(
+                prop_name,
+                lineage_id=lin_id,
+                message=(
+                    f"Link {source} -> {target} in lineage {lin_id} has no value for "
+                    f"'{prop_name}' (cell cycle {nid})."
+                ),
+            ) from None
     return values
+
+
+def _get_position(
+    lineage: CellLineage, cell_id: int, coord_props: tuple[str, ...], prop_id: str
+) -> list[float]:
+    """
+    Return the position of a cell.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        Lineage graph containing the cell.
+    cell_id : int
+        ID of the cell.
+    coord_props : tuple[str, ...]
+        Identifiers of the node properties holding the coordinates of the cells,
+        one per axis.
+    prop_id : str
+        Identifier of the property computed from the position, for the error
+        message.
+
+    Returns
+    -------
+    list[float]
+        The coordinates of the cell, in the order of `coord_props`.
+
+    Raises
+    ------
+    MissingPropertyError
+        If the cell has no value, or None, for one of the coordinates.
+    """
+    cell = lineage.nodes[cell_id]
+    position = [cell.get(coord) for coord in coord_props]
+    if None in position:
+        coord = coord_props[position.index(None)]
+        lineage_id = lineage.graph.get("lineage_id")
+        raise MissingPropertyError(
+            coord,
+            node_id=cell_id,
+            lineage_id=lineage_id,
+            message=(
+                f"Cell {cell_id} in lineage {lineage_id} has no value for '{coord}', "
+                f"which '{prop_id}' needs. Set the coordinates of this cell, or "
+                f"remove '{prop_id}' with remove_property()."
+            ),
+        )
+    return position
 
 
 def _nanmean(values: list[Any]) -> float:
     """
     Compute the mean of a list of values, ignoring NaN and None values.
 
-    Unlike `np.nanmean()`, return NaN without warning when there is
+    Unlike `numpy.nanmean`, return NaN without warning when there is
     no value to average.
 
     Parameters
     ----------
-    values : list of Any
+    values : list[Any]
         Values to average. None values are treated as NaN.
 
     Returns
@@ -137,11 +200,11 @@ def _nansum(values: list[Any]) -> float:
     """
     Compute the sum of a list of values, ignoring NaN and None values.
 
-    Unlike `np.nansum()`, return NaN instead of 0 when there is no value to sum.
+    Unlike `numpy.nansum`, return NaN instead of 0 when there is no value to sum.
 
     Parameters
     ----------
-    values : list of Any
+    values : list[Any]
         Values to sum. None values are treated as NaN.
 
     Returns
@@ -155,15 +218,24 @@ def _nansum(values: list[Any]) -> float:
     return np.nansum(array).item()
 
 
-class PropertyExtractor(ast.NodeVisitor):
-    """AST visitor to extract property information from create_xxxxx_property functions."""
+class _PropertyExtractor(ast.NodeVisitor):
+    """
+    AST visitor to extract property information from ``create_*_property`` functions.
+
+    Attributes
+    ----------
+    properties : dict[str, dict[str, str]]
+        Information on the properties found, by name of the function that creates
+        them: the ``identifier``, ``description`` and ``lineage_type`` given to
+        `~pycellin.Property`, when they are strings.
+    """
 
     def __init__(self) -> None:
         self.properties: dict[str, dict[str, str]] = {}
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         """
-        Visit function definitions looking for create_xxxxx_property pattern.
+        Visit function definitions looking for the ``create_*_property`` pattern.
 
         Parameters
         ----------
@@ -182,12 +254,12 @@ class PropertyExtractor(ast.NodeVisitor):
 
     def _extract_from_call(self, call: ast.Call) -> dict[str, str] | None:
         """
-        Extract property info from Property constructor call.
+        Extract property info from a `~pycellin.Property` constructor call.
 
         Parameters
         ----------
         call : ast.Call
-            The AST Call node representing the Property constructor.
+            The AST Call node representing the `~pycellin.Property` constructor.
 
         Returns
         -------
@@ -200,7 +272,7 @@ class PropertyExtractor(ast.NodeVisitor):
 
         info: dict[str, str] = {}
         for kw in call.keywords:
-            fields = ["identifier", "description", "lin_type"]
+            fields = ["identifier", "description", "lineage_type"]
             if kw.arg in fields:
                 value = self._extract_value(kw.value)
                 if value is not None:
@@ -224,10 +296,10 @@ class PropertyExtractor(ast.NodeVisitor):
 
         Notes
         -----
-        This method cannot handle f-strings with variables (like f"cell_{axis}")
+        This method cannot handle f-strings with variables (like ``f"cell_{axis}"``)
         since variable values are only known at runtime. Such properties will be
         skipped during discovery. To solve this issue, fake properties have been
-        created for cell, link and lineage coordinates in core.py.
+        created for cell, link and lineage coordinates in ``core.py``.
         """
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             return node.value
@@ -263,7 +335,7 @@ def _discover_props_via_ast(include_core: bool) -> dict[str, dict[str, str]]:
             continue
         try:
             tree = ast.parse(py_file.read_text(encoding="utf-8"))
-            extractor = PropertyExtractor()
+            extractor = _PropertyExtractor()
             extractor.visit(tree)
             all_props.update(extractor.properties)
         except (FileNotFoundError, OSError, SyntaxError, UnicodeDecodeError):
@@ -277,27 +349,28 @@ def _get_pycellin_props_by_lin_type(
     lin_type_filter: list[str],
 ) -> dict[str, str]:
     """
-    Return the pycellin properties that can be computed on a given lineage type.
+    Return the Pycellin properties that can be computed on a given lineage type.
 
     Parameters
     ----------
     include_core : bool
         Whether to include core properties.
     lin_type_filter : list[str]
-        The lineage type to filter properties by ('Lineage', 'CellLineage', 'CycleLineage')
+        The lineage types to filter properties by (``"both"``, ``"cell"``,
+        ``"cycle"``).
 
     Returns
     -------
     dict[str, str]
-        Dictionary of properties of the specified lineage type,
-        with properties name as keys and properties description as values.
+        Dictionary of properties of the specified lineage types,
+        with property identifiers as keys and property descriptions as values.
     """
     all_properties = _discover_props_via_ast(include_core)
     filtered_props: dict[str, str] = {}
 
     for prop_info in all_properties.values():
-        lin_type = prop_info.get("lin_type")
-        if lin_type in lin_type_filter:
+        lineage_type = prop_info.get("lineage_type")
+        if lineage_type in lin_type_filter:
             identifier = prop_info.get("identifier")
             description = prop_info.get("description")
             if identifier and description:
@@ -308,58 +381,60 @@ def _get_pycellin_props_by_lin_type(
 
 def get_pycellin_cell_lineage_properties(
     include_core_properties: bool = True,
-    include_Lineage_properties: bool = True,
+    single_type: bool = False,
 ) -> dict[str, str]:
     """
-    Return the pycellin properties that can be computed on cell lineages.
+    Return the Pycellin properties that can be computed on cell lineages.
 
-    Automatically discovers properties by parsing create_xxxxx_property functions using AST.
+    Automatically discovers properties by parsing ``create_*_property`` functions
+    using AST.
 
     Parameters
     ----------
-    include_core_properties : bool, optional
-        Whether to include core properties, i.e. properties automatically computed by pycellin.
-        True by default.
-    include_Lineage_properties : bool, optional
-        Whether to include Lineage properties. True by default.
+    include_core_properties : bool, default=True
+        Whether to include core properties, i.e. properties automatically computed by
+        Pycellin.
+    single_type : bool, default=False
+        True to only return the properties of lineage type ``"cell"``. False to also
+        return those of lineage type ``"both"``, which belong to cell and cycle
+        lineages alike.
 
     Returns
     -------
     dict[str, str]
         Dictionary of properties of the cell lineages,
-        with properties name as keys and properties description as values.
+        with property identifiers as keys and property descriptions as values.
     """
-    lin_types = (
-        ["CellLineage", "Lineage"] if include_Lineage_properties else ["CellLineage"]
-    )
+    lin_types = ["cell"] if single_type else ["cell", "both"]
     props = _get_pycellin_props_by_lin_type(include_core_properties, lin_types)
     return props
 
 
 def get_pycellin_cycle_lineage_properties(
     include_core_properties: bool = True,
-    include_Lineage_properties: bool = True,
+    single_type: bool = False,
 ) -> dict[str, str]:
     """
-    Return the pycellin properties that can be computed on cycle lineages.
+    Return the Pycellin properties that can be computed on cycle lineages.
 
-    Automatically discovers properties by parsing create_xxxxx_property functions using AST.
+    Automatically discovers properties by parsing ``create_*_property`` functions
+    using AST.
 
     Parameters
     ----------
-    include_core_properties : bool, optional
-        Whether to include core properties, i.e. properties automatically computed by pycellin.
-        True by default.
-    include_Lineage_properties : bool, optional
-        Whether to include Lineage properties. True by default.
+    include_core_properties : bool, default=True
+        Whether to include core properties, i.e. properties automatically computed by
+        Pycellin.
+    single_type : bool, default=False
+        True to only return the properties of lineage type ``"cycle"``. False to also
+        return those of lineage type ``"both"``, which belong to cell and cycle
+        lineages alike.
 
     Returns
     -------
     dict[str, str]
         Dictionary of properties of the cycle lineages,
-        with properties name as keys and properties description as values.
+        with property identifiers as keys and property descriptions as values.
     """
-    lin_types = (
-        ["CycleLineage", "Lineage"] if include_Lineage_properties else ["CycleLineage"]
-    )
+    lin_types = ["cycle"] if single_type else ["cycle", "both"]
     return _get_pycellin_props_by_lin_type(include_core_properties, lin_types)

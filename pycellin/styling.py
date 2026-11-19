@@ -1,3 +1,10 @@
+"""
+Pycellin's colors, marker styles of branch profile plots, and Plotly templates.
+
+Importing this module registers the ``"pycellin_white"`` and ``"pycellin_dark"``
+templates in ``plotly.io.templates``.
+"""
+
 from typing import Final
 
 import plotly.express as px
@@ -5,9 +12,12 @@ import plotly.graph_objects as go
 import plotly.io as pio
 
 # Pycellin colors.
-PYCELLIN_PURPLE: Final = "#862CC6"
-PYCELLIN_PINK: Final = "#CA427E"
-PYCELLIN_ORANGE: Final = "#DD7320"
+#: Purple of the Pycellin logo.
+PYCELLIN_PURPLE: Final = "#982FC4"
+#: Pink of the Pycellin logo.
+PYCELLIN_PINK: Final = "#DD397D"
+#: Orange of the Pycellin logo.
+PYCELLIN_ORANGE: Final = "#F46C00"
 
 # Default marker styles for lineage branch profile plots
 # (Lineage.get_branch_profile_figure / plot_branch_profile). Only the constant
@@ -16,22 +26,24 @@ PYCELLIN_ORANGE: Final = "#DD7320"
 # "opacity" is pinned to 1 and the node border width to 0 to opt out of Plotly's
 # "bubble mode" (a semi-transparent fill and a white outline), which activates as
 # soon as marker.size is an array -- always the case for these plots.
+#: Default style of the node markers of branch profile plots.
 BRANCH_PROFILE_NODE_MARKER: Final = {
     "size": 10,
     "symbol": "circle",
     "opacity": 1,
     "line": {"width": 0},
 }
+#: Default style of the division markers of branch profile plots.
 BRANCH_PROFILE_DIVISION_MARKER: Final = {
     "color": "white",
     "symbol": "circle-cross",
     "line": {"width": 2},
 }
-# Division markers default to this many pixels larger than the node markers.
+#: Division markers default to this many pixels larger than the node markers.
 BRANCH_PROFILE_DIVISION_SIZE_INCREASE: Final = 2
 
 # Pycellin templates.
-# Shared style config.
+#: Axis style shared by the Pycellin templates.
 _COMMON_AXIS = {
     "showgrid": False,
     "zeroline": False,
@@ -42,6 +54,7 @@ _COMMON_AXIS = {
     "linewidth": 1,
     "rangemode": "tozero",
 }
+#: Layout style shared by the Pycellin templates.
 _COMMON_LAYOUT = {
     "hovermode": "x unified",
     "font": {"family": "Arial", "size": 13},
@@ -50,7 +63,19 @@ _COMMON_LAYOUT = {
 
 
 def _make_axis(color: str) -> dict:
-    """Return the shared axis style with the given tick/line color."""
+    """
+    Return the shared axis style with the given tick/line color.
+
+    Parameters
+    ----------
+    color : str
+        Color of the axis ticks and lines.
+
+    Returns
+    -------
+    dict
+        The axis style shared by the Pycellin templates, with this color.
+    """
     return {**_COMMON_AXIS, "tickcolor": color, "linecolor": color}
 
 
@@ -61,9 +86,9 @@ def _make_template(base: str, axis_color: str) -> go.layout.Template:
     Parameters
     ----------
     base : str
-        Name of the built-in Plotly template to extend (e.g. "plotly_white").
+        Name of the built-in Plotly template to extend (e.g. ``"plotly_white"``).
     axis_color : str
-        Color of the axis ticks and lines (e.g. "black" or "white").
+        Color of the axis ticks and lines (e.g. ``"black"`` or ``"white"``).
 
     Returns
     -------

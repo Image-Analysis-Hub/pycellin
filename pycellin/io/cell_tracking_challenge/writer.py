@@ -1,0 +1,312 @@
+#!/usr/bin/env python3
+
+"""
+Writer for Cell Tracking Challenge (CTC) tracking files.
+
+References
+----------
+- CTC website: https://celltrackingchallenge.net/
+- CTC tracking annotations conventions:
+  https://public.celltrackingchallenge.net/documents/Naming%20and%20file%20content%20conventions.pdf
+"""
+
+from pathlib import Path
+
+from pycellin.classes.lineage import CellLineage
+from pycellin.classes.model import Model
+from pycellin.exceptions import FusionError
+from pycellin.io.utils import _check_up_to_date
+from pycellin.utils import _check_integer
+
+# TODO: need to extensively test this.
+# TODO: check beforehand for fusions and gap just after division. No need to start
+# the CTC file creation if we know it will fail.
+
+
+def _sort_nodes_by_timepoint(
+    lineage: CellLineage,
+    nodes: list[int],
+) -> list[int]:
+    """
+    Sort the nodes by ascending timepoint.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The lineage object to which the nodes belong.
+    nodes : list[int]
+        A list of node IDs to order by ascending timepoint.
+
+    Returns
+    -------
+    list[int]
+        A list of node IDs, ordered by ascending timepoint.
+    """
+    sorted_list = [(node, lineage.nodes[node]["timepoint"]) for node in nodes]
+    sorted_list.sort(key=lambda x: x[1])
+    return [node for node, _ in sorted_list]
+
+
+def _find_gaps(
+    lineage: CellLineage,
+    sorted_nodes: list[int],
+) -> list[tuple[int, int]]:
+    """
+    Find the temporal gaps in an ordered list of nodes.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The lineage object to which the nodes belong.
+    sorted_nodes : list[int]
+        A list of node IDs, ordered by ascending timepoint.
+
+    Returns
+    -------
+    list[tuple[int, int]]
+        A list of tuples, where each tuple contains the IDs of the nodes that
+        are separated by a gap in the ordered list of nodes.
+    """
+    gap_nodes = []
+    for i in range(len(sorted_nodes) - 1):
+        timepoint = lineage.nodes[sorted_nodes[i]]["timepoint"]
+        next_timepoint = lineage.nodes[sorted_nodes[i + 1]]["timepoint"]
+        if next_timepoint - timepoint > 1:
+            gap_nodes.append((sorted_nodes[i], sorted_nodes[i + 1]))
+
+    return gap_nodes
+
+
+def _add_track(
+    lineage: CellLineage,
+    sorted_nodes: list[int],
+    ctc_tracks: dict[int, dict[str, int]],
+    node_to_parent_track: dict[int, int],
+    current_track_label: int,
+) -> int:
+    """
+    Add a CTC track to the CTC output.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The lineage object to which the nodes belong.
+    sorted_nodes : list[int]
+        A list of node IDs, ordered by ascending timepoint.
+    ctc_tracks : dict[int, dict[str, int]]
+        A dictionary containing the CTC tracks of the lineage.
+    node_to_parent_track : dict[int, int]
+        A dictionary mapping the last node of each CTC track to the label of that
+        track, the parent track of the tracks that start with its children.
+    current_track_label : int
+        The current track label.
+
+    Returns
+    -------
+    int
+        The updated current track label.
+    """
+    track = {
+        "B": lineage.nodes[sorted_nodes[0]]["timepoint"],
+        "E": lineage.nodes[sorted_nodes[-1]]["timepoint"],
+        "B_node": sorted_nodes[0],
+        "E_node": sorted_nodes[-1],
+    }
+    ctc_tracks[current_track_label] = track
+    node_to_parent_track[track["E_node"]] = current_track_label
+    return current_track_label + 1
+
+
+def _build_CTC_tracks(
+    lineage: CellLineage,
+    ctc_tracks: dict[int, dict[str, int]],
+    node_to_parent_track: dict[int, int],
+    current_track_label: int,
+) -> int:
+    """
+    Build the CTC tracks from the lineage.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The lineage object we want to build tracks from.
+    ctc_tracks : dict[int, dict[str, int]]
+        A dictionary containing the CTC tracks of the lineage.
+    node_to_parent_track : dict[int, int]
+        A dictionary mapping the last node of each CTC track to the label of that
+        track, the parent track of the tracks that start with its children.
+    current_track_label : int
+        The current track label.
+
+    Returns
+    -------
+    int
+        The updated current track label.
+
+    Raises
+    ------
+    FusionError
+        If a fusion event is detected in the lineage.
+    """
+    if len(lineage) == 1:
+        current_track_label = _add_track(
+            lineage,
+            list(lineage.nodes),
+            ctc_tracks,
+            node_to_parent_track,
+            current_track_label,
+        )
+    else:
+        try:
+            cell_cycles = lineage.get_cell_cycles()
+        except FusionError as err:
+            raise FusionError(
+                err.node_id,
+                lineage.graph["lineage_id"],
+                f"The CTC format does not support fusion events. {err.message}",
+            ) from err
+        for cc in cell_cycles:
+            sorted_nodes = _sort_nodes_by_timepoint(lineage, cc)
+            gaps = _find_gaps(lineage, sorted_nodes)
+            if gaps:
+                track_start_i = 0
+                for gap in gaps:
+                    track_end_i = sorted_nodes.index(gap[0])
+                    current_track_label = _add_track(
+                        lineage,
+                        sorted_nodes[track_start_i : track_end_i + 1],
+                        ctc_tracks,
+                        node_to_parent_track,
+                        current_track_label,
+                    )
+                    track_start_i = sorted_nodes.index(gap[1])
+                current_track_label = _add_track(
+                    lineage,
+                    sorted_nodes[track_start_i:],
+                    ctc_tracks,
+                    node_to_parent_track,
+                    current_track_label,
+                )
+            else:
+                current_track_label = _add_track(
+                    lineage,
+                    sorted_nodes,
+                    ctc_tracks,
+                    node_to_parent_track,
+                    current_track_label,
+                )
+    return current_track_label
+
+
+def _add_parent_track(
+    lineage: CellLineage,
+    track_info: dict[str, int],
+    node_to_parent_track: dict[int, int],
+) -> None:
+    """
+    Add the parent track label to the CTC track information.
+
+    Parameters
+    ----------
+    lineage : CellLineage
+        The lineage object from which we are building CTC tracks.
+    track_info : dict[str, int]
+        A dictionary containing the CTC track information.
+    node_to_parent_track : dict[int, int]
+        A dictionary mapping the last node of each CTC track to the label of that
+        track, the parent track of the tracks that start with its children.
+    """
+    # A cell has one parent at most: _build_CTC_tracks() raises on fusions first.
+    parent_nodes = list(lineage.predecessors(track_info["B_node"]))
+    if parent_nodes:
+        track_info["P"] = node_to_parent_track[parent_nodes[0]]
+    else:
+        track_info["P"] = 0
+
+
+def write_ctc(
+    model: Model,
+    path: str | Path,
+    *,
+    frame_offset: int = 0,
+) -> None:
+    """
+    Export lineage data from a `Model` to CTC tracking file format.
+
+    The CTC tracking format does not support fusion events and does not allow
+    gaps right after division events.
+
+    The CTC frames of the cells are their timepoints plus `frame_offset`.
+    Timepoints count time steps from the earliest cell of the model, so they start
+    at 0 even when the data doesn't, e.g. for a model loaded from a CTC file whose
+    first frame is 5. To keep the frames in line with the images, set
+    `frame_offset` to the frame of timepoint 0: the first frame of that file, or in
+    general the frame of any cell minus its timepoint.
+
+    Parameters
+    ----------
+    model : Model
+        The model from which we want to export the CTC file.
+    path : str | Path
+        The path to the CTC file to write.
+    frame_offset : int, default=0
+        The frame of timepoint 0, added to the timepoints of the cells to give
+        their CTC frames. With 0, the timepoints are written as frames.
+
+    Raises
+    ------
+    TypeError
+        If `frame_offset` is not an integer.
+    UpdateRequiredError
+        If the model requires an update.
+    ValueError
+        If `frame_offset` gives cells a negative frame.
+    FusionError
+        If a lineage has a fusion event, which CTC does not support.
+    """
+    _check_integer(frame_offset, "frame_offset")
+    _check_up_to_date(model)
+    lineages = [lineage for lineage in model.data.cell_lineages.values()]
+    timepoints = [lin.nodes[cid]["timepoint"] for lin in lineages for cid in lin.nodes]
+    if timepoints and min(timepoints) + frame_offset < 0:
+        min_timepoint = min(timepoints)
+        raise ValueError(
+            f"CTC frames can't be negative, but the earliest cells, at timepoint "
+            f"{min_timepoint}, would be at frame {min_timepoint + frame_offset} with "
+            f"frame_offset={frame_offset}. Use a frame_offset of at least "
+            f"{-min_timepoint}."
+        )
+
+    current_track_label = 1  # 0 is kept for no parent track
+    tracks_to_write = []
+    for lin in lineages:
+        ctc_tracks: dict[int, dict[str, int]] = {}
+        node_to_parent_track: dict[int, int] = {}
+        current_track_label = _build_CTC_tracks(
+            lin, ctc_tracks, node_to_parent_track, current_track_label
+        )
+        for track_label, track_info in ctc_tracks.items():
+            _add_parent_track(lin, track_info, node_to_parent_track)
+            # The tracks hold timepoints, turned into frames here.
+            begin = track_info["B"] + frame_offset
+            end = track_info["E"] + frame_offset
+            tracks_to_write.append(f"{track_label} {begin} {end} {track_info['P']}\n")
+
+    with open(path, "w") as file:
+        file.writelines(tracks_to_write)
+
+
+if __name__ == "__main__":
+    """
+    Quick demo with sample data.
+    """
+    import tempfile
+
+    from pycellin.io.trackmate.reader import read_trackmate_xml
+
+    xml_in = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    model = read_trackmate_xml(xml_in)
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        ctc_out = Path(tmp_dir) / "output.xml"
+        write_ctc(model, ctc_out)

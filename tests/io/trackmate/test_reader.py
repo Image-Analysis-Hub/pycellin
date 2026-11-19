@@ -1,0 +1,1879 @@
+#!/usr/bin/env python3
+
+"""Unit test for TrackMate XML file loader."""
+
+import io
+import logging
+from copy import deepcopy
+from pathlib import Path
+from typing import Any
+
+import networkx as nx
+import pytest
+from lxml import etree as ET
+
+import pycellin.io.trackmate.reader as tml
+from pycellin.classes import CellLineage, Data, Property, PropsMetadata
+from pycellin.custom_types import PropertyType
+from tests.utils import is_equal
+
+# Fixtures #####################################################################
+
+
+@pytest.fixture(scope="module")
+def units():
+    return {"timeunits": "s", "spatialunits": "um"}
+
+
+@pytest.fixture(scope="module")
+def prop_QUALITY():
+    return Property(
+        identifier="QUALITY",
+        name="Quality",
+        description="Quality",
+        provenance="TrackMate",
+        prop_type="node",
+        lineage_type="cell",
+        dtype="float",
+    )
+
+
+@pytest.fixture(scope="module")
+def prop_FRAME():
+    return Property(
+        identifier="FRAME",
+        name="Frame",
+        description="Frame",
+        provenance="TrackMate",
+        prop_type="node",
+        lineage_type="cell",
+        dtype="int",
+        unit="frame",
+    )
+
+
+@pytest.fixture(scope="module")
+def prop_spot_name():
+    return Property(
+        identifier="cell_name",
+        name="cell name",
+        description="Name of the spot",
+        provenance="TrackMate",
+        prop_type="node",
+        lineage_type="cell",
+        dtype="string",
+    )
+
+
+@pytest.fixture(scope="module")
+def spot_props(prop_QUALITY: Property, prop_FRAME: Property, prop_spot_name: Property):
+    return {
+        "QUALITY": prop_QUALITY,
+        "FRAME": prop_FRAME,
+        "cell_name": prop_spot_name,
+    }
+
+
+@pytest.fixture(scope="module")
+def prop_SPOT_SOURCE_ID():
+    return Property(
+        identifier="SPOT_SOURCE_ID",
+        name="Source spot ID",
+        description="Source spot ID",
+        provenance="TrackMate",
+        prop_type="edge",
+        lineage_type="cell",
+        dtype="int",
+    )
+
+
+@pytest.fixture(scope="module")
+def prop_SPOT_TARGET_ID():
+    return Property(
+        identifier="SPOT_TARGET_ID",
+        name="Target spot ID",
+        description="Target spot ID",
+        provenance="TrackMate",
+        prop_type="edge",
+        lineage_type="cell",
+        dtype="int",
+    )
+
+
+@pytest.fixture(scope="module")
+def edge_props(prop_SPOT_SOURCE_ID: Property, prop_SPOT_TARGET_ID: Property):
+    return {
+        "SPOT_SOURCE_ID": prop_SPOT_SOURCE_ID,
+        "SPOT_TARGET_ID": prop_SPOT_TARGET_ID,
+    }
+
+
+@pytest.fixture(scope="module")
+def prop_TRACK_INDEX():
+    return Property(
+        identifier="TRACK_INDEX",
+        name="Track index",
+        description="Track index",
+        provenance="TrackMate",
+        prop_type="lineage",
+        lineage_type="cell",
+        dtype="int",
+    )
+
+
+@pytest.fixture(scope="module")
+def prop_NUMBER_SPOTS():
+    return Property(
+        identifier="NUMBER_SPOTS",
+        name="Number of spots",
+        description="Number of spots",
+        provenance="TrackMate",
+        prop_type="lineage",
+        lineage_type="cell",
+        dtype="int",
+    )
+
+
+@pytest.fixture(scope="module")
+def prop_track_name():
+    return Property(
+        identifier="lineage_name",
+        name="lineage name",
+        description="Name of the track",
+        provenance="TrackMate",
+        prop_type="lineage",
+        lineage_type="cell",
+        dtype="string",
+    )
+
+
+@pytest.fixture(scope="module")
+def track_props(
+    prop_TRACK_INDEX: Property, prop_NUMBER_SPOTS: Property, prop_track_name: Property
+):
+    return {
+        "TRACK_INDEX": prop_TRACK_INDEX,
+        "NUMBER_SPOTS": prop_NUMBER_SPOTS,
+        "lineage_name": prop_track_name,
+    }
+
+
+@pytest.fixture(scope="module")
+def fake_tracks_xml_path():
+    """Path of the FakeTracks sample, in 2D: one slice and a POSITION_Z of 0."""
+    return Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+
+
+@pytest.fixture(scope="module")
+def celegans_xml_path():
+    """Path of the C. elegans sample, whose frame interval is 2 min."""
+    return (
+        Path(__file__).resolve().parents[3]
+        / "sample_data"
+        / "Celegans-5pc-17timepoints.xml"
+    )
+
+
+@pytest.fixture
+def celegans_without_position_t(tmp_path, celegans_xml_path):
+    """Copy the C. elegans sample without POSITION_T, as TrackMate allows."""
+    tree = ET.parse(str(celegans_xml_path))
+    for spot in tree.iter("Spot"):
+        del spot.attrib["POSITION_T"]
+    features = [f for f in tree.iter("Feature") if f.get("feature") == "POSITION_T"]
+    for feature in features:
+        feature.getparent().remove(feature)
+    xml_path = tmp_path / "Celegans_without_POSITION_T.xml"
+    tree.write(str(xml_path), xml_declaration=True, encoding="UTF-8")
+    return xml_path
+
+
+# _get_units ##################################################################
+
+
+def test_get_units():
+    xml_data = '<Model spatialunits="µm" timeunits="min"></Model>'
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    obtained = tml._get_units(element)
+
+    expected = {"spatialunits": "µm", "timeunits": "min"}
+
+    assert obtained == expected
+
+
+def test_get_units_missing_spaceunits():
+    xml_data = '<Model timeunits="min"></Model>'
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    obtained = tml._get_units(element)
+
+    expected = {"spatialunits": "pixel", "timeunits": "min"}
+
+    assert obtained == expected
+
+
+def test_get_units_missing_timeunits():
+    xml_data = '<Model spatialunits="µm"></Model>'
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    obtained = tml._get_units(element)
+
+    expected = {"spatialunits": "µm", "timeunits": "frame"}
+
+    assert obtained == expected
+
+
+def test_get_units_no_units():
+    xml_data = "<Model></Model>"
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    obtained = tml._get_units(element)
+
+    expected = {"spatialunits": "pixel", "timeunits": "frame"}
+
+    assert obtained == expected
+
+
+# _get_props_dict ##########################################################
+
+
+def test_get_props_dict():
+    xml_data = (
+        "<SpotFeatures>"
+        '   <Feature feature="QUALITY" isint="false" />'
+        '   <Feature feature="FRAME" isint="true" />'
+        "</SpotFeatures>"
+    )
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    props = tml._get_props_dict(it, element)
+    spot_features = [
+        {"feature": "QUALITY", "isint": "false"},
+        {"feature": "FRAME", "isint": "true"},
+    ]
+    assert props == spot_features
+
+
+def test_get_props_dict_no_feature_tag():
+    xml_data = "<SpotFeatures></SpotFeatures>"
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    props = tml._get_props_dict(it, element)
+    assert props == []
+
+
+def test_get_props_dict_other_tag():
+    xml_data = (
+        "<SpotFeatures>"
+        '   <Feature feature="QUALITY" isint="false" />'
+        '   <Other feature="FRAME" isint="true" />'
+        "</SpotFeatures>"
+    )
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    props = tml._get_props_dict(it, element)
+    spot_features = [{"feature": "QUALITY", "isint": "false"}]
+    assert props == spot_features
+
+
+# _dimension_to_unit ##########################################################
+
+
+class TestDimensionToUnit:
+    """Test cases for _dimension_to_unit function."""
+
+    def test_frame_is_in_frames(self, units: dict[str, str]):
+        """Test that FRAME, which has no dimension in TrackMate, is in frames."""
+        trackmate_feature = {"feature": "FRAME", "dimension": "NONE"}
+        assert tml._dimension_to_unit(trackmate_feature, units) == "frame"
+
+    def test_other_dimensionless_feature_has_no_unit(self, units: dict[str, str]):
+        """Test that other features without dimension have no unit."""
+        trackmate_feature = {"feature": "VISIBILITY", "dimension": "NONE"}
+        assert tml._dimension_to_unit(trackmate_feature, units) is None
+
+    def test_rate_is_per_time_unit(self, units: dict[str, str]):
+        """Test that RATE features are per time unit."""
+        trackmate_feature = {
+            "feature": "inverse_interdivision_time",
+            "dimension": "RATE",
+        }
+        assert tml._dimension_to_unit(trackmate_feature, units) == "1/s"
+
+
+# _convert_and_add_prop ####################################################
+
+
+def test_convert_and_add_prop_spot_feature(
+    units: dict[str, str], prop_QUALITY: Property
+):
+    trackmate_feature = {
+        "feature": "QUALITY",
+        "name": "Quality",
+        "isint": "false",
+        "dimension": "NONE",
+    }
+    feature_type = "SpotFeatures"
+    obtained = PropsMetadata()
+    tml._convert_and_add_prop(trackmate_feature, feature_type, obtained, units)
+
+    expected = PropsMetadata({"QUALITY": prop_QUALITY})
+
+    assert obtained == expected
+
+
+def test_convert_and_add_prop_edge_feature(
+    units: dict[str, str], prop_SPOT_SOURCE_ID: Property
+):
+    trackmate_feature = {
+        "feature": "SPOT_SOURCE_ID",
+        "name": "Source spot ID",
+        "isint": "true",
+        "dimension": "NONE",
+    }
+    feature_type = "EdgeFeatures"
+    obtained = PropsMetadata()
+    tml._convert_and_add_prop(trackmate_feature, feature_type, obtained, units)
+
+    expected = PropsMetadata({"SPOT_SOURCE_ID": prop_SPOT_SOURCE_ID})
+
+    assert obtained == expected
+
+
+def test_convert_and_add_prop_track_feature(
+    units: dict[str, str], prop_TRACK_INDEX: Property
+):
+    trackmate_feature = {
+        "feature": "TRACK_INDEX",
+        "name": "Track index",
+        "isint": "true",
+        "dimension": "NONE",
+    }
+    feature_type = "TrackFeatures"
+    obtained = PropsMetadata()
+    tml._convert_and_add_prop(trackmate_feature, feature_type, obtained, units)
+
+    expected = PropsMetadata({"TRACK_INDEX": prop_TRACK_INDEX})
+
+    assert obtained == expected
+
+
+def test_convert_and_add_prop_invalid_feature_type(units: dict[str, str]):
+    trackmate_feature = {
+        "feature": "QUALITY",
+        "name": "Quality",
+        "isint": "false",
+        "dimension": "NONE",
+    }
+    feature_type = "InvalidFeatureType"
+    props_md = PropsMetadata()
+
+    with pytest.raises(ValueError, match="Invalid property type: InvalidFeatureType"):
+        tml._convert_and_add_prop(trackmate_feature, feature_type, props_md, units)
+
+
+# _add_all_props ###########################################################
+
+
+def test_add_all_props(
+    spot_props: dict[str, Any], edge_props: dict[str, Any], track_props: dict[str, Any]
+):
+    xml_data = (
+        "<FeatureDeclarations>"
+        "   <SpotFeatures>"
+        '       <Feature feature="QUALITY" name="Quality" isint="false" '
+        '                dimension="NONE"/>'
+        '       <Feature feature="FRAME" name="Frame" isint="true" dimension="NONE"/>'
+        "   </SpotFeatures>"
+        "   <EdgeFeatures>"
+        '       <Feature feature="SPOT_SOURCE_ID" name="Source spot ID" isint="true" '
+        '                dimension="NONE"/>'
+        '       <Feature feature="SPOT_TARGET_ID" name="Target spot ID" isint="true" '
+        '                dimension="NONE"/>'
+        "   </EdgeFeatures>"
+        "   <TrackFeatures>"
+        '       <Feature feature="TRACK_INDEX" name="Track index" isint="true" '
+        '                dimension="NONE"/>'
+        '       <Feature feature="NUMBER_SPOTS" name="Number of spots" isint="true" '
+        '                dimension="NONE"/>'
+        "   </TrackFeatures>"
+        "</FeatureDeclarations>"
+    )
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+
+    obtained = PropsMetadata()
+    tml._add_all_props(it, element, obtained, {})
+
+    expected = PropsMetadata({**spot_props, **edge_props, **track_props})
+
+    assert obtained == expected
+
+
+def test_add_all_props_name_declared():
+    """Test that 'name', declared as a feature by some files, gives no property: it
+    would convert the display names of spots and tracks."""
+    xml_data = (
+        "<FeatureDeclarations>"
+        "   <TrackFeatures>"
+        '       <Feature feature="name" name="Name" isint="false" dimension="NONE"/>'
+        "   </TrackFeatures>"
+        "</FeatureDeclarations>"
+    )
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+
+    obtained = PropsMetadata()
+    tml._add_all_props(it, element, obtained, {})
+
+    assert "name" not in obtained.properties
+    assert "lineage_name" in obtained.properties
+
+
+def test_add_all_props_empty():
+    xml_data = "<FeatureDeclarations></FeatureDeclarations>"
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+
+    obtained = PropsMetadata()
+    tml._add_all_props(it, element, obtained, {})
+
+    assert obtained == PropsMetadata()
+
+
+def test_add_all_props_tag_with_no_feature_tag(
+    spot_props: dict[str, Any], track_props: dict[str, Any]
+):
+    xml_data = (
+        "<FeatureDeclarations>"
+        "   <SpotFeatures>"
+        '       <Feature feature="QUALITY" name="Quality" isint="false" '
+        '                dimension="NONE"/>'
+        '       <Feature feature="FRAME" name="Frame" isint="true" dimension="NONE"/>'
+        "   </SpotFeatures>"
+        "   <EdgeFeatures>"
+        "   </EdgeFeatures>"
+        "   <TrackFeatures>"
+        '       <Feature feature="TRACK_INDEX" name="Track index" isint="true" '
+        '                dimension="NONE"/>'
+        '       <Feature feature="NUMBER_SPOTS" name="Number of spots" isint="true" '
+        '                dimension="NONE"/>'
+        "   </TrackFeatures>"
+        "</FeatureDeclarations>"
+    )
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+
+    obtained = PropsMetadata()
+    tml._add_all_props(it, element, obtained, {})
+
+    expected = PropsMetadata({**spot_props, **track_props})
+
+    assert obtained == expected
+
+
+# _convert_attributes #########################################################
+
+
+def test_convert_attributes():
+    props = {
+        "prop_float": Property(
+            identifier="prop_float",
+            name="",
+            description="",
+            provenance="",
+            prop_type="node",
+            lineage_type="cell",
+            dtype="float",
+        ),
+        "prop_int": Property(
+            identifier="prop_int",
+            name="",
+            description="",
+            provenance="",
+            prop_type="node",
+            lineage_type="cell",
+            dtype="int",
+        ),
+        "prop_neg": Property(
+            identifier="prop_neg",
+            name="",
+            description="",
+            provenance="",
+            prop_type="node",
+            lineage_type="cell",
+            dtype="int",
+        ),
+        "prop_string": Property(
+            identifier="prop_string",
+            name="",
+            description="",
+            provenance="",
+            prop_type="node",
+            lineage_type="cell",
+            dtype="string",
+        ),
+    }
+
+    obtained_attr = {
+        "prop_float": "30",
+        "prop_int": "20",
+        "prop_neg": "-10",
+        "prop_string": "nope",
+    }
+    tml._convert_attributes(obtained_attr, props, "node")
+
+    expected_attr = {
+        "prop_float": 30.0,
+        "prop_int": 20,
+        "prop_neg": -10.0,
+        "prop_string": "nope",
+    }
+
+    assert obtained_attr == expected_attr
+
+
+def test_convert_attributes_specific_keys():
+    props = {}
+
+    obtained_attr = {"ID": "42", "name": "ID42", "ROI_N_POINTS": "something here"}
+    tml._convert_attributes(obtained_attr, props, "node")
+
+    expected_attr = {"ID": 42, "name": "ID42", "ROI_N_POINTS": "something here"}
+
+    assert obtained_attr == expected_attr
+
+
+def test_convert_attributes_int_nan_is_none():
+    props = {
+        "prop_int": Property(
+            identifier="prop_int",
+            name="",
+            description="",
+            provenance="",
+            prop_type="node",
+            lineage_type="cell",
+            dtype="int",
+        )
+    }
+    attributes = {"prop_int": "NaN"}
+
+    tml._convert_attributes(attributes, props, "node")
+
+    assert attributes == {"prop_int": None}
+
+
+def test_convert_attributes_ValueError():
+    props = {
+        "prop_int": Property(
+            identifier="prop_int",
+            name="",
+            description="",
+            provenance="",
+            prop_type="node",
+            lineage_type="cell",
+            dtype="integer",
+        )
+    }
+    attributes = {"prop_int": "20"}
+
+    with pytest.raises(ValueError):
+        tml._convert_attributes(attributes, props, "node")
+
+
+def test_convert_attributes_undeclared_attribute(caplog):
+    """An undeclared attribute is recorded and left as a string, without warning:
+    its data type is inferred once the whole file is read."""
+    props = {
+        "prop_float": Property(
+            identifier="prop_float",
+            name="",
+            description="",
+            provenance="",
+            prop_type="node",
+            lineage_type="cell",
+            dtype="float",
+        ),
+    }
+    attributes = {"prop_float": "30", "prop_int": "20"}
+    undeclared = {}
+
+    with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.reader"):
+        tml._convert_attributes(attributes, props, "node", undeclared)
+
+    assert attributes == {"prop_float": 30.0, "prop_int": "20"}
+    assert undeclared == {"node": {"prop_int"}}
+    assert list(props) == ["prop_float"]
+    assert not caplog.records
+
+
+# _infer_attribute_dtype ######################################################
+
+
+@pytest.mark.parametrize(
+    "values, expected",
+    [
+        (["1", "-2"], "int"),
+        (["1", "NaN"], "int"),
+        (["1", "2.5"], "float"),
+        (["1e3"], "float"),
+        (["NaN", "Infinity"], "float"),
+        (["NaN"], "float"),
+        (["1", "a"], "str"),
+    ],
+)
+def test_infer_attribute_dtype(values, expected):
+    assert tml._infer_attribute_dtype(values) == expected
+
+
+# _declare_undeclared_attributes ##############################################
+
+
+def test_declare_undeclared_attributes(caplog):
+    """Values are converted to the inferred data type, and the attributes declared
+    without unit, with a single warning."""
+    graph = nx.DiGraph()
+    graph.add_node(1, TRACK_ID=0, count="3", label="a")
+    graph.add_node(2, TRACK_ID=0, count="NaN", label="b")
+    graph.add_edge(1, 2, weight="0.5")
+    tracks_attributes = [{"TRACK_ID": 0, "score": "2"}]
+    undeclared = {"node": {"count", "label"}, "edge": {"weight"}, "lineage": {"score"}}
+    props_md = PropsMetadata()
+
+    with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.reader"):
+        tml._declare_undeclared_attributes(
+            undeclared, graph, tracks_attributes, props_md
+        )
+
+    assert graph.nodes[1]["count"] == 3
+    assert graph.nodes[2]["count"] is None
+    assert graph.nodes[1]["label"] == "a"
+    assert graph.edges[1, 2]["weight"] == 0.5
+    assert tracks_attributes[0]["score"] == 2
+    dtypes = {key: props_md.properties[key].dtype for key in props_md.properties}
+    assert dtypes == {"count": "int", "label": "str", "weight": "float", "score": "int"}
+    assert props_md.properties["weight"].prop_type == PropertyType.EDGE
+    assert props_md.properties["score"].prop_type == PropertyType.LINEAGE
+    assert all(prop.unit is None for prop in props_md.properties.values())
+    assert len(caplog.records) == 1
+    assert "'count' (spots, int)" in caplog.records[0].message
+    assert "'score' (tracks, int)" in caplog.records[0].message
+
+
+def test_declare_undeclared_attributes_of_spots_and_tracks():
+    """An attribute of spots and tracks gets a single declaration."""
+    graph = nx.DiGraph()
+    graph.add_node(1, TRACK_ID=0, extra="1")
+    graph.add_node(2, TRACK_ID=0, extra="2")
+    graph.add_edge(1, 2)
+    tracks_attributes = [{"TRACK_ID": 0, "extra": "1.5"}]
+    props_md = PropsMetadata()
+
+    tml._declare_undeclared_attributes(
+        {"node": {"extra"}, "lineage": {"extra"}}, graph, tracks_attributes, props_md
+    )
+
+    prop = props_md.properties["extra"]
+    assert prop.prop_type == PropertyType.NODE | PropertyType.LINEAGE
+    assert prop.dtype == "float"
+    assert graph.nodes[1]["extra"] == 1.0
+
+
+def test_declare_undeclared_attributes_of_filtered_track_ignored(caplog):
+    """An attribute found only on a track that was filtered out is not declared."""
+    graph = nx.DiGraph()
+    graph.add_node(1, TRACK_ID=0)
+    graph.add_node(2, TRACK_ID=0)
+    graph.add_edge(1, 2)
+    tracks_attributes = [{"TRACK_ID": 0}, {"TRACK_ID": 1, "extra": "1"}]
+    props_md = PropsMetadata()
+
+    with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.reader"):
+        tml._declare_undeclared_attributes(
+            {"lineage": {"extra"}}, graph, tracks_attributes, props_md
+        )
+
+    assert "extra" not in props_md.properties
+    assert not caplog.records
+
+
+# _convert_ROI_coordinates ####################################################
+
+
+def test_convert_ROI_coordinates_2D():
+    el_obtained = ET.Element("Spot")
+    el_obtained.attrib["ROI_N_POINTS"] = "3"
+    el_obtained.text = "1 2.0 -3 -4.0 5.5 6"
+    att_obtained = deepcopy(el_obtained.attrib)
+    tml._convert_ROI_coordinates(el_obtained, att_obtained)
+
+    att_expected = {"cell_contour": [(1.0, 2.0), (-3.0, -4.0), (5.5, 6.0)]}
+
+    assert att_obtained == att_expected
+
+
+def test_convert_ROI_coordinates_3D():
+    el_obtained = ET.Element("Spot")
+    el_obtained.attrib["ROI_N_POINTS"] = "2"
+    el_obtained.text = "1 2.0 -3 -4.0 5.5 6"
+    att_obtained = deepcopy(el_obtained.attrib)
+    tml._convert_ROI_coordinates(el_obtained, att_obtained)
+
+    att_expected = {"cell_contour": [(1.0, 2.0, -3.0), (-4.0, 5.5, 6.0)]}
+
+    assert att_obtained == att_expected
+
+
+def test_convert_ROI_coordinates_KeyError():
+    el_obtained = ET.Element("Spot")
+    el_obtained.text = "1 2.0 -3 -4.0 5.5 6"
+    att_obtained = deepcopy(el_obtained.attrib)
+
+    with pytest.raises(KeyError):
+        tml._convert_ROI_coordinates(el_obtained, att_obtained)
+
+
+def test_convert_ROI_coordinates_no_ROI_txt():
+    el_obtained = ET.Element("Spot")
+    el_obtained.attrib["ROI_N_POINTS"] = "2"
+    att_obtained = deepcopy(el_obtained.attrib)
+    tml._convert_ROI_coordinates(el_obtained, att_obtained)
+
+    att_expected = {"cell_contour": None}
+
+    assert att_obtained == att_expected
+
+
+# _add_all_nodes ##############################################################
+
+
+def test_add_all_nodes_several_attributes():
+    xml_data = (
+        "<data>"
+        "   <frame>"
+        '       <Spot name="ID1000" ID="1000" x="10" y="20" />'
+        '       <Spot name="ID1001" ID="1001" x="30.5" y="30" />'
+        "   </frame>"
+        "</data>"
+    )
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+
+    spot_props = {
+        "x": Property(
+            identifier="x",
+            name="",
+            description="",
+            provenance="",
+            prop_type="node",
+            lineage_type="cell",
+            dtype="float",
+        ),
+        "y": Property(
+            identifier="y",
+            name="",
+            description="",
+            provenance="",
+            prop_type="node",
+            lineage_type="cell",
+            dtype="int",
+        ),
+    }
+    props_md = PropsMetadata(spot_props)
+    obtained = nx.DiGraph()
+    tml._add_all_nodes(it, element, props_md, obtained)
+
+    expected = nx.DiGraph()
+    expected.add_nodes_from(
+        [
+            (1001, {"name": "ID1001", "y": 30, "ID": 1001, "x": 30.5}),
+            (1000, {"name": "ID1000", "ID": 1000, "x": 10.0, "y": 20}),
+        ]
+    )
+
+    assert is_equal(obtained, expected)
+
+
+def test_add_all_nodes_only_id_attribute():
+    xml_data = (
+        "<data>"
+        "   <frame>"
+        '       <Spot ID="1000" />'
+        '       <Spot ID="1001" />'
+        "   </frame>"
+        "</data>"
+    )
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+
+    obtained = nx.DiGraph()
+    tml._add_all_nodes(it, element, PropsMetadata(), obtained)
+
+    expected = nx.DiGraph()
+    expected.add_nodes_from([(1001, {"ID": 1001}), (1000, {"ID": 1000})])
+
+    assert is_equal(obtained, expected)
+
+
+def test_add_all_nodes_no_node_attributes():
+    xml_data = (
+        '<data>   <frame>       <Spot />       <Spot ID="1001" />   </frame></data>'
+    )
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+
+    obtained = nx.DiGraph()
+    tml._add_all_nodes(it, element, PropsMetadata(), obtained)
+
+    expected = nx.DiGraph()
+    expected.add_nodes_from([(1001, {"ID": 1001})])
+
+    assert is_equal(obtained, expected)
+
+
+def test_add_all_nodes_no_nodes():
+    xml_data = "<data>   <frame /></data>"
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+
+    obtained = nx.DiGraph()
+    tml._add_all_nodes(it, element, PropsMetadata(), obtained)
+
+    assert is_equal(obtained, nx.DiGraph())
+
+
+# _add_edge ###################################################################
+
+
+def test_add_edge():
+    xml_data = '<data SPOT_SOURCE_ID="1" SPOT_TARGET_ID="2" x="20" y="25" />'
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    track_id = 0
+
+    edge_props = {
+        "x": Property(
+            identifier="x",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="float",
+        ),
+        "y": Property(
+            identifier="y",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="int",
+        ),
+        "SPOT_SOURCE_ID": Property(
+            identifier="SPOT_SOURCE_ID",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="int",
+        ),
+        "SPOT_TARGET_ID": Property(
+            identifier="SPOT_TARGET_ID",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="int",
+        ),
+    }
+    obtained = nx.DiGraph()
+    props_md = PropsMetadata(edge_props)
+    tml._add_edge(element, props_md, obtained, track_id)
+
+    expected = nx.DiGraph()
+    expected.add_edge(1, 2, x=20.0, y=25, SPOT_SOURCE_ID=1, SPOT_TARGET_ID=2)
+    expected.nodes[1]["TRACK_ID"] = track_id
+    expected.nodes[2]["TRACK_ID"] = track_id
+
+    assert is_equal(obtained, expected)
+
+
+def test_add_edge_no_node_id():
+    xml_data = '<data SPOT_SOURCE_ID="1" x="20" y="25" />'
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    track_id = 0
+
+    edge_props = {
+        "x": Property(
+            identifier="x",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="float",
+        ),
+        "y": Property(
+            identifier="y",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="int",
+        ),
+        "SPOT_SOURCE_ID": Property(
+            identifier="SPOT_SOURCE_ID",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="int",
+        ),
+    }
+    obtained = nx.DiGraph()
+    props_md = PropsMetadata(edge_props)
+    tml._add_edge(element, props_md, obtained, track_id)
+
+    expected = nx.DiGraph()
+
+    assert is_equal(obtained, expected)
+
+
+def test_add_edge_no_edge_attributes():
+    xml_data = '<data SPOT_SOURCE_ID="1" SPOT_TARGET_ID="2" />'
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    track_id = 0
+
+    edge_props = {
+        "SPOT_SOURCE_ID": Property(
+            identifier="SPOT_SOURCE_ID",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="int",
+        ),
+        "SPOT_TARGET_ID": Property(
+            identifier="SPOT_TARGET_ID",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="int",
+        ),
+    }
+    obtained = nx.DiGraph()
+    props_md = PropsMetadata(edge_props)
+    tml._add_edge(element, props_md, obtained, track_id)
+
+    expected = nx.DiGraph()
+    expected.add_edge(1, 2, SPOT_SOURCE_ID=1, SPOT_TARGET_ID=2)
+    expected.nodes[1]["TRACK_ID"] = track_id
+    expected.nodes[2]["TRACK_ID"] = track_id
+
+    assert is_equal(obtained, expected)
+
+
+# _build_tracks ###############################################################
+
+
+def test_build_tracks_several_attributes():
+    xml_data = (
+        "<data>"
+        '   <Track TRACK_ID="1" name="blob">'
+        '       <Edge SPOT_SOURCE_ID="11" SPOT_TARGET_ID="12"'
+        '           x="10" y="20" />'
+        '       <Edge SPOT_SOURCE_ID="12" SPOT_TARGET_ID="13"'
+        '           x="30" y="30" />'
+        "   </Track>"
+        '   <Track TRACK_ID="2" name="blub">'
+        '       <Edge SPOT_SOURCE_ID="21" SPOT_TARGET_ID="22"'
+        '           x="15" y="25" />'
+        "   </Track>"
+        "</data>"
+    )
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    edge_props = {
+        "x": Property(
+            identifier="x",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="float",
+        ),
+        "y": Property(
+            identifier="y",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="int",
+        ),
+        "SPOT_SOURCE_ID": Property(
+            identifier="SPOT_SOURCE_ID",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="int",
+        ),
+        "SPOT_TARGET_ID": Property(
+            identifier="SPOT_TARGET_ID",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="int",
+        ),
+    }
+    track_props = {
+        "TRACK_ID": Property(
+            identifier="TRACK_ID",
+            name="",
+            description="",
+            provenance="",
+            prop_type="lineage",
+            lineage_type="cell",
+            dtype="int",
+        )
+    }
+
+    obtained = nx.DiGraph()
+    props_md = PropsMetadata({**edge_props, **track_props})
+    obtained_tracks_attrib = tml._build_tracks(it, element, props_md, obtained)
+    obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
+
+    expected = nx.DiGraph()
+    expected.add_edge(11, 12, SPOT_SOURCE_ID=11, SPOT_TARGET_ID=12, x=10.0, y=20)
+    expected.add_edge(12, 13, SPOT_SOURCE_ID=12, SPOT_TARGET_ID=13, x=30.0, y=30)
+    expected.add_edge(21, 22, SPOT_SOURCE_ID=21, SPOT_TARGET_ID=22, x=15.0, y=25)
+    expected.add_nodes_from(
+        [
+            (11, {"TRACK_ID": 1}),
+            (12, {"TRACK_ID": 1}),
+            (13, {"TRACK_ID": 1}),
+            (21, {"TRACK_ID": 2}),
+            (22, {"TRACK_ID": 2}),
+        ]
+    )
+    expected_tracks_attrib = [
+        {"TRACK_ID": 2, "name": "blub"},
+        {"TRACK_ID": 1, "name": "blob"},
+    ]
+    expected_tracks_attrib = sorted(expected_tracks_attrib, key=lambda d: d["TRACK_ID"])
+
+    assert is_equal(obtained, expected)
+    assert obtained_tracks_attrib == expected_tracks_attrib
+
+
+def test_build_tracks_no_nodes_id():
+    xml_data = (
+        "<data>"
+        '   <Track TRACK_ID="1" name="blob">'
+        '       <Edge x="10" y="20" />'
+        '       <Edge x="30" y="30" />'
+        "   </Track>"
+        '   <Track TRACK_ID="2" name="blub">'
+        '       <Edge x="15" y="25" />'
+        "   </Track>"
+        "</data>"
+    )
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    edge_props = {
+        "x": Property(
+            identifier="x",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="float",
+        ),
+        "y": Property(
+            identifier="y",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="int",
+        ),
+    }
+    track_props = {
+        "TRACK_ID": Property(
+            identifier="TRACK_ID",
+            name="",
+            description="",
+            provenance="",
+            prop_type="lineage",
+            lineage_type="cell",
+            dtype="int",
+        )
+    }
+
+    obtained = nx.DiGraph()
+    props_md = PropsMetadata({**edge_props, **track_props})
+    obtained_tracks_attrib = tml._build_tracks(it, element, props_md, obtained)
+    obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
+
+    expected = nx.DiGraph()
+    expected_tracks_attrib = [
+        {"TRACK_ID": 2, "name": "blub"},
+        {"TRACK_ID": 1, "name": "blob"},
+    ]
+    expected_tracks_attrib = sorted(expected_tracks_attrib, key=lambda d: d["TRACK_ID"])
+
+    assert is_equal(obtained, expected)
+    assert obtained_tracks_attrib == expected_tracks_attrib
+
+
+def test_build_tracks_no_edges():
+    xml_data = (
+        "<data>"
+        '   <Track TRACK_ID="1" name="blob" />'
+        '   <Track TRACK_ID="2" name="blub" />'
+        "</data>"
+    )
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    track_props = {
+        "TRACK_ID": Property(
+            identifier="TRACK_ID",
+            name="",
+            description="",
+            provenance="",
+            prop_type="lineage",
+            lineage_type="cell",
+            dtype="int",
+        )
+    }
+
+    obtained = nx.DiGraph()
+    props_md = PropsMetadata(track_props)
+    obtained_tracks_attrib = tml._build_tracks(it, element, props_md, obtained)
+    obtained_tracks_attrib = sorted(obtained_tracks_attrib, key=lambda d: d["TRACK_ID"])
+
+    expected = nx.DiGraph()
+    expected_tracks_attrib = [
+        {"TRACK_ID": 2, "name": "blub"},
+        {"TRACK_ID": 1, "name": "blob"},
+    ]
+    expected_tracks_attrib = sorted(expected_tracks_attrib, key=lambda d: d["TRACK_ID"])
+
+    assert is_equal(obtained, expected)
+    assert obtained_tracks_attrib == expected_tracks_attrib
+
+
+def test_build_tracks_no_track_id():
+    xml_data = (
+        "<data>"
+        '   <Track name="blob">'
+        '       <Edge SPOT_SOURCE_ID="11" SPOT_TARGET_ID="12"'
+        '           x="10" y="20" />'
+        '       <Edge SPOT_SOURCE_ID="12" SPOT_TARGET_ID="13"'
+        '           x="30" y="30" />'
+        "   </Track>"
+        '   <Track name="blub">'
+        '       <Edge SPOT_SOURCE_ID="21" SPOT_TARGET_ID="22"'
+        '           x="15" y="25" />'
+        "   </Track>"
+        "</data>"
+    )
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    edge_props = {
+        "x": Property(
+            identifier="x",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="float",
+        ),
+        "y": Property(
+            identifier="y",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="int",
+        ),
+        "SPOT_SOURCE_ID": Property(
+            identifier="SPOT_SOURCE_ID",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="int",
+        ),
+        "SPOT_TARGET_ID": Property(
+            identifier="SPOT_TARGET_ID",
+            name="",
+            description="",
+            provenance="",
+            prop_type="edge",
+            lineage_type="cell",
+            dtype="int",
+        ),
+    }
+
+    obtained = nx.DiGraph()
+    props_md = PropsMetadata(edge_props)
+
+    with pytest.raises(KeyError):
+        tml._build_tracks(it, element, props_md, obtained)
+
+
+# _get_filtered_tracks_id #####################################################
+
+
+def test_get_filtered_tracks_id():
+    xml_data = '<data>   <TrackID TRACK_ID="0" />   <TrackID TRACK_ID="1" /></data>'
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+
+    obtained_id = tml._get_filtered_tracks_id(it, element)
+    expected_id = [0, 1]
+    assert sorted(obtained_id) == expected_id
+
+
+def test_get_filtered_tracks_id_no_id():
+    xml_data = "<data>   <TrackID />   <TrackID /></data>"
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    obtained_id = tml._get_filtered_tracks_id(it, element)
+    assert not obtained_id
+
+
+def test_get_filtered_tracks_id_no_tracks():
+    xml_data = "<data>   <tag />   <tag /></data>"
+    it = ET.iterparse(io.BytesIO(xml_data.encode("utf-8")), events=["start", "end"])
+    _, element = next(it)
+    obtained_id = tml._get_filtered_tracks_id(it, element)
+    assert not obtained_id
+
+
+# _update_location_related_props ###########################################
+
+
+def _location_props_md(axes: str) -> PropsMetadata:
+    """Return properties metadata declaring the coordinates of cells, links and
+    lineages on `axes`, as renamed by _update_props_metadata()."""
+    props_md = PropsMetadata()
+    for prefix, prop_type in [
+        ("cell", "node"),
+        ("link", "edge"),
+        ("lineage", "lineage"),
+    ]:
+        for axis in axes:
+            props_md._add_prop(
+                Property(
+                    identifier=f"{prefix}_{axis}",
+                    name=f"{prefix}_{axis}",
+                    description=f"{axis.upper()} coordinate",
+                    provenance="TrackMate",
+                    prop_type=prop_type,
+                    lineage_type="cell",
+                    dtype="float",
+                )
+            )
+    return props_md
+
+
+def test_update_location_related_props():
+    lineage = CellLineage()
+    lineage.add_node(1, POSITION_X=1, POSITION_Y=2, POSITION_Z=3)
+    lineage.add_node(2, POSITION_X=4, POSITION_Y=5, POSITION_Z=6)
+    lineage.add_edge(1, 2, EDGE_X_LOCATION=7, EDGE_Y_LOCATION=8, EDGE_Z_LOCATION=9)
+    lineage.graph["TRACK_X_LOCATION"] = 10
+    lineage.graph["TRACK_Y_LOCATION"] = 11
+    lineage.graph["TRACK_Z_LOCATION"] = 12
+
+    tml._update_location_related_props(lineage, _location_props_md("xyz"))
+
+    assert lineage.nodes[1]["cell_x"] == 1
+    assert lineage.nodes[1]["cell_y"] == 2
+    assert lineage.nodes[1]["cell_z"] == 3
+    assert lineage.nodes[2]["cell_x"] == 4
+    assert lineage.nodes[2]["cell_y"] == 5
+    assert lineage.nodes[2]["cell_z"] == 6
+    assert lineage.edges[(1, 2)]["link_x"] == 7
+    assert lineage.edges[(1, 2)]["link_y"] == 8
+    assert lineage.edges[(1, 2)]["link_z"] == 9
+    assert lineage.graph["lineage_x"] == 10
+    assert lineage.graph["lineage_y"] == 11
+    assert lineage.graph["lineage_z"] == 12
+
+
+def test_update_location_related_props_one_node():
+    """Test that a one-node lineage, from a spot outside tracks, gets the position of
+    its cell as location."""
+    lineage = CellLineage()
+    lineage.add_node(1, POSITION_X=1, POSITION_Y=2, POSITION_Z=3)
+
+    tml._update_location_related_props(lineage, _location_props_md("xyz"))
+
+    assert lineage.nodes[1]["cell_x"] == 1
+    assert lineage.nodes[1]["cell_y"] == 2
+    assert lineage.nodes[1]["cell_z"] == 3
+    assert lineage.graph["lineage_x"] == 1
+    assert lineage.graph["lineage_y"] == 2
+    assert lineage.graph["lineage_z"] == 3
+
+
+def test_update_location_related_props_2d():
+    """Test that 2D data, without z declarations, gets no z coordinate, not even
+    a z of None."""
+    lineage = CellLineage()
+    lineage.add_node(1, POSITION_X=1, POSITION_Y=2)
+    lineage.add_node(2, POSITION_X=4, POSITION_Y=5)
+    lineage.add_edge(1, 2, EDGE_X_LOCATION=7, EDGE_Y_LOCATION=8)
+    lineage.graph["TRACK_X_LOCATION"] = 10
+    lineage.graph["TRACK_Y_LOCATION"] = 11
+
+    tml._update_location_related_props(lineage, _location_props_md("xy"))
+
+    assert lineage.nodes[1] == {"cell_x": 1, "cell_y": 2}
+    assert lineage.edges[(1, 2)] == {"link_x": 7, "link_y": 8}
+    assert "lineage_z" not in lineage.graph
+
+
+# _parse_model_tag ############################################################
+
+
+def test_parse_model_tag_all_lone_spots_and_tracks():
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    _, _, data = tml._parse_model_tag(xml_path, lone_spots="all", tracks="all")
+
+    # 107 spots: 96 in 7 tracks that keep their TrackMate ID, and 11 lone spots
+    # that get the next IDs.
+    track_sizes = {
+        lin_id: len(lin) for lin_id, lin in data.cell_lineages.items() if len(lin) > 1
+    }
+    assert track_sizes == {0: 74, 1: 2, 2: 4, 3: 2, 4: 10, 5: 2, 6: 2}
+    lone_spots = {lin_id for lin_id, lin in data.cell_lineages.items() if len(lin) == 1}
+    assert lone_spots == set(range(7, 18))
+    # Lone spots get the position of their spot as location.
+    for lin_id in lone_spots:
+        lin = data.cell_lineages[lin_id]
+        (cell,) = lin.nodes.values()
+        assert lin.graph["lineage_x"] == cell["cell_x"]
+        assert lin.graph["lineage_y"] == cell["cell_y"]
+    # The lineage ID of each lineage and of its cells matches its key in the data.
+    for lin_id, lin in data.cell_lineages.items():
+        assert lin.graph["lineage_id"] == lin_id
+        cell_lin_ids = {cell_lin_id for _, cell_lin_id in lin.nodes(data="lineage_id")}
+        assert cell_lin_ids == {lin_id}
+    # Only tracks 0 and 4 are listed in FilteredTracks.
+    visible = {
+        lid for lid, lin in data.cell_lineages.items() if lin.graph["FilteredTrack"]
+    }
+    assert visible == {0, 4}
+
+
+def test_parse_model_tag_lone_spots_whatever_the_tracks():
+    """Lone spots get the IDs after all the track IDs of the file, so that they load
+    the same whatever the tracks loaded, without the attributes of a hidden track."""
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    lone_spots = {}
+    for tracks in ["visible", "all"]:
+        _, _, data = tml._parse_model_tag(xml_path, lone_spots="all", tracks=tracks)
+        lone_spots[tracks] = {
+            lin_id: (dict(lin.graph), dict(lin.nodes(data=True)))
+            for lin_id, lin in data.cell_lineages.items()
+            if len(lin) == 1
+        }
+
+    # FakeTracks has tracks 0 to 6, of which only 0 and 4 are visible.
+    assert set(lone_spots["visible"]) == set(range(7, 18))
+    assert lone_spots["visible"] == lone_spots["all"]
+
+
+@pytest.mark.parametrize(
+    "lone_spots, tracks, num_cells",
+    [
+        ("none", "visible", 84),
+        ("none", "all", 96),
+        ("visible", "visible", 94),
+        ("visible", "all", 106),
+        ("all", "visible", 95),
+        ("all", "all", 107),
+    ],
+)
+def test_parse_model_tag_lone_spots_and_tracks(lone_spots, tracks, num_cells):
+    """FakeTracks has 84 spots in its 2 visible tracks, 12 in its 5 hidden tracks,
+    and 11 outside tracks, 1 of them hidden by the spot filters (VISIBILITY of 0)."""
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    _, _, data = tml._parse_model_tag(xml_path, lone_spots=lone_spots, tracks=tracks)
+
+    assert sum(len(lin) for lin in data.cell_lineages.values()) == num_cells
+    lone_spot_visibilities = {
+        visibility
+        for lin in data.cell_lineages.values()
+        if len(lin) == 1
+        for _, visibility in lin.nodes(data="VISIBILITY")
+    }
+    expected = {"none": set(), "visible": {1}, "all": {0, 1}}
+    assert lone_spot_visibilities == expected[lone_spots]
+
+
+def test_parse_model_tag_lone_spots_without_visibility(tmp_path):
+    """Spots without VISIBILITY, as in files written by other tools, are visible."""
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    tree = ET.parse(str(xml_path))
+    for spot in tree.iter("Spot"):
+        del spot.attrib["VISIBILITY"]
+    declaration = tree.find(".//SpotFeatures/Feature[@feature='VISIBILITY']")
+    declaration.getparent().remove(declaration)
+    modified_path = tmp_path / "FakeTracks_without_visibility.xml"
+    tree.write(str(modified_path), xml_declaration=True, encoding="UTF-8")
+
+    _, _, data = tml._parse_model_tag(
+        modified_path, lone_spots="visible", tracks="visible"
+    )
+
+    # The 84 spots of the visible tracks, and the 11 spots outside tracks.
+    assert sum(len(lin) for lin in data.cell_lineages.values()) == 95
+
+
+def test_parse_model_tag_without_FilteredTracks(tmp_path):
+    """Without a FilteredTracks tag, as in files written by other tools, all the
+    tracks are visible."""
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    tree = ET.parse(str(xml_path))
+    filtered_tracks = tree.find(".//FilteredTracks")
+    filtered_tracks.getparent().remove(filtered_tracks)
+    modified_path = tmp_path / "FakeTracks_without_FilteredTracks.xml"
+    tree.write(str(modified_path), xml_declaration=True, encoding="UTF-8")
+
+    _, _, data = tml._parse_model_tag(
+        modified_path, lone_spots="none", tracks="visible"
+    )
+
+    # The 96 spots of the 7 tracks.
+    assert sum(len(lin) for lin in data.cell_lineages.values()) == 96
+    assert all(lin.graph["FilteredTrack"] for lin in data.cell_lineages.values())
+
+
+def test_parse_model_tag_spots_after_tracks(tmp_path):
+    """Spots and tracks are filtered once the whole file is read, so a file with its
+    spots after its tracks, as other tools may write it, loads as with the tag order
+    of TrackMate."""
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    tree = ET.parse(str(xml_path))
+    model = tree.find(".//Model")
+    all_spots = model.find("AllSpots")
+    model.remove(all_spots)
+    model.append(all_spots)
+    modified_path = tmp_path / "FakeTracks_spots_after_tracks.xml"
+    tree.write(str(modified_path), xml_declaration=True, encoding="UTF-8")
+
+    _, _, data = tml._parse_model_tag(
+        modified_path, lone_spots="none", tracks="visible"
+    )
+
+    track_sizes = {lin_id: len(lin) for lin_id, lin in data.cell_lineages.items()}
+    assert track_sizes == {0: 74, 4: 10}
+
+
+def test_parse_model_tag_undeclared_attributes(tmp_path):
+    """Attributes that the file doesn't declare, here on every spot, edge and track
+    of FakeTracks, are loaded with the data type of their values."""
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    tree = ET.parse(str(xml_path))
+    for i, spot in enumerate(tree.iter("Spot")):
+        spot.set("spot_int", str(i))
+        spot.set("spot_text", f"spot{i}")
+    for edge in tree.iter("Edge"):
+        edge.set("edge_float", "1.5")
+    for track in tree.iter("Track"):
+        track.set("track_int", "7")
+    modified_path = tmp_path / "FakeTracks_undeclared.xml"
+    tree.write(str(modified_path), xml_declaration=True, encoding="UTF-8")
+
+    _, props_md, data = tml._parse_model_tag(
+        modified_path, lone_spots="none", tracks="visible"
+    )
+
+    dtypes = {
+        key: props_md.properties[key].dtype
+        for key in ("spot_int", "spot_text", "edge_float", "track_int")
+    }
+    assert dtypes == {
+        "spot_int": "int",
+        "spot_text": "str",
+        "edge_float": "float",
+        "track_int": "int",
+    }
+    for lin in data.cell_lineages.values():
+        for _, attrs in lin.nodes(data=True):
+            assert attrs["spot_text"] == f"spot{attrs['spot_int']}"
+        assert all(value == 1.5 for *_, value in lin.edges(data="edge_float"))
+        if len(lin) > 1:
+            assert lin.graph["track_int"] == 7
+
+
+# _get_specific_tags ##########################################################
+
+
+def test_get_specific_tags():
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    tag_names = ["GUIState", "FeaturePenalties", "FilteredTracks"]
+    obtained = tml._get_specific_tags(xml_path, tag_names)
+
+    nested_element = ET.Element("FilteredTracks")
+    nested_element.append(ET.Element("TrackID", attrib={"TRACK_ID": "0"}))
+    nested_element.append(ET.Element("TrackID", attrib={"TRACK_ID": "4"}))
+    expected = {
+        "GUIState": ET.Element("GUIState", attrib={"state": "ConfigureViews"}),
+        "FeaturePenalties": ET.Element("FeaturePenalties"),  # empty tag
+        "FilteredTracks": nested_element,
+    }
+
+    assert obtained.keys() == expected.keys()
+    for k in obtained:
+        assert k in expected
+        assert obtained[k].tag == expected[k].tag
+        assert obtained[k].attrib == expected[k].attrib
+
+
+# _get_trackmate_version ######################################################
+
+
+def test_get_trackmate_version():
+    xml_path = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+    obtained = tml._get_trackmate_version(xml_path)
+
+    assert obtained == "8.0.0-SNAPSHOT-f411154ed1a4b9de350bbfe91c230cf3ae7639a3"
+
+
+# _get_time_step ##############################################################
+
+
+def test_get_time_step():
+    settings = ET.Element("Settings")
+    ET.SubElement(settings, "ImageData", timeinterval="0.5")
+    obtained = tml._get_time_step(settings)
+    expected = 0.5
+    assert obtained == expected
+
+
+def test_get_time_step_missing_timeinterval():
+    settings = ET.Element("Settings")
+    ET.SubElement(settings, "ImageData")
+    with pytest.raises(KeyError, match="The 'timeinterval' attribute is missing"):
+        tml._get_time_step(settings)
+
+
+def test_get_time_step_invalid_timeinterval():
+    settings = ET.Element("Settings")
+    ET.SubElement(settings, "ImageData", timeinterval="invalid")
+    with pytest.raises(
+        ValueError, match="The 'timeinterval' attribute cannot be converted to float"
+    ):
+        tml._get_time_step(settings)
+
+
+def test_get_time_step_missing_image_data():
+    settings = ET.Element("Settings")
+    with pytest.raises(KeyError, match="The 'ImageData' element is not found"):
+        tml._get_time_step(settings)
+
+
+# _get_pixel_size #############################################################
+
+
+def test_get_pixel_size():
+    settings = ET.Element("Settings")
+    image_data = ET.SubElement(settings, "ImageData")
+    image_data.attrib["pixelwidth"] = "1.5"
+    image_data.attrib["pixelheight"] = "2.0"
+    image_data.attrib["voxeldepth"] = "0.5"
+
+    obtained = tml._get_pixel_size(settings)
+
+    expected = {"pixel_width": 1.5, "pixel_height": 2.0, "pixel_depth": 0.5}
+
+    assert obtained == expected
+
+
+def test_get_pixel_size_missing_attribute():
+    settings = ET.Element("Settings")
+    image_data = ET.SubElement(settings, "ImageData")
+    image_data.attrib["pixelwidth"] = "1.5"
+    image_data.attrib["pixelheight"] = "2.0"
+
+    with pytest.raises(KeyError, match="The voxeldepth attribute is missing"):
+        tml._get_pixel_size(settings)
+
+
+def test_get_pixel_size_invalid_attribute():
+    settings = ET.Element("Settings")
+    image_data = ET.SubElement(settings, "ImageData")
+    image_data.attrib["pixelwidth"] = "1.5"
+    image_data.attrib["pixelheight"] = "2.0"
+    image_data.attrib["voxeldepth"] = "invalid"
+
+    with pytest.raises(
+        ValueError, match="The voxeldepth attribute cannot be converted to float."
+    ):
+        tml._get_pixel_size(settings)
+
+
+def test_get_pixel_size_missing_image_data():
+    settings = ET.Element("Settings")
+
+    with pytest.raises(
+        KeyError, match="The 'ImageData' element is not found in the settings."
+    ):
+        tml._get_pixel_size(settings)
+
+
+# _add_missing_position_t #####################################################
+
+
+class TestAddMissingPositionT:
+    """Test cases for _add_missing_position_t function."""
+
+    def test_computed_from_frame(self):
+        """Test that POSITION_T is FRAME times the frame interval, in the time unit."""
+        lin = CellLineage()
+        lin.add_node(1, FRAME=0)
+        lin.add_node(2, FRAME=3)
+        props_md = PropsMetadata()
+
+        tml._add_missing_position_t(Data({0: lin}), props_md, 2.5, "min")
+
+        assert lin.nodes[1]["POSITION_T"] == 0.0
+        assert lin.nodes[2]["POSITION_T"] == 7.5
+        prop = props_md.properties["POSITION_T"]
+        assert (prop.dtype, prop.unit, prop.provenance) == ("float", "min", "Pycellin")
+
+    def test_warns_when_computed(self, caplog):
+        """Test that a warning says POSITION_T is not from the file."""
+        lin = CellLineage()
+        lin.add_node(1, FRAME=0)
+
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.reader"):
+            tml._add_missing_position_t(Data({0: lin}), PropsMetadata(), 2.5, "min")
+
+        assert len(caplog.records) == 1
+        assert "computed from 'FRAME'" in caplog.records[0].message
+        assert "(2.5 min)" in caplog.records[0].message
+
+    def test_values_from_the_file_are_kept(self, caplog):
+        """Test that nothing changes when the spots have POSITION_T."""
+        lin = CellLineage()
+        lin.add_node(1, FRAME=0, POSITION_T=0.0)
+        lin.add_node(2, FRAME=3, POSITION_T=9.0)
+        props_md = PropsMetadata()
+
+        with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.reader"):
+            tml._add_missing_position_t(Data({0: lin}), props_md, 2.5, "min")
+
+        assert lin.nodes[2]["POSITION_T"] == 9.0
+        assert not props_md._has_prop("POSITION_T")
+        assert not caplog.records
+
+
+# read_trackmate_xml ##########################################################
+
+
+class TestReadTrackmateXml:
+    """Test cases for read_trackmate_xml function."""
+
+    @staticmethod
+    def _get_cells(model):
+        """Return the attributes of the cells of `model`, by lineage and cell IDs."""
+        return {
+            (lin_id, cell_id): cell
+            for lin_id, lin in model.data.cell_lineages.items()
+            for cell_id, cell in lin.nodes(data=True)
+        }
+
+    def test_missing_position_t_is_computed(
+        self, celegans_xml_path, celegans_without_position_t
+    ):
+        """Test that a file without POSITION_T gives the same times as with it."""
+        expected = self._get_cells(tml.read_trackmate_xml(celegans_xml_path))
+
+        model = tml.read_trackmate_xml(celegans_without_position_t)
+
+        obtained = self._get_cells(model)
+        assert obtained.keys() == expected.keys()
+        for key, cell in obtained.items():
+            assert cell["POSITION_T"] == expected[key]["POSITION_T"]
+            assert cell["timepoint"] == expected[key]["timepoint"]
+        assert model.model_metadata.time_step == 2.0
+        assert model.get_property("POSITION_T").unit == "min"
+
+    def test_frame_as_reference_time_prop(self, celegans_xml_path):
+        """Test that FRAME counts the time in frames, whatever the frame interval."""
+        expected = self._get_cells(tml.read_trackmate_xml(celegans_xml_path))
+
+        model = tml.read_trackmate_xml(celegans_xml_path, reference_time_prop="FRAME")
+
+        assert model.model_metadata.time_step == 1
+        assert model.model_metadata.time_unit == "frame"
+        assert model.get_property("FRAME").unit == "frame"
+        obtained = self._get_cells(model)
+        for key, cell in obtained.items():
+            assert cell["timepoint"] == expected[key]["timepoint"]
+
+    def test_frame_as_reference_needs_no_frame_interval(
+        self, tmp_path, celegans_xml_path
+    ):
+        """Test that FRAME as reference doesn't read the frame interval of the image."""
+        tree = ET.parse(str(celegans_xml_path))
+        for image_data in tree.iter("ImageData"):
+            del image_data.attrib["timeinterval"]
+        xml_path = tmp_path / "Celegans_without_timeinterval.xml"
+        tree.write(str(xml_path), xml_declaration=True, encoding="UTF-8")
+
+        model = tml.read_trackmate_xml(xml_path, reference_time_prop="FRAME")
+
+        assert model.model_metadata.time_step == 1
+
+    @pytest.mark.parametrize(
+        "option, value",
+        [
+            ("lone_spots", True),
+            ("lone_spots", "hidden"),
+            ("tracks", True),
+            ("tracks", "none"),
+        ],
+    )
+    def test_invalid_spot_and_track_options_raise(
+        self, celegans_xml_path, option, value
+    ):
+        """Test that a value that isn't an option of lone_spots or tracks raises."""
+        with pytest.raises(ValueError, match=f"'{option}' must be"):
+            tml.read_trackmate_xml(celegans_xml_path, **{option: value})
+
+    # 2D and 3D data.
+
+    @staticmethod
+    def _write_modified(tmp_path, xml_path, modify):
+        """Write a copy of the file at `xml_path`, modified by `modify(tree)`."""
+        tree = ET.parse(str(xml_path))
+        modify(tree)
+        modified_path = tmp_path / f"modified_{Path(xml_path).name}"
+        tree.write(str(modified_path), xml_declaration=True, encoding="UTF-8")
+        return modified_path
+
+    @staticmethod
+    def _remove_features(tree, features):
+        """Remove the declarations and the values of `features` from `tree`."""
+        for element in tree.iter("Spot", "Edge", "Track"):
+            for feature in features:
+                element.attrib.pop(feature, None)
+        for declaration in list(tree.iter("Feature")):
+            if declaration.get("feature") in features:
+                declaration.getparent().remove(declaration)
+
+    @staticmethod
+    def _z_props(model):
+        """Return the z coordinates that `model` declares."""
+        return {p for p in ("cell_z", "link_z", "lineage_z") if model.has_property(p)}
+
+    def test_2d_file_has_no_z(self, fake_tracks_xml_path):
+        """Test that a file with one slice and a POSITION_Z of 0 on every spot gives
+        a model without z coordinates or pixel depth."""
+        model = tml.read_trackmate_xml(fake_tracks_xml_path, lone_spots="all")
+
+        assert self._z_props(model) == set()
+        assert model.has_property("link_x") and model.has_property("lineage_x")
+        for lin in model.get_cell_lineages():
+            assert all("cell_z" not in cell for _, cell in lin.nodes(data=True))
+            assert all("link_z" not in link for _, _, link in lin.edges(data=True))
+            assert "lineage_z" not in lin.graph
+        assert model.get_pixel_depth() is None
+
+    def test_image_with_several_slices_keeps_z(self, tmp_path, fake_tracks_xml_path):
+        """Test that the z coordinates of 0 are kept when the image has several
+        slices, as TrackMate's own criterion for 3D data."""
+
+        def set_slices(tree):
+            for image_data in tree.iter("ImageData"):
+                image_data.set("nslices", "5")
+
+        xml_path = self._write_modified(tmp_path, fake_tracks_xml_path, set_slices)
+        model = tml.read_trackmate_xml(xml_path)
+
+        assert self._z_props(model) == {"cell_z", "link_z", "lineage_z"}
+        cells = self._get_cells(model).values()
+        assert {cell["cell_z"] for cell in cells} == {0.0}
+        assert model.get_pixel_depth() == 1.0
+
+    @pytest.mark.parametrize("lone_spots", ["none", "all"])
+    def test_nonzero_z_keeps_z_whatever_the_spots_loaded(
+        self, tmp_path, fake_tracks_xml_path, lone_spots
+    ):
+        """Test that a single nonzero POSITION_Z keeps the z coordinates, even on a
+        spot that is not loaded: the loading options don't change the dimension."""
+
+        def set_z_on_lone_spot(tree):
+            linked = {
+                edge.get(key)
+                for edge in tree.iter("Edge")
+                for key in ("SPOT_SOURCE_ID", "SPOT_TARGET_ID")
+            }
+            spot = next(s for s in tree.iter("Spot") if s.get("ID") not in linked)
+            spot.set("POSITION_Z", "2.0")
+
+        xml_path = self._write_modified(
+            tmp_path, fake_tracks_xml_path, set_z_on_lone_spot
+        )
+        model = tml.read_trackmate_xml(xml_path, lone_spots=lone_spots)
+
+        assert "cell_z" in self._z_props(model)
+        assert model.get_pixel_depth() == 1.0
+
+    def test_file_without_z_features(self, tmp_path, fake_tracks_xml_path):
+        """Test that a file without any z feature, as other tools can write, gives a
+        2D model."""
+        z_features = ["POSITION_Z", "EDGE_Z_LOCATION", "TRACK_Z_LOCATION"]
+        xml_path = self._write_modified(
+            tmp_path,
+            fake_tracks_xml_path,
+            lambda tree: self._remove_features(tree, z_features),
+        )
+        model = tml.read_trackmate_xml(xml_path)
+
+        assert self._z_props(model) == set()
+        assert model.has_property("cell_x") and model.has_property("link_x")
+
+    def test_links_and_tracks_without_z_location(self, tmp_path, celegans_xml_path):
+        """Test that the locations of links and tracks are read on the axes that the
+        file gives, here x and y only, while the spots stay in 3D."""
+        xml_path = self._write_modified(
+            tmp_path,
+            celegans_xml_path,
+            lambda tree: self._remove_features(
+                tree, ["EDGE_Z_LOCATION", "TRACK_Z_LOCATION"]
+            ),
+        )
+        model = tml.read_trackmate_xml(xml_path)
+
+        assert self._z_props(model) == {"cell_z"}
+        assert model.has_property("link_y") and model.has_property("lineage_y")

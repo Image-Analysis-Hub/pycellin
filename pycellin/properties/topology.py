@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Lineage topology property functions to create standard Property instances."""
+"""Topology property functions to create standard `~pycellin.Property` instances."""
 
 import logging
 import warnings
@@ -8,11 +8,15 @@ from typing import ClassVar
 
 import numpy as np
 
+from pycellin.classes.lineage import CellLineage, CycleLineage
 from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import (
     LineageLocalPropCalculator,
     NodeLocalPropCalculator,
 )
+from pycellin.exceptions import PycellinWarning
+from pycellin.properties.utils import _get_position
+from pycellin.utils import _find_stack_level
 
 logger = logging.getLogger(__name__)
 
@@ -22,31 +26,63 @@ def create_is_division_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``is_division`` property.
+
+    ``is_division`` tells whether the cell is a division event, i.e. has more than one
+    daughter cell. It is a node property of cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"is_division"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Is division".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Whether the
+        cell is a division event, i.e. has more than one daughter cell".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``is_division`` property.
+    """
     return Property(
         identifier=custom_identifier or "is_division",
         name=custom_name or "Is division",
         description=custom_description
         or "Whether the cell is a division event, i.e. has more than one daughter cell",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="bool",
     )
 
 
-class IsDivision(NodeLocalPropCalculator):
-    """Calculator for the is_division property."""
+class IsDivision(NodeLocalPropCalculator[CellLineage]):
+    """
+    Calculator for the ``is_division`` property.
 
-    def compute(self, lineage, nid: int) -> bool:
+    It tells whether a cell is a division event, i.e. has more than one daughter
+    cell.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    """
+
+    def compute(self, lineage: CellLineage, node_id: int) -> bool:
         """
         Compute whether a given node is a division event.
 
         Parameters
         ----------
-        lineage : Lineage
+        lineage : CellLineage
             Lineage graph containing the node of interest.
-        nid : int
-            Node ID (cell_id) of the cell of interest.
+        node_id : int
+            Node ID (``cell_id``) of the cell of interest.
 
         Returns
         -------
@@ -54,7 +90,7 @@ class IsDivision(NodeLocalPropCalculator):
             True if the cell is a division event, i.e. has more than one daughter cell,
             False otherwise.
         """
-        return lineage.is_division(nid)  # type: ignore
+        return lineage.is_division(node_id)
 
 
 def create_is_leaf_property(
@@ -62,31 +98,61 @@ def create_is_leaf_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``is_leaf`` property.
+
+    ``is_leaf`` tells whether the cell is a leaf cell, i.e. has no daughter cells. It is
+    a node property of cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be ``"is_leaf"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Is leaf".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Whether the
+        cell is a leaf cell, i.e. has no daughter cells".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``is_leaf`` property.
+    """
     return Property(
         identifier=custom_identifier or "is_leaf",
         name=custom_name or "Is leaf",
         description=custom_description
         or "Whether the cell is a leaf cell, i.e. has no daughter cells",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="bool",
     )
 
 
-class IsLeaf(NodeLocalPropCalculator):
-    """Calculator for the is_leaf property."""
+class IsLeaf(NodeLocalPropCalculator[CellLineage]):
+    """
+    Calculator for the ``is_leaf`` property.
 
-    def compute(self, lineage, nid: int) -> bool:
+    It tells whether a cell is a leaf cell, i.e. has no daughter cells.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    """
+
+    def compute(self, lineage: CellLineage, node_id: int) -> bool:
         """
         Compute whether a given node is a leaf cell.
 
         Parameters
         ----------
-        lineage : Lineage
+        lineage : CellLineage
             Lineage graph containing the node of interest.
-        nid : int
-            Node ID (cell_id) of the cell of interest.
+        node_id : int
+            Node ID (``cell_id``) of the cell of interest.
 
         Returns
         -------
@@ -94,7 +160,7 @@ class IsLeaf(NodeLocalPropCalculator):
             True if the cell is a leaf cell, i.e. has no daughter cells,
             False otherwise.
         """
-        return lineage.is_leaf(nid)  # type: ignore
+        return lineage.is_leaf(node_id)
 
 
 def create_is_root_property(
@@ -102,31 +168,61 @@ def create_is_root_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``is_root`` property.
+
+    ``is_root`` tells whether the cell is a root cell, i.e. has no parent cell. It is a
+    node property of cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be ``"is_root"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Is root".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Whether the
+        cell is a root cell, i.e. has no parent cell".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``is_root`` property.
+    """
     return Property(
         identifier=custom_identifier or "is_root",
         name=custom_name or "Is root",
         description=custom_description
         or "Whether the cell is a root cell, i.e. has no parent cell",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="bool",
     )
 
 
-class IsRoot(NodeLocalPropCalculator):
-    """Calculator for the is_root property."""
+class IsRoot(NodeLocalPropCalculator[CellLineage]):
+    """
+    Calculator for the ``is_root`` property.
 
-    def compute(self, lineage, nid: int) -> bool:
+    It tells whether a cell is a root cell, i.e. has no parent cell.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    """
+
+    def compute(self, lineage: CellLineage, node_id: int) -> bool:
         """
         Compute whether a given node is a root cell.
 
         Parameters
         ----------
-        lineage : Lineage
+        lineage : CellLineage
             Lineage graph containing the node of interest.
-        nid : int
-            Node ID (cell_id) of the cell of interest.
+        node_id : int
+            Node ID (``cell_id``) of the cell of interest.
 
         Returns
         -------
@@ -134,7 +230,105 @@ class IsRoot(NodeLocalPropCalculator):
             True if the cell is a root cell, i.e. has no parent cell,
             False otherwise.
         """
-        return lineage.is_root(nid)  # type: ignore
+        return lineage.is_root(node_id)
+
+
+def create_is_complete_cycle_property(
+    custom_identifier: str | None = None,
+    custom_name: str | None = None,
+    custom_description: str | None = None,
+) -> Property:
+    """
+    Create the declaration of the ``is_complete_cycle`` property.
+
+    ``is_complete_cycle`` tells whether the full cell cycle is captured, i.e. starts
+    from a division and ends with a division. It is a node property of cycle lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"is_complete_cycle"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Is complete cycle".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Whether the
+        full cell cycle is captured, i.e. starts from a division and ends with a
+        division".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``is_complete_cycle`` property.
+    """
+    return Property(
+        identifier=custom_identifier or "is_complete_cycle",
+        name=custom_name or "Is complete cycle",
+        description=custom_description
+        or "Whether the full cell cycle is captured, i.e. starts from a division "
+        "and ends with a division",
+        provenance="Pycellin",
+        prop_type="node",
+        lineage_type="cycle",
+        dtype="bool",
+    )
+
+
+class IsCompleteCycle(NodeLocalPropCalculator[CellLineage | CycleLineage]):
+    """
+    Calculator to compute whether cell cycles are complete.
+
+    A cell cycle is defined as complete when it starts with a division
+    AND ends with a division. Cell cycles that start at the root
+    or end with a leaf are thus incomplete.
+    This can be useful when analyzing properties like interdivision time. It avoids
+    the introduction of a bias since we have no information on what happened
+    before the root or after the leaves.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    """
+
+    def compute(self, lineage: CellLineage | CycleLineage, node_id: int) -> bool:
+        """
+        Compute whether the cell cycle of a cell, or a cell cycle, is complete.
+
+        Parameters
+        ----------
+        lineage : CellLineage | CycleLineage
+            Lineage graph containing the node (cell or cell cycle) of interest.
+        node_id : int
+            Node ID of the node (cell or cell cycle) of interest.
+
+        Returns
+        -------
+        bool
+            True if the cell cycle is complete, False otherwise.
+
+        Raises
+        ------
+        KeyError
+            If the cell or cycle is not in the lineage.
+        FusionError
+            If the cell or an earlier cell of its cell cycle has more than one parent.
+        """
+        if isinstance(lineage, CellLineage):
+            if node_id not in lineage.nodes:
+                raise KeyError(f"Cell {node_id} not in the lineage.")
+            cell_cycle = lineage.get_cell_cycle(node_id)
+            if lineage.is_root(cell_cycle[0]) or lineage.is_leaf(cell_cycle[-1]):
+                return False
+            else:
+                return True
+        elif isinstance(lineage, CycleLineage):
+            if node_id not in lineage.nodes:
+                raise KeyError(f"Cycle {node_id} not in the lineage.")
+            if lineage.is_root(node_id) or lineage.is_leaf(node_id):
+                return False
+            else:
+                return True
 
 
 # TODO: should be named num_cells or lineage_length?
@@ -143,28 +337,59 @@ def create_num_cells_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``num_cells`` property.
+
+    ``num_cells`` is the number of cells in the lineage. It is a lineage property of
+    cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"num_cells"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Number of cells".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Number of
+        cells in the lineage".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``num_cells`` property.
+    """
     return Property(
         identifier=custom_identifier or "num_cells",
         name=custom_name or "Number of cells",
         description=custom_description or "Number of cells in the lineage",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
 
-class NumCells(LineageLocalPropCalculator):
-    """Calculator for the num_cells property."""
+class NumCells(LineageLocalPropCalculator[CellLineage]):
+    """
+    Calculator for the ``num_cells`` property.
 
-    def compute(self, lineage) -> int:
+    It is the number of cells in a lineage.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    """
+
+    def compute(self, lineage: CellLineage) -> int:
         """
         Compute the number of cells in the lineage.
 
         Parameters
         ----------
-        lineage : Lineage
-            Lineage graph containing the node of interest.
+        lineage : CellLineage
+            Lineage graph of interest.
 
         Returns
         -------
@@ -181,28 +406,59 @@ def create_num_cycles_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``num_cycles`` property.
+
+    ``num_cycles`` is the number of cell cycles in the lineage. It is a lineage property
+    of cycle lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"num_cycles"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Number of cell cycles".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Number of
+        cell cycles in the lineage".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``num_cycles`` property.
+    """
     return Property(
         identifier=custom_identifier or "num_cycles",
         name=custom_name or "Number of cell cycles",
         description=custom_description or "Number of cell cycles in the lineage",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="int",
     )
 
 
-class NumCycles(LineageLocalPropCalculator):
-    """Calculator for the num_cycles property."""
+class NumCycles(LineageLocalPropCalculator[CycleLineage]):
+    """
+    Calculator for the ``num_cycles`` property.
 
-    def compute(self, lineage) -> int:
+    It is the number of cell cycles in a lineage.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    """
+
+    def compute(self, lineage: CycleLineage) -> int:
         """
         Compute the number of cell cycles in the lineage.
 
         Parameters
         ----------
-        lineage : Lineage
-            Lineage graph containing the node of interest.
+        lineage : CycleLineage
+            Lineage graph of interest.
 
         Returns
         -------
@@ -212,33 +468,64 @@ class NumCycles(LineageLocalPropCalculator):
         return len(lineage)
 
 
-def create_num_divs_property(
+def create_num_divisions_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``num_divisions`` property.
+
+    ``num_divisions`` is the number of cell divisions in the lineage. It is a lineage
+    property of cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"num_divisions"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Number of divisions".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Number of
+        cell divisions in the lineage".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``num_divisions`` property.
+    """
     return Property(
-        identifier=custom_identifier or "num_divs",
+        identifier=custom_identifier or "num_divisions",
         name=custom_name or "Number of divisions",
         description=custom_description or "Number of cell divisions in the lineage",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
 
-class NumDivs(LineageLocalPropCalculator):
-    """Calculator for the num_divs property."""
+class NumDivisions(LineageLocalPropCalculator[CellLineage]):
+    """
+    Calculator for the ``num_divisions`` property.
 
-    def compute(self, lineage) -> int:
+    It is the number of cell divisions in a lineage.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    """
+
+    def compute(self, lineage: CellLineage) -> int:
         """
         Compute the number of cell divisions in the lineage.
 
         Parameters
         ----------
-        lineage : Lineage
-            Lineage graph containing the node of interest.
+        lineage : CellLineage
+            Lineage graph of interest.
 
         Returns
         -------
@@ -254,29 +541,60 @@ def create_num_gaps_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``num_gaps`` property.
+
+    ``num_gaps`` is the number of gaps (missing detections) in the lineage. It is a
+    lineage property of cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be ``"num_gaps"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Number of gaps".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Number of
+        gaps (missing detections) in the lineage".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``num_gaps`` property.
+    """
     return Property(
         identifier=custom_identifier or "num_gaps",
         name=custom_name or "Number of gaps",
         description=custom_description
         or "Number of gaps (missing detections) in the lineage",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
 
-class NumGaps(LineageLocalPropCalculator):
-    """Calculator for the num_gaps property."""
+class NumGaps(LineageLocalPropCalculator[CellLineage]):
+    """
+    Calculator for the ``num_gaps`` property.
 
-    def compute(self, lineage) -> int:
+    It is the number of gaps in a lineage: links between two cells that are not
+    at consecutive timepoints.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    """
+
+    def compute(self, lineage: CellLineage) -> int:
         """
         Compute the number of gaps in the lineage.
 
         Parameters
         ----------
-        lineage : Lineage
-            Lineage graph containing the node of interest.
+        lineage : CellLineage
+            Lineage graph of interest.
 
         Returns
         -------
@@ -291,29 +609,60 @@ def create_num_leaves_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``num_leaves`` property.
+
+    ``num_leaves`` is the number of leaf cells (cells without daughter cells) in the
+    lineage. It is a lineage property of cell lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"num_leaves"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Number of leaves".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Number of
+        leaf cells (cells without daughter cells) in the lineage".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``num_leaves`` property.
+    """
     return Property(
         identifier=custom_identifier or "num_leaves",
         name=custom_name or "Number of leaves",
         description=custom_description
         or "Number of leaf cells (cells without daughter cells) in the lineage",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
 
-class NumLeaves(LineageLocalPropCalculator):
-    """Calculator for the num_leaves property."""
+class NumLeaves(LineageLocalPropCalculator[CellLineage]):
+    """
+    Calculator for the ``num_leaves`` property.
 
-    def compute(self, lineage) -> int:
+    It is the number of leaf cells in a lineage.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    """
+
+    def compute(self, lineage: CellLineage) -> int:
         """
         Compute the number of leaf cells in the lineage.
 
         Parameters
         ----------
-        lineage : Lineage
-            Lineage graph containing the node of interest.
+        lineage : CellLineage
+            Lineage graph of interest.
 
         Returns
         -------
@@ -328,30 +677,64 @@ def create_lineage_cell_depth_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``lineage_cell_depth`` property.
+
+    ``lineage_cell_depth`` is the maximum number of cells along any path from the
+    founding cell (root) to a terminal cell (leaf). It is a lineage property of cell
+    lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"lineage_cell_depth"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Lineage cell depth".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Maximum
+        number of cells along any path from the founding cell (root) to a terminal cell
+        (leaf)".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``lineage_cell_depth`` property.
+    """
     return Property(
         identifier=custom_identifier or "lineage_cell_depth",
         name=custom_name or "Lineage cell depth",
         description=custom_description
-        or "Number of cells from the founding cell (root) to the most recent "
-        "descendant (leaf)",
-        provenance="pycellin",
+        or "Maximum number of cells along any path from the founding cell (root) to "
+        "a terminal cell (leaf)",
+        provenance="Pycellin",
         prop_type="lineage",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
 
-class LineageCellDepth(LineageLocalPropCalculator):
-    """Calculator for the lineage_cell_depth property."""
+class LineageCellDepth(LineageLocalPropCalculator[CellLineage]):
+    """
+    Calculator for the ``lineage_cell_depth`` property.
 
-    def compute(self, lineage) -> int:
+    It is the maximum number of cells along any path from the root of a lineage
+    to a leaf.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    """
+
+    def compute(self, lineage: CellLineage) -> int:
         """
         Compute the number of cells from the root to the most recent leaf.
 
         Parameters
         ----------
-        lineage : Lineage
-            Lineage graph containing the node of interest.
+        lineage : CellLineage
+            Lineage graph of interest.
 
         Returns
         -------
@@ -367,29 +750,64 @@ def create_lineage_cycle_depth_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``lineage_cycle_depth`` property.
+
+    ``lineage_cycle_depth`` is the maximum number of cell cycles along any path from the
+    founding cell (root) to a terminal cell (leaf), i.e. the highest generation + 1. It
+    is a lineage property of cycle lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"lineage_cycle_depth"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Lineage cycle depth".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Maximum
+        number of cell cycles along any path from the founding cell (root) to a terminal
+        cell (leaf), i.e. the highest generation + 1".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``lineage_cycle_depth`` property.
+    """
     return Property(
         identifier=custom_identifier or "lineage_cycle_depth",
         name=custom_name or "Lineage cycle depth",
         description=custom_description
-        or "Maximum number of cell cycles along any path from founding cell (root) to terminal cell (leaf)",
-        provenance="pycellin",
+        or "Maximum number of cell cycles along any path from the founding cell (root) "
+        "to a terminal cell (leaf), i.e. the highest generation + 1",
+        provenance="Pycellin",
         prop_type="lineage",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="int",
     )
 
 
-class LineageCycleDepth(LineageLocalPropCalculator):
-    """Calculator for the lineage_cell_depth property."""
+class LineageCycleDepth(LineageLocalPropCalculator[CycleLineage]):
+    """
+    Calculator for the ``lineage_cycle_depth`` property.
 
-    def compute(self, lineage) -> int:
+    It is the maximum number of cell cycles along any path from the root of a
+    lineage to a leaf.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    """
+
+    def compute(self, lineage: CycleLineage) -> int:
         """
         Compute the maximum number of cell cycles along any path from root to leaf.
 
         Parameters
         ----------
-        lineage : Lineage
-            Lineage graph containing the node of interest.
+        lineage : CycleLineage
+            Lineage graph of interest.
 
         Returns
         -------
@@ -403,23 +821,59 @@ def create_lineage_duration_property(
     custom_identifier: str | None = None,
     custom_name: str | None = None,
     custom_description: str | None = None,
+    dtype: str = "float",
+    unit: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``lineage_duration`` property.
+
+    ``lineage_duration`` is the total lifespan of the lineage, from the founding cell
+    (root) to the most recent descendant (leaf). It is a lineage property of cell
+    lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"lineage_duration"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Lineage duration".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "Total
+        lifespan of the lineage, from the founding cell (root) to the most recent
+        descendant (leaf)".
+    dtype : str, default="float"
+        Data type of the durations, usually the one of the time property they are
+        computed from.
+    unit : str | None, default=None
+        Unit of the durations, usually the one of the time property they are computed
+        from.
+
+    Returns
+    -------
+    Property
+        Declaration of the ``lineage_duration`` property.
+    """
     return Property(
         identifier=custom_identifier or "lineage_duration",
         name=custom_name or "Lineage duration",
         description=custom_description
         or "Total lifespan of the lineage, from the founding cell (root) to the most "
         "recent descendant (leaf)",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="lineage",
-        lin_type="CellLineage",
-        dtype="float",
+        lineage_type="cell",
+        dtype=dtype,
+        unit=unit,
     )
 
 
-class LineageDuration(LineageLocalPropCalculator):
+class LineageDuration(LineageLocalPropCalculator[CellLineage]):
     """
-    Calculator for the lineage_duration property.
+    Calculator for the ``lineage_duration`` property.
+
+    It is the total lifespan of a lineage: the difference between the latest and the
+    earliest time values of its cells.
 
     Parameters
     ----------
@@ -427,30 +881,34 @@ class LineageDuration(LineageLocalPropCalculator):
         Property object to which the calculator is associated.
     time_prop : str
         Identifier of the cell lineage node property holding the time
-        of the cells (e.g. "frame", "POSITION_T").
+        of the cells (e.g. ``frame``, ``POSITION_T``).
     """
 
-    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "time_prop": ("node", "CellLineage")
-    }
+    #: Input property: `time_prop`, a node property of cell lineages.
+    INPUT_PROPS: ClassVar[dict[str, tuple[str, str]]] = {"time_prop": ("node", "cell")}
 
     def __init__(self, property: Property, time_prop: str):
         super().__init__(property)
         self.time_prop = time_prop
 
-    def compute(self, lineage) -> float:
+    def compute(self, lineage: CellLineage) -> float:
         """
         Compute the total lifespan of the lineage.
 
         Parameters
         ----------
-        lineage : Lineage
-            Lineage graph containing the node of interest.
+        lineage : CellLineage
+            Lineage graph of interest.
 
         Returns
         -------
         float
             The total lifespan of the lineage.
+
+        Raises
+        ------
+        ValueError
+            If no cell of the lineage has a value for `time_prop`.
         """
         return lineage.get_duration(time_prop=self.time_prop)
 
@@ -462,41 +920,44 @@ def create_location_tag_property(
     dtype: str = "int",
 ) -> Property:
     """
-    Create the location_tag property.
+    Create the declaration of the ``location_tag`` property.
+
+    ``location_tag`` is a tag indicating the location of a cell in the image, read in a
+    mask image. It is a node property of cell lineages.
 
     Parameters
     ----------
-    custom_identifier : str, optional
+    custom_identifier : str | None, default=None
         New identifier for the property. If None, the identifier will be
-        "location_tag".
-    custom_name : str, optional
+        ``"location_tag"``.
+    custom_name : str | None, default=None
         New name for the property. If None, the name will be "Location tag".
-    custom_description : str, optional
-        New description for the property. If None, a default description is used.
-    dtype : str, optional
-        Data type of the tags: "int" for raw mask values (default), "str" for
-        tag names.
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "A tag
+        indicating the location of a cell in the image".
+    dtype : str, default="int"
+        Data type of the tags: ``"int"`` for raw mask values, ``"str"`` for tag names.
 
     Returns
     -------
     Property
-        The location_tag property.
+        Declaration of the ``location_tag`` property.
     """
     return Property(
         identifier=custom_identifier or "location_tag",
         name=custom_name or "Location tag",
         description=custom_description
         or "A tag indicating the location of a cell in the image",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype=dtype,
     )
 
 
-class LocationTag(NodeLocalPropCalculator):
+class LocationTag(NodeLocalPropCalculator[CellLineage]):
     """
-    Calculator for the location_tag property.
+    Calculator for the ``location_tag`` property.
 
     This calculator assigns a location tag to each node in the lineage based on
     a provided mask image. The mask image should contain integer labels that
@@ -507,18 +968,18 @@ class LocationTag(NodeLocalPropCalculator):
 
     Parameters
     ----------
-    prop: Property
+    property : Property
         Property object to which the calculator is associated.
-    mask_img: np.ndarray
+    mask_image : np.ndarray
         The mask image that defines the location tags. It must be a tif stack with
         dimensions (time, height, width), where each pixel value represents a
         location tag. The first frame/slice of the mask image must correspond to the
         first timepoint in the model.
-    pixel_size: float
-        The size of a pixel in the image.
-    tag_names: dict[int, str], optional
-        Mapping from mask pixel values to tag names. If None (default), the tag is
-        the raw pixel value.
+    pixel_size : float
+        The size of a pixel in the image, in the unit of the cell coordinates.
+    tag_names : dict[int, str] | None, default=None
+        Mapping from mask pixel values to tag names. If None, the tag is the raw pixel
+        value.
 
     Raises
     ------
@@ -529,22 +990,22 @@ class LocationTag(NodeLocalPropCalculator):
 
     Warns
     -----
-    UserWarning
+    PycellinWarning
         If some keys of `tag_names` are not values of the mask.
     """
 
-    # The mask image belongs to the model the calculator was created for.
+    #: True: the mask image belongs to the model the calculator was created for.
     _USES_EXTERNAL_DATA = True
 
     def __init__(
         self,
-        prop: Property,
-        mask_img: np.ndarray,
+        property: Property,
+        mask_image: np.ndarray,
         pixel_size: float,
         tag_names: dict[int, str] | None = None,
     ):
-        super().__init__(prop)
-        self.mask = mask_img
+        super().__init__(property)
+        self.mask = mask_image
         self.pixel_size = pixel_size
         if tag_names is not None:
             if not tag_names:
@@ -574,7 +1035,7 @@ class LocationTag(NodeLocalPropCalculator):
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If some keys of `tag_names` are not values of the mask.
         """
         mask_values = set(np.unique(self.mask).tolist())
@@ -584,7 +1045,8 @@ class LocationTag(NodeLocalPropCalculator):
             warnings.warn(
                 f"Tag name values {missing} are not in the mask, "
                 "so no cell will get these tags.",
-                stacklevel=4,
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
             )
         unmapped = sorted(mask_values - mapped_values)
         if unmapped:
@@ -593,7 +1055,7 @@ class LocationTag(NodeLocalPropCalculator):
                 "so cells on these values will get None."
             )
 
-    def compute(self, lineage, nid: int) -> int | str | None:
+    def compute(self, lineage: CellLineage, node_id: int) -> int | str | None:
         """
         Compute the location tag of a cell.
 
@@ -604,8 +1066,8 @@ class LocationTag(NodeLocalPropCalculator):
         ----------
         lineage : CellLineage
             Lineage graph containing the cell of interest.
-        nid : int
-            Node ID (cell_id) of the cell of interest.
+        node_id : int
+            Node ID (``cell_id``) of the cell of interest.
 
         Returns
         -------
@@ -615,17 +1077,22 @@ class LocationTag(NodeLocalPropCalculator):
 
         Raises
         ------
+        MissingPropertyError
+            If the cell has no value for ``cell_x`` or ``cell_y``.
         ValueError
             If the cell's position is outside the mask image.
         """
-        x = int(np.floor(lineage.nodes[nid]["cell_x"] / self.pixel_size + 0.5))
-        y = int(np.floor(lineage.nodes[nid]["cell_y"] / self.pixel_size + 0.5))
-        t = lineage.nodes[nid]["timepoint"]
+        x_coord, y_coord = _get_position(
+            lineage, node_id, ("cell_x", "cell_y"), self.property.identifier
+        )
+        x = int(np.floor(x_coord / self.pixel_size + 0.5))
+        y = int(np.floor(y_coord / self.pixel_size + 0.5))
+        t = lineage.nodes[node_id]["timepoint"]
         # Explicit check: negative indices would silently wrap around.
         for axis, index, size in zip("tyx", (t, y, x), self.mask.shape):
             if not 0 <= index < size:
                 raise ValueError(
-                    f"Cell {nid} is outside the mask image: {axis} index {index} "
+                    f"Cell {node_id} is outside the mask image: {axis} index {index} "
                     f"is out of range [0, {size - 1}]."
                 )
         value = int(self.mask[t, y, x])
@@ -639,23 +1106,55 @@ def create_mother_cycle_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``mother_cycle`` property.
+
+    ``mother_cycle`` is the ID of the cell cycle whose division gave birth to the cell
+    cycle, or None for the root cell cycle. It is a node property of cycle lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"mother_cycle"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Mother cycle".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "ID of the
+        cell cycle whose division gave birth to the cell cycle, or None for the root
+        cell cycle".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``mother_cycle`` property.
+    """
     return Property(
         identifier=custom_identifier or "mother_cycle",
         name=custom_name or "Mother cycle",
         description=custom_description
         or "ID of the cell cycle whose division gave birth to the cell cycle, "
         "or None for the root cell cycle",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="int",
     )
 
 
-class MotherCycle(NodeLocalPropCalculator):
-    """Calculator for the mother_cycle property."""
+class MotherCycle(NodeLocalPropCalculator[CycleLineage]):
+    """
+    Calculator for the ``mother_cycle`` property.
 
-    def compute(self, lineage, nid: int) -> int | None:
+    It is the ID of the cell cycle whose division gave birth to a cell cycle.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    """
+
+    def compute(self, lineage: CycleLineage, node_id: int) -> int | None:
         """
         Compute the mother cycle of a given cell cycle.
 
@@ -663,15 +1162,15 @@ class MotherCycle(NodeLocalPropCalculator):
         ----------
         lineage : CycleLineage
             Lineage graph containing the cell cycle of interest.
-        nid : int
-            Node ID (cycle_id) of the cell cycle of interest.
+        node_id : int
+            Node ID (``cycle_id``) of the cell cycle of interest.
 
         Returns
         -------
         int | None
             ID of the mother cycle, or None if the cell cycle is the root.
         """
-        return next(lineage.predecessors(nid), None)
+        return next(lineage.predecessors(node_id), None)
 
 
 def create_daughter_cycles_property(
@@ -679,22 +1178,54 @@ def create_daughter_cycles_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``daughter_cycles`` property.
+
+    ``daughter_cycles`` holds the IDs of the cell cycles born from the division ending
+    the cell cycle. It is a node property of cycle lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"daughter_cycles"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Daughter cycles".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "IDs of the
+        cell cycles born from the division ending the cell cycle".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``daughter_cycles`` property.
+    """
     return Property(
         identifier=custom_identifier or "daughter_cycles",
         name=custom_name or "Daughter cycles",
         description=custom_description
         or "IDs of the cell cycles born from the division ending the cell cycle",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="list[int]",
     )
 
 
-class DaughterCycles(NodeLocalPropCalculator):
-    """Calculator for the daughter_cycles property."""
+class DaughterCycles(NodeLocalPropCalculator[CycleLineage]):
+    """
+    Calculator for the ``daughter_cycles`` property.
 
-    def compute(self, lineage, nid: int) -> list[int]:
+    It is the list of the IDs of the cell cycles born from the division ending a
+    cell cycle.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    """
+
+    def compute(self, lineage: CycleLineage, node_id: int) -> list[int]:
         """
         Compute the daughter cycles of a given cell cycle.
 
@@ -702,15 +1233,15 @@ class DaughterCycles(NodeLocalPropCalculator):
         ----------
         lineage : CycleLineage
             Lineage graph containing the cell cycle of interest.
-        nid : int
-            Node ID (cycle_id) of the cell cycle of interest.
+        node_id : int
+            Node ID (``cycle_id``) of the cell cycle of interest.
 
         Returns
         -------
         list[int]
             IDs of the daughter cycles, empty if the cell cycle is a leaf.
         """
-        return list(lineage.successors(nid))
+        return list(lineage.successors(node_id))
 
 
 def create_sister_cycles_property(
@@ -718,22 +1249,54 @@ def create_sister_cycles_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``sister_cycles`` property.
+
+    ``sister_cycles`` holds the IDs of the other cell cycles born from the same division
+    as the cell cycle. It is a node property of cycle lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"sister_cycles"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Sister cycles".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "IDs of the
+        other cell cycles born from the same division as the cell cycle".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``sister_cycles`` property.
+    """
     return Property(
         identifier=custom_identifier or "sister_cycles",
         name=custom_name or "Sister cycles",
         description=custom_description
         or "IDs of the other cell cycles born from the same division as the cell cycle",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="list[int]",
     )
 
 
-class SisterCycles(NodeLocalPropCalculator):
-    """Calculator for the sister_cycles property."""
+class SisterCycles(NodeLocalPropCalculator[CycleLineage]):
+    """
+    Calculator for the ``sister_cycles`` property.
 
-    def compute(self, lineage, nid: int) -> list[int]:
+    It is the list of the IDs of the other cell cycles born from the same division
+    as a cell cycle.
+
+    Parameters
+    ----------
+    property : Property
+        Property object to which the calculator is associated.
+    """
+
+    def compute(self, lineage: CycleLineage, node_id: int) -> list[int]:
         """
         Compute the sister cycles of a given cell cycle.
 
@@ -741,15 +1304,15 @@ class SisterCycles(NodeLocalPropCalculator):
         ----------
         lineage : CycleLineage
             Lineage graph containing the cell cycle of interest.
-        nid : int
-            Node ID (cycle_id) of the cell cycle of interest.
+        node_id : int
+            Node ID (``cycle_id``) of the cell cycle of interest.
 
         Returns
         -------
         list[int]
             IDs of the sister cycles, empty if the cell cycle is the root.
         """
-        return lineage.get_sisters(nid)
+        return lineage.get_sisters(node_id)
 
 
 def create_cousin_cycles_property(
@@ -757,22 +1320,46 @@ def create_cousin_cycles_property(
     custom_name: str | None = None,
     custom_description: str | None = None,
 ) -> Property:
+    """
+    Create the declaration of the ``cousin_cycles`` property.
+
+    ``cousin_cycles`` holds the IDs of the cousin cell cycles: cell cycles of the same
+    generation that share an ancestor with the cell cycle, but not its mother. It is a
+    node property of cycle lineages.
+
+    Parameters
+    ----------
+    custom_identifier : str | None, default=None
+        New identifier for the property. If None, the identifier will be
+        ``"cousin_cycles"``.
+    custom_name : str | None, default=None
+        New name for the property. If None, the name will be "Cousin cycles".
+    custom_description : str | None, default=None
+        New description for the property. If None, the description will be "IDs of the
+        cousin cell cycles: cell cycles of the same generation that share an ancestor
+        with the cell cycle, but not its mother".
+
+    Returns
+    -------
+    Property
+        Declaration of the ``cousin_cycles`` property.
+    """
     return Property(
         identifier=custom_identifier or "cousin_cycles",
         name=custom_name or "Cousin cycles",
         description=custom_description
         or "IDs of the cousin cell cycles: cell cycles of the same generation that "
         "share an ancestor with the cell cycle, but not its mother",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CycleLineage",
+        lineage_type="cycle",
         dtype="list[int]",
     )
 
 
-class CousinCycles(NodeLocalPropCalculator):
+class CousinCycles(NodeLocalPropCalculator[CycleLineage]):
     """
-    Calculator for the cousin_cycles property.
+    Calculator for the ``cousin_cycles`` property.
 
     First cousins share the same grandmother but not the same mother: their
     mothers are sisters. More generally, cousins of degree n share an ancestor
@@ -782,10 +1369,9 @@ class CousinCycles(NodeLocalPropCalculator):
     ----------
     property : Property
         Property object to which the calculator is associated.
-    degree : int | None, optional
+    degree : int | None, default=1
         Degree of the cousins: 1 for first cousins, 2 for second cousins, and
         so on. If None, the cousins of all degrees are listed, closest first.
-        1 by default.
 
     Raises
     ------
@@ -800,7 +1386,7 @@ class CousinCycles(NodeLocalPropCalculator):
             raise ValueError(f"'degree' must be at least 1 or None, got {degree}.")
         self.degree = degree
 
-    def compute(self, lineage, nid: int) -> list[int]:
+    def compute(self, lineage: CycleLineage, node_id: int) -> list[int]:
         """
         Compute the cousin cycles of a given cell cycle.
 
@@ -808,12 +1394,12 @@ class CousinCycles(NodeLocalPropCalculator):
         ----------
         lineage : CycleLineage
             Lineage graph containing the cell cycle of interest.
-        nid : int
-            Node ID (cycle_id) of the cell cycle of interest.
+        node_id : int
+            Node ID (``cycle_id``) of the cell cycle of interest.
 
         Returns
         -------
         list[int]
             IDs of the cousin cycles of the requested degree.
         """
-        return lineage.get_cousins(nid, degree=self.degree)
+        return lineage.get_cousins(node_id, degree=self.degree)

@@ -7,25 +7,26 @@ import numpy as np
 import pytest
 
 from pycellin.classes import CellLineage, Data, Model, Property, PropsMetadata
-from pycellin.properties.core import (
-    create_cell_coord_property,
-    create_lineage_id_property,
-    create_link_coord_property,
-    create_timepoint_property,
-)
+from pycellin.exceptions import PycellinWarning, UpdateRequiredError
 from pycellin.io.utils import (
     _add_lineage_props,
+    _check_up_to_date,
     _get_int_ids,
     _get_props_from_data,
     _graph_has_node_prop,
-    _has_lin_id,
     _remove_orphaned_metadata,
     _split_graph_into_lineages,
     _update_lineage_prop_key,
     _update_lineages_ids_key,
     _update_node_prop_key,
 )
-from pycellin.utils import is_equal
+from pycellin.properties.core import (
+    create_cell_coord_property,
+    create_lineage_id_property,
+    create_link_coord_property,
+    create_timepoint_property,
+)
+from tests.utils import is_equal
 
 # Fixtures ####################################################################
 
@@ -105,7 +106,8 @@ def two_lin_graph_with_track_id():
 
 @pytest.fixture
 def expected_two_lins_with_track_id():
-    """Expected CellLineages resulting from splitting two_lineage_graph_with_track_id."""
+    """Expected CellLineages resulting from splitting
+    two_lineage_graph_with_track_id."""
     lin0 = CellLineage()
     lin0.add_node(1, TRACK_ID=0)
     lin0.add_node(2, TRACK_ID=0)
@@ -142,7 +144,9 @@ def graph_with_props():
 def expected_props_lins():
     """Expected CellLineages resulting from splitting graph_with_properties."""
     lin0_exp = CellLineage()
-    lin0_exp.add_node(1, lineage_id=0, custom_prop="value1", x=10.5, count=0, flag=False)
+    lin0_exp.add_node(
+        1, lineage_id=0, custom_prop="value1", x=10.5, count=0, flag=False
+    )
     lin0_exp.add_node(2, lineage_id=0, custom_prop="value2", x=20.5, count=5, flag=True)
     lin0_exp.add_edge(
         1, 2, weight=1.5, edge_data="test", empty_str="", empty_list=[], none_val=None
@@ -191,8 +195,8 @@ def model():
     lin2.add_edge(3, 4, link_x=2.0)
     lin2.graph["lineage_id"] = 1
 
-    cell_data = {0: lin1, 1: lin2}
-    data = Data(cell_data)
+    cell_lineages = {0: lin1, 1: lin2}
+    data = Data(cell_lineages)
     props_metadata = PropsMetadata()
     props_metadata._add_prop(create_timepoint_property(provenance="Test"))
     props_metadata._add_prop(
@@ -206,7 +210,7 @@ def model():
     model = Model(
         data=data,
         props_metadata=props_metadata,
-        reference_time_property="timepoint",
+        reference_time_prop="timepoint",
     )
     return model
 
@@ -221,7 +225,7 @@ def model_with_orphaned_metadata(model):
             description="This doesn't exist in data",
             provenance="Test",
             prop_type="node",
-            lin_type="Lineage",
+            lineage_type="both",
             dtype="string",
         )
     )
@@ -232,7 +236,7 @@ def model_with_orphaned_metadata(model):
             description="This doesn't exist in data",
             provenance="Test",
             prop_type="edge",
-            lin_type="Lineage",
+            lineage_type="both",
             dtype="string",
         )
     )
@@ -243,7 +247,7 @@ def model_with_orphaned_metadata(model):
             description="This doesn't exist in data",
             provenance="Test",
             prop_type="lineage",
-            lin_type="Lineage",
+            lineage_type="both",
             dtype="string",
         )
     )
@@ -253,15 +257,16 @@ def model_with_orphaned_metadata(model):
 @pytest.fixture
 def model_with_orphaned_data(model):
     """Model with some data properties that have no corresponding metadata."""
-    model.data.cell_data[0].nodes[1]["node_prop_no_metadata"] = "value"
-    model.data.cell_data[0].edges[1, 2]["edge_prop_no_metadata"] = 100
-    model.data.cell_data[0].graph["lineage_prop_no_metadata"] = False
+    model.data.cell_lineages[0].nodes[1]["node_prop_no_metadata"] = "value"
+    model.data.cell_lineages[0].edges[1, 2]["edge_prop_no_metadata"] = 100
+    model.data.cell_lineages[0].graph["lineage_prop_no_metadata"] = False
     return model
 
 
 @pytest.fixture
 def model_with_lineage_id_config():
-    """Factory fixture for creating models with flexible lineage_id property configurations.
+    """Factory fixture for creating models with flexible lineage_id property
+    configurations.
 
     Returns a callable that creates a model with specified lineage_id properties.
     Parameters control whether lineage_id exists in node or graph properties.
@@ -295,8 +300,8 @@ def model_with_lineage_id_config():
         if lin2_graph_lin_id:
             lin2.graph["lineage_id"] = 1
 
-        cell_data = {0: lin1, 1: lin2}
-        data = Data(cell_data)
+        cell_lineages = {0: lin1, 1: lin2}
+        data = Data(cell_lineages)
         props_metadata = PropsMetadata()
         props_metadata._add_prop(create_timepoint_property(provenance="Test"))
         props_metadata._add_prop(
@@ -310,13 +315,27 @@ def model_with_lineage_id_config():
         return Model(
             data=data,
             props_metadata=props_metadata,
-            reference_time_property="timepoint",
+            reference_time_prop="timepoint",
         )
 
     return _create_model
 
 
 # Test classes ###############################################################
+
+
+class TestCheckUpToDate:
+    """Test cases for _check_up_to_date function."""
+
+    def test_model_requiring_update_raises(self, model):
+        """Test that a model requiring an update raises UpdateRequiredError."""
+        model.prepare_full_data_update()
+        with pytest.raises(UpdateRequiredError, match="before exporting"):
+            _check_up_to_date(model)
+
+    def test_up_to_date_model_passes(self, model):
+        """Test that a model not requiring an update passes."""
+        _check_up_to_date(model)
 
 
 class TestAddLineagesProps:
@@ -479,7 +498,9 @@ class TestGetPropsFromData:
 
     def test_get_props_from_data(self, model):
         """Test extracting properties from model data."""
-        node_props, edge_props, lineage_props = _get_props_from_data(model)
+        node_props, edge_props, lineage_props = _get_props_from_data(
+            model.data.cell_lineages.values()
+        )
 
         assert "timepoint" in node_props
         assert "cell_x" in node_props
@@ -495,9 +516,11 @@ class TestGetPropsFromData:
     def test_get_props_from_empty_data(self):
         """Test with empty data."""
         data = Data({})
-        model = Model(data=data, reference_time_property="timepoint")
+        model = Model(data=data, reference_time_prop="timepoint")
 
-        node_props, edge_props, lineage_props = _get_props_from_data(model)
+        node_props, edge_props, lineage_props = _get_props_from_data(
+            model.data.cell_lineages.values()
+        )
 
         assert len(node_props) == 0
         assert len(edge_props) == 0
@@ -552,15 +575,18 @@ class TestRemoveOrphanedMetadata:
 
     def test_remove_orphaned_metadata(self, caplog, model_with_orphaned_metadata):
         """Test removing orphaned properties from metadata."""
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.utils"):
             _remove_orphaned_metadata(model_with_orphaned_metadata)
-        assert len(caplog.records) == 3
-        assert caplog.records[0].levelname == "WARNING"
-        assert "Node metadata with no corresponding data" in caplog.records[0].message
-        assert caplog.records[1].levelname == "WARNING"
-        assert "Edge metadata with no corresponding data" in caplog.records[1].message
-        assert caplog.records[2].levelname == "WARNING"
-        assert "Lineage metadata with no corresponding data" in caplog.records[2].message
+        assert [(record.levelname, record.message) for record in caplog.records] == [
+            (
+                "INFO",
+                "Ignoring property without any value on cells: orphaned_node_prop.",
+            ),
+            (
+                "INFO",
+                "Ignoring property without any value on links: orphaned_edge_prop.",
+            ),
+        ]
 
         node_props = (
             model_with_orphaned_metadata.props_metadata._get_prop_dict_from_prop_type(
@@ -589,13 +615,65 @@ class TestRemoveOrphanedMetadata:
         assert "link_x" in edge_props
         assert "lineage_id" in lineage_props
 
+    def test_values_on_cycle_lineages(self, caplog, model):
+        """Test that a warning only names the properties with values on cycles."""
+        for prop_id, prop_type in (
+            ("cycle_node_prop", "node"),
+            ("cycle_edge_prop", "edge"),
+            ("empty_node_prop", "node"),
+            ("empty_edge_prop", "edge"),
+        ):
+            model.props_metadata._add_prop(
+                Property(
+                    identifier=prop_id,
+                    name=prop_id,
+                    description="This doesn't exist in cell data",
+                    provenance="Test",
+                    prop_type=prop_type,
+                    lineage_type="cycle",
+                    dtype="float",
+                )
+            )
+        cycle_lineage = nx.DiGraph()
+        cycle_lineage.add_edge(0, 1, cycle_edge_prop=1.0)
+        cycle_lineage.nodes[0]["cycle_node_prop"] = 1.0
+        model.data.cycle_lineages = {0: cycle_lineage}
+
+        with (
+            caplog.at_level(logging.INFO, logger="pycellin.io.utils"),
+            pytest.warns(PycellinWarning) as warned,
+        ):
+            _remove_orphaned_metadata(model)
+
+        warning = (
+            "Cycle properties are not exported: cycle_edge_prop, cycle_node_prop. "
+            "Use propagate_cycle_props=True to write them on the cells."
+        )
+        assert [str(w.message) for w in warned] == [warning]
+        assert [(record.levelname, record.message) for record in caplog.records] == [
+            ("INFO", "Ignoring property without any value on cells: empty_node_prop."),
+            ("INFO", "Ignoring property without any value on links: empty_edge_prop."),
+        ]
+        for prop_id in (
+            "cycle_node_prop",
+            "cycle_edge_prop",
+            "empty_node_prop",
+            "empty_edge_prop",
+        ):
+            assert not model.props_metadata._has_prop(prop_id)
+
     def test_orphaned_data(self, model_with_orphaned_data):
-        """Test that metadata are unchanged when orphaned data properties are present."""
+        """Test that metadata are unchanged when orphaned data properties are
+        present."""
         before_node_props = (
-            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type("node")
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+                "node"
+            )
         )
         before_edge_props = (
-            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type("edge")
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+                "edge"
+            )
         )
         before_lineage_props = (
             model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
@@ -604,10 +682,14 @@ class TestRemoveOrphanedMetadata:
         )
         _remove_orphaned_metadata(model_with_orphaned_data)
         after_node_props = (
-            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type("node")
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+                "node"
+            )
         )
         after_edge_props = (
-            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type("edge")
+            model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
+                "edge"
+            )
         )
         after_lineage_props = (
             model_with_orphaned_data.props_metadata._get_prop_dict_from_prop_type(
@@ -635,7 +717,8 @@ class TestRemoveOrphanedMetadata:
     # TODO: review the tests below (until the end of the class)
 
     def test_multitype_property_in_both_node_and_lineage(self, model):
-        """Test multi-type property found in both nodes and lineage graph is NOT removed."""
+        """Test multi-type property found in both nodes and lineage graph is NOT
+        removed."""
         before_node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
         before_lineage_props = model.props_metadata._get_prop_dict_from_prop_type(
             "lineage"
@@ -661,11 +744,11 @@ class TestRemoveOrphanedMetadata:
             lin2_node_lin_id=False,
             lin2_graph_lin_id=True,
         )
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.utils"):
             _remove_orphaned_metadata(model)
         assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "Node metadata with no corresponding data" in caplog.records[0].message
+        assert caplog.records[0].levelname == "INFO"
+        assert "without any value on cells: lineage_id" in caplog.records[0].message
 
         node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
         lineage_props = model.props_metadata._get_prop_dict_from_prop_type("lineage")
@@ -684,11 +767,9 @@ class TestRemoveOrphanedMetadata:
             lin2_graph_lin_id=False,
         )
 
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.utils"):
             _remove_orphaned_metadata(model)
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "Lineage metadata with no corresponding data" in caplog.records[0].message
+        assert not caplog.records
 
         node_props = model.props_metadata._get_prop_dict_from_prop_type("node")
         lineage_props = model.props_metadata._get_prop_dict_from_prop_type("lineage")
@@ -706,19 +787,19 @@ class TestRemoveOrphanedMetadata:
             lin2_node_lin_id=False,
             lin2_graph_lin_id=False,
         )
-        with caplog.at_level(logging.WARNING, logger="pycellin.io.utils"):
+        with caplog.at_level(logging.INFO, logger="pycellin.io.utils"):
             _remove_orphaned_metadata(model)
-        assert len(caplog.records) == 2
-        assert caplog.records[0].levelname == "WARNING"
-        assert "Node metadata with no corresponding data" in caplog.records[0].message
-        assert caplog.records[1].levelname == "WARNING"
-        assert "Lineage metadata with no corresponding data" in caplog.records[1].message
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "INFO"
+        assert "without any value on cells: lineage_id" in caplog.records[0].message
 
 
 class TestSplitGraphIntoLineages:
     """Test cases for _split_graph_into_lineages function."""
 
-    def test_split_graph_into_lineages(self, two_lin_graph, lin_props, expected_two_lins):
+    def test_split_graph_into_lineages(
+        self, two_lin_graph, lin_props, expected_two_lins
+    ):
         """Test splitting graph into lineages."""
         g1_attr, g2_attr = lin_props
         obtained = _split_graph_into_lineages(
@@ -757,7 +838,9 @@ class TestSplitGraphIntoLineages:
 
     def test_no_lin_props(self, two_lin_graph, expected_two_lins):
         """Test splitting graph with no lineage properties."""
-        obtained = _split_graph_into_lineages(two_lin_graph, lineage_id_key="lineage_id")
+        obtained = _split_graph_into_lineages(
+            two_lin_graph, lineage_id_key="lineage_id"
+        )
 
         g1_exp, g2_exp = expected_two_lins
 
@@ -777,18 +860,18 @@ class TestSplitGraphIntoLineages:
             )
 
     def test_auto_generated_ids(self, expected_two_lins):
-        """Test auto-generated IDs for single-node lineages (negative IDs)."""
+        """Test auto-generated IDs: the next ones, single-node lineages included."""
         g = nx.DiGraph()
-        g.add_edges_from([(1, 2), (3, 4)])  # positive IDs
-        g.add_nodes_from([10, 20])  # negative IDs
+        g.add_edges_from([(1, 2), (3, 4)])  # IDs 0 and 1
+        g.add_nodes_from([10, 20])  # IDs 2 and 3
         obtained = _split_graph_into_lineages(g, lineage_id_key=None)
 
         lin10_exp = CellLineage()
-        lin10_exp.add_node(10, lineage_id=-10)
-        lin10_exp.graph["lineage_id"] = -10
+        lin10_exp.add_node(10, lineage_id=2)
+        lin10_exp.graph["lineage_id"] = 2
         lin20_exp = CellLineage()
-        lin20_exp.add_node(20, lineage_id=-20)
-        lin20_exp.graph["lineage_id"] = -20
+        lin20_exp.add_node(20, lineage_id=3)
+        lin20_exp.graph["lineage_id"] = 3
         expected_two_lins.extend([lin10_exp, lin20_exp])
 
         assert len(obtained) == 4
@@ -855,38 +938,17 @@ class TestSplitGraphIntoLineages:
         lin_ids = {min(lin.nodes): lin.graph["lineage_id"] for lin in obtained}
         assert lin_ids == {1: 0, 3: 1, 5: 2}
 
-    def test_single_cell_without_id_gets_minus_cell_id(self, two_lin_graph):
-        """Test that a single-cell lineage without ID gets minus its cell ID."""
+    def test_single_cell_without_id_gets_next_id(self, two_lin_graph):
+        """Test that a single-cell lineage without ID gets the next ID."""
         two_lin_graph.add_node(5)
         obtained = _split_graph_into_lineages(
             two_lin_graph, lineage_id_key="lineage_id"
         )
 
         lin_ids = {min(lin.nodes): lin.graph["lineage_id"] for lin in obtained}
-        assert lin_ids == {1: 0, 3: 1, 5: -5}
+        assert lin_ids == {1: 0, 3: 1, 5: 2}
         lin5 = next(lin for lin in obtained if 5 in lin)
-        assert lin5.nodes[5]["lineage_id"] == -5
-
-    def test_single_cell_whose_minus_cell_id_is_used(self, two_lin_graph):
-        """Test that cell 0 alone gets a negative ID when lineage ID 0 is used."""
-        two_lin_graph.add_node(0)
-        obtained = _split_graph_into_lineages(
-            two_lin_graph, lineage_id_key="lineage_id"
-        )
-
-        lin_ids = {min(lin.nodes): lin.graph["lineage_id"] for lin in obtained}
-        assert lin_ids == {1: 0, 3: 1, 0: -1}
-
-    def test_single_cell_fallback_id_skips_single_cell_ids(self):
-        """Test that the replacement of a used -cell_id skips other single-cell IDs."""
-        g = nx.DiGraph()
-        g.add_edge(5, 6)
-        g.nodes[5]["lineage_id"] = g.nodes[6]["lineage_id"] = 0
-        g.add_nodes_from([0, 1])
-        obtained = _split_graph_into_lineages(g, lineage_id_key="lineage_id")
-
-        lin_ids = {min(lin.nodes): lin.graph["lineage_id"] for lin in obtained}
-        assert lin_ids == {5: 0, 0: -2, 1: -1}
+        assert lin5.nodes[5]["lineage_id"] == 2
 
     def test_numpy_int_ids_count_as_used(self, two_lin_graph):
         """Test that IDs stored as NumPy integers count as used IDs."""
@@ -902,15 +964,19 @@ class TestSplitGraphIntoLineages:
         lin_ids = {min(lin.nodes): lin.graph["lineage_id"] for lin in obtained}
         assert lin_ids == {1: 0, 3: 1, 5: 2}
 
-    def test_lineage_without_id_skips_single_cell_id(self):
-        """Test that a multi-cell lineage without ID skips the ID of cell 0 alone."""
+    @pytest.mark.parametrize("lineage_id_key", [None, "lineage_id"])
+    def test_ids_after_reserved_ids(self, lineage_id_key):
+        """Test that lineages without an ID get the IDs after the reserved ones, e.g.
+        those of the tracks of a file that are not loaded."""
         g = nx.DiGraph()
         g.add_edge(1, 2)
-        g.add_node(0)
-        obtained = _split_graph_into_lineages(g, lineage_id_key="lineage_id")
+        g.add_node(3)
+        obtained = _split_graph_into_lineages(
+            g, lineage_id_key=lineage_id_key, reserved_ids=[0, 4]
+        )
 
         lin_ids = {min(lin.nodes): lin.graph["lineage_id"] for lin in obtained}
-        assert lin_ids == {1: 1, 0: 0}
+        assert lin_ids == {1: 5, 3: 6}
 
     def test_duplicate_lineage_ids_raise(self, two_lin_graph):
         """Test ValueError when disconnected parts of the graph share a lineage ID."""
@@ -943,7 +1009,8 @@ class TestSplitGraphIntoLineages:
         assert is_equal(obt_1[0], expected)
 
     def test_inconsistent_node_ids_some_missing_key(self):
-        """Test ValueError when some nodes lack the key and those that have it disagree."""
+        """Test ValueError when some nodes lack the key and those that have it
+        disagree."""
         g = nx.DiGraph()
         g.add_edges_from([(1, 2), (2, 3)])
         g.nodes[1]["lineage_id"] = 0
@@ -956,7 +1023,8 @@ class TestSplitGraphIntoLineages:
             _split_graph_into_lineages(g, lineage_id_key="lineage_id")
 
     def test_node_ids_disagree_with_graph_id(self):
-        """Test ValueError when graph has a lin ID but some nodes have a different one."""
+        """Test ValueError when graph has a lin ID but some nodes have a different
+        one."""
         g = nx.DiGraph()
         g.add_edges_from([(1, 2)])
         g.graph["lineage_id"] = 0
@@ -970,7 +1038,8 @@ class TestSplitGraphIntoLineages:
             _split_graph_into_lineages(g, lineage_id_key="lineage_id")
 
     def test_nodes_all_have_key_but_disagree_with_each_other(self):
-        """Test ValueError when all nodes and graph have the key but nodes have different values."""
+        """Test ValueError when all nodes and graph have the key but nodes have
+        different values."""
         g = nx.DiGraph()
         g.add_edges_from([(1, 2)])
         g.graph["lineage_id"] = 0
@@ -983,7 +1052,8 @@ class TestSplitGraphIntoLineages:
             _split_graph_into_lineages(g, lineage_id_key="lineage_id")
 
     def test_nodes_agree_but_differ_from_graph(self):
-        """Test ValueError when nodes are consistent with each other but differ from lin ID."""
+        """Test ValueError when nodes are consistent with each other but differ from lin
+        ID."""
         g = nx.DiGraph()
         g.add_edges_from([(1, 2)])
         g.graph["lineage_id"] = 0
@@ -994,38 +1064,6 @@ class TestSplitGraphIntoLineages:
             ValueError, match="inconsistent lineage ID values between nodes and lineage"
         ):
             _split_graph_into_lineages(g, lineage_id_key="lineage_id")
-
-
-class TestHasLinId:
-    """Test cases for _has_lin_id function."""
-
-    def test_lineage_has_id(self):
-        lin = CellLineage()
-        lin.add_node(1)
-        lin.graph["lineage_id"] = 3
-        assert _has_lin_id(lin, "lineage_id")
-
-    def test_one_node_has_id(self):
-        lin = CellLineage()
-        lin.add_edge(1, 2)
-        lin.nodes[2]["lineage_id"] = 3
-        assert _has_lin_id(lin, "lineage_id")
-
-    def test_no_id(self):
-        lin = CellLineage()
-        lin.add_edge(1, 2)
-        assert not _has_lin_id(lin, "lineage_id")
-
-    def test_none_ids(self):
-        lin = CellLineage()
-        lin.add_node(1, lineage_id=None)
-        lin.graph["lineage_id"] = None
-        assert not _has_lin_id(lin, "lineage_id")
-
-    def test_id_0(self):
-        lin = CellLineage()
-        lin.add_node(1, lineage_id=0)
-        assert _has_lin_id(lin, "lineage_id")
 
 
 class TestGetIntIds:
@@ -1055,7 +1093,8 @@ class TestUpdateNodePropKey:
             assert lin_with_old_key.nodes[node]["new_key"] == old_key_values[i]
 
     def test_missing_old_key_skip(self, lin_with_mixed_keys):
-        """Test that nodes without old_key are skipped when enforce_old_key_existence=False."""
+        """Test that nodes without old_key are skipped when
+        enforce_old_key_existence=False."""
         _update_node_prop_key(lin_with_mixed_keys, "old_key", "new_key")
 
         assert lin_with_mixed_keys.nodes[1]["new_key"] == "value1"
@@ -1066,7 +1105,8 @@ class TestUpdateNodePropKey:
         assert "old_key" not in lin_with_mixed_keys.nodes[3]
 
     def test_enforce_old_key_existence(self, lin_with_mixed_keys):
-        """Test that missing old_key raises error when enforce_old_key_existence=True."""
+        """Test that missing old_key raises error when
+        enforce_old_key_existence=True."""
         err_msg = "Node 2 does not have the required key 'old_key'"
         with pytest.raises(ValueError, match=err_msg):
             _update_node_prop_key(
@@ -1077,7 +1117,8 @@ class TestUpdateNodePropKey:
             )
 
     def test_set_default_if_missing(self, lin_with_mixed_keys):
-        """Test setting default value when old_key is missing and set_default_if_missing=True."""
+        """Test setting default value when old_key is missing and
+        set_default_if_missing=True."""
         _update_node_prop_key(
             lin_with_mixed_keys,
             "old_key",
@@ -1154,7 +1195,8 @@ class TestUpdateLineagesIDsKey:
         assert "TRACK_ID" not in lin2.graph
 
     def test_no_key_multi_node(self):
-        """Test updating lineage IDs key when no TRACK_ID key is present in a multi-node lineage."""
+        """Test updating lineage IDs key when no TRACK_ID key is present in a multi-node
+        lineage."""
         lin1 = CellLineage()
         lin1.add_nodes_from([1, 2, 3])
         lin2 = CellLineage()
@@ -1168,7 +1210,8 @@ class TestUpdateLineagesIDsKey:
         assert "TRACK_ID" not in lin2.graph
 
     def test_no_key_one_node(self):
-        """Test updating lineage IDs key when no TRACK_ID key is present in a one-node lineage."""
+        """Test updating lineage IDs key when no TRACK_ID key is present in a one-node
+        lineage."""
         lin1 = CellLineage()
         lin1.add_node(1)
         lin2 = CellLineage()
@@ -1176,7 +1219,7 @@ class TestUpdateLineagesIDsKey:
         lin2.graph["TRACK_ID"] = 20
 
         _update_lineages_ids_key([lin1, lin2], "TRACK_ID")
-        assert lin1.graph["lineage_id"] == -1
+        assert lin1.graph["lineage_id"] == 21
         assert lin2.graph["lineage_id"] == 20
 
     def test_all_lineages_no_key(self):
@@ -1191,7 +1234,7 @@ class TestUpdateLineagesIDsKey:
         _update_lineages_ids_key([lin1, lin2, lin3], "TRACK_ID")
         assert lin1.graph["lineage_id"] == 0
         assert lin2.graph["lineage_id"] == 1
-        assert lin3.graph["lineage_id"] == -6
+        assert lin3.graph["lineage_id"] == 2
         assert "TRACK_ID" not in lin1.graph
         assert "TRACK_ID" not in lin2.graph
         assert "TRACK_ID" not in lin3.graph
@@ -1213,10 +1256,10 @@ class TestUpdateLineagesIDsKey:
         lin4.add_node(5)
 
         _update_lineages_ids_key([lin1, lin2, lin3, lin4], "TRACK_ID")
-        assert lin1.graph["lineage_id"] == -1
-        assert lin2.graph["lineage_id"] == 11
+        assert lin1.graph["lineage_id"] == 11
+        assert lin2.graph["lineage_id"] == 12
         assert lin3.graph["lineage_id"] == 10
-        assert lin4.graph["lineage_id"] == -5
+        assert lin4.graph["lineage_id"] == 13
 
     def test_preserves_other_graph_attributes(self):
         """Test that other graph attributes are preserved."""

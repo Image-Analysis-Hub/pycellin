@@ -1,3 +1,5 @@
+"""The classes of Pycellin: model, data, lineages, properties and calculators."""
+
 from .data import Data
 from .lineage import CellLineage, CycleLineage
 from .model import Model
@@ -11,19 +13,20 @@ from .property_calculator import (
     NodeGlobalPropCalculator,
     NodeLocalPropCalculator,
 )
+from .props_metadata import PropsMetadata
 
 __all__ = [
-    "Data",
     "CellLineage",
     "CycleLineage",
+    "Data",
+    "EdgeGlobalPropCalculator",
+    "EdgeLocalPropCalculator",
+    "LineageGlobalPropCalculator",
+    "LineageLocalPropCalculator",
+    "Model",
+    "ModelMetadata",
+    "NodeGlobalPropCalculator",
+    "NodeLocalPropCalculator",
     "Property",
     "PropsMetadata",
-    "Model",
-    "NodeLocalPropCalculator",
-    "EdgeLocalPropCalculator",
-    "LineageLocalPropCalculator",
-    "NodeGlobalPropCalculator",
-    "EdgeGlobalPropCalculator",
-    "LineageGlobalPropCalculator",
 ]
-from .props_metadata import PropsMetadata

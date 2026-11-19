@@ -4,6 +4,7 @@
 
 import logging
 
+import networkx as nx
 import numpy as np
 import pytest
 
@@ -11,11 +12,13 @@ from pycellin.classes import CellLineage, CycleLineage, Property
 from pycellin.properties.topology import (
     CousinCycles,
     DaughterCycles,
+    IsCompleteCycle,
     LocationTag,
     MotherCycle,
     SisterCycles,
     create_cousin_cycles_property,
     create_daughter_cycles_property,
+    create_is_complete_cycle_property,
     create_mother_cycle_property,
     create_sister_cycles_property,
 )
@@ -29,9 +32,9 @@ def prop():
         identifier="location_tag",
         name="Location tag",
         description="test property",
-        provenance="pycellin",
+        provenance="Pycellin",
         prop_type="node",
-        lin_type="CellLineage",
+        lineage_type="cell",
         dtype="int",
     )
 
@@ -53,10 +56,78 @@ def make_lineage(x: float, y: float, t: int) -> CellLineage:
 def cycle_lin():
     # Three rounds of divisions numbered like a binary heap: cell cycle n divides
     # into cell cycles 2n and 2n + 1, from 1 -> (2, 3) to 7 -> (14, 15).
-    lineage = CycleLineage(time_prop="timepoint", time_step=1)
+    lineage = CycleLineage(time_prop="timepoint")
     for mother in range(1, 8):
         lineage.add_edges_from([(mother, 2 * mother), (mother, 2 * mother + 1)])
     return lineage
+
+
+@pytest.fixture
+def branching_cell_lin():
+    lineage = CellLineage()
+    lineage.add_edges_from(
+        [
+            (1, 2),
+            (2, 3),
+            (3, 4),
+            (4, 5),
+            (5, 6),
+            (4, 7),
+            (7, 8),
+            (8, 9),
+            (8, 10),
+            (2, 11),
+            (11, 12),
+            (12, 13),
+            (13, 14),
+            (14, 15),
+            (14, 16),
+        ]
+    )
+    for n in lineage.nodes:
+        lineage.nodes[n]["frame"] = nx.shortest_path_length(lineage, 1, n)
+        lineage.nodes[n]["cell_id"] = n
+    lineage.graph["lineage_id"] = 1
+    return lineage
+
+
+# IsCompleteCycle #############################################################
+
+
+class TestIsCompleteCycle:
+    def test_compute_cell_lineage(self, branching_cell_lin):
+        cell_lin = branching_cell_lin
+        calculator = IsCompleteCycle(create_is_complete_cycle_property())
+        # Complete cell cycles.
+        assert calculator.compute(cell_lin, node_id=4) is True  # division
+        assert calculator.compute(cell_lin, node_id=14) is True  # division
+        assert calculator.compute(cell_lin, node_id=7) is True  # intermediate
+        assert calculator.compute(cell_lin, node_id=13) is True  # intermediate
+        # Incomplete cell cycles.
+        assert calculator.compute(cell_lin, node_id=1) is False  # root
+        assert calculator.compute(cell_lin, node_id=6) is False  # leaf
+        assert calculator.compute(cell_lin, node_id=10) is False  # leaf
+        assert calculator.compute(cell_lin, node_id=2) is False  # division
+        assert calculator.compute(cell_lin, node_id=5) is False  # intermediate
+        # Non-existent node.
+        with pytest.raises(KeyError, match="Cell 99 not in the lineage."):
+            calculator.compute(cell_lin, node_id=99)
+
+    def test_compute_cycle_lineage(self, branching_cell_lin):
+        cycle_lin = CycleLineage(time_prop="frame", cell_lineage=branching_cell_lin)
+        calculator = IsCompleteCycle(create_is_complete_cycle_property())
+        # Complete cell cycles.
+        assert calculator.compute(cycle_lin, node_id=4) is True  # division
+        assert calculator.compute(cycle_lin, node_id=8) is True  # division
+        assert calculator.compute(cycle_lin, node_id=14) is True  # division
+        # Incomplete cell cycles.
+        assert calculator.compute(cycle_lin, node_id=2) is False  # division
+        assert calculator.compute(cycle_lin, node_id=6) is False  # leaf
+        assert calculator.compute(cycle_lin, node_id=10) is False  # leaf
+        assert calculator.compute(cycle_lin, node_id=15) is False  # leaf
+        # Non-existent node.
+        with pytest.raises(KeyError, match="Cycle 99 not in the lineage."):
+            calculator.compute(cycle_lin, node_id=99)
 
 
 # LocationTag #################################################################
@@ -64,80 +135,84 @@ def cycle_lin():
 
 class TestLocationTag:
     def test_compute_on_pixel_center(self, prop, mask):
-        calculator = LocationTag(prop, mask_img=mask, pixel_size=1.0)
+        calculator = LocationTag(prop, mask_image=mask, pixel_size=1.0)
         assert calculator.compute(make_lineage(2.0, 1.0, 1), 1) == 112
 
     def test_compute_rounds_to_nearest_pixel(self, prop, mask):
-        calculator = LocationTag(prop, mask_img=mask, pixel_size=1.0)
+        calculator = LocationTag(prop, mask_image=mask, pixel_size=1.0)
         assert calculator.compute(make_lineage(1.6, 0.7, 0), 1) == 12
         assert calculator.compute(make_lineage(1.4, 0.3, 0), 1) == 1
 
     def test_compute_with_pixel_size(self, prop, mask):
-        calculator = LocationTag(prop, mask_img=mask, pixel_size=0.5)
+        calculator = LocationTag(prop, mask_image=mask, pixel_size=0.5)
         assert calculator.compute(make_lineage(1.5, 1.0, 0), 1) == 23
 
     def test_compute_near_zero_is_inside(self, prop, mask):
-        calculator = LocationTag(prop, mask_img=mask, pixel_size=1.0)
+        calculator = LocationTag(prop, mask_image=mask, pixel_size=1.0)
         assert calculator.compute(make_lineage(-0.4, -0.4, 0), 1) == 0
 
     def test_compute_negative_coordinate_raises(self, prop, mask):
-        calculator = LocationTag(prop, mask_img=mask, pixel_size=1.0)
+        calculator = LocationTag(prop, mask_image=mask, pixel_size=1.0)
         with pytest.raises(ValueError, match="x index -1"):
             calculator.compute(make_lineage(-1.0, 0.0, 0), 1)
 
     def test_compute_coordinate_past_edge_raises(self, prop, mask):
-        calculator = LocationTag(prop, mask_img=mask, pixel_size=1.0)
+        calculator = LocationTag(prop, mask_image=mask, pixel_size=1.0)
         with pytest.raises(ValueError, match="y index 3"):
             calculator.compute(make_lineage(0.0, 2.6, 0), 1)
 
     def test_compute_timepoint_out_of_range_raises(self, prop, mask):
-        calculator = LocationTag(prop, mask_img=mask, pixel_size=1.0)
+        calculator = LocationTag(prop, mask_image=mask, pixel_size=1.0)
         with pytest.raises(ValueError, match="t index 2"):
             calculator.compute(make_lineage(0.0, 0.0, 2), 1)
 
     def test_compute_with_tag_names(self, prop, mask):
         calculator = LocationTag(
-            prop, mask_img=mask, pixel_size=1.0, tag_names={1: "a", 112: "b"}
+            prop, mask_image=mask, pixel_size=1.0, tag_names={1: "a", 112: "b"}
         )
         assert calculator.compute(make_lineage(1.0, 0.0, 0), 1) == "a"
         assert calculator.compute(make_lineage(2.0, 1.0, 1), 1) == "b"
 
     def test_compute_value_missing_from_tag_names_is_none(self, prop, mask):
-        calculator = LocationTag(prop, mask_img=mask, pixel_size=1.0, tag_names={1: "a"})
+        calculator = LocationTag(
+            prop, mask_image=mask, pixel_size=1.0, tag_names={1: "a"}
+        )
         assert calculator.compute(make_lineage(0.0, 0.0, 0), 1) is None
 
     def test_compute_with_tag_names_out_of_bounds_raises(self, prop, mask):
-        calculator = LocationTag(prop, mask_img=mask, pixel_size=1.0, tag_names={1: "a"})
+        calculator = LocationTag(
+            prop, mask_image=mask, pixel_size=1.0, tag_names={1: "a"}
+        )
         with pytest.raises(ValueError, match="x index 4"):
             calculator.compute(make_lineage(4.0, 0.0, 0), 1)
 
     def test_numpy_int_keys_accepted(self, prop, mask):
         calculator = LocationTag(
-            prop, mask_img=mask, pixel_size=1.0, tag_names={np.uint32(1): "a"}
+            prop, mask_image=mask, pixel_size=1.0, tag_names={np.uint32(1): "a"}
         )
         assert calculator.compute(make_lineage(1.0, 0.0, 0), 1) == "a"
 
     def test_empty_tag_names_raises(self, prop, mask):
         with pytest.raises(ValueError, match="must not be empty"):
-            LocationTag(prop, mask_img=mask, pixel_size=1.0, tag_names={})
+            LocationTag(prop, mask_image=mask, pixel_size=1.0, tag_names={})
 
     def test_non_int_key_raises(self, prop, mask):
         with pytest.raises(TypeError, match="keys must be int"):
-            LocationTag(prop, mask_img=mask, pixel_size=1.0, tag_names={1.0: "a"})
+            LocationTag(prop, mask_image=mask, pixel_size=1.0, tag_names={1.0: "a"})
 
     def test_bool_key_raises(self, prop, mask):
         with pytest.raises(TypeError, match="keys must be int"):
-            LocationTag(prop, mask_img=mask, pixel_size=1.0, tag_names={True: "a"})
+            LocationTag(prop, mask_image=mask, pixel_size=1.0, tag_names={True: "a"})
 
     def test_non_str_value_raises(self, prop, mask):
         with pytest.raises(TypeError, match="values must be str"):
-            LocationTag(prop, mask_img=mask, pixel_size=1.0, tag_names={1: 1})
+            LocationTag(prop, mask_image=mask, pixel_size=1.0, tag_names={1: 1})
 
     def test_tag_name_value_missing_from_mask_warns(self, prop, mask):
         with pytest.warns(UserWarning, match=r"\[7, 999\] are not in the mask"):
             LocationTag(
                 prop,
-                mask_img=mask,
+                mask_image=mask,
                 pixel_size=1.0,
                 tag_names={1: "a", 7: "b", 999: "c"},
             )
@@ -145,14 +220,14 @@ class TestLocationTag:
     def test_unmapped_mask_values_logged_as_info(self, prop, caplog):
         mask = np.array([[[0, 1], [2, 2]]], dtype=np.uint32)
         with caplog.at_level(logging.INFO, logger="pycellin.properties.topology"):
-            LocationTag(prop, mask_img=mask, pixel_size=1.0, tag_names={1: "a"})
+            LocationTag(prop, mask_image=mask, pixel_size=1.0, tag_names={1: "a"})
         assert "Mask values [0, 2] have no tag name" in caplog.text
 
     def test_full_coverage_neither_warns_nor_logs(self, prop, recwarn, caplog):
         mask = np.array([[[0, 1], [2, 2]]], dtype=np.uint32)
         with caplog.at_level(logging.INFO, logger="pycellin.properties.topology"):
             LocationTag(
-                prop, mask_img=mask, pixel_size=1.0, tag_names={0: "", 1: "a", 2: "b"}
+                prop, mask_image=mask, pixel_size=1.0, tag_names={0: "", 1: "a", 2: "b"}
             )
         assert len(recwarn) == 0
         assert caplog.text == ""

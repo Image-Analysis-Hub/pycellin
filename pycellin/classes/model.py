@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+"""The `Model` class: the lineages of a dataset, their properties and metadata."""
+
 import inspect
-import pickle
+import logging
 import warnings
-from copy import deepcopy
+from copy import copy, deepcopy
 from decimal import Decimal
 from itertools import pairwise
 from math import gcd
@@ -19,103 +21,127 @@ import pycellin.properties.morphology as morpho
 import pycellin.properties.topology as topo
 import pycellin.properties.utils as futils
 from pycellin.classes.data import Data
-from pycellin.classes.exceptions import (
-    FusionError,
-    MissingPropertyError,
-    ProtectedPropertyError,
-)
 from pycellin.classes.lineage import CellLineage, CycleLineage, Lineage
 from pycellin.classes.model_metadata import ModelMetadata
 from pycellin.classes.property import Property
 from pycellin.classes.property_calculator import PropertyCalculator
 from pycellin.classes.props_metadata import PropsMetadata
-from pycellin.classes.updater import ModelUpdater
-from pycellin.custom_types import Cell, Link, PropertyType, property_type_from_string
-from pycellin.properties import intensity, motion, tracking
+from pycellin.classes.updater import _ModelUpdater
+from pycellin.custom_types import Cell, Link, PropertyType, _property_type_from_string
+from pycellin.exceptions import (
+    FusionError,
+    MissingPropertyError,
+    ProtectedPropertyError,
+    PycellinWarning,
+)
+from pycellin.properties import intensity, motion, timing
 from pycellin.properties.core import (
     Timepoint,
     create_timepoint_property,
 )
 from pycellin.styling import PYCELLIN_PURPLE
-from pycellin.utils import _color_to_rgba, _infer_dtype
+from pycellin.utils import (
+    _check_integer,
+    _color_to_rgba,
+    _find_stack_level,
+    _infer_dtype,
+    _unit_uses,
+)
 
-L = TypeVar("L", bound="Lineage")
+logger = logging.getLogger(__name__)
 
-# Provenance of models built by Model.merge() and of the lineage properties it creates.
-_MERGE_PROVENANCE = "pycellin merge"
+_L = TypeVar("_L", bound="Lineage")
+
+#: Provenance of models built by Model.merge() and of the lineage properties it creates.
+_MERGE_PROVENANCE = "Pycellin merge"
 
 
 class Model:
-    """ """
+    """
+    Cell lineages of a tracking dataset, with their properties and metadata.
+
+    A model holds the cell lineages, their cycle lineages once added with
+    `add_cycle_lineages`, the declarations of their properties, and metadata such as
+    the time step and the units. Its methods edit the lineages, add and compute
+    properties, and export the data as DataFrames. A model is usually created by a
+    reader, such as `read_trackmate_xml`.
+
+    Parameters
+    ----------
+    model_metadata : ModelMetadata | dict[str, Any] | None, default=None
+        Metadata of the model. The model keeps a shallow copy.
+    props_metadata : PropsMetadata | None, default=None
+        The declaration of the properties present in the model. The model keeps a
+        deep copy.
+    data : Data | None, default=None
+        The lineages data of the model. The model keeps a deep copy.
+    reference_time_prop : str | None, default=None
+        The name of the property to use as the reference for time measurements.
+        Needs to be provided if `model_metadata` is None or does not contain it.
+    variable_time_step : bool, default=False
+        If True and ``time_step`` is not provided in `model_metadata`, the time step
+        will be computed using the greatest common divisor (GCD) of time
+        differences, which is suitable for irregularly sampled timepoints.
+        If False, the minimum time difference is used instead.
+        This parameter is only used when the time step needs to be automatically
+        computed from the data.
+
+    Attributes
+    ----------
+    data : Data
+        The cell lineages of the model, and their cycle lineages once added.
+    model_metadata : ModelMetadata
+        The metadata of the model.
+    props_metadata : PropsMetadata
+        The declarations of the properties of the model.
+
+    Raises
+    ------
+    ValueError
+        If `reference_time_prop` is not provided and cannot be inferred from
+        `model_metadata`.
+    TypeError
+        If `model_metadata` is not None, a `ModelMetadata` or a dict.
+
+    Warns
+    -----
+    PycellinWarning
+        If ``time_step`` is not provided in `model_metadata` and cannot be inferred
+        from the data.
+
+    Notes
+    -----
+    The core properties ``cell_id``, ``lineage_id`` and ``timepoint``, and the
+    reference time property, are protected whenever they are declared.
+    """
 
     def __init__(
         self,
         model_metadata: ModelMetadata | dict[str, Any] | None = None,
         props_metadata: PropsMetadata | None = None,
         data: Data | None = None,
-        reference_time_property: str | None = None,
+        reference_time_prop: str | None = None,
         variable_time_step: bool = False,
     ) -> None:
-        """
-        Constructs all the necessary attributes for the Model object.
-
-        Parameters
-        ----------
-        model_metadata : ModelMetadata | dict[str, Any] | None, optional
-            Metadata of the model (default is None).
-        props_metadata : PropsMetadata, optional
-            The declaration of the properties present in the model (default is None).
-        data : Data, optional
-            The lineages data of the model (default is None).
-        reference_time_property : str, optional
-            The name of the property to use as the reference for time measurements.
-            Needs to be provided if model_metadata is None or does not contain it.
-        variable_time_step : bool, optional
-            If True and time_step is not provided in model_metadata, the time step
-            will be computed using the greatest common divisor (GCD) of time
-            differences, which is suitable for irregularly sampled timepoints.
-            If False, the minimum time difference is used instead (default is False).
-            This parameter is only used when time_step needs to be automatically
-            computed from the data.
-
-        Raises
-        ------
-        ValueError
-            If `reference_time_property` is not provided and cannot be inferred from
-            `model_metadata`.
-        TypeError
-            If `model_metadata` is not None, ModelMetadata, or dict.
-
-        Warns
-        -----
-        UserWarning
-            If `time_step` is not provided in `model_metadata` and cannot be inferred
-            from the data.
-
-        Notes
-        -----
-        The core properties "cell_id", "lineage_id", "timepoint" and the reference
-        time property are protected whenever they are declared.
-        """
-        # Check that we have a reference_time_property.
-        if reference_time_property is None:
+        # Check that we have a reference_time_prop.
+        if reference_time_prop is None:
             if model_metadata is None:
-                raise ValueError("'reference_time_property' must be provided.")
+                raise ValueError("'reference_time_prop' must be provided.")
 
             # Extract from metadata regardless of type.
             if isinstance(model_metadata, dict):
-                reference_time_property = model_metadata.get("reference_time_property")
+                reference_time_prop = model_metadata.get("reference_time_prop")
             else:
-                reference_time_property = getattr(
-                    model_metadata, "reference_time_property", None
+                reference_time_prop = getattr(
+                    model_metadata, "reference_time_prop", None
                 )
 
-            if not reference_time_property:
+            if not reference_time_prop:
                 raise ValueError(
-                    "'reference_time_property' must be provided in model_metadata "
+                    "'reference_time_prop' must be provided in model_metadata "
                     "or as an explicit argument."
                 )
-        self._reference_time_property = reference_time_property
+        self._reference_time_prop = reference_time_prop
 
         # Initialize data early since _compute_time_step() needs it.
         self.data = data.copy() if data is not None else Data({})
@@ -131,11 +157,9 @@ class Model:
 
         # Determine time_step if not provided in metadata.
         if time_step is None:
-            if self.data.cell_data:
+            if self.data.cell_lineages:
                 # Create temporary metadata for _compute_time_step().
-                temp_metadata = ModelMetadata(
-                    reference_time_property=reference_time_property
-                )
+                temp_metadata = ModelMetadata(reference_time_prop=reference_time_prop)
                 self.model_metadata = temp_metadata
                 time_step = self._compute_time_step(variable_time_step)
             else:
@@ -146,22 +170,22 @@ class Model:
                     "automatically with model.set_time_step() once you have added data "
                     "to the model."
                 )
-                warnings.warn(msg, UserWarning, stacklevel=2)
+                warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
 
         # Create final model metadata with all required values.
         # TODO: add unit extracted from props_metadata, if any
         if model_metadata is None:
             self.model_metadata = ModelMetadata(
-                reference_time_property=reference_time_property, time_step=time_step
+                reference_time_prop=reference_time_prop, time_step=time_step
             )
         elif isinstance(model_metadata, ModelMetadata):
             metadata_dict = model_metadata.to_dict()  # to avoid mutating the original
-            metadata_dict["reference_time_property"] = reference_time_property
+            metadata_dict["reference_time_prop"] = reference_time_prop
             metadata_dict["time_step"] = time_step
             self.model_metadata = ModelMetadata.from_dict(metadata_dict)
         elif isinstance(model_metadata, dict):
             metadata_dict = model_metadata.copy()  # to avoid mutating the original
-            metadata_dict["reference_time_property"] = reference_time_property
+            metadata_dict["reference_time_prop"] = reference_time_prop
             metadata_dict["time_step"] = time_step
             self.model_metadata = ModelMetadata.from_dict(metadata_dict)
         else:
@@ -174,29 +198,29 @@ class Model:
         self.props_metadata = (
             props_metadata.copy() if props_metadata is not None else PropsMetadata()
         )
-        self._updater = ModelUpdater()
+        self._updater = _ModelUpdater()
         self.variable_time_step = variable_time_step
 
         # Update to actually compute the "timepoint" property.
-        if self.data.cell_data and "timepoint" not in self.get_node_properties():
+        if self.data.cell_lineages and "timepoint" not in self.get_node_properties():
             self.add_custom_property(
                 Timepoint(
                     property=create_timepoint_property(),
                     data=self.data,
                     time_step=self.get_time_step(),
-                    reference_time_property=self.reference_time_property,
+                    reference_time_prop=self.reference_time_prop,
                 )
             )
             self.update(["timepoint"])
 
-        # Core properties are protected whenever they are declared.
-        core_props = (
+        # Protect the properties Pycellin relies on, whenever they are declared.
+        props_to_protect = (
             "cell_id",
             "lineage_id",
             "timepoint",
-            self.reference_time_property,
+            self.reference_time_prop,
         )
-        for prop_id in core_props:
+        for prop_id in props_to_protect:
             if self.props_metadata._has_prop(prop_id):
                 self.props_metadata._protect_prop(prop_id)
 
@@ -206,6 +230,14 @@ class Model:
         # Same for provenance, description, etc.
 
     def __repr__(self) -> str:
+        """
+        Return the representation of the model, with its metadata and data.
+
+        Returns
+        -------
+        str
+            The representation of the model.
+        """
         return (
             f"Model(model_metadata={self.model_metadata!r}, "
             f"props_metadata={self.props_metadata!r}, "
@@ -213,6 +245,15 @@ class Model:
         )
 
     def __str__(self) -> str:
+        """
+        Return a short description of the model.
+
+        Returns
+        -------
+        str
+            The name of the model, its number of lineages and its provenance, when
+            known.
+        """
         if self.model_metadata and self.data:
             nb_lin = self.data.number_of_lineages()
             if (
@@ -270,10 +311,10 @@ class Model:
 
     def __getstate__(self) -> dict[str, Any]:
         """
-        Custom pickle state preparation.
+        Prepare the state of the model for pickling.
 
-        Converts ModelMetadata to dictionary format for serialization.
-        This ensures that ModelMetadata with dynamic fields is properly serialized.
+        Converts `ModelMetadata` to dictionary format for serialization.
+        This ensures that `ModelMetadata` with dynamic fields is properly serialized.
 
         Returns
         -------
@@ -287,10 +328,10 @@ class Model:
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         """
-        Custom pickle state restoration.
+        Restore the state of the model after unpickling.
 
-        Converts dictionary back to ModelMetadata instance during deserialization.
-        This ensures that ModelMetadata with dynamic fields is properly restored.
+        Converts dictionary back to `ModelMetadata` instance during deserialization.
+        This ensures that `ModelMetadata` with dynamic fields is properly restored.
 
         Parameters
         ----------
@@ -302,7 +343,7 @@ class Model:
         self.__dict__.update(state)
 
     @property
-    def reference_time_property(self) -> str:
+    def reference_time_prop(self) -> str:
         """
         Get the reference time property of the model.
 
@@ -311,14 +352,19 @@ class Model:
         str
             The identifier of the reference time property.
         """
-        return self._reference_time_property
+        return self._reference_time_prop
 
-    @reference_time_property.setter
-    def reference_time_property(self, value: str) -> None:
+    @reference_time_prop.setter
+    def reference_time_prop(self, value: str) -> None:
         """
-        Prevent direct assignment to reference_time_property.
+        Prevent direct assignment to `reference_time_prop`.
 
-        Users must use the set_reference_time_property() method instead.
+        Users must use the `set_reference_time_prop()` method instead.
+
+        Parameters
+        ----------
+        value : str
+            The value assigned, which is refused.
 
         Raises
         ------
@@ -326,25 +372,31 @@ class Model:
             Always raised to prevent direct assignment.
         """
         raise AttributeError(
-            "Cannot assign directly to 'reference_time_property'. "
-            "Use the 'set_reference_time_property()' method instead."
+            "Cannot assign directly to 'reference_time_prop'. "
+            "Use the 'set_reference_time_prop()' method instead."
         )
 
-    def set_reference_time_property(self, prop_id: str) -> None:
+    def set_reference_time_prop(self, prop: str) -> None:
         """
         Set the reference time property of the model.
 
         On top of updating the reference time property, this method:
+
         - protects the new reference time property
-        - unprotects the previous reference time property if it is not "timepoint"
-        (which is a special property that should always be protected)
+        - unprotects the previous reference time property if it is not ``timepoint``
+          (which is a special property that should always be protected)
         - updates the time step and time unit of the model based on the new
-        reference time property
-        - updates the timepoint calculator property to use the new reference time property
+          reference time property
+        - sets the unit of the ``cycle_duration``, ``cycle_start_time`` and
+          ``cycle_end_time`` properties, if declared, to the unit of the new reference
+          time property, since their values are computed from it at the next
+          `update()`
+        - updates the timepoint calculator property to use the new reference time
+          property
 
         Parameters
         ----------
-        prop_id : str
+        prop : str
             The identifier of the property to set as the reference time property.
 
         Raises
@@ -353,27 +405,29 @@ class Model:
             If the specified property is not found in the model's node properties.
         """
         node_props = self.get_node_properties()
-        if prop_id not in node_props:
+        if prop not in node_props:
             raise ValueError(
-                f"Cannot set reference time property: '{prop_id}' not found in model's node properties."
+                f"Cannot set reference time property: '{prop}' not found in "
+                "model's node properties."
             )
 
-        old_ref_time_prop = self._reference_time_property
-        self._reference_time_property = prop_id
-        self.model_metadata.reference_time_property = prop_id
+        old_reference_time_prop = self._reference_time_prop
+        self._reference_time_prop = prop
+        self.model_metadata.reference_time_prop = prop
 
-        self.props_metadata._protect_prop(prop_id)
-        if old_ref_time_prop != "timepoint":
-            self.props_metadata._unprotect_prop(old_ref_time_prop)
+        self.props_metadata._protect_prop(prop)
+        if old_reference_time_prop != "timepoint":
+            self.props_metadata._unprotect_prop(old_reference_time_prop)
 
         self.set_time_step()
-        self.model_metadata.time_unit = node_props[prop_id].unit
+        self.model_metadata.time_unit = node_props[prop].unit
+        self._set_cycle_time_units(node_props[prop].unit)
 
         calc = Timepoint(
             property=create_timepoint_property(),
             data=self.data,
             time_step=self.model_metadata.time_step,
-            reference_time_property=self.model_metadata.reference_time_property,
+            reference_time_prop=self.model_metadata.reference_time_prop,
         )
         self._updater.register_calculator(calc)
 
@@ -383,16 +437,16 @@ class Model:
 
         By default, the time step is calculated as the minimum difference between
         consecutive timepoints across all lineages.
-        If the timepoints are irregularly sampled, i.e. not evenly spaced regardless of gaps,
-        `variable_time_step` should be set to True. In this case, the greatest common divisor (GCD)
-        of the differences is used instead. However, this method is more computationally intensive
-        and should be used only when necessary.
+        If the timepoints are irregularly sampled, i.e. not evenly spaced regardless of
+        gaps, `variable_time_step` should be set to True. In this case, the greatest
+        common divisor (GCD) of the differences is used instead. However, this method is
+        more computationally intensive and should be used only when necessary.
 
         Parameters
         ----------
-        variable_time_step : bool, optional
+        variable_time_step : bool, default=False
             If True, the time step is computed using the GCD of time differences.
-            If False, the minimum time difference is used (default is False).
+            If False, the minimum time difference is used.
 
         Returns
         -------
@@ -403,8 +457,9 @@ class Model:
         ------
         ValueError
             If no lineages are found in the model data.
-            If no valid time intervals are found (e.g., all nodes have the same timepoint).
-            If reference_time_property is not found in lineage nodes.
+            If no valid time intervals are found (e.g., all nodes have the same
+            timepoint).
+            If `reference_time_prop` is not found in lineage nodes.
 
         Examples
         --------
@@ -413,12 +468,14 @@ class Model:
         >>> model._compute_time_step(variable_time_step=False)
         1
 
-        Regular time sampling with consistent base interval but gaps (variable_time_step=False):
+        Regular time sampling with consistent base interval but gaps
+        (variable_time_step=False):
         >>> # Time differences: [1, 2, 1, 3] → time_step = 1 (minimum)
         >>> model._compute_time_step(variable_time_step=False)
         1
 
-        Regular time sampling with consistent float interval but gaps (variable_time_step=False):
+        Regular time sampling with consistent float interval but gaps
+        (variable_time_step=False):
         >>> # Time differences: [1.5, 3.0, 1.5] → time_step = 1.5 (minimum)
         >>> model._compute_time_step(variable_time_step=False)
         1.5
@@ -445,34 +502,38 @@ class Model:
         - Regular timepoints like [0, 1, 2, 3, 4] (classic case)
         - Timepoints like [0, 1, 3, 4, 5, 7] (some gaps but consistent unit steps)
         - Timepoints like [0, 1.5, 3.0, 4.5] (non-integer but regular intervals)
-        - Timepoints like [0, 1, 1.5, 2.5, 4] (non-integer and gaps but regular intervals)
+        - Timepoints like [0, 1, 1.5, 2.5, 4] (non-integer and gaps but regular
+          intervals)
 
         When to use variable_time_step=True:
-        - Timepoints like [0, 1, 2.5, 3.5] (non-integer and gaps but no regular intervals)
+        - Timepoints like [0, 1, 2.5, 3.5] (non-integer and gaps but no regular
+          intervals)
           => cannot reach all timepoints by adding a fixed step of 1 from the minimum,
              we need a smaller step to reach all timepoints (0.5 in this case)
         - Timepoints like [0, 1.1, 2.5, 2.8] (non-integer and irregular intervals)
         - Timepoints like [0, 1.1, 3.42, 4.0, 7.61] (completely random intervals)
         """
         # TODO: Should time_step be recomputed when doing an update?
-        lineages = self.data.cell_data.values()
+        lineages = self.data.cell_lineages.values()
         if not lineages:
             raise ValueError("Cannot compute time step: no lineages found.")
 
         time_diffs = set()
-        time_prop = self.model_metadata.reference_time_property
+        time_prop = self.model_metadata.reference_time_prop
         for lin in lineages:
             for source_node, target_node in lin.edges():
                 if time_prop not in lin.nodes[source_node]:
                     raise ValueError(
-                        f"Reference time property '{time_prop}' not found in node {source_node} "
-                        f"of lineage {lin.graph.get('lineage_id', 'of unknown ID')}."
+                        f"Reference time property '{time_prop}' not found in node "
+                        f"{source_node} of lineage "
+                        f"{lin.graph.get('lineage_id', 'of unknown ID')}."
                     )
                 source_time = lin.nodes[source_node][time_prop]
                 if time_prop not in lin.nodes[target_node]:
                     raise ValueError(
-                        f"Reference time property '{time_prop}' not found in node {target_node} "
-                        f"of lineage {lin.graph.get('lineage_id', 'of unknown ID')}."
+                        f"Reference time property '{time_prop}' not found in node "
+                        f"{target_node} of lineage "
+                        f"{lin.graph.get('lineage_id', 'of unknown ID')}."
                     )
                 target_time = lin.nodes[target_node][time_prop]
                 time_diff = abs(target_time - source_time)
@@ -487,7 +548,8 @@ class Model:
             # TODO: extract EPSILON as a constant
             EPSILON = 1e-12
             if all(abs(td - round(td)) < EPSILON for td in time_diffs):
-                # Treat numbers like 2.0000001 as integers for more efficient GCD calculation
+                # Treat numbers like 2.0000001 as integers for more efficient
+                # GCD calculation
                 time_step = gcd(*map(int, map(round, time_diffs)))
             else:
                 time_step = self._gcd_floats(time_diffs)
@@ -506,16 +568,21 @@ class Model:
 
         Parameters
         ----------
-        time_step : int | float | None
+        time_step : int | float | None, default=None
             The time step to set for the model. If None, the time step will be
-            computed automatically based on the data in the model (default is None).
-        variable_time_step : bool, optional
-            If True and time_step is None, the time step will be computed using
+            computed automatically based on the data in the model.
+        variable_time_step : bool, default=False
+            If True and `time_step` is None, the time step will be computed using
             the GCD of time differences. If False, the minimum time difference
-            will be used (default is False).
+            will be used.
 
-        # TODO: should I copy the docstring examples from _compute_time_step() here?
+        Raises
+        ------
+        ValueError
+            If `time_step` is None and the time step cannot be computed from the
+            data, e.g. when the model has no lineage.
         """
+        # TODO: should I copy the docstring examples from _compute_time_step() here?
         if time_step is None:
             time_step = self._compute_time_step(variable_time_step)
         self.model_metadata.time_step = time_step
@@ -524,7 +591,7 @@ class Model:
         # that the next update() rebuilds it from the current data and recomputes all
         # values.
         self._updater._calculators.pop("timepoint", None)
-        if self.data.cell_data:
+        if self.data.cell_lineages:
             self.prepare_full_data_update()
 
     def rescale_time(
@@ -538,7 +605,7 @@ class Model:
         Use this method to convert the time of the model into another unit, e.g. from
         frames to minutes when the data was loaded without time calibration. The
         reference time values are rescaled immediately. The cycle lineages, the
-        "timepoint" property and the other properties with a calculator are
+        ``timepoint`` property and the other properties with a calculator are
         recomputed at the next `update()`.
 
         Parameters
@@ -547,23 +614,26 @@ class Model:
             Strictly positive factor to multiply the reference time values and the
             time step by, e.g. 5 to convert frames acquired every 5 minutes into
             minutes.
-        time_unit : str | None, optional
-            New time unit, e.g. "min". It is set as the time unit of the model, as
+        time_unit : str | None, default=None
+            New time unit, e.g. ``"min"``. It is set as the time unit of the model, as
             the unit of the reference time property and, if declared, as the unit of
-            the "cycle_duration", "cycle_start_time" and "cycle_end_time" properties.
-            If None (default), units are unchanged.
+            the ``cycle_duration``, ``cycle_start_time`` and ``cycle_end_time``
+            properties. If None, units are unchanged.
 
         Raises
         ------
         ValueError
             If `factor` is not strictly positive.
-            If the reference time property is "timepoint".
+            If the reference time property is ``timepoint``.
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If the reference time property has a calculator, since it will overwrite
             the rescaled values at the next update.
+            If `time_unit` is given and properties with a calculator have a unit that
+            uses the previous time unit, e.g. ``"1/frame"``, since their unit is left
+            as it is.
 
         Notes
         -----
@@ -573,11 +643,13 @@ class Model:
         values of other properties without a calculator (e.g. loaded from a file),
         as well as the units of other property declarations, are left as they are.
         As such, the rescaling should be done shortly after loading the data and
-        before adding any other properties or calculators.
+        before adding any other properties or calculators. The properties added
+        before, whose unit uses the previous time unit, are named in a warning: add
+        them again to update their unit.
 
         Examples
         --------
-        >>> model.reference_time_property, model.get_time_step()
+        >>> model.reference_time_prop, model.get_time_step()
         ('time', 1)
         >>> model.rescale_time(5, time_unit="min")  # frames acquired every 5 min
         >>> model.update()
@@ -586,31 +658,29 @@ class Model:
         """
         if not factor > 0:
             raise ValueError(f"'factor' must be strictly positive, got {factor}.")
-        time_prop = self.reference_time_property
+        time_prop = self.reference_time_prop
         if time_prop == "timepoint":
             raise ValueError(
                 "Cannot rescale the 'timepoint' reference time property. Set another "
-                "reference time property first with set_reference_time_property()."
+                "reference time property first with set_reference_time_prop()."
             )
         if time_prop in self._updater._calculators:
             warnings.warn(
                 f"The reference time property '{time_prop}' has a calculator, which "
                 "will overwrite the rescaled values at the next update.",
-                stacklevel=2,
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
             )
+        # The units of the properties computed from time are built from this unit.
+        old_time_unit = self._get_prop_unit(time_prop)
 
         self._multiply_prop_values(time_prop, PropertyType.NODE, factor)
         if time_unit is not None:
             self.model_metadata.time_unit = time_unit
-            for prop_id in (
-                time_prop,
-                "cycle_duration",
-                "cycle_start_time",
-                "cycle_end_time",
-            ):
-                prop = self.props_metadata.props.get(prop_id)
-                if prop is not None:
-                    prop.unit = time_unit
+            prop = self.props_metadata.properties.get(time_prop)
+            if prop is not None:
+                prop.unit = time_unit
+            self._set_cycle_time_units(time_unit)
 
         time_step = self.model_metadata.time_step
         if time_step is not None:
@@ -618,8 +688,14 @@ class Model:
             # time step and minimum time are outdated (in the old unit), so that
             # update() can rebuild it with correct values.
             self.set_time_step(time_step * factor)
-        elif self.data.cell_data:
+        elif self.data.cell_lineages:
             self.prepare_full_data_update()
+
+        self._warn_outdated_units(
+            old_time_unit,
+            time_unit,
+            {time_prop, "cycle_duration", "cycle_start_time", "cycle_end_time"},
+        )
 
     def rescale_space(
         self,
@@ -640,13 +716,13 @@ class Model:
         factor : int | float
             Strictly positive factor to multiply the coordinates and the pixel size by,
             e.g. the size of a pixel in micrometers to convert pixels into micrometers.
-        space_unit : str | None, optional
-            New space unit, e.g. "µm". It is set as the space unit of the model and as
-            the unit of the rescaled coordinate properties. If None (default), units
-            are unchanged.
-        z_factor : int | float | None, optional
-            Strictly positive factor for the z axis, for anisotropic data. If None
-            (default), `factor` is used for all axes.
+        space_unit : str | None, default=None
+            New space unit, e.g. ``"µm"``. It is set as the space unit of the model
+            and as the unit of the rescaled coordinate properties. If None, units are
+            unchanged.
+        z_factor : int | float | None, default=None
+            Strictly positive factor for the z axis, for anisotropic data. If None,
+            `factor` is used for all axes.
 
         Raises
         ------
@@ -655,22 +731,28 @@ class Model:
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If a coordinate property has a calculator, since it will overwrite the
             rescaled values at the next update.
+            If `space_unit` is given and properties with a calculator have a unit that
+            uses the previous space unit, e.g. ``"pixel/frame"``, since their unit is
+            left as it is.
 
         Notes
         -----
-        The rescaled coordinate properties are the declared "cell_x", "cell_y",
-        "cell_z", "link_x", "link_y", "link_z", "lineage_x", "lineage_y" and
-        "lineage_z". The pixel width, height and depth of the model, expressed in the
+        The rescaled coordinate properties are the declared ``cell_x``, ``cell_y``,
+        ``cell_z``, ``link_x``, ``link_y``, ``link_z``, ``lineage_x``, ``lineage_y`` and
+        ``lineage_z``. The pixel width, height and depth of the model, expressed in the
         space unit, are multiplied too when they are defined. An undefined pixel size
         stays undefined: set it after rescaling, not before, or it will be multiplied.
         Space-dependent values of other properties without a calculator (e.g. loaded
         from a file), the units of other property declarations, and the parameters of
         existing calculators (e.g. the pixel size used by `add_cell_polygon()`) are
         left as they are. As such, the rescaling should be done shortly after loading
-        the data and before adding any other properties or calculators.
+        the data and before adding any other properties or calculators. The
+        properties added before, whose unit uses the previous space unit (``"pixel"`` if
+        the model had none), are named in a warning: add them again to update their
+        unit.
 
         Examples
         --------
@@ -687,22 +769,29 @@ class Model:
             z_factor = factor
         elif not z_factor > 0:
             raise ValueError(f"'z_factor' must be strictly positive, got {z_factor}.")
+        # The units of the properties computed from space are built from this unit,
+        # or from "pixel" when the model has none.
+        old_space_unit = self.model_metadata.space_unit or "pixel"
 
+        rescaled_props: set[str] = set()
         for axis in ("x", "y", "z"):
             axis_factor = z_factor if axis == "z" else factor
             for element in ("cell", "link", "lineage"):
-                prop = self.props_metadata.props.get(f"{element}_{axis}")
+                prop = self.props_metadata.properties.get(f"{element}_{axis}")
                 if prop is None:
                     continue
                 if prop.identifier in self._updater._calculators:
                     warnings.warn(
-                        f"The coordinate property '{prop.identifier}' has a calculator, "
-                        "which will overwrite the rescaled values at the next update.",
-                        stacklevel=2,
+                        f"The coordinate property '{prop.identifier}' has a "
+                        "calculator, which will overwrite the rescaled values at the "
+                        "next update.",
+                        PycellinWarning,
+                        stacklevel=_find_stack_level(),
                     )
                 self._multiply_prop_values(prop.identifier, prop.prop_type, axis_factor)
                 if space_unit is not None:
                     prop.unit = space_unit
+                rescaled_props.add(prop.identifier)
 
         metadata = self.model_metadata
         if metadata.pixel_width is not None:
@@ -714,8 +803,82 @@ class Model:
         if space_unit is not None:
             metadata.space_unit = space_unit
 
-        if self.data.cell_data:
+        if self.data.cell_lineages:
             self.prepare_full_data_update()
+
+        self._warn_outdated_units(old_space_unit, space_unit, rescaled_props)
+
+    def _set_cycle_time_units(self, time_unit: str | None) -> None:
+        """
+        Set the unit of the cycle properties computed from the reference time property.
+
+        The values of ``cycle_duration``, ``cycle_start_time`` and ``cycle_end_time``
+        are computed from the reference time property, so they share its unit. The
+        properties that are not declared, e.g. before `add_cycle_lineages()`, are
+        skipped.
+
+        Parameters
+        ----------
+        time_unit : str | None
+            The unit of the reference time property.
+        """
+        for prop_id in ("cycle_duration", "cycle_start_time", "cycle_end_time"):
+            prop = self.props_metadata.properties.get(prop_id)
+            if prop is not None:
+                prop.unit = time_unit
+
+    def _warn_outdated_units(
+        self, old_unit: str | None, new_unit: str | None, updated_props: set[str]
+    ) -> None:
+        """
+        Warn about the properties whose unit still uses the unit before a rescaling.
+
+        The properties with a calculator are recomputed at the next update, but their
+        unit was built from the units of the model when they were added (e.g.
+        ``"micrometer/minute"`` for ``cell_speed``) and is left as it is. The properties
+        without a calculator are skipped: their values are not recomputed, so they
+        still match their unit. The properties are named in the order they were
+        added, which puts the input properties before the properties computed from
+        them.
+
+        Parameters
+        ----------
+        old_unit : str | None
+            The unit before the rescaling. If None, nothing is checked.
+        new_unit : str | None
+            The unit after the rescaling. If None or equal to `old_unit`, units are
+            unchanged and nothing is checked.
+        updated_props : set[str]
+            Identifiers of the properties whose unit the rescaling sets.
+        """
+        if old_unit is None or new_unit is None or new_unit == old_unit:
+            return
+        outdated = [
+            prop
+            for prop_id, prop in self.props_metadata.properties.items()
+            if prop_id not in updated_props
+            and prop_id in self._updater._calculators
+            and prop.unit is not None
+            and _unit_uses(prop.unit, old_unit)
+        ]
+        if not outdated:
+            return
+        names = [f"'{prop.identifier}' ({prop.unit})" for prop in outdated]
+        if len(names) == 1:
+            message = (
+                f"Property {names[0]} was added before the rescaling, so its unit "
+                f"still uses '{old_unit}' instead of '{new_unit}'. Add it again, with "
+                "the same method and arguments, to update its unit."
+            )
+        else:
+            message = (
+                f"Properties {', '.join(names[:-1])} and {names[-1]} were added before "
+                f"the rescaling, so their units still use '{old_unit}' instead of "
+                f"'{new_unit}'. Add them again in this order, with the same methods "
+                "and arguments, to update their units."
+            )
+        # stacklevel=3 points to the call of rescale_time() or rescale_space().
+        warnings.warn(message, PycellinWarning, stacklevel=_find_stack_level())
 
     def _multiply_prop_values(
         self,
@@ -726,8 +889,8 @@ class Model:
         """
         Multiply in place the values of a property in the cell lineages.
 
-        If the property is declared with an "int" dtype and `factor` is a float, its
-        dtype is set to "float".
+        If the property is declared with an ``"int"`` dtype and `factor` is a float,
+        its dtype is set to ``"float"``.
 
         Parameters
         ----------
@@ -738,7 +901,7 @@ class Model:
         factor : int | float
             The factor to multiply the values by.
         """
-        for lin in self.data.cell_data.values():
+        for lin in self.data.cell_lineages.values():
             elements_props = []
             if PropertyType.NODE in prop_type:
                 elements_props.extend(props for _, props in lin.nodes(data=True))
@@ -750,7 +913,7 @@ class Model:
                 if props.get(prop_id) is not None:
                     props[prop_id] *= factor
 
-        prop = self.props_metadata.props.get(prop_id)
+        prop = self.props_metadata.properties.get(prop_id)
         if prop is not None and prop.dtype == "int" and isinstance(factor, float):
             prop.dtype = "float"
 
@@ -796,7 +959,7 @@ class Model:
 
         Returns
         -------
-        str
+        str | None
             The spatial unit of the model.
         """
         return self.model_metadata.space_unit
@@ -807,7 +970,7 @@ class Model:
 
         Returns
         -------
-        float
+        float | None
             The pixel width of the model.
         """
         return self.model_metadata.pixel_width
@@ -818,7 +981,7 @@ class Model:
 
         Returns
         -------
-        float
+        float | None
             The pixel height of the model.
         """
         return self.model_metadata.pixel_height
@@ -829,7 +992,7 @@ class Model:
 
         Returns
         -------
-        float
+        float | None
             The pixel depth of the model.
         """
         return self.model_metadata.pixel_depth
@@ -840,9 +1003,9 @@ class Model:
 
         Returns
         -------
-        dict[str, float]
-            The pixel size of the model as a dictionary with 'width', 'height', and 'depth' keys.
-            Returns None if no pixel sizes are defined.
+        dict[str, float] | None
+            The pixel size of the model as a dictionary with ``"width"``,
+            ``"height"`` and ``"depth"`` keys, or None if no pixel size is defined.
         """
         pixel_size = {}
         if self.model_metadata.pixel_width is not None:
@@ -860,7 +1023,7 @@ class Model:
 
         Returns
         -------
-        str
+        str | None
             The temporal unit of the model.
         """
         return self.model_metadata.time_unit
@@ -871,34 +1034,34 @@ class Model:
 
         Returns
         -------
-        float
+        float | None
             The time step of the model.
         """
         return self.model_metadata.time_step
 
-    def get_units_per_properties(self) -> dict[str, list[str]]:
+    def get_properties_per_unit(self) -> dict[str | None, list[str]]:
         """
-        Return a dict of units and the properties associated with each unit.
+        Return the identifiers of the properties associated with each unit.
 
         The method iterates over the node, edge, and lineage properties
         of the properties declaration object, grouping them by unit.
 
         Returns
         -------
-        dict[str, list[str]]
-            A dictionary where the keys are units and the values are lists
-            of property identifiers. For example:
-            {'unit1': ['property1', 'property2'], 'unit2': ['property3']}.
+        dict[str | None, list[str]]
+            A dictionary where the keys are units (or None for unitless properties)
+            and the values are lists of property identifiers, not `Property` objects.
+            For example, ``{"µm": ["cell_x", "cell_y"], None: ["cell_id"]}``.
         """
-        return self.props_metadata._get_units_per_props()
+        return self.props_metadata._get_props_per_unit()
 
-    def get_property(self, prop_identifier: str) -> Property | None:
+    def get_property(self, prop: str) -> Property | None:
         """
         Return the property with the specified identifier.
 
         Parameters
         ----------
-        prop_identifier : str
+        prop : str
             The identifier of the property to return.
 
         Returns
@@ -906,7 +1069,7 @@ class Model:
         Property | None
             The property with the specified identifier, or None if not found.
         """
-        return self.props_metadata.props.get(prop_identifier)
+        return self.props_metadata.properties.get(prop)
 
     def get_properties(self) -> dict[str, Property]:
         """
@@ -917,53 +1080,77 @@ class Model:
         dict[str, Property]
             Dictionary of the properties present in the model.
         """
-        return self.props_metadata.props
+        return self.props_metadata.properties
 
     def get_cell_lineage_properties(
         self,
-        include_Lineage_props: bool = True,
+        single_type: bool = False,
     ) -> dict[str, Property]:
         """
-        Return the cell lineages properties present in the model.
+        Return the cell lineage properties present in the model.
 
         Parameters
         ----------
-        include_Lineage_props : bool, optional
-            True to return Lineage properties along with CellLineage ones,
-            False to only return CellLineage properties (default is True).
+        single_type : bool, default=False
+            True to only return the properties of lineage type ``"cell"``. False to
+            also return those of lineage type ``"both"``, which belong to cell and
+            cycle lineages alike, and the cycle properties propagated to the cell
+            lineages (see `get_propagated_properties()`).
 
         Returns
         -------
         dict[str, Property]
-            Dictionary of the cell lineages properties present in the model.
+            Dictionary of the cell lineage properties present in the model.
         """
-        props = self.props_metadata._get_prop_dict_from_lin_type("CellLineage")
-        if include_Lineage_props:
-            props.update(self.props_metadata._get_prop_dict_from_lin_type("Lineage"))
+        props = self.props_metadata._get_prop_dict_from_lin_type("cell")
+        if not single_type:
+            props.update(self.props_metadata._get_prop_dict_from_lin_type("both"))
+            props.update(self.get_propagated_properties())
         return props
 
     def get_cycle_lineage_properties(
         self,
-        include_Lineage_props: bool = True,
+        single_type: bool = False,
     ) -> dict[str, Property]:
         """
-        Return the cycle lineages properties present in the model.
+        Return the cycle lineage properties present in the model.
 
         Parameters
         ----------
-        include_Lineage_props : bool, optional
-            True to return Lineage properties along with CycleLineage ones,
-            False to only return CycleLineage properties (default is True).
+        single_type : bool, default=False
+            True to only return the properties of lineage type ``"cycle"``. False to
+            also return those of lineage type ``"both"``, which belong to cell and
+            cycle lineages alike.
 
         Returns
         -------
         dict[str, Property]
-            Dictionary of the cycle lineages properties present in the model.
+            Dictionary of the cycle lineage properties present in the model.
         """
-        props = self.props_metadata._get_prop_dict_from_lin_type("CycleLineage")
-        if include_Lineage_props:
-            props.update(self.props_metadata._get_prop_dict_from_lin_type("Lineage"))
+        props = self.props_metadata._get_prop_dict_from_lin_type("cycle")
+        if not single_type:
+            props.update(self.props_metadata._get_prop_dict_from_lin_type("both"))
         return props
+
+    def get_propagated_properties(self) -> dict[str, Property]:
+        """
+        Return the cycle properties propagated to the cell lineages.
+
+        `propagate_cycle_properties()` copies the values of these cycle lineage
+        properties to the cells, and `update()` copies them again once it has
+        computed them. They keep the lineage type ``"cycle"``, and
+        `get_cell_lineage_properties()` also returns them.
+
+        Returns
+        -------
+        dict[str, Property]
+            Dictionary of the propagated properties, by identifier.
+        """
+        return {
+            prop_id: self.props_metadata.properties[prop_id]
+            for prop_id in self.props_metadata._get_propagated_props()
+            if prop_id in self.props_metadata.properties
+        }
 
     def get_node_properties(self, single_type: bool = False) -> dict[str, Property]:
         """
@@ -971,10 +1158,10 @@ class Model:
 
         Parameters
         ----------
-        single_type : bool, optional
+        single_type : bool, default=False
             True to only return single-type node properties (i.e., those with
-            exactly the "node" flag). False to return all properties with the
-            "node" flag regardless of other flags (default is False).
+            exactly the ``NODE`` flag). False to return all properties with the
+            ``NODE`` flag regardless of other flags.
 
         Returns
         -------
@@ -994,10 +1181,10 @@ class Model:
 
         Parameters
         ----------
-        single_type : bool, optional
-            True to only return single-type node properties (i.e., those with
-            exactly the "node" flag). False to return all properties with the
-            "node" flag regardless of other flags (default is False).
+        single_type : bool, default=False
+            True to only return single-type edge properties (i.e., those with
+            exactly the ``EDGE`` flag). False to return all properties with the
+            ``EDGE`` flag regardless of other flags.
 
         Returns
         -------
@@ -1017,10 +1204,10 @@ class Model:
 
         Parameters
         ----------
-        single_type : bool, optional
+        single_type : bool, default=False
             True to only return single-type lineage properties (i.e., those with
-            exactly the "lineage" flag). False to return all properties with the
-            "lineage" flag regardless of other flags (default is False).
+            exactly the ``LINEAGE`` flag). False to return all properties with the
+            ``LINEAGE`` flag regardless of other flags.
 
         Returns
         -------
@@ -1034,181 +1221,202 @@ class Model:
         else:
             return self.props_metadata._get_prop_dict_from_prop_type("lineage")
 
-    def get_cell_lineages(self) -> list[CellLineage]:
-        """
-        Return the cell lineages present in the model.
-
-        Returns
-        -------
-        list[CellLineage]
-            List of the cell lineages present in the model.
-        """
-        return list(self.data.cell_data.values())
-
-    def get_cycle_lineages(self) -> list[CycleLineage]:
-        """
-        Return the cycle lineages present in the model.
-
-        Returns
-        -------
-        list[CellLineage]
-            List of the cycle lineages present in the model.
-        """
-        if self.data.cycle_data is None:
-            return []
-        else:
-            return list(self.data.cycle_data.values())
-
-    def get_cell_lineage_from_id(self, lid: int) -> CellLineage | None:
+    def get_cell_lineage(self, lineage_id: int) -> CellLineage | None:
         """
         Return the cell lineage with the specified ID.
 
         Parameters
         ----------
-        lid : int
+        lineage_id : int
             ID of the lineage to return.
 
         Returns
         -------
-        CellLineage
-            The cell lineage with the specified ID.
+        CellLineage | None
+            The cell lineage with the specified ID, or None if it isn't in the model.
+
+        Raises
+        ------
+        TypeError
+            If `lineage_id` is not an integer, e.g. if it is a lineage.
         """
-        if lid in self.data.cell_data:
-            return self.data.cell_data[lid]
+        _check_integer(lineage_id, "lineage_id")
+        if lineage_id in self.data.cell_lineages:
+            return self.data.cell_lineages[lineage_id]
         else:
             return None
 
-    def get_cell_lineages_from_ids(
-        self, lids: list[int], ignore_missing: bool = True
-    ) -> list[CellLineage | None]:
-        """
-        Return a list of cell lineages with the specified IDs.
-
-        Parameters
-        ----------
-        lids : list[int]
-            IDs of the lineages to return.
-        ignore_missing: bool, optional
-            True to ignore missing lineages (default is True). If True, the returned
-            list may be short than `lids`. If False, the returned list will be aligned
-            with `lids` but may contain None values.
-
-        Returns
-        -------
-        list[CellLineage | None]
-            The cell lineages with the specified IDs.
-        """
-        lins = [self.get_cell_lineage_from_id(lid) for lid in lids]
-        if ignore_missing:
-            lins = [lin for lin in lins if lin is not None]
-        return lins
-
-    def get_cycle_lineage_from_id(self, lid: int) -> CycleLineage | None:
+    def get_cycle_lineage(self, lineage_id: int) -> CycleLineage | None:
         """
         Return the cycle lineage with the specified ID.
 
         Parameters
         ----------
-        lid : int
+        lineage_id : int
             ID of the lineage to return.
 
         Returns
         -------
-        CycleLineage
-            The cycle lineage with the specified ID.
+        CycleLineage | None
+            The cycle lineage with the specified ID, or None if it isn't in the model.
+
+        Raises
+        ------
+        TypeError
+            If `lineage_id` is not an integer, e.g. if it is a lineage.
         """
-        if self.data.cycle_data and lid in self.data.cycle_data:
-            return self.data.cycle_data[lid]
+        _check_integer(lineage_id, "lineage_id")
+        if self.data.cycle_lineages and lineage_id in self.data.cycle_lineages:
+            return self.data.cycle_lineages[lineage_id]
         else:
             return None
 
-    def get_cycle_lineages_from_ids(
-        self, lids: list[int], ignore_missing: bool = True
-    ) -> list[CycleLineage | None]:
+    def get_cell_lineages(
+        self, lineage_ids: list[int] | None = None, ignore_missing: bool = True
+    ) -> list[CellLineage | None]:
         """
-        Return a list of cycle lineages with the specified IDs.
+        Return the cell lineages of the model, or those with the specified IDs.
 
         Parameters
         ----------
-        lids : list[int]
-            IDs of the lineages to return.
-        ignore_missing: bool, optional
-            True to ignore missing lineages (default is True). If True, the returned
-            list may be short than `lids`. If False, the returned list will be aligned
-            with `lids` but may contain None values.
+        lineage_ids : list[int] | None, default=None
+            IDs of the lineages to return. If None, all the cell lineages of the model
+            are returned.
+        ignore_missing : bool, default=True
+            True to ignore missing lineages. If True, the returned
+            list may be shorter than `lineage_ids`. If False, the returned list will be
+            aligned with `lineage_ids` but may contain None values. Not used when
+            `lineage_ids` is None.
+
+        Returns
+        -------
+        list[CellLineage | None]
+            The cell lineages. The list only holds None values if `lineage_ids` is
+            given and `ignore_missing` is False.
+
+        Raises
+        ------
+        TypeError
+            If `lineage_ids` is a lineage, or if one of its values is not an integer.
+        """
+        if lineage_ids is None:
+            return list(self.data.cell_lineages.values())
+        # A lineage is iterable over its cell IDs, which would be taken for lineage IDs.
+        if isinstance(lineage_ids, Lineage):
+            raise TypeError(
+                "'lineage_ids' must be a list of integers, "
+                f"not {type(lineage_ids).__name__}."
+            )
+        lins = [self.get_cell_lineage(lid) for lid in lineage_ids]
+        if ignore_missing:
+            lins = [lin for lin in lins if lin is not None]
+        return lins
+
+    def get_cycle_lineages(
+        self, lineage_ids: list[int] | None = None, ignore_missing: bool = True
+    ) -> list[CycleLineage | None]:
+        """
+        Return the cycle lineages of the model, or those with the specified IDs.
+
+        Parameters
+        ----------
+        lineage_ids : list[int] | None, default=None
+            IDs of the lineages to return. If None, all the cycle lineages of the model
+            are returned.
+        ignore_missing : bool, default=True
+            True to ignore missing lineages. If True, the returned
+            list may be shorter than `lineage_ids`. If False, the returned list will be
+            aligned with `lineage_ids` but may contain None values. Not used when
+            `lineage_ids` is None.
 
         Returns
         -------
         list[CycleLineage | None]
-            The cycle lineages with the specified IDs.
+            The cycle lineages. The list only holds None values if `lineage_ids` is
+            given and `ignore_missing` is False.
+
+        Raises
+        ------
+        TypeError
+            If `lineage_ids` is a lineage, or if one of its values is not an integer.
         """
-        lins = [self.get_cycle_lineage_from_id(lid) for lid in lids]
+        if lineage_ids is None:
+            if self.data.cycle_lineages is None:
+                return []
+            return list(self.data.cycle_lineages.values())
+        # A lineage is iterable over its cell IDs, which would be taken for lineage IDs.
+        if isinstance(lineage_ids, Lineage):
+            raise TypeError(
+                "'lineage_ids' must be a list of integers, "
+                f"not {type(lineage_ids).__name__}."
+            )
+        lins = [self.get_cycle_lineage(lid) for lid in lineage_ids]
         if ignore_missing:
             lins = [lin for lin in lins if lin is not None]
         return lins
 
     @staticmethod
-    def _get_lineages_from_lin_prop(
-        lineages: list[L],
-        lin_prop: str,
-        lin_prop_value: Any,
-    ) -> list[L]:
+    def _get_lineages_by_property(
+        lineages: list[_L],
+        prop: str,
+        value: Any,
+    ) -> list[_L]:
         """
         Return the lineages with the specified property value.
 
         Parameters
         ----------
-        lineages : list[T]
+        lineages : list[_L]
             The lineages.
-        lin_prop : str
+        prop : str
             The identifier of the property to check.
-        lin_prop_value : Any
+        value : Any
             The value of the property to check.
 
         Returns
         -------
-        list[T]
+        list[_L]
             The lineages with the specified property value.
         """
-        return [lin for lin in lineages if lin.graph[lin_prop] == lin_prop_value]
+        return [lin for lin in lineages if lin.graph[prop] == value]
 
-    def get_cell_lineages_from_lin_prop(
+    def get_cell_lineages_by_property(
         self,
-        lin_prop: str,
-        lin_prop_value: Any,
+        prop: str,
+        value: Any,
     ) -> list[CellLineage]:
         """
         Return the cell lineages with the specified property value.
 
         Parameters
         ----------
-        lin_prop : str
+        prop : str
             The identifier of the property to check.
-        lin_prop_value : Any
+        value : Any
             The value of the property to check.
 
         Returns
         -------
         list[CellLineage]
-            The cell lineage(s) with the specified property value.
+            The cell lineages with the specified property value.
         """
-        return self._get_lineages_from_lin_prop(
-            list(self.data.cell_data.values()), lin_prop, lin_prop_value
+        return self._get_lineages_by_property(
+            list(self.data.cell_lineages.values()), prop, value
         )
 
-    def get_cycle_lineages_from_lin_prop(
+    def get_cycle_lineages_by_property(
         self,
-        lin_prop: str,
-        lin_prop_value: Any,
+        prop: str,
+        value: Any,
     ) -> list[CycleLineage]:
         """
         Return the cycle lineages with the specified property value.
 
         Parameters
         ----------
-        lin_prop : str
+        prop : str
             The identifier of the property to check.
-        lin_prop_value : Any
+        value : Any
             The value of the property to check.
 
         Returns
@@ -1216,10 +1424,10 @@ class Model:
         list[CycleLineage]
             The cycle lineages with the specified property value.
         """
-        if self.data.cycle_data is None:
+        if self.data.cycle_lineages is None:
             return []
-        return self._get_lineages_from_lin_prop(
-            list(self.data.cycle_data.values()), lin_prop, lin_prop_value
+        return self._get_lineages_by_property(
+            list(self.data.cycle_lineages.values()), prop, value
         )
 
     def get_cell_lineage_ids(self) -> list[int]:
@@ -1231,10 +1439,7 @@ class Model:
         list[int]
             List of the IDs of the cell lineages present in the model.
         """
-        return list(self.data.cell_data.keys())
-
-    get_lineage_ids = get_cell_lineage_ids
-    get_lineage_ids.__doc__ = "Alias for get_cell_lineage_ids"
+        return list(self.data.cell_lineages.keys())
 
     def get_cycle_lineage_ids(self) -> list[int]:
         """
@@ -1245,9 +1450,9 @@ class Model:
         list[int]
             List of the IDs of the cycle lineages present in the model.
         """
-        if self.data.cycle_data is None:
+        if self.data.cycle_lineages is None:
             return []
-        return list(self.data.cycle_data.keys())
+        return list(self.data.cycle_lineages.keys())
 
     def get_next_available_lineage_id(self, positive: bool = True) -> int:
         """
@@ -1255,9 +1460,9 @@ class Model:
 
         Parameters
         ----------
-        positive : bool, optional
+        positive : bool, default=True
             True to return a positive lineage ID,
-            False to return a negative lineage ID (default is True).
+            False to return a negative lineage ID.
 
         Returns
         -------
@@ -1269,28 +1474,25 @@ class Model:
         Next available lineage IDs are determined by finding the maximum
         (for positive IDs) or minimum (for negative IDs) existing lineage ID
         in the model and incrementing or decrementing it by one, respectively.
-        This way, lineage IDs of previously deleted lineages are not reused.
-        This avoids potential confusion or errors in lineage handling.
+        This way, lineage IDs of previously deleted lineages are not reused,
+        unless they were above the maximum (or below the minimum) of the remaining
+        lineage IDs. This avoids potential confusion or errors in lineage handling.
 
         The returned lineage ID cannot be 0 in case the user wants to reserve
         it for special purposes.
-
-        Positive lineage IDs should be used for lineages with more than one cell.
-        Negative lineage IDs should be used for lineages with a single cell,
-        and are equal to the negative of the cell ID.
         """
         return self.data._get_next_available_lineage_id(positive)
 
     def has_property(
         self,
-        prop_identifier: str,
+        prop: str,
     ) -> bool:
         """
         Check if the model contains the specified property.
 
         Parameters
         ----------
-        prop_identifier : str
+        prop : str
             The identifier of the property to check.
 
         Returns
@@ -1298,7 +1500,7 @@ class Model:
         bool
             True if the property is in the model, False otherwise.
         """
-        return self.props_metadata._has_prop(prop_identifier)
+        return self.props_metadata._has_prop(prop)
 
     def prepare_full_data_update(self) -> None:
         """
@@ -1311,12 +1513,12 @@ class Model:
             return
         self._updater._full_data_update = True
         self._updater._update_required = True
-        for lin_id, lin in self.data.cell_data.items():
+        for lin_id, lin in self.data.cell_lineages.items():
             for nid in lin.nodes:
                 self._updater._added_cells.add(Cell(nid, lin_id))
             for edge in lin.edges:
                 self._updater._added_links.add(Link(edge[0], edge[1], lin_id))
-        self._updater._added_lineages = set(self.data.cell_data.keys())
+        self._updater._added_lineages = set(self.data.cell_lineages.keys())
 
     def is_update_required(self) -> bool:
         """
@@ -1342,25 +1544,34 @@ class Model:
 
         Parameters
         ----------
-        props_to_update : list[str], optional
+        props_to_update : list[str] | None, default=None
             List of properties to update. If None, all properties are updated.
-            The "timepoint" property is updated even if it is not in the list
+            The ``timepoint`` property is updated even if it is not in the list,
+            and so are the cycle lineage properties of rebuilt cycle lineages
             (see Notes).
+
+        Raises
+        ------
+        ValueError
+            If the time step of the model is not defined.
 
         Warns
         -----
-        If the model is already up to date, a warning is raised and no update
-        is performed. If the user wants to force an update, they can call
-        `prepare_full_data_update()` before calling this method.
-        If a property in the `props_to_update` list has not been declared,
-        a warning is raised and that property is ignored during the update.
-        If no properties are left to update after filtering, a warning is raised
-        and the model is not updated.
+        PycellinWarning
+            If a property in the `props_to_update` list has not been declared, or has
+            no calculator (e.g. a property loaded from a file): that property is
+            ignored during the update.
+            If no properties are left to update after filtering: the model is not
+            updated.
 
         Notes
         -----
-        The "timepoint" property is always kept declared and up to date, whatever
-        `props_to_update` contains. The only exception is when "timepoint" is the
+        If the model is already up to date, no update is performed, and a message
+        says so at the info level of the `logging` module. To force an update, call
+        `prepare_full_data_update()` before this method.
+
+        The ``timepoint`` property is always kept declared and up to date, whatever
+        `props_to_update` contains. The only exception is when ``timepoint`` is the
         reference time property itself.
 
         - It is computed before all the other properties, since they may rely on it.
@@ -1371,11 +1582,34 @@ class Model:
           recomputed.
 
         Consequently, the reference time property must not be computed from
-        "timepoint", which would be a circular dependency. To convert the reference
+        ``timepoint``, which would be a circular dependency. To convert the reference
         time into another unit, e.g. from frames to minutes, use `rescale_time()`.
+
+        A property is computed after the properties it reads, but cell lineage
+        properties are computed before cycle lineage properties.
+
+        A partial update, with `props_to_update`, computes the listed properties on
+        the cells, links and lineages that changed since the last update, i.e. on all
+        of them after a property was added. Their cycle lineages are rebuilt with only
+        the core properties, so all the cycle lineage properties are computed again
+        on them, listed or not. The other cell lineage properties are not computed:
+        the model then still requires an update, and the next `update()` computes all
+        the properties again.
+
+        The cycle properties propagated to the cell lineages with
+        `propagate_cycle_properties()` are copied to them again once computed on the
+        cycle lineages, so that they stay up to date.
+
+        The update also deletes empty lineages, and splits a lineage made of several
+        parts, e.g. after `remove_link()`. The largest part keeps the lineage ID and
+        the lineage properties. Each other part becomes a new lineage, with a new ID
+        and no other lineage property, since the values of the original lineage
+        describe it whole, e.g. its number of cells, or identify it, e.g. its name.
+        The ``lineage_id`` of the cells of the lineages that changed is set to the ID of
+        their lineage.
         """
         if not self._updater._update_required:
-            warnings.warn("Model is already up to date.")
+            logger.info("Model is already up to date.")
             return
 
         if props_to_update is not None:
@@ -1386,17 +1620,38 @@ class Model:
             ]
             if missing_props:
                 warnings.warn(
-                    f"The following properties have not been declared "
-                    f"and will be ignored: {', '.join(missing_props)}."
+                    "The following properties have not been declared and will be "
+                    f"ignored: {', '.join(repr(prop) for prop in missing_props)}.",
+                    PycellinWarning,
+                    stacklevel=_find_stack_level(),
                 )
-                props_to_update = [
-                    prop for prop in props_to_update if prop not in missing_props
-                ]
-                if not props_to_update:
-                    warnings.warn(
-                        "No properties to update. The model will not be updated."
-                    )
-                    return
+            # E.g. a property loaded from a file, or a core property of cycle lineages.
+            props_without_calc = [
+                prop
+                for prop in props_to_update
+                if prop not in missing_props and prop not in self._updater._calculators
+            ]
+            if props_without_calc:
+                warnings.warn(
+                    "The following properties have no calculator and will be ignored: "
+                    f"{', '.join(repr(prop) for prop in props_without_calc)}. Their "
+                    "values come from the data, or are computed with the cycle "
+                    "lineages.",
+                    PycellinWarning,
+                    stacklevel=_find_stack_level(),
+                )
+            props_to_update = [
+                prop
+                for prop in props_to_update
+                if prop not in missing_props and prop not in props_without_calc
+            ]
+            if not props_to_update:
+                warnings.warn(
+                    "No properties to update. The model will not be updated.",
+                    PycellinWarning,
+                    stacklevel=_find_stack_level(),
+                )
+                return
 
         # self.data._freeze_lineage_data()
 
@@ -1406,56 +1661,69 @@ class Model:
 
         time_step = self.model_metadata.time_step
         if time_step is None:
-            # TODO: add "see documentation" to the error message or explain
-            # directly how to set it?
             raise ValueError(
-                "The time step of the model is currently not defined "
-                "but is required for cycle lineage computation."
+                "The time step of the model is not defined, but is required to update "
+                "the model. Set it with set_time_step()."
             )
         # The timepoint property is always declared and protected, unless it is the
-        # reference time property (see ModelUpdater._update()).
+        # reference time property (see _ModelUpdater._update()).
         if (
-            self.model_metadata.reference_time_property != "timepoint"
-            and self.data.cell_data
+            self.model_metadata.reference_time_prop != "timepoint"
+            and self.data.cell_lineages
             and not self.props_metadata._has_prop("timepoint")
         ):
             self.props_metadata._add_prop(create_timepoint_property())
             self.props_metadata._protect_prop("timepoint")
-        self._updater._update(
+        complete = self._updater._update(
             self.data,
-            time_prop=self.model_metadata.reference_time_property,
+            time_prop=self.model_metadata.reference_time_prop,
             time_step=time_step,
             props_to_update=props_to_update,
         )
+        # The cycle properties propagated to the cells were computed again on the
+        # cycle lineages: they are copied to the cells again.
+        if self.data.cycle_lineages:
+            cycle_props = self.get_cycle_lineage_properties()
+            propagated_props = [
+                prop_id
+                for prop_id in self.props_metadata._get_propagated_props()
+                if prop_id in cycle_props
+            ]
+            if propagated_props:
+                self._copy_cycle_props_to_cells(propagated_props)
+        if not complete:
+            # The properties left out by a partial update are computed by the next
+            # update, which recomputes all of them.
+            self.prepare_full_data_update()
 
         # self.data._unfreeze_lineage_data()
 
     def add_lineage(
         self,
         lineage: CellLineage | None = None,
-        lid: int | None = None,
-        overwrite_lid: bool = False,
-        with_CycleLineage: bool = False,
+        lineage_id: int | None = None,
+        overwrite_lineage_id: bool = False,
+        with_cycle_lineage: bool = False,
     ) -> int:
         """
         Add a lineage to the model.
 
         Parameters
         ----------
-        lineage : CellLineage, optional
-            Lineage to add (default is None). If None, a new lineage
-            will be created.
-        lid : int, optional
-            ID to assign to the lineage (default is None). Resolution order:
-                1. Use `lid` if provided.
-                2. Fall back to the lineage's internal `lineage_id` property.
-                3. Generate a new ID if neither is available.
-        overwrite_lid: bool, optional
-            If True, overwrite the lineage's internal `lineage_id` with
-            the provided `lid`. If False, raise a ValueError if `lid` conflicts with
-            the lineage's existing internal `lineage_id` (default is False).
-        with_CycleLineage : bool, optional
-            True to compute the cycle lineage, False otherwise (default is False).
+        lineage : CellLineage | None, default=None
+            Lineage to add. If None, a new lineage will be created.
+        lineage_id : int | None, default=None
+            ID to assign to the lineage. Resolution order:
+
+            1. Use `lineage_id` if provided.
+            2. Fall back to the lineage's internal ``lineage_id`` property.
+            3. Generate a new ID if neither is available.
+        overwrite_lineage_id : bool, default=False
+            If True, overwrite the lineage's internal ``lineage_id`` with
+            the provided `lineage_id`. If False, raise a ValueError if `lineage_id`
+            conflicts with the lineage's existing internal ``lineage_id``.
+        with_cycle_lineage : bool, default=False
+            True to compute the cycle lineage, False otherwise.
 
         Returns
         -------
@@ -1464,81 +1732,82 @@ class Model:
 
         Raises
         ------
+        TypeError
+            If the lineage ID, provided or from the lineage, is not an integer.
         ValueError
-            If `lid` is provided and conflicts with the lineage's existing
-            internal `lineage_id` and `overwrite_lid` is True.
-            If `lid` is already in use by another lineage in the model.
+            If `lineage_id` is provided and conflicts with the lineage's existing
+            internal ``lineage_id`` and `overwrite_lineage_id` is False.
+            If `lineage_id` is already in use by another lineage in the model.
 
         Warns
         -----
-        UserWarning
-            If `with_CycleLineage` is True but the cycle data has not been added yet.
-            If `with_CycleLineage` is True but the time step of the model is not defined.
-            In both these cases, the cycle lineage is not computed.
+        PycellinWarning
+            If `with_cycle_lineage` is True but the cycle lineages have not been added
+            yet. The cycle lineage is then not computed.
         """
         # Determine the lineage ID to use.
         if lineage is None:
-            if lid is None:
-                lid = self.get_next_available_lineage_id()
-            lineage = CellLineage(lid=lid)
+            if lineage_id is None:
+                lineage_id = self.get_next_available_lineage_id()
+            lineage = CellLineage(lineage_id=lineage_id)
         else:
             inferred_lid = lineage.graph.get("lineage_id")
             if (
-                lid is not None
+                lineage_id is not None
                 and inferred_lid is not None
-                and lid != inferred_lid
-                and not overwrite_lid
+                and lineage_id != inferred_lid
+                and not overwrite_lineage_id
             ):
                 raise ValueError(
-                    f"Provided lid={lid} conflicts with the lineage's "
+                    f"Provided lineage_id={lineage_id} conflicts with the lineage's "
                     f"internal lineage_id={inferred_lid}."
                 )
-            if lid is None:
-                lid = inferred_lid
-            if lid is None:
-                lid = self.get_next_available_lineage_id()
+            if lineage_id is None:
+                lineage_id = inferred_lid
+            if lineage_id is None:
+                lineage_id = self.get_next_available_lineage_id()
 
-        if lid in self.get_cell_lineage_ids():
-            raise ValueError(f"Lineage with ID {lid} already exists in the model.")
+        _check_integer(lineage_id, "lineage_id")
+        lineage_id = int(lineage_id)
+        if lineage_id in self.get_cell_lineage_ids():
+            raise ValueError(
+                f"Lineage with ID {lineage_id} already exists in the model."
+            )
 
         # Update the data.
-        self.data.cell_data[lid] = lineage
-        if lineage.graph.get("lineage_id") != lid:
-            lineage.graph["lineage_id"] = lid
-            nx.set_node_attributes(lineage, lid, "lineage_id")
+        self.data.cell_lineages[lineage_id] = lineage
+        if lineage.graph.get("lineage_id") != lineage_id:
+            nx.set_node_attributes(lineage, lineage_id, "lineage_id")
+        lineage.graph["lineage_id"] = lineage_id
 
-        if with_CycleLineage:
-            if self.data.cycle_data is None:
+        if with_cycle_lineage:
+            if self.data.cycle_lineages is None:
                 warnings.warn(
-                    f"Cannot add cycle lineage {lid} when cycle data "
-                    "has not been added yet."
+                    f"Cannot add cycle lineage {lineage_id} when the cycle lineages "
+                    "have not been added yet.",
+                    PycellinWarning,
+                    stacklevel=_find_stack_level(),
                 )
             else:
-                timestep = self.get_time_step()
-                if timestep is None:
-                    warnings.warn(
-                        f"Cannot add cycle lineage {lid} when the time step "
-                        "of the model is not defined."
-                    )
-                else:
-                    cycle_lineage = self.data._compute_cycle_lineage(
-                        self.reference_time_property, timestep, lid
-                    )
-                    self.data.cycle_data[lid] = cycle_lineage
+                cycle_lineage = self.data._compute_cycle_lineage(
+                    self.reference_time_prop, lineage_id
+                )
+                self.data.cycle_lineages[lineage_id] = cycle_lineage
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
-        self._updater._added_lineages.add(lid)
+        self._updater._added_lineages.add(lineage_id)
+        self._updater._discard_removals(lineage)
 
-        return lid
+        return lineage_id
 
-    def remove_lineage(self, lid: int) -> CellLineage:
+    def remove_lineage(self, lineage_id: int) -> CellLineage:
         """
         Remove the specified lineage from the model.
 
         Parameters
         ----------
-        lid : int
+        lineage_id : int
             ID of the lineage to remove.
 
         Returns
@@ -1553,25 +1822,25 @@ class Model:
             exist in the model.
         """
         try:
-            lineage = self.data.cell_data.pop(lid)
+            lineage = self.data.cell_lineages.pop(lineage_id)
         except KeyError:
-            raise KeyError(f"Lineage with ID {lid} does not exist.")
-        if self.data.cycle_data and lid in self.data.cycle_data:
-            self.data.cycle_data.pop(lid)
+            raise KeyError(f"Lineage with ID {lineage_id} does not exist.")
+        if self.data.cycle_lineages and lineage_id in self.data.cycle_lineages:
+            self.data.cycle_lineages.pop(lineage_id)
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
-        self._updater._removed_lineages.add(lid)
+        self._updater._removed_lineages.add(lineage_id)
 
         return lineage
 
-    def remove_lineages(self, lids: list[int]) -> list[CellLineage]:
+    def remove_lineages(self, lineage_ids: list[int]) -> list[CellLineage]:
         """
         Remove the specified lineages from the model.
 
         Parameters
         ----------
-        lids : list[int]
+        lineage_ids : list[int]
             IDs of the lineages to remove.
 
         Returns
@@ -1580,37 +1849,39 @@ class Model:
             The removed lineages.
         """
         lins = []
-        for lid in lids:
+        for lid in lineage_ids:
             lin = self.remove_lineage(lid)
             lins.append(lin)
         return lins
 
     def split_lineage_from_cell(
         self,
-        cid: int,
-        lid: int,
-        new_lid: int | None = None,
+        cell_id: int,
+        *,
+        lineage_id: int,
+        new_lineage_id: int | None = None,
         split: Literal["upstream", "downstream"] = "upstream",
     ) -> CellLineage:
         """
         From a given cell, split a part of the given lineage into a new lineage.
 
-        By default, the given cell will be the root of the new lineage.
+        By default, the given cell will be the root of the new lineage. The new
+        lineage has no lineage property other than its ID, since the values of the
+        original lineage describe it whole, e.g. its number of cells, or identify it,
+        e.g. its name. Its cells get its ID as `lineage_id` at the next `update()`.
 
         Parameters
         ----------
-        cid : int
+        cell_id : int
             ID of the cell at which to split the lineage.
-        lid : int
+        lineage_id : int
             ID of the lineage to split.
-        new_lid : int, optional
-            ID of the new lineage (default is None). If None, a new ID
-            will be generated.
-        split : {"upstream", "downstream"}, optional
+        new_lineage_id : int | None, default=None
+            ID of the new lineage. If None, a new ID will be generated.
+        split : Literal["upstream", "downstream"], default="upstream"
             Where to split the lineage relative to the given cell.
-            If upstream, the given cell is included in the second lineage.
-            If downstream, the given cell is included in the first lineage.
-            "upstream" by default.
+            If ``"upstream"``, the given cell is included in the second lineage.
+            If ``"downstream"``, the given cell is included in the first lineage.
 
         Returns
         -------
@@ -1621,58 +1892,70 @@ class Model:
         ------
         KeyError
             If the lineage with the specified ID does not exist in the model.
+        TypeError
+            If `new_lineage_id` is not an integer.
+        ValueError
+            If `new_lineage_id` is already in use by a lineage of the model.
         """
         # TODO: unclear method... and the case where the cell is a division
         # and split is downstream is not handled correctly (we end up with
         # a lineage with several disconnected components.
         try:
-            lineage = self.data.cell_data[lid]
+            lineage = self.data.cell_lineages[lineage_id]
         except KeyError as err:
-            raise KeyError(f"Lineage with ID {lid} does not exist.") from err
+            raise KeyError(f"Lineage with ID {lineage_id} does not exist.") from err
+        if new_lineage_id is not None:
+            _check_integer(new_lineage_id, "new_lineage_id")
+            new_lineage_id = int(new_lineage_id)
+            if new_lineage_id in self.data.cell_lineages:
+                raise ValueError(
+                    f"Lineage with ID {new_lineage_id} already exists in the model."
+                )
 
         # Create the new lineage.
-        new_lineage = lineage._split_from_cell(cid, split)
-        if new_lid is None:
-            new_lid = self.get_next_available_lineage_id()
-        new_lineage.graph["lineage_id"] = new_lid
+        new_lineage = lineage._split_from_cell(cell_id, split)
+        if new_lineage_id is None:
+            new_lineage_id = self.get_next_available_lineage_id()
+        new_lineage.graph["lineage_id"] = new_lineage_id
 
         # Update the model data.
-        self.data.cell_data[new_lid] = new_lineage
+        self.data.cell_lineages[new_lineage_id] = new_lineage
         # The update of the cycle lineages (if needed) will be
         # done by the updater.
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
-        self._updater._added_lineages.add(new_lid)
-        self._updater._modified_lineages.add(lid)
+        self._updater._added_lineages.add(new_lineage_id)
+        self._updater._discard_removals(new_lineage)
+        self._updater._modified_lineages.add(lineage_id)
 
         return new_lineage
 
     def add_cell(
         self,
-        lid: int,
-        cid: int | None = None,
-        global_cid: bool = False,
+        *,
+        lineage_id: int,
+        cell_id: int | None = None,
+        unique_in_model: bool = False,
         time_value: int | float = 0,
         prop_values: dict[str, Any] | None = None,
     ) -> int:
         """
-        Add a cell to the lineage.
+        Add a cell to a lineage of the model.
 
         Parameters
         ----------
-        lid : int
+        lineage_id : int
             The ID of the lineage to which the cell belongs.
-        cid : int, optional
-            The ID of the cell to add (default is None).
-        global_cid : bool, optional
+        cell_id : int | None, default=None
+            The ID of the cell to add. If None, a new ID is generated.
+        unique_in_model : bool, default=False
             If True, the cell ID will be unique across all lineages in the model.
-            If False, the cell ID will only be unique within the specified lineage
-            (default is False).
-        time_value : int | float, optional
-            The value of the reference time property for the cell to add (default is 0).
-        prop_values : dict, optional
-            A dictionary containing the properties values of the cell to add.
+            If False, the cell ID will only be unique within the specified lineage.
+        time_value : int | float, default=0
+            The value of the reference time property for the cell to add.
+        prop_values : dict[str, Any] | None, default=None
+            A dictionary containing the property values of the cell to add.
 
         Returns
         -------
@@ -1683,19 +1966,26 @@ class Model:
         ------
         KeyError
             If the lineage with the specified ID does not exist in the model.
-        KeyError
-            If a property in the prop_values is not declared.
+            If a property in `prop_values` is not declared.
         TypeError
-            If the time_value is not an integer or a float.
+            If `time_value` is not an integer or a float.
+        ValueError
+            If `cell_id` is already used in the lineage or, with `unique_in_model`,
+            in the model.
+
+        Warns
+        -----
+        PycellinWarning
+            If `time_value` is not a multiple of the time step of the model.
 
         Notes
         -----
-        The timepoint of the cell is computed at the next ``update()``.
+        The timepoint of the cell is computed at the next `update()`.
         """
         try:
-            lineage = self.data.cell_data[lid]
+            lineage = self.data.cell_lineages[lineage_id]
         except KeyError as err:
-            raise KeyError(f"Lineage with ID {lid} does not exist.") from err
+            raise KeyError(f"Lineage with ID {lineage_id} does not exist.") from err
 
         if not isinstance(time_value, (int, float)):
             raise TypeError("Time value must be an integer or a float.")
@@ -1706,7 +1996,7 @@ class Model:
                     raise KeyError(f"The property {prop} has not been declared.")
         else:
             prop_values = {}
-        prop_values["lineage_id"] = lid
+        prop_values["lineage_id"] = lineage_id
 
         # Is the time value consistent with the time step of the model?
         time_step = self.model_metadata.time_step
@@ -1714,52 +2004,58 @@ class Model:
             warnings.warn(
                 f"The time value {time_value} is not consistent with the time step "
                 f"of the model ({time_step}). Use model.set_time_step() to set or "
-                f"compute a new time step compatible with all time values."
+                f"compute a new time step compatible with all time values.",
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
             )
 
-        if global_cid is True:
-            if cid is None:
+        if unique_in_model is True:
+            if cell_id is None:
                 # Determine the next available global cell_id.
                 next_cids = [
-                    lin._get_next_available_node_id() for lin in self.get_cell_lineages()
+                    lin._get_next_available_node_id()
+                    for lin in self.get_cell_lineages()
                 ]
-                cid = max(next_cids)
+                cell_id = max(next_cids)
             else:
                 # Check if the specified cell_id is already used in the model.
                 for lin in self.get_cell_lineages():
-                    if cid in lin.nodes:
+                    if cell_id in lin.nodes:
                         raise ValueError(
-                            f"Cell ID {cid} is already used in lineage {lin.graph['lineage_id']}."
+                            f"Cell ID {cell_id} is already used in lineage "
+                            f"{lin.graph['lineage_id']}."
                         )
 
-        cid = lineage._add_cell(
-            cid,
-            time_prop=self.model_metadata.reference_time_property,
+        cell_id = lineage._add_cell(
+            cell_id,
+            time_prop=self.model_metadata.reference_time_prop,
             time_prop_value=time_value,
             **prop_values,
         )
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
-        self._updater._added_cells.add(Cell(cid, lid))
-        self._updater._modified_lineages.add(lid)
+        self._updater._added_cells.add(Cell(cell_id, lineage_id))
+        # A cell removed then added back is not removed anymore.
+        self._updater._removed_cells.discard(Cell(cell_id, lineage_id))
+        self._updater._modified_lineages.add(lineage_id)
 
-        return cid
+        return cell_id
 
-    def remove_cell(self, cid: int, lid: int) -> dict[str, Any]:
+    def remove_cell(self, cell_id: int, *, lineage_id: int) -> dict[str, Any]:
         """
         Remove a cell from a lineage.
 
         Parameters
         ----------
-        cid : int
+        cell_id : int
             The ID of the cell to remove.
-        lid : int
+        lineage_id : int
             The ID of the lineage to which the cell belongs.
 
         Returns
         -------
-        dict
+        dict[str, Any]
             Property values of the removed cell.
 
         Raises
@@ -1768,31 +2064,30 @@ class Model:
             If the lineage with the specified ID does not exist in the model.
         """
         try:
-            lineage = self.data.cell_data[lid]
+            lineage = self.data.cell_lineages[lineage_id]
         except KeyError as err:
-            raise KeyError(f"Lineage with ID {lid} does not exist.") from err
+            raise KeyError(f"Lineage with ID {lineage_id} does not exist.") from err
 
-        cell_attrs = lineage._remove_cell(cid)
+        cell_attrs = lineage._remove_cell(cell_id)
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
-        self._updater._removed_cells.add(Cell(cid, lid))
-        self._updater._modified_lineages.add(lid)
+        self._updater._removed_cells.add(Cell(cell_id, lineage_id))
+        self._updater._modified_lineages.add(lineage_id)
 
         return cell_attrs
 
-    def relabel_cells(self, start_id: int = 0, unique_ids: bool = False) -> None:
+    def relabel_cells(self, start_id: int = 0, unique_in_model: bool = False) -> None:
         """
         Relabel the cells in the model to have consecutive IDs.
 
         Parameters
         ----------
-        start_id: int, optional
-            The starting ID for the relabeling (default is 0).
-        unique_ids : bool, optional
+        start_id : int, default=0
+            The starting ID for the relabeling.
+        unique_in_model : bool, default=False
             If True, cell IDs will be unique across all lineages in the model.
-            If False, cell IDs will only be unique within each lineage
-            (default is False).
+            If False, cell IDs will only be unique within each lineage.
 
         Warnings
         --------
@@ -1804,10 +2099,10 @@ class Model:
         Within each lineage, cells are relabeled in a deterministic order:
         a topological order (each cell is numbered after all of its ancestors,
         so a parent always receives a smaller ID than its descendants), with
-        ties broken by the ``reference_time_property`` value and then by the
+        ties broken by the `reference_time_prop` value and then by the
         original cell ID. This guarantees reproducible IDs across runs and
         across differently-built but structurally-identical lineages.
-        When ``unique_ids`` is True, lineages are processed in order of their
+        When `unique_in_model` is True, lineages are processed in order of their
         lineage ID, so global IDs are also reproducible.
         """
         self.update()  # better to start from a clean state, just in case
@@ -1816,19 +2111,21 @@ class Model:
         for lin in sorted(
             self.get_cell_lineages(), key=lambda graph: graph.graph["lineage_id"]
         ):
-            if not unique_ids:
+            if not unique_in_model:
                 current_id = start_id
 
             ordered = list(
                 nx.lexicographical_topological_sort(
-                    lin, key=lambda n: (lin.nodes[n][self.reference_time_property], n)
+                    lin, key=lambda n: (lin.nodes[n][self.reference_time_prop], n)
                 )
             )
             # Temporary relabeling to guard against cycles (e.g. {0: 55, 55: 0}).
             tmp_mapping = {cid: ("__tmp__", i) for i, cid in enumerate(ordered)}
             nx.relabel_nodes(lin, tmp_mapping, copy=False)
 
-            final_mapping = {("__tmp__", i): current_id + i for i in range(len(ordered))}
+            final_mapping = {
+                ("__tmp__", i): current_id + i for i in range(len(ordered))
+            }
             current_id += len(ordered)
             nx.relabel_nodes(lin, final_mapping, copy=False)
 
@@ -1841,10 +2138,11 @@ class Model:
 
     def add_link(
         self,
-        source_cid: int,
-        source_lid: int,
-        target_cid: int,
-        target_lid: int | None = None,
+        source_cell_id: int,
+        target_cell_id: int,
+        *,
+        source_lineage_id: int,
+        target_lineage_id: int | None = None,
         prop_values: dict[str, Any] | None = None,
     ) -> None:
         """
@@ -1852,37 +2150,48 @@ class Model:
 
         Parameters
         ----------
-        source_cid : int
+        source_cell_id : int
             The ID of the source cell.
-        source_lid : int
-            The ID of the source lineage.
-        target_cid : int
+        target_cell_id : int
             The ID of the target cell.
-        target_lid : int, optional
-            The ID of the target lineage (default is None).
-        prop_values : dict, optional
-            A dictionary containing the properties value of
+        source_lineage_id : int
+            The ID of the source lineage.
+        target_lineage_id : int | None, default=None
+            The ID of the target lineage. If None, the target cell is in the source
+            lineage.
+        prop_values : dict[str, Any] | None, default=None
+            A dictionary containing the property values of
             the link between the two cells.
 
         Raises
         ------
         KeyError
-            If the lineage with the specified ID does not exist in the model.
-        KeyError
-            If a property in the link_attributes is not declared.
+            If a lineage with the specified IDs does not exist in the model.
+            If a property in `prop_values` is not declared.
+        ValueError
+            If the source or target cell does not exist in its lineage, or if the
+            link already exists.
+        FusionError
+            If the target cell already has a parent cell.
+        TimeFlowError
+            If the target cell is not later than the source cell.
         """
         try:
-            source_lineage = self.data.cell_data[source_lid]
+            source_lineage = self.data.cell_lineages[source_lineage_id]
         except KeyError as err:
-            raise KeyError(f"Lineage with ID {source_lid} does not exist.") from err
-        if target_lid is not None:
+            raise KeyError(
+                f"Lineage with ID {source_lineage_id} does not exist."
+            ) from err
+        if target_lineage_id is not None:
             try:
-                target_lineage = self.data.cell_data[target_lid]
+                target_lineage = self.data.cell_lineages[target_lineage_id]
             except KeyError as err:
-                raise KeyError(f"Lineage with ID {target_lid} does not exist.") from err
+                raise KeyError(
+                    f"Lineage with ID {target_lineage_id} does not exist."
+                ) from err
         else:
-            target_lid = source_lid
-            target_lineage = self.data.cell_data[source_lid]
+            target_lineage_id = source_lineage_id
+            target_lineage = self.data.cell_lineages[source_lineage_id]
 
         if prop_values is not None:
             for prop in prop_values:
@@ -1892,36 +2201,44 @@ class Model:
             prop_values = {}
 
         source_lineage._add_link(
-            source_cid,
-            target_cid,
+            source_cell_id,
+            target_cell_id,
             target_lineage,
-            time_prop=self.model_metadata.reference_time_property,
+            time_prop=self.model_metadata.reference_time_prop,
             **prop_values,
         )
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
-        self._updater._added_links.add(Link(source_cid, target_cid, source_lid))
-        self._updater._modified_lineages.add(source_lid)
-        if target_lid != source_lid:
-            self._updater._modified_lineages.add(target_lid)
+        self._updater._added_links.add(
+            Link(source_cell_id, target_cell_id, source_lineage_id)
+        )
+        # A link removed then added back is not removed anymore.
+        self._updater._removed_links.discard(
+            Link(source_cell_id, target_cell_id, source_lineage_id)
+        )
+        self._updater._modified_lineages.add(source_lineage_id)
+        if target_lineage_id != source_lineage_id:
+            self._updater._modified_lineages.add(target_lineage_id)
 
-    def remove_link(self, source_cid: int, target_cid: int, lid: int) -> dict[str, Any]:
+    def remove_link(
+        self, source_cell_id: int, target_cell_id: int, *, lineage_id: int
+    ) -> dict[str, Any]:
         """
         Remove a link between two cells.
 
         Parameters
         ----------
-        source_cid : int
+        source_cell_id : int
             The ID of the source cell.
-        target_cid : int
+        target_cell_id : int
             The ID of the target cell.
-        lid : int
+        lineage_id : int
             The ID of the lineage to which the cells belong.
 
         Returns
         -------
-        dict
+        dict[str, Any]
             Property values of the removed link.
 
         Raises
@@ -1930,69 +2247,81 @@ class Model:
             If the link between the two cells does not exist.
         """
         try:
-            lineage = self.data.cell_data[lid]
+            lineage = self.data.cell_lineages[lineage_id]
         except KeyError as err:
-            raise KeyError(f"Lineage with ID {lid} does not exist.") from err
-        link_attrs = lineage._remove_link(source_cid, target_cid)
+            raise KeyError(f"Lineage with ID {lineage_id} does not exist.") from err
+        link_attrs = lineage._remove_link(source_cell_id, target_cell_id)
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
-        self._updater._removed_links.add(Link(source_cid, target_cid, lid))
-        self._updater._modified_lineages.add(lid)
+        self._updater._removed_links.add(
+            Link(source_cell_id, target_cell_id, lineage_id)
+        )
+        self._updater._modified_lineages.add(lineage_id)
 
         return link_attrs
 
-    def remove_intercycle_links(self, lids: list[int] | None = None) -> dict[str, Any]:
+    def remove_intercycle_links(
+        self, lineage_ids: list[int] | None = None
+    ) -> dict[int, list[tuple[int, int, dict[str, Any]]]]:
         """
         Remove the outgoing links from all division cells of the specified lineages.
 
         Parameters
         ----------
-        lids : list[int], optional
+        lineage_ids : list[int] | None, default=None
             List of lineage IDs for which to remove intercycle links.
-            If not specified, all lineages will be processed (default is None).
+            If None, all lineages will be processed.
 
         Returns
         -------
-        dict[str, Any]
-            A dictionary containing the property values of the removed links.
+        dict[int, list[tuple[int, int, dict[str, Any]]]]
+            The removed links of each lineage, by lineage ID, as (source cell ID,
+            target cell ID, property values of the link) tuples.
+
+        Raises
+        ------
+        KeyError
+            If a lineage with the specified ID does not exist in the model.
         """
-        if lids is None:
-            lids = list(self.data.cell_data.keys())
+        if lineage_ids is None:
+            lineage_ids = list(self.data.cell_lineages.keys())
 
         removed_links = {}
         updater_links = []
-        for lid in lids:
+        for lid in lineage_ids:
             try:
-                lineage = self.data.cell_data[lid]
+                lineage = self.data.cell_lineages[lid]
             except KeyError as err:
                 raise KeyError(f"Lineage with ID {lid} does not exist.") from err
             edges = lineage._remove_intercycle_links()
             removed_links[lid] = edges
-            updater_links.extend(Link(source, target, lid) for source, target, _ in edges)
+            updater_links.extend(
+                Link(source, target, lid) for source, target, _ in edges
+            )
 
         # Notify that an update of the property values may be required.
         self._updater._update_required = True
         self._updater._removed_links.update(updater_links)
-        self._updater._modified_lineages.update(lids)
+        self._updater._modified_lineages.update(lineage_ids)
 
         return removed_links
 
-    def get_fusions(self, lids: list[int] | None = None) -> list[Cell]:
+    def get_fusions(self, lineage_ids: list[int] | None = None) -> list[Cell]:
         """
         Return fusion cells, i.e. cells with more than one parent.
 
         Parameters
         ----------
-        lids : list[int], optional
+        lineage_ids : list[int] | None, default=None
             List of lineage IDs to check for fusions.
-            If not specified, all lineages will be checked (default is None).
+            If None, all lineages will be checked.
 
         Returns
         -------
         list[Cell]
-            List of the fusion cells. Each cell is a named tuple:
-            (cell_id, lineage_id).
+            List of the fusion cells, as `~pycellin.custom_types.Cell` named tuples:
+            ``(cell_id, lineage_id)``.
 
         Raises
         ------
@@ -2000,11 +2329,11 @@ class Model:
             If a lineage with the specified ID does not exist in the model.
         """
         fusions = []
-        if lids is None:
-            lids = list(self.data.cell_data.keys())
-        for lin_id in lids:
+        if lineage_ids is None:
+            lineage_ids = list(self.data.cell_lineages.keys())
+        for lin_id in lineage_ids:
             try:
-                lineage = self.data.cell_data[lin_id]
+                lineage = self.data.cell_lineages[lin_id]
             except KeyError as err:
                 msg = f"Lineage with ID {lin_id} does not exist."
                 raise KeyError(msg) from err
@@ -2013,21 +2342,21 @@ class Model:
                 fusions.extend([Cell(cell_id, lin_id) for cell_id in tmp])
         return fusions
 
-    def get_divisions(self, lids: list[int] | None = None) -> list[Cell]:
+    def get_divisions(self, lineage_ids: list[int] | None = None) -> list[Cell]:
         """
         Return division cells, i.e. cells with more than one child.
 
         Parameters
         ----------
-        lids : list[int], optional
+        lineage_ids : list[int] | None, default=None
             List of lineage IDs to check for divisions.
-            If not specified, all lineages will be checked (default is None).
+            If None, all lineages will be checked.
 
         Returns
         -------
         list[Cell]
-            List of the division cells. Each cell is a named tuple:
-            (cell_id, lineage_id).
+            List of the division cells, as `~pycellin.custom_types.Cell` named tuples:
+            ``(cell_id, lineage_id)``.
 
         Raises
         ------
@@ -2035,11 +2364,11 @@ class Model:
             If a lineage with the specified ID does not exist in the model.
         """
         divisions = []
-        if lids is None:
-            lids = list(self.data.cell_data.keys())
-        for lin_id in lids:
+        if lineage_ids is None:
+            lineage_ids = list(self.data.cell_lineages.keys())
+        for lin_id in lineage_ids:
             try:
-                lineage = self.data.cell_data[lin_id]
+                lineage = self.data.cell_lineages[lin_id]
             except KeyError as err:
                 msg = f"Lineage with ID {lin_id} does not exist."
                 raise KeyError(msg) from err
@@ -2055,10 +2384,25 @@ class Model:
         """
         Add a custom property to the model.
 
-        This method adds the property to the PropsMetadata,
-        register the way to compute the property,
-        and notify the updater that all data needs to be updated.
-        To actually update the data, the user needs to call the update() method.
+        This method adds the property to the `PropsMetadata`,
+        registers the way to compute the property,
+        and notifies the updater that all data needs to be updated.
+        To actually update the data, the user needs to call the `update()` method.
+
+        If the property is already declared with the same property type and lineage
+        type, e.g. added before with other arguments, its declaration and calculator
+        are replaced, and an info message says so. A cycle property propagated to the
+        cell lineages
+        stays propagated. If the property is declared with another property type or
+        lineage type, e.g. loaded from a file, the declaration is replaced only if it
+        is unused: not protected, without calculator and without values in cell
+        lineages.
+
+        The model keeps its own copies of the calculator and of its property, so
+        they can be given to several models. Changes made to them after adding no
+        longer reach the model, and the changes the model makes to its declaration,
+        e.g. a property type removed by `remove_property()`, don't reach them.
+        `get_property()` returns the declaration of the model.
 
         Parameters
         ----------
@@ -2068,30 +2412,181 @@ class Model:
         Raises
         ------
         ValueError
+            If the calculator computes values of another kind of object than the
+            property type, e.g. a node calculator for an edge property.
+            If the lineage type of the property is ``"both"``, since a calculator
+            computes a property on cell lineages or on cycle lineages.
             If the property is a cycle lineage property and cycle lineages
             have not been computed yet.
+            If a property read by the calculator does not have the property type
+            or lineage type expected by the calculator.
+            If the property is already declared with another property type or
+            lineage type, and this declaration is used.
         TypeError
             If the identifier of a property read by the calculator is not a string.
         MissingPropertyError
             If a property read by the calculator has not been declared in the model.
-        ValueError
-            If a property read by the calculator does not have the property type
-            or lineage type expected by the calculator.
+
+        Warns
+        -----
+        PycellinWarning
+            If the calculator uses external data (e.g. a label image) and the model
+            comes from a merge without a shared label image, since that data may not
+            match all the lineages.
         """
-        if calculator.prop.lin_type == "CycleLineage" and not self.data.cycle_data:
+        # The objects given may be shared with other models, and the model changes
+        # its declarations, e.g. propagate_cycle_properties(). The copy of the
+        # calculator is shallow, since it may hold a label image, and its property is
+        # the declaration of the model, which the updater reads.
+        calculator = copy(calculator)
+        calculator.property = copy(calculator.property)
+        prop = calculator.property
+        # A node calculator stores its values on nodes, whatever the property type.
+        calc_type = calculator.get_property_type()
+        if calc_type is not None and (
+            _property_type_from_string(calc_type) not in prop.prop_type
+        ):
+            raise ValueError(
+                f"Cannot add '{prop.identifier}': {type(calculator).__name__} computes "
+                f"{calc_type} values, but the property type of '{prop.identifier}' is "
+                f"'{prop.prop_type}'."
+            )
+        if prop.lineage_type == "both":
+            raise ValueError(
+                f"Cannot add '{prop.identifier}' with the lineage type 'both': a "
+                "calculator computes a property on cell lineages or on cycle lineages. "
+                "For a cycle property also stored on the cells, add it with the "
+                "lineage type 'cycle', then call model.propagate_cycle_properties()."
+            )
+        if prop.lineage_type == "cycle" and self.data.cycle_lineages is None:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with model.add_cycle_data()."
+                "Please compute them first with model.add_cycle_lineages()."
             )
         self._check_input_props(calculator)
-        self.props_metadata._add_prop(calculator.prop)
+        # Without a shared label image, the lineages may come from different images.
+        if (
+            calculator.uses_external_data()
+            and self.model_metadata.label_image is None
+            and self.model_metadata.label_image_path is None
+            and any(
+                lin_prop.provenance == _MERGE_PROVENANCE
+                for lin_prop in self.get_lineage_properties().values()
+            )
+        ):
+            warnings.warn(
+                f"'{prop.identifier}' reads one image for all the lineages of this "
+                "merged model. If they come from different images, its values will be "
+                "wrong for some of them: add the property to each model before merging "
+                "instead.",
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
+            )
+        declared = self.get_property(prop.identifier)
+        if declared is not None and not self._is_same_kind(declared, prop):
+            if self._is_unused_prop(prop.identifier):
+                self.props_metadata._remove_prop(prop.identifier)
+            else:
+                raise ValueError(
+                    f"Cannot add '{prop.identifier}' as {self._describe_kind(prop)}: "
+                    f"it is already declared as {self._describe_kind(declared)}, "
+                    "with values or a calculator. If it is a cycle property propagated "
+                    "to cell lineages, e.g. loaded from an exported file, remove it "
+                    "first with model.remove_property(). Otherwise, give the new "
+                    "property another identifier with the custom_identifier "
+                    "argument of the add_*() methods."
+                )
+        self.props_metadata._add_prop(prop, overwrite=True)
         self._updater.register_calculator(calculator)
         self.prepare_full_data_update()
 
+    @staticmethod
+    def _is_same_kind(declared: Property, prop: Property) -> bool:
+        """
+        Check whether a property is of the same kind as a declared one.
+
+        Both must have the same property type and lineage type.
+
+        Parameters
+        ----------
+        declared : Property
+            Property already declared in the model.
+        prop : Property
+            Property to compare with `declared`.
+
+        Returns
+        -------
+        bool
+            True if both properties are of the same kind, False otherwise.
+        """
+        return (
+            declared.prop_type == prop.prop_type
+            and declared.lineage_type == prop.lineage_type
+        )
+
+    def _is_unused_prop(self, prop_id: str) -> bool:
+        """
+        Check whether a declared property is unused.
+
+        A property is unused when it is not protected, has no calculator and no cell
+        lineage holds a value for it, e.g. a property declared in a file but given
+        no values. Values in cycle lineages are not checked: cycle lineages are
+        rebuilt from the cell lineages, and only protected properties and properties
+        with a calculator get values again.
+
+        Parameters
+        ----------
+        prop_id : str
+            Identifier of the declared property.
+
+        Returns
+        -------
+        bool
+            True if the property is unused, False otherwise.
+        """
+        if prop_id in self.props_metadata._get_protected_props():
+            return False
+        if prop_id in self._updater._calculators:
+            return False
+        for lin in self.data.cell_lineages.values():
+            if prop_id in lin.graph:
+                return False
+            if any(prop_id in cell for _, cell in lin.nodes(data=True)):
+                return False
+            if any(prop_id in link for _, _, link in lin.edges(data=True)):
+                return False
+        return True
+
+    @staticmethod
+    def _describe_kind(prop: Property) -> str:
+        """
+        Describe the property type and lineage type of a property, for messages.
+
+        Parameters
+        ----------
+        prop : Property
+            Property to describe.
+
+        Returns
+        -------
+        str
+            Description of the property, with its article, e.g. "a node property of
+            cell lineages" or "an edge property of cycle lineages".
+        """
+        lineages = {
+            "cell": "cell lineages",
+            "cycle": "cycle lineages",
+            "both": "cell and cycle lineages",
+        }
+        kind = f"{prop.prop_type} property of {lineages[prop.lineage_type]}"
+        return f"{'an' if kind[0] in 'aeiou' else 'a'} {kind}"
+
     def _check_input_props(self, calculator: PropertyCalculator) -> None:
         """
-        Check that the properties read by a calculator are declared in the model
-        with the expected property type and lineage type.
+        Check the properties read by a calculator.
+
+        They must be declared in the model with the property type and lineage type
+        expected by the calculator.
 
         Parameters
         ----------
@@ -2101,17 +2596,19 @@ class Model:
         Raises
         ------
         TypeError
-            If the identifier of an input property is not a string, e.g. a Property.
+            If the identifier of an input property is not a string, e.g. a `Property`.
         MissingPropertyError
             If an input property has not been declared in the model.
         ValueError
             If an input property does not have the property type or lineage type
             expected by the calculator.
         """
-        prop_id = calculator.prop.identifier
-        for param, (input_id, prop_type, lin_type) in (
-            calculator.get_input_props().items()
-        ):
+        prop_id = calculator.property.identifier
+        for param, (
+            input_id,
+            prop_type,
+            lineage_type,
+        ) in calculator.get_input_props().items():
             if not isinstance(input_id, str):
                 msg = (
                     f"'{param}' must be the identifier of a property (str), "
@@ -2130,7 +2627,7 @@ class Model:
                         include_core_properties=False
                     ),
                 }
-                fix = f"set '{param}' to the identifier of a declared property"
+                fixes = []
                 if input_id in pycellin_props:
                     add_method = self._get_prop_method(input_id)
                     parameters = inspect.signature(add_method).parameters.values()
@@ -2138,25 +2635,39 @@ class Model:
                     # Don't suggest an add method that reads, by default, the property
                     # being added, e.g. add_cell_contour() for a polygon from contours.
                     if prop_id not in defaults:
-                        fix = f"add it first with model.add_{input_id}(), or {fix}"
-                raise MissingPropertyError(
-                    input_id,
-                    message=(
-                        f"'{prop_id}' requires the property '{input_id}', which has "
-                        f"not been declared. To fix this, {fix}."
-                    ),
+                        fixes.append(f"add it first with model.add_{input_id}()")
+                # Don't suggest a parameter that the add method of the property being
+                # added doesn't take, e.g. 'contour_prop' for add_rod_length().
+                if (
+                    prop_id not in pycellin_props
+                    or param
+                    in inspect.signature(self._get_prop_method(prop_id)).parameters
+                ):
+                    fixes.append(
+                        f"set '{param}' to the identifier of a declared property"
+                    )
+                message = (
+                    f"'{prop_id}' requires the property '{input_id}', which has not "
+                    "been declared."
                 )
-            if property_type_from_string(prop_type) not in input_prop.prop_type:
+                if fixes:
+                    message += f" To fix this, {', or '.join(fixes)}."
+                raise MissingPropertyError(input_id, message=message)
+            if _property_type_from_string(prop_type) not in input_prop.prop_type:
                 raise ValueError(
                     f"'{prop_id}' requires '{param}' to be a property with "
                     f"prop_type '{prop_type}', but '{input_id}' has prop_type "
                     f"'{input_prop.prop_type}'."
                 )
-            if input_prop.lin_type not in (lin_type, "Lineage"):
+            # The values of a cycle property propagated to the cells are on the cells.
+            propagated = input_id in self.props_metadata._get_propagated_props()
+            if input_prop.lineage_type not in (lineage_type, "both") and not (
+                lineage_type == "cell" and propagated
+            ):
                 raise ValueError(
                     f"'{prop_id}' requires '{param}' to be a property with "
-                    f"lin_type '{lin_type}', but '{input_id}' has lin_type "
-                    f"'{input_prop.lin_type}'."
+                    f"lineage_type '{lineage_type}', but '{input_id}' has lineage_type "
+                    f"'{input_prop.lineage_type}'."
                 )
 
     def _get_input_prop(self, prop_identifier: Any) -> Property | None:
@@ -2219,17 +2730,17 @@ class Model:
 
         Parameters
         ----------
-        time_prop : str, optional
+        time_prop : str | None, default=None
             Identifier of the cell lineage node property holding the time of the
             cells. If None, the reference time property of the model is used.
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "absolute_age".
-        custom_name : str, optional
+            ``"absolute_age"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Absolute age".
-        custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Age of the cell since the start of the lineage".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2238,18 +2749,18 @@ class Model:
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
-        time_prop = time_prop or self.reference_time_property
+        time_prop = time_prop or self.reference_time_prop
         # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
         time = self._get_input_prop(time_prop)
 
-        prop = tracking.create_absolute_age_property(
+        prop = timing.create_absolute_age_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             dtype=time.dtype if time else "float",
             unit=time.unit if time else None,
         )
-        self.add_custom_property(tracking.AbsoluteAge(prop, time_prop=time_prop))
+        self.add_custom_property(timing.AbsoluteAge(prop, time_prop=time_prop))
 
     def add_turning_angle(
         self,
@@ -2262,20 +2773,29 @@ class Model:
         Add the turning angle property to the model.
 
         The turning angle is defined as the angle between the vectors representing
-        the displacement of the cell at two consecutive detections.
+        the displacement of the cell at two consecutive detections. The positions
+        are given by ``cell_x`` and ``cell_y``, and by ``cell_z`` when it is declared at
+        the time of this call, as for 3D data.
 
         Parameters
         ----------
-        unit : Literal["radian", "degree"], optional
-            Unit of the turning angle (default is "radian").
-        custom_identifier : str, optional
+        unit : Literal["radian", "degree"], default="radian"
+            Unit of the turning angle.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "turning_angle".
-        custom_name : str, optional
+            ``"turning_angle"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Turning angle".
-        custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Angle of the cell trajectory between two consecutive displacements".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If ``cell_x`` or ``cell_y`` has not been declared.
+        ValueError
+            If `unit` is not ``"radian"`` or ``"degree"``.
         """
         prop = motion.create_turning_angle_property(
             custom_identifier=custom_identifier,
@@ -2283,7 +2803,9 @@ class Model:
             custom_description=custom_description,
             unit=unit,
         )
-        self.add_custom_property(motion.TurningAngle(prop, unit))
+        self.add_custom_property(
+            motion.TurningAngle(prop, unit, self._get_coord_props(prop.identifier))
+        )
 
     def add_cycle_mean_displacement(
         self,
@@ -2300,19 +2822,18 @@ class Model:
 
         Parameters
         ----------
-        displacement_prop : str, optional
+        displacement_prop : str, default="cell_displacement"
             Identifier of the cell lineage edge property holding the cell
-            displacements. Defaults to "cell_displacement", added by
-            `add_cell_displacement()`.
-        custom_identifier : str, optional
+            displacements. The default property is added by `add_cell_displacement()`.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cycle_mean_displacement".
-        custom_name : str, optional
+            ``"cycle_mean_displacement"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be
             "Cycle mean displacement".
-        custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Mean displacement of the cell during the cell cycle".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2320,7 +2841,6 @@ class Model:
             If `displacement_prop` has not been declared in the model.
         ValueError
             If `displacement_prop` is not an edge property of cell lineages.
-        ValueError
             If the cycle lineages have not been computed yet.
         """
         prop = motion.create_cycle_mean_displacement_property(
@@ -2349,21 +2869,21 @@ class Model:
 
         Parameters
         ----------
-        speed_prop : str, optional
+        speed_prop : str, default="cell_speed"
             Identifier of the cell lineage edge property holding the cell speeds.
-            Defaults to "cell_speed", added by `add_cell_speed()`.
-        include_incoming_edge : bool, optional
+            The default property is added by `add_cell_speed()`.
+        include_incoming_edge : bool, default=False
             Whether to include the distance between the first cell of the cycle
-            and its predecessor. Default is False.
-        custom_identifier : str, optional
+            and its predecessor.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cycle_mean_speed".
-        custom_name : str, optional
+            ``"cycle_mean_speed"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be
             "Cycle mean speed".
-        custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Mean speed of the cell during the cell cycle".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2371,7 +2891,6 @@ class Model:
             If `speed_prop` has not been declared in the model.
         ValueError
             If `speed_prop` is not an edge property of cell lineages.
-        ValueError
             If the cycle lineages have not been computed yet.
         """
         prop = motion.create_cycle_mean_speed_property(
@@ -2403,19 +2922,18 @@ class Model:
 
         Parameters
         ----------
-        displacement_prop : str, optional
+        displacement_prop : str, default="cell_displacement"
             Identifier of the cell lineage edge property holding the cell
-            displacements. Defaults to "cell_displacement", added by
-            `add_cell_displacement()`.
-        custom_identifier : str, optional
+            displacements. The default property is added by `add_cell_displacement()`.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cycle_total_displacement".
-        custom_name : str, optional
+            ``"cycle_total_displacement"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be
             "Cycle total displacement".
-        custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Displacement of the cell during the cell cycle".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2423,7 +2941,6 @@ class Model:
             If `displacement_prop` has not been declared in the model.
         ValueError
             If `displacement_prop` is not an edge property of cell lineages.
-        ValueError
             If the cycle lineages have not been computed yet.
         """
         prop = motion.create_cycle_total_displacement_property(
@@ -2447,23 +2964,23 @@ class Model:
         Add the cell area property to the model.
 
         The cell area is computed from the cell polygons. For a
-        shapely.MultiPolygon, it is the area of all the pieces, holes excluded.
+        ``shapely.MultiPolygon``, it is the area of all the pieces, holes excluded.
         It is NaN for cells whose polygon is None, such as cells without a contour.
 
         Parameters
         ----------
-        polygon_prop : str, optional
+        polygon_prop : str, default="cell_polygon"
             Identifier of the cell lineage node property holding the cell shapes
-            as shapely.Polygon or shapely.MultiPolygon. Defaults to
-            "cell_polygon", added by `add_cell_polygon()`.
-        custom_identifier : str, optional
+            as ``shapely.Polygon`` or ``shapely.MultiPolygon``. The default property
+            is added by `add_cell_polygon()`.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cell_area".
-        custom_name : str, optional
+            ``"cell_area"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Cell area".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cell_area_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2496,17 +3013,17 @@ class Model:
 
         Parameters
         ----------
-        area_prop : str, optional
+        area_prop : str, default="cell_area"
             Identifier of the cell lineage node property holding the cell areas.
-            Defaults to "cell_area", added by `add_cell_area()`.
-        custom_identifier : str, optional
+            The default property is added by `add_cell_area()`.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cycle_mean_area".
-        custom_name : str, optional
+            ``"cycle_mean_area"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Cycle mean area".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cycle_mean_area_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2514,7 +3031,6 @@ class Model:
             If `area_prop` has not been declared in the model.
         ValueError
             If `area_prop` is not a node property of cell lineages.
-        ValueError
             If the cycle lineages have not been computed yet.
         """
         prop = morpho.create_cycle_mean_area_property(
@@ -2541,17 +3057,17 @@ class Model:
 
         Parameters
         ----------
-        area_prop : str, optional
+        area_prop : str, default="cell_area"
             Identifier of the cell lineage node property holding the cell areas.
-            Defaults to "cell_area", added by `add_cell_area()`.
-        custom_identifier : str, optional
+            The default property is added by `add_cell_area()`.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "birth_area".
-        custom_name : str, optional
+            ``"birth_area"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Birth area".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_birth_area_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2559,7 +3075,6 @@ class Model:
             If `area_prop` has not been declared in the model.
         ValueError
             If `area_prop` is not a node property of cell lineages.
-        ValueError
             If the cycle lineages have not been computed yet.
         """
         prop = morpho.create_birth_area_property(
@@ -2587,17 +3102,17 @@ class Model:
 
         Parameters
         ----------
-        area_prop : str, optional
+        area_prop : str, default="cell_area"
             Identifier of the cell lineage node property holding the cell areas.
-            Defaults to "cell_area", added by `add_cell_area()`.
-        custom_identifier : str, optional
+            The default property is added by `add_cell_area()`.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "division_area".
-        custom_name : str, optional
+            ``"division_area"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Division area".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_division_area_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2605,7 +3120,6 @@ class Model:
             If `area_prop` has not been declared in the model.
         ValueError
             If `area_prop` is not a node property of cell lineages.
-        ValueError
             If the cycle lineages have not been computed yet.
         """
         prop = morpho.create_division_area_property(
@@ -2627,23 +3141,24 @@ class Model:
         Add the cell perimeter property to the model.
 
         The cell perimeter is computed from the cell polygons. For a
-        shapely.MultiPolygon, it includes all the pieces and the edges of their holes.
-        It is NaN for cells whose polygon is None, such as cells without a contour.
+        ``shapely.MultiPolygon``, it includes all the pieces and the edges of their
+        holes. It is NaN for cells whose polygon is None, such as cells without a
+        contour.
 
         Parameters
         ----------
-        polygon_prop : str, optional
+        polygon_prop : str, default="cell_polygon"
             Identifier of the cell lineage node property holding the cell shapes
-            as shapely.Polygon or shapely.MultiPolygon. Defaults to
-            "cell_polygon", added by `add_cell_polygon()`.
-        custom_identifier : str, optional
+            as ``shapely.Polygon`` or ``shapely.MultiPolygon``. The default property
+            is added by `add_cell_polygon()`.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cell_perimeter".
-        custom_name : str, optional
+            ``"cell_perimeter"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Cell perimeter".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cell_perimeter_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2674,25 +3189,25 @@ class Model:
         squared perimeter, both computed from the cell polygons. It is 1 for a disk
         and gets closer to 0 as the cell gets elongated or its outline irregular.
         Polygons always have a circularity below 1, even regular polygons with many
-        sides. For a shapely.MultiPolygon, it is computed from the area and
+        sides. For a ``shapely.MultiPolygon``, it is computed from the area and
         perimeter of all the pieces, as in `add_cell_area()` and
         `add_cell_perimeter()`, so pieces and holes lower it. It is NaN for cells
         whose polygon is None, such as cells without a contour.
 
         Parameters
         ----------
-        polygon_prop : str, optional
+        polygon_prop : str, default="cell_polygon"
             Identifier of the cell lineage node property holding the cell shapes
-            as shapely.Polygon or shapely.MultiPolygon. Defaults to
-            "cell_polygon", added by `add_cell_polygon()`.
-        custom_identifier : str, optional
+            as ``shapely.Polygon`` or ``shapely.MultiPolygon``. The default property
+            is added by `add_cell_polygon()`.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cell_circularity".
-        custom_name : str, optional
+            ``"cell_circularity"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Cell circularity".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cell_circularity_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2723,24 +3238,24 @@ class Model:
         The cell solidity is the area of the cell divided by the area of its convex
         hull, both computed from the cell polygons. It is 1 for a convex cell and
         gets closer to 0 as the outline of the cell gets more concave. For a
-        shapely.MultiPolygon, the convex hull encloses all the pieces, and holes are
+        ``shapely.MultiPolygon``, the convex hull encloses all the pieces, and holes are
         excluded from the area. It is NaN for cells whose polygon is None, such as
         cells without a contour.
 
         Parameters
         ----------
-        polygon_prop : str, optional
+        polygon_prop : str, default="cell_polygon"
             Identifier of the cell lineage node property holding the cell shapes
-            as shapely.Polygon or shapely.MultiPolygon. Defaults to
-            "cell_polygon", added by `add_cell_polygon()`.
-        custom_identifier : str, optional
+            as ``shapely.Polygon`` or ``shapely.MultiPolygon``. The default property
+            is added by `add_cell_polygon()`.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cell_solidity".
-        custom_name : str, optional
+            ``"cell_solidity"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Cell solidity".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cell_solidity_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2770,27 +3285,27 @@ class Model:
         The cell contour is the coordinates of the contour of the cell,
         relative to the cell centroid. It is computed from the cell polygons, and is
         None for cells whose polygon is None. Don't use it on the contours that the
-        polygons are computed from (`add_cell_polygon(source="contour")`).
+        polygons are computed from (`add_cell_polygon()` with ``source="contour"``).
 
         Parameters
         ----------
-        polygon_prop : str, optional
+        polygon_prop : str, default="cell_polygon"
             Identifier of the cell lineage node property holding the cell shapes
-            as shapely.Polygon. A shapely.MultiPolygon is not accepted, since it has
-            no single contour. Defaults to "cell_polygon", added by
+            as ``shapely.Polygon``. A ``shapely.MultiPolygon`` is not accepted, since
+            it has no single contour. The default property is added by
             `add_cell_polygon()`.
-        force_recompute : bool
+        force_recompute : bool, default=False
             Whether to force recomputation of the property when it has already been
-            computed. Defaults to False.
-        custom_identifier : str, optional
+            computed.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cell_contour".
-        custom_name : str, optional
+            ``"cell_contour"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be
             "Cell contour".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cell_contour_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -2811,40 +3326,40 @@ class Model:
             )
         )
 
-    def add_cycle_completeness(
+    def add_is_complete_cycle(
         self,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the cell cycle completeness property to the model.
+        Add the ``is_complete_cycle`` property to the model.
 
-        A cell cycle is defined as complete when it starts by a division
-        AND ends by a division. Cell cycles that start at the root
+        A cell cycle is defined as complete when it starts with a division
+        AND ends with a division. Cell cycles that start at the root
         or end with a leaf are thus incomplete.
-        This can be useful when analyzing properties like division time. It avoids
+        This can be useful when analyzing properties like interdivision time. It avoids
         the introduction of a bias since we have no information on what happened
         before the root or after the leaves.
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cycle_completeness".
-        custom_name : str, optional
+            ``"is_complete_cycle"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be
-            "Cycle completeness".
-        custom_description : str, optional
+            "Is complete cycle".
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.tracking.create_cycle_completeness_property`).
+            default value (see :doc:`/api/predefined_properties`).
         """
-        prop = tracking.create_cycle_completeness_property(
+        prop = topo.create_is_complete_cycle_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
         )
-        self.add_custom_property(tracking.CycleCompleteness(prop))
+        self.add_custom_property(topo.IsCompleteCycle(prop))
 
     def add_cell_displacement(
         self,
@@ -2856,18 +3371,25 @@ class Model:
         Add the cell displacement property to the model.
 
         The cell displacement is defined as the Euclidean distance between the positions
-        of the cell at two consecutive detections.
+        of the cell at two consecutive detections. The positions are given by
+        ``cell_x`` and ``cell_y``, and by ``cell_z`` when it is declared at the time
+        of this call, as for 3D data.
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cell_displacement".
-        custom_name : str, optional
+            ``"cell_displacement"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Cell displacement".
-        custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Displacement of the cell between two consecutive detections".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If ``cell_x`` or ``cell_y`` has not been declared.
         """
         prop = motion.create_cell_displacement_property(
             custom_identifier=custom_identifier,
@@ -2875,14 +3397,16 @@ class Model:
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-        self.add_custom_property(motion.CellDisplacement(prop))
+        self.add_custom_property(
+            motion.CellDisplacement(prop, self._get_coord_props(prop.identifier))
+        )
 
     def add_cell_polygon(
         self,
-        source: Literal["label_img", "contour"] = "label_img",
+        source: Literal["label_image", "contour"] = "label_image",
         label_prop: str | None = None,
-        label_img: np.ndarray | None = None,
-        label_img_path: str | None = None,
+        label_image: np.ndarray | None = None,
+        label_image_path: str | None = None,
         contour_prop: str | None = None,
         force_recompute: bool = False,
         custom_identifier: str | None = None,
@@ -2892,19 +3416,19 @@ class Model:
         """
         Add the cell polygon property to the model.
 
-        The cell polygon is the shape of the cell as a shapely.Polygon. It is
+        The cell polygon is the shape of the cell as a ``shapely.Polygon``. It is
         computed from one of these sources:
 
-        - "label_img": the outline of the cell label in a label image. Holes are
+        - ``"label_image"``: the outline of the cell label in a label image. Holes are
           filled and, when a label is made of several pieces, only the largest one
           is kept: a warning lists the cells concerned when the model is updated.
           Pixels that touch only by a corner belong to the same piece. To keep all
           the pieces and holes, use the cell multipolygon property instead
           (`add_cell_multipolygon()`).
-        - "contour": the cell contour, relative to the cell position (`cell_x`,
-          `cell_y`), like the contours loaded from TrackMate or Cell Tracking
-          Challenge data. The polygon is None for cells without a contour. An
-          invalid contour, such as a contour that crosses itself, is repaired: the
+        - ``"contour"``: the cell contour, relative to the cell position
+          (``cell_x``, ``cell_y``), like the contours loaded from TrackMate or Cell
+          Tracking Challenge data. The polygon is None for cells without a contour.
+          An invalid contour, such as a contour that crosses itself, is repaired: the
           polygon is its largest piece with holes filled. A log message lists the
           cells concerned when the model is updated. Since `add_cell_contour()`
           computes contours from polygons, don't use it on the contours the
@@ -2916,31 +3440,32 @@ class Model:
 
         Parameters
         ----------
-        source : {"label_img", "contour"}, optional
-            Source of the cell polygons. Defaults to "label_img".
-        label_prop : str, optional
-            Name of the property that stores cell labels. Must match the labels in
-            the label image. Defaults to "label". Only used with
-            source="label_img".
-        label_img : np.ndarray, optional
-            The label image. If None, the method will fallback to `label_img_path`
+        source : Literal["label_image", "contour"], default="label_image"
+            Source of the cell polygons.
+        label_prop : str | None, default=None
+            Identifier of the property that stores cell labels. Must match the labels
+            in the label image. If None, ``"label"`` is used. Only used with
+            ``source="label_image"``.
+        label_image : np.ndarray | None, default=None
+            The label image. If None, the method will fall back to `label_image_path`
             or attempt to find it in the model's metadata. Only used with
-            source="label_img".
-        label_img_path: str, optional
+            ``source="label_image"``.
+        label_image_path : str | None, default=None
             The path to the label image (tif stack). If None, the method will attempt
-            to find it in the model's metadata. Only used with source="label_img".
-        contour_prop : str, optional
+            to find it in the model's metadata. Only used with
+            ``source="label_image"``.
+        contour_prop : str | None, default=None
             Identifier of the cell lineage node property holding the cell contours.
-            Defaults to "cell_contour". Only used with source="contour".
-        force_recompute : bool
+            If None, ``"cell_contour"`` is used. Only used with ``source="contour"``.
+        force_recompute : bool, default=False
             Whether to force recomputation of the property when it has already been
-            computed. Defaults to False.
-        custom_identifier : str, optional
+            computed.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cell_polygon".
-        custom_name : str, optional
+            ``"cell_polygon"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Cell polygon".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description says which
             source the polygons are computed from.
 
@@ -2949,32 +3474,28 @@ class Model:
         ValueError
             If `source` is not one of the sources above, or if a parameter
             of another source is set.
-        ValueError
-            If `label_img` and `label_img_path` are not provided nor defined in the
+            If `label_image` and `label_image_path` are not provided nor defined in the
             model's metadata.
-        ValueError
             If pixels are not isotropic in x and y.
-        ValueError
             If the contours and the cell positions have different units.
-        MissingPropertyError
-            If `label_prop` or `contour_prop` has not been declared in the model.
-        ValueError
             If `label_prop` or `contour_prop` is not a node property of cell
             lineages.
+        MissingPropertyError
+            If `label_prop` or `contour_prop` has not been declared in the model.
         """
         self._check_source_params(
             source,
             {
-                "label_img": {
+                "label_image": {
                     "label_prop": label_prop,
-                    "label_img": label_img,
-                    "label_img_path": label_img_path,
+                    "label_image": label_image,
+                    "label_image_path": label_image_path,
                 },
                 "contour": {"contour_prop": contour_prop},
             },
         )
 
-        if source == "label_img":
+        if source == "label_image":
             prop = morpho.create_cell_polygon_property(
                 custom_identifier=custom_identifier,
                 custom_name=custom_name,
@@ -2982,10 +3503,10 @@ class Model:
                 or "Cell shape as a shapely.Polygon, computed from a label image",
                 unit=self.model_metadata.space_unit or "pixel",
             )
-            calc = morpho.CellPolygonFromLabelImg(
+            calc = morpho.CellPolygonFromLabelImage(
                 prop,
                 label_prop="label" if label_prop is None else label_prop,
-                label_img=self._resolve_label_img(label_img, label_img_path),
+                label_image=self._resolve_label_image(label_image, label_image_path),
                 pixel_size=self._get_xy_pixel_size(),
                 force_recompute=force_recompute,
             )
@@ -3010,7 +3531,7 @@ class Model:
         Return the unit shared by cell contours and cell positions.
 
         A contour is relative to the cell position, so both must have the same unit.
-        Undeclared properties and unknown units are not checked.
+        Undeclared properties and properties without unit are not checked.
 
         Parameters
         ----------
@@ -3020,7 +3541,7 @@ class Model:
         Returns
         -------
         str | None
-            The shared unit, or the unit of the contours if no unit is known.
+            The shared unit, or None if none of these properties has a unit.
 
         Raises
         ------
@@ -3031,9 +3552,7 @@ class Model:
             identifier: self._get_prop_unit(identifier)
             for identifier in (contour_prop, "cell_x", "cell_y")
         }
-        known_units = {
-            prop: unit for prop, unit in units.items() if unit not in (None, "unknown")
-        }
+        known_units = {prop: unit for prop, unit in units.items() if unit is not None}
         if len(set(known_units.values())) > 1:
             mismatch = ", ".join(
                 f"'{prop}' is in '{unit}'" for prop, unit in known_units.items()
@@ -3042,13 +3561,13 @@ class Model:
                 "The contours and the cell positions must have the same unit, since "
                 f"contours are relative to the cell position, but {mismatch}."
             )
-        return next(iter(known_units.values()), units[contour_prop])
+        return next(iter(known_units.values()), None)
 
     def add_cell_multipolygon(
         self,
         label_prop: str = "label",
-        label_img: np.ndarray | None = None,
-        label_img_path: str | None = None,
+        label_image: np.ndarray | None = None,
+        label_image_path: str | None = None,
         force_recompute: bool = False,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
@@ -3058,7 +3577,7 @@ class Model:
         Add the cell multipolygon property to the model.
 
         The cell multipolygon is the shape of the cell label in the label image,
-        as a shapely.MultiPolygon. It holds one polygon per piece of the label,
+        as a ``shapely.MultiPolygon``. It holds one polygon per piece of the label,
         sorted by decreasing area, with the holes of each piece as interior rings.
         Pixels that touch only by a corner belong to the same piece. For labels
         made of a single piece without holes, prefer the cell polygon property
@@ -3066,38 +3585,36 @@ class Model:
 
         Parameters
         ----------
-        label_prop: str
-            Name of the property that stores cell labels. Must match the labels in
-            the label image. Defaults to "label".
-        label_img : np.ndarray, optional
-            The label image. If None, the method will fallback to `label_img_path`
+        label_prop : str, default="label"
+            Identifier of the property that stores cell labels. Must match the labels
+            in the label image.
+        label_image : np.ndarray | None, default=None
+            The label image. If None, the method will fall back to `label_image_path`
             or attempt to find it in the model's metadata.
-        label_img_path: str, optional
+        label_image_path : str | None, default=None
             The path to the label image (tif stack). If None, the method will attempt
             to find it in the model's metadata.
-        force_recompute : bool
+        force_recompute : bool, default=False
             Whether to force recomputation of the property when it has already been
-            computed. Defaults to False.
-        custom_identifier : str, optional
+            computed.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cell_multipolygon".
-        custom_name : str, optional
+            ``"cell_multipolygon"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Cell multipolygon".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.morphology.create_cell_multipolygon_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
         ValueError
-            If `label_img` and `label_img_path` are not provided nor defined in the
+            If `label_image` and `label_image_path` are not provided nor defined in the
             model's metadata.
-        ValueError
             If pixels are not isotropic in x and y.
+            If `label_prop` is not a node property of cell lineages.
         MissingPropertyError
             If `label_prop` has not been declared in the model.
-        ValueError
-            If `label_prop` is not a node property of cell lineages.
         """
         prop = morpho.create_cell_multipolygon_property(
             custom_identifier=custom_identifier,
@@ -3105,10 +3622,10 @@ class Model:
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-        calc = morpho.CellMultiPolygonFromLabelImg(
+        calc = morpho.CellMultiPolygonFromLabelImage(
             prop,
             label_prop=label_prop,
-            label_img=self._resolve_label_img(label_img, label_img_path),
+            label_image=self._resolve_label_image(label_image, label_image_path),
             pixel_size=self._get_xy_pixel_size(),
             force_recompute=force_recompute,
         )
@@ -3116,12 +3633,12 @@ class Model:
 
     def add_cell_total_intensity(
         self,
-        intensity_img: np.ndarray | None = None,
-        intensity_img_path: str | None = None,
-        source: Literal["label_img", "polygon"] = "label_img",
+        intensity_image: np.ndarray | None = None,
+        intensity_image_path: str | None = None,
+        source: Literal["label_image", "polygon"] = "label_image",
         label_prop: str | None = None,
-        label_img: np.ndarray | None = None,
-        label_img_path: str | None = None,
+        label_image: np.ndarray | None = None,
+        label_image_path: str | None = None,
         polygon_prop: str | None = None,
         background: float = 0.0,
         custom_identifier: str | None = None,
@@ -3136,11 +3653,11 @@ class Model:
         measures the amount of fluorophore in the cell. The pixels of each cell are
         taken from one of these sources:
 
-        - "label_img": the pixels of the cell label in a label image, with all the
-          pieces of the label and without its holes. Images can be 2D or 3D.
-        - "polygon": the pixels whose center is inside the cell shape, a
-          shapely.Polygon or shapely.MultiPolygon. A pixel whose center is exactly
-          on an edge is counted only if the edge is a left or top edge of the
+        - ``"label_image"``: the pixels of the cell label in a label image, with all
+          the pieces of the label and without its holes. Images can be 2D or 3D.
+        - ``"polygon"``: the pixels whose center is inside the cell shape, a
+          ``shapely.Polygon`` or ``shapely.MultiPolygon``. A pixel whose center is
+          exactly on an edge is counted only if the edge is a left or top edge of the
           shape, so that a pixel shared by two touching cells is counted once.
           With the cell multipolygon (`add_cell_multipolygon()`), these are exactly
           the pixels of the cell label. With the cell polygon, holes are included
@@ -3152,41 +3669,42 @@ class Model:
 
         Parameters
         ----------
-        intensity_img : np.ndarray, optional
+        intensity_image : np.ndarray | None, default=None
             The intensity image, with time as first axis: (t, y, x), or (t, z, y, x)
-            with source="label_img". Pass the same array to several intensity
+            with ``source="label_image"``. Pass the same array to several intensity
             properties to load the image only once.
-        intensity_img_path : str, optional
+        intensity_image_path : str | None, default=None
             The path to the intensity image (tif stack). Only used if
-            `intensity_img` is None.
-        source : {"label_img", "polygon"}, optional
-            Source of the pixels of each cell. Defaults to "label_img".
-        label_prop : str, optional
-            Name of the property that stores cell labels. Must match the labels in
-            the label image. Defaults to "label". Only used with
-            source="label_img".
-        label_img : np.ndarray, optional
+            `intensity_image` is None.
+        source : Literal["label_image", "polygon"], default="label_image"
+            Source of the pixels of each cell.
+        label_prop : str | None, default=None
+            Identifier of the property that stores cell labels. Must match the labels
+            in the label image. If None, ``"label"`` is used. Only used with
+            ``source="label_image"``.
+        label_image : np.ndarray | None, default=None
             The label image, with the same shape as the intensity image. If None,
-            the method will fallback to `label_img_path` or attempt to find it in
-            the model's metadata. Only used with source="label_img".
-        label_img_path : str, optional
+            the method will fall back to `label_image_path` or attempt to find it in
+            the model's metadata. Only used with ``source="label_image"``.
+        label_image_path : str | None, default=None
             The path to the label image (tif stack). If None, the method will
             attempt to find it in the model's metadata. Only used with
-            source="label_img".
-        polygon_prop : str, optional
+            ``source="label_image"``.
+        polygon_prop : str | None, default=None
             Identifier of the cell lineage node property holding the cell shapes as
-            shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
-            The shapes are in the space unit of the model, or in pixels if the unit
-            of the property is "pixel". Only used with source="polygon".
-        background : float, optional
-            Value subtracted from each pixel value. Defaults to 0.
-        custom_identifier : str, optional
+            ``shapely.Polygon`` or ``shapely.MultiPolygon``. If None,
+            ``"cell_polygon"`` is used. The shapes are in the space unit of the model,
+            or in pixels if the unit of the property is ``"pixel"``. Only used with
+            ``source="polygon"``.
+        background : float, default=0.0
+            Value subtracted from each pixel value.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cell_total_intensity".
-        custom_name : str, optional
+            ``"cell_total_intensity"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be
             "Cell total intensity".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description says where
             the pixels of each cell are taken from.
 
@@ -3195,21 +3713,17 @@ class Model:
         ValueError
             If `source` is not one of the sources above, or if a parameter
             of another source is set.
-        ValueError
-            If `intensity_img` and `intensity_img_path` are not provided.
-        ValueError
-            If `label_img` and `label_img_path` are not provided nor defined in the
+            If `intensity_image` and `intensity_image_path` are not provided.
+            If `label_image` and `label_image_path` are not provided nor defined in the
             model's metadata.
-        ValueError
             If the intensity image and the label image have different shapes, or if
-            the intensity image doesn't have 3 axes (t, y, x) with source="polygon".
-        ValueError
-            If pixels are not isotropic in x and y, with source="polygon".
-        MissingPropertyError
-            If `label_prop` or `polygon_prop` has not been declared in the model.
-        ValueError
+            the intensity image doesn't have 3 axes (t, y, x) with
+            ``source="polygon"``.
+            If pixels are not isotropic in x and y, with ``source="polygon"``.
             If `label_prop` or `polygon_prop` is not a node property of cell
             lineages.
+        MissingPropertyError
+            If `label_prop` or `polygon_prop` has not been declared in the model.
         """
         prop = intensity.create_cell_total_intensity_property(
             custom_identifier=custom_identifier,
@@ -3219,12 +3733,12 @@ class Model:
         self._add_cell_intensity(
             prop,
             "total",
-            intensity_img,
-            intensity_img_path,
+            intensity_image,
+            intensity_image_path,
             source,
             label_prop,
-            label_img,
-            label_img_path,
+            label_image,
+            label_image_path,
             polygon_prop,
             background,
             describe_pixels=custom_description is None,
@@ -3232,12 +3746,12 @@ class Model:
 
     def add_cell_mean_intensity(
         self,
-        intensity_img: np.ndarray | None = None,
-        intensity_img_path: str | None = None,
-        source: Literal["label_img", "polygon"] = "label_img",
+        intensity_image: np.ndarray | None = None,
+        intensity_image_path: str | None = None,
+        source: Literal["label_image", "polygon"] = "label_image",
         label_prop: str | None = None,
-        label_img: np.ndarray | None = None,
-        label_img_path: str | None = None,
+        label_image: np.ndarray | None = None,
+        label_image_path: str | None = None,
         polygon_prop: str | None = None,
         background: float = 0.0,
         custom_identifier: str | None = None,
@@ -3252,11 +3766,11 @@ class Model:
         measures the concentration of fluorophore in the cell. The pixels of each
         cell are taken from one of these sources:
 
-        - "label_img": the pixels of the cell label in a label image, with all the
-          pieces of the label and without its holes. Images can be 2D or 3D.
-        - "polygon": the pixels whose center is inside the cell shape, a
-          shapely.Polygon or shapely.MultiPolygon. A pixel whose center is exactly
-          on an edge is counted only if the edge is a left or top edge of the
+        - ``"label_image"``: the pixels of the cell label in a label image, with all
+          the pieces of the label and without its holes. Images can be 2D or 3D.
+        - ``"polygon"``: the pixels whose center is inside the cell shape, a
+          ``shapely.Polygon`` or ``shapely.MultiPolygon``. A pixel whose center is
+          exactly on an edge is counted only if the edge is a left or top edge of the
           shape, so that a pixel shared by two touching cells is counted once.
           With the cell multipolygon (`add_cell_multipolygon()`), these are exactly
           the pixels of the cell label. With the cell polygon, holes are included
@@ -3268,41 +3782,42 @@ class Model:
 
         Parameters
         ----------
-        intensity_img : np.ndarray, optional
+        intensity_image : np.ndarray | None, default=None
             The intensity image, with time as first axis: (t, y, x), or (t, z, y, x)
-            with source="label_img". Pass the same array to several intensity
+            with ``source="label_image"``. Pass the same array to several intensity
             properties to load the image only once.
-        intensity_img_path : str, optional
+        intensity_image_path : str | None, default=None
             The path to the intensity image (tif stack). Only used if
-            `intensity_img` is None.
-        source : {"label_img", "polygon"}, optional
-            Source of the pixels of each cell. Defaults to "label_img".
-        label_prop : str, optional
-            Name of the property that stores cell labels. Must match the labels in
-            the label image. Defaults to "label". Only used with
-            source="label_img".
-        label_img : np.ndarray, optional
+            `intensity_image` is None.
+        source : Literal["label_image", "polygon"], default="label_image"
+            Source of the pixels of each cell.
+        label_prop : str | None, default=None
+            Identifier of the property that stores cell labels. Must match the labels
+            in the label image. If None, ``"label"`` is used. Only used with
+            ``source="label_image"``.
+        label_image : np.ndarray | None, default=None
             The label image, with the same shape as the intensity image. If None,
-            the method will fallback to `label_img_path` or attempt to find it in
-            the model's metadata. Only used with source="label_img".
-        label_img_path : str, optional
+            the method will fall back to `label_image_path` or attempt to find it in
+            the model's metadata. Only used with ``source="label_image"``.
+        label_image_path : str | None, default=None
             The path to the label image (tif stack). If None, the method will
             attempt to find it in the model's metadata. Only used with
-            source="label_img".
-        polygon_prop : str, optional
+            ``source="label_image"``.
+        polygon_prop : str | None, default=None
             Identifier of the cell lineage node property holding the cell shapes as
-            shapely.Polygon or shapely.MultiPolygon. Defaults to "cell_polygon".
-            The shapes are in the space unit of the model, or in pixels if the unit
-            of the property is "pixel". Only used with source="polygon".
-        background : float, optional
-            Value subtracted from each pixel value. Defaults to 0.
-        custom_identifier : str, optional
+            ``shapely.Polygon`` or ``shapely.MultiPolygon``. If None,
+            ``"cell_polygon"`` is used. The shapes are in the space unit of the model,
+            or in pixels if the unit of the property is ``"pixel"``. Only used with
+            ``source="polygon"``.
+        background : float, default=0.0
+            Value subtracted from each pixel value.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cell_mean_intensity".
-        custom_name : str, optional
+            ``"cell_mean_intensity"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be
             "Cell mean intensity".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description says where
             the pixels of each cell are taken from.
 
@@ -3311,21 +3826,17 @@ class Model:
         ValueError
             If `source` is not one of the sources above, or if a parameter
             of another source is set.
-        ValueError
-            If `intensity_img` and `intensity_img_path` are not provided.
-        ValueError
-            If `label_img` and `label_img_path` are not provided nor defined in the
+            If `intensity_image` and `intensity_image_path` are not provided.
+            If `label_image` and `label_image_path` are not provided nor defined in the
             model's metadata.
-        ValueError
             If the intensity image and the label image have different shapes, or if
-            the intensity image doesn't have 3 axes (t, y, x) with source="polygon".
-        ValueError
-            If pixels are not isotropic in x and y, with source="polygon".
-        MissingPropertyError
-            If `label_prop` or `polygon_prop` has not been declared in the model.
-        ValueError
+            the intensity image doesn't have 3 axes (t, y, x) with
+            ``source="polygon"``.
+            If pixels are not isotropic in x and y, with ``source="polygon"``.
             If `label_prop` or `polygon_prop` is not a node property of cell
             lineages.
+        MissingPropertyError
+            If `label_prop` or `polygon_prop` has not been declared in the model.
         """
         prop = intensity.create_cell_mean_intensity_property(
             custom_identifier=custom_identifier,
@@ -3335,12 +3846,12 @@ class Model:
         self._add_cell_intensity(
             prop,
             "mean",
-            intensity_img,
-            intensity_img_path,
+            intensity_image,
+            intensity_image_path,
             source,
             label_prop,
-            label_img,
-            label_img_path,
+            label_image,
+            label_image_path,
             polygon_prop,
             background,
             describe_pixels=custom_description is None,
@@ -3350,12 +3861,12 @@ class Model:
         self,
         prop: Property,
         statistic: Literal["total", "mean"],
-        intensity_img: np.ndarray | None,
-        intensity_img_path: str | None,
+        intensity_image: np.ndarray | None,
+        intensity_image_path: str | None,
         source: str,
         label_prop: str | None,
-        label_img: np.ndarray | None,
-        label_img_path: str | None,
+        label_image: np.ndarray | None,
+        label_image_path: str | None,
         polygon_prop: str | None,
         background: float,
         describe_pixels: bool,
@@ -3367,11 +3878,23 @@ class Model:
         ----------
         prop : Property
             The cell intensity property to add.
-        statistic : {"total", "mean"}
+        statistic : Literal["total", "mean"]
             Statistic computed on the pixel values of each cell.
-        intensity_img, intensity_img_path, source, label_prop
+        intensity_image : np.ndarray | None
             See `add_cell_total_intensity()`.
-        label_img, label_img_path, polygon_prop, background
+        intensity_image_path : str | None
+            See `add_cell_total_intensity()`.
+        source : str
+            See `add_cell_total_intensity()`.
+        label_prop : str | None
+            See `add_cell_total_intensity()`.
+        label_image : np.ndarray | None
+            See `add_cell_total_intensity()`.
+        label_image_path : str | None
+            See `add_cell_total_intensity()`.
+        polygon_prop : str | None
+            See `add_cell_total_intensity()`.
+        background : float
             See `add_cell_total_intensity()`.
         describe_pixels : bool
             True to add to the description of the property where the pixels of each
@@ -3379,36 +3902,38 @@ class Model:
 
         Raises
         ------
-        ValueError, MissingPropertyError
+        ValueError
+            See `add_cell_total_intensity()`.
+        MissingPropertyError
             See `add_cell_total_intensity()`.
         """
         self._check_source_params(
             source,
             {
-                "label_img": {
+                "label_image": {
                     "label_prop": label_prop,
-                    "label_img": label_img,
-                    "label_img_path": label_img_path,
+                    "label_image": label_image,
+                    "label_image_path": label_image_path,
                 },
                 "polygon": {"polygon_prop": polygon_prop},
             },
         )
-        img = self._resolve_intensity_img(intensity_img, intensity_img_path)
+        img = self._resolve_intensity_image(intensity_image, intensity_image_path)
 
         calc: intensity._CellIntensityCalculator
-        if source == "label_img":
-            labels = self._resolve_label_img(label_img, label_img_path)
+        if source == "label_image":
+            labels = self._resolve_label_image(label_image, label_image_path)
             if img.shape != labels.shape:
                 raise ValueError(
                     "The intensity image and the label image must have the same "
                     f"shape, but their shapes are {img.shape} and {labels.shape}."
                 )
-            calc = intensity.CellIntensityFromLabelImg(
+            calc = intensity.CellIntensityFromLabelImage(
                 prop,
                 statistic,
                 img,
                 label_prop="label" if label_prop is None else label_prop,
-                label_img=labels,
+                label_image=labels,
                 background=background,
             )
             pixels_txt = "taking the pixels of each cell from a label image"
@@ -3455,19 +3980,18 @@ class Model:
 
         Parameters
         ----------
-        intensity_prop : str, optional
+        intensity_prop : str, default="cell_mean_intensity"
             Identifier of the cell lineage node property holding the cell
-            intensities. Defaults to "cell_mean_intensity", added by
-            `add_cell_mean_intensity()`.
-        custom_identifier : str, optional
+            intensities. The default property is added by `add_cell_mean_intensity()`.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cycle_mean_intensity".
-        custom_name : str, optional
+            ``"cycle_mean_intensity"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be
             "Cycle mean intensity".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.intensity.create_cycle_mean_intensity_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -3475,7 +3999,6 @@ class Model:
             If `intensity_prop` has not been declared in the model.
         ValueError
             If `intensity_prop` is not a node property of cell lineages.
-        ValueError
             If the cycle lineages have not been computed yet.
         """
         prop = intensity.create_cycle_mean_intensity_property(
@@ -3504,18 +4027,17 @@ class Model:
 
         Parameters
         ----------
-        intensity_prop : str, optional
+        intensity_prop : str, default="cell_total_intensity"
             Identifier of the cell lineage node property holding the cell
-            intensities. Defaults to "cell_total_intensity", added by
-            `add_cell_total_intensity()`.
-        custom_identifier : str, optional
+            intensities. The default property is added by `add_cell_total_intensity()`.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "birth_intensity".
-        custom_name : str, optional
+            ``"birth_intensity"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Birth intensity".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.intensity.create_birth_intensity_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -3523,7 +4045,6 @@ class Model:
             If `intensity_prop` has not been declared in the model.
         ValueError
             If `intensity_prop` is not a node property of cell lineages.
-        ValueError
             If the cycle lineages have not been computed yet.
         """
         prop = intensity.create_birth_intensity_property(
@@ -3552,19 +4073,18 @@ class Model:
 
         Parameters
         ----------
-        intensity_prop : str, optional
+        intensity_prop : str, default="cell_total_intensity"
             Identifier of the cell lineage node property holding the cell
-            intensities. Defaults to "cell_total_intensity", added by
-            `add_cell_total_intensity()`.
-        custom_identifier : str, optional
+            intensities. The default property is added by `add_cell_total_intensity()`.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "division_intensity".
-        custom_name : str, optional
+            ``"division_intensity"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be
             "Division intensity".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.intensity.create_division_intensity_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -3572,7 +4092,6 @@ class Model:
             If `intensity_prop` has not been declared in the model.
         ValueError
             If `intensity_prop` is not a node property of cell lineages.
-        ValueError
             If the cycle lineages have not been computed yet.
         """
         prop = intensity.create_division_intensity_property(
@@ -3626,17 +4145,17 @@ class Model:
             )
 
     @staticmethod
-    def _resolve_intensity_img(
-        intensity_img: np.ndarray | None, intensity_img_path: str | None
+    def _resolve_intensity_image(
+        intensity_image: np.ndarray | None, intensity_image_path: str | None
     ) -> np.ndarray:
         """
         Return the intensity image to use, from the array or from its path.
 
         Parameters
         ----------
-        intensity_img : np.ndarray | None
-            The intensity image. If None, `intensity_img_path` is used.
-        intensity_img_path : str | None
+        intensity_image : np.ndarray | None
+            The intensity image. If None, `intensity_image_path` is used.
+        intensity_image_path : str | None
             The path to the intensity image (tif stack).
 
         Returns
@@ -3647,28 +4166,28 @@ class Model:
         Raises
         ------
         ValueError
-            If `intensity_img` and `intensity_img_path` are not provided.
+            If `intensity_image` and `intensity_image_path` are not provided.
         """
-        if intensity_img is not None:
-            return intensity_img
-        if intensity_img_path is None:
+        if intensity_image is not None:
+            return intensity_image
+        if intensity_image_path is None:
             raise ValueError(
-                "No intensity image provided. Please provide 'intensity_img' or "
-                "'intensity_img_path'."
+                "No intensity image provided. Please provide 'intensity_image' or "
+                "'intensity_image_path'."
             )
-        return tifffile.imread(intensity_img_path)
+        return tifffile.imread(intensity_image_path)
 
-    def _resolve_label_img(
-        self, label_img: np.ndarray | None, label_img_path: str | None
+    def _resolve_label_image(
+        self, label_image: np.ndarray | None, label_image_path: str | None
     ) -> np.ndarray:
         """
         Return the label image to use, from the arguments or the model metadata.
 
         Parameters
         ----------
-        label_img : np.ndarray | None
-            The label image. If None, `label_img_path` is used.
-        label_img_path : str | None
+        label_image : np.ndarray | None
+            The label image. If None, `label_image_path` is used.
+        label_image_path : str | None
             The path to the label image (tif stack). If None as well, the label
             image or its path is taken from the model metadata.
 
@@ -3680,21 +4199,64 @@ class Model:
         Raises
         ------
         ValueError
-            If `label_img` and `label_img_path` are not provided nor defined in the
+            If `label_image` and `label_image_path` are not provided nor defined in the
             model's metadata.
         """
-        if label_img is not None:
-            return label_img
-        if label_img_path is None:
-            if getattr(self.model_metadata, "label_img", None) is not None:
-                return self.model_metadata.label_img
-            label_img_path = getattr(self.model_metadata, "label_img_path", None)
-            if label_img_path is None:
+        if label_image is not None:
+            return label_image
+        if label_image_path is None:
+            if getattr(self.model_metadata, "label_image", None) is not None:
+                return self.model_metadata.label_image
+            label_image_path = getattr(self.model_metadata, "label_image_path", None)
+            if label_image_path is None:
                 raise ValueError(
-                    "No label image provided. Please provide 'label_img' or "
-                    "'label_img_path', or set them in the model metadata."
+                    "No label image provided. Please provide 'label_image' or "
+                    "'label_image_path', or set them in the model metadata."
                 )
-        return tifffile.imread(label_img_path).astype(np.uint32)
+        return tifffile.imread(label_image_path).astype(np.uint32)
+
+    def _get_coord_props(self, prop_id: str) -> tuple[str, ...]:
+        """
+        Return the identifiers of the cell coordinates of the model.
+
+        Parameters
+        ----------
+        prop_id : str
+            Identifier of the property that reads the coordinates, for the error
+            message.
+
+        Returns
+        -------
+        tuple[str, ...]
+            ``("cell_x", "cell_y", "cell_z")`` when ``cell_z`` is declared, as for
+            3D data, else ``("cell_x", "cell_y")``.
+
+        Raises
+        ------
+        MissingPropertyError
+            If ``cell_x`` or ``cell_y`` has not been declared.
+        """
+        missing = [
+            coord
+            for coord in ("cell_x", "cell_y")
+            if not self.props_metadata._has_prop(coord)
+        ]
+        if missing:
+            if len(missing) == 2:
+                detail = "which have not been declared"
+            else:
+                detail = f"but '{missing[0]}' has not been declared"
+            raise MissingPropertyError(
+                missing[0],
+                message=(
+                    f"'{prop_id}' requires the cell coordinates 'cell_x' and "
+                    f"'cell_y', {detail}. Models read with read_ctc() only have them "
+                    "when label images are given with `labels_path`."
+                ),
+            )
+        if self.props_metadata._has_prop("cell_z"):
+            return ("cell_x", "cell_y", "cell_z")
+        return ("cell_x", "cell_y")
 
     def _get_xy_pixel_size(self) -> float:
         """
@@ -3718,30 +4280,67 @@ class Model:
 
     def add_rod_length(
         self,
-        skel_algo: str = "zhang",
+        skeleton_method: str = "zhang",
         tolerance: float = 0.5,
-        method_width: str = "mean",
+        width_method: str = "mean",
         width_ignore_tips: bool = False,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
     ) -> None:
+        """
+        Add the rod length property to the model.
+
+        The rod length is the length of a rod-shaped cell, such as a bacterium,
+        measured on its skeleton. The cell contour (``cell_contour``) is filled and
+        skeletonized, and the skeleton is pruned and simplified into a line: the
+        length is the length of this line, extended at both tips to the edge of the
+        cell. It is only meaningful for rod-shaped cells: cells whose skeleton is a
+        single pixel or has no tip, typically round cells, get NaN, and an info
+        message names them.
+
+        Parameters
+        ----------
+        skeleton_method : str, default="zhang"
+            Skeletonization method, ``"zhang"`` or ``"lee"`` (see
+            ``skimage.morphology.skeletonize``).
+        tolerance : float, default=0.5
+            Tolerance distance for the simplification of the skeleton line (0-1). The
+            higher the tolerance, the more simplified the line.
+        width_method : str, default="mean"
+            Not used for the length (see `add_rod_width()`), but must be ``"min"``,
+            ``"max"``, ``"mean"`` or ``"median"``.
+        width_ignore_tips : bool, default=False
+            Not used for the length (see `add_rod_width()`).
+        custom_identifier : str | None, default=None
+            New identifier for the property. If None, the identifier will be
+            ``"rod_length"``.
+        custom_name : str | None, default=None
+            New name for the property. If None, the name will be "Rod length".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
+
+        Raises
+        ------
+        ValueError
+            If pixels are not isotropic in x and y, or if `width_method` is not
+            ``"min"``, ``"max"``, ``"mean"`` or ``"median"``.
+        MissingPropertyError
+            If ``cell_contour`` has not been declared in the model.
+        """
         prop = morpho.create_rod_length_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-        pixel_size = self.get_pixel_size()
-        size_x = pixel_size["width"] if pixel_size else 1.0
-        size_y = pixel_size["height"] if pixel_size else 1.0
-        assert size_x == size_y, "Pixels must be isotropic in x and y."
         calc = morpho.RodLength(
             prop,
-            size_x,
-            skel_algo=skel_algo,
+            self._get_xy_pixel_size(),
+            skeleton_method=skeleton_method,
             tolerance=tolerance,
-            method_width=method_width,
+            width_method=width_method,
             width_ignore_tips=width_ignore_tips,
         )
         self.add_custom_property(calc)
@@ -3759,30 +4358,33 @@ class Model:
         The cell speed is defined as the displacement of the cell between two
         consecutive detections divided by the time elapsed between these two detections.
         By default, it is computed using the reference time property
-        of the model, but a custom time property can be specified.
+        of the model, but a custom time property can be specified. The positions
+        are given by ``cell_x`` and ``cell_y``, and by ``cell_z`` when it is declared at
+        the time of this call, as for 3D data.
 
         Parameters
         ----------
-        time_prop : str, optional
+        time_prop : str | None, default=None
             Identifier of the cell lineage node property holding the time of the
             cells. If None, the reference time property of the model is used.
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cell_speed".
-        custom_name : str, optional
+            ``"cell_speed"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Cell speed".
-        custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Speed of the cell between two consecutive detections".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
         MissingPropertyError
             If `time_prop` has not been declared in the model.
+            If ``cell_x`` or ``cell_y`` has not been declared.
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
-        time_prop = time_prop or self.reference_time_property
+        time_prop = time_prop or self.reference_time_prop
         space_unit = self.get_space_unit() or "pixel"
         time_unit = self._get_prop_unit(time_prop)
 
@@ -3792,34 +4394,75 @@ class Model:
             custom_description=custom_description,
             unit=f"{space_unit}/{time_unit}" if time_unit else None,
         )
-        self.add_custom_property(motion.CellSpeed(prop, time_prop=time_prop))
+        self.add_custom_property(
+            motion.CellSpeed(
+                prop,
+                time_prop=time_prop,
+                coord_props=self._get_coord_props(prop.identifier),
+            )
+        )
 
     def add_rod_width(
         self,
-        skel_algo: str = "zhang",
+        skeleton_method: str = "zhang",
         tolerance: float = 0.5,
-        method_width: str = "mean",
+        width_method: str = "mean",
         width_ignore_tips: bool = False,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
     ) -> None:
+        """
+        Add the rod width property to the model.
+
+        The rod width is the width of a rod-shaped cell, such as a bacterium,
+        measured along its skeleton. The cell contour (``cell_contour``) is filled
+        and skeletonized, and the width is computed from the distances between the
+        skeleton and the edge of the cell. It is only meaningful for rod-shaped
+        cells: cells whose skeleton is a single pixel or has no tip, typically round
+        cells, get NaN, and an info message names them.
+
+        Parameters
+        ----------
+        skeleton_method : str, default="zhang"
+            Skeletonization method, ``"zhang"`` or ``"lee"`` (see
+            ``skimage.morphology.skeletonize``).
+        tolerance : float, default=0.5
+            Not used for the width (see `add_rod_length()`).
+        width_method : str, default="mean"
+            How to compute the width from the distances along the skeleton:
+            ``"min"``, ``"max"``, ``"mean"`` or ``"median"``.
+        width_ignore_tips : bool, default=False
+            True to ignore the tips of the skeleton when computing the width.
+        custom_identifier : str | None, default=None
+            New identifier for the property. If None, the identifier will be
+            ``"rod_width"``.
+        custom_name : str | None, default=None
+            New name for the property. If None, the name will be "Rod width".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
+
+        Raises
+        ------
+        ValueError
+            If pixels are not isotropic in x and y, or if `width_method` is not
+            ``"min"``, ``"max"``, ``"mean"`` or ``"median"``.
+        MissingPropertyError
+            If ``cell_contour`` has not been declared in the model.
+        """
         prop = morpho.create_rod_width_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=self.model_metadata.space_unit or "pixel",
         )
-        pixel_size = self.get_pixel_size()
-        size_x = pixel_size["width"] if pixel_size else 1.0
-        size_y = pixel_size["height"] if pixel_size else 1.0
-        assert size_x == size_y, "Pixels must be isotropic in x and y."
         calc = morpho.RodWidth(
             prop,
-            size_x,
-            skel_algo=skel_algo,
+            self._get_xy_pixel_size(),
+            skeleton_method=skeleton_method,
             tolerance=tolerance,
-            method_width=method_width,
+            width_method=width_method,
             width_ignore_tips=width_ignore_tips,
         )
         self.add_custom_property(calc)
@@ -3843,24 +4486,22 @@ class Model:
 
         Parameters
         ----------
-        degree : int | None, optional
+        degree : int | None, default=1
             Degree of the cousins: 1 for first cousins, 2 for second cousins, and
             so on. If None, the cousins of all degrees are listed, closest first.
-            1 by default.
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "cousin_cycles".
-        custom_name : str, optional
+            ``"cousin_cycles"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Cousin cycles".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_cousin_cycles_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
         ValueError
             If `degree` is lower than 1.
-        ValueError
             If the cycle lineages have not been computed yet.
         """
         prop = topo.create_cousin_cycles_property(
@@ -3884,14 +4525,14 @@ class Model:
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "daughter_cycles".
-        custom_name : str, optional
+            ``"daughter_cycles"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Daughter cycles".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_daughter_cycles_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -3905,7 +4546,7 @@ class Model:
         )
         self.add_custom_property(topo.DaughterCycles(prop))
 
-    def add_division_rate(
+    def add_inverse_interdivision_time(
         self,
         time_prop: str | None = None,
         custom_identifier: str | None = None,
@@ -3913,26 +4554,27 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the division rate property to the model.
+        Add the inverse interdivision time property to the model.
 
-        Division rate is defined as the number of divisions per time unit.
-        It is the inverse of the division time. By default, division rate
-        is given in the time unit of the model, but a custom time property can be
-        specified.
+        Inverse interdivision time is defined as the inverse of the time elapsed
+        between two successive divisions. By default, inverse interdivision time is
+        given in the inverse of the time unit of the model, but a custom time property
+        can be specified.
 
         Parameters
         ----------
-        time_prop : str, optional
+        time_prop : str | None, default=None
             Identifier of the cell lineage node property holding the time of the
             cells. If None, the reference time property of the model is used.
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "division_rate".
-        custom_name : str, optional
-            New name for the property. If None, the name will be "Division rate".
-        custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Number of divisions per time unit".
+            ``"inverse_interdivision_time"``.
+        custom_name : str | None, default=None
+            New name for the property. If None, the name will be "Inverse interdivision
+            time".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -3941,18 +4583,20 @@ class Model:
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
-        time_prop = time_prop or self.reference_time_property
+        time_prop = time_prop or self.reference_time_prop
         time_unit = self._get_prop_unit(time_prop)
 
-        prop = tracking.create_division_rate_property(
+        prop = timing.create_inverse_interdivision_time_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             unit=f"1/{time_unit}" if time_unit else None,
         )
-        self.add_custom_property(tracking.DivisionRate(prop, time_prop=time_prop))
+        self.add_custom_property(
+            timing.InverseInterdivisionTime(prop, time_prop=time_prop)
+        )
 
-    def add_division_time(
+    def add_interdivision_time(
         self,
         time_prop: str | None = None,
         custom_identifier: str | None = None,
@@ -3960,25 +4604,30 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the division time property to the model.
+        Add the interdivision time property to the model.
 
-        Division time is defined as the time elapsed between two successive divisions.
-        By default, division time is given in the time unit of the model,
-        but a custom time property can be specified.
+        Interdivision time is defined as the time elapsed between two successive
+        divisions, from the last cell of the previous cell cycle to the last cell of
+        the cell cycle. Only complete cell cycles, see ``is_complete_cycle``, have
+        both divisions: for a root cell cycle, the time starts at its first cell, and
+        for a cell cycle that doesn't end with a division, it stops at its last cell.
+        The core property ``cycle_duration`` gives the time from the first cell of
+        the cell cycle instead. By default, interdivision time is given in the time
+        unit of the model, but a custom time property can be specified.
 
         Parameters
         ----------
-        time_prop : str, optional
+        time_prop : str | None, default=None
             Identifier of the cell lineage node property holding the time of the
             cells. If None, the reference time property of the model is used.
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "division_time".
-        custom_name : str, optional
-            New name for the property. If None, the name will be "Division time".
-        custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Time elapsed between two successive divisions".
+            ``"interdivision_time"``.
+        custom_name : str | None, default=None
+            New name for the property. If None, the name will be "Interdivision time".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -3987,11 +4636,11 @@ class Model:
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
-        time_prop = time_prop or self.reference_time_property
+        time_prop = time_prop or self.reference_time_prop
         # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
         time = self._get_input_prop(time_prop)
 
-        prop = tracking.create_division_time_property(
+        prop = timing.create_interdivision_time_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
@@ -3999,7 +4648,7 @@ class Model:
             unit=time.unit if time else None,
         )
 
-        self.add_custom_property(tracking.DivisionTime(prop, time_prop=time_prop))
+        self.add_custom_property(timing.InterdivisionTime(prop, time_prop=time_prop))
 
     def add_is_division(
         self,
@@ -4008,21 +4657,21 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the is_division property to the model.
+        Add the ``is_division`` property to the model.
 
-        The is_division property is a boolean property that indicates whether the cell
-        is a division event, i.e. has more than one daughter cell.
+        The ``is_division`` property is a boolean property that indicates whether the
+        cell is a division event, i.e. has more than one daughter cell.
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "is_division".
-        custom_name : str, optional
+            ``"is_division"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "is division".
-        custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Whether the cell is a division event, i.e. has more than one daughter cell".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
         """
         prop = topo.create_is_division_property(
             custom_identifier=custom_identifier,
@@ -4039,21 +4688,21 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the is_leaf property to the model.
+        Add the ``is_leaf`` property to the model.
 
-        The is_leaf property is a boolean property that indicates whether the cell
+        The ``is_leaf`` property is a boolean property that indicates whether the cell
         is a leaf cell, i.e. has no daughter cells.
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "is_leaf".
-        custom_name : str, optional
+            ``"is_leaf"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "is leaf".
-        custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Whether the cell is a leaf cell, i.e. has no daughter cells".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
         """
         prop = topo.create_is_leaf_property(
             custom_identifier=custom_identifier,
@@ -4070,21 +4719,21 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the is_root property to the model.
+        Add the ``is_root`` property to the model.
 
-        The is_root property is a boolean property that indicates whether the cell
+        The ``is_root`` property is a boolean property that indicates whether the cell
         is a root cell, i.e. has no parent cell.
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "is_root".
-        custom_name : str, optional
+            ``"is_root"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "is root".
-        custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Whether the cell is a root cell, i.e. has no parent cell".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
         """
         prop = topo.create_is_root_property(
             custom_identifier=custom_identifier,
@@ -4101,23 +4750,22 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the lineage_cell_depth property to the model.
+        Add the ``lineage_cell_depth`` property to the model.
 
-        The lineage_cell_depth property is a cell lineage property that indicates the
-        number of cells from the founding cell (root) to the most recent descendant
-        (leaf).
-        The founding cell has a depth of 0, its children have a depth of 1, etc.
+        The ``lineage_cell_depth`` property is a cell lineage property that indicates
+        the maximum number of cells along any path from the founding cell (root) to a
+        terminal cell (leaf): 1 for a lineage of a single cell.
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "lineage_cell_depth".
-        custom_name : str, optional
+            ``"lineage_cell_depth"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Lineage cell depth".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_lineage_cell_depth_property`).
+            default value (see :doc:`/api/predefined_properties`).
         """
         prop = topo.create_lineage_cell_depth_property(
             custom_identifier=custom_identifier,
@@ -4134,22 +4782,22 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the lineage_cycle_depth property to the model.
+        Add the ``lineage_cycle_depth`` property to the model.
 
-        The lineage_cycle_depth property is a cycle lineage property that indicates the
-        maximum number of cell cycles along any path from founding cell (root) to
-        terminal cell (leaf).
+        The ``lineage_cycle_depth`` property is a cycle lineage property that indicates
+        the maximum number of cell cycles along any path from the founding cell (root)
+        to a terminal cell (leaf), i.e. the highest generation + 1.
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "lineage_cycle_depth".
-        custom_name : str, optional
+            ``"lineage_cycle_depth"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Lineage cycle depth".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_lineage_cycle_depth_property`).
+            default value (see :doc:`/api/predefined_properties`).
         """
         prop = topo.create_lineage_cycle_depth_property(
             custom_identifier=custom_identifier,
@@ -4167,7 +4815,7 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the lineage_duration property to the model.
+        Add the ``lineage_duration`` property to the model.
 
         The lineage duration is a cell lineage property that represents the total
         lifespan of a lineage.
@@ -4176,17 +4824,17 @@ class Model:
 
         Parameters
         ----------
-        time_prop : str, optional
+        time_prop : str | None, default=None
             Identifier of the cell lineage node property holding the time of the
             cells. If None, the reference time property of the model is used.
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "lineage_duration".
-        custom_name : str, optional
+            ``"lineage_duration"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Lineage duration".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_lineage_duration_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -4195,30 +4843,33 @@ class Model:
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
-        time_prop = time_prop or self.reference_time_property
+        time_prop = time_prop or self.reference_time_prop
+        # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
+        time = self._get_input_prop(time_prop)
 
         prop = topo.create_lineage_duration_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
+            dtype=time.dtype if time else "float",
+            unit=time.unit if time else None,
         )
 
         self.add_custom_property(topo.LineageDuration(prop, time_prop=time_prop))
 
     def add_location_tag(
         self,
-        mask_path_metadata_field: str | None = None,
-        mask_path: str | None = None,
+        mask_path: str,
         tag_names: dict[int, str] | None = None,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the location_tag property to the model.
+        Add the ``location_tag`` property to the model.
 
-        The location_tag property is a cell property defined by a mask image. In this
-        mask image, each pixel value represents a location tag. The property is
+        The ``location_tag`` property is a cell property defined by a mask image. In
+        this mask image, each pixel value represents a location tag. The property is
         assigned to each cell based on the pixel value at the cell's position in the
         mask image.
         The location tag can be used to define different regions of interest in the
@@ -4231,79 +4882,39 @@ class Model:
 
         Parameters
         ----------
-        mask_path_metadata_field: str, optional
-            Name of the model metadata field that contains the path to the mask
-            image (str).
-        mask_path : str, optional
+        mask_path : str
             Path to the mask image (tif stack) that defines the location tags.
             The mask must be a tif stack where each pixel value represents a
             location tag. The first frame/slice of the mask image must correspond to
             the first timepoint in the model.
-        tag_names : dict[int, str], optional
+        tag_names : dict[int, str] | None, default=None
             Mapping from mask pixel values to tag names, e.g.
-            ``{1: "cortex", 2: "medulla"}``. If None (default), the tag is the raw
+            ``{1: "cortex", 2: "medulla"}``. If None, the tag is the raw
             pixel value.
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "location_tag".
-        custom_name : str, optional
+            ``"location_tag"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Location tag".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_location_tag_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
-        ValueError
-            If neither `mask_path_metadata_field` nor `mask_path` are provided.
-        ValueError
-            If the specified mask metadata field is None and no mask path is provided.
-        ValueError
-            If the specified mask metadata field is a string (path to mask) but does not
-            match the provided mask path.
+        MissingPropertyError
+            If ``cell_x`` or ``cell_y`` has not been declared.
         ValueError
             If `tag_names` is empty.
-        TypeError
-            If the specified mask metadata field is not a string (path to mask).
         TypeError
             If `tag_names` has a key that is not an int or a value that is not a str.
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If some keys of `tag_names` are not values of the mask.
         """
-        # Resolve mask_path from metadata or argument.
-        if mask_path_metadata_field is None:
-            if mask_path is None:
-                raise ValueError(
-                    "Either 'mask_path_metadata_field' or 'mask_path' must be provided."
-                )
-        else:
-            mask_md_value = self.model_metadata[mask_path_metadata_field]
-            if mask_md_value is None:
-                if mask_path is None:
-                    raise ValueError(
-                        f"No mask found: metadata field '{mask_path_metadata_field}' "
-                        "is None and no mask path is provided."
-                    )
-                self.model_metadata[mask_path_metadata_field] = mask_path
-            elif isinstance(mask_md_value, str):
-                if mask_path is None:
-                    mask_path = mask_md_value
-                elif mask_path != mask_md_value:
-                    raise ValueError(
-                        f"Metadata field '{mask_path_metadata_field}' value "
-                        f"'{mask_md_value}' does not match provided mask_path"
-                        f"'{mask_path}'."
-                    )
-            else:
-                raise TypeError(
-                    f"Metadata field '{mask_path_metadata_field}' must be a string "
-                    f"but got type {type(mask_md_value).__name__}."
-                )
-
-        mask_img = tifffile.imread(mask_path).astype(np.uint32)
+        mask_image = tifffile.imread(mask_path).astype(np.uint32)
 
         size_x = self.get_pixel_width() or 1.0
         size_y = self.get_pixel_height() or 1.0
@@ -4316,9 +4927,11 @@ class Model:
             custom_description=custom_description,
             dtype="int" if tag_names is None else "str",
         )
+        # The mask is read at the cell coordinates.
+        self._get_coord_props(prop.identifier)
         self.add_custom_property(
             topo.LocationTag(
-                prop, mask_img=mask_img, pixel_size=size_x, tag_names=tag_names
+                prop, mask_image=mask_image, pixel_size=size_x, tag_names=tag_names
             )
         )
 
@@ -4336,14 +4949,14 @@ class Model:
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "mother_cycle".
-        custom_name : str, optional
+            ``"mother_cycle"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Mother cycle".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_mother_cycle_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -4377,20 +4990,20 @@ class Model:
 
         Parameters
         ----------
-        time_prop : str, optional
+        time_prop : str | None, default=None
             Identifier of the cell lineage node property holding the time of the
             cells. If None, the reference time property of the model is used.
-        ignore_incomplete_cycles : bool, optional
+        ignore_incomplete_cycles : bool, default=False
             True to give NaN to the cells of incomplete cell cycles, False to
-            normalize them over their observed part. False by default.
-        custom_identifier : str, optional
+            normalize them over their observed part.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "normalized_age".
-        custom_name : str, optional
+            ``"normalized_age"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Normalized age".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.tracking.create_normalized_age_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -4399,14 +5012,14 @@ class Model:
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
-        time_prop = time_prop or self.reference_time_property
-        prop = tracking.create_normalized_age_property(
+        time_prop = time_prop or self.reference_time_prop
+        prop = timing.create_normalized_age_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
         )
         self.add_custom_property(
-            tracking.NormalizedAge(
+            timing.NormalizedAge(
                 prop,
                 time_prop=time_prop,
                 ignore_incomplete_cycles=ignore_incomplete_cycles,
@@ -4420,21 +5033,21 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the num_cells property to the model.
+        Add the ``num_cells`` property to the model.
 
-        The num_cells property is a cell lineage property that indicates the number of
-        cells in the lineage.
+        The ``num_cells`` property is a cell lineage property that indicates the number
+        of cells in the lineage.
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "num_cells".
-        custom_name : str, optional
+            ``"num_cells"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Number of cells".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_num_cells_property`).
+            default value (see :doc:`/api/predefined_properties`).
         """
         prop = topo.create_num_cells_property(
             custom_identifier=custom_identifier,
@@ -4451,21 +5064,22 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the num_cycles property to the model.
+        Add the ``num_cycles`` property to the model.
 
-        The num_cycles property is a cell cycle lineage property that indicates the
+        The ``num_cycles`` property is a cell cycle lineage property that indicates the
         number of cell cycles in the lineage.
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "num_cycles".
-        custom_name : str, optional
-            New name for the property. If None, the name will be "Number of cell cycles".
-        custom_description : str, optional
+            ``"num_cycles"``.
+        custom_name : str | None, default=None
+            New name for the property. If None, the name will be "Number of cell
+            cycles".
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_num_cycles_property`).
+            default value (see :doc:`/api/predefined_properties`).
         """
         prop = topo.create_num_cycles_property(
             custom_identifier=custom_identifier,
@@ -4475,36 +5089,37 @@ class Model:
 
         self.add_custom_property(topo.NumCycles(prop))
 
-    def add_num_divs(
+    def add_num_divisions(
         self,
         custom_identifier: str | None = None,
         custom_name: str | None = None,
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the num_divs property to the model.
+        Add the ``num_divisions`` property to the model.
 
-        The num_divs property is a cell lineage property that indicates the number of
-        cell divisions in the lineage.
+        The ``num_divisions`` property is a cell lineage property that indicates the
+        number of cell divisions in the lineage.
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "num_divs".
-        custom_name : str, optional
-            New name for the property. If None, the name will be "Number of cell divisions".
-        custom_description : str, optional
+            ``"num_divisions"``.
+        custom_name : str | None, default=None
+            New name for the property. If None, the name will be "Number of cell
+            divisions".
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_num_divs_property`).
+            default value (see :doc:`/api/predefined_properties`).
         """
-        prop = topo.create_num_divs_property(
+        prop = topo.create_num_divisions_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
         )
 
-        self.add_custom_property(topo.NumDivs(prop))
+        self.add_custom_property(topo.NumDivisions(prop))
 
     def add_num_gaps(
         self,
@@ -4513,21 +5128,21 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the num_gaps property to the model.
+        Add the ``num_gaps`` property to the model.
 
-        The num_gaps property is a cell lineage property that indicates the number of
-        gaps (missing detections) in the lineage.
+        The ``num_gaps`` property is a cell lineage property that indicates the number
+        of gaps (missing detections) in the lineage.
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "num_gaps".
-        custom_name : str, optional
+            ``"num_gaps"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Number of gaps".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_num_gaps_property`).
+            default value (see :doc:`/api/predefined_properties`).
         """
         prop = topo.create_num_gaps_property(
             custom_identifier=custom_identifier,
@@ -4544,21 +5159,21 @@ class Model:
         custom_description: str | None = None,
     ) -> None:
         """
-        Add the num_leaves property to the model.
+        Add the ``num_leaves`` property to the model.
 
-        The num_leaves property is a cell lineage property that indicates the number of
-        leaf cells (cells without daughter cells) in the lineage.
+        The ``num_leaves`` property is a cell lineage property that indicates the number
+        of leaf cells (cells without daughter cells) in the lineage.
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "num_leaves".
-        custom_name : str, optional
+            ``"num_leaves"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Number of leaves".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_num_leaves_property`).
+            default value (see :doc:`/api/predefined_properties`).
         """
         prop = topo.create_num_leaves_property(
             custom_identifier=custom_identifier,
@@ -4586,17 +5201,17 @@ class Model:
 
         Parameters
         ----------
-        time_prop : str, optional
+        time_prop : str | None, default=None
             Identifier of the cell lineage node property holding the time of the
             cells. If None, the reference time property of the model is used.
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "relative_age".
-        custom_name : str, optional
+            ``"relative_age"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Relative age".
-        custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Age of the cell since the start of the current cell cycle".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -4605,18 +5220,18 @@ class Model:
         ValueError
             If `time_prop` is not a node property of cell lineages.
         """
-        time_prop = time_prop or self.reference_time_property
+        time_prop = time_prop or self.reference_time_prop
         # If `time_prop` is invalid or undeclared, add_custom_property() raises below.
         time = self._get_input_prop(time_prop)
 
-        prop = tracking.create_relative_age_property(
+        prop = timing.create_relative_age_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
             dtype=time.dtype if time else "float",
             unit=time.unit if time else None,
         )
-        self.add_custom_property(tracking.RelativeAge(prop, time_prop=time_prop))
+        self.add_custom_property(timing.RelativeAge(prop, time_prop=time_prop))
 
     def add_sister_cycles(
         self,
@@ -4632,14 +5247,14 @@ class Model:
 
         Parameters
         ----------
-        custom_identifier : str, optional
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "sister_cycles".
-        custom_name : str, optional
+            ``"sister_cycles"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Sister cycles".
-        custom_description : str, optional
+        custom_description : str | None, default=None
             New description for the property. If None, the description will take its
-            default value (see :func:`pycellin.properties.topology.create_sister_cycles_property`).
+            default value (see :doc:`/api/predefined_properties`).
 
         Raises
         ------
@@ -4667,27 +5282,38 @@ class Model:
         the start and end cells of the cell cycle to the total distance traveled.
         Straightness is a value between 0 and 1. A straight line has a straightness
         of 1, while a trajectory with many turns has a straightness close to 0.
+        The positions are given by ``cell_x`` and ``cell_y``, and by ``cell_z`` when
+        it is declared at the time of this call, as for 3D data.
 
         Parameters
         ----------
-        include_incoming_edge : bool, optional
-            Whether to include the distance between the first cell and its predecessor
-            (default is False).
-        custom_identifier : str, optional
+        include_incoming_edge : bool, default=False
+            Whether to start the trajectory at the parent of the first cell, i.e. to
+            include the link from this parent to the first cell.
+        custom_identifier : str | None, default=None
             New identifier for the property. If None, the identifier will be
-            "straightness".
-        custom_name : str, optional
+            ``"straightness"``.
+        custom_name : str | None, default=None
             New name for the property. If None, the name will be "Straightness".
-        custom_description : str, optional
-            New description for the property. If None, the description will be
-            "Straightness of the cell trajectory during the cell cycle".
+        custom_description : str | None, default=None
+            New description for the property. If None, the description will take its
+            default value (see :doc:`/api/predefined_properties`).
+
+        Raises
+        ------
+        MissingPropertyError
+            If ``cell_x`` or ``cell_y`` has not been declared.
         """
         prop = motion.create_straightness_property(
             custom_identifier=custom_identifier,
             custom_name=custom_name,
             custom_description=custom_description,
         )
-        self.add_custom_property(motion.Straightness(prop, include_incoming_edge))
+        self.add_custom_property(
+            motion.Straightness(
+                prop, include_incoming_edge, self._get_coord_props(prop.identifier)
+            )
+        )
 
     def _get_prop_method(self, prop_identifier: str) -> Callable:
         """
@@ -4700,7 +5326,7 @@ class Model:
 
         Returns
         -------
-        callable
+        Callable
             Method to compute the property.
 
         Raises
@@ -4710,7 +5336,7 @@ class Model:
 
         Notes
         -----
-        The method name must follow the pattern "add_{property_name}", otherwise
+        The method name must follow the pattern ``add_{property_name}``, otherwise
         it won't be recognized.
         """
         method_name = f"add_{prop_identifier}"
@@ -4720,77 +5346,115 @@ class Model:
         else:
             raise AttributeError(f"Method {method_name} not found in Model class.")
 
-    def add_pycellin_property(self, prop_identifier: str, **kwargs: bool) -> None:
+    def add_pycellin_property(self, prop: str, **kwargs: Any) -> None:
         """
-        Add a single predefined pycellin property to the model.
+        Add a single predefined Pycellin property to the model.
 
         Parameters
         ----------
-        prop_identifier : str
+        prop : str
             Identifier of the property to add. Needs to be an available property.
-        kwargs : bool
-            Additional keyword arguments to pass to the function
-            computing the property. For example, for absolute_age,
-            in_time_unit=True can be used to yield the age
-            in the time unit of the model instead of in frames.
+        **kwargs : Any
+            Keyword arguments passed to the method that adds the property,
+            ``add_<prop>()``, whose docstring lists them. For example,
+            ``unit="degree"`` for ``turning_angle``.
 
         Raises
         ------
         KeyError
-            If the property is not a predefined property of pycellin.
+            If the property is not a predefined property of Pycellin.
         ValueError
             If the property is a property of cycle lineages and the cycle lineages
             have not been computed yet.
         """
         cell_lin_props = list(futils.get_pycellin_cell_lineage_properties().keys())
         cycle_lin_props = list(futils.get_pycellin_cycle_lineage_properties().keys())
-        if prop_identifier not in cell_lin_props + cycle_lin_props:
-            raise KeyError(
-                f"Property {prop_identifier} is not a predefined property of pycellin."
-            )
-        elif prop_identifier in cycle_lin_props and not self.data.cycle_data:
+        if prop not in cell_lin_props + cycle_lin_props:
+            raise KeyError(f"Property {prop} is not a predefined property of Pycellin.")
+        elif prop in cycle_lin_props and self.data.cycle_lineages is None:
             raise ValueError(
-                f"Property {prop_identifier} is a property of cycle lineages, "
+                f"Property {prop} is a property of cycle lineages, "
                 "but the cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with model.add_cycle_data()."
+                "Please compute them first with model.add_cycle_lineages()."
             )
-        self._get_prop_method(prop_identifier)(**kwargs)
+        self._get_prop_method(prop)(**kwargs)
 
-    def add_pycellin_properties(self, props_info: list[str | dict[str, Any]]) -> None:
+    def add_pycellin_properties(
+        self, props_info: list[str | dict[str, dict[str, Any]]]
+    ) -> None:
         """
-        Add the specified predefined pycellin properties to the model.
+        Add the specified predefined Pycellin properties to the model.
 
         Parameters
         ----------
-        props_info : list[str | dict[str, Any]]
+        props_info : list[str | dict[str, dict[str, Any]]]
             List of the properties to add. Each property can be a string
             (the identifier of the property) or a dictionary with the identifier
-            of the property as the key and additional keyword arguments as values.
+            of the property as the key and a dictionary of keyword arguments as
+            the value (see `add_pycellin_property()`).
+
+        Raises
+        ------
+        TypeError
+            If `props_info` is not a list, if one of its items is neither a string
+            nor a dictionary, or if the keyword arguments of a property are not given
+            as a dictionary. No property is added then.
+        KeyError
+            If a property is not a predefined property of Pycellin.
+        ValueError
+            If a property is a property of cycle lineages and the cycle lineages
+            have not been computed yet.
 
         Examples
         --------
         With no additional arguments:
+
         >>> model.add_pycellin_properties(["absolute_age", "relative_age"])
+
         With additional arguments:
+
         >>> model.add_pycellin_properties(
         ...     [
-        ...         {"absolute_age": {"in_time_unit": True}},
-        ...         {"relative_age": {"in_time_unit": True}},
+        ...         {"rod_length": {"skeleton_method": "lee", "tolerance": 0.6}},
+        ...         {"turning_angle": {"unit": "degree"}},
         ...     ]
-        )
+        ... )
+
         It is possible to mix properties with and without additional arguments:
+
         >>> model.add_pycellin_properties(
-        ...     [
-        ...         {"absolute_age": {"in_time_unit": True}},
-        ...         "cell_cycle_completeness",
-        ...         {"relative_age": {"in_time_unit": True}},
-        ...     ]
-        )
+        ...     [{"turning_angle": {"unit": "degree"}}, "is_complete_cycle"]
+        ... )
         """
+        example = '["absolute_age", {"turning_angle": {"unit": "degree"}}]'
+        if not isinstance(props_info, list):
+            raise TypeError(
+                "'props_info' must be a list of property identifiers and "
+                f"dictionaries, e.g. {example}, got '{type(props_info).__name__}'."
+            )
+        # Everything is checked before adding any property, so that a TypeError
+        # leaves the model unchanged.
+        for prop_info in props_info:
+            if isinstance(prop_info, str):
+                continue
+            if not isinstance(prop_info, dict):
+                raise TypeError(
+                    "The items of 'props_info' must be property identifiers or "
+                    f"dictionaries, e.g. {example}, got "
+                    f"'{type(prop_info).__name__}': {prop_info!r}."
+                )
+            for prop_id, kwargs in prop_info.items():
+                if not isinstance(kwargs, dict):
+                    raise TypeError(
+                        f"The keyword arguments of '{prop_id}' must be given as a "
+                        f"dictionary, e.g. {example}, got "
+                        f"'{type(kwargs).__name__}': {kwargs!r}."
+                    )
+
         for prop_info in props_info:
             if isinstance(prop_info, str):
                 self.add_pycellin_property(prop_info)
-            elif isinstance(prop_info, dict):
+            else:
                 for prop_id, kwargs in prop_info.items():
                     self.add_pycellin_property(prop_id, **kwargs)
 
@@ -4818,35 +5482,40 @@ class Model:
 
     def remove_property(
         self,
-        prop_identifier: str,
+        prop: str,
         prop_type: PropertyType | str | list[str] | None = None,
     ) -> None:
         """
         Remove the specified property from the model.
 
-        This updates the PropsMetadata, removes the property values
+        This updates the `PropsMetadata`, removes the property values
         for all lineages, and notifies the updater to unregister the calculator.
+        The values of a cycle property propagated to the cell lineages are removed
+        from the cells too.
 
         For multi-type properties, can either remove entirely or just remove
         specific types.
 
         Parameters
         ----------
-        prop_identifier : str
+        prop : str
             Identifier of the property to remove.
-        prop_type : PropertyType | str | list[str], optional
+        prop_type : PropertyType | str | list[str] | None, default=None
             If specified, only remove the property for the specified type. Can be:
-            - PropertyType Flag: PropertyType.NODE, PropertyType.EDGE, PropertyType.LINEAGE
-            - String: "node", "edge", or "lineage"
-            - List of strings: ["node", "lineage"] for removing multiple types
-            For multi-type properties (e.g., NODE|LINEAGE), this allows converting
-            to single-type by removing one flag. If None (default), the property is
+
+            - PropertyType Flag: ``PropertyType.NODE``, ``PropertyType.EDGE``,
+              ``PropertyType.LINEAGE``
+            - String: ``"node"``, ``"edge"``, or ``"lineage"``
+            - List of strings: ``["node", "lineage"]`` for removing multiple types
+
+            For multi-type properties (e.g., ``NODE|LINEAGE``), this allows converting
+            to single-type by removing one flag. If None, the property is
             removed entirely.
 
         Raises
         ------
         ValueError
-            If the property does not exist or if prop_type is specified but the
+            If the property does not exist or if `prop_type` is specified but the
             property doesn't have those flags.
         ProtectedPropertyError
             If the property is a protected property.
@@ -4867,68 +5536,64 @@ class Model:
         >>> model.remove_property("my_property", ["node", "edge"])
         """
         # Preliminary checks.
-        if not self.props_metadata._has_prop(prop_identifier):
-            raise ValueError(
-                f"There is no property {prop_identifier} in the declared properties."
-            )
-        if prop_identifier in self.props_metadata._get_protected_props():
-            raise ProtectedPropertyError(prop_identifier)
+        if not self.props_metadata._has_prop(prop):
+            raise ValueError(f"There is no property {prop} in the declared properties.")
+        if prop in self.props_metadata._get_protected_props():
+            raise ProtectedPropertyError(prop)
 
         # Convert string/list to PropertyType if needed.
         prop_type_flag: PropertyType | None
         if prop_type is None:
             prop_type_flag = None
         elif isinstance(prop_type, (str, list)):
-            prop_type_flag = property_type_from_string(prop_type)
+            prop_type_flag = _property_type_from_string(prop_type)
         else:
             prop_type_flag = prop_type
 
         # Get current property info before any modifications.
-        prop = self.props_metadata.props[prop_identifier]
-        current_prop_type = prop.prop_type
-        lin_type = prop.lin_type
+        property = self.props_metadata.properties[prop]
+        current_prop_type = property.prop_type
+        lineage_type = property.lineage_type
+        if lineage_type not in ("cell", "cycle", "both"):
+            raise ValueError(
+                "Lineage type not recognized. Must be 'cell', 'cycle' or 'both'."
+            )
+        # The values of a cycle property propagated to the cells are on the cells too.
+        on_cells = (
+            lineage_type in ("cell", "both")
+            or prop in self.props_metadata._get_propagated_props()
+        )
+        on_cycles = lineage_type in ("cycle", "both")
 
         # Determine which types to remove.
         if prop_type_flag is None:
             types_to_remove = current_prop_type
-            delete_calculator = True
+            unregister_calculator = True
         else:
             if not (current_prop_type & prop_type_flag):
                 raise ValueError(
-                    f"Property '{prop_identifier}' does not have type(s) {prop_type_flag}. "
-                    f"Current type: {current_prop_type}"
+                    f"Property '{prop}' does not have type(s) "
+                    f"{prop_type_flag}. Current type: {current_prop_type}"
                 )
             types_to_remove = prop_type_flag
             new_prop_type = current_prop_type & ~prop_type_flag
-            delete_calculator = new_prop_type == PropertyType(0)
+            unregister_calculator = new_prop_type == PropertyType(0)
 
         # Update the metadata.
-        self.props_metadata._remove_prop(prop_identifier, prop_type_flag)
+        self.props_metadata._remove_prop(prop, prop_type_flag)
 
         # Update the data.
-        match lin_type:
-            case "CellLineage":
-                for lin in self.data.cell_data.values():
-                    lin._remove_prop(prop_identifier, types_to_remove)
-            case "CycleLineage" if self.data.cycle_data:
-                for clin in self.data.cycle_data.values():
-                    clin._remove_prop(prop_identifier, types_to_remove)
-            case "Lineage":
-                for lin in self.data.cell_data.values():
-                    lin._remove_prop(prop_identifier, types_to_remove)
-                if self.data.cycle_data:
-                    for clin in self.data.cycle_data.values():
-                        clin._remove_prop(prop_identifier, types_to_remove)
-            case _:
-                raise ValueError(
-                    "Lineage type not recognized. Must be 'CellLineage', 'CycleLineage'"
-                    "or 'Lineage'."
-                )
+        if on_cells:
+            for lin in self.data.cell_lineages.values():
+                lin._remove_prop(prop, types_to_remove)
+        if on_cycles and self.data.cycle_lineages:
+            for clin in self.data.cycle_lineages.values():
+                clin._remove_prop(prop, types_to_remove)
 
         # Update the updater only if property was completely removed.
-        if delete_calculator:
+        if unregister_calculator:
             try:
-                self._updater.delete_calculator(prop_identifier)
+                self._updater.unregister_calculator(prop)
             except KeyError:
                 # No calculator doesn't mean there is something wrong,
                 # maybe it's just an imported property.
@@ -4939,18 +5604,35 @@ class Model:
     # def remove_properties(self, props_info: list[str | dict[str, Any]]) -> None:
     #     pass
 
-    def add_cycle_data(self) -> None:
+    def add_cycle_lineages(self) -> None:
         """
         Compute and add the cycle lineages of the model.
 
         This method computes the cycle lineages from the cell lineages
-        and add them to the model. It also adds the default properties
-        associated with cycle lineages to the PropsMetadata.
+        and adds them to the model. It also adds the default properties
+        associated with cycle lineages to the `PropsMetadata`.
+
+        The new cycle lineages only hold these default properties. If the model has
+        cycle properties computed by a calculator, e.g. when this method is called
+        again after adding some, the model then requires an update: `update()`
+        computes them on the new cycle lineages.
+
+        These default properties may be declared already as other kinds of
+        properties, e.g. as cell lineage properties in a loaded file where cycle
+        properties were propagated to cell lineages. Such declarations are replaced
+        if they are unused: not protected, without calculator and without values in
+        cell lineages. Otherwise, remove them first with `remove_property()`.
 
         Raises
         ------
         ValueError
-            If the time step of the model is not defined.
+            If a default property of cycle lineages is already declared as another
+            kind of property, and this declaration is used.
+        FusionError
+            If a lineage has a fusion, i.e. a cell with more than one parent.
+        LineageStructureError
+            If a lineage has several roots, e.g. when `remove_link()` split it and
+            the model wasn't updated since.
         """
         # if self._updater._update_required:
         #     txt = (
@@ -4961,20 +5643,42 @@ class Model:
         #     raise UpdateRequiredError(txt)
         # TODO: I have nothing to check if the structure was modified since
         # _update_required becomes true when properties are added...
-        time_prop = self.model_metadata.reference_time_property
-        time_step = self.model_metadata.time_step
-        if time_step is None:
-            # TODO: add "see documentation" to the error message or explain
-            # directly how to set it?
-            raise ValueError(
-                "The time step of the model is currently not defined "
-                "but is required for cycle lineage computation."
-            )
+        time_prop = self.model_metadata.reference_time_prop
         time_unit = self.model_metadata.time_unit
-        self.data._add_cycle_lineages(time_prop, time_step)
+        unused, used = [], []
+        for prop in self.props_metadata._create_cycle_lineage_props(time_unit):
+            declared = self.get_property(prop.identifier)
+            if declared is None or self._is_same_kind(declared, prop):
+                continue
+            if self._is_unused_prop(prop.identifier):
+                unused.append(prop.identifier)
+            else:
+                used.append(prop.identifier)
+        if used:
+            names = ", ".join(repr(prop_id) for prop_id in used)
+            raise ValueError(
+                "Cannot add the cycle lineages: these properties are already declared, "
+                "but not as node properties of cycle lineages, and have values or a "
+                f"calculator: {names}. If they are cycle properties propagated to cell "
+                "lineages, e.g. loaded from an exported file, remove them first with "
+                "model.remove_property(), as well as the other cycle properties "
+                "propagated there: add_cycle_lineages() and the add_*() methods "
+                "compute them again."
+            )
+        for prop_id in unused:
+            self.props_metadata._remove_prop(prop_id)
+        self.data._add_cycle_lineages(time_prop)
         self.props_metadata._add_cycle_lineage_props(time_unit)
+        # The new cycle lineages only hold their default properties: the next update,
+        # even partial, computes the cycle properties that have a calculator.
+        if any(
+            calc.property.lineage_type in ("cycle", "both")
+            for calc in self._updater._calculators.values()
+        ):
+            self._updater._update_required = True
+            self._updater._cycle_lineages_rebuilt = True
 
-    def has_cycle_data(self) -> bool:
+    def has_cycle_lineages(self) -> bool:
         """
         Check if the model has cycle lineages.
 
@@ -4983,7 +5687,7 @@ class Model:
         bool
             True if the model has cycle lineages, False otherwise.
         """
-        return bool(self.data.cycle_data)
+        return bool(self.data.cycle_lineages)
 
     def _categorize_props(
         self, props: list[str] | None
@@ -5034,7 +5738,7 @@ class Model:
                 plural = len(missing_props) > 1
                 raise ValueError(
                     f"Propert{'ies' if plural else 'y'} {missing_str} "
-                    f"{'are' if plural else 'is'} either not{' ' if plural else 'a'}"
+                    f"{'are' if plural else 'is'} either not {'' if plural else 'a '}"
                     f"cycle lineage propert{'ies' if plural else 'y'} or not declared "
                     f"in the model."
                 )
@@ -5187,25 +5891,27 @@ class Model:
         - lineage property: the value of the cycle lineage is copied onto the
           cell lineage graph.
 
-        Values missing on the cycle lineage are skipped. The lineage type of the
-        properties that were propagated becomes `Lineage`, since the properties are
-        then present on both cycle and cell lineages.
+        Values missing on the cycle lineage are skipped. The properties that were
+        propagated keep the lineage type ``"cycle"``: `get_propagated_properties()`
+        lists them, and `get_cell_lineage_properties()` also returns them.
 
-        This is a one-shot copy: cell lineage values are not kept in sync if the
-        cycle lineages change later, e.g. when they are rebuilt during `update()`.
-        Call this method again to refresh them.
+        `update()` keeps the propagated values up to date: once it has computed the
+        cycle properties again, it copies the properties propagated with this method
+        again to the cell lineages, including to the cells added since. A propagated
+        property that the update doesn't compute, e.g. without calculator, keeps its
+        previous values on the cells.
 
         Parameters
         ----------
-        props : list[str], optional
-            List of the properties to propagate. If None, all cycle properties are
-            propagated. Default is None.
-        update : bool, optional
+        props : list[str] | None, default=None
+            List of the properties to propagate. If None, all the properties of
+            lineage type ``"cycle"`` are propagated.
+        update : bool, default=True
             Whether to update the model before propagating the properties.
-            Default is True. For a correct propagation, the model must be updated
+            For a correct propagation, the model must be updated
             beforehand. If you are not sure about the state of the model, leave
             this parameter to True. If you are sure that the model is up to date,
-            you can set it to False for better performances.
+            you can set it to False for better performance.
 
         Raises
         ------
@@ -5213,6 +5919,8 @@ class Model:
             If the cycle lineages have not been computed yet.
             If a property in the list is not a cycle lineage property or not declared
             in the model.
+            If a property in the list has the lineage type ``"both"``, e.g.
+            ``lineage_id``, since it is already on the cell lineages.
         FusionError
             If the first cell of a cycle has more than one incoming link in the cell
             lineage, which indicates a fusion event.
@@ -5220,48 +5928,86 @@ class Model:
         Warnings
         --------
         Quantitative analysis of cell cycle properties should not be done on cell
-        lineages after propagation of cycle properties, UNLESS you account for cell
-        cycle length. Otherwise you will introduce a bias in your quantification.
-        Indeed, after propagation, cycle properties (like division time) become
-        over-represented in long cell cycles since these properties are propagated on each
-        node of the cell cycle in cell lineages, whereas they are stored only once
+        lineages after propagation of cycle properties, UNLESS you account for the
+        number of cells in each cell cycle (``cycle_num_cells``). Otherwise you will
+        introduce a bias in your quantification.
+        Indeed, after propagation, cycle properties (like interdivision time) become
+        over-represented in long cell cycles since these properties are propagated on
+        each node of the cell cycle in cell lineages, whereas they are stored only once
         per cell cycle on the cycle node in cycle lineages.
         """
-        if not self.data.cycle_data:
+        if self.data.cycle_lineages is None:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with model.add_cycle_data()."
+                "Please compute them first with model.add_cycle_lineages()."
             )
         if self._updater._update_required and update:
             self.update()
+        if props is None:
+            # Not the properties of lineage type "both", such as lineage_id, which are
+            # already on the cell lineages.
+            props = list(self.get_cycle_lineage_properties(single_type=True))
+        else:
+            both_props = [
+                prop_id
+                for prop_id in props
+                if self.has_property(prop_id)
+                and self.props_metadata.properties[prop_id].lineage_type == "both"
+            ]
+            if both_props:
+                names = ", ".join(repr(prop_id) for prop_id in both_props)
+                raise ValueError(
+                    f"Cannot propagate {names}: properties of lineage type 'both' are "
+                    "already on the cell lineages."
+                )
+        propagated_props = self._copy_cycle_props_to_cells(props)
+
+        # The propagated properties keep the lineage type "cycle". They are recorded
+        # for get_propagated_properties(), and for update() to copy them again.
+        for prop in propagated_props:
+            self.props_metadata._add_propagated_prop(prop)
+
+    def _copy_cycle_props_to_cells(self, props: list[str] | None) -> set[str]:
+        """
+        Copy the values of cycle properties from the cycle lineages to the cells.
+
+        Parameters
+        ----------
+        props : list[str] | None
+            The cycle properties to copy, or None for all of them.
+
+        Returns
+        -------
+        set[str]
+            The properties that had values to copy.
+
+        Raises
+        ------
+        ValueError
+            If a property is not a cycle lineage property or not declared.
+        FusionError
+            If the first cell of a cycle has more than one incoming link.
+        """
         node_props, edge_props, lin_props = self._categorize_props(props)
-
-        propagated_props = (
-            set()
-        )  # to keep track of which properties were actually propagated
-
-        # Propagation.
-        for lin_id in self.data.cell_data:
-            lin = self.data.cell_data[lin_id]
-            clin = self.data.cycle_data[lin_id]
+        cycle_lineages = self.data.cycle_lineages or {}
+        copied_props: set[str] = set()
+        for lin_id, lin in self.data.cell_lineages.items():
+            clin = cycle_lineages.get(lin_id)
+            if clin is None:
+                continue
             if node_props:
-                propagated_props.update(
+                copied_props.update(
                     Model._propagate_cycle_node_props(node_props, clin, lin)
                 )
             if edge_props:
-                propagated_props.update(
+                copied_props.update(
                     Model._propagate_cycle_edge_props(edge_props, clin, lin)
                 )
             if lin_props:
-                propagated_props.update(
+                copied_props.update(
                     Model._propagate_cycle_lineage_props(lin_props, clin, lin)
                 )
-
-        # Update the properties declaration: now the property type is `Lineage`
-        # instead of just `CycleLineage` since the properties are now present on cycle
-        # AND cell lineages.
-        for prop in propagated_props:
-            self.props_metadata.props[prop].lin_type = "Lineage"
+        return copied_props
 
     def merge(
         self,
@@ -5277,22 +6023,21 @@ class Model:
         ----------
         model : Model
             The model to merge into this one.
-        new_name : str | None, optional
+        new_name : str | None, default=None
             The name of the merged model. If None, the names of the two models are
-            concatenated, separated by a "+" sign, with "unnamed" for a model without
-            a name (None or empty). Default is None.
-        in_place : bool, optional
-            Whether to merge the model in place or return a new model. Default is False.
-        new_metadata : dict[str, Any] | None, optional
+            concatenated, separated by a ``"+"`` sign, with ``"unnamed"`` for a model
+            without a name (None or empty).
+        in_place : bool, default=False
+            Whether to merge the model in place or return a new model.
+        new_metadata : dict[str, Any] | None, default=None
             Model metadata fields to set on the merged model, overriding the values
             computed by the merge (see Notes). Critical fields (reference time property,
             time step, time unit, pixel size and space unit) cannot be set.
-            Default is None.
 
         Returns
         -------
         Model
-            The merged model. If ``in_place`` is True, this is ``self`` (mutated);
+            The merged model. If `in_place` is True, this is ``self`` (mutated);
             otherwise it is a new, independent copy and ``self`` is left unchanged.
 
         Raises
@@ -5303,69 +6048,69 @@ class Model:
             is set in only one of them.
             If a property with the same identifier and not created by a merge operation
             already exists in the model.
-            If one of the models has cycle lineages but the time step of this model is
-            not defined, or if a cycle lineage cannot be built (e.g. a lineage with
-            several roots).
-            If ``new_metadata`` contains a critical field, or a name while ``new_name``
+            If a cycle lineage cannot be built (e.g. a lineage with several roots).
+            If `new_metadata` contains a critical field, or a name while `new_name`
             is also given.
-            If ``model`` starts earlier than the time origin of this model, which would
+            If `model` starts earlier than the time origin of this model, which would
             give negative timepoints.
             If a property declared in both models has a different property type,
             lineage type or unit.
 
         Warns
         -----
-        UserWarning
+        PycellinWarning
             If a property declared in both models has a different data type.
             If calculators using external data (e.g. a label image) are not kept in the
             merged model.
 
         Notes
         -----
-        The argument ``model`` is never modified; it is deep-copied internally.
+        The argument `model` is never modified; it is deep-copied internally.
 
         All checks are performed before any modification, so if an error is raised,
-        this model is left unchanged, even when ``in_place`` is True.
+        this model is left unchanged, even when `in_place` is True.
 
-        The merged model is not updated: call ``update()`` to compute the property
+        The merged model is not updated: call `update()` to compute the property
         values of the added lineages. To make cell IDs unique across all lineages, call
-        ``relabel_cells(unique_ids=True)`` on the merged model.
+        ``relabel_cells(unique_in_model=True)`` on the merged model.
 
         Regarding lineages:
-        Lineages of ``model`` whose lineage ID is already used get a new ID. Single-cell
-        lineages keep the convention lineage ID = -cell ID: their cell is renumbered
-        when needed.
+        Lineages of `model` whose lineage ID is already used get a new ID.
 
         Regarding model metadata:
         Critical fields must be identical in both models. The merged model
         keeps the other fields shared by both models, except ``creation_timestamp`` and
         ``pycellin_version`` which are set at merge time, and ``name`` which follows
-        ``new_name``. Standard fields whose values differ are set to None, except
-        ``provenance`` which is set to "pycellin merge", and custom fields whose values
-        differ are removed. ``new_metadata`` is applied last.
+        `new_name`. Standard fields whose values differ are set to None, except
+        ``provenance`` which is set to ``"Pycellin merge"``, and custom fields whose
+        values differ are removed. `new_metadata` is applied last.
         When the value of a field for the merged model differs from its value in one of
         the models, the values of each model are stored on its lineages, in a lineage
-        property with the "pycellin merge" provenance. Lineages already storing a field
-        from a previous merge keep their values. Label images (``label_img``) are never
-        stored on lineages. The data type of these lineage properties is inferred from
-        the stored values, in Python type hint syntax (e.g. "float", "int | str").
+        property with the ``"Pycellin merge"`` provenance. Lineages already storing a
+        field from a previous merge keep their values. Label images (``label_image``)
+        are never stored on lineages. The data type of these lineage properties is
+        inferred from the stored values, in Python type hint syntax (e.g. ``"float"``,
+        ``"int | str"``).
 
         Regarding cycle lineages:
         If one of the models has cycle lineages, the merged model has cycle lineages
         for all its lineages. Their property values are computed at the next
-        ``update()``.
+        `update()`.
 
         Regarding properties:
         Properties declared in both models must have the same property type, lineage
         type and unit. A different data type only triggers a warning, data types being
-        compared after normalizing their spelling (e.g. "float" and "float64"). Their
+        compared after normalizing their spelling (e.g. ``"float"`` and ``"float64"``).
+        Their
         name, description and provenance can differ: the declaration and calculator of
         this model are kept. A property is protected in the merged model if it is
         protected in either model.
         Calculators using external data (e.g. a label image or a mask) are not kept in
         the merged model, since that data belongs to only one of the models. Their
         property values are kept, but are not computed again until the properties are
-        added again.
+        added again. Added to the merged model, such a property reads one image for all
+        its lineages: when the models come from different images, add it to each model
+        before merging instead.
         """
         if in_place:
             model1 = self
@@ -5377,7 +6122,7 @@ class Model:
         md1 = model1.model_metadata.get_standard_metadata()
         md2 = model2.model_metadata.get_standard_metadata()
         critical = [
-            "reference_time_property",
+            "reference_time_prop",
             "time_step",
             "time_unit",
             "pixel_width",
@@ -5423,16 +6168,16 @@ class Model:
         # released timepoint values).
         timepoint_calc = model1._updater._calculators.get("timepoint")
         if isinstance(timepoint_calc, Timepoint):
-            ref_time_prop = timepoint_calc.ref_time_prop
+            reference_time_prop = timepoint_calc.reference_time_prop
             times2 = [
-                lin.nodes[nid][ref_time_prop]
+                lin.nodes[nid][reference_time_prop]
                 for lin in model2.get_cell_lineages()
                 for nid in lin.nodes
-                if ref_time_prop in lin.nodes[nid]
+                if reference_time_prop in lin.nodes[nid]
             ]
             if times2 and min(times2) < timepoint_calc.min_time:
                 raise ValueError(
-                    f"Cannot merge a model starting earlier ({ref_time_prop}="
+                    f"Cannot merge a model starting earlier ({reference_time_prop}="
                     f"{min(times2)}) than the time origin of this model "
                     f"({timepoint_calc.min_time}), since it would give negative "
                     "timepoints. Merge this model into the other one instead."
@@ -5468,14 +6213,14 @@ class Model:
         # TODO: let such calculators get their data per lineage (e.g. from a label
         # image path stored on lineages), so that they can be kept when merging.
         external_calcs1 = set()
-        if model2.data.cell_data:
+        if model2.data.cell_lineages:
             external_calcs1 = {
                 prop_id
                 for prop_id, calc in model1._updater._calculators.items()
                 if calc.uses_external_data()
             }
         external_calcs2 = set()
-        if model1.data.cell_data:
+        if model1.data.cell_lineages:
             external_calcs2 = {
                 prop_id
                 for prop_id in props_to_add
@@ -5484,23 +6229,12 @@ class Model:
 
         # Lineage IDs of the lineages to add. Missing IDs, and IDs already used in
         # model1 or planned for a previous lineage, are replaced by new ones.
-        # Single-cell lineages keep the convention lineage ID = -cell ID: if that ID is
-        # not available, their cell is renumbered, as when splitting lineages in
-        # ModelUpdater._update(). Only model2, a copy, is modified here.
         used_lids = set(model1.get_cell_lineage_ids())
         lineages_to_add = []
         for lin in model2.get_cell_lineages():
             lid = lin.graph.get("lineage_id")
             if lid is None or lid in used_lids:
-                if len(lin) == 1:
-                    cid = next(iter(lin.nodes))
-                    lid = -cid
-                    if lid >= 0 or lid in used_lids:
-                        lid = min(min(used_lids, default=0) - 1, -1)
-                        nx.relabel_nodes(lin, {cid: -lid}, copy=False)
-                        lin.nodes[-lid]["cell_id"] = -lid
-                else:
-                    lid = max(max(used_lids, default=0) + 1, 1)
+                lid = max(max(used_lids, default=0) + 1, 1)
             used_lids.add(lid)
             lineages_to_add.append((lin, lid))
         new_lids = {lid for _, lid in lineages_to_add}
@@ -5509,26 +6243,27 @@ class Model:
         # properties with a calculator are added, the merged model gets cycle lineages
         # for all its lineages. They are built now so that a lineage whose cycle lineage
         # cannot be built stops the merge before any modification.
-        with_cycles = bool(model1.data.cycle_data or model2.data.cycle_data) or any(
-            dict_calcs2[prop_id].prop.lin_type == "CycleLineage"
+        has_cycles = bool(model1.data.cycle_lineages or model2.data.cycle_lineages)
+        with_cycles = has_cycles or any(
+            dict_calcs2[prop_id].property.lineage_type == "cycle"
             for prop_id in props_to_add
             if prop_id in dict_calcs2
         )
         cycle_lineages_to_add = {}
         if with_cycles:
-            time_prop = model1.reference_time_property
-            time_step = model1.model_metadata.time_step
-            if time_step is None:
-                raise ValueError(
-                    "Cannot build the cycle lineages of the merged model: the time "
-                    "step of this model is not defined."
-                )
+            time_prop = model1.reference_time_prop
             lineages = list(lineages_to_add)
-            if not model1.data.cycle_data:
-                lineages += [(lin, lid) for lid, lin in model1.data.cell_data.items()]
+            if not model1.data.cycle_lineages:
+                lineages += [
+                    (lin, lid) for lid, lin in model1.data.cell_lineages.items()
+                ]
             for lin, lid in lineages:
-                cycle_lin = CycleLineage(time_prop, time_step, lin)
+                # The lineage still has its ID in its model: its cycle lineage and
+                # cell cycles get the ID it will have in the merged model.
+                cycle_lin = CycleLineage(time_prop, lin)
                 cycle_lin.graph["lineage_id"] = lid
+                for _, cycle in cycle_lin.nodes(data=True):
+                    cycle["lineage_id"] = lid
                 cycle_lineages_to_add[lid] = cycle_lin
 
         # Model metadata of the merged model. Fields shared by both models are kept,
@@ -5587,7 +6322,8 @@ class Model:
             changed_fields.update(
                 field for field in md_diff if source_values.get(field) is not None
             )
-        lineage_fields = (merge_props1 | merge_props2 | changed_fields) - {"label_img"}
+        lineage_fields = merge_props1 | merge_props2 | changed_fields
+        lineage_fields -= {"label_image"}
 
         # Lineage properties of model1 once the properties of model2 are added.
         lin_props = {
@@ -5615,7 +6351,8 @@ class Model:
             warnings.warn(
                 "Properties declared with different data types in the two models: "
                 f"{dtype_mismatches}. The declarations of this model are kept.",
-                stacklevel=2,
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
             )
         external_calcs = sorted(external_calcs1 | external_calcs2)
         if external_calcs:
@@ -5623,32 +6360,34 @@ class Model:
                 "Calculators using external data (e.g. a label image) are not kept in "
                 f"the merged model: {external_calcs}. The property values are kept, "
                 "but are not computed again until the properties are added again.",
-                stacklevel=2,
+                PycellinWarning,
+                stacklevel=_find_stack_level(),
             )
 
         # Calculators using external data.
         for prop_id in external_calcs1:
-            model1._updater.delete_calculator(prop_id)
+            model1._updater.unregister_calculator(prop_id)
 
         # Lineages, with their cycle lineages.
         for lin, lid in lineages_to_add:
-            model1.add_lineage(lin, lid, overwrite_lid=True)
+            model1.add_lineage(lin, lid, overwrite_lineage_id=True)
         if with_cycles:
-            if model1.data.cycle_data is None:
-                model1.data.cycle_data = {}
-            model1.data.cycle_data.update(cycle_lineages_to_add)
+            if model1.data.cycle_lineages is None:
+                model1.data.cycle_lineages = {}
+            model1.data.cycle_lineages.update(cycle_lineages_to_add)
             time_unit = model1.model_metadata.time_unit
             model1.props_metadata._add_cycle_lineage_props(time_unit)
 
         # Properties.
-        # Model2's calculators are registered in model2's order, since properties
+        # Properties without calculator come first, since calculators can read them.
+        # Model2's calculators are then registered in model2's order, since properties
         # are computed in calculator registration order.
-        props_order = [prop_id for prop_id in dict_calcs2 if prop_id in props_to_add]
-        props_order += [
+        props_order = [
             prop_id
             for prop_id in props2
             if prop_id in props_to_add and prop_id not in dict_calcs2
         ]
+        props_order += [prop_id for prop_id in dict_calcs2 if prop_id in props_to_add]
         for prop_id in props_order:
             # Skip the core cycle lineage properties declared with the cycle lineages.
             if model1.has_property(prop_id):
@@ -5661,10 +6400,14 @@ class Model:
             else:  # register both metadata and calculator
                 model1.add_custom_property(calc)
 
-        # A property is protected if it is protected in either model.
+        # A property is protected if it is protected in either model, and likewise
+        # propagated to cell lineages.
         for prop_id in model2.props_metadata._protected_props:
             if model1.has_property(prop_id):
                 model1.props_metadata._protect_prop(prop_id)
+        for prop_id in model2.props_metadata._get_propagated_props():
+            if model1.has_property(prop_id):
+                model1.props_metadata._add_propagated_prop(prop_id)
 
         # Model metadata stored on lineages. Each lineage gets the value of the model it
         # comes from, unless that model already stores the field from a previous merge.
@@ -5679,7 +6422,7 @@ class Model:
                     description=field,
                     provenance=_MERGE_PROVENANCE,
                     prop_type=PropertyType.LINEAGE,
-                    lin_type="CellLineage",
+                    lineage_type="cell",
                     dtype=_infer_dtype(values),
                 )
                 model1.props_metadata._add_prop(new_prop)
@@ -5703,25 +6446,25 @@ class Model:
 
         return model1
 
-    def split(self, lin_id_groups: dict[str, list[int]]) -> list["Model"]:
+    def split(self, lineage_id_groups: dict[str, list[int]]) -> list["Model"]:
         """
         Split the model into a list of models.
 
         Parameters
         ----------
-        lin_id_groups: dict[str, list[int]]
+        lineage_id_groups : dict[str, list[int]]
             Dictionary mapping new model names to lists of lineage IDs. Each list
             will be used to create a new model containing only the lineages
             with the specified IDs.
 
         Returns
         -------
-        list[Model]
+        list["Model"]
             List of models created from the specified lineage ID groups.
         """
         models = []
         model_ids = set(self.get_cell_lineage_ids())
-        for name, lids in lin_id_groups.items():
+        for name, lids in lineage_id_groups.items():
             model = deepcopy(self)  # TODO: this is heavy...
             to_remove = list(model_ids - set(lids))
             model.remove_lineages(to_remove)
@@ -5736,14 +6479,14 @@ class Model:
         """
         Add cell lineage properties as columns of a DataFrame.
 
-        Each row gets the value of the cell lineage matching its `lineage_id`, or NaN
-        if that lineage has no value. `lineage_id` is skipped since it is already
+        Each row gets the value of the cell lineage matching its ``lineage_id``, or NaN
+        if that lineage has no value. ``lineage_id`` is skipped since it is already
         a column.
 
         Parameters
         ----------
         df : pd.DataFrame
-            DataFrame with a `lineage_id` column.
+            DataFrame with a ``lineage_id`` column.
         lineage_props : list[str] | None
             Identifiers of the cell lineage properties to add. If None or empty,
             the DataFrame is returned unchanged.
@@ -5788,26 +6531,28 @@ class Model:
         for prop in props:
             values = {
                 lin_id: lin.graph[prop]
-                for lin_id, lin in self.data.cell_data.items()
+                for lin_id, lin in self.data.cell_lineages.items()
                 if prop in lin.graph
             }
             new_columns[prop] = df["lineage_id"].map(values)
         return df.assign(**new_columns)
 
     def to_cell_dataframe(
-        self, lids: list[int] | None = None, lineage_props: list[str] | None = None
+        self,
+        lineage_ids: list[int] | None = None,
+        lineage_props: list[str] | None = None,
     ) -> pd.DataFrame:
         """
         Return the cell data of the model as a pandas DataFrame.
 
         Parameters
         ----------
-        lids : list[int], optional
-            List of IDs of the lineages to export (default is None).
+        lineage_ids : list[int] | None, default=None
+            List of IDs of the lineages to export.
             If None, all lineages are exported.
-        lineage_props : list[str], optional
+        lineage_props : list[str] | None, default=None
             Identifiers of cell lineage properties to add as columns, e.g. an
-            experimental condition stored on lineages (default is None). Each row
+            experimental condition stored on lineages. Each row
             gets the value of its lineage, or NaN if the lineage has no value.
 
         Returns
@@ -5818,29 +6563,30 @@ class Model:
         Raises
         ------
         ValueError
-            If the model has no lineages, or none with an ID in `lids`.
-            If the `lineage_id`, `frame` or `cell_id` property is not found in the model.
+            If the model has no lineages, or none with an ID in `lineage_ids`.
+            If the ``lineage_id`` or ``cell_id`` property, or the reference time
+            property, is not found in the model.
             If a property of `lineage_props` is not a lineage property of cell
             lineages, is not declared in the model, or clashes with an existing
             column.
         """
         records = [
             {**cell_props, "lineage_id": lin_id}
-            for lin_id, lineage in self.data.cell_data.items()
-            if not lids or lin_id in lids
+            for lin_id, lineage in self.data.cell_lineages.items()
+            if not lineage_ids or lin_id in lineage_ids
             for cell_props in lineage.nodes.values()
         ]
         if not records:
             raise ValueError(
                 "No cells to export: the model has no lineages, "
-                "or none with an ID in 'lids'."
+                "or none with an ID in 'lineage_ids'."
             )
         # A single DataFrame for all the lineages: concatenating one DataFrame per
         # lineage makes pandas warn when a column is all None in a lineage.
         df = pd.DataFrame(records)
 
-        # Reoder the columns to have pycellin mandatory properties first.
-        time_prop = self.model_metadata.reference_time_property
+        # Reorder the columns to have Pycellin mandatory properties first.
+        time_prop = self.model_metadata.reference_time_prop
         mandatory_columns = ["lineage_id", time_prop, "cell_id"]
         missing_columns = [col for col in mandatory_columns if col not in df.columns]
         if missing_columns:
@@ -5852,26 +6598,26 @@ class Model:
             col for col in df.columns if col not in mandatory_columns
         ]
         df = df[columns]
-        df.sort_values(
-            ["lineage_id", time_prop, "cell_id"], ignore_index=True, inplace=True
-        )
+        df = df.sort_values(["lineage_id", time_prop, "cell_id"], ignore_index=True)
 
         return self._add_lineage_props_to_df(df, lineage_props)
 
     def to_link_dataframe(
-        self, lids: list[int] | None = None, lineage_props: list[str] | None = None
+        self,
+        lineage_ids: list[int] | None = None,
+        lineage_props: list[str] | None = None,
     ) -> pd.DataFrame:
         """
         Return the link data of the model as a pandas DataFrame.
 
         Parameters
         ----------
-        lids : list[int], optional
-            List of IDs of the lineages to export (default is None).
+        lineage_ids : list[int] | None, default=None
+            List of IDs of the lineages to export.
             If None, all lineages are exported.
-        lineage_props : list[str], optional
+        lineage_props : list[str] | None, default=None
             Identifiers of cell lineage properties to add as columns, e.g. an
-            experimental condition stored on lineages (default is None). Each row
+            experimental condition stored on lineages. Each row
             gets the value of its lineage, or NaN if the lineage has no value.
 
         Returns
@@ -5882,20 +6628,20 @@ class Model:
         Raises
         ------
         ValueError
-            If the model has no lineages, or none with an ID in `lids`.
+            If the model has no lineages, or none with an ID in `lineage_ids`.
             If a property of `lineage_props` is not a lineage property of cell
             lineages, is not declared in the model, or clashes with an existing
             column.
         """
         lineages = [
             (lin_id, lineage)
-            for lin_id, lineage in self.data.cell_data.items()
-            if not lids or lin_id in lids
+            for lin_id, lineage in self.data.cell_lineages.items()
+            if not lineage_ids or lin_id in lineage_ids
         ]
         if not lineages:
             raise ValueError(
                 "No links to export: the model has no lineages, "
-                "or none with an ID in 'lids'."
+                "or none with an ID in 'lineage_ids'."
             )
         # A single DataFrame for all the lineages, built from the link properties
         # rather than with networkx's to_pandas_edgelist(), which puts them in a
@@ -5917,23 +6663,25 @@ class Model:
             # Lineages without links, e.g. single-cell lineages.
             df = pd.DataFrame(columns=mandatory_columns, dtype=int)
 
-        # Reoder the columns to have pycellin mandatory properties first.
+        # Reorder the columns to have Pycellin mandatory properties first.
         columns = mandatory_columns + [
             col for col in df.columns if col not in mandatory_columns
         ]
         df = df[columns]
-        df.sort_values("lineage_id", ignore_index=True, inplace=True)
+        df = df.sort_values("lineage_id", ignore_index=True)
 
         return self._add_lineage_props_to_df(df, lineage_props)
 
-    def to_lineage_dataframe(self, lids: list[int] | None = None) -> pd.DataFrame:
+    def to_lineage_dataframe(
+        self, lineage_ids: list[int] | None = None
+    ) -> pd.DataFrame:
         """
         Return the lineage data of the model as a pandas DataFrame.
 
         Parameters
         ----------
-        lids : list[int], optional
-            List of IDs of the lineages to export (default is None).
+        lineage_ids : list[int] | None, default=None
+            List of IDs of the lineages to export.
             If None, all lineages are exported.
 
         Returns
@@ -5944,24 +6692,24 @@ class Model:
         Raises
         ------
         ValueError
-            If the model has no lineages, or none with an ID in `lids`.
-            If the `lineage_id` is not found in the model.
+            If the model has no lineages, or none with an ID in `lineage_ids`.
+            If the ``lineage_id`` property is not found in the model.
         """
         records = [
             lineage.graph
-            for lin_id, lineage in self.data.cell_data.items()
-            if not lids or lin_id in lids
+            for lin_id, lineage in self.data.cell_lineages.items()
+            if not lineage_ids or lin_id in lineage_ids
         ]
         if not records:
             raise ValueError(
                 "No lineages to export: the model has no lineages, "
-                "or none with an ID in 'lids'."
+                "or none with an ID in 'lineage_ids'."
             )
         # A single DataFrame for all the lineages: concatenating one DataFrame per
         # lineage makes pandas warn when a property is None in a lineage.
         df = pd.DataFrame(records)
 
-        # Reoder the columns to have pycellin mandatory properties first.
+        # Reorder the columns to have Pycellin mandatory properties first.
         if "lineage_id" not in df.columns:
             raise ValueError(
                 "Mandatory lineage property not found in the model: 'lineage_id'."
@@ -5970,24 +6718,26 @@ class Model:
         columns.remove("lineage_id")
         columns = ["lineage_id"] + columns
         df = df[columns]
-        df.sort_values("lineage_id", ignore_index=True, inplace=True)
+        df = df.sort_values("lineage_id", ignore_index=True)
 
         return df
 
     def to_cycle_dataframe(
-        self, lids: list[int] | None = None, lineage_props: list[str] | None = None
+        self,
+        lineage_ids: list[int] | None = None,
+        lineage_props: list[str] | None = None,
     ) -> pd.DataFrame:
         """
         Return the cell cycle data of the model as a pandas DataFrame.
 
         Parameters
         ----------
-        lids : list[int], optional
-            List of IDs of the lineages to export (default is None).
+        lineage_ids : list[int] | None, default=None
+            List of IDs of the lineages to export.
             If None, all lineages are exported.
-        lineage_props : list[str], optional
+        lineage_props : list[str] | None, default=None
             Identifiers of cell lineage properties to add as columns, e.g. an
-            experimental condition stored on lineages (default is None). Each row
+            experimental condition stored on lineages. Each row
             gets the value of its lineage, or NaN if the lineage has no value.
 
         Returns
@@ -5999,44 +6749,42 @@ class Model:
         ------
         ValueError
             If the cycle lineages have not been computed yet.
-            If the model has no lineages, or none with an ID in `lids`.
-            If the `lineage_id`, `level` or `cycle_id` property is not found
+            If the model has no lineages, or none with an ID in `lineage_ids`.
+            If the ``lineage_id``, ``generation`` or ``cycle_id`` property is not found
             in the model.
             If a property of `lineage_props` is not a lineage property of cell
             lineages, is not declared in the model, or clashes with an existing
             column.
         """
-        if not self.data.cycle_data:
+        if self.data.cycle_lineages is None:
             raise ValueError(
                 "Cycle lineages have not been computed yet. "
-                "Please compute the cycle lineages first with model.add_cycle_data()."
+                "Please compute them first with model.add_cycle_lineages()."
             )
         records = [
             {**cycle_props, "lineage_id": lin_id}
-            for lin_id, lineage in self.data.cycle_data.items()
-            if not lids or lin_id in lids
+            for lin_id, lineage in self.data.cycle_lineages.items()
+            if not lineage_ids or lin_id in lineage_ids
             for cycle_props in lineage.nodes.values()
         ]
         if not records:
             raise ValueError(
                 "No cell cycles to export: the model has no lineages, "
-                "or none with an ID in 'lids'."
+                "or none with an ID in 'lineage_ids'."
             )
         # A single DataFrame for all the lineages: concatenating one DataFrame per
         # lineage makes pandas warn when a column is all None in a lineage, e.g.
         # mother_cycle in a lineage of a single cell cycle.
         df = pd.DataFrame(records)
 
-        # Reoder the columns to have pycellin mandatory properties first.
+        # Reorder the columns to have Pycellin mandatory properties first.
         columns = df.columns.tolist()
         columns.remove("lineage_id")
-        columns.remove("level")
+        columns.remove("generation")
         columns.remove("cycle_id")
-        columns = ["lineage_id", "level", "cycle_id"] + columns
+        columns = ["lineage_id", "generation", "cycle_id"] + columns
         df = df[columns]
-        df.sort_values(
-            ["lineage_id", "level", "cycle_id"], ignore_index=True, inplace=True
-        )
+        df = df.sort_values(["lineage_id", "generation", "cycle_id"], ignore_index=True)
 
         return self._add_lineage_props_to_df(df, lineage_props)
 
@@ -6044,7 +6792,7 @@ class Model:
         self,
         relation_prop: str,
         props: list[str] | None = None,
-        lids: list[int] | None = None,
+        lineage_ids: list[int] | None = None,
         lineage_props: list[str] | None = None,
         unique_pairs: bool = False,
         suffixes: tuple[str, str] = ("_1", "_2"),
@@ -6054,7 +6802,7 @@ class Model:
 
         Each row is a pair of cell cycles of the same lineage: a cell cycle, and one
         of the cell cycles listed in its `relation_prop` property, e.g. its mother
-        with "mother_cycle", or one of its sisters with "sister_cycles". The
+        with ``mother_cycle``, or one of its sisters with ``sister_cycles``. The
         properties of both cell cycles are side by side, to compare or correlate
         them, e.g. the area at birth of mothers and daughters.
 
@@ -6062,33 +6810,32 @@ class Model:
         ----------
         relation_prop : str
             Identifier of the node property of cycle lineages that lists the related
-            cell cycles: a cell cycle ID or None (e.g. "mother_cycle"), or a list of
-            cell cycle IDs (e.g. "daughter_cycles", "sister_cycles",
-            "cousin_cycles"). A user-defined property works too, as long as the
+            cell cycles: a cell cycle ID or None (e.g. ``mother_cycle``), or a list of
+            cell cycle IDs (e.g. ``daughter_cycles``, ``sister_cycles``,
+            ``cousin_cycles``). A user-defined property works too, as long as the
             related cell cycles belong to the same lineage.
-        props : list[str], optional
+        props : list[str] | None, default=None
             Identifiers of the node properties of cycle lineages to export for both
-            cell cycles of each pair (default is None). If None, all of them are
+            cell cycles of each pair. If None, all of them are
             exported.
-        lids : list[int], optional
-            List of IDs of the lineages to export (default is None).
+        lineage_ids : list[int] | None, default=None
+            List of IDs of the lineages to export.
             If None, all lineages are exported.
-        lineage_props : list[str], optional
+        lineage_props : list[str] | None, default=None
             Identifiers of cell lineage properties to add as columns, e.g. an
-            experimental condition stored on lineages (default is None). Each row
+            experimental condition stored on lineages. Each row
             gets the value of its lineage, or NaN if the lineage has no value.
-        unique_pairs : bool, optional
+        unique_pairs : bool, default=False
             True to keep a single row for the pairs whose cell cycles list each
             other, such as sisters or cousins: the row whose first cell cycle has the
-            lower ID. False to keep both rows (default is False), which makes
+            lower ID. False to keep both rows, which makes
             correlations between the two columns of a property symmetric. Pairs
             listed from one side only, such as a daughter and its mother, are
             always kept.
-        suffixes : tuple[str, str], optional
-            Suffixes of the `cycle_id` and property columns: the first one for the
+        suffixes : tuple[str, str], default=("_1", "_2")
+            Suffixes of the ``cycle_id`` and property columns: the first one for the
             cell cycle that lists the relation, the second one for the related cell
-            cycle (default is ("_1", "_2")). E.g. ("", "_mother") with
-            "mother_cycle".
+            cycle. E.g. ``("", "_mother")`` with ``mother_cycle``.
 
         Returns
         -------
@@ -6100,7 +6847,7 @@ class Model:
         ------
         ValueError
             If the cycle lineages have not been computed yet.
-            If the model has no lineages, or none with an ID in `lids`.
+            If the model has no lineages, or none with an ID in `lineage_ids`.
             If the two suffixes are the same, or give the same name to two columns.
             If `relation_prop` or a property of `props` is not a node property of
             cycle lineages, or is not declared in the model.
@@ -6115,13 +6862,13 @@ class Model:
         -----
         No cell cycle is left out. The first cell cycle of a lineage starts with the
         tracking, not at a division, and the last ones can end with it: add
-        "cycle_completeness" to `props` to keep the pairs of complete cell cycles,
-        e.g. to compare areas at birth or division times.
+        ``is_complete_cycle`` to `props` to keep the pairs of complete cell cycles,
+        e.g. to compare areas at birth or interdivision times.
 
         Examples
         --------
         The area at birth of each cell cycle and of its mother, side by side, once
-        the mother cycles are computed (model.add_mother_cycle(), model.update()):
+        the mother cycles are computed (`add_mother_cycle()`, then `update()`):
 
         >>> pairs = model.to_cycle_pair_dataframe(
         ...     "mother_cycle", props=["birth_area"], suffixes=("_daughter", "_mother")
@@ -6136,7 +6883,7 @@ class Model:
         ... )
         """
         # Also checks that there are cycle lineages to export.
-        df = self.to_cycle_dataframe(lids)
+        df = self.to_cycle_dataframe(lineage_ids)
         first, second = suffixes
         if first == second:
             raise ValueError(f"The two suffixes must differ, got {suffixes!r}.")
@@ -6166,8 +6913,8 @@ class Model:
         # rather than from the DataFrame, where None turns integer IDs into floats.
         lineages = [
             (lin_id, lineage)
-            for lin_id, lineage in self.data.cycle_data.items()
-            if not lids or lin_id in lids
+            for lin_id, lineage in self.data.cycle_lineages.items()
+            if not lineage_ids or lin_id in lineage_ids
         ]
         has_values = False
         pairs = []
@@ -6191,12 +6938,14 @@ class Model:
                 "compute it with model.update()."
             )
         if unique_pairs:
-            # Pairs listed from both sides keep the row with the lower ID first.
+            # Pairs listed from both sides keep the row with the lower ID first, and
+            # a cell cycle listed by itself keeps its row, which is its own reverse.
             listed = set(pairs)
             pairs = [
                 (lin_id, cycle_id, related_id)
                 for lin_id, cycle_id, related_id in pairs
-                if cycle_id < related_id or (lin_id, related_id, cycle_id) not in listed
+                if cycle_id <= related_id
+                or (lin_id, related_id, cycle_id) not in listed
             ]
 
         # The properties of both cell cycles, side by side.
@@ -6219,7 +6968,7 @@ class Model:
                 how="left",
             )
         pairs_df = pairs_df[columns]
-        pairs_df.sort_values(id_columns, ignore_index=True, inplace=True)
+        pairs_df = pairs_df.sort_values(id_columns, ignore_index=True)
 
         return self._add_lineage_props_to_df(pairs_df, lineage_props)
 
@@ -6247,59 +6996,7 @@ class Model:
             return []
         return [int(value)]
 
-    def save_to_pickle(self, path: str, protocol: int = pickle.HIGHEST_PROTOCOL) -> None:
-        """
-        Save the model to a file by pickling it.
-
-        Uses custom __getstate__ and __setstate__ methods to ensure ModelMetadata
-        with dynamic fields is properly serialized and deserialized.
-
-        Parameters
-        ----------
-        path : str
-            Path to save the model.
-        protocol : int, optional
-            Pickle protocol to use (default is pickle.HIGHEST_PROTOCOL).
-        """
-        with open(path, "wb") as file:
-            pickle.dump(self, file, protocol=protocol)
-
-    @staticmethod
-    def load_from_pickle(path: str) -> "Model":
-        """
-        Load a model from a pickled pycellin file.
-
-        Uses custom __getstate__ and __setstate__ methods to ensure ModelMetadata
-        with dynamic fields is properly serialized and deserialized.
-
-        Parameters
-        ----------
-        path : str
-            Path to read the model.
-
-        Returns
-        -------
-        Model
-            The loaded model.
-        """
-        with open(path, "rb") as file:
-            return pickle.load(file)
-
-    # def export(self, path: str, format: str) -> None:
-    #     """
-    #     Export the model to a file in a specific format (e.g. TrackMate).
-
-    #     Parameters
-    #     ----------
-    #     path : str
-    #         Path to export the model.
-    #     format : str
-    #         Format of the exported file.
-    #     """
-    #     # TODO: implement
-    #     pass
-
-    def get_mean_cell_prop_over_time_fig(
+    def get_mean_over_time_figure(
         self,
         y_prop: str,
         time_prop: str | None = None,
@@ -6308,9 +7005,9 @@ class Model:
         clip_std_band: bool = True,
         nan_std_handling: Literal["drop", "keep", "zero"] = "keep",
         title: str | None = None,
-        line: dict | None = None,
-        marker: dict | None = None,
-        band_line: dict | None = None,
+        line_style: dict | None = None,
+        marker_style: dict | None = None,
+        band_line_style: dict | None = None,
         band_opacity: float = 0.1,
         template: str | go.layout.Template = "pycellin_white",
         width: int | None = None,
@@ -6323,60 +7020,63 @@ class Model:
         ----------
         y_prop : str
             The property to plot on the y-axis.
-        time_prop : str, optional
+        time_prop : str | None, default=None
             The time property to plot on the x-axis. If None, the model's reference time
-            property is used (default is None).
-        subset : list[dict[int, list[int]]], optional
+            property is used.
+        subset : list[dict[int, list[int]]] | None, default=None
             A list of dictionaries specifying the data subset to include in the plot.
             Each dictionary should have a lineage ID as the key and a list of cell IDs
             as the value. If the list of cell IDs is empty, all the cells of the lineage
             are included. If a lineage ID is not in the dictionary, the entire lineage
-            is ignored. If subset is None, all lineages are included (default is None).
-        std_band: bool, optional
-            True to display the standard deviation band (default is True).
-        clip_std_band : bool, optional
-            Whether to clip the standard deviation band to avoid negative values
-            (default is True).
-        nan_std_handling: Literal["drop", "keep", "zero"], optional
+            is ignored. If subset is None, all lineages are included.
+        std_band : bool, default=True
+            True to display the standard deviation band.
+        clip_std_band : bool, default=True
+            Whether to clip the standard deviation band to avoid negative values.
+        nan_std_handling : Literal["drop", "keep", "zero"], default="keep"
             How to handle NaN values in the standard deviation calculation. A NaN std
             occurs when a timepoint has only a single datapoint:
-            - "drop": drop the datapoint -> no mean and no std
-            - "keep": keep the datapoint -> drawn mean, but the std band has a gap
-            - "zero": replace NaN std by 0 -> the band collapses to the mean line
-        title : str, optional
-            The title of the figure. If None, a default title is generated based on the
-            y_prop (default is None).
-        line : dict, optional
-            Plotly line properties for the mean line (e.g. "color", "width", "dash").
-            Merged over the defaults {"color": "#862CC6", "width": 3}. The
-            "color" is also used as the base color for the std band. Colors must be
-            given as 'rgb(r,g,b)' or '#rrggbb'.
-        marker : dict, optional
-            Plotly marker properties for the mean line's markers (e.g. "color",
-            "size", "symbol"). Merged over Plotly's defaults; if "color" is omitted,
-            markers inherit the mean line color automatically.
-        band_line : dict, optional
+
+            - ``"drop"``: drop the datapoint -> no mean and no std
+            - ``"keep"``: keep the datapoint -> drawn mean, but the std band has a
+              gap
+            - ``"zero"``: replace NaN std by 0 -> the band collapses to the mean line
+        title : str | None, default=None
+            The title of the figure. If None, a default title is generated based on
+            `y_prop`.
+        line_style : dict | None, default=None
+            Plotly line properties for the mean line (e.g. ``"color"``, ``"width"``,
+            ``"dash"``). Merged over the defaults ``{"color": "#982FC4", "width": 3}``.
+            The ``"color"`` is also used as the base color for the std band. Colors
+            must be given as ``"rgb(r,g,b)"`` or ``"#rrggbb"``.
+        marker_style : dict | None, default=None
+            Plotly marker properties for the mean line's markers (e.g. ``"color"``,
+            ``"size"``, ``"symbol"``). Merged over Plotly's defaults; if ``"color"`` is
+            omitted, markers inherit the mean line color automatically.
+        band_line_style : dict | None, default=None
             Plotly line properties for the std band border (upper/lower edges).
-            Merged over the defaults {"width": 1, "dash": "dash"} (thin dashed border
-            in the mean line color). Set "width" to 0 to hide the border.
-        band_opacity : float, optional
-            Opacity of the std band fill, in [0, 1] (default is 0.1). The fill uses
+            Merged over the defaults ``{"width": 1, "dash": "dash"}`` (thin dashed
+            border in the mean line color). Set ``"width"`` to 0 to hide the border.
+        band_opacity : float, default=0.1
+            Opacity of the std band fill, in [0, 1]. The fill uses
             the mean line color with this opacity.
-        template : str or go.layout.Template, optional
-            Plotly template to use for the figure (default is "pycellin_white"). A
-            "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on templates.
-        width: int, optional
-            Width of the figure in pixels (default is None, fallback to autosize).
-        height: int, optional
-            Height of the figure in pixels (default is None, fallback to autosize).
+        template : str | go.layout.Template, default="pycellin_white"
+            Plotly template to use for the figure. A
+            ``"pycellin_dark"`` template is also available. See ``styling.py`` for
+            Pycellin template details. See Plotly documentation for more information
+            on templates.
+        width : int | None, default=None
+            Width of the figure in pixels. If None, the figure is autosized.
+        height : int | None, default=None
+            Height of the figure in pixels. If None, the figure is autosized.
 
         Returns
         -------
-        fig : plotly.graph_objects.Figure
+        go.Figure
+            The figure, with the mean and standard deviation over time.
         """
         if time_prop is None:
-            time_prop = self.reference_time_property
+            time_prop = self.reference_time_prop
 
         # Validation.
         df_cells = self.to_cell_dataframe()
@@ -6393,10 +7093,16 @@ class Model:
             )
 
         # Merge user style dicts over defaults.
-        line = {"color": PYCELLIN_PURPLE, "width": 3, **(line or {})}
-        base_color = line["color"]
-        marker = {**(marker or {})}  # empty by default: markers inherit the line color
-        band_line = {"color": base_color, "width": 1, "dash": "dash", **(band_line or {})}
+        line_style = {"color": PYCELLIN_PURPLE, "width": 3, **(line_style or {})}
+        base_color = line_style["color"]
+        # Empty by default: markers inherit the line color.
+        marker_style = {**(marker_style or {})}
+        band_line_style = {
+            "color": base_color,
+            "width": 1,
+            "dash": "dash",
+            **(band_line_style or {}),
+        }
         band_fill_color = _color_to_rgba(base_color, alpha=band_opacity)
 
         # Subset.
@@ -6437,9 +7143,10 @@ class Model:
                 y=df_agg["mean"],
                 mode="lines+markers",
                 name=f"Mean {y_prop}",
-                line=line,
-                marker=marker,
-                connectgaps=True,  # continuous mean: no break where std is NaN ("keep" mode)
+                line=line_style,
+                marker=marker_style,
+                # continuous mean: no break where std is NaN ("keep" mode)
+                connectgaps=True,
                 showlegend=False,
             )
         )
@@ -6451,7 +7158,7 @@ class Model:
                     y=df_agg["upper"],
                     fill=None,
                     mode="lines",
-                    line=band_line,
+                    line=band_line_style,
                     connectgaps=False,  # break the band where std is NaN ("keep" mode)
                     showlegend=False,
                 )
@@ -6462,15 +7169,15 @@ class Model:
                     y=df_agg["lower"],
                     fill="tonexty",
                     mode="lines",
-                    line=band_line,
+                    line=band_line_style,
                     fillcolor=band_fill_color,
                     connectgaps=False,  # break the band where std is NaN ("keep" mode)
                     showlegend=False,
                 )
             )
         # Layout.
-        x_unit = self.props_metadata.props[time_prop].unit
-        y_unit = self.props_metadata.props[y_prop].unit
+        x_unit = self.props_metadata.properties[time_prop].unit
+        y_unit = self.props_metadata.properties[y_prop].unit
         fig.update_layout(
             title=title if title else f"Mean {y_prop} over time",
             xaxis_title=f"{time_prop} ({x_unit})" if x_unit else time_prop,
@@ -6482,7 +7189,7 @@ class Model:
 
         return fig
 
-    def plot_mean_cell_prop_over_time(
+    def plot_mean_over_time(
         self,
         y_prop: str,
         time_prop: str | None = None,
@@ -6491,9 +7198,9 @@ class Model:
         clip_std_band: bool = True,
         nan_std_handling: Literal["drop", "keep", "zero"] = "keep",
         title: str | None = None,
-        line: dict | None = None,
-        marker: dict | None = None,
-        band_line: dict | None = None,
+        line_style: dict | None = None,
+        marker_style: dict | None = None,
+        band_line_style: dict | None = None,
         band_opacity: float = 0.1,
         template: str | go.layout.Template = "pycellin_white",
         width: int | None = None,
@@ -6506,55 +7213,57 @@ class Model:
         ----------
         y_prop : str
             The property to plot on the y-axis.
-        time_prop : str, optional
+        time_prop : str | None, default=None
             The time property to plot on the x-axis. If None, the model's reference time
-            property is used (default is None).
-        subset : list[dict[int, list[int]]], optional
+            property is used.
+        subset : list[dict[int, list[int]]] | None, default=None
             A list of dictionaries specifying the data subset to include in the plot.
             Each dictionary should have a lineage ID as the key and a list of cell IDs
             as the value. If the list of cell IDs is empty, all the cells of the lineage
             are included. If a lineage ID is not in the dictionary, the entire lineage
-            is ignored. If subset is None, all lineages are included (default is None).
-        std_band: bool, optional
-            True to display the standard deviation band (default is True).
-        clip_std_band : bool, optional
-            Whether to clip the standard deviation band to avoid negative values
-            (default is True).
-        nan_std_handling: Literal["drop", "keep", "zero"], optional
+            is ignored. If subset is None, all lineages are included.
+        std_band : bool, default=True
+            True to display the standard deviation band.
+        clip_std_band : bool, default=True
+            Whether to clip the standard deviation band to avoid negative values.
+        nan_std_handling : Literal["drop", "keep", "zero"], default="keep"
             How to handle NaN values in the standard deviation calculation. A NaN std
             occurs when a timepoint has only a single datapoint:
-            - "drop": drop the datapoint -> no mean and no std
-            - "keep": keep the datapoint -> drawn mean, but the std band has a gap
-            - "zero": replace NaN std by 0 -> the band collapses to the mean line
-        title : str, optional
-            The title of the figure. If None, a default title is generated based on the
-            y_prop (default is None).
-        line : dict, optional
-            Plotly line properties for the mean line (e.g. "color", "width", "dash").
-            Merged over the defaults {"color": "#862CC6", "width": 3}. The
-            "color" is also used as the base color for the std band. Colors must be
-            given as 'rgb(r,g,b)' or '#rrggbb'.
-        marker : dict, optional
-            Plotly marker properties for the mean line's markers (e.g. "color",
-            "size", "symbol"). Merged over Plotly's defaults; if "color" is omitted,
-            markers inherit the mean line color automatically.
-        band_line : dict, optional
+
+            - ``"drop"``: drop the datapoint -> no mean and no std
+            - ``"keep"``: keep the datapoint -> drawn mean, but the std band has a
+              gap
+            - ``"zero"``: replace NaN std by 0 -> the band collapses to the mean line
+        title : str | None, default=None
+            The title of the figure. If None, a default title is generated based on
+            `y_prop`.
+        line_style : dict | None, default=None
+            Plotly line properties for the mean line (e.g. ``"color"``, ``"width"``,
+            ``"dash"``). Merged over the defaults ``{"color": "#982FC4", "width": 3}``.
+            The ``"color"`` is also used as the base color for the std band. Colors
+            must be given as ``"rgb(r,g,b)"`` or ``"#rrggbb"``.
+        marker_style : dict | None, default=None
+            Plotly marker properties for the mean line's markers (e.g. ``"color"``,
+            ``"size"``, ``"symbol"``). Merged over Plotly's defaults; if ``"color"`` is
+            omitted, markers inherit the mean line color automatically.
+        band_line_style : dict | None, default=None
             Plotly line properties for the std band border (upper/lower edges).
-            Merged over the defaults {"width": 1, "dash": "dash"} (thin dashed border
-            in the mean line color). Set "width" to 0 to hide the border.
-        band_opacity : float, optional
-            Opacity of the std band fill, in [0, 1] (default is 0.1). The fill uses
+            Merged over the defaults ``{"width": 1, "dash": "dash"}`` (thin dashed
+            border in the mean line color). Set ``"width"`` to 0 to hide the border.
+        band_opacity : float, default=0.1
+            Opacity of the std band fill, in [0, 1]. The fill uses
             the mean line color with this opacity.
-        template : str or go.layout.Template, optional
-            Plotly template to use for the figure (default is "pycellin_white"). A
-            "pycellin_dark" template is also available. See styling.py for Pycellin
-            template details. See Plotly documentation for more information on templates.
-        width: int, optional
-            Width of the figure in pixels (default is None, fallback to autosize).
-        height: int, optional
-            Height of the figure in pixels (default is None, fallback to autosize).
+        template : str | go.layout.Template, default="pycellin_white"
+            Plotly template to use for the figure. A
+            ``"pycellin_dark"`` template is also available. See ``styling.py`` for
+            Pycellin template details. See Plotly documentation for more information
+            on templates.
+        width : int | None, default=None
+            Width of the figure in pixels. If None, the figure is autosized.
+        height : int | None, default=None
+            Height of the figure in pixels. If None, the figure is autosized.
         """
-        fig = self.get_mean_cell_prop_over_time_fig(
+        fig = self.get_mean_over_time_figure(
             y_prop=y_prop,
             time_prop=time_prop,
             subset=subset,
@@ -6562,9 +7271,9 @@ class Model:
             clip_std_band=clip_std_band,
             nan_std_handling=nan_std_handling,
             title=title,
-            line=line,
-            marker=marker,
-            band_line=band_line,
+            line_style=line_style,
+            marker_style=marker_style,
+            band_line_style=band_line_style,
             band_opacity=band_opacity,
             template=template,
             width=width,

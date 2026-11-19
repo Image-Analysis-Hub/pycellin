@@ -1,3 +1,14 @@
+"""Graph-based framework to manipulate and analyze cell lineages from tracking data."""
+
+import importlib.metadata
+
+# Set before the other imports: submodules read it while the package is loading.
+try:
+    __version__ = importlib.metadata.version("pycellin")
+except importlib.metadata.PackageNotFoundError:
+    __version__ = "development"
+
+from . import exceptions
 from .classes.data import Data
 from .classes.lineage import CellLineage, CycleLineage
 from .classes.model import Model
@@ -12,14 +23,16 @@ from .classes.property_calculator import (
     NodeLocalPropCalculator,
 )
 from .classes.props_metadata import PropsMetadata
-from .io.cell_tracking_challenge.exporter import export_CTC_file
-from .io.cell_tracking_challenge.loader import load_CTC_file
-from .io.geff.exporter import export_GEFF
-from .io.geff.loader import load_GEFF
-from .io.trackmate.exporter import export_TrackMate_XML
-from .io.trackmate.loader import load_TrackMate_XML
-from .io.trackpy.exporter import export_trackpy_dataframe
-from .io.trackpy.loader import load_trackpy_dataframe
+from .io.cell_tracking_challenge.reader import read_ctc
+from .io.cell_tracking_challenge.writer import write_ctc
+from .io.geff.reader import read_geff
+from .io.geff.writer import write_geff
+from .io.pickle.reader import read_pickle
+from .io.pickle.writer import write_pickle
+from .io.trackmate.reader import read_trackmate_xml
+from .io.trackmate.writer import write_trackmate_xml
+from .io.trackpy.reader import from_trackpy
+from .io.trackpy.writer import to_trackpy
 from .properties import (
     get_pycellin_cell_lineage_properties,
     get_pycellin_cycle_lineage_properties,
@@ -39,14 +52,18 @@ __all__ = [
     "NodeLocalPropCalculator",
     "Property",
     "PropsMetadata",
-    "export_CTC_file",
-    "export_GEFF",
-    "export_TrackMate_XML",
-    "export_trackpy_dataframe",
+    "__version__",
+    "exceptions",
+    "from_trackpy",
     "get_pycellin_cell_lineage_properties",
     "get_pycellin_cycle_lineage_properties",
-    "load_CTC_file",
-    "load_GEFF",
-    "load_TrackMate_XML",
-    "load_trackpy_dataframe",
+    "read_ctc",
+    "read_geff",
+    "read_pickle",
+    "read_trackmate_xml",
+    "to_trackpy",
+    "write_ctc",
+    "write_geff",
+    "write_pickle",
+    "write_trackmate_xml",
 ]

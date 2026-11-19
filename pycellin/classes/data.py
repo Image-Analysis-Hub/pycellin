@@ -1,112 +1,144 @@
 #!/usr/bin/env python3
 
+"""The `Data` class: the cell lineages of a model and their cycle lineages."""
+
 import copy
 import math
 import warnings
-from typing import Literal
+from typing import Any, Literal
 
 import networkx as nx
 
 from pycellin.classes.lineage import CellLineage, CycleLineage
+from pycellin.exceptions import PycellinWarning
+from pycellin.utils import _find_stack_level
 
 
 class Data:
     """
     Class to store and manipulate cell lineages and cell cycle lineages.
 
+    Parameters
+    ----------
+    cell_lineages : dict[int, CellLineage]
+        The cell lineages to store, by lineage ID.
+
     Attributes
     ----------
-    cell_data : dict[int, CellLineage]
-        The cell lineages stored.
-    cycle_data : dict[int, CycleLineage] | None
-        The cycle lineages stored, if any.
+    cell_lineages : dict[int, CellLineage]
+        The cell lineages stored, by lineage ID.
+    cycle_lineages : dict[int, CycleLineage] | None
+        The cycle lineages stored, by lineage ID, if any.
     """
 
-    def __init__(self, cell_data: dict[int, CellLineage]) -> None:
+    def __init__(self, cell_lineages: dict[int, CellLineage]) -> None:
+        self.cell_lineages = cell_lineages
+        self.cycle_lineages: dict[int, CycleLineage] | None = None
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> "Data":
         """
-        Initialize a Data object.
+        Create a deep copy of the `Data` object.
 
         Parameters
         ----------
-        cell_data : dict[int, CellLineage]
-            The cell lineages to store.
-        add_cycle_data : bool, optional
-            Whether to compute and store the cycle lineages, by default False.
-        """
-        self.cell_data = cell_data
-        self.cycle_data: dict[int, CycleLineage] | None = None
-
-    def __deepcopy__(self, memo) -> "Data":
-        """
-        Create a deep copy of the Data object.
-
-        Parameters
-        ----------
-        memo : dict
+        memo : dict[int, Any]
             A dictionary used by the copy module to track already copied objects
             to handle circular references.
 
         Returns
         -------
         Data
-            A deep copy of the Data object with all cell lineages and
+            A deep copy of the `Data` object with all cell lineages and
             cycle lineages (if present) independently copied.
         """
-        # Cell_data
-        cell_data_copy = {
-            lid: copy.deepcopy(lineage, memo) for lid, lineage in self.cell_data.items()
+        # Cell lineages.
+        cell_lineages_copy = {
+            lid: copy.deepcopy(lineage, memo)
+            for lid, lineage in self.cell_lineages.items()
         }
 
-        # Cycle_data
-        cycle_data_copy = None
-        if self.cycle_data is not None:
-            cycle_data_copy = {
+        # Cycle lineages.
+        cycle_lineages_copy = None
+        if self.cycle_lineages is not None:
+            cycle_lineages_copy = {
                 lid: copy.deepcopy(cycle_lineage, memo)
-                for lid, cycle_lineage in self.cycle_data.items()
+                for lid, cycle_lineage in self.cycle_lineages.items()
             }
 
-        new_data = Data(cell_data_copy)
-        new_data.cycle_data = cycle_data_copy
+        new_data = Data(cell_lineages_copy)
+        new_data.cycle_lineages = cycle_lineages_copy
 
         return new_data
 
     def __repr__(self) -> str:
-        return f"Data(cell_data={self.cell_data!r}, cycle_data={self.cycle_data!r})"
+        """
+        Return the representation of the data, with its cell and cycle lineages.
+
+        Returns
+        -------
+        str
+            The representation of the data.
+        """
+        return (
+            f"Data(cell_lineages={self.cell_lineages!r}, "
+            f"cycle_lineages={self.cycle_lineages!r})"
+        )
 
     def __str__(self) -> str:
-        if self.cycle_data:
-            txt = f" and {self.number_of_lineages()} cycle lineages"
-        else:
-            txt = ""
-        return f"Data object with {self.number_of_lineages()} cell lineages{txt}."
+        """
+        Return a short description of the data.
+
+        Returns
+        -------
+        str
+            The number of cell lineages, and of cycle lineages if any.
+        """
+        txt = f"Data object with {len(self.cell_lineages)} cell lineages"
+        if self.cycle_lineages:
+            txt += f" and {len(self.cycle_lineages)} cycle lineages"
+        return txt + "."
 
     def _add_cycle_lineages(
-        self, time_prop: str, time_step: int | float, lids: list[int] | None = None
+        self, time_prop: str, lids: list[int] | None = None
     ) -> None:
         """
         Add the cell cycle lineages from the cell lineages.
+
+        Without `lids`, the cycle lineages of all the cell lineages are computed and
+        replace the stored ones. With `lids`, only the cycle lineages of these
+        lineages are computed, and the others are kept.
 
         Parameters
         ----------
         time_prop : str
             The name of the time property to use for computation
             of cycle lineage properties.
-        time_step : int | float
-            The time step between two consecutive time points.
-        lids : list[int], optional
-            The IDs of the lineages for which to compute cycle lineages,
-            by default None i.e. all lineages.
+        lids : list[int] | None, default=None
+            The IDs of the lineages for which to compute cycle lineages.
+            If None, all lineages.
+
+        Raises
+        ------
+        KeyError
+            If a lineage of `lids` is not in the data, or if a cell has no
+            `time_prop` value.
+        LineageStructureError
+            If a cell lineage has several roots or cell fusions. It is a
+            `~pycellin.exceptions.FusionError` for cell fusions.
         """
         if lids is None:
-            lids = list(self.cell_data.keys())
-        self.cycle_data = {
-            lin_id: self._compute_cycle_lineage(time_prop, time_step, lin_id)
-            for lin_id in lids
-        }
+            self.cycle_lineages = {
+                lin_id: self._compute_cycle_lineage(time_prop, lin_id)
+                for lin_id in self.cell_lineages
+            }
+        else:
+            new_cycle_lineages = {
+                lin_id: self._compute_cycle_lineage(time_prop, lin_id)
+                for lin_id in lids
+            }
+            self.cycle_lineages = {**(self.cycle_lineages or {}), **new_cycle_lineages}
 
-    def _compute_cycle_lineage(
-        self, time_prop: str, time_step: float, lid: int
-    ) -> CycleLineage:
+    def _compute_cycle_lineage(self, time_prop: str, lid: int) -> CycleLineage:
         """
         Compute and return the cycle lineage corresponding to a given cell lineage.
 
@@ -114,8 +146,6 @@ class Data:
         ----------
         time_prop : str
             The name of the time property to use for cycle lineage computation.
-        time_step : float
-            The time step between two consecutive time points.
         lid : int
             The ID of the cell lineage for which to compute the cycle lineage.
 
@@ -123,8 +153,17 @@ class Data:
         -------
         CycleLineage
             The cycle lineage corresponding to the cell lineage.
+
+        Raises
+        ------
+        KeyError
+            If there is no cell lineage with the ID `lid`, or if a cell has no
+            `time_prop` value.
+        LineageStructureError
+            If the cell lineage has several roots or cell fusions. It is a
+            `~pycellin.exceptions.FusionError` for cell fusions.
         """
-        return CycleLineage(time_prop, time_step, self.cell_data[lid])
+        return CycleLineage(time_prop, self.cell_lineages[lid])
 
     def _freeze_lineage_data(self):
         """
@@ -134,7 +173,7 @@ class Data:
         nodes and edges cannot be added or removed. However, graph, node and edge
         attributes can still be modified.
         """
-        for lineage in self.cell_data.values():
+        for lineage in self.cell_lineages.values():
             if not nx.is_frozen(lineage):
                 nx.freeze(lineage)
 
@@ -142,22 +181,22 @@ class Data:
     #     """
     #     Unfreeze all cell lineages.
     #     """
-    #     for lineage in self.cell_data.values():
+    #     for lineage in self.cell_lineages.values():
     #         Lineage.unfreeze(lineage)
 
     def copy(self, deep: bool = True) -> "Data":
         """
-        Create a copy of the Data instance.
+        Create a copy of the `Data` instance.
 
         Parameters
         ----------
-        deep : bool, optional
-            If True (default), creates a deep copy. If False, creates a shallow copy.
+        deep : bool, default=True
+            If True, creates a deep copy. If False, creates a shallow copy.
 
         Returns
         -------
         Data
-            A copy of the Data instance. If deep=True, all cell lineages and
+            A copy of the `Data` instance. If `deep` is True, all cell lineages and
             cycle lineages (if present) are copied independently.
         """
         if deep:
@@ -174,19 +213,19 @@ class Data:
         int
             The number of cell lineages in the data.
 
-        Raises
-        ------
-        Warning
+        Warns
+        -----
+        PycellinWarning
             If the number of cell lineages and cycle lineages do not match.
         """
-        if self.cycle_data and len(self.cell_data) != len(self.cycle_data):
+        if self.cycle_lineages and len(self.cell_lineages) != len(self.cycle_lineages):
             msg = (
-                f"Number of cell lineages ({len(self.cell_data)}) "
-                f"and cycle lineages ({len(self.cycle_data)}) do not match. "
+                f"Number of cell lineages ({len(self.cell_lineages)}) "
+                f"and cycle lineages ({len(self.cycle_lineages)}) do not match. "
                 "An update of the model is required. "
             )
-            warnings.warn(msg)
-        return len(self.cell_data)
+            warnings.warn(msg, PycellinWarning, stacklevel=_find_stack_level())
+        return len(self.cell_lineages)
 
     def _get_next_available_lineage_id(self, positive: bool) -> int:
         """
@@ -194,7 +233,7 @@ class Data:
 
         Parameters
         ----------
-        positive : bool, optional
+        positive : bool
             True to return a positive lineage ID,
             False to return a negative lineage ID.
 
@@ -208,66 +247,83 @@ class Data:
         Next available lineage IDs are determined by finding the maximum
         (for positive IDs) or minimum (for negative IDs) existing lineage ID
         in the model and incrementing or decrementing it by one, respectively.
-        This way, lineage IDs of previously deleted lineages are not reused.
-        This avoids potential confusion or errors in lineage handling.
+        This way, lineage IDs of previously deleted lineages are not reused,
+        unless they were above the maximum (or below the minimum) of the remaining
+        lineage IDs. This avoids potential confusion or errors in lineage handling.
 
         The returned lineage ID cannot be 0 in case the user wants to reserve
         it for special purposes.
-
-        Positive lineage IDs should be used for lineages with more than one cell.
-        Negative lineage IDs should be used for lineages with a single cell,
-        and are equal to the negative of the cell ID.
         """
         new_lin_id: int
-        if len(self.cell_data) == 0:
+        if len(self.cell_lineages) == 0:
             new_lin_id = 1 if positive else -1
         else:
             if positive:
-                new_lin_id = max(self.cell_data.keys()) + 1
+                new_lin_id = max(self.cell_lineages.keys()) + 1
                 new_lin_id = max(new_lin_id, 1)
             else:
-                new_lin_id = min(self.cell_data.keys()) - 1
+                new_lin_id = min(self.cell_lineages.keys()) - 1
                 new_lin_id = min(new_lin_id, -1)
         return new_lin_id
 
     def get_closest_cell(
         self,
-        nid: int,
+        cell_id: int,
         lineage: CellLineage,
         radius: float = 0,
         time_window: int = 0,
         time_window_type: Literal["before", "after", "symmetric"] = "symmetric",
         lineages_to_search: list[CellLineage] | None = None,
         reference: Literal["center", "border"] = "center",
-    ) -> tuple[int, CellLineage]:
+    ) -> tuple[int, CellLineage] | None:
         """
         Find the closest cell to a given cell of a lineage.
 
+        The distances are measured between the positions of the cells: ``cell_x`` and
+        ``cell_y``, and ``cell_z`` when the given cell has one.
+
         Parameters
         ----------
-        nid : int
-            ID of the node for which to find the closest cell.
+        cell_id : int
+            ID of the cell for which to find the closest cell.
         lineage : CellLineage
-            The lineage the node belongs to.
-        radius : float, optional
-            The maximum distance to consider, by default 0.
+            The lineage the cell belongs to.
+        radius : float, default=0
+            The maximum distance to consider.
             If 0, the whole space is considered.
-        time_window : int, optional
-            The time window to consider, by default 0 i.e. only the current frame.
-        time_window_type : Literal["before", "after", "symmetric"], optional
-            The type of time window to consider, by default "symmetric".
-        lineages_to_search : list[CellLineage], optional
-            The lineages to search in, by default None i.e. all lineages.
-        reference : Literal["center", "border"], optional
-            The reference point to consider for the distance, by default "center".
+        time_window : int, default=0
+            The time window to consider, in values of the ``timepoint`` property. If
+            0, only the cells with the same ``timepoint`` value as the given cell are
+            considered.
+        time_window_type : Literal["before", "after", "symmetric"], default="symmetric"
+            The type of time window to consider: before the time of the given cell,
+            after it, or on both sides.
+        lineages_to_search : list[CellLineage] | None, default=None
+            The lineages to search in. If None, all lineages.
+        reference : Literal["center", "border"], default="center"
+            The reference point to consider for the distance. Only ``"center"``, the
+            position of the cells, is implemented.
 
         Returns
         -------
-        tuple[int, CellLineage]
-            The node ID of the closest cell and the lineage it belongs to.
+        tuple[int, CellLineage] | None
+            The ID of the closest cell and the lineage it belongs to, or None if no
+            other cell is within the radius and the time window.
+
+        Raises
+        ------
+        KeyError
+            If `cell_id` is not a cell of `lineage`, or if it has no ``timepoint``
+            value.
+            If the given cell or a cell in the time window lacks one of the
+            coordinates.
+        ValueError
+            If `time_window_type` or `reference` is not one of the values above.
+        NotImplementedError
+            If `reference` is ``"border"``.
         """
         distances = self.get_closest_cells(
-            nid=nid,
+            cell_id=cell_id,
             lineage=lineage,
             radius=radius,
             time_window=time_window,
@@ -275,11 +331,11 @@ class Data:
             lineages_to_search=lineages_to_search,
             reference=reference,
         )
-        return distances[0]
+        return distances[0] if distances else None
 
     def get_closest_cells(
         self,
-        nid: int,
+        cell_id: int,
         lineage: CellLineage,
         radius: float = 0,
         time_prop: str = "timepoint",
@@ -291,84 +347,89 @@ class Data:
         """
         Find the closest cells to a given cell of a lineage.
 
+        The distances are measured between the positions of the cells: ``cell_x`` and
+        ``cell_y``, and ``cell_z`` when the given cell has one.
+
         Parameters
         ----------
-        nid : int
-            ID of the node for which to find the closest cell.
+        cell_id : int
+            ID of the cell for which to find the closest cells.
         lineage : CellLineage
-            The lineage the node belongs to.
-        radius : float, optional
-            The maximum distance to consider, by default 0.
+            The lineage the cell belongs to.
+        radius : float, default=0
+            The maximum distance to consider.
             If 0, the whole space is considered.
-        time_prop: str = "timepoint"
-            The name of the time property. Default is "timepoint".
-        time_window : int, optional
-            The time window to consider, by default 0 i.e. only the current frame.
-        time_window_type : Literal["before", "after", "symmetric"], optional
-            The type of time window to consider, by default "symmetric".
-        lineages_to_search : list[CellLineage], optional
-            The lineages to search in, by default None i.e. all lineages.
-        reference : Literal["center", "border"], optional
-            The reference point to consider for the distance, by default "center".
+        time_prop : str, default="timepoint"
+            The name of the time property.
+        time_window : int, default=0
+            The time window to consider, in values of `time_prop`. If 0, only the
+            cells with the same `time_prop` value as the given cell are considered.
+        time_window_type : Literal["before", "after", "symmetric"], default="symmetric"
+            The type of time window to consider: before the time of the given cell,
+            after it, or on both sides.
+        lineages_to_search : list[CellLineage] | None, default=None
+            The lineages to search in. If None, all lineages.
+        reference : Literal["center", "border"], default="center"
+            The reference point to consider for the distance. Only ``"center"``, the
+            position of the cells, is implemented.
 
         Returns
         -------
-        tuple[int, CellLineage]
-            The node ID of the closest cells and the lineages it belongs to,
-            sorted by increasing distance.
+        list[tuple[int, CellLineage]]
+            The ID of each cell found and the lineage it belongs to, sorted by
+            increasing distance. The given cell is not included.
+
+        Raises
+        ------
+        KeyError
+            If `cell_id` is not a cell of `lineage`, or if it has no `time_prop`
+            value.
+            If the given cell or a cell in the time window lacks one of the
+            coordinates.
+        ValueError
+            If `time_window_type` or `reference` is not one of the values above.
+        NotImplementedError
+            If `reference` is ``"border"``.
         """
-        # TODO: implement the reference parameter
+        # TODO: implement the "border" reference, e.g. from the cell contours.
+        if reference == "border":
+            raise NotImplementedError(
+                "The distance between cell borders is not implemented yet: use "
+                "reference='center'."
+            )
+        if reference != "center":
+            raise ValueError(
+                f"Unknown reference: '{reference}'. Should be 'center' or 'border'."
+            )
+        if time_window_type not in ("before", "after", "symmetric"):
+            raise ValueError(
+                f"Unknown time window type: '{time_window_type}'."
+                " Should be 'before', 'after' or 'symmetric'."
+            )
 
-        # Identification of the time interval to search in.
-        center_timepoint = lineage.nodes[nid][time_prop]
-        if time_window == 0:
-            timepoints_to_search = [center_timepoint]
-        else:
-            if time_window_type == "symmetric":
-                timepoints_to_search = list(
-                    range(
-                        center_timepoint - time_window, center_timepoint + time_window + 1
-                    )
-                )
-            elif time_window_type == "before":
-                timepoints_to_search = list(
-                    range(center_timepoint - time_window, center_timepoint + 1)
-                )
-            elif time_window_type == "after":
-                timepoints_to_search = list(
-                    range(center_timepoint, center_timepoint + time_window + 1)
-                )
-            else:
-                raise ValueError(
-                    f"Unknown time window type: '{time_window_type}'."
-                    " Should be 'before', 'after' or 'symmetric'."
-                )
-            timepoints_to_search.sort()
+        # Position of the cell, in 3D when the cell has a z coordinate.
+        cell = lineage.nodes[cell_id]
+        coord_props = ["cell_x", "cell_y"]
+        if "cell_z" in cell:
+            coord_props.append("cell_z")
+        position = [cell[prop] for prop in coord_props]
 
-        # Identification of nodes that are good candidates,
-        # i.e. nodes that are in the time window
-        # and in the lineages to search in.
-        if not lineages_to_search:
-            lineages_to_search = list(self.cell_data.values())
-        candidate_cells = {}
-        for lin in lineages_to_search:
-            nodes = [
-                node
-                for node, timepoint in lin.nodes(data=time_prop)
-                if timepoint in timepoints_to_search
-            ]
-            if nodes:
-                candidate_cells[lin] = nodes
-        # Need to remove the node itself from the candidates.
-        candidate_cells[lineage].remove(nid)
+        # Time interval to search in.
+        time = cell[time_prop]
+        start = time if time_window_type == "after" else time - time_window
+        end = time if time_window_type == "before" else time + time_window
 
-        # Identification of the closest cell.
+        if lineages_to_search is None:
+            lineages_to_search = list(self.cell_lineages.values())
         distances = []
-        for lin, nodes in candidate_cells.items():
-            for node in nodes:
-                distance = math.dist(
-                    lineage.nodes[nid]["location"], lin.nodes[node]["location"]
-                )
+        for lin in lineages_to_search:
+            for node, node_time in lin.nodes(data=time_prop):
+                if node_time is None or not start <= node_time <= end:
+                    continue
+                if lin is lineage and node == cell_id:
+                    continue
+                other_position = [lin.nodes[node][prop] for prop in coord_props]
+                distance = math.dist(position, other_position)
                 if radius == 0 or distance <= radius:
                     distances.append((node, lin, distance))
         distances.sort(key=lambda x: x[2])

@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 
 """
-Declarations of the properties pycellin can attach to lineages.
+Declarations of the properties Pycellin can attach to lineages.
 
-The factories exported here build the `Property` declarations of pycellin core
-properties: the ones loaders create, and the ones you need to declare yourself
-when building a `Model` from scratch or writing a loader for a new format.
+The factories exported here build the `~pycellin.Property` declarations of Pycellin
+core properties: the ones loaders create, and the ones you need to declare
+yourself when building a `~pycellin.Model` from scratch or writing a loader for a
+new format.
 
-Every other pycellin property (morphology, motion, topology, tracking) is added
-through its dedicated `Model.add_<identifier>()` method, which builds the
+Every other Pycellin property (morphology, motion, topology, timing) is added
+through its dedicated ``Model.add_<identifier>()`` method, which builds the
 declaration and registers the matching calculator in one step. Use
 `get_pycellin_cell_lineage_properties()` and
 `get_pycellin_cycle_lineage_properties()` to list them.
@@ -21,12 +22,12 @@ from .core import (
     create_cycle_duration_property,
     create_cycle_end_time_property,
     create_cycle_id_property,
-    create_cycle_length_property,
+    create_cycle_num_cells_property,
     create_cycle_start_time_property,
     create_first_cell_property,
     create_frame_property,
+    create_generation_property,
     create_last_cell_property,
-    create_level_property,
     create_lineage_coord_property,
     create_lineage_id_property,
     create_link_coord_property,
@@ -45,12 +46,12 @@ __all__ = [
     "create_cycle_duration_property",
     "create_cycle_end_time_property",
     "create_cycle_id_property",
-    "create_cycle_length_property",
+    "create_cycle_num_cells_property",
     "create_cycle_start_time_property",
     "create_first_cell_property",
     "create_frame_property",
+    "create_generation_property",
     "create_last_cell_property",
-    "create_level_property",
     "create_lineage_coord_property",
     "create_lineage_id_property",
     "create_link_coord_property",
