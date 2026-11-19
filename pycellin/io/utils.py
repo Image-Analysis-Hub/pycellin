@@ -12,12 +12,12 @@ import logging
 import numbers
 import warnings
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any
 
 import networkx as nx
 
-from pycellin.classes import CellLineage, Model
+from pycellin.classes import CellLineage, Model, Property
 from pycellin.custom_types import PropertyType, _property_type_from_string
 from pycellin.exceptions import PycellinWarning, UpdateRequiredError
 from pycellin.utils import _find_stack_level
@@ -360,7 +360,59 @@ def _get_cycle_props_message(props: list[str]) -> str:
     )
 
 
-def _remove_orphaned_metadata(model: Model) -> None:
+def _report_cycle_props_left_out(
+    model: Model,
+    props: list[str],
+    can_store: Callable[[Property], bool],
+) -> None:
+    """
+    Report the cycle properties left out of an export.
+
+    Those that ``propagate_cycle_props=True`` would export get a warning that says
+    so. The others, whose data type the file format can't store, e.g. the lists of
+    cell IDs of ``cells``, are only logged at the info level, since nothing can
+    export them.
+
+    Parameters
+    ----------
+    model : Model
+        The model exported, which declares these properties.
+    props : list[str]
+        The identifiers of the cycle properties left out.
+    can_store : Callable[[Property], bool]
+        Whether the file format can store the values of a property.
+
+    Warns
+    -----
+    PycellinWarning
+        If ``propagate_cycle_props=True`` would export some of these properties.
+    """
+    unstorable = [
+        prop
+        for prop in props
+        if (declared := model.get_property(prop)) is not None
+        and not can_store(declared)
+    ]
+    exportable = [prop for prop in props if prop not in unstorable]
+    if exportable:
+        warnings.warn(
+            _get_cycle_props_message(exportable),
+            PycellinWarning,
+            stacklevel=_find_stack_level(),
+        )
+    if unstorable:
+        plural = len(unstorable) > 1
+        logger.info(
+            f"Cycle propert{'ies are' if plural else 'y is'} not exported, since the "
+            f"file format can't store {'their' if plural else 'its'} data type: "
+            f"{', '.join(unstorable)}."
+        )
+
+
+def _remove_orphaned_metadata(
+    model: Model,
+    can_store: Callable[[Property], bool] | None = None,
+) -> None:
     """
     Remove properties from metadata that are not present in any cell lineage.
 
@@ -377,12 +429,16 @@ def _remove_orphaned_metadata(model: Model) -> None:
     ----------
     model : Model
         The Pycellin model to update.
+    can_store : Callable[[Property], bool] | None, default=None
+        Whether the file format of the export can store the values of a property. If
+        None, it can store them all.
 
     Warns
     -----
     PycellinWarning
         If some of the cell and link properties removed have values on the cycle
-        lineages, since an export leaves these values out.
+        lineages, since an export leaves these values out, unless the file format
+        can't store them, see ``_report_cycle_props_left_out()``.
 
     Notes
     -----
@@ -414,10 +470,8 @@ def _remove_orphaned_metadata(model: Model) -> None:
         | (cycle_edge_props & set(orphaned_edge_props))
     )
     if not_exported:
-        warnings.warn(
-            _get_cycle_props_message(not_exported),
-            PycellinWarning,
-            stacklevel=_find_stack_level(),
+        _report_cycle_props_left_out(
+            model, not_exported, can_store or (lambda _prop: True)
         )
     for location, orphaned_props, cycle_props in (
         ("cells", orphaned_node_props, cycle_node_props),

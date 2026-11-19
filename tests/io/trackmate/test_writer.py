@@ -666,10 +666,12 @@ class TestWriteTrackmateXml:
         self, tmp_path, model_with_cycle_lineages, caplog
     ):
         """Test that a warning names the cycle properties left out and how to export
-        them, and that the non-numeric ones are not named as unsupported."""
+        them, that those TrackMate can't store even propagated, e.g. cells, are only
+        logged, and that the non-numeric ones are not named as unsupported."""
         xml_path = tmp_path / "model.xml"
+        caplog.set_level(logging.INFO, logger="pycellin.io.utils")
         with (
-            caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"),
+            caplog.at_level(logging.INFO, logger="pycellin.io.trackmate.writer"),
             pytest.warns(PycellinWarning) as warned,
         ):
             write_trackmate_xml(
@@ -680,12 +682,17 @@ class TestWriteTrackmateXml:
             )
 
         warning = (
-            "Cycle properties are not exported: cells, cycle_duration, "
-            "cycle_end_time, cycle_id, cycle_num_cells, cycle_start_time, first_cell, "
-            "generation, last_cell, mother_cycle. Use propagate_cycle_props=True to "
-            "write them on the cells."
+            "Cycle properties are not exported: cycle_duration, cycle_end_time, "
+            "cycle_id, cycle_num_cells, cycle_start_time, first_cell, generation, "
+            "last_cell, mother_cycle. Use propagate_cycle_props=True to write them on "
+            "the cells."
         )
         assert warning in [str(w.message) for w in warned]
+        info = (
+            "Cycle property is not exported, since the file format can't store its "
+            "data type: cells."
+        )
+        assert info in [record.message for record in caplog.records]
         assert not any("not numeric" in record.message for record in caplog.records)
 
     def test_propagated_cycle_props_not_named_as_left_out(

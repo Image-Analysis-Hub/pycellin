@@ -186,14 +186,39 @@ def _to_geff_dtype(dtype: str) -> str:
     return dtype
 
 
+def _is_geff_storable(prop: Property) -> bool:
+    """
+    Tell whether GEFF can store the values of a property, from its data type.
+
+    GEFF stores booleans, numbers and strings, as single values or as
+    variable-length arrays (e.g. cell contours), but not data types such as
+    ``list[int]`` or shapely geometries.
+
+    Parameters
+    ----------
+    prop : Property
+        The property to check.
+
+    Returns
+    -------
+    bool
+        True if GEFF can store the values of the property, False otherwise.
+    """
+    try:
+        geff_spec.PropMetadata(
+            identifier=prop.identifier, dtype=_to_geff_dtype(prop.dtype)
+        )
+    except ValueError:  # pydantic's ValidationError is a ValueError.
+        return False
+    return True
+
+
 def _remove_unsupported_props(model: Model) -> None:
     """
     Remove the cell and link properties whose data type GEFF cannot store.
 
-    GEFF stores booleans, numbers and strings, as single values or as
-    variable-length arrays (e.g. cell contours), but not data types such as
-    ``list[int]`` or shapely geometries. Lineage properties are not checked, since
-    they are not exported.
+    See ``_is_geff_storable()`` for the data types that GEFF stores. Lineage
+    properties are not checked, since they are not exported.
 
     Parameters
     ----------
@@ -209,9 +234,7 @@ def _remove_unsupported_props(model: Model) -> None:
     for prop_id, prop in model.get_cell_lineage_properties().items():
         if not prop.prop_type & (PropertyType.NODE | PropertyType.EDGE):
             continue
-        try:
-            geff_spec.PropMetadata(identifier=prop_id, dtype=_to_geff_dtype(prop.dtype))
-        except ValueError:  # pydantic's ValidationError is a ValueError.
+        if not _is_geff_storable(prop):
             unsupported[prop_id] = prop.dtype
     if not unsupported:
         return
@@ -851,7 +874,7 @@ def write_geff(
     _remove_none_values(model_copy)
     # For GEFF compatibility, we need to ensure that there are no property metadata
     # entries that don't correspond to any actual property in the data.
-    _remove_orphaned_metadata(model_copy)
+    _remove_orphaned_metadata(model_copy, can_store=_is_geff_storable)
     # All the lineages must also be in the same graph. However, some nodes can
     # have the same identifier across different lineages.
     lineages = list(model_copy.data.cell_lineages.values())

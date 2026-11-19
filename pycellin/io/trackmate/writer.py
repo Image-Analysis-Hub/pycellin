@@ -29,10 +29,10 @@ from pycellin.custom_types import PropertyType
 from pycellin.exceptions import ProtectedPropertyError, PycellinWarning
 from pycellin.io.utils import (
     _check_up_to_date,
-    _get_cycle_props_message,
     _get_props_from_data,
     _identify_frame_prop,
     _relabel_nodes_in_place,
+    _report_cycle_props_left_out,
     _update_node_prop_key,
 )
 from pycellin.utils import _find_stack_level, _is_numeric_dtype, _normalize_dtype
@@ -1018,7 +1018,9 @@ def _warn_cycle_props_left_out(model: Model) -> None:
     Only the properties of cell lineages are exported, see
     ``_write_FeatureDeclarations()``, so cycle properties are left out unless they
     were propagated to the cells first. As for GEFF, the properties named are the
-    cell and link properties with values on cycle lineages only.
+    cell and link properties with values on cycle lineages only. Those that aren't
+    numeric, e.g. ``cells``, are only logged at the info level, since TrackMate
+    can't store them even propagated.
 
     Parameters
     ----------
@@ -1028,7 +1030,7 @@ def _warn_cycle_props_left_out(model: Model) -> None:
     Warns
     -----
     PycellinWarning
-        If some cell or link properties have values on cycle lineages only.
+        If some numeric cell or link properties have values on cycle lineages only.
     """
     if not model.data.cycle_lineages:
         return
@@ -1049,10 +1051,8 @@ def _warn_cycle_props_left_out(model: Model) -> None:
         | ((edge_props_md & cycle_edge_props) - cell_edge_props)
     )
     if left_out:
-        warnings.warn(
-            _get_cycle_props_message(left_out),
-            PycellinWarning,
-            stacklevel=_find_stack_level(),
+        _report_cycle_props_left_out(
+            model, left_out, lambda prop: _is_numeric_dtype(prop.dtype)
         )
 
 

@@ -1126,16 +1126,28 @@ class TestWriteGeff:
         # The original model is not modified.
         assert "daughter_ids" in simple_model.get_properties()
 
-    def test_cycle_props_left_out_by_default(self, simple_model, tmp_path):
-        """Test that cycle properties are left out by default, with a warning."""
+    def test_cycle_props_left_out_by_default(self, caplog, simple_model, tmp_path):
+        """Test that cycle properties are left out by default, with a warning, except
+        those GEFF can't store even propagated, e.g. cells, which are only logged."""
         geff_out = str(tmp_path / "test.geff")
         simple_model.add_cycle_lineages()
 
-        with pytest.warns(PycellinWarning, match="propagate_cycle_props=True"):
+        with (
+            caplog.at_level(logging.INFO, logger="pycellin.io.utils"),
+            pytest.warns(PycellinWarning, match="propagate_cycle_props=True") as warned,
+        ):
             write_geff(simple_model, geff_out)
 
         _, metadata = geff.read(geff_out)
         assert "cycle_id" not in metadata.node_props_metadata
+        message = next(str(w.message) for w in warned if "propagate" in str(w.message))
+        named = message.split(": ", 1)[1].split(". Use", 1)[0].split(", ")
+        assert "cycle_id" in named
+        assert "cells" not in named
+        assert (
+            "Cycle property is not exported, since the file format can't store its "
+            "data type: cells." in caplog.text
+        )
 
     def test_propagate_cycle_props(self, caplog, simple_model, tmp_path):
         """Test that cycle properties are written on the cells of the file, without

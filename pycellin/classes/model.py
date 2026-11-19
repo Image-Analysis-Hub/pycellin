@@ -2627,7 +2627,7 @@ class Model:
                         include_core_properties=False
                     ),
                 }
-                fix = f"set '{param}' to the identifier of a declared property"
+                fixes = []
                 if input_id in pycellin_props:
                     add_method = self._get_prop_method(input_id)
                     parameters = inspect.signature(add_method).parameters.values()
@@ -2635,14 +2635,24 @@ class Model:
                     # Don't suggest an add method that reads, by default, the property
                     # being added, e.g. add_cell_contour() for a polygon from contours.
                     if prop_id not in defaults:
-                        fix = f"add it first with model.add_{input_id}(), or {fix}"
-                raise MissingPropertyError(
-                    input_id,
-                    message=(
-                        f"'{prop_id}' requires the property '{input_id}', which has "
-                        f"not been declared. To fix this, {fix}."
-                    ),
+                        fixes.append(f"add it first with model.add_{input_id}()")
+                # Don't suggest a parameter that the add method of the property being
+                # added doesn't take, e.g. 'contour_prop' for add_rod_length().
+                if (
+                    prop_id not in pycellin_props
+                    or param
+                    in inspect.signature(self._get_prop_method(prop_id)).parameters
+                ):
+                    fixes.append(
+                        f"set '{param}' to the identifier of a declared property"
+                    )
+                message = (
+                    f"'{prop_id}' requires the property '{input_id}', which has not "
+                    "been declared."
                 )
+                if fixes:
+                    message += f" To fix this, {', or '.join(fixes)}."
+                raise MissingPropertyError(input_id, message=message)
             if _property_type_from_string(prop_type) not in input_prop.prop_type:
                 raise ValueError(
                     f"'{prop_id}' requires '{param}' to be a property with "

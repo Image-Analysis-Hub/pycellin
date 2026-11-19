@@ -2347,6 +2347,18 @@ class TestAddCellPolygon:
         # add_cell_contour() computes contours from cell polygons.
         assert "add_cell_contour" not in str(exc.value)
 
+    @pytest.mark.parametrize("method", ["add_rod_length", "add_rod_width"])
+    def test_rod_missing_contour_suggests_no_contour_prop(
+        self, input_props_model, method
+    ):
+        """add_rod_length() and add_rod_width() don't take 'contour_prop', so the
+        error only suggests computing the contours."""
+        with pytest.raises(
+            MissingPropertyError, match=r"model\.add_cell_contour\(\)\.$"
+        ) as exc:
+            getattr(input_props_model, method)()
+        assert "contour_prop" not in str(exc.value)
+
     def test_contour_source_unit_mismatch_raises(self, contour_model):
         contour_model.get_property("cell_x").unit = "pixel"
         with pytest.raises(ValueError, match="'cell_x' is in 'pixel'"):
