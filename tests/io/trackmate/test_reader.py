@@ -159,6 +159,12 @@ def track_props(
 
 
 @pytest.fixture(scope="module")
+def fake_tracks_xml_path():
+    """Path of the FakeTracks sample, in 2D: one slice and a POSITION_Z of 0."""
+    return Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+
+
+@pytest.fixture(scope="module")
 def celegans_xml_path():
     """Path of the C. elegans sample, whose frame interval is 2 min."""
     return (
@@ -1270,6 +1276,30 @@ def test_get_filtered_tracks_id_no_tracks():
 # _update_location_related_props ###########################################
 
 
+def _location_props_md(axes: str) -> PropsMetadata:
+    """Return properties metadata declaring the coordinates of cells, links and
+    lineages on `axes`, as renamed by _update_props_metadata()."""
+    props_md = PropsMetadata()
+    for prefix, prop_type in [
+        ("cell", "node"),
+        ("link", "edge"),
+        ("lineage", "lineage"),
+    ]:
+        for axis in axes:
+            props_md._add_prop(
+                Property(
+                    identifier=f"{prefix}_{axis}",
+                    name=f"{prefix}_{axis}",
+                    description=f"{axis.upper()} coordinate",
+                    provenance="TrackMate",
+                    prop_type=prop_type,
+                    lineage_type="cell",
+                    dtype="float",
+                )
+            )
+    return props_md
+
+
 def test_update_location_related_props():
     lineage = CellLineage()
     lineage.add_node(1, POSITION_X=1, POSITION_Y=2, POSITION_Z=3)
@@ -1279,7 +1309,7 @@ def test_update_location_related_props():
     lineage.graph["TRACK_Y_LOCATION"] = 11
     lineage.graph["TRACK_Z_LOCATION"] = 12
 
-    tml._update_location_related_props(lineage)
+    tml._update_location_related_props(lineage, _location_props_md("xyz"))
 
     assert lineage.nodes[1]["cell_x"] == 1
     assert lineage.nodes[1]["cell_y"] == 2
@@ -1299,11 +1329,28 @@ def test_update_location_related_props_one_node():
     lineage = CellLineage()
     lineage.add_node(1, POSITION_X=1, POSITION_Y=2, POSITION_Z=3)
 
-    tml._update_location_related_props(lineage)
+    tml._update_location_related_props(lineage, _location_props_md("xyz"))
 
     assert lineage.nodes[1]["cell_x"] == 1
     assert lineage.nodes[1]["cell_y"] == 2
     assert lineage.nodes[1]["cell_z"] == 3
+
+
+def test_update_location_related_props_2d():
+    """Test that 2D data, without z declarations, gets no z coordinate, not even
+    a z of None."""
+    lineage = CellLineage()
+    lineage.add_node(1, POSITION_X=1, POSITION_Y=2)
+    lineage.add_node(2, POSITION_X=4, POSITION_Y=5)
+    lineage.add_edge(1, 2, EDGE_X_LOCATION=7, EDGE_Y_LOCATION=8)
+    lineage.graph["TRACK_X_LOCATION"] = 10
+    lineage.graph["TRACK_Y_LOCATION"] = 11
+
+    tml._update_location_related_props(lineage, _location_props_md("xy"))
+
+    assert lineage.nodes[1] == {"cell_x": 1, "cell_y": 2}
+    assert lineage.edges[(1, 2)] == {"link_x": 7, "link_y": 8}
+    assert "lineage_z" not in lineage.graph
 
 
 # _parse_model_tag ############################################################
@@ -1693,3 +1740,111 @@ class TestReadTrackmateXml:
         """Test that a value that isn't an option of lone_spots or tracks raises."""
         with pytest.raises(ValueError, match=f"'{option}' must be"):
             tml.read_trackmate_xml(celegans_xml_path, **{option: value})
+
+    # 2D and 3D data.
+
+    @staticmethod
+    def _write_modified(tmp_path, xml_path, modify):
+        """Write a copy of the file at `xml_path`, modified by `modify(tree)`."""
+        tree = ET.parse(str(xml_path))
+        modify(tree)
+        modified_path = tmp_path / f"modified_{Path(xml_path).name}"
+        tree.write(str(modified_path), xml_declaration=True, encoding="UTF-8")
+        return modified_path
+
+    @staticmethod
+    def _remove_features(tree, features):
+        """Remove the declarations and the values of `features` from `tree`."""
+        for element in tree.iter("Spot", "Edge", "Track"):
+            for feature in features:
+                element.attrib.pop(feature, None)
+        for declaration in list(tree.iter("Feature")):
+            if declaration.get("feature") in features:
+                declaration.getparent().remove(declaration)
+
+    @staticmethod
+    def _z_props(model):
+        """Return the z coordinates that `model` declares."""
+        return {p for p in ("cell_z", "link_z", "lineage_z") if model.has_property(p)}
+
+    def test_2d_file_has_no_z(self, fake_tracks_xml_path):
+        """Test that a file with one slice and a POSITION_Z of 0 on every spot gives
+        a model without z coordinates or pixel depth."""
+        model = tml.read_trackmate_xml(fake_tracks_xml_path, lone_spots="all")
+
+        assert self._z_props(model) == set()
+        assert model.has_property("link_x") and model.has_property("lineage_x")
+        for lin in model.get_cell_lineages():
+            assert all("cell_z" not in cell for _, cell in lin.nodes(data=True))
+            assert all("link_z" not in link for _, _, link in lin.edges(data=True))
+            assert "lineage_z" not in lin.graph
+        assert model.get_pixel_depth() is None
+
+    def test_image_with_several_slices_keeps_z(self, tmp_path, fake_tracks_xml_path):
+        """Test that the z coordinates of 0 are kept when the image has several
+        slices, as TrackMate's own criterion for 3D data."""
+
+        def set_slices(tree):
+            for image_data in tree.iter("ImageData"):
+                image_data.set("nslices", "5")
+
+        xml_path = self._write_modified(tmp_path, fake_tracks_xml_path, set_slices)
+        model = tml.read_trackmate_xml(xml_path)
+
+        assert self._z_props(model) == {"cell_z", "link_z", "lineage_z"}
+        cells = self._get_cells(model).values()
+        assert {cell["cell_z"] for cell in cells} == {0.0}
+        assert model.get_pixel_depth() == 1.0
+
+    @pytest.mark.parametrize("lone_spots", ["none", "all"])
+    def test_nonzero_z_keeps_z_whatever_the_spots_loaded(
+        self, tmp_path, fake_tracks_xml_path, lone_spots
+    ):
+        """Test that a single nonzero POSITION_Z keeps the z coordinates, even on a
+        spot that is not loaded: the loading options don't change the dimension."""
+
+        def set_z_on_lone_spot(tree):
+            linked = {
+                edge.get(key)
+                for edge in tree.iter("Edge")
+                for key in ("SPOT_SOURCE_ID", "SPOT_TARGET_ID")
+            }
+            spot = next(s for s in tree.iter("Spot") if s.get("ID") not in linked)
+            spot.set("POSITION_Z", "2.0")
+
+        xml_path = self._write_modified(
+            tmp_path, fake_tracks_xml_path, set_z_on_lone_spot
+        )
+        model = tml.read_trackmate_xml(xml_path, lone_spots=lone_spots)
+
+        assert "cell_z" in self._z_props(model)
+        assert model.get_pixel_depth() == 1.0
+
+    def test_file_without_z_features(self, tmp_path, fake_tracks_xml_path):
+        """Test that a file without any z feature, as other tools can write, gives a
+        2D model."""
+        z_features = ["POSITION_Z", "EDGE_Z_LOCATION", "TRACK_Z_LOCATION"]
+        xml_path = self._write_modified(
+            tmp_path,
+            fake_tracks_xml_path,
+            lambda tree: self._remove_features(tree, z_features),
+        )
+        model = tml.read_trackmate_xml(xml_path)
+
+        assert self._z_props(model) == set()
+        assert model.has_property("cell_x") and model.has_property("link_x")
+
+    def test_links_and_tracks_without_z_location(self, tmp_path, celegans_xml_path):
+        """Test that the locations of links and tracks are read on the axes that the
+        file gives, here x and y only, while the spots stay in 3D."""
+        xml_path = self._write_modified(
+            tmp_path,
+            celegans_xml_path,
+            lambda tree: self._remove_features(
+                tree, ["EDGE_Z_LOCATION", "TRACK_Z_LOCATION"]
+            ),
+        )
+        model = tml.read_trackmate_xml(xml_path)
+
+        assert self._z_props(model) == {"cell_z"}
+        assert model.has_property("link_y") and model.has_property("lineage_y")

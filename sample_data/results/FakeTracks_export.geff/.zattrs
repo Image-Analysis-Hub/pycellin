@@ -14,16 +14,6 @@
         "offset": null
       },
       {
-        "name": "cell_z",
-        "type": "space",
-        "unit": "pixel",
-        "min": 0.0,
-        "max": 0.0,
-        "scale": 1.0,
-        "scaled_unit": "micrometer",
-        "offset": null
-      },
-      {
         "name": "cell_y",
         "type": "space",
         "unit": "pixel",
@@ -261,14 +251,6 @@
         "name": "Y",
         "description": "Y coordinate of the cell"
       },
-      "cell_z": {
-        "identifier": "cell_z",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "pixel",
-        "name": "Z",
-        "description": "Z coordinate of the cell"
-      },
       "cell_contour": {
         "identifier": "cell_contour",
         "dtype": "float64",
@@ -366,14 +348,6 @@
         "unit": "micrometer",
         "name": "Edge Y",
         "description": "Y coordinate of the link, i.e. mean coordinate of its two cells"
-      },
-      "link_z": {
-        "identifier": "link_z",
-        "dtype": "float64",
-        "varlength": false,
-        "unit": "micrometer",
-        "name": "Edge Z",
-        "description": "Z coordinate of the link, i.e. mean coordinate of its two cells"
       }
     },
     "sphere": null,
@@ -386,7 +360,7 @@
     "display_hints": {
       "display_horizontal": "cell_x",
       "display_vertical": "cell_y",
-      "display_depth": "cell_z",
+      "display_depth": null,
       "display_time": "POSITION_T"
     },
     "extra": {}

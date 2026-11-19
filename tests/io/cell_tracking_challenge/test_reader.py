@@ -103,10 +103,10 @@ class TestIntegrateLabelImagesMetadata:
             "space_unit": "cm",
             "pixel_width": 0.5,
             "pixel_height": 2.0,
-            "pixel_depth": 1.0,
         }
 
     def test_imagej_unit_and_spacing(self, tmp_path):
+        # Label images are 2D: the ImageJ spacing, a z step, gives no pixel depth.
         path = tmp_path / "mask000.tif"
         tifffile.imwrite(
             path,
@@ -121,7 +121,6 @@ class TestIntegrateLabelImagesMetadata:
             "space_unit": "micron",
             "pixel_width": 0.25,
             "pixel_height": 0.25,
-            "pixel_depth": 2.0,
         }
 
     def test_imagej_escaped_unit(self, tmp_path):
@@ -151,7 +150,6 @@ class TestIntegrateLabelImagesMetadata:
             "space_unit": "pixel",
             "pixel_width": 1.0,
             "pixel_height": 1.0,
-            "pixel_depth": 1.0,
         }
 
     def test_resolution_in_inches_ignored(self, tmp_path):
@@ -169,7 +167,6 @@ class TestIntegrateLabelImagesMetadata:
             "space_unit": "pixel",
             "pixel_width": 1.0,
             "pixel_height": 1.0,
-            "pixel_depth": 1.0,
         }
 
     def test_resolution_in_inches_no_warning_when_calibrated(self, tmp_path):
@@ -184,7 +181,7 @@ class TestIntegrateLabelImagesMetadata:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             _integrate_label_images_metadata(metadata, path)
-        assert metadata["pixel_depth"] == 1.0
+        assert metadata == {"space_unit": "um", "pixel_width": 0.1, "pixel_height": 0.1}
 
     def test_given_values_kept(self, tmp_path):
         path = tmp_path / "mask000.tif"
@@ -200,7 +197,6 @@ class TestIntegrateLabelImagesMetadata:
             "space_unit": "um",
             "pixel_width": 0.1,
             "pixel_height": 0.1,
-            "pixel_depth": 1.0,
         }
 
 
@@ -298,6 +294,7 @@ class TestReadCtc:
 
         assert model.get_space_unit() == "cm"
         assert (model.get_pixel_width(), model.get_pixel_height()) == (0.5, 2.0)
+        assert model.get_pixel_depth() is None  # 2D label images
         cells = _get_cells(model)
         assert (cells[0]["cell_x"], cells[0]["cell_y"]) == pytest.approx((3.0, 5.0))
         assert model.get_property("cell_x").unit == "cm"
@@ -357,6 +354,13 @@ class TestReadCtc:
         # Track 1 (3 cells) divides into tracks 2 (2 cells) and 3 (3 cells).
         assert len(model.data.cell_lineages) == 1
         assert len(_get_cells(model)) == 8
+
+    @pytest.mark.parametrize("pixel_depth", [None, 2.0])
+    def test_no_pixel_depth_unless_given(self, tmp_path, pixel_depth):
+        ctc_path = tmp_path / "res_track.txt"
+        ctc_path.write_text("1 0 2 0\n")
+        model = read_ctc(ctc_path, pixel_depth=pixel_depth)
+        assert model.get_pixel_depth() == pixel_depth
 
     @pytest.mark.parametrize(
         ("text", "match"),

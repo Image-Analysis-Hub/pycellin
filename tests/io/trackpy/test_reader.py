@@ -57,6 +57,17 @@ class TestFromTrackpy:
         with pytest.raises(ValueError, match=r"column\(s\) \['timepoint'\]"):
             from_trackpy(trackpy_df)
 
+    @pytest.mark.parametrize(
+        "z, pixel_depth, expected",
+        [(False, None, None), (True, None, 1.0), (False, 2.0, 2.0)],
+    )
+    def test_pixel_depth_only_for_3d_data(self, trackpy_df, z, pixel_depth, expected):
+        """2D data gets no pixel depth unless one is given, 3D data gets 1.0."""
+        if z:
+            trackpy_df["z"] = [5.0, 6.0]
+        model = from_trackpy(trackpy_df, pixel_depth=pixel_depth)
+        assert model.get_pixel_depth() == expected
+
     def test_no_reserved_column(self, trackpy_df):
         """Without reserved columns, Pycellin creates its own properties."""
         model = from_trackpy(trackpy_df)

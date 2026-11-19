@@ -178,6 +178,7 @@ def _create_metadata(
     pixel_depth: float | None = None,
     time_unit: str | None = None,
     time_step: float | None = None,
+    is_3d: bool = True,
 ) -> dict[str, Any]:
     """
     Create a dictionary of basic Pycellin metadata for trackpy data.
@@ -191,11 +192,14 @@ def _create_metadata(
     pixel_height : float | None, default=None
         The pixel height in the spatial unit. If None, 1.0 is used.
     pixel_depth : float | None, default=None
-        The pixel depth in the spatial unit. If None, 1.0 is used.
+        The pixel depth in the spatial unit. If None, 1.0 is used for 3D data, while
+        2D data gets no pixel depth.
     time_unit : str | None, default=None
         The temporal unit of the data. If None, ``"frame"`` is used.
     time_step : float | None, default=None
         The time step in the temporal unit. If None, 1.0 is used.
+    is_3d : bool, default=True
+        True if the data has a z coordinate.
 
     Returns
     -------
@@ -209,7 +213,10 @@ def _create_metadata(
     metadata["space_unit"] = space_unit if space_unit is not None else "pixel"
     metadata["pixel_width"] = pixel_width if pixel_width is not None else 1.0
     metadata["pixel_height"] = pixel_height if pixel_height is not None else 1.0
-    metadata["pixel_depth"] = pixel_depth if pixel_depth is not None else 1.0
+    if pixel_depth is not None:
+        metadata["pixel_depth"] = pixel_depth
+    elif is_3d:
+        metadata["pixel_depth"] = 1.0
     metadata["time_unit"] = time_unit if time_unit is not None else "frame"
     metadata["time_step"] = time_step if time_step is not None else 1.0
 
@@ -329,7 +336,8 @@ def from_trackpy(
     pixel_height : float | None, default=None
         The pixel height in the spatial unit. If None, 1.0 is used.
     pixel_depth : float | None, default=None
-        The pixel depth in the spatial unit. If None, 1.0 is used.
+        The pixel depth in the spatial unit. If None, 1.0 is used when `df` has a
+        ``z`` column, while 2D data gets no pixel depth.
     time_unit : str | None, default=None
         The temporal unit of the data. If None, ``"frame"`` is used.
     time_step : float | None, default=None
@@ -387,7 +395,13 @@ def from_trackpy(
     _add_edges(graph)
 
     md = _create_metadata(
-        space_unit, pixel_width, pixel_height, pixel_depth, time_unit, time_step
+        space_unit,
+        pixel_width,
+        pixel_height,
+        pixel_depth,
+        time_unit,
+        time_step,
+        is_3d="cell_z" in coord_props,
     )
     # The reference time property is the physical time, so that the time step and
     # time unit apply to it. Timepoints are then derived from it by the model.

@@ -990,6 +990,29 @@ class TestWriteTrackmateXml:
         assert visibilities.count(0.0) == 1
         assert visibilities.count(1.0) == 106
 
+    def test_2d_model_written_with_z_of_0(self, tmp_path):
+        """Test that a 2D model is written with z coordinates of 0 on its spots,
+        links and tracks, as in TrackMate's own 2D files, and is read back in 2D."""
+        xml_in = Path(__file__).resolve().parents[3] / "sample_data" / "FakeTracks.xml"
+        model = read_trackmate_xml(xml_in, lone_spots="all", tracks="all")
+        assert not model.has_property("cell_z")
+        xml_path = tmp_path / "model.xml"
+        write_trackmate_xml(
+            model, xml_path, space_unit="micrometer", time_unit="second"
+        )
+
+        tree = ET.parse(str(xml_path))
+        z_features = {
+            "Spot": "POSITION_Z",
+            "Edge": "EDGE_Z_LOCATION",
+            "Track": "TRACK_Z_LOCATION",
+        }
+        declared = {feature.get("feature") for feature in tree.iter("Feature")}
+        assert set(z_features.values()) <= declared
+        for tag, z_feature in z_features.items():
+            assert {float(element.get(z_feature)) for element in tree.iter(tag)} == {0}
+        assert not read_trackmate_xml(xml_path).has_property("cell_z")
+
     def test_position_z_property_without_cell_z_raises(self, tmp_path, simple_model):
         """Test that a POSITION_Z property isn't replaced by the zeros written as
         POSITION_Z when the model has no cell_z."""

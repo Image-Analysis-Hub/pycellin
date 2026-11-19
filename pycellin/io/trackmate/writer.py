@@ -798,7 +798,7 @@ def _update_nodes(lin: CellLineage, frame_prop: str) -> set[int]:
     return nodes_with_missing_pos
 
 
-def _update_edges(lin: CellLineage) -> None:
+def _update_edges(lin: CellLineage, is_2d: bool) -> None:
     """
     Update the edge properties in the lineage to match TrackMate requirements.
 
@@ -806,6 +806,9 @@ def _update_edges(lin: CellLineage) -> None:
     ----------
     lin : CellLineage
         Lineage whose edges to update.
+    is_2d : bool
+        True if the model has no ``cell_z``, as for 2D data: the edges with an x
+        location then get a z location of 0, as in TrackMate's own 2D files.
     """
     for source_node, target_node, data in lin.edges(data=True):
         # Mandatory TrackMate properties.
@@ -818,9 +821,11 @@ def _update_edges(lin: CellLineage) -> None:
                 data[f"EDGE_{axis}_LOCATION"] = data.pop(f"link_{axis.lower()}")
             except KeyError:
                 pass  # not mandatory
+        if is_2d and "EDGE_X_LOCATION" in data:
+            data.setdefault("EDGE_Z_LOCATION", 0.0)
 
 
-def _update_lineages(lin: CellLineage) -> None:
+def _update_lineages(lin: CellLineage, is_2d: bool) -> None:
     """
     Update the lineage properties to match TrackMate requirements.
 
@@ -828,6 +833,9 @@ def _update_lineages(lin: CellLineage) -> None:
     ----------
     lin : CellLineage
         Lineage whose graph to update.
+    is_2d : bool
+        True if the model has no ``cell_z``, as for 2D data: a lineage with an x
+        location then gets a z location of 0, as in TrackMate's own 2D files.
     """
     # Mandatory TrackMate property.
     lin.graph["TRACK_ID"] = lin.graph.pop("lineage_id")
@@ -844,6 +852,8 @@ def _update_lineages(lin: CellLineage) -> None:
             )
         except KeyError:
             pass  # not mandatory
+    if is_2d and "TRACK_X_LOCATION" in lin.graph:
+        lin.graph.setdefault("TRACK_Z_LOCATION", 0.0)
 
 
 def _get_time_interval(model: Model) -> float:
@@ -911,6 +921,7 @@ def _update_model_data(
     model: Model,
     frame_prop: str,
     id_mapping: dict[int, dict[int, int]] | None = None,
+    is_2d: bool = False,
 ) -> None:
     """
     Update the data in the model to match TrackMate requirements.
@@ -924,6 +935,9 @@ def _update_model_data(
     id_mapping : dict[int, dict[int, int]] | None, default=None
         Mapping of the old node IDs to the new ones for each lineage, as returned by
         ``_relabel_nodes()``, if the nodes were relabeled.
+    is_2d : bool, default=False
+        True if the model has no ``cell_z``, as for 2D data: links and lineages with
+        an x location then get a z location of 0.
 
     Warns
     -----
@@ -952,8 +966,8 @@ def _update_model_data(
         times, qualities = _add_missing_time_and_quality(lin, time_interval)
         num_times += times
         num_qualities += qualities
-        _update_edges(lin)
-        _update_lineages(lin)
+        _update_edges(lin, is_2d)
+        _update_lineages(lin, is_2d)
 
     if num_times or num_qualities:
         added = []
@@ -1259,9 +1273,11 @@ def _update_location_props(props_md: PropsMetadata) -> None:
 
     This function renames the ``cell_x``, ``cell_y``, ``cell_z``, ``link_x``,
     ``link_y``, ``link_z``, ``lineage_x``, ``lineage_y``, and ``lineage_z``
-    properties to their TrackMate matching features. A missing ``cell_z`` property
-    gets a ``POSITION_Z`` declaration instead, since the spots are then written with
-    a ``POSITION_Z`` of 0.
+    properties to their TrackMate matching features. A missing ``cell_z`` property,
+    as for 2D data, gets a ``POSITION_Z`` declaration instead, since the spots are
+    then written with a ``POSITION_Z`` of 0. Links and lineages with an x location
+    then also get an ``EDGE_Z_LOCATION`` and a ``TRACK_Z_LOCATION`` declaration,
+    since they are written with z locations of 0, as in TrackMate's own 2D files.
 
     Parameters
     ----------
@@ -1278,6 +1294,7 @@ def _update_location_props(props_md: PropsMetadata) -> None:
         property is written as, e.g. ``POSITION_X`` for ``cell_x``, or if there is
         a ``POSITION_Z`` property but no ``cell_z``.
     """
+    is_2d = not props_md._has_prop("cell_z")
     for axis in ["x", "y", "z"]:
         try:
             _rename_prop_to_feature(
@@ -1326,6 +1343,27 @@ def _update_location_props(props_md: PropsMetadata) -> None:
             )
         except KeyError:
             pass  # not mandatory
+
+    if is_2d:
+        # The z locations of 0 are written in _update_edges() and _update_lineages().
+        for feature, prop_type, element in [
+            ("EDGE", "edge", "link"),
+            ("TRACK", "lineage", "lineage"),
+        ]:
+            x_feature, z_feature = f"{feature}_X_LOCATION", f"{feature}_Z_LOCATION"
+            if props_md._has_prop(x_feature) and not props_md._has_prop(z_feature):
+                props_md._add_prop(
+                    Property(
+                        identifier=z_feature,
+                        name=z_feature,
+                        description=f"Z coordinate of the {element}",
+                        provenance="TrackMate",
+                        prop_type=prop_type,
+                        lineage_type="cell",
+                        dtype="float",
+                        unit=props_md.properties[x_feature].unit,
+                    )
+                )
 
 
 def _update_props_metadata(model: Model, frame_prop: str) -> None:
@@ -1545,8 +1583,10 @@ def _prepare_model_for_export(
 
     frame_prop = _identify_frame_prop(model)
     _add_radius_prop(model)
+    # Checked before cell_z becomes POSITION_Z: TrackMate stores 2D data in 3D.
+    is_2d = not model.props_metadata._has_prop("cell_z")
     _update_props_metadata(model, frame_prop)
-    _update_model_data(model, frame_prop, id_mapping)
+    _update_model_data(model, frame_prop, id_mapping, is_2d)
     _remove_non_numeric_props(model)
 
 
@@ -1834,6 +1874,11 @@ def write_trackmate_xml(
     `read_ctc` or `from_trackpy`, get the time of their frame, ``FRAME`` times the
     time interval of the file, and a quality of -1, as TrackMate gives spots added by
     hand.
+
+    TrackMate stores 2D data in 3D. A model without ``cell_z``, such as a model of
+    2D data, is written with a ``POSITION_Z`` of 0 for its spots, and with an
+    ``EDGE_Z_LOCATION`` and a ``TRACK_Z_LOCATION`` of 0 for its links and lineages
+    that have x and y locations, as in TrackMate's own files of 2D data.
 
     The messages about what TrackMate can't store, e.g. properties left out because
     they are not numeric, are logged with the `logging` module, while the problems

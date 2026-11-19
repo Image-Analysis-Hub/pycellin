@@ -809,8 +809,8 @@ def _update_props_metadata(
     Raises
     ------
     KeyError
-        If the ``POSITION_X``, ``POSITION_Y``, ``POSITION_Z`` or ``TRACK_ID``
-        property is missing in the properties metadata.
+        If the ``POSITION_X``, ``POSITION_Y`` or ``TRACK_ID`` property is missing in
+        the properties metadata.
     ValueError
         If a feature already has the identifier that Pycellin gives to another
         feature, e.g. ``cell_x`` for ``POSITION_X``.
@@ -819,6 +819,8 @@ def _update_props_metadata(
     prop_cell_id = create_cell_id_property("TrackMate")
     props_md._add_prop(prop_cell_id)
     for axis in ["x", "y", "z"]:
+        if axis == "z" and not props_md._has_prop("POSITION_Z"):
+            continue  # 2D data has no z coordinate, see _remove_z_coordinates().
         props_md._change_prop_identifier(f"POSITION_{axis.upper()}", f"cell_{axis}")
         props_md._change_prop_description(
             f"cell_{axis}", f"{axis.upper()} coordinate of the cell"
@@ -830,9 +832,9 @@ def _update_props_metadata(
         )
         props_md._add_prop(roi_coord_prop)
 
-    # Edge properties.
-    if "EDGE_X_LOCATION" in props_md.properties:
-        for axis in ["x", "y", "z"]:
+    # Edge properties. They are optional: Mastodon files don't have them.
+    for axis in ["x", "y", "z"]:
+        if props_md._has_prop(f"EDGE_{axis.upper()}_LOCATION"):
             props_md._change_prop_identifier(
                 f"EDGE_{axis.upper()}_LOCATION", f"link_{axis}"
             )
@@ -860,8 +862,8 @@ def _update_props_metadata(
         dtype="int",
     )
     props_md._add_prop(prop_filtered_track)
-    if "TRACK_X_LOCATION" in props_md.properties:
-        for axis in ["x", "y", "z"]:
+    for axis in ["x", "y", "z"]:
+        if props_md._has_prop(f"TRACK_{axis.upper()}_LOCATION"):
             props_md._change_prop_identifier(
                 f"TRACK_{axis.upper()}_LOCATION", f"lineage_{axis}"
             )
@@ -874,18 +876,32 @@ def _update_props_metadata(
 
 def _update_location_related_props(
     lineage: CellLineage,
+    props_md: PropsMetadata,
 ) -> None:
     """
     Update properties related to location of lineage, nodes and edges in a lineage.
+
+    Only the coordinates that `props_md` declares are renamed, so that 2D data gets
+    no z coordinate.
 
     Parameters
     ----------
     lineage : CellLineage
         The lineage to update.
+    props_md : PropsMetadata
+        The properties metadata, whose location properties are already renamed by
+        ``_update_props_metadata()``.
     """
+    axes = {
+        prefix: [
+            axis for axis in ("x", "y", "z") if props_md._has_prop(f"{prefix}_{axis}")
+        ]
+        for prefix in ("cell", "link", "lineage")
+    }
+
     # Nodes
     for _, data in lineage.nodes(data=True):
-        for axis in ["x", "y", "z"]:
+        for axis in axes["cell"]:
             data[f"cell_{axis}"] = data.pop(f"POSITION_{axis.upper()}", None)
 
     # Edges
@@ -894,11 +910,11 @@ def _update_location_related_props(
     if lineage.edges():
         first_edge = next(iter(lineage.edges(data=True)))
         has_edge_location = any(
-            f"EDGE_{axis.upper()}_LOCATION" in first_edge[2] for axis in ["x", "y", "z"]
+            f"EDGE_{axis.upper()}_LOCATION" in first_edge[2] for axis in axes["link"]
         )
         if has_edge_location:
             for _, _, data in lineage.edges(data=True):
-                for axis in ["x", "y", "z"]:
+                for axis in axes["link"]:
                     data[f"link_{axis}"] = data.pop(
                         f"EDGE_{axis.upper()}_LOCATION", None
                     )
@@ -915,7 +931,7 @@ def _update_location_related_props(
 
     # Lineage
     if "TRACK_X_LOCATION" in lineage.graph:
-        for axis in ["x", "y", "z"]:
+        for axis in axes["lineage"]:
             lineage.graph[f"lineage_{axis}"] = lineage.graph.pop(
                 f"TRACK_{axis.upper()}_LOCATION", None
             )
@@ -925,7 +941,7 @@ def _update_location_related_props(
             # One-node graph don't have the TRACK_X_LOCATION, TRACK_Y_LOCATION
             # and TRACK_Z_LOCATION properties in the graph, so we have to create it.
             node = [n for n in lineage.nodes][0]
-            for axis in ["x", "y", "z"]:
+            for axis in axes["lineage"]:
                 lineage.graph[f"lineage_{axis}"] = lineage.nodes[node][f"cell_{axis}"]
         # else:
         #     # Mastodon does not have the TRACK_{axis}_LOCATION, so we compute the mean
@@ -979,10 +995,79 @@ def _filter_spots_and_tracks(
     graph.remove_nodes_from(to_remove)
 
 
+def _is_3d(graph: nx.DiGraph, num_slices: int | None) -> bool:
+    """
+    Tell whether the spots of a TrackMate file are in 3D.
+
+    TrackMate gives every spot a ``POSITION_Z``, of 0 for a 2D image. The spots are
+    in 3D if one of them has a nonzero ``POSITION_Z``, or if the image has several
+    slices. Without any ``POSITION_Z``, they are in 2D.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph holding all the spots of the file, before filtering, so that the
+        result doesn't depend on the spots and tracks to load.
+    num_slices : int | None
+        Number of slices of the image, or None if the file doesn't give it.
+
+    Returns
+    -------
+    bool
+        True if the spots are in 3D, False if they are in 2D.
+    """
+
+    def is_zero(value: Any) -> bool:
+        # The values of an undeclared attribute are still strings.
+        try:
+            return float(value) == 0
+        except (TypeError, ValueError):
+            return False  # Kept: a z that can't be read could be nonzero.
+
+    z_values = [z for _, z in graph.nodes(data="POSITION_Z") if z is not None]
+    if not z_values:
+        return False
+    if num_slices is not None and num_slices > 1:
+        return True
+    return not all(is_zero(z) for z in z_values)
+
+
+def _remove_z_coordinates(
+    graph: nx.DiGraph,
+    tracks_attributes: list[dict[str, Any]],
+    props_md: PropsMetadata,
+) -> None:
+    """
+    Remove the z coordinates of the spots, edges and tracks of 2D data.
+
+    TrackMate gives them a ``POSITION_Z``, ``EDGE_Z_LOCATION`` and
+    ``TRACK_Z_LOCATION`` of 0 in 2D, which are removed with their declarations.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        The graph holding the spots and edges.
+    tracks_attributes : list[dict[str, Any]]
+        The attributes of the tracks.
+    props_md : PropsMetadata
+        The properties metadata to remove the declarations from.
+    """
+    for _, data in graph.nodes(data=True):
+        data.pop("POSITION_Z", None)
+    for _, _, data in graph.edges(data=True):
+        data.pop("EDGE_Z_LOCATION", None)
+    for attributes in tracks_attributes:
+        attributes.pop("TRACK_Z_LOCATION", None)
+    for feature in ("POSITION_Z", "EDGE_Z_LOCATION", "TRACK_Z_LOCATION"):
+        if props_md._has_prop(feature):
+            props_md._remove_prop(feature)
+
+
 def _parse_model_tag(
     xml_path: str | Path,
     lone_spots: _LoneSpotsOption,
     tracks: _TracksOption,
+    num_slices: int | None = None,
 ) -> tuple[dict[str, str], PropsMetadata, Data]:
     """
     Read an XML file and convert the model data into several graphs.
@@ -1001,12 +1086,16 @@ def _parse_model_tag(
         (``"visible"``), or all (``"all"``).
     tracks : _TracksOption
         Tracks to keep: only the visible ones (``"visible"``), or all (``"all"``).
+    num_slices : int | None, default=None
+        Number of slices of the image, from the settings of the file, or None if
+        unknown. With several slices, the spots are in 3D even if all of them have
+        a ``POSITION_Z`` of 0, see ``_is_3d()``.
 
     Returns
     -------
     tuple[dict[str, str], PropsMetadata, Data]
         A tuple containing the space and time units, the properties metadata
-        and the data of the model.
+        and the data of the model. 2D data has no z coordinate.
 
     Raises
     ------
@@ -1020,8 +1109,7 @@ def _parse_model_tag(
         feature, e.g. ``cell_x`` for ``POSITION_X``.
     KeyError
         If a Track element has no ``TRACK_ID`` attribute.
-        If the file has no ``POSITION_X``, ``POSITION_Y``, ``POSITION_Z`` or
-        ``TRACK_ID`` feature.
+        If the file has no ``POSITION_X``, ``POSITION_Y`` or ``TRACK_ID`` feature.
     """
     props_md = PropsMetadata()
     # Keys of the attributes that the file doesn't declare, by property type.
@@ -1079,9 +1167,15 @@ def _parse_model_tag(
             if element.tag == "Model" and event == "end":
                 break  # We are not interested in the following data.
 
+    # 2D data has no z coordinate. This is decided on all the spots, before filtering,
+    # so that the spots and tracks to load don't change the dimension of the model.
+    is_3d = _is_3d(graph, num_slices)
+
     # The spots and tracks are filtered once all of them are read, since files written
     # by other tools can have the spots after the tracks.
     _filter_spots_and_tracks(graph, lone_spots, tracks, visible_tracks)
+    if not is_3d:
+        _remove_z_coordinates(graph, tracks_attributes, props_md)
 
     # Now that all the values are read, we can infer the data type of the attributes
     # that the file doesn't declare.
@@ -1108,7 +1202,7 @@ def _parse_model_tag(
         ]:
             _update_node_prop_key(lin, key_name, new_key)
         _update_lineage_prop_key(lin, "name", "lineage_name")
-        _update_location_related_props(lin)
+        _update_location_related_props(lin, props_md)
 
         # Adding if each track was present in the 'FilteredTracks' tag
         # because this info is needed when reconstructing TrackMate XMLs
@@ -1264,6 +1358,29 @@ def _get_pixel_size(settings: ET._Element) -> dict[str, float]:
     raise KeyError("The 'ImageData' element is not found in the settings.")
 
 
+def _get_num_slices(settings: ET._Element) -> int | None:
+    """
+    Extract the number of slices of the image of the TrackMate model.
+
+    Parameters
+    ----------
+    settings : ET._Element
+        The XML element containing the settings of the TrackMate model.
+
+    Returns
+    -------
+    int | None
+        The ``nslices`` attribute of the ImageData element, or None if the file
+        doesn't give it as an integer.
+    """
+    for element in settings.iterchildren("ImageData"):
+        try:
+            return int(element.attrib["nslices"])
+        except (KeyError, ValueError):
+            return None
+    return None
+
+
 def _add_missing_position_t(
     data: Data,
     props_md: PropsMetadata,
@@ -1371,6 +1488,14 @@ def read_trackmate_xml(
         If a track has no ``TRACK_ID``, if the file has no Settings element, or if
         its ImageData element is missing or lacks the pixel size or, unless
         `reference_time_prop` is ``"FRAME"``, the frame interval.
+
+    Notes
+    -----
+    TrackMate gives every spot a z coordinate, of 0 for a 2D image. Pycellin keeps
+    it only for 3D data, i.e. when a spot has a nonzero ``POSITION_Z`` or when the
+    image has several slices. Models of 2D data have no ``cell_z``, ``link_z`` or
+    ``lineage_z``, and no pixel depth; `write_trackmate_xml` writes these
+    coordinates back as 0.
     """
     if not _check_literal_type(lone_spots, _LoneSpotsOption):
         raise ValueError(
@@ -1378,13 +1503,14 @@ def read_trackmate_xml(
         )
     if not _check_literal_type(tracks, _TracksOption):
         raise ValueError(f"'tracks' must be 'visible' or 'all', not {tracks!r}.")
-    units, props_md, data = _parse_model_tag(path, lone_spots, tracks)
-
-    # Add in the metadata all the TrackMate info that was not in the
-    # TrackMate XML `Model` tag.
+    # The TrackMate info that is not in the `Model` tag goes in the metadata. The
+    # settings are read first: the number of slices of the image tells 3D data.
     dict_tags = _get_specific_tags(
         path, ["Log", "Settings", "GUIState", "DisplaySettings"]
     )
+    num_slices = _get_num_slices(dict_tags["Settings"])
+    units, props_md, data = _parse_model_tag(path, lone_spots, tracks, num_slices)
+
     pixel_size = _get_pixel_size(dict_tags["Settings"])
     time_step: int | float
     if reference_time_prop == "FRAME":
@@ -1404,7 +1530,12 @@ def read_trackmate_xml(
     metadata["time_step"] = time_step
     metadata["pixel_width"] = pixel_size.get("pixel_width")
     metadata["pixel_height"] = pixel_size.get("pixel_height")
-    metadata["pixel_depth"] = pixel_size.get("pixel_depth")
+    # 2D data has no pixel depth. The voxel depth of the file stays in its settings,
+    # which a TrackMate export writes back.
+    if props_md._has_prop("cell_z"):
+        metadata["pixel_depth"] = pixel_size.get("pixel_depth")
+    else:
+        metadata["pixel_depth"] = None
     # Traceability info.
     metadata["name"] = Path(path).stem
     metadata["file_path"] = path

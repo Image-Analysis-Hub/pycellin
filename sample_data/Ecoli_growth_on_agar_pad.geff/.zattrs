@@ -30,21 +30,10 @@
                 "scaled_unit": null,
                 "type": "space",
                 "unit": "micrometer"
-            },
-            {
-                "max": 0.0,
-                "min": 0.0,
-                "name": "cell_z",
-                "offset": null,
-                "scale": null,
-                "scaled_unit": null,
-                "type": "space",
-                "unit": "micrometer"
             }
         ],
         "directed": true,
         "display_hints": {
-            "display_depth": "cell_z",
             "display_horizontal": "cell_x",
             "display_time": "POSITION_T",
             "display_vertical": "cell_y"
@@ -119,14 +108,6 @@
                 "dtype": "float64",
                 "identifier": "link_y",
                 "name": "Edge Y",
-                "unit": "micrometer",
-                "varlength": false
-            },
-            "link_z": {
-                "description": "Z coordinate of the link, i.e. mean coordinate of its two cells",
-                "dtype": "float64",
-                "identifier": "link_z",
-                "name": "Edge Z",
                 "unit": "micrometer",
                 "varlength": false
             }
@@ -428,14 +409,6 @@
                 "dtype": "float64",
                 "identifier": "cell_y",
                 "name": "Y",
-                "unit": "micrometer",
-                "varlength": false
-            },
-            "cell_z": {
-                "description": "Z coordinate of the cell",
-                "dtype": "float64",
-                "identifier": "cell_z",
-                "name": "Z",
                 "unit": "micrometer",
                 "varlength": false
             },

@@ -84,10 +84,11 @@ def _integrate_label_images_metadata(
     Fill the space unit and pixel size missing from the metadata with a label image's.
 
     The pixel size is read from the TIFF resolution tags, in the unit of the
-    ResolutionUnit tag or, for ImageJ images, in the unit of the ImageJ metadata,
-    which also gives the pixel depth. A resolution without unit gives no physical
-    pixel size: the space unit is then ``"pixel"``, with pixels of size 1. So does a
-    resolution in inches, most likely a print default such as 72 dpi.
+    ResolutionUnit tag (centimeter, millimeter or micrometer) or, for ImageJ images,
+    in the unit of the ImageJ metadata. A resolution without unit or in inches gives
+    no physical pixel size: the space unit is then ``"pixel"``, with pixels of size 1.
+    A resolution in inches is most likely a print default such as 72 dpi, not a pixel
+    size. `read_ctc()` only reads 2D label images, so they give no pixel depth.
 
     Parameters
     ----------
@@ -116,13 +117,10 @@ def _integrate_label_images_metadata(
     resolution_unit = tags["ResolutionUnit"].value if "ResolutionUnit" in tags else 1
     if imagej_unit not in ("", "pixel", "pixels"):
         space_unit = imagej_unit
-        pixel_depth = float(imagej_md.get("spacing", 1.0))
     elif resolution_unit in _RESOLUTION_UNITS:
         space_unit = _RESOLUTION_UNITS[resolution_unit]
-        pixel_depth = 1.0
     else:
         space_unit = "pixel"
-        pixel_depth = 1.0
         calibrated = {"space_unit", "pixel_width", "pixel_height"} <= metadata.keys()
         if resolution_unit == 2 and not calibrated:
             warnings.warn(
@@ -146,7 +144,6 @@ def _integrate_label_images_metadata(
     metadata.setdefault("space_unit", space_unit)
     metadata.setdefault("pixel_width", pixel_sizes[0])
     metadata.setdefault("pixel_height", pixel_sizes[1])
-    metadata.setdefault("pixel_depth", pixel_depth)
 
 
 def _create_metadata(
@@ -178,8 +175,8 @@ def _create_metadata(
         The pixel height in the spatial unit. If None, it is read from the label
         images, if any, or 1.0 is used.
     pixel_depth : float | None, default=None
-        The pixel depth in the spatial unit. If None, it is read from the label
-        images, if any, or 1.0 is used.
+        The pixel depth in the spatial unit. If None, the model has no pixel depth,
+        since `read_ctc()` only reads 2D label images.
     time_unit : str | None, default=None
         The temporal unit of the data.
     time_step : float | None, default=None
@@ -216,7 +213,7 @@ def _create_metadata(
     else:
         metadata["time_step"] = 1
 
-    complete_metadata_flag = [0, 0, 0, 0]
+    complete_metadata_flag = [0, 0, 0]
     if space_unit is not None:
         metadata["space_unit"] = space_unit
         complete_metadata_flag[0] = 1
@@ -226,13 +223,13 @@ def _create_metadata(
     if pixel_height is not None:
         metadata["pixel_height"] = pixel_height
         complete_metadata_flag[2] = 1
+    # 2D data has no pixel depth: only a given one is kept.
     if pixel_depth is not None:
         metadata["pixel_depth"] = pixel_depth
-        complete_metadata_flag[3] = 1
 
     if labels_path is not None:
         metadata["label_images_location"] = labels_path
-    if sum(complete_metadata_flag) < 4:
+    if sum(complete_metadata_flag) < 3:
         if labels_path is not None:
             # Hopefully all label images have the same metadata.
             label_image_path = _get_label_image_paths(labels_path)[0]
@@ -244,8 +241,6 @@ def _create_metadata(
                 metadata["pixel_width"] = 1.0
             if complete_metadata_flag[2] == 0:
                 metadata["pixel_height"] = 1.0
-            if complete_metadata_flag[3] == 0:
-                metadata["pixel_depth"] = 1.0
 
     return metadata
 
@@ -614,9 +609,8 @@ def read_ctc(
     gaps right after division events.
     If only `path` is given, only track topology is read. To load
     cell positions and contours into the model, `labels_path` must also be given.
-    The label images must be in the same format as the CTC format,
-    i.e. a single 2D image per frame with a single label per cell. 3D label
-    images are not supported yet.
+    The label images must follow the CTC format, one image per frame with a single
+    label per cell. Only 2D label images are supported for now.
     The label image names must end in ``<frame_number>.tif`` (e.g. ``000.tif``,
     ``02.tif``, ``0155.tif``, etc.).
     For the space unit and pixel size, priority is given to the values given by the
@@ -650,8 +644,8 @@ def read_ctc(
         The pixel height in the spatial unit. If None and not inferred from the
         label images, 1.0 is used.
     pixel_depth : float | None, default=None
-        The pixel depth in the spatial unit. If None and not inferred from the
-        label images, 1.0 is used.
+        The pixel depth in the spatial unit. If None, the model has no pixel depth,
+        since only 2D label images are supported.
     time_unit : str | None, default=None
         The temporal unit of the data.
     time_step : float | None, default=None
