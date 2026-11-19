@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 
 def _unit_to_dimension(
     prop: Property,
+    time_unit: str | None = None,
 ) -> str:
     """
     Convert a unit to a dimension.
@@ -50,6 +51,9 @@ def _unit_to_dimension(
     ----------
     prop : Property
         The property for which to convert the unit.
+    time_unit : str | None, default=None
+        The time unit of the model. A property that TrackMate and Pycellin don't
+        know, in this unit, is a time, except in frames, which have no dimension.
 
     Returns
     -------
@@ -277,6 +281,8 @@ def _unit_to_dimension(
                     dimension = "LENGTH"
             case None | "frame":
                 dimension = "NONE"
+            case _ if unit == time_unit:
+                dimension = "TIME"
             case _:
                 msg = (
                     f"Cannot infer dimension for property '{name}'. Dimension is "
@@ -335,6 +341,7 @@ def _transform_name(name: str) -> str:
 
 def _convert_prop_to_feat(
     prop: Property,
+    time_unit: str | None = None,
 ) -> dict[str, str]:
     """
     Convert a Pycellin property to a TrackMate feature.
@@ -343,6 +350,8 @@ def _convert_prop_to_feat(
     ----------
     prop : Property
         Property to convert.
+    time_unit : str | None, default=None
+        The time unit of the model, see ``_unit_to_dimension()``.
 
     Returns
     -------
@@ -360,7 +369,7 @@ def _convert_prop_to_feat(
     new_name = _transform_name(prop.identifier)
     trackmate_feat["name"] = new_name
     trackmate_feat["shortname"] = new_name
-    trackmate_feat["dimension"] = _unit_to_dimension(prop)
+    trackmate_feat["dimension"] = _unit_to_dimension(prop, time_unit)
     if _normalize_dtype(prop.dtype) == "int":
         trackmate_feat["isint"] = "true"
     else:
@@ -421,7 +430,9 @@ def _write_FeatureDeclarations(
                         continue  # no values on spots, edges or tracks
                     if prop.identifier == "name" and f_type != "EdgeFeatures":
                         continue  # display name of spots and tracks, not a feature
-                    trackmate_feat = _convert_prop_to_feat(prop)
+                    trackmate_feat = _convert_prop_to_feat(
+                        prop, model.model_metadata.time_unit
+                    )
                     if trackmate_feat:
                         if first_feat_written:
                             xf.write(f"\n{' ' * 8}")

@@ -2488,8 +2488,8 @@ class Model:
                 self.props_metadata._remove_prop(prop.identifier)
             else:
                 raise ValueError(
-                    f"Cannot add '{prop.identifier}' as a {self._describe_kind(prop)}: "
-                    f"it is already declared as a {self._describe_kind(declared)}, "
+                    f"Cannot add '{prop.identifier}' as {self._describe_kind(prop)}: "
+                    f"it is already declared as {self._describe_kind(declared)}, "
                     "with values or a calculator. If it is a cycle property propagated "
                     "to cell lineages, e.g. loaded from an exported file, remove it "
                     "first with model.remove_property(). Otherwise, give the new "
@@ -2570,14 +2570,16 @@ class Model:
         Returns
         -------
         str
-            Description of the property, e.g. "node property of cell lineages".
+            Description of the property, with its article, e.g. "a node property of
+            cell lineages" or "an edge property of cycle lineages".
         """
         lineages = {
             "cell": "cell lineages",
             "cycle": "cycle lineages",
             "both": "cell and cycle lineages",
         }
-        return f"{prop.prop_type} property of {lineages[prop.lineage_type]}"
+        kind = f"{prop.prop_type} property of {lineages[prop.lineage_type]}"
+        return f"{'an' if kind[0] in 'aeiou' else 'a'} {kind}"
 
     def _check_input_props(self, calculator: PropertyCalculator) -> None:
         """

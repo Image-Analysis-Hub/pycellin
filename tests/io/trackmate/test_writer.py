@@ -278,16 +278,22 @@ class TestUnitToDimension:
         assert _unit_to_dimension(prop) == dimension
 
     @pytest.mark.parametrize(
-        ("identifier", "unit", "dimension", "warns"),
+        ("identifier", "unit", "time_unit", "dimension", "warns"),
         [
-            ("my_length", "pixel", "LENGTH", False),
-            ("x", "pixel", "POSITION", False),
-            ("my_count", None, "NONE", False),
-            ("my_frame", "frame", "NONE", False),
-            ("my_time", "min", "NONE", True),
+            ("my_length", "pixel", None, "LENGTH", False),
+            ("x", "pixel", None, "POSITION", False),
+            ("my_count", None, None, "NONE", False),
+            ("my_frame", "frame", None, "NONE", False),
+            ("my_time", "min", None, "NONE", True),
+            # In the time unit of the model, e.g. the time property of trackpy data.
+            ("time", "min", "min", "TIME", False),
+            ("my_time", "s", "min", "NONE", True),
+            ("my_frame", "frame", "frame", "NONE", False),
         ],
     )
-    def test_dimension_from_unit(self, caplog, identifier, unit, dimension, warns):
+    def test_dimension_from_unit(
+        self, caplog, identifier, unit, time_unit, dimension, warns
+    ):
         """Test the dimension given by the unit of a property that TrackMate and
         Pycellin don't know, and the warning when the unit gives none."""
         prop = Property(
@@ -301,7 +307,7 @@ class TestUnitToDimension:
             unit=unit,
         )
         with caplog.at_level(logging.WARNING, logger="pycellin.io.trackmate.writer"):
-            assert _unit_to_dimension(prop) == dimension
+            assert _unit_to_dimension(prop, time_unit) == dimension
         assert ("Cannot infer dimension" in caplog.text) is warns
 
 
