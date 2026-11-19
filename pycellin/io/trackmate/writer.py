@@ -843,6 +843,67 @@ def _update_lineages(lin: CellLineage) -> None:
             pass  # not mandatory
 
 
+def _get_time_interval(model: Model) -> float:
+    """
+    Return the time between two frames written in the TrackMate file.
+
+    It is the ``timeinterval`` of the TrackMate settings kept in the model metadata,
+    when the model was read from a TrackMate file, else the time step of the model,
+    or 1.0 if the model has none.
+
+    Parameters
+    ----------
+    model : Model
+        Model to write.
+
+    Returns
+    -------
+    float
+        Time between two frames, in the time unit of the file.
+    """
+    settings = model.model_metadata.to_dict().get("Settings")
+    if settings:
+        image_data = ET.fromstring(settings).find("ImageData")
+        if image_data is not None and image_data.get("timeinterval"):
+            return float(image_data.get("timeinterval"))
+    return model.model_metadata.time_step or 1.0
+
+
+def _add_missing_time_and_quality(
+    lin: CellLineage, time_interval: float
+) -> tuple[int, int]:
+    """
+    Give a ``POSITION_T`` and a ``QUALITY`` to the spots that have none.
+
+    TrackMate computes features such as the duration and speed of tracks from
+    ``POSITION_T``, and their mean quality from ``QUALITY``, e.g. after a link is
+    deleted in TrackScheme: spots without them make it fail. Spots without
+    ``POSITION_T`` get the time of their frame, as TrackMate computes it, and spots
+    without ``QUALITY`` get -1, the quality TrackMate gives spots added by hand.
+
+    Parameters
+    ----------
+    lin : CellLineage
+        Lineage whose nodes to update, with their ``FRAME`` already set.
+    time_interval : float
+        Time between two frames, as written in the file.
+
+    Returns
+    -------
+    tuple[int, int]
+        Number of spots given a ``POSITION_T``, and number given a ``QUALITY``.
+    """
+    num_times = num_qualities = 0
+    for _, data in lin.nodes(data=True):
+        if data.get("POSITION_T") is None:
+            data["POSITION_T"] = data["FRAME"] * time_interval
+            num_times += 1
+        if data.get("QUALITY") is None:
+            data["QUALITY"] = -1.0
+            num_qualities += 1
+    return num_times, num_qualities
+
+
 def _update_model_data(
     model: Model,
     frame_prop: str,
@@ -866,10 +927,15 @@ def _update_model_data(
     A warning is logged if some cells are missing x and/or y coordinates, in which
     case they are set to 0.0 by default. It names the cells by their ID in the
     model, i.e. before relabeling.
+
+    Spots without ``POSITION_T`` or ``QUALITY`` get one, as TrackMate needs them,
+    and a message at the info level says how many.
     """
     # Track cells with missing position properties: {lineage_id: set of cell IDs}.
     missing_positions = {}
     mapping = id_mapping or {}
+    time_interval = _get_time_interval(model)
+    num_times = num_qualities = 0
 
     for lin_id, lin in model.data.cell_lineages.items():
         nodes_with_missing_pos = _update_nodes(lin, frame_prop)
@@ -878,8 +944,28 @@ def _update_model_data(
             missing_positions[lin.graph["lineage_id"]] = {
                 old_ids.get(node, node) for node in nodes_with_missing_pos
             }
+        times, qualities = _add_missing_time_and_quality(lin, time_interval)
+        num_times += times
+        num_qualities += qualities
         _update_edges(lin)
         _update_lineages(lin)
+
+    if num_times or num_qualities:
+        added = []
+        if num_times:
+            spots = "spot" if num_times == 1 else "spots"
+            added.append(
+                f"a POSITION_T computed from FRAME and the time interval "
+                f"({time_interval}) for {num_times} {spots}"
+            )
+        if num_qualities:
+            spots = "spot" if num_qualities == 1 else "spots"
+            added.append(f"a QUALITY of -1 for {num_qualities} {spots}")
+        logger.info(
+            "TrackMate needs a POSITION_T and a QUALITY on every spot. Added "
+            + " and ".join(added)
+            + "."
+        )
 
     # Show a single summary warning at the end if any positions are missing.
     if missing_positions:
@@ -1133,6 +1219,29 @@ def _add_mandatory_props(props_md: PropsMetadata) -> None:
             unit="NONE",
         )
         props_md._add_prop(visibility_prop)
+    # Spots without them get one in _add_missing_time_and_quality().
+    if not props_md._has_prop("POSITION_T"):
+        time_prop = Property(
+            identifier="POSITION_T",
+            name="T",
+            description="Time of the spot",
+            provenance="TrackMate",
+            prop_type="node",
+            lineage_type="cell",
+            dtype="float",
+        )
+        props_md._add_prop(time_prop)
+    if not props_md._has_prop("QUALITY"):
+        quality_prop = Property(
+            identifier="QUALITY",
+            name="Quality",
+            description="Quality of the detection, -1 for spots added by hand",
+            provenance="TrackMate",
+            prop_type="node",
+            lineage_type="cell",
+            dtype="float",
+        )
+        props_md._add_prop(quality_prop)
 
 
 def _update_location_props(props_md: PropsMetadata) -> None:
@@ -1514,7 +1623,7 @@ def _write_Settings(
                 "pixelwidth": str(metadata.get("pixel_width", 1.0) or 1.0),
                 "pixelheight": str(metadata.get("pixel_height", 1.0) or 1.0),
                 "voxeldepth": str(metadata.get("pixel_depth", 1.0) or 1.0),
-                "timeinterval": str(metadata.get("time_step", 1.0) or 1.0),
+                "timeinterval": str(_get_time_interval(model)),
             },
         )
         xf.write(img_data)
@@ -1692,6 +1801,13 @@ def write_trackmate_xml(
     between frame and timepoint of the other cells, which must be the same for all of
     them. Without frame property, the frames are the timepoints, which start at 0 at
     the earliest cell.
+
+    TrackMate computes features such as the duration and speed of tracks from the
+    ``POSITION_T`` of the spots, and their mean quality from ``QUALITY``, e.g. after
+    an edit in TrackScheme. Spots without them, e.g. from a model read with
+    `read_ctc` or `from_trackpy`, get the time of their frame, ``FRAME`` times the
+    time interval of the file, and a quality of -1, as TrackMate gives spots added by
+    hand.
     """
     _check_up_to_date(model)
     # We don't want to modify the original model.

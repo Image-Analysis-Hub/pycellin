@@ -921,6 +921,51 @@ class TestWriteTrackmateXml:
         spots = ET.parse(str(xml_path)).iter("Spot")
         assert [float(spot.get("VISIBILITY")) for spot in spots] == [1.0, 1.0]
 
+    def test_spots_without_time_and_quality_get_them(self, tmp_path, simple_model):
+        """Test that spots without POSITION_T or QUALITY, e.g. not from TrackMate, get
+        the time of their frame and a quality of -1, both declared, since TrackMate
+        fails to compute track features without them."""
+        simple_model.model_metadata.time_step = 5.0
+        xml_path = tmp_path / "model.xml"
+        write_trackmate_xml(simple_model, xml_path, space_unit="pixel", time_unit="min")
+
+        tree = ET.parse(str(xml_path))
+        spots = list(tree.iter("Spot"))
+        assert [float(spot.get("FRAME")) for spot in spots] == [0.0, 1.0]
+        assert [float(spot.get("POSITION_T")) for spot in spots] == [0.0, 5.0]
+        assert [float(spot.get("QUALITY")) for spot in spots] == [-1.0, -1.0]
+        dimensions = {
+            f.get("feature"): f.get("dimension") for f in tree.iter("Feature")
+        }
+        assert dimensions["POSITION_T"] == "TIME"
+        assert dimensions["QUALITY"] == "QUALITY"
+
+    def test_spot_time_and_quality_kept(self, tmp_path, simple_model):
+        """Test that the POSITION_T and QUALITY of the spots that have them are kept,
+        and only the other spots get computed values."""
+        for identifier in ("POSITION_T", "QUALITY"):
+            simple_model.props_metadata._add_prop(
+                Property(
+                    identifier=identifier,
+                    name=identifier,
+                    description=identifier,
+                    provenance="TrackMate",
+                    prop_type="node",
+                    lineage_type="cell",
+                    dtype="float",
+                )
+            )
+        cell = simple_model.data.cell_lineages[0].nodes[1]
+        cell["POSITION_T"] = 42.0
+        cell["QUALITY"] = 3.5
+        simple_model.model_metadata.time_step = 5.0
+        xml_path = tmp_path / "model.xml"
+        write_trackmate_xml(simple_model, xml_path, space_unit="pixel", time_unit="min")
+
+        spots = list(ET.parse(str(xml_path)).iter("Spot"))
+        assert [float(spot.get("POSITION_T")) for spot in spots] == [42.0, 5.0]
+        assert [float(spot.get("QUALITY")) for spot in spots] == [3.5, -1.0]
+
     def test_hidden_spot_stays_hidden(self, tmp_path):
         """Test that a spot hidden by the spot filters of TrackMate is exported with
         its VISIBILITY of 0, so that it stays hidden."""
