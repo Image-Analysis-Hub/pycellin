@@ -5,7 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Covers commits up to the v0.6.0 tag. Update from there with: git log v0.6.0..dev -->
+<!-- Covers commits up to the v0.6.0 tag, and the uncommitted README badge fix. Update from there with: git log v0.6.0..dev -->
+
+### Maintenance
+
+- **Docs:** fix the README's Documentation Status badge, which showed only its alt text on GitHub: Read the Docs refuses the requests of GitHub's image proxy (HTTP 429). The badge now comes from shields.io, like the other badges, and still reports the build status of the `latest` version
 
 ## [0.6.0] - 2026-11-19
 
