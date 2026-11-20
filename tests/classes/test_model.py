@@ -996,6 +996,16 @@ class TestSetReferenceTimeProp:
         assert two_times_model.get_time_unit() == "frame"
         assert two_times_model.get_property("cycle_duration") is None
 
+    def test_previous_reference_unprotected(self, two_times_model):
+        two_times_model.set_reference_time_prop("frame")
+        protected_props = two_times_model.props_metadata._get_protected_props()
+        assert "frame" in protected_props
+        assert "time" not in protected_props
+
+    def test_same_reference_stays_protected(self, two_times_model):
+        two_times_model.set_reference_time_prop("time")
+        assert "time" in two_times_model.props_metadata._get_protected_props()
+
     def test_properties_added_before_warn(self, two_times_model):
         two_times_model.add_absolute_age()
         two_times_model.add_relative_age()

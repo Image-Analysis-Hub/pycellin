@@ -383,8 +383,8 @@ class Model:
         On top of updating the reference time property, this method:
 
         - protects the new reference time property
-        - unprotects the previous reference time property if it is not ``timepoint``
-          (which is a special property that should always be protected)
+        - unprotects the previous reference time property, unless it is ``timepoint``
+          (which is a special property that should always be protected) or `prop`
         - updates the time step and time unit of the model based on the new
           reference time property
         - sets the unit of the ``cycle_duration``, ``cycle_start_time`` and
@@ -429,7 +429,8 @@ class Model:
         self.model_metadata.reference_time_prop = prop
 
         self.props_metadata._protect_prop(prop)
-        if old_reference_time_prop != "timepoint":
+        # Given again, the reference time property must stay protected.
+        if old_reference_time_prop not in ("timepoint", prop):
             self.props_metadata._unprotect_prop(old_reference_time_prop)
 
         self.set_time_step()
