@@ -996,6 +996,53 @@ class TestSetReferenceTimeProp:
         assert two_times_model.get_time_unit() == "frame"
         assert two_times_model.get_property("cycle_duration") is None
 
+    def test_properties_added_before_warn(self, two_times_model):
+        two_times_model.add_absolute_age()
+        two_times_model.add_relative_age()
+        with pytest.warns(UserWarning) as record:
+            two_times_model.set_reference_time_prop("frame")
+        message = (
+            "Properties 'absolute_age' and 'relative_age' were added before the change "
+            "of reference time property, so they are still computed from 'time' "
+            "instead of 'frame'. Add them again, in this order, to compute them from "
+            "'frame'."
+        )
+        assert [str(warning.message) for warning in record] == [message]
+
+    def test_adding_again_uses_new_reference(self, two_times_model):
+        two_times_model.add_cycle_lineages()
+        two_times_model.add_interdivision_time()
+        two_times_model.update()
+        cycle_lin = two_times_model.data.cycle_lineages[1]
+        in_minutes = dict(cycle_lin.nodes(data="interdivision_time"))
+        with pytest.warns(UserWarning) as record:
+            two_times_model.set_reference_time_prop("frame")
+        message = (
+            "Property 'interdivision_time' was added before the change of reference "
+            "time property, so it is still computed from 'time' instead of 'frame'. "
+            "Add it again to compute it from 'frame'."
+        )
+        assert [str(warning.message) for warning in record] == [message]
+        two_times_model.add_interdivision_time()
+        two_times_model.update()
+        cycle_lin = two_times_model.data.cycle_lineages[1]
+        # 5 min per frame.
+        assert dict(cycle_lin.nodes(data="interdivision_time")) == {
+            cycle_id: duration / 5 for cycle_id, duration in in_minutes.items()
+        }
+        assert two_times_model.get_property("interdivision_time").unit == "frame"
+
+    def test_new_reference_and_its_inputs_not_named(self, two_times_model):
+        # The new reference time property is computed from the previous one on
+        # purpose, and absolute_age already reads the new one.
+        shifted = create_time_property(unit="min", custom_identifier="shifted_time")
+        two_times_model.add_custom_property(Time(shifted, time_prop="time", factor=1))
+        two_times_model.add_absolute_age(time_prop="shifted_time")
+        two_times_model.update()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            two_times_model.set_reference_time_prop("shifted_time")
+
 
 class TestAddPycellinProperties:
     """Test cases for Model.add_pycellin_properties() method."""

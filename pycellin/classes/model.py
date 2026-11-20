@@ -394,6 +394,12 @@ class Model:
         - updates the timepoint calculator property to use the new reference time
           property
 
+        The other properties computed from a time property, e.g. ``interdivision_time``
+        or ``absolute_age``, keep the time property they were given when they were
+        added: by default, the reference time property of that moment. So set the
+        reference time property before adding them. A warning names those added
+        before: add them again to compute them from the new reference time property.
+
         Parameters
         ----------
         prop : str
@@ -403,6 +409,13 @@ class Model:
         ------
         ValueError
             If the specified property is not found in the model's node properties.
+
+        Warns
+        -----
+        PycellinWarning
+            If properties with a calculator are computed from the previous reference
+            time property, except the new one and the properties it is computed from,
+            which read it on purpose.
         """
         node_props = self.get_node_properties()
         if prop not in node_props:
@@ -430,6 +443,7 @@ class Model:
             reference_time_prop=self.model_metadata.reference_time_prop,
         )
         self._updater.register_calculator(calc)
+        self._warn_outdated_time_prop(old_reference_time_prop, prop)
 
     def _compute_time_step(self, variable_time_step: bool = False) -> int | float:
         """
@@ -878,6 +892,65 @@ class Model:
                 "and arguments, to update their units."
             )
         # stacklevel=3 points to the call of rescale_time() or rescale_space().
+        warnings.warn(message, PycellinWarning, stacklevel=_find_stack_level())
+
+    def _warn_outdated_time_prop(self, old_time_prop: str, new_time_prop: str) -> None:
+        """
+        Warn about the properties still computed from the previous reference time.
+
+        A calculator reads the time property it was given when its property was
+        added, listed in its ``INPUT_PROPS``: by default, the reference time property
+        of that moment. So after a change of reference time property, the properties
+        added before are still computed from the previous one. The new reference time
+        property and the properties it is computed from, directly or not, are
+        skipped, since they read the previous one on purpose. The properties are named
+        in the order they were added, which puts the input properties before the
+        properties computed from them.
+
+        Parameters
+        ----------
+        old_time_prop : str
+            The reference time property before the change.
+        new_time_prop : str
+            The reference time property after the change.
+        """
+        if old_time_prop == new_time_prop:
+            return
+        inputs = {
+            prop_id: [input_id for input_id, _, _ in calc.get_input_props().values()]
+            for prop_id, calc in self._updater._calculators.items()
+        }
+        # The new reference time property and the properties it is computed from.
+        sources: set[str] = set()
+        to_visit = [new_time_prop]
+        while to_visit:
+            prop_id = to_visit.pop()
+            if prop_id in inputs and prop_id not in sources:
+                sources.add(prop_id)
+                to_visit.extend(inputs[prop_id])
+        outdated = [
+            prop_id
+            for prop_id in self.props_metadata.properties
+            if prop_id in inputs
+            and prop_id not in sources
+            and old_time_prop in inputs[prop_id]
+        ]
+        if not outdated:
+            return
+        names = [f"'{prop_id}'" for prop_id in outdated]
+        if len(names) == 1:
+            message = (
+                f"Property {names[0]} was added before the change of reference time "
+                f"property, so it is still computed from '{old_time_prop}' instead of "
+                f"'{new_time_prop}'. Add it again to compute it from '{new_time_prop}'."
+            )
+        else:
+            message = (
+                f"Properties {', '.join(names[:-1])} and {names[-1]} were added before "
+                "the change of reference time property, so they are still computed "
+                f"from '{old_time_prop}' instead of '{new_time_prop}'. Add them again, "
+                f"in this order, to compute them from '{new_time_prop}'."
+            )
         warnings.warn(message, PycellinWarning, stacklevel=_find_stack_level())
 
     def _multiply_prop_values(

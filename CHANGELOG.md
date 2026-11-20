@@ -5,10 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-<!-- Covers commits up to the v0.6.0 tag, and the uncommitted README badge fix. Update from there with: git log v0.6.0..dev -->
+<!-- Covers commits up to 6dfad19 (the README badge fix, merged from main), and the uncommitted Ruff 0.17.6 pin and set_reference_time_prop() warning. Update from there with: git log 6dfad19..dev -->
+
+### Changed
+
+- **Model:** `set_reference_time_prop()` names in a warning the properties added before it that are still computed from the previous reference time property, e.g. `interdivision_time` or `absolute_age`: they keep the time property of the moment they were added. Add them again to compute them from the new one. The properties the new reference time property is computed from are left out, since they read the previous one on purpose
 
 ### Maintenance
 
+- **CI:** bump Ruff from 0.17.5 to 0.17.6 in the Style workflow, the version now bundled with the VS Code extension. It formats the code as 0.17.5 did and reports nothing new
 - **Docs:** fix the README's Documentation Status badge, which showed only its alt text on GitHub: Read the Docs refuses the requests of GitHub's image proxy (HTTP 429). The badge now comes from shields.io, like the other badges, and still reports the build status of the `latest` version
 
 ## [0.6.0] - 2026-11-19
