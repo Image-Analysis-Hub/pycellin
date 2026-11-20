@@ -3,7 +3,7 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/pycellin.svg)](https://python.org)
 [![License](https://img.shields.io/pypi/l/pycellin.svg)](https://github.com/Image-Analysis-Hub/pycellin/blob/main/LICENSE)
 [![Actions Status](https://github.com/Image-Analysis-Hub/pycellin/workflows/Test/badge.svg)](https://github.com/Image-Analysis-Hub/pycellin/actions)
-[![Documentation Status](https://readthedocs.org/projects/pycellin/badge/?version=latest)](https://pycellin.readthedocs.io/)
+[![Documentation Status](https://img.shields.io/readthedocs/pycellin/latest)](https://pycellin.readthedocs.io/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 </br>
